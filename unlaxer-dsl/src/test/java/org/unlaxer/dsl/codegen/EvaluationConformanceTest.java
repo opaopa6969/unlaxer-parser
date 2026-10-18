@@ -23,11 +23,11 @@ public class EvaluationConformanceTest {
         Path classes=temporary.newFolder().toPath();var compiler=ToolProvider.getSystemJavaCompiler();var diagnostics=new DiagnosticCollector<JavaFileObject>();
         try(var manager=compiler.getStandardFileManager(diagnostics,null,null)){assertTrue(diagnostics.getDiagnostics().toString(),compiler.getTask(null,manager,diagnostics,List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",classes.toString()),null,units).call());}
         if(grammarName.equals("AutoEval")) {
-            for(String obligation:List.of("convertValue", "evalManual", "evalUnknown")) {
+            for(String obligation:List.of("convertValue", "evalManual", "evalUnknown", "evalLeaf")) {
                 String incomplete=Files.readString(FIXTURES.resolve(probeFile));
                 if(obligation.equals("convertValue")) incomplete=incomplete.replaceAll("(?s)    @Override protected Object convertValue\\(Object value\\) \\{.*?\\n    \\}\\n", "");
                 else if(obligation.equals("evalManual")) incomplete=incomplete.replaceAll("(?s)    @Override protected Object evalManual\\(AutoEvalAST.Manual node\\) \\{.*?\\n    \\}\\n", "");
-                else incomplete=incomplete.replaceAll("(?m)^    @Override protected Object evalUnknown.*\\n", "");
+                else incomplete=incomplete.replaceAll("(?m)^    @Override protected Object "+obligation+".*\\n", "");
                 var missing=new ArrayList<>(units.subList(0,units.size()-1));missing.add(source("org.example.autoeval.Probe",incomplete));
                 var problems=new DiagnosticCollector<JavaFileObject>();
                 try(var manager=compiler.getStandardFileManager(problems,null,null)) {
@@ -69,16 +69,18 @@ public class EvaluationConformanceTest {
         var grammar=UBNFMapper.parse(Files.readString(FIXTURES.resolve(grammarName+".ubnf"))).grammars().get(0);Path generated=Files.createDirectory(dir.resolve("generated"));
         for(var file:new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar)){assertEquals(file.relativePath(),file.content(),Files.readString(nativeOut.resolve(file.relativePath())));Files.writeString(generated.resolve(file.relativePath()),file.content());}
         String grammarText=Files.readString(FIXTURES.resolve(grammarName+".ubnf"));
+        var javaReport=org.unlaxer.dsl.impact.ApiImpact.compare("java",grammarText,grammarText);
+        assertTrue(javaReport.toJson(),javaReport.ok()); assertFalse(javaReport.hasChanges());
         String nativeImpact=run(List.of(repo.resolve("rust/target/debug/unlaxer").toString(),"impact","--target","rust","--before",FIXTURES.resolve(grammarName+".ubnf").toAbsolutePath().normalize().toString(),"--after",FIXTURES.resolve(grammarName+".ubnf").toAbsolutePath().normalize().toString()),dir);
         assertEquals("actual API schema",JsonParser.parseString(org.unlaxer.dsl.impact.ApiImpact.compare("rust",grammarText,grammarText).toJson()),JsonParser.parseString(nativeImpact));
         var api=org.unlaxer.dsl.impact.ApiImpact.schema("rust",grammarText);
         assertTrue(api.methods().stream().anyMatch(m->m.name().equals("convert_value")&&m.required()));
-        assertTrue(api.methods().stream().anyMatch(m->m.name().equals(grammarName.equals("AutoEval")?"eval_literal":"eval_single")&&!m.required()));
+        assertTrue(api.methods().stream().anyMatch(m->m.name().equals(grammarName.equals("AutoEval")?"eval_leaf":"eval_single")&&!m.required()));
         Files.writeString(dir.resolve("main.rs"),Files.readString(FIXTURES.resolve(probeFile)));
         Files.writeString(dir.resolve("Cargo.toml"),"[package]\nname=\"evaluation-probe\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[[bin]]\nname=\"probe\"\npath=\"main.rs\"\n[dependencies]\nunlaxer-runtime={path=\""+repo.resolve("rust/unlaxer-runtime")+"\"}\nserde_json=\"1\"\n");
         run(List.of("cargo","run","--quiet","--manifest-path",dir.resolve("Cargo.toml").toString(),"--target-dir",repo.resolve("rust/target/evaluation-probe").toString(),"--",FIXTURES.resolve(casesFile).toAbsolutePath().normalize().toString()),dir);
         if(grammarName.equals("AutoEval")) {
-            for(String obligation:List.of("convert_value", "eval_manual", "eval_unknown")) {
+            for(String obligation:List.of("convert_value", "eval_manual", "eval_unknown", "evaluate_literal")) {
                 String incomplete=Files.readString(FIXTURES.resolve(probeFile)).replaceAll("(?m)^    fn "+obligation+".*\\n", "");Files.writeString(dir.resolve("main.rs"),incomplete);
                 Path log=temporary.newFile().toPath();
                 var process=new ProcessBuilder("cargo","check","--quiet","--manifest-path",dir.resolve("Cargo.toml").toString(),"--target-dir",repo.resolve("rust/target/evaluation-probe").toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();

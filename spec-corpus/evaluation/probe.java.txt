@@ -24,7 +24,7 @@ public final class Probe extends AutoEvalEvaluator<Object> {
         events.add("binary:"+op);if(((Number)right).longValue()==13)throw new IllegalArgumentException("binary failure");return ((Number)left).longValue()+((Number)right).longValue();
     }
     public static JsonObject invalidBinary() {
-        return run(new AutoEvalAST.Binary(new AutoEvalAST.Literal("1"),List.of("+"),List.of()));
+        return run(new AutoEvalAST.Binary(new AutoEvalAST.Leaf("1"),List.of("+"),List.of()));
     }
     public static JsonObject run(AutoEvalAST ast) {
         var probe = new Probe(); var out = new JsonObject();
