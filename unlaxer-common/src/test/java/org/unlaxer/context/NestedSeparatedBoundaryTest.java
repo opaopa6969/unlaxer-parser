@@ -141,4 +141,72 @@ public class NestedSeparatedBoundaryTest {
             }
         }
     }
+    @Test public void separatedFailureResetSameContextFallbackAndOuterRollbackMatchSharedOracle() throws Exception {
+        var rows=Files.readAllLines(Path.of("../conformance/nested-separated/reset.tsv"))
+                .stream().filter(row->!row.startsWith("#")&&!row.isBlank()).toList();
+        assertEquals(8,rows.size());
+        var actual=new java.util.ArrayList<String>();
+        var expected=new java.util.ArrayList<String>();
+        for(var memo:Memoization.values()) for(var diagnostics:ParseOptions.Diagnostics.values()) for(String row:rows) {
+            var fields=row.split("\t");
+            String label=fields[1]+"\t"+fields[2]+"\t"+memo+"\t"+diagnostics;
+            Parser parser=input(Kind.LIST,new Chain(input(Kind.VALUE,new WordParser("a")),
+                    new ZeroOrMore(new Chain(wrap(Kind.SEPARATOR,new WordParser(",")),input(Kind.VALUE,new WordParser("a"))))));
+            try(var context=ParseContext.withOptions(StringSource.createRootSource(decode(fields[3])),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                context.getCurrent().setResetMatchedWithConsumed(Boolean.parseBoolean(fields[2]));
+                context.beginPreservingMatched(parser);
+                var parsed=parser.parse(context,TokenKind.valueOf(fields[1]),false);
+                String inner=parsed.isSucceeded()+"\t"+context.position()+"\t"+context.matchedPosition()
+                        +"\t"+context.getCurrent().isResetMatchedWithConsumed()+"\t"+context.getCurrent().getTokens().isEmpty();
+                var fallback=new WordParser("?").parse(context);
+                inner+="\t"+fallback.isSucceeded()+"\t"+context.position()+"\t"+context.matchedPosition();
+                context.rollback(parser);
+                actual.add(label+"\t"+inner+"\t"+context.position()+"\t"+context.matchedPosition()
+                        +"\t"+context.getCurrent().isResetMatchedWithConsumed()+"\t"+context.getCurrent().getTokens().isEmpty());
+                expected.add(label+"\t"+fields[4]+"\t"+fields[5]+"\t"+fields[6]+"\t"+fields[7]+"\ttrue\t"+fields[9]+"\t"+fields[10]+"\t"+fields[11]+"\t0\t0\t"+fields[8]+"\ttrue");
+                assertEquals("outer frame restored",1,context.getTokenStack().size());
+            }
+        }
+        Files.createDirectories(Path.of("target"));
+        Files.write(Path.of("target/nested-separated-reset-java.tsv"),actual);
+        assertEquals(48,actual.size());
+        assertEquals("all observations recorded before checking reset contract",expected,actual);
+    }
+    private static Token snapshotNode(Parser parser,List<Token> children) {
+        return new Token(TokenKind.consumed,StringSource.createRootSource(""),parser,TokenList.of(children));
+    }
+    @Test public void separatorSnapshotVisitDepthLimitsAndOpaqueMapperValidationMatchSharedOracle()throws Exception {
+        var actual=new ArrayList<String>();var expected=new ArrayList<String>();
+        for(String row:Files.readAllLines(Path.of("../conformance/nested-separated/snapshot-limits.tsv"))) {
+            if(row.startsWith("#"))continue;var e=row.split("\t");int size=Integer.parseInt(e[2]);
+            Parser marker=wrap(Kind.SEPARATOR,new Chain());Parser scalar=input(Kind.VALUE,new Chain());
+            var children=new ArrayList<Token>();
+            if(e[1].equals("visits")) {
+                children.add(snapshotNode(scalar,List.of()));
+                for(int i=0;i<size;i++)children.add(snapshotNode(marker,List.of()));
+            } else if(e[1].equals("depth")) {
+                Token child=snapshotNode(marker,List.of());
+                for(int i=0;i<size;i++)child=snapshotNode(new Chain(),List.of(child));
+                children.add(child);
+            } else {
+                Token value=snapshotNode(scalar,List.of());Token child=value;
+                for(int i=0;i<size;i++)child=snapshotNode(new Chain(),List.of(child));
+                Token separator=snapshotNode(marker,List.of(child));
+                children.add(snapshotNode(scalar,List.of()));children.add(separator);
+                assertSame(child,separator.getOriginalChildren().get(0));
+                assertEquals("V@0:0:~[]",canonical(CaptureSnapshot.from(value)));
+            }
+            Token root=snapshotNode(wrap(Kind.LIST,new Chain()),children);String snapshot;
+            try {var value=CaptureSnapshot.from(root);snapshot="OK:"+value.children().size();assertEquals("",value.text());assertEquals(0,value.startCP());assertEquals(0,value.endCP());}
+            catch(CaptureSnapshot.SnapshotException failure){snapshot=failure.error().name();}
+            String guard;
+            try {org.unlaxer.mapper.MappingGuard.prepare(root);guard="OK";}
+            catch(IllegalArgumentException failure){guard=failure.getMessage().split(":",2)[0];}
+            actual.add(e[0]+"\t"+snapshot+"\t"+guard);expected.add(e[0]+"\t"+e[3]+"\t"+e[4]);
+        }
+        Files.write(Path.of("target/nested-separated-snapshot-limits-java.tsv"),actual);
+        assertEquals(5,actual.size());assertEquals(expected,actual);
+    }
+
 }

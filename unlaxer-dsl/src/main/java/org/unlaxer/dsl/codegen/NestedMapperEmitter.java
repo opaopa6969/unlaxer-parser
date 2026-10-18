@@ -18,6 +18,7 @@ final class NestedMapperEmitter {
             int visits = 0;
             while (!pending.isEmpty()) {
                 var current = pending.pop();
+                guardVisit(current.getKey());
                 if (++visits > 65536 || current.getValue() >= 256) throw new IllegalArgumentException("nested capture traversal limit");
                 if (current.getKey().parser instanceof org.unlaxer.parser.combinator.CaptureBoundaryParser) {
                     if (boundary != null) throw new IllegalArgumentException("multiple nested capture boundaries");
@@ -28,7 +29,16 @@ final class NestedMapperEmitter {
                 }
             }
             if (boundary == null) throw new IllegalArgumentException("missing nested capture boundary");
-            return org.unlaxer.capture.CaptureSnapshot.from(boundary);
+            var snapshot = org.unlaxer.capture.CaptureSnapshot.from(boundary);
+            var elements = new java.util.ArrayDeque<org.unlaxer.capture.CaptureSnapshot.Element>();
+            elements.push(snapshot);
+            while (!elements.isEmpty()) {
+                var element = elements.pop();
+                if (MAPPING_GUARD != null) MAPPING_GUARD.chargeWork(1L + element.children().size());
+                if (MAPPING_GUARD != null) MAPPING_GUARD.chargeText(element.text());
+                elements.addAll(element.children());
+            }
+            return snapshot;
         }
         private static String nestedText(org.unlaxer.capture.CaptureSnapshot.Element value) {
             if (value.kind() != org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind.VALUE) throw new IllegalArgumentException("expected nested value boundary");
@@ -57,6 +67,7 @@ final class NestedMapperEmitter {
             int visits = 0;
             while (!pending.isEmpty()) {
                 var current = pending.pop();
+                guardVisit(current.getKey());
                 if (++visits > 65536 || current.getValue() >= 256) throw new IllegalArgumentException("nested projection traversal limit");
                 Token token = current.getKey();
                 if (token.parser instanceof org.unlaxer.parser.combinator.CaptureBoundaryParser boundary && boundary.boundaryKind() == org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind.SEPARATOR) continue;
@@ -80,6 +91,7 @@ final class NestedMapperEmitter {
             int visits = 0;
             while (!pending.isEmpty()) {
                 var current = pending.pop();
+                guardVisit(current.getKey());
                 if (++visits > 65536 || current.getValue() >= 256) throw new IllegalArgumentException("nested projection traversal limit");
                 Object projected = map.apply(current.getKey());
                 if (projected != null) {

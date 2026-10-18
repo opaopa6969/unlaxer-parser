@@ -22,6 +22,9 @@ fn wrapped(name: &str) -> Expr {
     let child = Expr::Custom(recursive);
     match name {
         "chain" => child,
+        "input-boundary" => {
+            Expr::InputCaptureBoundary(unlaxer_runtime::capture_tree::Kind::Value, Box::new(child))
+        }
         "match-only" => child.match_only(),
         "peg" => child.ahead(),
         "capture" => child.capture_owned("inside"),

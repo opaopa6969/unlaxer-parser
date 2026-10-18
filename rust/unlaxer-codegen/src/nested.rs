@@ -77,7 +77,14 @@ pub(crate) fn mapped(
 pub(crate) const HELPERS: &str = r#"
 fn nested_capture(tree: &Tree, capture: &unlaxer_runtime::Capture) -> Result<unlaxer_runtime::capture_tree::Element, String> {
     if capture.nodes.len() != 1 { return Err(format!("invalid nested capture {} at {}..{}", capture.name, capture.span.start, capture.span.end)); }
-    unlaxer_runtime::capture_tree::snapshot(tree, capture.nodes[0]).map_err(|error| format!("invalid nested capture {} at {}..{}: {error:?}", capture.name, capture.span.start, capture.span.end))
+    let snapshot = unlaxer_runtime::capture_tree::snapshot(tree, capture.nodes[0]).map_err(|error| format!("invalid nested capture {} at {}..{}: {error:?}", capture.name, capture.span.start, capture.span.end))?;
+    let mut pending = vec![&snapshot];
+    while let Some(value) = pending.pop() {
+        tree.charge_work(1 + value.children().len())?;
+        tree.charge_text_bytes(value.text().len())?;
+        pending.extend(value.children());
+    }
+    Ok(snapshot)
 }
 fn nested_text(value: &unlaxer_runtime::capture_tree::Element) -> Result<String, String> {
     if value.kind() != unlaxer_runtime::capture_tree::Kind::Value { return Err("expected nested value boundary".into()); }
@@ -103,6 +110,7 @@ fn nested_source_nodes(tree: &Tree, root: usize) -> Result<Vec<usize>, String> {
     let mut values = Vec::new();
     let mut visits = 0usize;
     while let Some((id, depth)) = pending.pop() {
+        tree.visit(id)?;
         visits += 1;
         if visits > 65536 || depth >= 256 { return Err("nested projection traversal limit".into()); }
         let node = tree.nodes.get(id).ok_or("invalid nested projection node")?;

@@ -65,6 +65,12 @@ manual evaluator を検証する。mixed、透過 rule alias/recursive helper、
 consumer を同じ入力で比較し、全生成 Rust file の byte 一致と memo 2種 × diagnostics
 3種の結果を確認する。`conformance/nested-separated/` は状態/outer rollback、
 各 list 位置の sticky resource abort、一般 Generated/Projected snapshot の共有 oracle。
+`reset.tsv` は token 4種 × 初期 reset 2種 × memo 2種 × diagnostics 3種で、
+構文失敗後の同 context での fallback と outer rollback による初期 reset 復元を確認する。
+`snapshot-limits.tsv` は separator marker 自体を含めた 65,536 visits と depth 256 の
+境界値を確認する。opaque 内部は snapshot が走査・コピーしないためその予算の対象外だが、
+生成 mapper の MappingGuard は内部も検証する。同じ深い内部 CST を snapshot は除外し、
+mapper guard は depth 超過として拒否する対照を Java/Rust で固定する。
 通常 child callback exception の一般 parser cleanup は #649 の境界を使用する。
 `OrdinaryParserExceptionConformanceTest` は typed nested separated の first item /
 separator / tail を故障させ、Java の元例外同一性、abandoned/manual frame、登録 state /

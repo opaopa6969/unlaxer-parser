@@ -1,0 +1,6 @@
+# id	shape	size	snapshot	mapperGuard
+visits-exact	visits	65534	OK:1	OK
+visits-over	visits	65535	LIMIT	OK
+depth-exact	depth	254	OK:0	OK
+depth-over	depth	255	LIMIT	E-MAPPING-LIMIT
+opaque-depth	opaque	300	OK:1	E-MAPPING-LIMIT

@@ -1,3 +1,4 @@
+use unlaxer_runtime::token::TokenKind;
 use unlaxer_runtime::{
     capture_tree::{self, Element, Kind},
     Diagnostics, Expr, Memoization, ParseContext, ParseOptions, ParseResult,
@@ -444,4 +445,190 @@ fn memo_success_replays_opaque_separator_and_copies_original_boundaries() {
             c.parse_shared_grammar(&grammar, 0, false).unwrap();
         }
     }
+}
+
+#[test]
+fn separated_failure_reset_same_context_fallback_and_outer_rollback_match_shared_oracle() {
+    let rows: Vec<_> = include_str!("../../../conformance/nested-separated/reset.tsv")
+        .lines()
+        .filter(|row| !row.starts_with('#') && !row.is_empty())
+        .collect();
+    assert_eq!(rows.len(), 8);
+    let mut actual = Vec::new();
+    let mut expected = Vec::new();
+    for (memo, memo_name) in [
+        (Memoization::Off, "OFF"),
+        (Memoization::SafeFailures, "SAFE_FAILURES"),
+    ] {
+        for (diagnostics, diagnostic_name) in [
+            (Diagnostics::Auto, "AUTO"),
+            (Diagnostics::Detailed, "DETAILED"),
+            (Diagnostics::DetailedOnFailure, "DETAILED_ON_FAILURE"),
+        ] {
+            for row in &rows {
+                let f: Vec<_> = row.split('\t').collect();
+                let label = format!("{}\t{}\t{memo_name}\t{diagnostic_name}", f[1], f[2]);
+                let input = decode(f[3]);
+                let mut c = ParseContext::with_options(
+                    &input,
+                    ParseOptions::with_memoization(memo).with_diagnostics(diagnostics),
+                );
+                c.set_reset_matched_with_consumed(f[2] == "true");
+                let item = || Expr::InputCaptureBoundary(Kind::Value, Box::new(Expr::literal("a")));
+                let parser = Expr::InputCaptureBoundary(
+                    Kind::List,
+                    Box::new(Expr::sequence([
+                        item(),
+                        Expr::sequence([boundary(Kind::Separator, Expr::literal(",")), item()])
+                            .repeat_java(0, None),
+                    ])),
+                );
+                let mut inner = String::new();
+                let rollback: Result<(), _> = c.transaction(|c| {
+                    let kind = match f[1] {
+                        "consumed" => TokenKind::Consumed,
+                        "matchOnly" => TokenKind::MatchOnly,
+                        "virtualTokenConsumed" => TokenKind::VirtualConsumed,
+                        "virtualTokenMatchOnly" => TokenKind::VirtualMatchOnly,
+                        _ => panic!("unknown kind"),
+                    };
+                    let parsed = c.parse_with_token_mode(&parser, kind, false);
+                    inner = format!(
+                        "{}\t{}\t{}\t{}\t{}",
+                        parsed.is_ok(),
+                        c.position(),
+                        c.matched_position(),
+                        c.reset_matched_with_consumed(),
+                        c.node(0).is_none()
+                    );
+                    let fallback = c.parse(&Expr::literal("?"));
+                    inner.push_str(&format!(
+                        "\t{}\t{}\t{}",
+                        fallback.is_ok(),
+                        c.position(),
+                        c.matched_position()
+                    ));
+                    Err(c.error("force parent rollback"))
+                });
+                assert!(rollback.is_err());
+                actual.push(format!(
+                    "{label}\t{inner}\t{}\t{}\t{}\t{}",
+                    c.position(),
+                    c.matched_position(),
+                    c.reset_matched_with_consumed(),
+                    c.node(0).is_none()
+                ));
+                expected.push(format!(
+                    "{label}\t{}\t{}\t{}\t{}\ttrue\t{}\t{}\t{}\t0\t0\t{}\ttrue",
+                    f[4], f[5], f[6], f[7], f[9], f[10], f[11], f[8]
+                ));
+            }
+        }
+    }
+    let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../target/nested-separated-reset-rust.tsv");
+    std::fs::create_dir_all(output.parent().unwrap()).unwrap();
+    std::fs::write(output, actual.join("\n") + "\n").unwrap();
+    assert_eq!(actual.len(), 48);
+    assert_eq!(
+        actual, expected,
+        "all observations recorded before checking reset contract"
+    );
+}
+
+#[test]
+fn separator_snapshot_visit_depth_limits_and_opaque_mapper_validation_match_shared_oracle() {
+    fn node(tree: &mut unlaxer_runtime::Tree, rule: usize, children: Vec<usize>) -> usize {
+        let id = tree.nodes.len();
+        tree.nodes.push(unlaxer_runtime::Node {
+            rule,
+            span: unlaxer_runtime::Span { start: 0, end: 0 },
+            children,
+            captures: vec![],
+        });
+        id
+    }
+    fn boundary_rule(kind: Kind) -> usize {
+        let mut context = ParseContext::new("");
+        let parsed = context
+            .parse(&Expr::CaptureBoundary(kind, Box::new(Expr::Eof)))
+            .unwrap();
+        context.node(parsed.nodes[0]).unwrap().rule
+    }
+    let value_rule = boundary_rule(Kind::Value);
+    let separator_rule = boundary_rule(Kind::Separator);
+    let list_rule = boundary_rule(Kind::List);
+    let mut actual = Vec::new();
+    let mut expected = Vec::new();
+    for row in include_str!("../../../conformance/nested-separated/snapshot-limits.tsv")
+        .lines()
+        .filter(|r| !r.starts_with('#'))
+    {
+        let e: Vec<_> = row.split('\t').collect();
+        let size: usize = e[2].parse().unwrap();
+        let mut tree = unlaxer_runtime::parse(
+            &[unlaxer_runtime::Rule {
+                name: "root",
+                expression: Expr::Eof,
+            }],
+            0,
+            false,
+            "",
+        )
+        .unwrap();
+        tree.nodes.clear();
+        let mut children = Vec::new();
+        match e[1] {
+            "visits" => {
+                children.push(node(&mut tree, value_rule, vec![]));
+                for _ in 0..size {
+                    children.push(node(&mut tree, separator_rule, vec![]));
+                }
+            }
+            "depth" => {
+                let mut child = node(&mut tree, separator_rule, vec![]);
+                for _ in 0..size {
+                    child = node(&mut tree, 0, vec![child]);
+                }
+                children.push(child);
+            }
+            "opaque" => {
+                let value = node(&mut tree, value_rule, vec![]);
+                let mut child = value;
+                for _ in 0..size {
+                    child = node(&mut tree, 0, vec![child]);
+                }
+                let separator = node(&mut tree, separator_rule, vec![child]);
+                children.push(node(&mut tree, value_rule, vec![]));
+                children.push(separator);
+                assert_eq!(tree.nodes[separator].children, vec![child]);
+                assert_eq!(
+                    canonical(&capture_tree::snapshot(&tree, value).unwrap()),
+                    "V@0:0:~[]"
+                );
+            }
+            _ => panic!("unknown shape"),
+        }
+        tree.root = node(&mut tree, list_rule, children);
+        let snapshot = match capture_tree::snapshot(&tree, tree.root) {
+            Ok(value) => {
+                assert_eq!(value.text(), "");
+                assert_eq!(value.span(), unlaxer_runtime::Span { start: 0, end: 0 });
+                format!("OK:{}", value.children().len())
+            }
+            Err(capture_tree::Error::Limit) => "LIMIT".into(),
+            Err(error) => panic!("unexpected snapshot error {error:?}"),
+        };
+        let guard = match unlaxer_runtime::mapping::Context::new(&tree, 1) {
+            Ok(_) => "OK".into(),
+            Err(error) => error.split(':').next().unwrap().to_owned(),
+        };
+        actual.push(format!("{}\t{snapshot}\t{guard}", e[0]));
+        expected.push(format!("{}\t{}\t{}", e[0], e[3], e[4]));
+    }
+    let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../target/nested-separated-snapshot-limits-rust.tsv");
+    std::fs::write(output, actual.join("\n") + "\n").unwrap();
+    assert_eq!(actual.len(), 5);
+    assert_eq!(actual, expected);
 }
