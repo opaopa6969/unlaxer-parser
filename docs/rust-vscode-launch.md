@@ -12,7 +12,7 @@
 
 一般の生成拡張では `tinycalcLsp` を生成した `<name>Lsp` へ置き換える。実行ファイル名はPATHからも検索できる。引数は `server.rustLspArgs` / `server.rustDapArgs` の文字列配列へ渡す。コマンド文字列のshell展開は行わないため、空白を含むパスもそのまま指定する。
 
-初期化応答の待機上限は `server.startupTimeoutMs`（既定30000ms、1000〜300000ms）で設定できる。応答しないserverも、設定変更・再起動・拡張終了時には初期化待ちを中断して所有processを終了する。
+初期化応答の待機上限は `server.startupTimeoutMs`（既定30000ms、1000〜300000ms）で設定できる。応答しないserverも、設定変更・再起動・拡張終了時には初期化待ちを中断して所有processを終了する。 初期化応答だけで開始完了とは扱わず、`initialized` 通知を含む client の開始処理が完了してから通常の LSP shutdown を許可する。開始途中の送信失敗・中断では所有 process を終了し、失敗した開始の後も明示的に再起動できる。
 
 設定変更時にLSPを再起動し、以降に作るDAP sessionは選択されたbackendを使用する。開始済みのdebug sessionはそのまま継続する。コマンドパレットの「Restart Language Server」で明示的にも再起動できる。空のRust実行ファイル設定・未知のbackend・不正な引数は起動前に拒否する。異常終了時の自動再起動は3分以内に5回までとし、繰り返す場合は設定を修正して明示的に再起動する。
 
@@ -40,7 +40,7 @@ TinyCalc と新規生成する拡張は VS Code 1.97.2 以上を必要とする�
 xvfb-run -a npm run test:vsix -- target/tinycalc.vsix
 ```
 
-配布VSIXを一時directoryへ展開し、実際の拡張hostでJava/Rust両方を起動する。空白を含む実行パス、補完、同期後hover、既定definition非提供、Unicode診断、AST/token DAP、異常終了からの再起動、設定不正からの復帰、停止時のchild process終了を確認する。初期化に応答せずTERMも無視するfixtureを使い、timeout・設定修正・deactivate時の中断と強制終了、未処理Promise rejectionがないことも検査する。観測値は `target/ide-java.json` と `target/ide-rust.json` に保存し、両者を比較する。ユーザーのVS Code profileは使わない。
+配布VSIXを一時directoryへ展開し、実際の拡張hostでJava/Rust両方を起動する。空白を含む実行パス、補完、同期後hover、既定definition非提供、Unicode診断、AST/token DAP、異常終了からの再起動、設定不正からの復帰、停止時のchild process終了を確認する。初期化に応答せずTERMも無視するfixtureを使い、timeout・設定修正・deactivate時の中断と強制終了、未処理Promise rejectionがないことも検査する。実 backend の初期化応答後に writer を破棄済み Node stream へ差し替える試験では、reader の close 通知より先に送信失敗が届く順序を再現し、開始途中の shutdown 禁止・開始失敗の通知・再起動後の LSP 復旧を確認する。この注入は試験内に限り、backend の障害そのものを再現したとは扱わない。観測値は `target/ide-java.json` と `target/ide-rust.json` に保存し、両者を比較する。ユーザーのVS Code profileは使わない。
 
 生成DAP launcherは `disconnect` の応答を書き出してflushしてからtransportを終了する。Java/Rustとも初期化前の切断も受理し、正常切断・相手EOFでは終了code0となる。入力を閉じずに応答を待つclientでもJavaの所有workerが残らず、後続sessionは新adapterで開始できる。
 

@@ -71,6 +71,23 @@ public class InitRunnerTest {
     }
 
     @Test
+    public void testGeneratedClientMatchesPackagedLifecycle() throws IOException {
+        Path out = tmp.resolve("tinycalc");
+        var options = new InitCliParser.InitOptions("TinyCalc",
+            "org.unlaxer.tinycalc.generated", null, ".tcalc", out.toString(),
+            null, true, false, false);
+        int rc = InitRunner.run(options, new PrintStream(new ByteArrayOutputStream()),
+            new PrintStream(new ByteArrayOutputStream()));
+        assertEquals(0, rc);
+        String generated = Files.readString(out.resolve("vscode-extension/src/extension.ts"));
+        String packaged = Files.readString(Path.of("tinycalc-vscode/src/extension.ts"));
+        // Template section markers can leave blank lines; all executable source must match
+        // the client exercised with real Java/Rust backends by the packaged IDE suite.
+        assertEquals(String.join("\n", packaged.lines().filter(line -> !line.isBlank()).toList()),
+            String.join("\n", generated.lines().filter(line -> !line.isBlank()).toList()));
+    }
+
+    @Test
     public void testPackageJsonReflectsName() throws IOException {
         Path out = tmp.resolve("foo");
         InitRunner.run(opts("foo", true, out.toString()),

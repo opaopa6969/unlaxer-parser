@@ -11,10 +11,13 @@ let cancelStarting: (() => void) | undefined;
 class StartupCancelled extends Error {}
 
 class OwnedLanguageClient extends LanguageClient {
+  ready = false;
   override stop(timeout?: number): Promise<void> {
     // languageclient 9 invokes stop without handling its rejection when initialize fails.
-    // A starting client cannot shut down over LSP; stopClient terminates our owned process.
-    if (!this.isRunning()) return Promise.resolve();
+    // Its Running state precedes the initialized notification and completion of start().
+    // Failed/interrupted initialization must not send shutdown over that broken transport.
+    // stopClient terminates our owned process instead.
+    if (!this.ready || !this.isRunning()) return Promise.resolve();
     return super.stop(timeout);
   }
 }
@@ -82,7 +85,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       await stopClient();
       if (stopping) return;
-      let cancelled = false, ready = false;
+      let cancelled = false;
       const options: ServerOptions = () => new Promise<ChildProcess>((resolve, reject) => {
         if (cancelled || stopping) { reject(new StartupCancelled()); return; }
         const child = spawn(command.command, command.args, { shell: false, stdio: "pipe", windowsHide: true });
@@ -95,7 +98,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         errorHandler: {
           error: () => ({ action: ErrorAction.Continue }),
           closed: () => {
-            if (ready && !stopping && client === next) {
+            if (next.ready && !stopping && client === next) {
               const now = Date.now();
               crashes = crashes.filter(time => now - time < 180000);
               crashes.push(now);
@@ -121,7 +124,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // now: languageclient 9 otherwise leaves that internal promise unhandled on failure.
         void next.start().catch(() => {});
         await Promise.race([started, interrupted]);
-        ready = true;
+        next.ready = true;
       } catch (error) {
         await stopClient();
         if (!(error instanceof StartupCancelled)) throw error;
