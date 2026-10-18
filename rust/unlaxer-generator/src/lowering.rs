@@ -294,6 +294,9 @@ impl Lowering<'_> {
         Ok(AnalysisDepth(&self.analysis_depth))
     }
     fn run(mut self) -> Result<GrammarIr> {
+        for rule in &self.grammar.rules {
+            validate_typeof(rule)?;
+        }
         let mut lexical = crate::lexical::compile(self.grammar)?;
         if !self.grammar.imports.is_empty() {
             return Err("unsupported imports".into());
@@ -774,6 +777,7 @@ impl Lowering<'_> {
         let mut rules = Vec::new();
         for (i, expression) in self.bodies.iter().enumerate() {
             let captures = self.captures(expression)?;
+            let constraint_names = typeof_names(&self.grammar.rules[i].body);
             let effects = &rule_effects[i];
             for target in effects
                 .declares
@@ -800,7 +804,12 @@ impl Lowering<'_> {
                 })
             } else if let Some((name, params)) = &self.mappings[i] {
                 let names: HashSet<_> = params.iter().collect();
-                if names.len() != params.len() || captures.keys().collect::<HashSet<_>>() != names {
+                if names.len() != params.len()
+                    || !params.iter().all(|name| captures.contains_key(name))
+                    || !captures
+                        .keys()
+                        .all(|name| params.contains(name) || constraint_names.contains(name))
+                {
                     return Err(format!(
                         "@mapping params must match capture names on {}",
                         self.grammar.rules[i].name
@@ -832,6 +841,8 @@ impl Lowering<'_> {
                     && *effects == RuleEffects::default()
                     && self.comparisons[i].is_none()
                     && self.catalogs[i].is_none()
+                    && !(crate::common_fields::is_sum(self.grammar, &self.grammar.rules[i])
+                        && captures.keys().all(|name| constraint_names.contains(name)))
                 {
                     return Err(format!(
                         "captures without @mapping on {}",
@@ -917,6 +928,7 @@ impl Lowering<'_> {
                 operator: self.operators[i],
                 catalog,
                 enum_literals: self.enums[i].clone(),
+                type_constraints: self.type_constraints(i, &captures)?,
                 documentation: self.grammar.rules[i]
                     .annotations
                     .iter()
@@ -967,16 +979,45 @@ impl Lowering<'_> {
         let needs_values = variants
             .values()
             .flat_map(|m| &m.fields)
-            .any(|f| f.kind == Kind::Value);
+            .any(|f| f.kind == Kind::Value)
+            || rules
+                .iter()
+                .flat_map(|rule| &rule.type_constraints)
+                .any(|value| {
+                    value.capture.kind == Kind::Value || value.reference.kind == Kind::Value
+                });
         for (i, rule) in rules.iter_mut().enumerate() {
             if let Some(mapping) = &rule.mapping {
                 rule.mapping = Some(variants[&mapping.name].clone());
+            }
+            for constraint in &mut rule.type_constraints {
+                if let Some(mapping) = &rule.mapping {
+                    for value in [&mut constraint.capture, &mut constraint.reference] {
+                        if let Some(field) =
+                            mapping.fields.iter().find(|field| field.name == value.name)
+                        {
+                            *value = field.clone();
+                        }
+                    }
+                }
             }
             if needs_values && !rule.skip {
                 rule.body = if rule.mapping.is_none() {
                     self.project_helper_value(&rule.body)?
                 } else {
-                    self.project_text_values(&rule.body, rule.mapping.as_ref())?
+                    let mut projection = rule.mapping.clone().unwrap();
+                    for constraint in &rule.type_constraints {
+                        for value in [&constraint.capture, &constraint.reference] {
+                            if !projection
+                                .fields
+                                .iter()
+                                .any(|field| field.name == value.name)
+                            {
+                                projection.fields.push(value.clone());
+                            }
+                        }
+                    }
+                    self.project_text_values(&rule.body, Some(&projection))?
                 };
             }
             if rule
@@ -1140,6 +1181,38 @@ impl Lowering<'_> {
         Ok(())
     }
 
+    fn type_constraints(
+        &self,
+        index: usize,
+        captures: &HashMap<String, Shape>,
+    ) -> Result<Vec<TypeConstraint>> {
+        let rule = &self.grammar.rules[index];
+        let mut usages = Vec::new();
+        collect_typeof(&rule.body, &mut usages)?;
+        if !usages.is_empty() && (self.skips[index] || !self.enums[index].is_empty()) {
+            return Err("E-TYPEOF-MAPPING: @typeof requires a non-skipped @mapping rule".into());
+        }
+        let field = |name: &str| -> Result<Field> {
+            let shape = captures
+                .get(name)
+                .ok_or_else(|| format!("E-TYPEOF-UNKNOWN-CAPTURE: {name}"))?;
+            Ok(Field {
+                name: name.to_owned(),
+                kind: shape.kind.clone(),
+                cardinality: shape.cardinality,
+            })
+        };
+        usages
+            .into_iter()
+            .map(|(own, reference)| {
+                Ok(TypeConstraint {
+                    capture: field(&own)?,
+                    reference: field(&reference)?,
+                })
+            })
+            .collect()
+    }
+
     fn body(&self, body: &ast::RuleBody) -> Result<Expression> {
         if body.alternatives.is_empty() {
             return Err("empty choice".into());
@@ -1151,9 +1224,6 @@ impl Lowering<'_> {
             }
             let mut elements = Vec::new();
             for element in &sequence.elements {
-                if element.typeof_constraint.is_some() {
-                    return Err("unsupported @typeof".into());
-                }
                 let value = self.atomic(&element.element)?;
                 elements.push(if let Some(name) = &element.capture {
                     capture(name, value)?
@@ -2156,6 +2226,100 @@ fn token_expression_with_registry(
         },
         other => return Err(format!("unsupported token {other:?}")),
     })
+}
+
+fn validate_typeof(rule: &ast::RuleDecl) -> Result<()> {
+    let mut constraints = Vec::new();
+    collect_typeof(&rule.body, &mut constraints)?;
+    if constraints.is_empty() {
+        return Ok(());
+    }
+    if rule
+        .annotations
+        .iter()
+        .any(|a| matches!(a.kind, AnnotationKind::Skip | AnnotationKind::Enum))
+        || !rule
+            .annotations
+            .iter()
+            .any(|a| matches!(a.kind, AnnotationKind::Mapping { .. }))
+    {
+        return Err("E-TYPEOF-MAPPING: @typeof requires a non-skipped @mapping rule".into());
+    }
+    let mut names = HashSet::new();
+    collect_capture_names(&rule.body, &mut names);
+    for (_, reference) in constraints {
+        if !names.contains(&reference) {
+            return Err(format!("E-TYPEOF-UNKNOWN-CAPTURE: {reference}"));
+        }
+    }
+    Ok(())
+}
+fn annotated_elements(body: &ast::RuleBody) -> Vec<&ast::AnnotatedElement> {
+    enum Pending<'a> {
+        Body(&'a ast::RuleBody),
+        Element(&'a ast::AtomicElement),
+        Annotated(&'a ast::AnnotatedElement),
+    }
+    let mut pending = vec![Pending::Body(body)];
+    let mut found = Vec::new();
+    while let Some(value) = pending.pop() {
+        match value {
+            Pending::Body(body) => {
+                for sequence in body.alternatives.iter().rev() {
+                    for value in sequence.elements.iter().rev() {
+                        pending.push(Pending::Annotated(value));
+                    }
+                }
+            }
+            Pending::Annotated(value) => {
+                found.push(value);
+                pending.push(Pending::Element(&value.element));
+            }
+            Pending::Element(value) => match &value.kind {
+                ElementKind::Group(body)
+                | ElementKind::Optional(body)
+                | ElementKind::Repeat(body) => pending.push(Pending::Body(body)),
+                ElementKind::OneOrMore(child)
+                | ElementKind::BoundedRepeat { element: child, .. } => {
+                    pending.push(Pending::Element(child))
+                }
+                ElementKind::Separated { element, separator } => {
+                    pending.push(Pending::Element(separator));
+                    pending.push(Pending::Element(element));
+                }
+                _ => (),
+            },
+        }
+    }
+    found
+}
+fn collect_capture_names(body: &ast::RuleBody, names: &mut HashSet<String>) {
+    names.extend(
+        annotated_elements(body)
+            .into_iter()
+            .filter_map(|value| value.capture.clone()),
+    );
+}
+fn collect_typeof(body: &ast::RuleBody, result: &mut Vec<(String, String)>) -> Result<()> {
+    for value in annotated_elements(body) {
+        if let Some(reference) = &value.typeof_constraint {
+            let own = value
+                .capture
+                .clone()
+                .ok_or("E-TYPEOF-MISSING-CAPTURE: @typeof must be paired with its own capture")?;
+            result.push((own, reference.clone()));
+        }
+    }
+    Ok(())
+}
+
+fn typeof_names(body: &ast::RuleBody) -> HashSet<String> {
+    let mut values = Vec::new();
+    let _ = collect_typeof(body, &mut values);
+    values
+        .into_iter()
+        .flat_map(|(own, reference)| [own, reference])
+        .collect()
 }
 
 fn capture(name: &str, expression: Expression) -> Result<Expression> {

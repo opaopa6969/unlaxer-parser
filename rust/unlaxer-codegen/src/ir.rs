@@ -19,6 +19,14 @@ pub struct Rule {
     pub documentation: Vec<String>,
     /// Ordered literal alternatives for a grammar @enum; empty for ordinary rules.
     pub enum_literals: Vec<String>,
+    /// Mapping-time constraints, resolved after every named value is bound.
+    pub type_constraints: Vec<TypeConstraint>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypeConstraint {
+    pub capture: Field,
+    pub reference: Field,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

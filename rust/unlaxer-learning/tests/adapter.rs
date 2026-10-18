@@ -39,6 +39,19 @@ fn mapping_and_runtime_failures_are_separate_from_rejection() {
 }
 
 #[test]
+fn mapping_time_constraints_are_not_silently_ignored_by_the_teaching_subset() {
+    let source = "grammar Demo { @root @mapping(Pair,params=[left,right]) Root ::= Leaf @left '=' @typeof(left) 'x' @right; @mapping(Leaf) Leaf ::= 'x'; }";
+    let failure = match LessonGrammar::compile(source) {
+        Ok(_) => {
+            panic!("@typeof must use the generated mapper, not an unchecked teaching projection")
+        }
+        Err(error) => error,
+    };
+    assert!(failure.contains("@typeof"), "{failure}");
+    assert!(failure.contains("mapper"), "{failure}");
+}
+
+#[test]
 fn generated_enum_corpus_is_rejected_at_the_lesson_compile_boundary() {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../spec-corpus/enums/generated-cases.json"

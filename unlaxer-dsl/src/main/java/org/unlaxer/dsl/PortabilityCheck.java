@@ -180,8 +180,6 @@ public final class PortabilityCheck {
             for (SequenceBody alternative : choice.alternatives()) scanBody(alternative, snapshot, out);
         } else if (body instanceof SequenceBody sequence) {
             for (AnnotatedElement element : sequence.elements()) {
-                element.typeofConstraint().ifPresent(typeof ->
-                    add(out, "P-TYPEOF", snapshot, typeof, typeof.captureName()));
                 scanAtomic(element.element(), snapshot, out);
             }
         }

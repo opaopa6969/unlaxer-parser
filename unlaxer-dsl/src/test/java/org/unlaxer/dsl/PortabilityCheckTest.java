@@ -53,15 +53,14 @@ public class PortabilityCheckTest {
         var result = PortabilityCheck.check(source);
         assertFalse(result.portable());
         assertEquals("blocked", result.structure());
-        assertEquals(7, result.diagnostics().size());
+        assertEquals(6, result.diagnostics().size());
         assertEquals("P-EXTERNAL-TOKEN", result.diagnostics().get(0).code());
         assertEquals("example.UnsafeParser", result.diagnostics().get(0).subject());
         assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-TOKEN-KIND") && d.subject().equals("REGEX")));
         assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-ANNOTATION") && d.subject().equals("custom")));
         assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-EMPTY-LITERAL")));
         assertEquals(2, result.diagnostics().stream().filter(d -> d.code().equals("P-QUALIFIED-REFERENCE")).count());
-        assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-TYPEOF") && d.subject().equals("value")));
-        Span last = result.diagnostics().get(6).span();
+        Span last = result.diagnostics().get(5).span();
         assertEquals(source.indexOf("remote.Item", source.indexOf("Other ::=")), last.start());
     }
 
