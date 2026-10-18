@@ -267,6 +267,8 @@ public class PreferredAstConformanceTest {
                 false,
                 true);
         Path generator = repo.resolve("rust/target/debug/unlaxer");
+        var hostReport = new ArrayList<String>(List.of("fixture\thost\tcases\tstatus"));
+        int fixtureIndex = 0;
         for (var entry : corpus()) {
             var fixture = entry.getAsJsonObject();
             String source = fixture.get("grammar").getAsString();
@@ -286,11 +288,14 @@ public class PreferredAstConformanceTest {
                     "",
                     true,
                     true);
-            for (var file : new RustBackend().generate(grammar))
+            Path javaOutput = Files.createDirectories(dir.resolve("generated-java"));
+            for (var file : new RustBackend().generate(grammar)) {
                 assertEquals(
                         grammar.name() + "/" + file.relativePath(),
                         file.content(),
                         Files.readString(output.resolve(file.relativePath())));
+                Files.writeString(javaOutput.resolve(file.relativePath()), file.content());
+            }
             var code =
                     new StringBuilder(
                                     "#[path=\"generated/mod.rs\"] mod generated; use"
@@ -372,8 +377,11 @@ public class PreferredAstConformanceTest {
                 run(List.of(generator.toString(), "generate", "--grammar", foreignInput.toString(),
                     "--output", foreignOutput.toString()), "", true, true);
                 var foreignGrammar = UBNFMapper.parse(foreignSource).grammars().get(0);
-                for (var file : new RustBackend().generate(foreignGrammar))
+                Path javaForeignOutput = Files.createDirectories(dir.resolve("foreign-java"));
+                for (var file : new RustBackend().generate(foreignGrammar)) {
                     assertEquals(file.relativePath(), file.content(), Files.readString(foreignOutput.resolve(file.relativePath())));
+                    Files.writeString(javaForeignOutput.resolve(file.relativePath()), file.content());
+                }
                 code.insert(0, "#[path=\"foreign/mod.rs\"] mod foreign; ");
                 code.append("let foreign=foreign::parser::parse_tree_for_mapping(")
                     .append(rustString(fixture.getAsJsonArray("cases").get(0).getAsJsonObject().get("input").getAsString()))
@@ -421,22 +429,34 @@ public class PreferredAstConformanceTest {
                 }
                 code.append("}");
             }
-            Path probe = dir.resolve("main.rs"), exe = dir.resolve("probe");
-            Files.writeString(probe, code);
-            run(
-                    List.of(
-                            "rustc",
-                            "--edition=2021",
-                            probe.toString(),
-                            "--extern",
-                            "unlaxer_runtime=" + runtime,
-                            "-o",
-                            exe.toString()),
-                    "",
-                    false,
-                    true);
-            run(List.of(exe.toString()), "", true, true);
+            for (String host : List.of("native", "java")) {
+                String consumer = code.toString();
+                if (host.equals("java")) {
+                    consumer = consumer.replace("generated/mod.rs", "generated-java/mod.rs")
+                            .replace("foreign/mod.rs", "foreign-java/mod.rs");
+                }
+                Path probe = dir.resolve("main-" + host + ".rs"), exe = dir.resolve("probe-" + host);
+                Files.writeString(probe, consumer);
+                run(
+                        List.of(
+                                "rustc",
+                                "--edition=2021",
+                                "--crate-name=preferred_probe",
+                                probe.toString(),
+                                "--extern",
+                                "unlaxer_runtime=" + runtime,
+                                "-o",
+                                exe.toString()),
+                        "",
+                        false,
+                        true);
+                run(List.of(exe.toString()), "", true, true);
+                hostReport.add(fixtureIndex + "\t" + host + "\t"
+                        + fixture.getAsJsonArray("cases").size() + "\tchecked");
+            }
+            fixtureIndex++;
         }
+        Files.write(Path.of("target/preferred-ast-host-execution.tsv"), hostReport);
     }
 
     private Token findToken(Token token, Parser parser) {
