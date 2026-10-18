@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, readFile, writeFile, rm, cp} from 'node:fs/promises';
+import {mkdtemp, mkdir, readFile, writeFile, rm, cp, readdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -8,6 +8,16 @@ import {runTests} from '@vscode/test-electron';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const artifact = path.resolve(process.argv[2] ?? path.join(root, 'target/tinycalc-smoke.vsix'));
 const scratch = await mkdtemp(path.join(tmpdir(), 'tinycalc-ide-'));
+async function editorLogs(directory) {
+  const output = [];
+  for (const entry of await readdir(directory, {withFileTypes: true})) {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) output.push(await editorLogs(file));
+    else if (entry.name.endsWith('.log')) output.push(`${file}\n${await readFile(file, 'utf8')}`);
+  }
+  return output.join('\n');
+}
+
 try {
   execFileSync('unzip', ['-q', artifact, '-d', scratch]);
   const packaged = path.join(scratch, 'extension');
@@ -45,7 +55,11 @@ process.on('SIGTERM',()=>record('sigterm'));
     const result = path.join(folder, 'result.json');
     try { await runTests({version: '1.96.4', extensionDevelopmentPath: packaged, extensionTestsPath: path.join(root, 'scripts/vsix-suite.cjs'),
       extensionTestsEnv: {TINYCALC_PACKAGED_ROOT: packaged, TINYCALC_SCRATCH: folder, TINYCALC_SETTINGS: JSON.stringify(settings), TINYCALC_PIDS: pids, TINYCALC_UNRESPONSIVE: unresponsive, TINYCALC_RESULT: result},
-      launchArgs: ['--disable-extensions', '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes', '--no-sandbox', `--user-data-dir=${path.join(folder, 'user')}`, `--extensions-dir=${path.join(folder, 'extensions')}`]}); } catch (error) { await cp(folder, path.join(root, 'target', `failed-${backend}`), {recursive: true}); throw error; }
+      launchArgs: ['--disable-extensions', '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes', '--no-sandbox', `--user-data-dir=${path.join(folder, 'user')}`, `--extensions-dir=${path.join(folder, 'extensions')}`]});
+      const logs = await editorLogs(path.join(folder, 'user/logs'));
+      await writeFile(path.join(root, 'target', `ide-${backend}-editor.log`), logs);
+      assert.doesNotMatch(logs, /Invalid debug adapter|[Uu]nhandled[Pp]romise[Rr]ejection|[Uu]nhandled promise rejection/, `${backend} adapter shutdown must not leave editor errors`);
+    } catch (error) { await cp(folder, path.join(root, 'target', `failed-${backend}`), {recursive: true}); throw error; }
     const observation = JSON.parse(await readFile(result, 'utf8')); results.push(observation);
     await writeFile(path.join(root, 'target', `ide-${backend}.json`), JSON.stringify(observation, null, 2));
   }
