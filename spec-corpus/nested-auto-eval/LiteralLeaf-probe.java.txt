@@ -1,0 +1,55 @@
+package org.example.literalnested;
+import java.util.*;
+import com.google.gson.*;
+
+public final class Probe extends LiteralLeafEvaluator<List<String>> {
+    private final LiteralLeafMapper.SourceMappedAst<?> sourceMap;
+    private final List<String> events = new ArrayList<>();
+    private final Deque<LiteralLeafAST> frames = new ArrayDeque<>();
+    private static final class Failure extends RuntimeException {
+        final int[] span;
+        Failure(int[] span) { super("requested failure"); this.span = span; }
+    }
+    private Probe(LiteralLeafMapper.SourceMappedAst<?> sourceMap) {
+        this.sourceMap = sourceMap;
+        setDebugStrategy(new DebugStrategy() {
+            public void onEnter(LiteralLeafAST node) { frames.push(node); }
+            public void onExit(LiteralLeafAST node, Object result) {
+                if (frames.pop() != node) throw new AssertionError("unbalanced evaluator frame");
+            }
+        });
+    }
+    private int[] span(LiteralLeafAST node) { return sourceMap.sourceSpanOf(node).orElseThrow(); }
+    private String location(LiteralLeafAST node) { var s=span(node); return s[0] + ":" + s[1]; }
+    @Override protected List<String> evalRoot(LiteralLeafAST.Root node) {
+        events.add("root@" + location(node));
+        var values = new ArrayList<String>();
+        for (var child : node.value()) {
+            if (child.isPresent()) values.addAll(eval(child.orElseThrow()));
+            else { events.add("none"); values.add(null); }
+        }
+        return values;
+    }
+    @Override protected List<String> convertValue(Object raw) {
+        String value = (String) raw;
+        int[] span = span(frames.peek());
+        events.add("literal@" + span[0] + ":" + span[1] + "=" + value);
+        if (value.equals("!")) throw new Failure(span);
+        return List.of(value);
+    }
+
+    public static JsonObject run(Object snapshot) {
+        var sourceMap = (LiteralLeafMapper.SourceMappedAst<?>) snapshot;
+        var probe = new Probe(sourceMap);
+        var ast = (LiteralLeafAST) sourceMap.ast();
+        var result = new JsonObject();
+        result.add("span", new Gson().toJsonTree(probe.span(ast)));
+        try { result.add("value", new Gson().toJsonTree(probe.eval(ast))); }
+        catch (Failure failure) {
+            result.addProperty("error", failure.getMessage());
+            result.add("error_span", new Gson().toJsonTree(failure.span));
+        }
+        result.add("events", new Gson().toJsonTree(probe.events));
+        return result;
+    }
+}

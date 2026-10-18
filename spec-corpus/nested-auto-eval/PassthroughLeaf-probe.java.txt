@@ -1,0 +1,54 @@
+package org.example.passnested;
+import java.util.*;
+import com.google.gson.*;
+
+public final class Probe extends PassthroughLeafEvaluator<List<String>> {
+    private final PassthroughLeafMapper.SourceMappedAst<?> sourceMap;
+    private final List<String> events = new ArrayList<>();
+    private final Deque<PassthroughLeafAST> frames = new ArrayDeque<>();
+    private static final class Failure extends RuntimeException {
+        final int[] span;
+        Failure(int[] span) { super("requested failure"); this.span = span; }
+    }
+    private Probe(PassthroughLeafMapper.SourceMappedAst<?> sourceMap) {
+        this.sourceMap = sourceMap;
+        setDebugStrategy(new DebugStrategy() {
+            public void onEnter(PassthroughLeafAST node) { frames.push(node); }
+            public void onExit(PassthroughLeafAST node, Object result) {
+                if (frames.pop() != node) throw new AssertionError("unbalanced evaluator frame");
+            }
+        });
+    }
+    private int[] span(PassthroughLeafAST node) { return sourceMap.sourceSpanOf(node).orElseThrow(); }
+    private String location(PassthroughLeafAST node) { var s=span(node); return s[0] + ":" + s[1]; }
+    @Override protected List<String> evalLeaf(PassthroughLeafAST.Leaf node) {
+        events.add("leaf@" + location(node));
+        var values = new ArrayList<String>();
+        for (var child : node.value()) {
+            if (child.isEmpty()) { events.add("none"); values.add(null); continue; }
+            String value = child.orElseThrow();
+            events.add("text=" + value);
+            if (value.equals("!")) throw new Failure(span(node));
+            values.add(value);
+        }
+        return values;
+    }
+    @Override protected List<String> convertValue(Object raw) {
+        throw new AssertionError("passthrough must evaluate the nested mapped node: " + raw);
+    }
+
+    public static JsonObject run(Object snapshot) {
+        var sourceMap = (PassthroughLeafMapper.SourceMappedAst<?>) snapshot;
+        var probe = new Probe(sourceMap);
+        var ast = (PassthroughLeafAST) sourceMap.ast();
+        var result = new JsonObject();
+        result.add("span", new Gson().toJsonTree(probe.span(ast)));
+        try { result.add("value", new Gson().toJsonTree(probe.eval(ast))); }
+        catch (Failure failure) {
+            result.addProperty("error", failure.getMessage());
+            result.add("error_span", new Gson().toJsonTree(failure.span));
+        }
+        result.add("events", new Gson().toJsonTree(probe.events));
+        return result;
+    }
+}

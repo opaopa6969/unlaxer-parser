@@ -1,0 +1,180 @@
+[
+  {
+    "id": "empty",
+    "input": "",
+    "consumed_cp": 0,
+    "default": {
+      "value": [
+        null
+      ],
+      "events": [
+        "root@0:0",
+        "none"
+      ],
+      "span": [
+        0,
+        0
+      ]
+    },
+    "leaf": {
+      "value": [
+        null
+      ],
+      "events": [
+        "root@0:0",
+        "none"
+      ],
+      "span": [
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "id": "double",
+    "input": "😀😀",
+    "consumed_cp": 2,
+    "default": {
+      "value": [
+        "😀",
+        "😀",
+        null
+      ],
+      "events": [
+        "root@0:2",
+        "literal@0:1=😀",
+        "literal@1:2=😀",
+        "none"
+      ],
+      "span": [
+        0,
+        2
+      ]
+    },
+    "leaf": {
+      "value": [
+        "😀"
+      ],
+      "events": [
+        "literal@1:2=😀"
+      ],
+      "span": [
+        1,
+        2
+      ]
+    }
+  },
+  {
+    "id": "family-combining",
+    "input": "👨‍👩‍👧‍👦é",
+    "consumed_cp": 9,
+    "default": {
+      "value": [
+        "👨‍👩‍👧‍👦",
+        "é",
+        null
+      ],
+      "events": [
+        "root@0:9",
+        "literal@0:7=👨‍👩‍👧‍👦",
+        "literal@7:9=é",
+        "none"
+      ],
+      "span": [
+        0,
+        9
+      ]
+    },
+    "leaf": {
+      "value": [
+        "é"
+      ],
+      "events": [
+        "literal@7:9=é"
+      ],
+      "span": [
+        7,
+        9
+      ]
+    }
+  },
+  {
+    "id": "failure-middle",
+    "input": "😀!👨‍👩‍👧‍👦",
+    "consumed_cp": 9,
+    "default": {
+      "error": "requested failure",
+      "error_span": [
+        1,
+        2
+      ],
+      "events": [
+        "root@0:9",
+        "literal@0:1=😀",
+        "literal@1:2=!"
+      ],
+      "span": [
+        0,
+        9
+      ]
+    },
+    "leaf": {
+      "value": [
+        "👨‍👩‍👧‍👦"
+      ],
+      "events": [
+        "literal@2:9=👨‍👩‍👧‍👦"
+      ],
+      "span": [
+        2,
+        9
+      ]
+    }
+  },
+  {
+    "id": "failure-first",
+    "input": "!😀",
+    "consumed_cp": 2,
+    "default": {
+      "error": "requested failure",
+      "error_span": [
+        0,
+        1
+      ],
+      "events": [
+        "root@0:2",
+        "literal@0:1=!"
+      ],
+      "span": [
+        0,
+        2
+      ]
+    },
+    "leaf": {
+      "value": [
+        "😀"
+      ],
+      "events": [
+        "literal@1:2=😀"
+      ],
+      "span": [
+        1,
+        2
+      ]
+    }
+  },
+  {
+    "id": "unknown",
+    "input": "?",
+    "error": "trailing_input",
+    "error_cp": 0,
+    "events": []
+  },
+  {
+    "id": "trailing",
+    "input": "😀?",
+    "error": "trailing_input",
+    "error_cp": 1,
+    "events": []
+  }
+]
