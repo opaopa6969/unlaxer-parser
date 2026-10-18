@@ -875,3 +875,81 @@ fn success_budget_large_expected_payloads_and_foreign_edges_miss_before_copy() {
         (0, 0, 3)
     );
 }
+
+#[test]
+fn failure_budget_shared_configuration_in_fresh_processes() {
+    let rows = include_str!("../../../conformance/failure-memo-budget/configuration.tsv");
+    let mut observed = 0;
+    for line in rows
+        .lines()
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+    {
+        let row: Vec<_> = line.split('\t').collect();
+        assert_eq!(row.len(), 5, "{line}");
+        let raw = if row[1] == "-" {
+            None
+        } else {
+            let bytes = row[1]
+                .as_bytes()
+                .chunks(2)
+                .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+                .collect::<Vec<_>>();
+            Some(String::from_utf8(bytes).unwrap())
+        };
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+        child.args([
+            "--exact",
+            "memo_retention_tests::failure_budget_configuration_child",
+            "--nocapture",
+        ]);
+        child.env("UNLAXER_TEST_FAILURE_MEMO_EXPECTED", row[2..].join(","));
+        for field in ["ENTRIES", "BYTES", "ENTRY_BYTES"] {
+            let name = format!("UNLAXER_FAILURE_MEMO_MAX_{field}");
+            if let Some(value) = &raw {
+                child.env(name, value);
+            } else {
+                child.env_remove(name);
+            }
+            child.env_remove(format!("UNLAXER_SUCCESS_MEMO_MAX_{field}"));
+        }
+        let output = child.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}: {}{}",
+            row[0],
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("CONFIG_OK"),
+            "{}",
+            row[0]
+        );
+        observed += 1;
+    }
+    assert_eq!(observed, 25);
+}
+
+#[test]
+fn failure_budget_configuration_child() {
+    let Ok(raw) = std::env::var("UNLAXER_TEST_FAILURE_MEMO_EXPECTED") else {
+        return;
+    };
+    let expected = raw
+        .split(',')
+        .map(|x| x.parse::<usize>().unwrap())
+        .collect::<Vec<_>>();
+    let budget = failure_memo_budget();
+    assert_eq!(
+        (budget.entries, budget.bytes, budget.entry_bytes),
+        (expected[0], expected[1], expected[2])
+    );
+    let success = success_memo_budget();
+    assert_eq!(
+        (success.entries, success.bytes, success.entry_bytes),
+        (65_536, 16 * 1024 * 1024, 2 * 1024 * 1024)
+    );
+    assert_eq!(ParseOptions::default().memoization, Memoization::Off);
+    assert_eq!(ParseOptions::default().diagnostics, Diagnostics::Auto);
+    println!("CONFIG_OK");
+}

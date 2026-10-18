@@ -321,7 +321,7 @@ public final class PackratMemoTable {
   private int maxHitLookback;
 
   private static final int DEFAULT_FAILURE_ENTRIES = 65_536;
-  private static final long DEFAULT_FAILURE_BYTES = 16L * 1024 * 1024;
+  private static final long DEFAULT_FAILURE_BYTES = 32L * 1024 * 1024;
   private static final long DEFAULT_FAILURE_ENTRY_BYTES = 1024L * 1024;
   private static final int CONFIGURED_FAILURE_ENTRIES = (int) configuredFailureBudget(
       System.getProperty("unlaxer.memo.failure.maxEntries"), DEFAULT_FAILURE_ENTRIES, 1_048_576);

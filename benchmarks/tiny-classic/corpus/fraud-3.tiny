@@ -1,0 +1,1 @@
+if(isPresent($calculated_TorNode)&$calculated_TorNode>0.0){1}else{0}

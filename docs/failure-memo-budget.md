@@ -7,7 +7,7 @@ Java/Rust の memoization は引き続き既定 OFF です。opt-in した safe 
 | 予算 | Java system property | Rust environment variable | 既定 | 設定上限 |
 | --- | --- | --- | ---: | ---: |
 | failure 件数 | `unlaxer.memo.failure.maxEntries` | `UNLAXER_FAILURE_MEMO_MAX_ENTRIES` | 65,536 | 1,048,576 |
-| failure 合計 charge | `unlaxer.memo.failure.maxBytes` | `UNLAXER_FAILURE_MEMO_MAX_BYTES` | 16 MiB | 1 GiB |
+| failure 合計 charge | `unlaxer.memo.failure.maxBytes` | `UNLAXER_FAILURE_MEMO_MAX_BYTES` | 32 MiB | 1 GiB |
 | failure 単体 charge | `unlaxer.memo.failure.maxEntryBytes` | `UNLAXER_FAILURE_MEMO_MAX_ENTRY_BYTES` | 1 MiB | 64 MiB |
 
 値はプロセス内の最初の初期化時に一度だけ読みます。0 は明示的な保存停止です。
@@ -53,7 +53,28 @@ Rust の件数と charge は現在の grammar session の table を観測しま�
 同位置の多数 epoch、rollback 後の hit、eviction と underrun、両 cursor、原文と CP/UTF-16/UTF-8、
 syntax/semantic diagnostics を手書き期待値で固定します。言語固有 storage test は単体/合計容量、
 古い置換 payload の解放、計数、distant index、不正設定を確認します。
+共通 `configuration.tsv` の25設定は、両言語で新しいprocessごとに欠省・有効値・不正値を
+読み込み、実際のconstructor/OnceLock、既定OFF、変更していない成功/単体/件数の上限を検証します。
 #634 の資源上限と2 MiB再帰条件も維持します。
+
+## 32 MiB の選択 (#670)
+
+[固定sourceの対照](../benchmarks/tiny-classic/failure-budget-calibration.tsv)では、
+同じTiny13入力をJava生成とJava/native両hostのRust生成parser/mapperで比較しました。
+16/32 MiBの全273観測で完全AST・全CP位置・両cursor・native syntax/semantic診断が一致します。
+Java fraud1/4は16 MiBで予算拒否約142万/207万回、32 MiBでは0、保持charge約20.29/20.04 MBです。
+成功予算拒否とevictionは両入力で0であり、成功snapshot予算とは別のfailure cache飽和でした。
+
+最小2倍の32 MiBはfraud5入力すべてのfailure予算拒否を除去しました。
+large-matchには32 MiBで拒否が残りますが、観測warm約0.34–0.39秒に対し、64 MiBは
+約0.15秒、保持charge41.44 MBでした。全entryを保存するため一律64 MiBにせず、
+fraudの再探索cliffを解消し有限保持を保つ32 MiBを両言語で選びます。
+Rustは16/32 MiBとも全13入力でfailure予算拒否0、最大charge7.64 MBでした。
+同byte予算を同entry数や同RSSとみなしません。明示overrideの16 MiBも引き続き有効です。
+
+これはJFR/補助probe/他buildの負荷がある原因調査であり、最終1秒/deadline合格ではありません。
+raw timing・CPU/割当の単位と再現手順は [profile契約](../benchmarks/tiny-classic/profiles/README.md) に従います。
+単体1 MiB・件数65,536・設定ceiling・満杯時miss・安全性判定・diagnostic/rollback契約は維持します。
 
 [#629 の測定](../conformance/stateful-failure-memo/benchmark-results.tsv) の no-retry 約62% overhead や、
 [#624 の約41%](../conformance/pure-success-memo/benchmark-results.tsv) を撤回する変更ではありません。
