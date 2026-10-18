@@ -117,6 +117,33 @@ fn visit(
         _ => true,
     })
 }
+// The recursive side alone does not turn a mixed text/node operand into a
+// synthetic spine. A transparent operand must itself reach both this mapping
+// and another mapped class, matching SharedAssocSchema's per-operand contract.
+fn transparent_recursive_operand(
+    g: &GrammarDecl,
+    rule: &RuleDecl,
+    name: &str,
+    work: &mut usize,
+) -> Result<bool, String> {
+    for operand in operands(rule) {
+        let ElementKind::RuleRef { name: target, .. } = &operand.kind else {
+            continue;
+        };
+        let Some(target) = g.rules.iter().find(|r| &r.name == target) else {
+            continue;
+        };
+        if mapping(target).is_some() {
+            continue;
+        }
+        let mut reachable = HashSet::new();
+        visit(g, operand, &mut HashSet::new(), &mut reachable, 0, work)?;
+        if reachable.contains(name) && reachable.len() > 1 {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
 pub(crate) fn refine(g: &GrammarDecl, ir: &mut GrammarIr) -> Result<(), String> {
     let mut names = HashSet::new();
     let mut work = 0;
@@ -144,7 +171,7 @@ pub(crate) fn refine(g: &GrammarDecl, ir: &mut GrammarIr) -> Result<(), String> 
         let spine = if family.len() > 1 {
             !mapped.is_empty()
         } else {
-            right && mapped.contains(name) && mapped.len() > 1
+            right && transparent_recursive_operand(g, rule, name, &mut work)?
         };
         if spine && raw {
             names.insert(crate::common_fields::rust_name(name));

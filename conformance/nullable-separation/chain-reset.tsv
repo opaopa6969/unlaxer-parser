@@ -1,0 +1,25 @@
+# parser	kind	resetBefore	resetAfterSyntaxFailure	resetAfterOuterRollback
+code-start	consumed	false	false	false
+code-start	consumed	true	false	true
+code-start	matchOnly	false	false	false
+code-start	matchOnly	true	false	true
+code-start	virtualTokenConsumed	false	false	false
+code-start	virtualTokenConsumed	true	false	true
+code-start	virtualTokenMatchOnly	false	false	false
+code-start	virtualTokenMatchOnly	true	false	true
+code-end	consumed	false	false	false
+code-end	consumed	true	false	true
+code-end	matchOnly	false	false	false
+code-end	matchOnly	true	false	true
+code-end	virtualTokenConsumed	false	false	false
+code-end	virtualTokenConsumed	true	false	true
+code-end	virtualTokenMatchOnly	false	false	false
+code-end	virtualTokenMatchOnly	true	false	true
+capture-value	consumed	false	false	false
+capture-value	consumed	true	false	true
+capture-value	matchOnly	false	false	false
+capture-value	matchOnly	true	false	true
+capture-value	virtualTokenConsumed	false	false	false
+capture-value	virtualTokenConsumed	true	false	true
+capture-value	virtualTokenMatchOnly	false	false	false
+capture-value	virtualTokenMatchOnly	true	false	true

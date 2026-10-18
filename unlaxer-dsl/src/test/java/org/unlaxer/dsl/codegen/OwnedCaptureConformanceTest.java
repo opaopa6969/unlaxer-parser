@@ -58,7 +58,7 @@ public class OwnedCaptureConformanceTest {
                         org.unlaxer.context.ParseLimitException resource=null;
                         try{parsed=parser.parse(context);}catch(org.unlaxer.context.ParseLimitException error){resource=error;}
                         assertEquals(label,expected.has("resource"),resource!=null);
-                        if(resource!=null){var saved=resource;assertSame(label,saved,assertThrows(org.unlaxer.context.ParseLimitException.class,()->new org.unlaxer.parser.combinator.Repeat(new org.unlaxer.parser.elementary.WordParser("unused"),0,0).parse(context)));}
+                        if(resource!=null){assertEquals(label+" immediate resource frame restoration",1,context.getTokenStack().size());var saved=resource;assertSame(label,saved,assertThrows(org.unlaxer.context.ParseLimitException.class,()->new org.unlaxer.parser.combinator.Repeat(new org.unlaxer.parser.elementary.WordParser("unused"),0,0).parse(context)));}
                         assertEquals(label,expected.get("success").getAsBoolean(),parsed.isSucceeded());
                         assertEquals(label,expected.get("consumed").getAsInt(),context.getConsumedPosition().value());
                         assertEquals(label,expected.get("matched").getAsInt(),context.getMatchedPosition().value());

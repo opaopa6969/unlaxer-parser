@@ -39,10 +39,31 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record Mapping(String name, List<Field> fields) {
         public Mapping { fields = List.copyOf(fields); }
     }
-    public record Field(String name, Kind kind, Cardinality cardinality, String enumName) {
+    public record Field(String name, Kind kind, Cardinality cardinality, String enumName, NestedShape nested) {
+        public Field {
+            if (kind == Kind.NESTED && (nested == null || cardinality != Cardinality.ONE || enumName != null)
+                    || kind != Kind.NESTED && nested != null) {
+                throw new IllegalArgumentException("E-NESTED-SHAPE: invalid nested field schema");
+            }
+        }
+        public Field(String name, Kind kind, Cardinality cardinality, String enumName) { this(name,kind,cardinality,enumName,null); }
         public Field(String name, Kind kind, Cardinality cardinality) { this(name,kind,cardinality,null); }
     }
-    public enum Kind { TEXT, NODE, VALUE, ENUM, INTEGER, NULLABLE_NODE }
+    public record NestedShape(Kind leaf, String enumName, List<Cardinality> containers, String javaLeafType) {
+        public NestedShape(Kind leaf, String enumName, List<Cardinality> containers) { this(leaf,enumName,containers,null); }
+        public NestedShape {
+            containers = List.copyOf(containers);
+            boolean mapped = leaf == Kind.NODE || leaf == Kind.ENUM;
+            if ((leaf != Kind.TEXT && leaf != Kind.INTEGER && !mapped)
+                    || (leaf == Kind.ENUM ? enumName == null || enumName.isBlank() : enumName != null)
+                    || (mapped ? javaLeafType == null || javaLeafType.isBlank() : javaLeafType != null)
+                    || containers.size() > 32
+                    || containers.contains(Cardinality.ONE)) {
+                throw new IllegalArgumentException("E-NESTED-SHAPE: invalid nested leaf or containers");
+            }
+        }
+    }
+    public enum Kind { TEXT, NODE, VALUE, ENUM, INTEGER, NULLABLE_NODE, NESTED }
     public enum Cardinality { ONE, OPTIONAL, MANY }
     public enum ScopeMode { LEXICAL, DYNAMIC }
     public record Declaration(String symbolCapture, String description) {}
@@ -68,7 +89,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         }
     }
     public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, UniqueLongestChoice, PredictiveChoice, Capture,
-        OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CaseInsensitiveToken, ErrorExpected, CharRangeToken,
+        CaptureBoundary, OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CaseInsensitiveToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, GraphemeToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
         CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope, GeneralBody, Replay {}
@@ -103,6 +124,8 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record ExceptToken(String excluded) implements Expression {}
     public record UntilToken(String terminator) implements Expression {}
     public record LookaheadToken(String pattern, boolean positive) implements Expression {}
+    public enum BoundaryKind { VALUE, OPTIONAL, LIST }
+    public record CaptureBoundary(BoundaryKind kind, Expression child) implements Expression {}
     public record OptionalExpr(Expression child) implements Expression {}
     /** A null maximum denotes unbounded repetition. */
     public record Repeat(Expression child, int min, Integer max) implements Expression {}

@@ -106,14 +106,16 @@ contract still requires discarding a context after a panicking callback. Neither
 runtime rolls back arbitrary external I/O.
 
 Remaining #545 work is explicit: [capture/replay and name lifetime](https://github.com/opaopa6969/unlaxer-parser/issues/572),
-including its remaining generated UBNF integration, and [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573). The earlier PEG diagnostic-frontier gap
+including its remaining generated UBNF integration. The [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573) are implemented as described below. The earlier PEG diagnostic-frontier gap
 also remains tracked in #545; new Classic-entry cases do not prove all legacy
 PEG/TokenExpr entry diagnostics equivalent. [General owned capture/replay](owned-capture-replay.md)
 now has separate runtime APIs for input, projected and generated values (#590).
 The existing Rust AST field capture store retains its original-input boundary:
 it rejects a projected or detached field capture instead of reading a different
-input slice. Generated UBNF integration remains #591 / #572. The Tiny code-fence adapters now have mode-aware implementations (see below).
-Other unsupported native scanner shapes still reject this explicit mode. Classic `JavaUntil` and positive /
+input slice. Generated UBNF integration remains #591 / #572. The Tiny
+code-fence adapters now have mode-aware implementations (see below). Other
+unsupported native scanner shapes still reject this explicit mode; normal native
+parsing remains available. Classic `JavaUntil` and positive /
 negative `JavaLookahead` preserve their distinct runtime APIs and have shared
 handwritten cases. Full generated capture/replay integration must be verified
 separately before claiming that remaining scope.
