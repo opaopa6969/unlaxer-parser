@@ -308,7 +308,7 @@ fn build_snapshot(
             generated,
         });
     }
-    if ir.rules.iter().filter_map(|r|r.mapping.as_ref()).flat_map(|m|&m.fields).any(|f|matches!(&f.kind,unlaxer_codegen::Kind::Nested{leaf,..} if **leaf==unlaxer_codegen::Kind::Value)) {
+    if ir.rules.iter().flat_map(|r| r.mapping.iter().flat_map(|m| &m.fields).chain(r.type_constraints.iter().flat_map(|c| [&c.capture, &c.reference]))).any(|f|matches!(&f.kind,unlaxer_codegen::Kind::Nested{leaf,..} if **leaf==unlaxer_codegen::Kind::Value)) {
         let (_,generated)=declaration(ast,"ast.rs","pub enum NestedValue {")?;
         let mut variants=vec!["Text".into(),"Integer".into(),"Node".into()];
         variants.extend(ir.rules.iter().filter(|r|!r.enum_literals.is_empty()).map(|r|format!("Enum{}",r.name)));

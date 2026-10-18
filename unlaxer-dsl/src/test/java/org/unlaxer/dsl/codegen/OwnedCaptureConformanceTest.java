@@ -27,6 +27,7 @@ public class OwnedCaptureConformanceTest {
         return JsonParser.parseString(Files.readString(ROOT.resolve("spec-corpus/owned-capture/cases.json"))).getAsJsonArray();
     }
     @Test public void javaGeneratedOwnedCapturesMatchIndependentOracle() throws Exception {
+        var reuseReport=new ArrayList<String>(List.of("fixture\tmemo\tdiagnostics\tretry\tfallback"));
         for (var raw : cases()) {
             var row=raw.getAsJsonObject();
             var grammar=UBNFModuleLoader.load(writeGrammar(row,temporary.newFolder().toPath())).grammars().get(0);
@@ -58,7 +59,7 @@ public class OwnedCaptureConformanceTest {
                         org.unlaxer.context.ParseLimitException resource=null;
                         try{parsed=parser.parse(context);}catch(org.unlaxer.context.ParseLimitException error){resource=error;}
                         assertEquals(label,expected.has("resource"),resource!=null);
-                        if(resource!=null){var saved=resource;assertSame(label,saved,assertThrows(org.unlaxer.context.ParseLimitException.class,()->new org.unlaxer.parser.combinator.Repeat(new org.unlaxer.parser.elementary.WordParser("unused"),0,0).parse(context)));}
+                        if(resource!=null){assertEquals(label+" immediate resource frame restoration",1,context.getTokenStack().size());var saved=resource;assertSame(label,saved,assertThrows(org.unlaxer.context.ParseLimitException.class,()->new org.unlaxer.parser.combinator.Repeat(new org.unlaxer.parser.elementary.WordParser("unused"),0,0).parse(context)));}
                         assertEquals(label,expected.get("success").getAsBoolean(),parsed.isSucceeded());
                         assertEquals(label,expected.get("consumed").getAsInt(),context.getConsumedPosition().value());
                         assertEquals(label,expected.get("matched").getAsInt(),context.getMatchedPosition().value());
@@ -70,6 +71,21 @@ public class OwnedCaptureConformanceTest {
                             var b=binding.orElseThrow();var object=new JsonObject();object.addProperty("text",b.text());object.addProperty("source",b.provenance().name());object.addProperty("start",b.start());object.addProperty("end",b.end());bindingJson=object;
                         }
                         assertEquals(label,expected.has("binding")?expected.get("binding"):JsonNull.INSTANCE,bindingJson);
+                        if(row.get("name").getAsString().startsWith("nested-") && !parsed.isSucceeded() && resource==null){
+                            int consumed=context.position(),matched=context.matchedPosition();
+                            boolean reset=context.getCurrent().isResetMatchedWithConsumed();
+                            var tokens=context.getCurrent().getTokens().stream().toList();
+                            assertTrue(label+" same-context retry rejects",parser.parse(context).isFailed());
+                            assertEquals(label,consumed,context.position());assertEquals(label,matched,context.matchedPosition());
+                            assertEquals(label,reset,context.getCurrent().isResetMatchedWithConsumed());
+                            assertEquals(label,tokens,context.getCurrent().getTokens().stream().toList());
+                            assertEquals(label,binding,context.captured("word"));assertEquals(label,"",context.captured("sentinel").orElseThrow().text());
+                            assertTrue(label+" same-context fallback",new org.unlaxer.parser.elementary.WordParser(input).parse(context).isSucceeded());
+                            assertEquals(label,input.codePointCount(0,input.length()),context.position());
+                            assertEquals(label,context.position(),context.matchedPosition());
+                            assertEquals(label,binding,context.captured("word"));assertEquals(label,"",context.captured("sentinel").orElseThrow().text());
+                            reuseReport.add(row.get("name").getAsString()+"\t"+memo+"\t"+mode+"\trejected\tsucceeded");
+                        }
                         if(parsed.isSucceeded()){
                             var mapped=mapper.getMethod("mapParsedTokenWithSourceMap",org.unlaxer.Token.class).invoke(null,context.getCurrent().getTokens().get(0));
                             assertNotNull(label,mapped);
@@ -80,33 +96,57 @@ public class OwnedCaptureConformanceTest {
                 }
             }
         }
+        assertEquals("four non-input rejection cases across six options",25,reuseReport.size());
+        Files.write(Path.of("target/owned-capture-reuse-java.tsv"),reuseReport);
     }
     @Test public void bothRustHostsGenerateAndRunTheSameOwnedCaptureOracle() throws Exception {
         if(!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] OwnedCaptureConformanceTest requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
         run(List.of("cargo","build","--locked","--manifest-path",ROOT.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator"),0);
+        var report=new ArrayList<String>(List.of("fixture\thost\tcase\toption\tphase\tactual"));
         for(var raw:cases()) {
             var row=raw.getAsJsonObject();
             Path dir=temporary.newFolder().toPath(),input=writeGrammar(row,dir),out=dir.resolve("generated");
             var grammar=UBNFModuleLoader.load(input).grammars().get(0);
             run(List.of(ROOT.resolve("rust/target/debug/unlaxer").toString(),"generate","--grammar",input.toString(),"--output",out.toString()),0);
-            for(var file:new RustBackend().generate(grammar)) assertEquals(row.get("name")+" "+file.relativePath(),file.content(),Files.readString(out.resolve(file.relativePath())));
+            Path javaGenerated=Files.createDirectory(dir.resolve("java-generated"));
+            var javaModules=new RustBackend().generate(grammar);assertEquals(5,javaModules.size());
+            for(var file:javaModules){
+                assertEquals(row.get("name")+" "+file.relativePath(),file.content(),Files.readString(out.resolve(file.relativePath())));
+                Files.writeString(javaGenerated.resolve(file.relativePath()),file.content());
+            }
             Files.writeString(dir.resolve("main.rs"), rustProbe());
-            Files.writeString(dir.resolve("Cargo.toml"),"[package]\nname=\"nullable-repetition-probe\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[[bin]]\nname=\"probe\"\npath=\"main.rs\"\n[dependencies]\nunlaxer-runtime={path=\""+ROOT.resolve("rust/unlaxer-runtime")+"\"}\n");
+            Files.writeString(dir.resolve("java-main.rs"), rustProbe().replace("mod generated;","#[path=\"java-generated/mod.rs\"] mod generated;"));
+            Files.writeString(dir.resolve("Cargo.toml"),"[package]\nname=\"nullable-repetition-probe\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[[bin]]\nname=\"probe\"\npath=\"main.rs\"\n[[bin]]\nname=\"java-probe\"\npath=\"java-main.rs\"\n[dependencies]\nunlaxer-runtime={path=\""+ROOT.resolve("rust/unlaxer-runtime")+"\"}\n");
             Path target=ROOT.resolve("rust/target/owned-capture-probe");
             run(List.of("cargo","build","--offline","--quiet","--manifest-path",dir.resolve("Cargo.toml").toString(),"--target-dir",target.toString()),0);
-            var command=new ArrayList<String>(List.of(target.resolve("debug/probe").toString()));
-            for(var value:row.getAsJsonArray("cases")){command.add(value.getAsJsonObject().has("resource")?"resource":"normal");command.add(value.getAsJsonObject().get("input").getAsString());}
-            var output=run(command,0).lines().toList();assertEquals(row.get("name").toString(),row.getAsJsonArray("cases").size()*6,output.size());
-            int index=0;
-            for(var value:row.getAsJsonArray("cases"))for(int option=0;option<6;option++){
-                var expected=value.getAsJsonObject();String label=row.get("name")+" "+expected+" option="+option;var parts=output.get(index++).split("\\t",-1);
-                assertEquals(label,5,parts.length);assertEquals(label,expected.get("success").getAsString(),parts[0]);
-                assertEquals(label,expected.get("consumed").getAsString(),parts[1]);assertEquals(label,expected.get("matched").getAsString(),parts[2]);
-                assertEquals(label,expected.has("ast")?expected.get("ast"):JsonNull.INSTANCE,JsonParser.parseString(parts[3]));
-                assertEquals(label,expected.has("binding")?expected.get("binding"):JsonNull.INSTANCE,JsonParser.parseString(parts[4]));
+            List<String> nativeOutput=null;
+            for(String host:List.of("native","java")){
+                var command=new ArrayList<String>(List.of(target.resolve("debug/"+(host.equals("native")?"probe":"java-probe")).toString()));
+                for(var value:row.getAsJsonArray("cases")){var expected=value.getAsJsonObject();command.add(phase(row,expected));command.add(expected.get("input").getAsString());}
+                var output=run(command,0).lines().toList();assertEquals(row.get("name").toString(),row.getAsJsonArray("cases").size()*6,output.size());
+                int index=0,caseIndex=0;
+                for(var value:row.getAsJsonArray("cases")){
+                    var expected=value.getAsJsonObject();
+                    for(int option=0;option<6;option++){
+                        String actual=output.get(index++),label=row.get("name")+" "+host+" "+expected+" option="+option;
+                        var parts=actual.split("\\t",-1);
+                        assertEquals(label,5,parts.length);assertEquals(label,expected.get("success").getAsString(),parts[0]);
+                        assertEquals(label,expected.get("consumed").getAsString(),parts[1]);assertEquals(label,expected.get("matched").getAsString(),parts[2]);
+                        assertEquals(label,expected.has("ast")?expected.get("ast"):JsonNull.INSTANCE,JsonParser.parseString(parts[3]));
+                        assertEquals(label,expected.has("binding")?expected.get("binding"):JsonNull.INSTANCE,JsonParser.parseString(parts[4]));
+                        report.add(row.get("name").getAsString()+"\t"+host+"\t"+caseIndex+"\t"+option+"\t"+phase(row,expected)+"\t"+actual);
+                    }
+                    caseIndex++;
+                }
+                if(nativeOutput==null)nativeOutput=output;else assertEquals("independently executed Rust hosts",nativeOutput,output);
             }
         }
+        Files.write(Path.of("target/owned-capture-rust-hosts.tsv"),report);
+    }
+    private static String phase(JsonObject row,JsonObject expected){
+        if(expected.has("resource"))return "resource";
+        return row.get("name").getAsString().startsWith("nested-")&&!expected.get("success").getAsBoolean()?"retry":"normal";
     }
     private static Path writeGrammar(JsonObject row, Path directory) throws Exception {
         if (row.has("modules")) for (var module : row.getAsJsonObject("modules").entrySet()) {
@@ -165,6 +205,19 @@ public class OwnedCaptureConformanceTest {
                         let ast=if let Ok(parsed)=result{let tree=context.tree(parsed.nodes[0]).unwrap();generated::mapper::map(&tree).unwrap().canonical_json()}else{"null".into()};
                         assert_eq!(context.captured_text("sentinel"),Some(""));
                         println!("{}\t{}\t{}\t{}\t{}",success,context.position(),context.matched_position(),ast,binding(&context));
+                        if phase=="retry"{
+                            assert!(!success);
+                            let before=(context.position(),context.matched_position(),context.reset_matched_with_consumed());
+                            let before_binding=binding(&context);let before_nodes=(0..).map_while(|i|context.node(i)).map(|node|format!("{node:?}")).collect::<Vec<_>>();
+                            assert!(context.parse_shared_grammar(generated::parser::grammar(),root,false).is_err());
+                            assert_eq!((context.position(),context.matched_position(),context.reset_matched_with_consumed()),before);
+                            assert_eq!(binding(&context),before_binding);assert_eq!(context.captured_text("sentinel"),Some(""));
+                            assert_eq!((0..).map_while(|i|context.node(i)).map(|node|format!("{node:?}")).collect::<Vec<_>>(),before_nodes);
+                            assert!(context.parse(&Expr::literal(Box::leak(input.to_owned().into_boxed_str()))).is_ok());
+                            assert_eq!((context.position(),context.matched_position()),(input.chars().count(),input.chars().count()));
+                            assert_eq!(binding(&context),before_binding);assert_eq!(context.captured_text("sentinel"),Some(""));
+                        }
+
                     }}
                 }
             }

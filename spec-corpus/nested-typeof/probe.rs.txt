@@ -1,0 +1,46 @@
+#![allow(dead_code,unused_imports)]
+#![deny(unused_variables)]
+mod generated;
+use generated::{ast::*,evaluator::{evaluate,Semantics}};
+use unlaxer_runtime::{Span,ParseOptions,Diagnostics,Memoization};
+use std::io::{self,BufRead};
+struct Probe;
+impl Semantics for Probe {
+    type Output=i32;
+    /*METHODS*/
+}
+fn main() {
+    let mut retained = Vec::new();
+    for line in io::stdin().lock().lines() {
+        let hex=line.unwrap();
+        let input=String::from_utf8((0..hex.len()).step_by(2).map(|i|u8::from_str_radix(&hex[i..i+2],16).unwrap()).collect()).unwrap();
+        for memo in [Memoization::Off,Memoization::SafeFailures] {
+            for diagnostics in [Diagnostics::Auto,Diagnostics::Detailed,Diagnostics::DetailedOnFailure] {
+                let result=match generated::parser::parse_tree_with_options(&input,ParseOptions::with_memoization(memo).with_diagnostics(diagnostics)) {
+                    Ok(tree)=>match generated::mapper::map(&tree) {
+                        Ok(ast)=>{
+                            let preferred=generated::mapper::map_parsed_tree(&generated::parser::parse_tree_for_mapping(&input).unwrap()).unwrap();
+                            assert_eq!(ast.canonical_json(),preferred.select_default().ast().canonical_json());
+                            let json=ast.canonical_json();
+                            let result=serde_json::json!({"status":"ok","value":serde_json::from_str::<serde_json::Value>(&json).unwrap(),"eval":evaluate(&ast,&mut Probe)});
+                            retained.push((ast,preferred,json)); result
+                        },
+                        Err(message)=>{ assert_eq!(generated::mapper::map(&tree).unwrap_err(),message); serde_json::json!({"status":"map_error","message":message}) },
+                    },
+                    Err(error)=>{
+                        let mut context=unlaxer_runtime::ParseContext::with_options(&input,ParseOptions::with_memoization(memo).with_diagnostics(diagnostics));
+                        assert_eq!(generated::parser::parse_context(&mut context).unwrap_err().offset,error.offset);
+                        assert_eq!((context.position(),context.matched_position()),(0,0));assert!(context.node(0).is_none());
+                        let reset=context.reset_matched_with_consumed();
+                        assert!(generated::parser::parse_context(&mut context).is_err());
+                        assert_eq!((context.position(),context.matched_position()),(0,0));assert_eq!(context.reset_matched_with_consumed(),reset);assert!(context.node(0).is_none());
+                        assert!(context.parse(&unlaxer_runtime::Expr::Any.repeat_java(input.chars().count(),Some(input.chars().count()))).is_ok());assert_eq!(context.position(),input.chars().count());
+                        serde_json::json!({"status":"syntax","offset":error.offset})
+                    },
+                };
+                println!("{}",result);
+            }
+        }
+    }
+    for (ast,preferred,json) in retained { assert_eq!(ast.canonical_json(),json);assert_eq!(preferred.select_default().ast().canonical_json(),json); }
+}

@@ -1240,7 +1240,22 @@ impl Lowering<'_> {
         if !usages.is_empty() && (self.skips[index] || !self.enums[index].is_empty()) {
             return Err("E-TYPEOF-MAPPING: @typeof requires a non-skipped @mapping rule".into());
         }
+        let nested_sites = if crate::nested_captures::enabled(rule) {
+            Some(crate::nested_captures::sites(rule)?)
+        } else {
+            None
+        };
         let field = |name: &str| -> Result<Field> {
+            if let Some(sites) = &nested_sites {
+                let _element = sites
+                    .get(name)
+                    .ok_or_else(|| format!("E-TYPEOF-UNKNOWN-CAPTURE: {name}"))?;
+                return Ok(Field {
+                    name: name.to_owned(),
+                    kind: crate::nested_captures::field(self.grammar, rule, name)?,
+                    cardinality: Cardinality::One,
+                });
+            }
             let shape = captures
                 .get(name)
                 .ok_or_else(|| format!("E-TYPEOF-UNKNOWN-CAPTURE: {name}"))?;
@@ -2577,7 +2592,10 @@ fn collect_capture_names(body: &ast::RuleBody, names: &mut HashSet<String>) {
             .filter_map(|value| value.capture.clone()),
     );
 }
-fn collect_typeof(body: &ast::RuleBody, result: &mut Vec<(String, String)>) -> Result<()> {
+pub(crate) fn collect_typeof(
+    body: &ast::RuleBody,
+    result: &mut Vec<(String, String)>,
+) -> Result<()> {
     for value in annotated_elements(body) {
         if let Some(reference) = &value.typeof_constraint {
             let own = value

@@ -39,6 +39,10 @@
     {
       "id": "depth",
       "category": "E-MAPPING-LIMIT"
+    },
+    {
+      "id": "span",
+      "category": "E-MAPPING-CST"
     }
   ],
   "dagGrammar": "grammar MapperDag { @package: guardprobe @root Root ::= Leaf; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",

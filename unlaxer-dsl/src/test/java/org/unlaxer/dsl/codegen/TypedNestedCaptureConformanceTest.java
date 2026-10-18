@@ -103,7 +103,11 @@ public class TypedNestedCaptureConformanceTest extends NestedCaptureConformanceT
         var ubnf=directory.resolve("fixture.ubnf");java.nio.file.Files.writeString(ubnf,fixture.get("grammar").getAsString());
         success(run(List.of("cargo","build","--locked","--manifest-path",repo.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator","--target-dir",nativeTarget().toString()),"",false));
         success(run(List.of(nativeTarget().resolve("debug/unlaxer").toString(),"generate","--grammar",ubnf.toString(),"--output",generated.toString()),"",true));
-        for(var file:new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar))assertEquals(file.content(),java.nio.file.Files.readString(generated.resolve(file.relativePath())));
+        var javaGenerated=java.nio.file.Files.createDirectory(directory.resolve("java-generated"));
+        for(var file:new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar)) {
+            assertEquals(file.content(),java.nio.file.Files.readString(generated.resolve(file.relativePath())));
+            java.nio.file.Files.writeString(javaGenerated.resolve(file.relativePath()),file.content());
+        }
         var rust=new StringBuilder("mod generated; fn main(){\n");
         try(var loader=compileJava(grammar)) {
             var parsers=loader.loadClass("org.example.nestedcaptures.NestedFailuresParsers");
@@ -142,6 +146,11 @@ public class TypedNestedCaptureConformanceTest extends NestedCaptureConformanceT
         rust.append('}');java.nio.file.Files.writeString(directory.resolve("main.rs"),rust);
         success(run(List.of("rustc","--edition=2021","--extern","unlaxer_runtime="+runtime,directory.resolve("main.rs").toString(),"-o",directory.resolve("probe").toString()),"",false));
         success(run(List.of(directory.resolve("probe").toString()),"",true));
+        assertEquals(1,rust.toString().split("mod generated;",-1).length-1);
+        java.nio.file.Files.writeString(directory.resolve("main_java.rs"),rust.toString().replace("mod generated;","#[path = \"java-generated/mod.rs\"] mod generated;"));
+        success(run(List.of("rustc","--edition=2021","--extern","unlaxer_runtime="+runtime,directory.resolve("main_java.rs").toString(),"-o",directory.resolve("probe-java").toString()),"",false));
+        success(run(List.of(directory.resolve("probe-java").toString()),"",true));
+        java.nio.file.Files.writeString(java.nio.file.Path.of("target/typed-nested-failures-hosts.tsv"),"host\tcases\nnative\t"+fixture.getAsJsonArray("cases").size()+"\njava\t"+fixture.getAsJsonArray("cases").size()+"\n");
     }
 
     @org.junit.Test public void apiImpactReportsActualRecursiveTypesOnBothHosts() throws Exception {
@@ -168,7 +177,8 @@ public class TypedNestedCaptureConformanceTest extends NestedCaptureConformanceT
         var corpus=com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(repo.resolve("spec-corpus/typed-nested-captures/depth-boundaries.json"))).getAsJsonArray();
         for(var entry:corpus) {
             var row=entry.getAsJsonObject();String source=row.get("grammar").getAsString();
-            var grammar=org.unlaxer.dsl.bootstrap.UBNFMapper.parse(source).grammars().get(0);
+            var snapshot=org.unlaxer.dsl.bootstrap.UBNFMapper.parseWithSource(source);
+            var grammar=snapshot.ast().grammars().get(0);
             var directory=temporary.newFolder().toPath();var input=directory.resolve("fixture.ubnf");var output=directory.resolve("generated");java.nio.file.Files.writeString(input,source);
             var nativeResult=run(List.of(nativeTarget().resolve("debug/unlaxer").toString(),"generate","--grammar",input.toString(),"--output",output.toString()),"",true);
             boolean nativeAccepted=nativeResult.code()==0;
@@ -179,6 +189,16 @@ public class TypedNestedCaptureConformanceTest extends NestedCaptureConformanceT
                 for(var file:new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar))assertEquals(file.content(),java.nio.file.Files.readString(output.resolve(file.relativePath())));
                 for(CodeGenerator generator:List.of(new ParserGenerator(),new ASTGenerator(),new MapperGenerator()))assertFalse(generator.generate(grammar).source().isEmpty());
             } else {
+                var diagnostic=GrammarValidator.validateWithoutClassLoading(grammar).stream().filter(d->d.code().equals("E-NESTED-SHAPE")).findFirst().orElseThrow();
+                assertEquals("Root",diagnostic.rule());
+                var rule=grammar.rules().stream().filter(r->r.name().equals(diagnostic.rule())).findFirst().orElseThrow();
+                var position=snapshot.spanOf(rule).orElseThrow();
+                assertEquals(row.get("startCP").getAsInt(),position.start());
+                assertEquals(row.get("endCP").getAsInt(),position.end());
+                for(CodeGenerator generator:List.of(new ParserGenerator(),new ASTGenerator(),new MapperGenerator())) {
+                    assertTrue(assertThrows(IllegalArgumentException.class,()->generator.generate(grammar)).getMessage().contains("E-NESTED-SHAPE"));
+                }
+                assertTrue(assertThrows(IllegalArgumentException.class,()->new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar)).getMessage().contains("E-NESTED-SHAPE"));
                 assertTrue(nativeResult.output(),nativeResult.output().contains("E-NESTED-SHAPE"));
                 assertTrue(nativeResult.output(),nativeResult.output().contains("at CP "+row.get("startCP")+".."+row.get("endCP")));
                 assertFalse(java.nio.file.Files.exists(output));

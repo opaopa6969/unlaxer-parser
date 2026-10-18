@@ -11,6 +11,7 @@ fn corrupted(input:&str,id:&str)->Tree {
         "child"=>tree.nodes[tree.root].children.push(usize::MAX),
         "cycle"=>tree.nodes[tree.root].children.push(tree.root),
         "capture-edge"=> {let id=tree.nodes.iter().position(|n|n.captures.iter().any(|c|!c.nodes.is_empty())).unwrap();tree.nodes[id].children.clear();},
+        "span"=>tree.nodes[tree.root].span.end=usize::MAX,
         "depth"=>for _ in 0..256 {let node=Node{rule:tree.nodes[tree.root].rule,span:tree.nodes[tree.root].span,children:vec![tree.root],captures:vec![]};tree.nodes.push(node);tree.root=tree.nodes.len()-1;},
         _=>panic!("unknown fixture")
     }
@@ -76,7 +77,7 @@ fn main() {
     let input="[😀😀]";
     let retained=generated::mapper::map_parsed_tree(&parsed(input)).unwrap();
     let expected=generated::mapper::map(&parsed(input)).unwrap().canonical_json();
-    for id in ["null-root","metadata","child","cycle","capture-edge","depth"] {
+    for id in ["null-root","metadata","child","cycle","capture-edge","depth","span"] {
         for entry in ["ordinary","source-map","subtree","subtree-source-map","preferred","subtree-preferred"] {
             let bad=corrupted(input,id);
             let error=match entry {

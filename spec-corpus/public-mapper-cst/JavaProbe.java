@@ -20,6 +20,7 @@ public final class JavaProbe {
             case "child": root.getOriginalChildren().add(null); break;
             case "cycle": root.getOriginalChildren().add(root); break;
             case "capture-edge": root.filteredChildren.add(parsed(input)); break;
+            case "span": return new Token(root.tokenKind, StringSource.createSubSource("😀", root.source.root(), new CodePointOffset(Integer.MAX_VALUE)), root.parser);
             case "depth":
                 for (int i = 0; i < 256; i++) root = new Token(root.tokenKind, root.source, root.parser, TokenList.of(root));
                 break;

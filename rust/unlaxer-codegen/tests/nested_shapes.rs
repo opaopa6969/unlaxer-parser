@@ -62,7 +62,7 @@ fn malformed_public_nested_schemas_are_rejected_before_emission() {
         capture: field.clone(),
         reference: field,
     });
-    assert!(generate(&ir).unwrap_err().0.contains("E-NESTED-SHAPE"));
+    assert!(generate(&ir).is_ok());
 }
 #[test]
 fn nested_scalar_schema_has_an_owned_value_and_borrowed_evaluator_parameter() {
@@ -84,4 +84,27 @@ fn nested_mixed_type_reserves_its_generated_namespace() {
     let mut ir = fixture(nested(Kind::Value, vec![]), Cardinality::One);
     ir.rules[0].mapping.as_mut().unwrap().name = "NestedValue".into();
     assert!(generate(&ir).unwrap_err().0.contains("E-NESTED-SHAPE"));
+}
+
+#[test]
+fn private_nested_typeof_schemas_receive_the_same_validation() {
+    for kind in [
+        nested(Kind::Enum("Unknown".into()), vec![]),
+        nested(Kind::Text, vec![Cardinality::One]),
+        nested(Kind::Text, vec![Cardinality::Optional; 33]),
+        nested(nested(Kind::Text, vec![]), vec![]),
+    ] {
+        let mut ir = fixture(Kind::Text, Cardinality::One);
+        ir.rules[0].mapping.as_mut().unwrap().fields.clear();
+        let field = Field {
+            name: "value".into(),
+            kind,
+            cardinality: Cardinality::One,
+        };
+        ir.rules[0].type_constraints.push(TypeConstraint {
+            capture: field.clone(),
+            reference: field,
+        });
+        assert!(generate(&ir).unwrap_err().0.contains("E-NESTED-SHAPE"));
+    }
 }

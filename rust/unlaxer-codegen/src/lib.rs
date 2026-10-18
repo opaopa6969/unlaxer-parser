@@ -140,9 +140,9 @@ fn has_values(ir: &GrammarIr) -> bool {
 }
 
 fn has_nested_values(ir: &GrammarIr) -> bool {
-    mappings(ir)
+    ir.rules
         .iter()
-        .flat_map(|m| &m.fields)
+        .flat_map(typeof_constraints::fields)
         .any(|f| matches!(&f.kind,Kind::Nested{leaf,..} if **leaf==Kind::Value))
 }
 fn needs_values(ir: &GrammarIr) -> bool {
@@ -759,15 +759,14 @@ fn mapper(ir: &GrammarIr) -> String {
     if ir
         .rules
         .iter()
-        .filter_map(|r| r.mapping.as_ref())
-        .flat_map(|m| &m.fields)
+        .flat_map(typeof_constraints::fields)
         .any(|f| matches!(f.kind, Kind::Nested { .. }))
     {
         if has_nested_values(ir) {
             out.push_str(&nested::mixed_mapper(ir));
         }
         out.push_str(nested::HELPERS);
-        if ir.rules.iter().filter_map(|r|r.mapping.as_ref()).flat_map(|m|&m.fields).any(|f|matches!(&f.kind,Kind::Nested{leaf,..} if matches!(leaf.as_ref(),Kind::Node|Kind::Enum(_)|Kind::Value))) { out.push_str(nested::PROJECT_HELPERS); }
+        if ir.rules.iter().flat_map(typeof_constraints::fields).any(|f|matches!(&f.kind,Kind::Nested{leaf,..} if matches!(leaf.as_ref(),Kind::Node|Kind::Enum(_)|Kind::Value))) { out.push_str(nested::PROJECT_HELPERS); }
     }
     out.push_str(&associative::helpers(ir));
     out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    tree.visit(id)?;\n    match tree.nodes[id].rule {\n");

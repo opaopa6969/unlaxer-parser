@@ -22,6 +22,7 @@ public final class MappingGuard {
     private int edges;
     private boolean originalIsTree = true;
     private int originalClock;
+    private boolean recoveredSyntax;
 
     private static final class State {
         int originalHeight;
@@ -114,6 +115,7 @@ public final class MappingGuard {
             if (start < 0 || length < 0 || (long) start + length > Integer.MAX_VALUE) {
                 throw invalid("invalid source span");
             }
+            recoveredSyntax |= token.parser instanceof org.unlaxer.parser.combinator.RecoveryDiagnostic.Marker;
             state = new State();
             state.originalParent = stack.isEmpty() ? null : stack.peek().token;
             state.originalEnter = ++originalClock;
@@ -175,6 +177,9 @@ public final class MappingGuard {
     private void chargeValidation() {
         if (++validationWork > MAX_WORK) throw limit("filtered reachability");
     }
+
+    /** Recovery detection shares the bounded, identity-based original graph validation. */
+    public boolean hasRecoveredSyntax() { return recoveredSyntax; }
 
     /** Charge actual visits, including repeated expansion of a shared DAG. */
     public void visit(Token token) {

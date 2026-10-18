@@ -28,9 +28,6 @@ pub fn sites(rule: &RuleDecl) -> Result<BTreeMap<String, &AtomicElement>, String
         }
         for sequence in &value.alternatives {
             for element in &sequence.elements {
-                if element.typeof_constraint.is_some() {
-                    return Err(error(rule, "typeof requires remaining #583 implementation"));
-                }
                 if let Some(name) = &element.capture {
                     if inside || result.insert(name.clone(), &element.element).is_some() {
                         return Err(error(rule, "one outer capture site required"));
@@ -58,9 +55,9 @@ pub fn sites(rule: &RuleDecl) -> Result<BTreeMap<String, &AtomicElement>, String
             return Err(error(rule, "capture traversal depth exceeds 64"));
         }
         match &value.kind {
-            ElementKind::Group(v)
-            | ElementKind::OwnedCapture { body: v, .. }
-            | ElementKind::CaptureScope(v) => body(rule, v, inside, depth + 1, result)?,
+            ElementKind::OwnedCapture { body: v, .. }
+            | ElementKind::CaptureScope(v)
+            | ElementKind::Group(v) => body(rule, v, inside, depth + 1, result)?,
             ElementKind::Optional(v) | ElementKind::Repeat(v) => {
                 body(rule, v, true, depth + 1, result)?
             }
@@ -136,7 +133,20 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
             return Err(error(rule, "commonField requires a mapped sum family"));
         }
         let values = sites(rule)?;
-        if values.len() != mapping.1.len() || !mapping.1.iter().all(|p| values.contains_key(p)) {
+        let mut usages = Vec::new();
+        crate::lowering::collect_typeof(&rule.body, &mut usages)?;
+        for (_, reference) in &usages {
+            if !values.contains_key(reference) {
+                return Err(format!("E-TYPEOF-UNKNOWN-CAPTURE: {reference}"));
+            }
+        }
+        let names: HashSet<_> = mapping
+            .1
+            .iter()
+            .cloned()
+            .chain(usages.into_iter().flat_map(|(a, b)| [a, b]))
+            .collect();
+        if values.len() != names.len() || !names.iter().all(|p| values.contains_key(p)) {
             return Err(error(rule, "mapping must name each unique outer capture"));
         }
         for value in values.values() {
@@ -161,6 +171,14 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
             continue;
         }
         for candidate in &grammar.rules {
+            // Skipped rules do not contribute a public mapping, matching Java's schema.
+            if candidate
+                .annotations
+                .iter()
+                .any(|a| matches!(a.kind, AnnotationKind::Skip))
+            {
+                continue;
+            }
             let Some(params) = candidate.annotations.iter().find_map(|a| match &a.kind {
                 AnnotationKind::Mapping { class_name, params } if class_name == mapping.0 => {
                     Some(params)
@@ -217,9 +235,9 @@ fn nominal_leaf(grammar: &GrammarDecl, atom: &AtomicElement) -> Option<String> {
                     _ => None,
                 })
             }),
-        ElementKind::Group(body)
-        | ElementKind::OwnedCapture { body, .. }
+        ElementKind::OwnedCapture { body, .. }
         | ElementKind::CaptureScope(body)
+        | ElementKind::Group(body)
         | ElementKind::Optional(body)
         | ElementKind::Repeat(body) => {
             let [sequence] = body.alternatives.as_slice() else {
@@ -264,9 +282,9 @@ pub fn shape(grammar: &GrammarDecl, atom: &AtomicElement, depth: usize) -> Resul
         ElementKind::OneOrMore(v) | ElementKind::BoundedRepeat { element: v, .. } => {
             wrap(Cardinality::Many, shape(grammar, v, depth + 1)?)
         }
-        ElementKind::Group(v)
-        | ElementKind::OwnedCapture { body: v, .. }
-        | ElementKind::CaptureScope(v) => body_shape(grammar, v, depth + 1)?,
+        ElementKind::OwnedCapture { body: v, .. }
+        | ElementKind::CaptureScope(v)
+        | ElementKind::Group(v) => body_shape(grammar, v, depth + 1)?,
         ElementKind::Terminal(_) | ElementKind::Replay { .. } => Kind::Text,
         ElementKind::RuleRef { name, .. } => {
             let token = grammar.tokens.iter().find(|t| &t.name == name);
@@ -351,23 +369,23 @@ pub fn field(grammar: &GrammarDecl, rule: &RuleDecl, name: &str) -> Result<Kind,
 }
 pub fn boundary(expression: Expression) -> Expression {
     let (kind, child) = match expression {
+        Expression::Sequence(mut v) if v.len() == 1 => {
+            let Expression::CaptureBoundary { kind, child } = boundary(v.remove(0)) else {
+                unreachable!()
+            };
+            (kind, Expression::Sequence(vec![*child]))
+        }
         Expression::OwnedCapture { name, child } => {
             let Expression::CaptureBoundary { kind, child } = boundary(*child) else {
                 unreachable!()
             };
             (kind, Expression::OwnedCapture { name, child })
         }
-        Expression::CaptureScope(child) => {
-            let Expression::CaptureBoundary { kind, child } = boundary(*child) else {
+        Expression::CaptureScope(v) => {
+            let Expression::CaptureBoundary { kind, child } = boundary(*v) else {
                 unreachable!()
             };
             (kind, Expression::CaptureScope(child))
-        }
-        Expression::Sequence(mut v) if v.len() == 1 => {
-            let Expression::CaptureBoundary { kind, child } = boundary(v.remove(0)) else {
-                unreachable!()
-            };
-            (kind, Expression::Sequence(vec![*child]))
         }
         Expression::Delimited(v) => {
             let Expression::CaptureBoundary { kind, child } = boundary(*v) else {

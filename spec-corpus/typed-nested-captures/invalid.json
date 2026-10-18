@@ -60,12 +60,6 @@
     "endCP": 167
   },
   {
-    "id": "typeof",
-    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value,other]) Root ::= 'a' @value @typeof(value) 'a' @other; }",
-    "startCP": 56,
-    "endCP": 161
-  },
-  {
     "id": "common-field",
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @commonField(value) @nestedCaptures @mapping(Root, params=[value]) Root ::= 'a' @value; }",
     "startCP": 56,

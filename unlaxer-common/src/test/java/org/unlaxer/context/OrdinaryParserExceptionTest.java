@@ -110,4 +110,85 @@ public class OrdinaryParserExceptionTest {
         }
     }
 
+    @Test public void entryPolicyAndTransparentCallbacksRestoreBeforeRetry() {
+        int count=0;
+        for(var memo:Memoization.values()) for(var diagnostic:ParseOptions.Diagnostics.values())
+        for(boolean manual:List.of(false,true)) for(boolean reset:List.of(false,true))
+        for(boolean abandoned:List.of(false,true)) for(String form:List.of("chain","holder","mapped-holder","finally")) {
+            try(var c=ParseContext.withOptions(StringSource.createRootSource("p😀"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostic))) {
+                int[] state={7}; c.registerTransactionalState(()->{int saved=state[0];return ()->state[0]=saved;});
+                new NamedCapture("word",word("p")).parse(c);
+                c.getCurrent().setResetMatchedWithConsumed(reset);
+                RuntimeException original=new IllegalStateException("first callback");
+                RuntimeException secondary=new IllegalArgumentException("finally callback");
+                Parser child=new NoneChildParser(){
+                    @Override public Parser createParser(){return this;}
+                    @Override public Parsed parse(ParseContext x,TokenKind k,boolean inverse){
+                        if(abandoned){x.startParse(this,x,k,inverse);x.begin(this);}
+                        state[0]=99;x.capture("word",new CapturedValue("",CapturedValue.Provenance.INPUT,x.position(),x.position()));
+                        x.consume(new CodePointLength(1));throw original;
+                    }
+                };
+                Parser parser=switch(form){
+                    case "chain" -> new Chain(child);
+                    case "holder" -> new ParserHolder(child);
+                    case "mapped-holder" -> new MappedSingleCharacterParserHolder(
+                        new org.unlaxer.parser.elementary.MappedSingleCharacterParser("a"){
+                            @Override public Parsed parse(ParseContext x,TokenKind k,boolean inverse){return child.parse(x,k,inverse);}
+                        });
+                    default -> new Chain(new NoneChildParser(){
+                        @Override public Parser createParser(){return this;}
+                        @Override public Parsed parse(ParseContext x,TokenKind k,boolean inverse){
+                            var inner=new Chain(child);
+                            try{return inner.parse(x,k,inverse);}
+                            finally {try{x.rollback(inner);}catch(RuntimeException ignored){}throw secondary;}
+                        }
+                    });
+                };
+                if(manual)c.begin(parser);
+                var before=List.copyOf(c.getCurrent().getTokens());
+                assertSame(form,original,assertThrows(RuntimeException.class,()->parser.parse(c)));
+                assertEquals(form,1,c.position());assertEquals(form,1,c.getMatchedPosition().value());
+                assertEquals(form,reset,c.getCurrent().isResetMatchedWithConsumed());
+                assertEquals(form,manual?2:1,c.getTokenStack().size());
+                assertEquals(form,before,c.getCurrent().getTokens());assertEquals(form,7,state[0]);
+                assertEquals(form,"p",c.captured("word").orElseThrow().text());
+                assertTrue(form,word("😀").parse(c).isSucceeded());
+                if(manual){c.rollback(parser);assertEquals(1,c.position());}
+                count++;
+            }
+        }
+        assertEquals(192,count);
+    }
+
+    @Test public void suggestionCallbackFailureDoesNotPublishEmptyToken() {
+        int count=0;
+        for(var memo:Memoization.values()) for(var diagnostic:ParseOptions.Diagnostics.values())
+        for(boolean manual:List.of(false,true)) {
+            RuntimeException original=new IllegalStateException("suggest callback");
+            boolean[] fail={true};
+            var collector=new org.unlaxer.parser.SuggestsCollectorParser();
+            var sibling=new org.unlaxer.parser.SuggestableParser(false,"x"){
+                @Override public String getSuggestString(String value){return value;}
+                @Override public java.util.Optional<org.unlaxer.parser.Suggest> getSuggests(String value){
+                    if(fail[0])throw original;return super.getSuggests(value);
+                }
+            };
+            var parent=new Choice(collector,sibling);parent.getChildren();collector.setParent(parent);
+            try(var c=ParseContext.withOptions(StringSource.createRootSource("x"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostic))) {
+                if(manual)c.begin(collector);
+                var before=List.copyOf(c.getCurrent().getTokens());
+                assertSame(original,assertThrows(RuntimeException.class,()->collector.parse(c)));
+                assertEquals(before,c.getCurrent().getTokens());assertEquals(0,c.position());
+                assertEquals(manual?2:1,c.getTokenStack().size());
+                fail[0]=false;assertTrue(collector.parse(c).isStopped());
+                assertEquals(before.size()+1,c.getCurrent().getTokens().size());
+                if(manual)c.rollback(collector);count++;
+            }
+        }
+        assertEquals(12,count);
+    }
+
 }

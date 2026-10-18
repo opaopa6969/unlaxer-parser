@@ -285,6 +285,8 @@ public class PreferredAstConformanceTest {
                 false,
                 true);
         Path generator = repo.resolve("rust/target/debug/unlaxer");
+        var hostReport = new ArrayList<String>(List.of("fixture\thost\tcases\tstatus"));
+        int fixtureIndex = 0;
         for (var entry : corpus()) {
             var fixture = entry.getAsJsonObject();
             String source = fixture.get("grammar").getAsString();
@@ -405,8 +407,11 @@ public class PreferredAstConformanceTest {
                 run(List.of(generator.toString(), "generate", "--grammar", foreignInput.toString(),
                     "--output", foreignOutput.toString()), "", true, true);
                 var foreignGrammar = UBNFMapper.parse(foreignSource).grammars().get(0);
-                for (var file : new RustBackend().generate(foreignGrammar))
+                Path javaForeignOutput = Files.createDirectories(dir.resolve("foreign-java"));
+                for (var file : new RustBackend().generate(foreignGrammar)) {
                     assertEquals(file.relativePath(), file.content(), Files.readString(foreignOutput.resolve(file.relativePath())));
+                    Files.writeString(javaForeignOutput.resolve(file.relativePath()), file.content());
+                }
                 code.insert(0, "#[path=\"foreign/mod.rs\"] mod foreign; ");
                 code.append("let foreign=foreign::parser::parse_tree_for_mapping(")
                     .append(rustString(fixture.getAsJsonArray("cases").get(0).getAsJsonObject().get("input").getAsString()))
@@ -476,8 +481,12 @@ public class PreferredAstConformanceTest {
             }
             for (String host : List.of("generated", "java-generated")) {
                 Path probe = dir.resolve(host + "-main.rs"), exe = dir.resolve(host + "-probe");
-                Files.writeString(probe, code.toString().replace(
-                        "#[path=\"generated/mod.rs\"]", "#[path=\"" + host + "/mod.rs\"]"));
+                String consumer = code.toString().replace(
+                        "#[path=\"generated/mod.rs\"]", "#[path=\"" + host + "/mod.rs\"]");
+                if (host.equals("java-generated")) {
+                    consumer = consumer.replace("#[path=\"foreign/mod.rs\"]", "#[path=\"foreign-java/mod.rs\"]");
+                }
+                Files.writeString(probe, consumer);
                 run(
                         List.of(
                                 "rustc", "--crate-name", "probe",
@@ -491,8 +500,12 @@ public class PreferredAstConformanceTest {
                         false,
                         true);
                 run(List.of(exe.toString()), "", true, true);
+                hostReport.add(fixtureIndex + "\t" + host + "\t"
+                        + fixture.getAsJsonArray("cases").size() + "\tchecked");
             }
+            fixtureIndex++;
         }
+        Files.write(Path.of("target/" + getClass().getSimpleName() + "-host-execution.tsv"), hostReport);
     }
 
     private static List<org.unlaxer.context.ParseOptions> parseOptions(JsonObject fixture) {

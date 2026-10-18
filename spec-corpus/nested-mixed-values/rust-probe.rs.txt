@@ -19,7 +19,7 @@ fn main(){
  for memo in [Memoization::Off,Memoization::SafeFailures]{for diagnostics in [Diagnostics::Auto,Diagnostics::Detailed,Diagnostics::DetailedOnFailure]{
   let mut context=ParseContext::with_options(input,ParseOptions::with_memoization(memo).with_diagnostics(diagnostics));
   let parsed=generated::parser::parse_context(&mut context);
-  if stage=="parse"{assert!(parsed.is_err());assert_eq!(context.position(),0);assert!(context.node(0).is_none());context.parse(&Expr::Any.repeat_java(input.chars().count(),Some(input.chars().count()))).unwrap();println!("{{\"stage\":\"parse\"}}");}
+  if stage=="parse"{assert!(parsed.is_err());assert_eq!(context.position(),0);assert!(context.node(0).is_none());let before=(context.position(),context.matched_position(),context.reset_matched_with_consumed());assert!(generated::parser::parse_context(&mut context).is_err());assert_eq!((context.position(),context.matched_position(),context.reset_matched_with_consumed()),before);assert!(context.node(0).is_none());context.parse(&Expr::Any.repeat_java(input.chars().count(),Some(input.chars().count()))).unwrap();assert_eq!(context.position(),input.chars().count());println!("{{\"stage\":\"parse\"}}");}
   else {
    let parsed=parsed.unwrap();assert_eq!(context.position(),input.chars().count());
    let tree=context.tree(parsed.root_node().unwrap()).unwrap();

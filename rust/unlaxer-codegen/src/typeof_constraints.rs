@@ -27,7 +27,9 @@ pub(super) fn helpers(ir: &GrammarIr) -> String {
     let values = fields
         .iter()
         .any(|field| field.kind == Kind::Value && field.cardinality == Cardinality::One);
-    let nodes = values
+    let nested_values = fields.iter().any(|field| matches!(&field.kind,Kind::Nested {leaf, containers} if containers.is_empty() && **leaf==Kind::Value));
+    let nodes = values || nested_values
+        || fields.iter().any(|field| matches!(&field.kind,Kind::Nested {leaf, containers} if containers.is_empty() && **leaf==Kind::Node))
         || fields.iter().any(|field| {
             matches!(field.kind, Kind::Node | Kind::NullableNode)
                 && field.cardinality == Cardinality::One
@@ -63,6 +65,23 @@ pub(super) fn helpers(ir: &GrammarIr) -> String {
         }
         out.push_str("    }\n}\n");
     }
+    if nested_values {
+        out.push_str("\nfn typeof_nested_value(value: &NestedValue) -> &'static str {\n    match value {\n        NestedValue::Text { .. } => \"String\",\n        NestedValue::Integer { .. } => \"Integer\",\n        NestedValue::Node(node) => typeof_node(node),\n");
+        for rule in ir
+            .rules
+            .iter()
+            .filter(|rule| !rule.enum_literals.is_empty())
+        {
+            writeln!(
+                out,
+                "        NestedValue::Enum{} {{ .. }} => {},",
+                rule.name,
+                quote(&format!("enum::{}", rule.name))
+            )
+            .unwrap();
+        }
+        out.push_str("    }\n}\n");
+    }
     out.push_str("\nfn typeof_span(node: &unlaxer_runtime::Node, name: &str) -> unlaxer_runtime::Span {\n    let mut found: Option<unlaxer_runtime::Span> = None;\n    for capture in node.captures.iter().filter(|capture| capture.name == name) {\n        found = Some(match found {\n            None => capture.span,\n            Some(span) => unlaxer_runtime::Span { start: std::cmp::min(span.start, capture.span.start), end: std::cmp::max(span.end, capture.span.end) },\n        });\n    }\n    found.unwrap_or(node.span)\n}\n");
     out
 }
@@ -84,9 +103,20 @@ pub(super) fn rule(ir: &GrammarIr, id: usize) -> String {
                 let enum_id=ir.rules.iter().position(|rule|&rule.name==name).unwrap();
                 writeln!(out,"            values.extend(map_enum_{enum_id}(tree, &capture.nodes)?);").unwrap();
             }
-            Kind::Nested { .. } => unreachable!("validated nested typeof restriction"),
+            Kind::Nested { leaf, containers } => {
+                let projection = match leaf.as_ref() {
+                    Kind::Value => Some("map_nested_values".to_owned()),
+                    Kind::Node => Some("map_nodes".to_owned()),
+                    Kind::Enum(name) => Some(format!("map_enum_{}", ir.rules.iter().position(|r| &r.name==name).unwrap())),
+                    _ => None,
+                };
+                out.push_str("            let nested = nested_capture(tree, capture)?;\n");
+                if projection.is_some() { out.push_str("            let mut nested_sources = nested_source_nodes(tree, capture.nodes[0])?.into_iter();\n"); }
+                writeln!(out,"            values.push({}?);", nested::mapped(leaf, containers, "&nested", 0, projection.as_deref())).unwrap();
+                if projection.is_some() { out.push_str("            if nested_sources.next().is_some() { return Err(\"unmapped original nested leaf\".into()); }\n"); }
+            },
             Kind::NullableNode => unreachable!("validated associative projection"),
-            Kind::Node if rule.mapping.is_none() => out.push_str("            if !capture.nodes.is_empty() { values.extend(projected.iter().cloned()); }\n"),
+            Kind::Node if rule.mapping.is_none() => out.push_str("            if !capture.nodes.is_empty() { tree.charge_work(projected.len())?; values.extend(projected.iter()); }\n"),
             Kind::Node => out.push_str("            values.extend(map_nodes(tree, &capture.nodes)?);\n"),
             Kind::Value => out.push_str("            values.extend(map_values(tree, &capture.nodes)?);\n"),
             Kind::Integer => out.push_str("            values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n"),
@@ -103,7 +133,7 @@ pub(super) fn rule(ir: &GrammarIr, id: usize) -> String {
         let own_type = type_expression(&fields[own], own);
         let ref_type = type_expression(&fields[reference], reference);
         let mut span = format!("typeof_span(node, {})", quote(&constraint.capture.name));
-        match fields[own].cardinality {
+        match outer_cardinality(&fields[own]) {
             Cardinality::Many => {
                 span = format!("if _value_{own}.is_empty() {{ node.span }} else {{ {span} }}")
             }
@@ -142,11 +172,18 @@ fn index(fields: &[Field], name: &str) -> usize {
     fields.iter().position(|field| field.name == name).unwrap()
 }
 fn type_expression(field: &Field, index: usize) -> String {
-    match field.cardinality {
+    match outer_cardinality(field) {
         Cardinality::Optional => "\"Optional\"".into(),
         Cardinality::Many => "\"List\"".into(),
         Cardinality::One => match &field.kind {
-            Kind::Nested { .. } => unreachable!("validated nested typeof restriction"),
+            Kind::Nested { leaf, .. } => match leaf.as_ref() {
+                Kind::Value => format!("typeof_nested_value(&_value_{index})"),
+                Kind::Node => format!("typeof_node(&_value_{index})"),
+                Kind::Enum(name) => quote(&format!("enum::{name}")),
+                Kind::Integer => "\"Integer\"".into(),
+                Kind::Text => "\"String\"".into(),
+                _ => unreachable!("validated nested leaf"),
+            },
             Kind::Integer => "\"Integer\"".into(),
             Kind::Text => "\"String\"".into(),
             Kind::Enum(name) => quote(&format!("enum::{name}")),
@@ -154,5 +191,13 @@ fn type_expression(field: &Field, index: usize) -> String {
             Kind::NullableNode => format!("typeof_node(_value_{index}.as_deref().ok_or(\"missing associative left operand\")?)"),
             Kind::Value => format!("typeof_value(&_value_{index})"),
         },
+    }
+}
+
+fn outer_cardinality(field: &Field) -> Cardinality {
+    if let Kind::Nested { containers, .. } = &field.kind {
+        containers.first().copied().unwrap_or(Cardinality::One)
+    } else {
+        field.cardinality
     }
 }

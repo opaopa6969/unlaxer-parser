@@ -21,7 +21,15 @@ public class MappedSingleCharacterParserHolder extends ConstructedSingleChildPar
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-		return getChild().parse(parseContext);
+		parseContext.enterParserCall(true);
+		try {
+			return getChild().parse(parseContext);
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
+		}
 	}
 	
 	

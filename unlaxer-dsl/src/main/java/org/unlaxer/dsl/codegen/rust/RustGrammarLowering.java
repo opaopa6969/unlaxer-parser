@@ -355,9 +355,10 @@ public final class RustGrammarLowering {
             var documentation = grammar.rules().get(i).annotations().stream()
                 .filter(DocAnnotation.class::isInstance).map(DocAnnotation.class::cast)
                 .map(DocAnnotation::text).toList();
+            final int ruleIndex = i;
             rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i), documentation, EnumSchema.isEnum(grammar.rules().get(i)) ? EnumSchema.literals(grammar.rules().get(i)) : List.of(),
                 org.unlaxer.dsl.codegen.TypeofConstraints.collect(grammar.rules().get(i)).stream()
-                    .map(value -> new TypeConstraint(constraintField(value.capture(), captures), constraintField(value.reference(), captures))).toList()));
+                    .map(value -> new TypeConstraint(constraintField(value.capture(), captures, grammar.rules().get(ruleIndex)), constraintField(value.reference(), captures, grammar.rules().get(ruleIndex)))).toList()));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
@@ -432,7 +433,8 @@ public final class RustGrammarLowering {
         return new Mapping(mapping.name(), List.copyOf(fields.values()));
     }
 
-    private static Field constraintField(String name, Map<String, Shape> captures) {
+    private Field constraintField(String name, Map<String, Shape> captures, RuleDecl rule) {
+        if (org.unlaxer.dsl.codegen.NestedCaptures.enabled(rule)) return new Field(name, Kind.NESTED, Cardinality.ONE, null, org.unlaxer.dsl.codegen.NestedCaptures.field(grammar, rule, name));
         Shape shape = captures.get(name);
         if (shape == null) throw unsupported("E-TYPEOF-UNKNOWN-CAPTURE: " + name);
         return new Field(name, shape.kind(), shape.cardinality(), shape.enumName());
@@ -445,7 +447,7 @@ public final class RustGrammarLowering {
     private Field boundConstraintField(Field field, Mapping mapping, RuleDecl sourceRule) {
         Field bound = mapping == null ? field : mapping.fields().stream()
             .filter(value -> value.name().equals(field.name())).findFirst().orElse(field);
-        return integerConstraint(grammar, sourceRule, field.name())
+        return bound.kind() != Kind.NESTED && integerConstraint(grammar, sourceRule, field.name())
             ? new Field(field.name(), Kind.INTEGER, field.cardinality()) : bound;
     }
 
@@ -749,10 +751,13 @@ public final class RustGrammarLowering {
     }
 
     private CaptureBoundary nestedBoundary(Expression expression) {
-        if (expression instanceof GeneralBody general) { var inner=nestedBoundary(general.child()); return new CaptureBoundary(inner.kind(),general.withChild(inner.child())); }
         if (expression instanceof Sequence s && s.elements().size()==1) {
             var inner=nestedBoundary(s.elements().get(0));
             return new CaptureBoundary(inner.kind(),new Sequence(List.of(inner.child())));
+        }
+        if (expression instanceof GeneralBody general) {
+            var inner=nestedBoundary(general.child());
+            return new CaptureBoundary(inner.kind(),general.withChild(inner.child()));
         }
         if (expression instanceof Delimited d) { var inner=nestedBoundary(d.child()); return new CaptureBoundary(inner.kind(),new Delimited(inner.child())); }
         if (expression instanceof OptionalExpr o) return new CaptureBoundary(BoundaryKind.OPTIONAL,new OptionalExpr(nestedBoundary(o.child())));
@@ -887,9 +892,9 @@ public final class RustGrammarLowering {
     }
 
     private boolean nullable(Expression expression) {
-        if (expression instanceof CaptureBoundary b) { return nullable(b.child()); }
         if (expression instanceof Replay) return true;
         if (expression instanceof GeneralBody general) return nullable(general.child());
+        if (expression instanceof CaptureBoundary b) { return nullable(b.child()); }
         if (expression instanceof LexicalToken token) return token.expression().nullable();
         if (expression instanceof ErrorExpected ignored) {
             return false;
@@ -1023,8 +1028,8 @@ public final class RustGrammarLowering {
     }
 
     private void checkRepetition(Expression expression) {
-        if (expression instanceof CaptureBoundary b) { checkRepetition(b.child()); return; }
         if (expression instanceof GeneralBody general) { checkRepetition(general.child()); return; }
+        if (expression instanceof CaptureBoundary b) { checkRepetition(b.child()); return; }
         if (expression instanceof Repeat repeat) {
             // Generated repeats use JavaRepeat: one successful zero-progress iteration stops.
             // Nullable bodies are safe here; source left-recursion analysis remains separate.
@@ -1057,8 +1062,8 @@ public final class RustGrammarLowering {
     }
 
     private Set<Integer> leadingRules(Expression expression) {
-        if (expression instanceof CaptureBoundary b) { return leadingRules(b.child()); }
         if (expression instanceof GeneralBody general) return leadingRules(general.child());
+        if (expression instanceof CaptureBoundary b) { return leadingRules(b.child()); }
         if (expression instanceof ErrorExpected ignored) return Set.of();
         if (expression instanceof Reference reference) {
             return Set.of(reference.rule());

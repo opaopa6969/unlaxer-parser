@@ -19,9 +19,10 @@ final class NestedMixedEmitter {
     }
     static String mapper(GrammarDecl grammar) {
         String ast=grammar.name()+"AST", value=ast+".NestedValue";
-        var out=new StringBuilder("    private static "+value+" mapNestedValue(Token token) {\n        guardVisit(token);\n");
-        out.append("        if (hasCaptureBinding(token, \"#nested:text\")) return registerNodeSourceSpan(new ").append(value).append(".Text(token.source.sourceAsString()), token);\n")
-            .append("        if (hasCaptureBinding(token, \"#nested:integer\")) {\n            try { return registerNodeSourceSpan(new ").append(value).append(".Integer(java.lang.Integer.parseInt(token.source.sourceAsString().trim())), token); }\n")
+        var out=new StringBuilder("    private static java.lang.String nestedMixedSourceText(Token token) {\n        if (MAPPING_GUARD != null) MAPPING_GUARD.text(token);\n        return token.source.sourceAsString();\n    }\n\n");
+        out.append("    private static ").append(value).append(" mapNestedValue(Token token) {\n        guardVisit(token);\n");
+        out.append("        if (hasCaptureBinding(token, \"#nested:text\")) return registerNodeSourceSpan(new ").append(value).append(".Text(nestedMixedSourceText(token)), token);\n")
+            .append("        if (hasCaptureBinding(token, \"#nested:integer\")) {\n            try { return registerNodeSourceSpan(new ").append(value).append(".Integer(java.lang.Integer.parseInt(nestedMixedSourceText(token).trim())), token); }\n")
             .append("            catch (java.lang.NumberFormatException error) { throw new java.lang.IllegalArgumentException(\"invalid i32 nested mixed capture at \" + token.source.offsetFromRoot().value(), error); }\n        }\n");
         for(var rule:grammar.rules())if(EnumSchema.isEnum(rule))out.append("        if (token.parser instanceof ").append(grammar.name()).append("Parsers.").append(rule.name()).append("Parser) return registerNodeSourceSpan(new ")
             .append(value).append(".Enum").append(rule.name()).append('(').append(ast).append('.').append(rule.name()).append(".fromText(tokenTextCompat(token))), token);\n");
