@@ -39,6 +39,8 @@ public class PropertyBasedParityTest {
     static final int DERIVATIONS = 4, MUTATIONS = 7, LEFT_RECURSION_EVERY = 3, RESERVE_DERIVATIONS = 12;
     /** Lower bound on seeds whose own generated inputs include an accepted one. */
     static final int MIN_ACCEPTING_SEEDS_PERCENT = 60;
+    // Coverage ratios are only meaningful over many seeds; a hand-run reproduction of one seed skips them.
+    static final int MIN_COVERAGE_GRAMMARS = 12;
 
     private static long longProperty(String name, long fallback) {
         String value = System.getProperty(name);
@@ -172,16 +174,18 @@ public class PropertyBasedParityTest {
         Files.writeString(Path.of("target/property-based-parity.json"), gson.toJson(reported));
         Files.write(Path.of("target/property-based-parity-observations.jsonl"), stats.evidence);
         Files.writeString(Path.of("target/property-based-parity-stats.txt"), stats + "\nexcluded=" + excluded + "\nseconds=" + seconds + "\n");
+        assertTrue("findings (minimized, corpus form) in target/property-based-parity.json:\n" + gson.toJson(reported), reported.isEmpty());
         assertTrue("both hosts must exercise success memo replay", stats.javaSuccessHits > 0 && stats.rustSuccessHits > 0);
         assertTrue("both hosts must exercise failure memo replay", stats.javaFailureHits > 0 && stats.rustFailureHits > 0);
-        assertTrue("most generated grammars must be accepted", stats.rejected * 4 <= stats.grammars);
-        assertTrue("left-recursive variants must be rejected by both frontends", stats.rejectedAsExpected >= grammars / LEFT_RECURSION_EVERY);
-        // Corpus inputs do not count: generated inputs alone must reach accepted parses (AST, CST).
-        assertTrue("generated inputs must be accepted in at least " + MIN_ACCEPTING_SEEDS_PERCENT + "% of the seeds: "
-                        + stats.generatedAcceptingCases + "/" + grammars,
-                stats.generatedAcceptingCases * 100 >= (long) grammars * MIN_ACCEPTING_SEEDS_PERCENT);
         assertTrue("known differences that excluded nothing are stale or too narrow: " + known.unused(), known.unused().isEmpty());
-        assertTrue("findings (minimized, corpus form) in target/property-based-parity.json:\n" + gson.toJson(reported), reported.isEmpty());
+        if (grammars >= MIN_COVERAGE_GRAMMARS) {
+            assertTrue("most generated grammars must be accepted", stats.rejected * 4 <= stats.grammars);
+            assertTrue("left-recursive variants must be rejected by both frontends", stats.rejectedAsExpected >= grammars / LEFT_RECURSION_EVERY);
+            // Corpus inputs do not count: generated inputs alone must reach accepted parses (AST, CST).
+            assertTrue("generated inputs must be accepted in at least " + MIN_ACCEPTING_SEEDS_PERCENT + "% of the seeds: "
+                            + stats.generatedAcceptingCases + "/" + grammars,
+                    stats.generatedAcceptingCases * 100 >= (long) grammars * MIN_ACCEPTING_SEEDS_PERCENT);
+        }
     }
 
     private static ParityHarness.Case caseOf(List<ParityHarness.Case> cases, String id) {
