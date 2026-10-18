@@ -15,6 +15,11 @@ Maven Central の 3.2.0 に以下の修正が含まれるという意味では�
 対象opt-in試験のskipなし実行、CI成功、各PRのmergeが必要である。
 ローカルの部分的な成功、待機中のCI、openのPRを全体完了の根拠にしない。
 
+2026-10-19の統合記録: 積み上げた#570〜#691のPRを下から順にmergeし、masterは`4e8bd971`（#682のmerge）になった。
+そのtreeは`fe648700`と同一で、同revisionのCI 18 checkがすべて成功した（Rust backend and Java conformance、Downstream smoke (tinyexpression)、JDK17 artifacts、VSIX、packaged IDE、各contract系）。
+途中のPRは同じ内容を先端に含むため、先端のCIで代表させた。
+これは統合済み範囲のCI成功記録であり、下記の残る境界（#583の未対応形、#197の性能deadline）の完了を意味しない。
+
 [REGEX廃止](regex-retirement.md)はユーザー指定の開発版変更であり、旧宣言には移行診断を返す。
 後段の#505は3.3.0の不具合修正履歴であり、今後Java Pattern互換エンジンを開発する計画ではない。
 公開済み成果物・署名・配布記録は保持する。
