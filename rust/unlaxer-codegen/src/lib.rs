@@ -169,7 +169,7 @@ fn ast(ir: &GrammarIr) -> String {
     }
     out.push_str(&enum_declarations(ir));
     if has_values(ir) {
-        out.push_str("#[derive(Debug, Clone, PartialEq)]\npub enum AstValue {\n    Text { text: String, span: Span },\n    Node(Box<Ast>),\n}\n\nimpl AstValue {\n    pub fn span(&self) -> Span {\n        match self {\n            Self::Text { span, .. } => *span,\n            Self::Node(node) => node.span(),\n        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n            Self::Text { text, .. } => json_string(text),\n            Self::Node(node) => node.canonical_json(),\n        }\n    }\n}\n\n");
+        out.push_str(&ast_values(ir));
     }
     out.push_str("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
     for mapping in mappings(ir) {
@@ -217,6 +217,42 @@ fn ast(ir: &GrammarIr) -> String {
     out
 }
 
+fn ast_values(ir: &GrammarIr) -> String {
+    let template = "#[derive(Debug, Clone, PartialEq)]\npub enum AstValue {\n    Text { text: String, span: Span },\n    Node(Box<Ast>),\n}\n\nimpl AstValue {\n    pub fn span(&self) -> Span {\n        match self {\n            Self::Text { span, .. } => *span,\n            Self::Node(node) => node.span(),\n        }\n    }\n\n    pub fn canonical_json(&self) -> String {\n        match self {\n            Self::Text { text, .. } => json_string(text),\n            Self::Node(node) => node.canonical_json(),\n        }\n    }\n}\n\n";
+    let mut variants = String::new();
+    let mut spans = String::new();
+    let mut json = String::new();
+    for rule in ir.rules.iter().filter(|r| !r.enum_literals.is_empty()) {
+        let name = &rule.name;
+        writeln!(variants, "    Enum{name} {{ value: {name}, span: Span }},").unwrap();
+        writeln!(
+            spans,
+            "            Self::Enum{name} {{ span, .. }} => *span,"
+        )
+        .unwrap();
+        writeln!(json,"            Self::Enum{name} {{ value, span }} => format!(r#\"{{{{\"enum\":{{}},\"value\":{{}},\"span\":[{{}},{{}}]}}}}\"#, json_string({}), value.canonical_json(), span.start, span.end),",quote(name)).unwrap();
+    }
+    if variants.is_empty() {
+        return template.into();
+    }
+    format!(
+        "#[allow(non_camel_case_types)]\n{}",
+        template
+            .replace(
+                "    Node(Box<Ast>),\n",
+                &format!("    Node(Box<Ast>),\n{variants}")
+            )
+            .replace(
+                "            Self::Node(node) => node.span(),\n",
+                &format!("            Self::Node(node) => node.span(),\n{spans}")
+            )
+            .replace(
+                "            Self::Node(node) => node.canonical_json(),\n",
+                &format!("            Self::Node(node) => node.canonical_json(),\n{json}")
+            )
+    )
+}
+
 fn enum_declarations(ir: &GrammarIr) -> String {
     let mut out = String::new();
     for rule in ir.rules.iter().filter(|r| !r.enum_literals.is_empty()) {
@@ -256,7 +292,19 @@ fn enum_declarations(ir: &GrammarIr) -> String {
             let name = enum_constant_name(literal).unwrap();
             writeln!(out, "            Self::{name} => {},", quote(&name)).unwrap();
         }
-        out.push_str("        })\n    }\n}\n\n");
+        out.push_str(
+            "        })\n    }\n\n    pub fn text(&self) -> &'static str {\n        match self {\n",
+        );
+        for literal in &rule.enum_literals {
+            writeln!(
+                out,
+                "            Self::{} => {},",
+                enum_constant_name(literal).unwrap(),
+                quote(literal)
+            )
+            .unwrap();
+        }
+        out.push_str("        }\n    }\n}\n\n");
     }
     out
 }
@@ -609,11 +657,20 @@ fn mapper(ir: &GrammarIr) -> String {
     if has_values(ir) {
         out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }),\n");
         out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
+        for (id, rule) in ir
+            .rules
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| !r.enum_literals.is_empty())
+        {
+            let name = &rule.name;
+            writeln!(out,"            {id} => found.push(AstValue::Enum{name} {{ value: {name}::from_text(tree.text(node.span))?, span: node.span }}),").unwrap();
+        }
         let ids: Vec<_> = ir
             .rules
             .iter()
             .enumerate()
-            .filter(|(_, r)| r.mapping.is_some())
+            .filter(|(_, r)| r.mapping.is_some() && r.enum_literals.is_empty())
             .map(|(id, _)| id.to_string())
             .collect();
         writeln!(out, "            {} => found.extend(map_node(tree, id)?.into_iter().map(|node| AstValue::Node(Box::new(node)))),", ids.join(" | ")).unwrap();

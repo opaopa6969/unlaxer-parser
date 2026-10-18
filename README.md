@@ -159,7 +159,7 @@ The evidence includes [CI](.github/workflows/maven.yml) on Rust 1.85 with Cargo 
 
 The development branch adds [Unicode-pinned `CI('word')` tokens](docs/case-insensitive-tokens.md) to both Java and Rust, removing JDK Unicode-version drift and correcting unsafe Java candidate pruning. This addition is **not included in the published 3.3.0 artifacts**.
 
-The development branch supports [literal enum values](docs/enum-values.md) in Java and Rust, including typed scalar/optional/list fields and source-positioned root wrappers. Mixed enum/Text/Node captures remain tracked in [#539](https://github.com/opaopa6969/unlaxer-parser/issues/539). The parity baseline is Java 21; Java 17 compatibility does not limit new feature design.
+The development branch supports [literal enum values](docs/enum-values.md) in Java and Rust, including typed scalar/optional/list fields and source-positioned root wrappers. Mixed enum/Text/Node captures preserve type identity and per-occurrence positions through Java `EnumValue` and Rust tagged `AstValue`, including scalar/optional/list fields and shared mappings ([contract](docs/enum-values.md#mixed-values)). The parity baseline is Java 21; Java 17 compatibility does not limit new feature design.
 
 The development branch adds [Java/Rust server selection in VS Code](docs/rust-vscode-launch.md) for TinyCalc and newly scaffolded extensions, with packaged editor tests. Java remains the default. This is not included in 3.3.0.
 
