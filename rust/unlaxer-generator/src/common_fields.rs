@@ -10,6 +10,13 @@ pub(crate) fn rust_name(name: &str) -> String {
     name.replace('.', "__")
 }
 fn mapping(rule: &RuleDecl) -> Option<(&str, &[String])> {
+    if rule
+        .annotations
+        .iter()
+        .any(|a| matches!(a.kind, AnnotationKind::Skip))
+    {
+        return None;
+    }
     rule.annotations.iter().find_map(|a| match &a.kind {
         AnnotationKind::Mapping { class_name, params } => {
             Some((class_name.as_str(), params.as_slice()))
