@@ -177,6 +177,8 @@ Java also gains [explicit PEG assertions](docs/peg-assertions.md), matching the 
 
 The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. Capture/replay integration, external code-fence adapters, and observer exceptions remain tracked separately; this runtime slice does not complete parity.
 
+[Owned capture and replay](docs/owned-capture-replay.md) now retain actual input, projected, or generated text in both runtimes, with nested scopes and transactional rollback. Java exposes `NamedCapture` / `ReplayParser` / `CaptureScope`; Rust exposes `capture_owned` / `Replay` / `capture_scope`. General UBNF syntax remains tracked in #591. These APIs are development changes after 3.3.0.
+
 The development branch also adds [full semantic-token providers](docs/classic-rust-lsp.md) to Rust and validates the existing Java hook against the same protocol corpus. Both default to empty data; applications supply the token legend and encoded tokens. Range and delta requests remain unsupported. This is not included in 3.3.0.
 
 Java and Rust development runtimes provide [bounded snapshot and chunk caches](docs/incremental-cache.md). Generated LSP servers reuse complete unchanged snapshots and invalidate on edits, configuration and external-state revisions. Edited documents are reparsed in full; partial CST splicing is not implemented in either version. This addition is not included in 3.3.0.

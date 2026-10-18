@@ -289,6 +289,7 @@ impl ParseContext<'_> {
             return;
         }
         let (label, kind, begin, end) = match expression {
+            Expr::Replay(_) => ("ReplayParser", TokenKind::Consumed, start, self.position),
             Expr::Literal(_) => ("WordParser", TokenKind::Consumed, start, self.position),
             Expr::CaseInsensitive(_) => (
                 "UnicodeIgnoreCaseWordParser",

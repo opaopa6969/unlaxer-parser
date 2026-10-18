@@ -1,0 +1,11 @@
+# input-utf8	scenario	kind	invert	failureCP	expected
+6162	input	consumed	false	1	SAME_AS(value)
+61626162	inverted	consumed	true	2	SAME_AS(value)
+616258	inverted	consumed	true	2	SAME_AS(value)
+61	undefined	consumed	false	0	SAME_AS(value)
+61	undefined	consumed	true	0	SAME_AS(value)
+~	empty	consumed	true	0	SAME_AS(value)
+616263	prior-failure	consumed	false	3	SAME_AS(value)
+616263	prior-failure	matchOnly	false	3	SAME_AS(value)
+616263	prior-failure	virtualTokenConsumed	false	3	SAME_AS(value)
+616263	prior-failure	virtualTokenMatchOnly	false	3	SAME_AS(value)

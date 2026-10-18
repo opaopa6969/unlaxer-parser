@@ -626,7 +626,7 @@ fn projected_sources_are_shared_and_cannot_be_replayed_as_other_input() {
     assert!(error
         .expected
         .iter()
-        .any(|name| name.contains("projected token capture")));
+        .any(|name| name.contains("AST field capture requires original input source")));
     assert_eq!((c.position(), c.matched_position()), (0, 1));
     assert!(c.capture_spans("value").is_empty());
 }
