@@ -49,4 +49,4 @@ CIは`target/rust-nested-captures.tsv`を必須artifactとする。
 
 Rust単独の`nested_capture_shapes`とnative compile/runテストは、shape推論・全出現・scope位置・
 CST破棄後のASTとlist型Semanticsを検証する。
-入れ子containerの構造保存は#583で継続する。再帰unmapped helperのflat投影は[再帰helper契約](recursive-helpers.md)（#582）、直接数値captureのJava/Rust統一は[数値capture契約](numeric-captures.md)（#566）を参照。
+入れ子containerの構造保存の対応範囲は[typed nested captureの表](typed-nested-captures.md#nested-の対応範囲と拡張先)を参照する。再帰unmapped helperのflat投影は[再帰helper契約](recursive-helpers.md)（#582）、直接数値captureのJava/Rust統一は[数値capture契約](numeric-captures.md)（#566）を参照。

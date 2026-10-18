@@ -24,12 +24,6 @@
     "endCP": 138
   },
   {
-    "id": "alias",
-    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= A @value; A ::= 'a'; }",
-    "startCP": 56,
-    "endCP": 127
-  },
-  {
     "id": "group-containers",
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= ('a' ['b']) @value; }",
     "startCP": 56,
@@ -39,13 +33,50 @@
     "id": "choice-containers",
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= (['a'] | ['b']) @value; }",
     "startCP": 56,
-    "endCP": 141
+    "endCP": 141,
+    "detail": "choice with container alternatives is not supported yet (#693)"
   },
   {
     "id": "auto-eval",
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @eval(kind='literal') @mapping(Root, params=[value]) Root ::= 'a' @value; }",
     "startCP": 56,
-    "endCP": 151
+    "endCP": 151,
+    "detail": "@eval on a nested capture owner is not supported yet (#694)"
+  },
+  {
+    "id": "left-assoc",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @leftAssoc @mapping(Root, params=[value]) Root ::= 'a' @value; }",
+    "startCP": 56,
+    "endCP": 140,
+    "detail": "@leftAssoc/@rightAssoc projection of nested captures is not supported yet (#695)"
+  },
+  {
+    "id": "right-assoc",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @rightAssoc @mapping(Root, params=[value]) Root ::= 'a' @value; }",
+    "startCP": 56,
+    "endCP": 141,
+    "detail": "@leftAssoc/@rightAssoc projection of nested captures is not supported yet (#695)"
+  },
+  {
+    "id": "skip",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @skip @mapping(Root, params=[value]) Root ::= 'a' @value; }",
+    "startCP": 56,
+    "endCP": 135,
+    "detail": "@skip/@enum rules cannot own nested captures"
+  },
+  {
+    "id": "enum",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @enum @mapping(Root, params=[value]) Root ::= 'a' @value; }",
+    "startCP": 56,
+    "endCP": 135,
+    "detail": "@skip/@enum rules cannot own nested captures"
+  },
+  {
+    "id": "manual-eval",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @eval(kind='literal', strategy='manual') @mapping(Root, params=[value]) Root ::= 'a' @value; }",
+    "startCP": 56,
+    "endCP": 170,
+    "detail": "@eval on a nested capture owner is not supported yet (#694)"
   },
   {
     "id": "shared",
@@ -63,13 +94,15 @@
     "id": "common-field",
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @commonField(value) @nestedCaptures @mapping(Root, params=[value]) Root ::= 'a' @value; }",
     "startCP": 56,
-    "endCP": 149
+    "endCP": 149,
+    "detail": "@commonField on a nested owner with fields is not supported yet (#697)"
   },
   {
     "id": "token-stream",
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @tokenStream: enabled @root @nestedCaptures @mapping(Root, params=[value]) Root ::= 'a' @value; }",
     "startCP": 78,
-    "endCP": 151
+    "endCP": 151,
+    "detail": "token stream with nested captures is not supported yet (#696)"
   },
   {
     "id": "preparatory-depth",

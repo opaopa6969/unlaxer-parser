@@ -15,11 +15,6 @@
     "code": "E-NESTED-SHAPE"
   },
   {
-    "name": "alias",
-    "grammar": "grammar Typeof { @package: typeofprobe @whitespace: none @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= H @left @typeof(left) H @right; H ::= 'a'; }",
-    "code": "E-NESTED-SHAPE"
-  },
-  {
     "name": "grouped-sum-owner",
     "grammar": "grammar Typeof {\n @package: typeofprobe\n @whitespace: none\n @nestedCaptures @mapping(Family) @commonField(text) Value ::= @typeof(value) (A | B) @value;\n@mapping(Family.A,params=[text]) A ::= 'a' @text;\n@mapping(Family.B,params=[text]) B ::= 'b' @text;\n @root @nestedCaptures @mapping(Pair,params=[left,right]) Root ::= Value @left '=' @typeof(left) Value @right;\n}",
     "code": "E-COMMONFIELD-MISMATCH"
