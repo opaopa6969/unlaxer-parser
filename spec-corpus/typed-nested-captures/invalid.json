@@ -24,12 +24,6 @@
     "endCP": 138
   },
   {
-    "id": "alias",
-    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= A @value; A ::= 'a'; }",
-    "startCP": 56,
-    "endCP": 127
-  },
-  {
     "id": "group-containers",
     "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @nestedCaptures @mapping(Root, params=[value]) Root ::= ('a' ['b']) @value; }",
     "startCP": 56,

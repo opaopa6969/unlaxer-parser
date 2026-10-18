@@ -9,11 +9,12 @@ public final class PreferredAstPlan {
     private PreferredAstPlan() {}
 
     public record Call(int rule, int depth) {}
+    private record Rules(GrammarDecl grammar, List<String> names) { int indexOf(String name) { return names.indexOf(name); } }
 
     public static List<List<Call>> calls(GrammarDecl grammar) {
         var semantics = new SemanticCardinality(grammar);
         boolean semantic = semantics.enabled();
-        var rules = grammar.rules().stream().map(RuleDecl::name).toList();
+        var rules = new Rules(grammar, grammar.rules().stream().map(RuleDecl::name).toList());
         var result = new ArrayList<List<Call>>();
         for (var rule : grammar.rules()) {
             var plan =
@@ -39,7 +40,7 @@ public final class PreferredAstPlan {
             RuleBody body,
             int depth,
             CaptureBindingPlan plan,
-            List<String> rules,
+            Rules rules,
             List<Call> calls) {
         if (body instanceof ChoiceBody choice) {
             for (var sequence : choice.alternatives()) {
@@ -56,7 +57,7 @@ public final class PreferredAstPlan {
             SequenceBody sequence,
             int depth,
             CaptureBindingPlan plan,
-            List<String> rules,
+            Rules rules,
             List<Call> calls) {
         for (var element : sequence.elements())
             atom(element.element(), depth + 1, plan, rules, calls);
@@ -73,7 +74,7 @@ public final class PreferredAstPlan {
             AtomicElement atom,
             int depth,
             CaptureBindingPlan plan,
-            List<String> rules,
+            Rules rules,
             List<Call> calls) {
         if (plan.nested && plan.outerCapture(atom)) {
             nested(atom, depth + 1, plan, rules, calls);
@@ -110,7 +111,10 @@ public final class PreferredAstPlan {
 
     /** Mirror resolveNested: each explicit container and leaf adds a boundary token. */
     private static void nested(AtomicElement atom, int depth, CaptureBindingPlan plan,
-            List<String> rules, List<Call> calls) {
+            Rules rules, List<Call> calls) {
+        // A transparent alias stands for its single body element, as in ParserRuleEmitter.resolveNested.
+        var alias=NestedCaptures.inlinedAlias(rules.grammar(),atom);
+        if (alias.isPresent()) { nested(NestedCaptures.aliasElement(alias.get()),depth,plan,rules,calls); return; }
         if (atom instanceof TransparentElement group) nestedBody(group.body(),depth,plan,rules,calls);
         else if (atom instanceof OptionalElement optional) nestedBody(optional.body(),depth+2,plan,rules,calls);
         else if (atom instanceof RepeatElement repeat) nestedBody(repeat.body(),depth+2,plan,rules,calls);
@@ -125,7 +129,7 @@ public final class PreferredAstPlan {
             int id=rules.indexOf(ref.name());if(id>=0)calls.add(new Call(id,depth+1));
         }
     }
-    private static void nestedBody(RuleBody value,int depth,CaptureBindingPlan plan,List<String> rules,List<Call> calls) {
+    private static void nestedBody(RuleBody value,int depth,CaptureBindingPlan plan,Rules rules,List<Call> calls) {
         var child=single(value);
         if(child!=null)nested(child,depth,plan,rules,calls);
         else body(value,depth+1,plan,rules,calls);
@@ -135,7 +139,7 @@ public final class PreferredAstPlan {
             AtomicElement child,
             int depth,
             CaptureBindingPlan plan,
-            List<String> rules,
+            Rules rules,
             List<Call> calls) {
         atom(child, depth + (child instanceof RuleRefElement ? 1 : 2), plan, rules, calls);
     }

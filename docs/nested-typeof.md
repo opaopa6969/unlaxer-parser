@@ -25,6 +25,6 @@ RUSTUP_TOOLCHAIN=1.85.0 mvn -pl unlaxer-common,unlaxer-dsl -am test \
   -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
-alias/helper を越えた nested shape、container 自体を choice alternative にする形、nested auto-eval、associative、token-stream の合成は親 #583 の別条件であり、本変更の完了範囲に含まない。各 capture は既存どおり一つの完全な外側 container を所有する。container 内側に別 capture を追加する形や重複 site の解放は行わない。
+非再帰の透過 alias を越える nested shape は [透過 rule alias](typed-nested-captures.md#透過-rule-alias) で対応し、循環 helper 経由は両版で拒否する。container 自体を choice alternative にする形、nested auto-eval、associative、token-stream の合成は親 #583 の別条件であり、本変更の完了範囲に含まない。各 capture は既存どおり一つの完全な外側 container を所有する。container 内側に別 capture を追加する形や重複 site の解放は行わない。
 
 既存の constrained mapped sum を nested field から参照する経路は維持する。一方、sum 所有 rule 自体を nested にし、`@mapping(Family) @commonField(text) Value ::= @typeof(value) (A | B) @value;` と group 全体を capture する新形は、既存 family schema の対象外である。両 host は AST 生成前に `E-COMMONFIELD-MISMATCH` として拒否する。構文のみを生成する Java `ParserGenerator` の直接 API は AST family schema の検証を担当しない。この grouped sum 投影拡張は親 #583 の残条件とする。

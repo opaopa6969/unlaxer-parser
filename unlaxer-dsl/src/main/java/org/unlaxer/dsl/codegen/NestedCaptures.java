@@ -53,9 +53,14 @@ public final class NestedCaptures {
                 throw new IllegalArgumentException(problem.code() + ": " + problem.message());
             var sites = new CaptureBindingPlan(rule);
             if (sites.allSites().size() != captureNames(rule).size()) throw invalid(rule,"mapping must name each unique outer capture");
+            boolean localTrivia=rule.annotations().stream().anyMatch(a -> a instanceof WhitespaceAnnotation || a instanceof InterleaveAnnotation);
             for (String field : captureNames(rule)) {
                 if (sites.sites(field).size() != 1) throw invalid(rule,"one capture site required for " + field);
-                shape(grammar, sites.sites(field).get(0).element(), 0);
+                var element=sites.sites(field).get(0).element();
+                shape(grammar, element, 0);
+                // Inlined alias helpers keep the grammar trivia; a rule-local override would differ per host.
+                if (localTrivia && !expandAliases(grammar,element).equals(element))
+                    throw invalid(rule,"nested capture through a helper under rule-local trivia is not supported");
             }
             if (captureNames(rule).stream().anyMatch(name -> field(grammar,rule,name).leaf()==Kind.VALUE)) {
                 for (var candidate : grammar.rules()) {
@@ -117,13 +122,17 @@ public final class NestedCaptures {
         else if (value instanceof SeparatedElement e) { checkTraversal(e.element(), depth + 1); checkTraversal(e.separator(), depth + 1); }
     }
     public static GrammarIR.NestedShape shape(GrammarDecl grammar, AtomicElement element, int depth) {
+        return shape(grammar,element,depth,new java.util.ArrayList<>());
+    }
+    // `helpers` is the active chain of expanded transparent aliases, used to reject cycles.
+    private static GrammarIR.NestedShape shape(GrammarDecl grammar, AtomicElement element, int depth, List<String> helpers) {
         if (depth > 32) throw new IllegalArgumentException("E-NESTED-SHAPE: schema depth exceeds 32");
-        if (element instanceof OptionalElement e) return wrap(Cardinality.OPTIONAL,body(grammar,e.body(),depth+1));
-        if (element instanceof RepeatElement e) return wrap(Cardinality.MANY,body(grammar,e.body(),depth+1));
-        if (element instanceof SeparatedElement e) return wrap(Cardinality.MANY,shape(grammar,e.element(),depth+1));
-        if (element instanceof OneOrMoreElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1));
-        if (element instanceof BoundedRepeatElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1));
-        if (element instanceof TransparentElement e) return body(grammar,e.body(),depth+1);
+        if (element instanceof OptionalElement e) return wrap(Cardinality.OPTIONAL,body(grammar,e.body(),depth+1,helpers));
+        if (element instanceof RepeatElement e) return wrap(Cardinality.MANY,body(grammar,e.body(),depth+1,helpers));
+        if (element instanceof SeparatedElement e) return wrap(Cardinality.MANY,shape(grammar,e.element(),depth+1,helpers));
+        if (element instanceof OneOrMoreElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1,helpers));
+        if (element instanceof BoundedRepeatElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1,helpers));
+        if (element instanceof TransparentElement e) return body(grammar,e.body(),depth+1,helpers);
         if (element instanceof TerminalElement || element instanceof ReplayElement) return new GrammarIR.NestedShape(Kind.TEXT,null,List.of());
         if (element instanceof RuleRefElement e) {
             var token=grammar.tokens().stream().filter(t->t.name().equals(e.name())).findFirst();
@@ -137,19 +146,106 @@ public final class NestedCaptures {
                 var mapping=MapperElementUtil.getMappingAnnotation(target);
                 if(mapping.isPresent()) return new GrammarIR.NestedShape(Kind.NODE,null,List.of(),grammar.name()+"AST."+mapping.get().className());
             }
-            throw new IllegalArgumentException("E-NESTED-SHAPE: unmapped/skip aliases require the remaining #583 implementation");
+            return aliasShape(grammar,target,depth,helpers);
         }
         throw new IllegalArgumentException("E-NESTED-SHAPE: unsupported element " + element.getClass().getSimpleName());
     }
+    /**
+     * An unmapped, unannotated, non-recursive helper is a transparent alias: its body's shape is the
+     * shape of the reference. Native Rust (`nested_captures::alias_shape`) checks the same conditions
+     * in the same order and reports the same text.
+     */
+    private static GrammarIR.NestedShape aliasShape(GrammarDecl grammar, RuleDecl target, int depth, List<String> helpers) {
+        String name=target.name();
+        if (helpers.contains(name)) throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through recursive helper "+name+" is not supported");
+        if (MapperElementUtil.isSkipped(target)) throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through @skip rule "+name+" is not supported");
+        if (target.annotations().stream().anyMatch(a -> !(a instanceof DocAnnotation)))
+            throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through annotated helper "+name+" is not supported");
+        if (hasBindings(target.body())) throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through helper "+name+" with captures is not supported");
+        helpers.add(name);
+        var result=body(grammar,target.body(),depth+1,helpers);
+        helpers.remove(helpers.size()-1);
+        if (result.leaf()==Kind.VALUE) throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through mixed-choice helper "+name+" is not supported");
+        return result;
+    }
+    // AST captures, typeof constraints and general bindings stay owned by the rule that declares them.
+    private static boolean hasBindings(RuleBody body) {
+        var sequences=body instanceof ChoiceBody c?c.alternatives():List.of((SequenceBody)body);
+        for (var sequence:sequences) for (var e:sequence.elements()) {
+            if (e.captureName().isPresent() || e.typeofConstraint().isPresent() || hasBindings(e.element())) return true;
+        }
+        return false;
+    }
+    private static boolean hasBindings(AtomicElement element) {
+        if (element instanceof OwnedCaptureElement || element instanceof CaptureScopeElement || element instanceof ReplayElement) return true;
+        if (element instanceof TransparentElement e) return hasBindings(e.body());
+        if (element instanceof OptionalElement e) return hasBindings(e.body());
+        if (element instanceof RepeatElement e) return hasBindings(e.body());
+        if (element instanceof OneOrMoreElement e) return hasBindings(e.body());
+        if (element instanceof BoundedRepeatElement e) return hasBindings(e.body());
+        if (element instanceof SeparatedElement e) return hasBindings(e.element()) || hasBindings(e.separator());
+        return false;
+    }
+    /**
+     * The transparent alias whose single body element stands for {@code element} inside a nested
+     * capture, or empty when the reference stays an ordinary leaf (token, mapped node, enum, or a
+     * helper whose body is a choice / multi-element sequence and therefore one text or i32 value).
+     * Callers only use this after {@link #requireValid} accepted the grammar, so no cycle remains.
+     */
+    public static java.util.Optional<RuleDecl> inlinedAlias(GrammarDecl grammar, AtomicElement element) {
+        if (!(element instanceof RuleRefElement reference) || grammar.tokens().stream().anyMatch(t->t.name().equals(reference.name())))
+            return java.util.Optional.empty();
+        return grammar.rules().stream().filter(r->r.name().equals(reference.name())).findFirst()
+            .filter(r->!EnumSchema.isEnum(r) && !MapperElementUtil.isSkipped(r) && MapperElementUtil.getMappingAnnotation(r).isEmpty())
+            .filter(r->r.body() instanceof SequenceBody s && s.elements().size()==1
+                || r.body() instanceof ChoiceBody c && c.alternatives().size()==1 && c.alternatives().get(0).elements().size()==1);
+    }
+    private static boolean isHelper(GrammarDecl grammar, String name) {
+        return grammar.tokens().stream().noneMatch(t->t.name().equals(name)) && grammar.rules().stream().anyMatch(r->r.name().equals(name)
+            && !EnumSchema.isEnum(r) && (MapperElementUtil.isSkipped(r) || MapperElementUtil.getMappingAnnotation(r).isEmpty()));
+    }
+    /** The single body element of an {@link #inlinedAlias}. */
+    public static AtomicElement aliasElement(RuleDecl alias) {
+        var sequence=alias.body() instanceof ChoiceBody c?c.alternatives().get(0):(SequenceBody)alias.body();
+        return sequence.elements().get(0).element();
+    }
+    /**
+     * Replaces inlined alias references by their single body element along the nested path, exactly
+     * where {@code ParserRuleEmitter.resolveNested} descends: single-element bodies, repeated items and
+     * separated items. Multi-element and choice bodies (and separators) stay ordinary flat parsers.
+     */
+    public static AtomicElement expandAliases(GrammarDecl grammar, AtomicElement element) {
+        var alias=inlinedAlias(grammar,element);
+        if (alias.isPresent()) return expandAliases(grammar,aliasElement(alias.get()));
+        if (element instanceof GroupElement e) return new GroupElement(expandSingle(grammar,e.body()));
+        if (element instanceof OwnedCaptureElement e) return new OwnedCaptureElement(e.name(),expandSingle(grammar,e.body()));
+        if (element instanceof CaptureScopeElement e) return new CaptureScopeElement(expandSingle(grammar,e.body()));
+        if (element instanceof OptionalElement e) return new OptionalElement(expandSingle(grammar,e.body()));
+        if (element instanceof RepeatElement e) return new RepeatElement(expandSingle(grammar,e.body()));
+        if (element instanceof OneOrMoreElement e) return new OneOrMoreElement(expandAliases(grammar,e.body()));
+        if (element instanceof BoundedRepeatElement e) return new BoundedRepeatElement(expandAliases(grammar,e.body()),e.min(),e.max());
+        if (element instanceof SeparatedElement e) return new SeparatedElement(expandAliases(grammar,e.element()),e.separator());
+        return element;
+    }
+    private static RuleBody expandSingle(GrammarDecl grammar, RuleBody body) {
+        var sequence=body instanceof ChoiceBody c && c.alternatives().size()==1?c.alternatives().get(0):body;
+        if (!(sequence instanceof SequenceBody s) || s.elements().size()!=1) return body;
+        var only=s.elements().get(0);
+        var replaced=new SequenceBody(List.of(new AnnotatedElement(expandAliases(grammar,only.element()),only.captureName(),only.typeofConstraint())));
+        return body instanceof ChoiceBody?new ChoiceBody(List.of(replaced)):replaced;
+    }
     public static GrammarIR.NestedShape body(GrammarDecl grammar, RuleBody body, int depth) {
+        return body(grammar,body,depth,new java.util.ArrayList<>());
+    }
+    private static GrammarIR.NestedShape body(GrammarDecl grammar, RuleBody body, int depth, List<String> helpers) {
         var sequences=body instanceof ChoiceBody c?c.alternatives():List.of((SequenceBody)body);
         GrammarIR.NestedShape result=null;
         for (var sequence:sequences) {
             GrammarIR.NestedShape current;
-            if (sequence.elements().size()==1) current=shape(grammar,sequence.elements().get(0).element(),depth+1);
+            if (sequence.elements().size()==1) current=shape(grammar,sequence.elements().get(0).element(),depth+1,helpers);
             else {
                 for (var e:sequence.elements()) {
-                    var item=shape(grammar,e.element(),depth+1);
+                    var item=shape(grammar,e.element(),depth+1,helpers);
                     if (!item.containers().isEmpty() || item.javaLeafType()!=null) throw new IllegalArgumentException("E-NESTED-SHAPE: multi-element container/mapped group needs an explicit mapped node");
                 }
                 current=new GrammarIR.NestedShape(Kind.TEXT,null,List.of());
@@ -163,6 +259,10 @@ public final class NestedCaptures {
             result=current;
         }
         if (result==null) throw new IllegalArgumentException("E-NESTED-SHAPE: empty body");
+        // Mixed sums classify each alternative by its own CST token; a helper token would hide it.
+        if (result.leaf()==Kind.VALUE) for (var sequence:sequences)
+            if (sequence.elements().size()==1 && sequence.elements().get(0).element() instanceof RuleRefElement r && isHelper(grammar,r.name()))
+                throw new IllegalArgumentException("E-NESTED-SHAPE: mixed choice alternative through helper "+r.name()+" is not supported");
         return result;
     }
     static java.util.Set<String> captureNames(RuleDecl rule) {

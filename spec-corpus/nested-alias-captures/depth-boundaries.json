@@ -1,0 +1,26 @@
+[
+  {
+    "depth": 7,
+    "optionals": 6,
+    "accepted": true,
+    "grammar": "grammar AliasDepth { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= A1 @value; A1 ::= [A2]; A2 ::= [A3]; A3 ::= [A4]; A4 ::= [A5]; A5 ::= [A6]; A6 ::= [A7]; A7 ::= 'a'; }",
+    "startCP": 58,
+    "endCP": 129
+  },
+  {
+    "depth": 8,
+    "optionals": 7,
+    "accepted": true,
+    "grammar": "grammar AliasDepth { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= A1 @value; A1 ::= [A2]; A2 ::= [A3]; A3 ::= [A4]; A4 ::= [A5]; A5 ::= [A6]; A6 ::= [A7]; A7 ::= [A8]; A8 ::= 'a'; }",
+    "startCP": 58,
+    "endCP": 129
+  },
+  {
+    "depth": 9,
+    "optionals": 8,
+    "accepted": false,
+    "grammar": "grammar AliasDepth { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= A1 @value; A1 ::= [A2]; A2 ::= [A3]; A3 ::= [A4]; A4 ::= [A5]; A5 ::= [A6]; A6 ::= [A7]; A7 ::= [A8]; A8 ::= [A9]; A9 ::= 'a'; }",
+    "startCP": 58,
+    "endCP": 129
+  }
+]

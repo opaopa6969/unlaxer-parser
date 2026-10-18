@@ -676,9 +676,10 @@ public final class RustGrammarLowering {
         }
         if (body instanceof SequenceBody sequence) {
             return new Sequence(sequence.elements().stream().map(element -> {
-                Expression expression = atomic(element.element());
-                if (element.captureName().isEmpty()) return expression;
-                return nestedRule ? new Capture(element.captureName().get(), nestedBoundary(expression)) : capture(element.captureName().get(), expression);
+                if (element.captureName().isEmpty()) return atomic(element.element());
+                // Nested captures lower transparent aliases as their single body element (see NestedCaptures.inlinedAlias).
+                if (nestedRule) return new Capture(element.captureName().get(), nestedBoundary(atomic(org.unlaxer.dsl.codegen.NestedCaptures.expandAliases(grammar,element.element()))));
+                return capture(element.captureName().get(), atomic(element.element()));
             }).toList());
         }
         throw new IllegalStateException("unhandled " + body);
