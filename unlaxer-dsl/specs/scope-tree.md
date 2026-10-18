@@ -134,7 +134,8 @@ Token rootToken = VariableTypeResolver.resolveVariableType(rootToken);
 grammar TinyExpression {
     @whitespace: javaStyle
 
-    token VARNAME  = REGEX('\$[a-zA-Z_][a-zA-Z0-9_]*')
+    token LETTER ::= CHAR_RANGE('a','z') | CHAR_RANGE('A','Z') | '_';
+    token VARNAME ::= '$' LETTER (LETTER | CHAR_RANGE('0','9'))*;
     token NUMBER   = NumberParser
     token STRING   = SingleQuotedParser
 

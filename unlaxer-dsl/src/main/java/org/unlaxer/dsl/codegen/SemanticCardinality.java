@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -113,7 +115,7 @@ final class SemanticCardinality {
             visiting.remove(ref.name());
             return result;
         }
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             return shape(group.body(), visiting);
         }
         if (element instanceof OptionalElement optional) {
@@ -186,7 +188,7 @@ final class SemanticCardinality {
     }
 
     private Map<String, Shape> captures(AtomicElement element) {
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             return captures(group.body());
         }
         if (element instanceof OptionalElement optional) {

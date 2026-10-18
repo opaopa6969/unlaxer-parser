@@ -156,6 +156,69 @@ impl Store {
     }
 }
 
+/// Only structural token data. Portable ID/extra/related values are transactional
+/// caller state, never memoized; replay allocates fresh generation-checked IDs.
+pub(crate) struct MemoTokens(Vec<(usize, TokenInfo, bool)>);
+impl MemoTokens {
+    pub(crate) fn measure(store: &Store, start: usize, end: usize) -> Option<usize> {
+        let mut bytes = 0_usize;
+        for (&index, info) in store.values.range(start..end) {
+            if !info.extra.is_empty() || !info.related.is_empty() {
+                return None;
+            }
+            let original = info.original.as_deref().unwrap_or(&[]);
+            if original.iter().any(|&child| child < start || child >= end) {
+                return None;
+            }
+            let text = match &info.source {
+                TokenSource::Input(_) => 0,
+                TokenSource::Projected { text, .. } => text.len(),
+                TokenSource::Generated { text, .. } => text.len(),
+            };
+            bytes = bytes
+                .saturating_add(std::mem::size_of::<(usize, TokenInfo, bool)>())
+                .saturating_add(std::mem::size_of_val(original))
+                .saturating_add(text);
+            debug_assert!(index >= start);
+        }
+        Some(bytes)
+    }
+    pub(crate) fn capture(store: &Store, start: usize, end: usize) -> Self {
+        Self(
+            store
+                .values
+                .range(start..end)
+                .map(|(&index, info)| {
+                    let mut info = info.clone();
+                    if let Some(original) = info.original.as_mut() {
+                        for child in original {
+                            *child -= start;
+                        }
+                    }
+                    (index - start, info, store.ids.contains_key(&index))
+                })
+                .collect(),
+        )
+    }
+    pub(crate) fn replay(&self, context: &mut ParseContext<'_>, start: usize) {
+        for (index, info, registered) in &self.0 {
+            let index = index + start;
+            let mut info = info.clone();
+            if let Some(original) = info.original.as_mut() {
+                for child in original {
+                    *child += start;
+                }
+            }
+            if *registered {
+                context
+                    .token_node_id(index)
+                    .expect("new memoized structural node");
+            }
+            Rc::make_mut(&mut context.tokens).values.insert(index, info);
+        }
+    }
+}
+
 impl ParseContext<'_> {
     /// The inherited Classic arguments. Custom parsers can forward these to
     /// `parse_token`; ordinary Expr children inherit them automatically.
@@ -723,6 +786,12 @@ impl ParseContext<'_> {
                     },
                 )
             }
+            Expr::LongCodeBlock => {
+                let end = (!mode.invert)
+                    .then(|| super::long_code_fence::end(self.input, start))
+                    .flatten();
+                ("LongCodeBlockParser", end.unwrap_or(start), end.is_some())
+            }
             Expr::Replay(name) => {
                 let text = self.captured_text(name);
                 let width = text.map_or(0, |text| text.chars().count());
@@ -742,12 +811,6 @@ impl ParseContext<'_> {
                     end,
                     full && (text.is_some_and(|text| raw.starts_with(text)) != mode.invert),
                 )
-            }
-            Expr::LongCodeBlock => {
-                let end = (!mode.invert)
-                    .then(|| super::long_code_fence::end(self.input, start))
-                    .flatten();
-                ("LongCodeBlockParser", end.unwrap_or(start), end.is_some())
             }
             Expr::Until(terminator) => {
                 let at = raw.find(terminator);
@@ -802,6 +865,10 @@ impl ParseContext<'_> {
         if self.options.diagnostics == super::Diagnostics::Detailed {
             let reached = self.position.max(self.matched_position);
             self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+            if let Some(frame) = self.diagnostic_frames.last_mut() {
+                frame.classic_max_reached =
+                    Some(frame.classic_max_reached.unwrap_or(0).max(reached));
+            }
         }
         let node = self.add_token_node_inner(
             super::TOKEN_LEAF_RULE,
@@ -1387,30 +1454,6 @@ fn classic_quoted(quote: char) -> &'static Expr {
     })
 }
 
-fn classic_class_name() -> &'static Expr {
-    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
-    VALUE.get_or_init(|| {
-        Expr::sequence([
-            Expr::Identifier,
-            Expr::sequence([
-                Expr::character("DotParser", |cp| cp == '.'),
-                Expr::Identifier,
-            ])
-            .repeat_java(0, None),
-        ])
-    })
-}
-fn classic_line_end() -> &'static Expr {
-    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
-    VALUE.get_or_init(|| {
-        Expr::choice([
-            Expr::Literal("\r\n"),
-            Expr::Literal("\r"),
-            Expr::Literal("\n"),
-            Expr::Eof,
-        ])
-    })
-}
 fn classic_whitespace() -> &'static Expr {
     static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
     VALUE.get_or_init(|| {
@@ -1448,6 +1491,31 @@ fn classic_line_body(context: &mut ParseContext<'_>) -> ParseResult {
         span,
         nodes: fragment.nodes,
         captures: fragment.captures,
+    })
+}
+
+fn classic_class_name() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::sequence([
+            Expr::Identifier,
+            Expr::sequence([
+                Expr::character("DotParser", |cp| cp == '.'),
+                Expr::Identifier,
+            ])
+            .repeat_java(0, None),
+        ])
+    })
+}
+fn classic_line_end() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::choice([
+            Expr::Literal("\r\n"),
+            Expr::Literal("\r"),
+            Expr::Literal("\n"),
+            Expr::Eof,
+        ])
     })
 }
 

@@ -58,7 +58,9 @@ pub fn sites(rule: &RuleDecl) -> Result<BTreeMap<String, &AtomicElement>, String
             return Err(error(rule, "capture traversal depth exceeds 64"));
         }
         match &value.kind {
-            ElementKind::Group(v) => body(rule, v, inside, depth + 1, result)?,
+            ElementKind::OwnedCapture { body: v, .. }
+            | ElementKind::CaptureScope(v)
+            | ElementKind::Group(v) => body(rule, v, inside, depth + 1, result)?,
             ElementKind::Optional(v) | ElementKind::Repeat(v) => {
                 body(rule, v, true, depth + 1, result)?
             }
@@ -148,6 +150,14 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
             continue;
         }
         for candidate in &grammar.rules {
+            // Skipped rules do not contribute a public mapping, matching Java's schema.
+            if candidate
+                .annotations
+                .iter()
+                .any(|a| matches!(a.kind, AnnotationKind::Skip))
+            {
+                continue;
+            }
             let Some(params) = candidate.annotations.iter().find_map(|a| match &a.kind {
                 AnnotationKind::Mapping { class_name, params } if class_name == mapping.0 => {
                     Some(params)
@@ -204,7 +214,11 @@ fn nominal_leaf(grammar: &GrammarDecl, atom: &AtomicElement) -> Option<String> {
                     _ => None,
                 })
             }),
-        ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
+        ElementKind::OwnedCapture { body, .. }
+        | ElementKind::CaptureScope(body)
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => {
             let [sequence] = body.alternatives.as_slice() else {
                 return None;
             };
@@ -244,7 +258,9 @@ pub fn shape(grammar: &GrammarDecl, atom: &AtomicElement, depth: usize) -> Resul
         ElementKind::OneOrMore(v) | ElementKind::BoundedRepeat { element: v, .. } => {
             wrap(Cardinality::Many, shape(grammar, v, depth + 1)?)
         }
-        ElementKind::Group(v) => body_shape(grammar, v, depth + 1)?,
+        ElementKind::OwnedCapture { body: v, .. }
+        | ElementKind::CaptureScope(v)
+        | ElementKind::Group(v) => body_shape(grammar, v, depth + 1)?,
         ElementKind::Terminal(_) => Kind::Text,
         ElementKind::RuleRef { name, .. } => {
             let token = grammar.tokens.iter().find(|t| &t.name == name);
@@ -329,6 +345,18 @@ pub fn boundary(expression: Expression) -> Expression {
                 unreachable!()
             };
             (kind, Expression::Sequence(vec![*child]))
+        }
+        Expression::OwnedCapture { name, child } => {
+            let Expression::CaptureBoundary { kind, child } = boundary(*child) else {
+                unreachable!()
+            };
+            (kind, Expression::OwnedCapture { name, child })
+        }
+        Expression::CaptureScope(v) => {
+            let Expression::CaptureBoundary { kind, child } = boundary(*v) else {
+                unreachable!()
+            };
+            (kind, Expression::CaptureScope(child))
         }
         Expression::Delimited(v) => {
             let Expression::CaptureBoundary { kind, child } = boundary(*v) else {

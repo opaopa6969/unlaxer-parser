@@ -5,7 +5,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
@@ -64,6 +64,7 @@ public class ASTGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         NestedCaptures.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
@@ -407,6 +408,16 @@ public class ASTGenerator implements CodeGenerator {
         if (!(grammar.name() + "AST." + className).equals(narrowInnerType)) {
             return false;
         }
+        // Widen only when both sides form the nominal recursive fold used by
+        // MapperRuleEmitter. A mixed Object left and recursive right retain
+        // their own types; widening just the right breaks List invariance.
+        String nominal = grammar.name() + "AST." + className;
+        if (!nominal.equals(MapperTypeResolver.inferType(grammar, rule, "left"))
+                || !"List<String>".equals(MapperTypeResolver.inferType(grammar, rule, "op"))
+                || !nominal.equals(MapperTypeResolver.unwrapListType(
+                        MapperTypeResolver.inferType(grammar, rule, "right")).orElse("Object"))) {
+            return false;
+        }
         Map<String, RuleDecl> ruleByName = new LinkedHashMap<>();
         List<RuleDecl> rulesForClass = new ArrayList<>();
         for (RuleDecl r : grammar.rules()) {
@@ -440,10 +451,11 @@ public class ASTGenerator implements CodeGenerator {
 
     private String inferTypeFromElement(GrammarDecl grammar, AtomicElement element) {
         String astClassName = grammar.name() + "AST";
+        if (element instanceof UBNFAST.ReplayElement) return "String";
         if (element instanceof TerminalElement t) {
             return "String";
         }
-        if (element instanceof RuleRefElement || element instanceof GroupElement) {
+        if (element instanceof RuleRefElement || element instanceof TransparentElement) {
             var enumType=EnumSchema.enumType(grammar,element);
             if(enumType.isPresent()) return grammar.name()+"AST."+enumType.get();
         }
@@ -484,7 +496,7 @@ public class ASTGenerator implements CodeGenerator {
             String inner = inferTypeFromElement(grammar, sep.element());
             return "List<" + MapperTypeResolver.boxedType(inner) + ">";
         }
-        if (element instanceof GroupElement g) {
+        if (element instanceof TransparentElement g) {
             return "Object";
         }
         if (element instanceof ErrorElement e) {
@@ -575,7 +587,7 @@ public class ASTGenerator implements CodeGenerator {
         if (element instanceof UBNFAST.SeparatedElement separated) {
             return findCapturedElementsInAtomic(separated.element(), captureName, inOptional, true);
         }
-        if (element instanceof GroupElement g) {
+        if (element instanceof TransparentElement g) {
             return findCapturedElementsInBody(g.body(), captureName, inOptional, inRepeat);
         }
         return List.of();

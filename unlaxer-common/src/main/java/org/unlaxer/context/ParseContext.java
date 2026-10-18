@@ -64,7 +64,7 @@ public class ParseContext implements
 
   /** Internal boundary for public begin/commit/rollback calls outside parse notifications. */
   public void beforeTransactionBegin() {
-    requireObserverHealthy();
+    requireParseHealthy();
     if (!observerBoundaryActive) beginObserverBoundary(true);
   }
 
@@ -76,12 +76,21 @@ public class ParseContext implements
     }
   }
 
+  /** Internal parser/transaction boundary; controlled resource aborts retain their first error. */
+  void requireParseHealthy() {
+    requireObserverHealthy();
+    if (parseLimitFailure != null) {
+      restoreObserverPublication();
+      throw parseLimitFailure;
+    }
+  }
+
   /** Internal listener boundary: preserve the first exception and publish no partial parse. */
   public void notifyObserver(Runnable notification) {
-    requireObserverHealthy();
+    requireParseHealthy();
     try {
       notification.run();
-      requireObserverHealthy();
+      requireParseHealthy();
     } catch (RuntimeException | Error failure) {
       abortObserver(failure);
       throw failure;
@@ -156,6 +165,11 @@ public class ParseContext implements
     if (observerFailure != null) return;
     observerFailure = failure;
     disableMemoizationPermanently();
+    abortPublication();
+  }
+
+  /** Roll back the outermost active parse without publishing abandoned callbacks. */
+  private void abortPublication() {
     // No more observer callbacks or memo publication while exceptional frames unwind.
     memoDiagnosticFrames.clear();
     Arrays.fill(memoTransactionFrames, null);
@@ -216,7 +230,7 @@ public class ParseContext implements
 
 	/** Records choice metadata in the current transaction so an enclosing rollback removes it. */
 	public void choose(ChoiceInterface choice, Parser parser) {
-        requireObserverHealthy();
+        requireParseHealthy();
         if (observerBoundaryActive) observerStateBoundary().recordChosenParser(choice, chosenParserByChoice.get(choice));
 		getCurrent().recordChosenParser(choice, chosenParserByChoice.get(choice));
 		chosenParserByChoice.put(choice, parser);
@@ -224,7 +238,7 @@ public class ParseContext implements
 
 	/** Records interleave ordering in the current transaction so an enclosing rollback removes it. */
 	public void order(NonOrdered nonOrdered, Parsers parsers) {
-        requireObserverHealthy();
+        requireParseHealthy();
         if (observerBoundaryActive) observerStateBoundary().recordOrderedParsers(nonOrdered, orderedParsersByNonOrdered.get(nonOrdered));
 		getCurrent().recordOrderedParsers(nonOrdered, orderedParsersByNonOrdered.get(nonOrdered));
 		orderedParsersByNonOrdered.put(nonOrdered, parsers);
@@ -256,7 +270,7 @@ public class ParseContext implements
      * Owners must obey {@link TransactionalState#checkpoint()}'s no-throw contract.
      */
     public void registerTransactionalState(TransactionalState state) {
-        requireObserverHealthy();
+        requireParseHealthy();
         java.util.Objects.requireNonNull(state, "state");
         if (transactionalStates.stream().anyMatch(existing -> existing == state)) return;
         transactionalStates.add(state);
@@ -272,7 +286,7 @@ public class ParseContext implements
      * must call this immediately before each mutation.
      */
     public void beforeTransactionalStateMutation(TransactionalState state) {
-        requireObserverHealthy();
+        requireParseHealthy();
         java.util.Objects.requireNonNull(state, "state");
         if (false == state instanceof MutationAwareTransactionalState) {
             throw new IllegalArgumentException("state is not mutation-aware");
@@ -298,7 +312,7 @@ public class ParseContext implements
     }
 
     void finishTransactionalState(TransactionElement frame, boolean restore) {
-        if (observerFailure != null && !transactionalFrames.contains(frame)) return;
+        if ((observerFailure != null || parseLimitFailure != null) && !transactionalFrames.contains(frame)) return;
         transactionalFrames.remove(frame);
         long savedMemoizationStateVersion = frame.takeMemoizationStateVersion();
         if (restore) {
@@ -686,6 +700,7 @@ public class ParseContext implements
    */
   public static final class FailureDiagnostic {
     int stackBaseDepth;
+    int memoParseDepth;
     int transactionBaseDepth;
     int farthestConsumedOffset;
     int farthestMatchedOffset;
@@ -975,7 +990,7 @@ public class ParseContext implements
       rollback(owner);
       completed = true;
     } finally {
-      if (observerFailure == null) {
+      if (observerFailure == null && parseLimitFailure == null) {
         // Unwind only frames opened by this assertion if a callback throws. Resource
         // failures remain fatal; do not turn them into successful negative assertions.
         while (tokenStack.size() > tokensBefore) {
@@ -1036,14 +1051,14 @@ public class ParseContext implements
         try {
           result = new Parsed(commit(owner, TokenKind.matchOnly));
         } finally {
-          if (observerFailure == null) stateBoundary.restoreState();
+          if (observerFailure == null && parseLimitFailure == null) stateBoundary.restoreState();
         }
       }
       endParse(owner, result, this, kind, invert);
       completed = true;
       return result;
     } finally {
-      if (!completed && observerFailure == null) {
+      if (!completed && observerFailure == null && parseLimitFailure == null) {
         // State owners obey the checkpoint/restore no-throw contract. Keep the
         // original callback or resource exception; do not synthesize callbacks.
         while (tokenStack.size() > tokensBefore) {
@@ -1122,7 +1137,7 @@ public class ParseContext implements
       completed = true;
       return result;
     } finally {
-      if (!completed && observerFailure == null) {
+      if (!completed && observerFailure == null && parseLimitFailure == null) {
         while (tokenStack.size() > tokensBefore) {
           TransactionElement abandoned = tokenStack.pollFirst();
           abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
@@ -1211,6 +1226,7 @@ public class ParseContext implements
 
   FailureDiagnostic beginMemoDiagnosticFrame() {
     FailureDiagnostic frame = new FailureDiagnostic();
+    frame.memoParseDepth = activeParseDepth();
     frame.transactionBaseDepth = tokenStack.size();
     if (memoTransactionFrameCount == memoTransactionFrames.length) {
       memoTransactionFrames = Arrays.copyOf(memoTransactionFrames, memoTransactionFrameCount * 2);
@@ -1583,15 +1599,20 @@ public class ParseContext implements
     trackCursorProgress();
   }
 
+  /** Active resource budget is part of a memoized parser invocation. */
+  int activeParseDepth() {
+    return deferredDiagnostics ? deferredFrameDepth : parseFrames.size();
+  }
+
   @Override
   public void startParse(Parser parser, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-    requireObserverHealthy();
-    if (parseLimitFailure != null) throw parseLimitFailure;
-    int activeDepth = deferredDiagnostics ? deferredFrameDepth : parseFrames.size();
+    requireParseHealthy();
+    int activeDepth = activeParseDepth();
     if (activeDepth == 0) beginObserverBoundary(false);
     if (activeDepth >= MAX_PARSE_DEPTH) {
       parseLimitFailure = new ParseLimitException(MAX_PARSE_DEPTH, getPosition(tokenKind).value());
       disableMemoizationPermanently();
+      abortPublication();
       throw parseLimitFailure;
     }
     int consumed = Transaction.super.getConsumedPosition().value();
@@ -1612,8 +1633,7 @@ public class ParseContext implements
 
   @Override
   public void endParse(Parser parser, Parsed parsed, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-    requireObserverHealthy();
-    if (parseLimitFailure != null) throw parseLimitFailure;
+    requireParseHealthy();
     if (deferredDiagnostics) {
       endDeferredParse(parser, parsed);
       ParserListenerContainer.super.endParse(parser, parsed, parseContext, tokenKind, invertMatch);

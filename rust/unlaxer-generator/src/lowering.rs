@@ -83,6 +83,14 @@ impl FixedShape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    for token in &grammar.tokens {
+        if matches!(&token.kind, TokenKind::Regex { .. })
+            || matches!(&token.kind, TokenKind::Simple { parser_class }
+                if parser_class == "RegexTokenParser" || parser_class == "org.unlaxer.dsl.runtime.RegexTokenParser")
+        {
+            return Err("E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)".into());
+        }
+    }
     crate::nested_captures::validate(grammar)?;
     crate::lexical_contexts::validate(grammar)?;
     let format_two = grammar.settings.iter().any(|setting| {
@@ -243,7 +251,10 @@ impl Lowering<'_> {
                     }
                 }
                 match &atom.kind {
-                    ElementKind::Group(inner) | ElementKind::Optional(inner) => {
+                    ElementKind::OwnedCapture { body: inner, .. }
+                    | ElementKind::CaptureScope(inner)
+                    | ElementKind::Group(inner)
+                    | ElementKind::Optional(inner) => {
                         self.follow_body(inner, target, tokens);
                     }
                     ElementKind::Repeat(inner) => {
@@ -303,7 +314,9 @@ impl Lowering<'_> {
                     tokens.push(value.clone());
                 }
             }
-            ElementKind::Group(inner)
+            ElementKind::OwnedCapture { body: inner, .. }
+            | ElementKind::CaptureScope(inner)
+            | ElementKind::Group(inner)
             | ElementKind::Optional(inner)
             | ElementKind::Repeat(inner) => {
                 self.first_body(inner, tokens, visited);
@@ -1309,6 +1322,14 @@ impl Lowering<'_> {
                     )
                 }
             }
+            ElementKind::OwnedCapture { name, body } => Expression::OwnedCapture {
+                name: name.clone(),
+                child: Box::new(self.single_body(body, true)?),
+            },
+            ElementKind::Replay { name } => Expression::Replay(name.clone()),
+            ElementKind::CaptureScope(body) => {
+                Expression::CaptureScope(Box::new(self.single_body(body, true)?))
+            }
             ElementKind::Group(body) => self.body(body)?,
             ElementKind::Optional(body) => {
                 Expression::OptionalExpr(Box::new(self.single_body(body, false)?))
@@ -1383,14 +1404,19 @@ impl Lowering<'_> {
     fn is_nullable(&self, expression: &Expression) -> bool {
         match expression {
             Expression::LexicalToken { expression, .. } => expression.nullable(),
-            Expression::EmptyToken
+            Expression::Replay(_)
+            | Expression::EmptyToken
             | Expression::EofToken
             | Expression::LookaheadToken { .. }
             | Expression::UntilToken(_)
             | Expression::CustomToken(_)
             | Expression::OptionalExpr(_) => true,
             Expression::Reference(rule) => self.nullable.contains(rule),
-            Expression::Capture { expression, .. }
+            Expression::OwnedCapture {
+                child: expression, ..
+            }
+            | Expression::CaptureScope(expression)
+            | Expression::Capture { expression, .. }
             | Expression::CaptureBoundary {
                 child: expression, ..
             }
@@ -1409,12 +1435,9 @@ impl Lowering<'_> {
     fn check_repetition(&self, expression: &Expression) -> Result<()> {
         // Generated repeats use JavaRepeat's successful no-progress termination.
         // Source left-recursion and lexical nullability are validated independently.
-        if let Expression::Separated { child, separator } = expression {
+        if let Expression::Separated { separator, .. } = expression {
             if self.shape(separator, &mut HashSet::new())?.kind != Kind::Text {
                 return Err("mapped separator".into());
-            }
-            if self.is_nullable(child) && self.is_nullable(separator) {
-                return Err("nullable unbounded separation".into());
             }
         }
         for child in children(expression) {
@@ -1626,7 +1649,11 @@ impl Lowering<'_> {
         let _depth = self.enter_analysis()?;
         match expression {
             Expression::Reference(rule) => Ok(state[*rule].clone()),
-            Expression::Capture { expression, .. }
+            Expression::OwnedCapture {
+                child: expression, ..
+            }
+            | Expression::CaptureScope(expression)
+            | Expression::Capture { expression, .. }
             | Expression::CaptureBoundary {
                 child: expression, ..
             }
@@ -1690,7 +1717,11 @@ impl Lowering<'_> {
         let _depth = self.enter_analysis()?;
         match expression {
             Expression::Reference(rule) => self.rule_shape_projected(*rule, visiting, enum_nodes),
-            Expression::Capture { expression, .. }
+            Expression::OwnedCapture {
+                child: expression, ..
+            }
+            | Expression::CaptureScope(expression)
+            | Expression::Capture { expression, .. }
             | Expression::CaptureBoundary {
                 child: expression, ..
             }
@@ -1835,7 +1866,11 @@ impl Lowering<'_> {
                     _ => Predictor::OneOf(values),
                 }
             }
-            Expression::Capture { expression, .. }
+            Expression::OwnedCapture {
+                child: expression, ..
+            }
+            | Expression::CaptureScope(expression)
+            | Expression::Capture { expression, .. }
             | Expression::CaptureBoundary {
                 child: expression, ..
             }
@@ -1865,6 +1900,13 @@ impl Lowering<'_> {
     ) -> Result<Expression> {
         let _depth = self.enter_analysis()?;
         Ok(match expression {
+            Expression::OwnedCapture { name, child } => Expression::OwnedCapture {
+                name: name.clone(),
+                child: Box::new(self.project_text_values(child, mapping)?),
+            },
+            Expression::CaptureScope(child) => {
+                Expression::CaptureScope(Box::new(self.project_text_values(child, mapping)?))
+            }
             Expression::Choice(alternatives) => {
                 let mixed = self.shape(expression, &mut HashSet::new())?.kind == Kind::Value;
                 Expression::Choice(
@@ -2039,7 +2081,9 @@ impl Lowering<'_> {
             Expression::OptionalExpr(child) => {
                 self.wrapped_captures(child, Cardinality::Optional)?
             }
-            Expression::Delimited(child)
+            Expression::OwnedCapture { child, .. }
+            | Expression::CaptureScope(child)
+            | Expression::Delimited(child)
             | Expression::CaptureBoundary { child, .. }
             | Expression::CaptureEquality { child, .. } => self.captures(child)?,
             Expression::Repeat { child, .. } => self.wrapped_captures(child, Cardinality::Many)?,
@@ -2447,7 +2491,9 @@ fn annotated_elements(body: &ast::RuleBody) -> Vec<&ast::AnnotatedElement> {
                 pending.push(Pending::Element(&value.element));
             }
             Pending::Element(value) => match &value.kind {
-                ElementKind::Group(body)
+                ElementKind::OwnedCapture { body, .. }
+                | ElementKind::CaptureScope(body)
+                | ElementKind::Group(body)
                 | ElementKind::Optional(body)
                 | ElementKind::Repeat(body) => pending.push(Pending::Body(body)),
                 ElementKind::OneOrMore(child)
@@ -2540,7 +2586,11 @@ fn capture(name: &str, expression: Expression) -> Result<Expression> {
 fn children(expression: &Expression) -> Vec<&Expression> {
     match expression {
         Expression::Sequence(elements) | Expression::Choice(elements) => elements.iter().collect(),
-        Expression::Capture { expression, .. }
+        Expression::OwnedCapture {
+            child: expression, ..
+        }
+        | Expression::CaptureScope(expression)
+        | Expression::Capture { expression, .. }
         | Expression::CaptureBoundary {
             child: expression, ..
         }

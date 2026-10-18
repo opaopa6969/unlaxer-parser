@@ -100,7 +100,7 @@ public class RustBackendTest {
         reject(SIMPLE.replace("grammar Example {", """
             grammar Example {
             @memoSafeToken: BUILTIN
-            token BUILTIN = REGEX('[a-z]+')
+            token BUILTIN = CI('a')
             """), "must name a Simple token BUILTIN");
         reject(SIMPLE.replace("grammar Example {", """
             grammar Example {
@@ -116,7 +116,7 @@ public class RustBackendTest {
             assertEquals(5, new RustBackend().generate(UBNFMapper.parse(source.replace("'hello' @value", "(T | 'x')+ @value")).grammars().get(0)).size());
             reject(source.replace("'hello' @value", "T @value Root @value"), "left recursion");
         }
-        reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "token T");
+        reject(SIMPLE.replace("grammar Example {", "grammar Example { token T = REGEX('x')\n"), "E-REGEX-RETIRED");
         assertEquals(5, new RustBackend().generate(UBNFMapper.parse(
             SIMPLE.replace("'hello' @value", "Root{0} @value")).grammars().get(0)).size());
         assertEquals(5, new RustBackend().generate(UBNFMapper.parse(
@@ -330,7 +330,7 @@ public class RustBackendTest {
         var grammar = UBNFMapper.parse("grammar LiteralMetadata { @root @mapping(Value,params=[text]) Root ::= '#preferred-depth:' % ',' @text; }").grammars().get(0);
         var parser = new RustBackend().generate(grammar).get(2).content();
         assertFalse(parser.contains("#preferred-extra:2"));
-        assertTrue(parser.contains(".separated_by("));
+        assertTrue(parser.contains(".separated_by_java("));
     }
 
     @Test public void leftAssocMetadataDoesNotRewriteTheGrammarAndInvalidShapesAreRejected() {
@@ -390,8 +390,8 @@ public class RustBackendTest {
     }
 
     private void reject(String source, String reason) {
-        var grammar = UBNFMapper.parse(source).grammars().get(0);
-        var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(grammar));
+        var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(
+            UBNFMapper.parse(source).grammars().get(0)));
         assertTrue(error.getMessage(), error.getMessage().contains(reason));
     }
 

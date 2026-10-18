@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen.rust;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -55,6 +57,7 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         org.unlaxer.dsl.codegen.NestedCaptures.requireValid(grammar);
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
@@ -489,6 +492,7 @@ public final class RustGrammarLowering {
             if (expression instanceof TextValue ignored) {
                 return expression;
             }
+            if (expression instanceof GeneralBody general) return general.withChild(retainTextValues(general.child(), mapping));
             if (expression instanceof Capture capture) {
                 Expression child = retainTextValues(capture.expression(), mapping);
                 if (mapping != null && mapping.fields().stream().anyMatch(field ->
@@ -655,6 +659,11 @@ public final class RustGrammarLowering {
             if (id == null) throw unsupported("unknown reference " + reference.name());
             return new Reference(id);
         }
+        if (element instanceof UBNFAST.OwnedCaptureElement capture) {
+            return new OwnedCapture(scalarText(capture.name()), singleBody(capture.body(), true));
+        }
+        if (element instanceof UBNFAST.ReplayElement replay) return new Replay(scalarText(replay.name()));
+        if (element instanceof UBNFAST.CaptureScopeElement scope) return new CaptureScope(singleBody(scope.body(), true));
         if (element instanceof GroupElement group) {
             return body(group.body());
         }
@@ -705,6 +714,10 @@ public final class RustGrammarLowering {
         if (expression instanceof Sequence s && s.elements().size()==1) {
             var inner=nestedBoundary(s.elements().get(0));
             return new CaptureBoundary(inner.kind(),new Sequence(List.of(inner.child())));
+        }
+        if (expression instanceof GeneralBody general) {
+            var inner=nestedBoundary(general.child());
+            return new CaptureBoundary(inner.kind(),general.withChild(inner.child()));
         }
         if (expression instanceof Delimited d) { var inner=nestedBoundary(d.child()); return new CaptureBoundary(inner.kind(),new Delimited(inner.child())); }
         if (expression instanceof OptionalExpr o) return new CaptureBoundary(BoundaryKind.OPTIONAL,new OptionalExpr(nestedBoundary(o.child())));
@@ -782,6 +795,7 @@ public final class RustGrammarLowering {
         if (expression instanceof UniqueLongestChoice choice) {
             return combinePredictors(choice.alternatives(), visiting, cache);
         }
+        if (expression instanceof GeneralBody general) return firstPredictor(general.child(), visiting, cache);
         if (expression instanceof Capture capture) {
             return firstPredictor(capture.expression(), visiting, cache);
         }
@@ -837,6 +851,8 @@ public final class RustGrammarLowering {
     }
 
     private boolean nullable(Expression expression) {
+        if (expression instanceof Replay) return true;
+        if (expression instanceof GeneralBody general) return nullable(general.child());
         if (expression instanceof CaptureBoundary b) { return nullable(b.child()); }
         if (expression instanceof LexicalToken token) return token.expression().nullable();
         if (expression instanceof ErrorExpected ignored) {
@@ -971,13 +987,13 @@ public final class RustGrammarLowering {
     }
 
     private void checkRepetition(Expression expression) {
+        if (expression instanceof GeneralBody general) { checkRepetition(general.child()); return; }
         if (expression instanceof CaptureBoundary b) { checkRepetition(b.child()); return; }
         if (expression instanceof Repeat repeat) {
             // Generated repeats use JavaRepeat: one successful zero-progress iteration stops.
             // Nullable bodies are safe here; source left-recursion analysis remains separate.
             checkRepetition(repeat.child());
         } else if (expression instanceof Separated separated) {
-            if (nullable(separated.child()) && nullable(separated.separator())) throw unsupported("nullable unbounded separation");
             if (shape(separated.separator(), new HashSet<>()).kind() != Kind.TEXT) throw unsupported("mapped separator");
             checkRepetition(separated.child()); checkRepetition(separated.separator());
         } else if (expression instanceof OptionalExpr optional) {
@@ -1005,6 +1021,7 @@ public final class RustGrammarLowering {
     }
 
     private Set<Integer> leadingRules(Expression expression) {
+        if (expression instanceof GeneralBody general) return leadingRules(general.child());
         if (expression instanceof CaptureBoundary b) { return leadingRules(b.child()); }
         if (expression instanceof ErrorExpected ignored) return Set.of();
         if (expression instanceof Reference reference) {
@@ -1061,6 +1078,7 @@ public final class RustGrammarLowering {
                 if (mappings.get(rule) != null || !visited.add(rule)) return false;
                 return skippedProjection(bodies.get(rule), visited);
             }
+            if (expression instanceof GeneralBody general) return skippedProjection(general.child(), visited);
             if (expression instanceof Capture capture) return skippedProjection(capture.expression(), visited);
             if (expression instanceof Delimited delimited) return skippedProjection(delimited.child(), visited);
             if (expression instanceof OptionalExpr optional) return skippedProjection(optional.child(), visited);
@@ -1120,6 +1138,7 @@ public final class RustGrammarLowering {
             if (expression instanceof Reference reference) {
                 return shape(reference.rule(), visiting, enumNodes);
             }
+            if (expression instanceof GeneralBody general) return shape(general.child(), visiting, enumNodes);
             if (expression instanceof Capture capture) {
                 return shape(capture.expression(), visiting, enumNodes);
             }
@@ -1191,6 +1210,7 @@ public final class RustGrammarLowering {
         if (expression instanceof CaptureBoundary b) { return captures(b.child()); }
         enterAnalysis();
         try {
+            if (expression instanceof GeneralBody general) return captures(general.child());
             if (expression instanceof Capture capture) {
                 Map<String, Shape> result = new LinkedHashMap<>(captures(capture.expression()));
                 result.merge(capture.name(), shape(capture.expression(), new HashSet<>()), (a, b) -> merge(a, b, true));

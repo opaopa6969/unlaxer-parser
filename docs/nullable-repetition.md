@@ -32,10 +32,9 @@ validation. Reachable source left recursion is still rejected before generation,
 including cycles behind nullable repetition; see
 [left-recursion.md](left-recursion.md).
 
-Nullable separated-list tails have a different existing runtime path and are
-tracked separately in [#616](https://github.com/opaopa6969/unlaxer-parser/issues/616).
-This change preserves that generation restriction until its own Classic runtime
-and generated-consumer parity is implemented.
+Nullable separated-list tails use their own Classic operation, specified in
+[nullable-separation.md](nullable-separation.md). The pure PEG separated-list API
+keeps its separate no-progress failure behavior.
 
 `spec-corpus/nullable-repeat/cases.json` contains independent generated-consumer
 expectations. `NullableRepeatConformanceTest` checks Java parsing/mapping and

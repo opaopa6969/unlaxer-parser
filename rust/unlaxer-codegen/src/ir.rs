@@ -122,6 +122,12 @@ pub enum RecoveryMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    OwnedCapture {
+        name: String,
+        child: Box<Expression>,
+    },
+    Replay(String),
+    CaptureScope(Box<Expression>),
     NamePredicate {
         child: Box<Expression>,
         snapshot: String,

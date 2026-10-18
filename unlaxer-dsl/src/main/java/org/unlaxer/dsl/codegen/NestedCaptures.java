@@ -73,7 +73,7 @@ public final class NestedCaptures {
         }
     }
     private static void visitOuter(RuleDecl rule, AtomicElement e, boolean inside) {
-        if (e instanceof GroupElement g) requireOuter(rule,g.body(),inside);
+        if (e instanceof TransparentElement g) requireOuter(rule,g.body(),inside);
         else if (e instanceof OptionalElement o) requireOuter(rule,o.body(),true);
         else if (e instanceof RepeatElement r) requireOuter(rule,r.body(),true);
         else if (e instanceof OneOrMoreElement r) visitOuter(rule,r.body(),true);
@@ -91,7 +91,7 @@ public final class NestedCaptures {
         // Native RuleBody stores alternatives directly, without an extra AST wrapper.
         if (value instanceof ChoiceBody c) for (var alternative : c.alternatives()) checkTraversal(alternative, depth);
         else if (value instanceof SequenceBody s) for (var element : s.elements()) checkTraversal(element.element(), depth + 1);
-        else if (value instanceof GroupElement e) checkTraversal(e.body(), depth + 1);
+        else if (value instanceof TransparentElement e) checkTraversal(e.body(), depth + 1);
         else if (value instanceof OptionalElement e) checkTraversal(e.body(), depth + 1);
         else if (value instanceof RepeatElement e) checkTraversal(e.body(), depth + 1);
         else if (value instanceof OneOrMoreElement e) checkTraversal(e.body(), depth + 1);
@@ -104,7 +104,7 @@ public final class NestedCaptures {
         if (element instanceof RepeatElement e) return wrap(Cardinality.MANY,body(grammar,e.body(),depth+1));
         if (element instanceof OneOrMoreElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1));
         if (element instanceof BoundedRepeatElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1));
-        if (element instanceof GroupElement e) return body(grammar,e.body(),depth+1);
+        if (element instanceof TransparentElement e) return body(grammar,e.body(),depth+1);
         if (element instanceof TerminalElement) return new GrammarIR.NestedShape(Kind.TEXT,null,List.of());
         if (element instanceof RuleRefElement e) {
             var token=grammar.tokens().stream().filter(t->t.name().equals(e.name())).findFirst();

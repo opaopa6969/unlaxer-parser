@@ -70,6 +70,7 @@ public final class RustBackend {
         else if (expression instanceof RuleEffects v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof CaptureEquality v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Recovery v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof GeneralBody v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Capture v) collectLspKeywords(v.expression(), keywords);
         else if (expression instanceof OptionalExpr v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Repeat v) collectLspKeywords(v.child(), keywords);
@@ -457,6 +458,11 @@ public final class RustBackend {
                 + choice.predictors().stream().map(this::predictor).collect(java.util.stream.Collectors.joining(", "))
                 + "] }";
         }
+        if (expression instanceof OwnedCapture capture) {
+            return "Expr::OwnedCapture(" + quote(capture.name()) + ", Box::new(" + expression(capture.child()) + "))";
+        }
+        if (expression instanceof Replay replay) return "Expr::Replay(" + quote(replay.name()) + ")";
+        if (expression instanceof CaptureScope scope) return "Expr::CaptureScope(Box::new(" + expression(scope.child()) + "))";
         if (expression instanceof Capture capture) {
             return "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
         }
@@ -484,8 +490,8 @@ public final class RustBackend {
         if (expression instanceof Separated separated) {
             String child = expression(separated.child()), separator = expression(separated.separator());
             if (PreferredAstEmitter.containsDepth(separated.child()))
-                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::Capture(\"#preferred-extra:2\", Box::new(" + child + "))]).zero_or_more()])";
-            return child + ".separated_by(" + separator + ")";
+                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::Capture(\"#preferred-extra:2\", Box::new(" + child + "))]).repeat_java(0, None)])";
+            return child + ".separated_by_java(" + separator + ")";
         }
         throw new IllegalStateException("unhandled " + expression);
     }
@@ -815,6 +821,7 @@ public final class RustBackend {
             else if (expression instanceof ValueBoundary value) children = List.of(value.child());
             else if (expression instanceof TriviaScope value) children = List.of(value.child());
             else if (expression instanceof RuleEffects value) children = List.of(value.child());
+            else if (expression instanceof GeneralBody value) children = List.of(value.child());
             else if (expression instanceof CaptureEquality value) children = List.of(value.child());
             else if (expression instanceof NamePredicate value) children = List.of(value.child());
             else if (expression instanceof NameResolutionScope value) children = List.of(value.child());
@@ -828,6 +835,7 @@ public final class RustBackend {
     }
 
     private static boolean containsRecovery(Expression expression) {
+        if (expression instanceof GeneralBody value) return containsRecovery(value.child());
         if (expression instanceof Recovery) return true;
         // A user adapter callback can parse a recovery expression inside its own provider.
         if (expression instanceof CustomToken) return true;

@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.tools.railroad;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -121,8 +123,17 @@ public class UBNFToRailroad {
             RailroadDiagram inner = convertAtomicElement(boundedRepeatElement.body(), grammarName);
             return new RailroadDiagram.Repeat(nextId(boundedRepeatElement), inner);
         }
-        if (atomicElement instanceof GroupElement groupElement) {
+        if (atomicElement instanceof org.unlaxer.dsl.bootstrap.UBNFAST.ReplayElement replay) {
+            return new RailroadDiagram.Terminal(nextId(replay), "SAME_AS(" + replay.name() + ")");
+        }
+        if (atomicElement instanceof TransparentElement groupElement) {
             RailroadDiagram inner = convertRuleBody(groupElement.body(), grammarName);
+            if (!(atomicElement instanceof GroupElement)) {
+                String label = atomicElement instanceof org.unlaxer.dsl.bootstrap.UBNFAST.OwnedCaptureElement capture
+                    ? "CAPTURE(" + capture.name() + ")" : "CAPTURE_SCOPE";
+                inner = new RailroadDiagram.Sequence(nextId(groupElement),
+                    List.of(new RailroadDiagram.Terminal(nextId(groupElement), label), inner));
+            }
             return new RailroadDiagram.Group(nextId(groupElement), inner);
         }
         if (atomicElement instanceof SeparatedElement separatedElement) {

@@ -124,9 +124,11 @@ fn count_captures(body: &unlaxer_ubnf::RuleBody, name: &str) -> usize {
 }
 fn nested_count(element: &ElementKind, name: &str) -> usize {
     match element {
-        ElementKind::Group(b) | ElementKind::Optional(b) | ElementKind::Repeat(b) => {
-            count_captures(b, name)
-        }
+        ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b)
+        | ElementKind::Group(b)
+        | ElementKind::Optional(b)
+        | ElementKind::Repeat(b) => count_captures(b, name),
         ElementKind::OneOrMore(e) | ElementKind::BoundedRepeat { element: e, .. } => {
             nested_count(&e.kind, name)
         }
