@@ -97,15 +97,14 @@ Java now unwinds transaction, parse, memo and deferred frames when a **child
 callback before the owner's commit** throws, then propagates the original
 exception. The context can be retried after an ordinary child exception.
 Resource-limit failures remain fatal for that context, with owned state restored
-before close. Listener exceptions during start/commit/end have a separate
-open boundary issue [#564](https://github.com/opaopa6969/unlaxer-parser/issues/564).
+before close. [Observer failures](parser-observer-failures.md) retract the outermost
+publication and invalidate that Java context; retry uses a new context (#564).
 Rust `ParseError` and resource failures restore owned state; the existing Rust
 contract still requires discarding a context after a panicking callback. Neither
 runtime rolls back arbitrary external I/O.
 
 Remaining #545 work is explicit: [capture/replay and name lifetime](https://github.com/opaopa6969/unlaxer-parser/issues/572),
-including projected/detached capture storage, [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573),
-and observer-exception boundaries (#564). The earlier PEG diagnostic-frontier gap
+including projected/detached capture storage, and [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573). The earlier PEG diagnostic-frontier gap
 also remains tracked in #545; new Classic-entry cases do not prove all legacy
 PEG/TokenExpr entry diagnostics equivalent. The original-input capture store
 rejects a projected or detached capture instead of replaying a different input slice. Native

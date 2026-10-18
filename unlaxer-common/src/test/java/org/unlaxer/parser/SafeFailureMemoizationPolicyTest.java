@@ -272,7 +272,7 @@ public class SafeFailureMemoizationPolicyTest {
             assertFalse(parser.parse(context).isSucceeded());
 
             assertEquals(1, child.calls);
-            assertEquals(2 * firstCheckpoints, checkpoints[0]);
+            assertEquals("first parse has an additional root observer checkpoint", 2 * firstCheckpoints - 1, checkpoints[0]);
             assertEquals(2 * firstRestores, restores[0]);
             assertEquals(1, context.getPackratMemoTable().failureHits());
         }
