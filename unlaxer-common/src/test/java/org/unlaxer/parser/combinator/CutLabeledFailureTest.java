@@ -190,6 +190,67 @@ public class CutLabeledFailureTest {
     }
   }
 
+  /** Calls a raising parser, ignores its failure and succeeds: a caller unaware of #700. */
+  private static Parser swallow(Parser raising) {
+    return new Chain() {
+      private static final long serialVersionUID = 1L;
+      @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+        raising.parse(context, kind, invert);
+        return Parsed.SUCCEEDED;
+      }
+    };
+  }
+
+  /** A raised failure ignored by its caller is cleared at the next parser entry, terminals included. */
+  @Test
+  public void anIgnoredRaisedFailureDoesNotTurnALaterOrdinaryFailureIntoACut() {
+    for (var memo : Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+      String label = memo + "/" + diagnostics;
+      try (var context = ParseContext.withOptions(StringSource.createRootSource("c"),
+          ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+        Parser parser = new Choice(new Chain(swallow(new Commit(w("a"))), w("b")), w("c"));
+        assertTrue(label, parser.parse(context).isSucceeded());
+        assertEquals(label, 1, context.getConsumedPosition().value());
+        assertTrue(label, context.getRaisedFailure().isEmpty());
+      }
+      // An ordinary memo hit (replayed without a parser entry) must also clear a stale failure.
+      try (var context = ParseContext.withOptions(StringSource.createRootSource("c"),
+          ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+        Parser rule = new MemoChoice(w("b"));
+        Parser parser = new Choice(new Chain(new Chain(rule)), new Chain(swallow(new Label("L", w("a"))), rule), w("c"));
+        assertTrue(label, parser.parse(context).isSucceeded());
+        assertEquals(label, 1, context.getConsumedPosition().value());
+        assertTrue(label, context.getRaisedFailure().isEmpty());
+        // DETAILED_ON_FAILURE excludes the rule by its FIRST set instead of replaying it.
+        if (memo == Memoization.SAFE_FAILURES && diagnostics != ParseOptions.Diagnostics.DETAILED_ON_FAILURE)
+          assertTrue(label, context.getPackratMemoTable().failureHits() > 0);
+      }
+    }
+  }
+
+  /** A shared grammar call returns its failure as data: an inner cut is an ordinary failure outside. */
+  @Test
+  public void aSharedGrammarCallDoesNotLeakAnInnerCut() {
+    var language = new org.unlaxer.source.LanguageRegions.Language("inner", "org.example", "1", "Inner", "Root");
+    var grammar = new org.unlaxer.source.CstGrammar("Inner",
+        java.util.Map.of("Root", new Chain(w("a"), new Commit(w("b"), "inner cut"))),
+        List.of(), Set.of(), token -> List.of(), false);
+    var registry = new org.unlaxer.source.SharedGrammarCalls.Registry(java.util.Map.of(language, grammar));
+    Parser adapter = new org.unlaxer.source.SharedGrammarCalls.Adapter() {
+      private static final long serialVersionUID = 1L;
+      @Override protected org.unlaxer.source.SharedGrammarCalls.Registry registry() { return registry; }
+      @Override protected org.unlaxer.source.LanguageRegions.Language language() { return language; }
+    };
+    for (var memo : Memoization.values()) {
+      try (var context = ParseContext.withOptions(StringSource.createRootSource("ax"),
+          ParseOptions.withMemoization(memo).withDiagnostics(ParseOptions.Diagnostics.DETAILED))) {
+        assertTrue(memo.toString(), new Choice(adapter, w("ax")).parse(context).isSucceeded());
+        assertEquals(2, context.getConsumedPosition().value());
+        assertTrue(context.getRaisedFailure().isEmpty());
+      }
+    }
+  }
+
   @Test
   public void classicNotDoesNotCatchARaisedFailure() {
     try (var context = new ParseContext(StringSource.createRootSource("b"))) {

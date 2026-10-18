@@ -139,8 +139,10 @@ public final class PackratMemoTable {
   public static Parsed replay(ParseContext context, Parser parser, TokenKind tokenKind,
       boolean invertMatch, Entry entry) {
     if (entry.tokens == null) {
-      // Restores the failure kind and label exactly as the original evaluation raised them.
+      // Restores the failure kind and label exactly as the original evaluation raised them,
+      // including "ordinary": a stale raised failure must not survive an ordinary memo hit.
       if (entry.raised != null) context.raise(entry.raised);
+      else context.clearRaisedFailure();
       return Parsed.FAILED;
     }
     context.startParse(parser, context, tokenKind, invertMatch);

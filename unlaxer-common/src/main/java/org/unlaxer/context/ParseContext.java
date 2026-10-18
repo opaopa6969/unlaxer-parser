@@ -1769,6 +1769,9 @@ public class ParseContext implements
   @Override
   public void startParse(Parser parser, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
     requireParseHealthy();
+    // Every parser attempt starts here, terminals included (they begin no transaction).
+    // A raised failure still pending was ignored by its caller and must not leak (#700).
+    raisedFailure = null;
     int activeDepth = activeParseDepth();
     if (activeDepth == 0 && (!observerBoundaryActive || observerExplicitTransaction)) beginObserverBoundary(false);
     if (activeDepth >= MAX_PARSE_DEPTH) {
