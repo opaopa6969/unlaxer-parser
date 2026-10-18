@@ -1,0 +1,35 @@
+grammar AutoEval {
+  @package: org.example.autoeval
+  token TEXT = UNTIL(')')
+  token NUM = NumberParser
+  @root Root ::= SharedConditional | GroupConditional | BinaryInteger | Shadow | Conditional | Binary | Pass | Variable | Literal | Manual | Unknown;
+  @mapping(Literal, params=[value]) Shadow ::= 'x(' TEXT @value ')';
+  @mapping(Literal, params=[value])
+  @eval(kind='literal')
+  Literal ::= 'l(' TEXT @value ')';
+  @mapping(Pass, params=[value])
+  @eval(kind='passthrough')
+  Pass ::= 'p(' Literal @value ')';
+  @mapping(Variable, params=[name])
+  @eval(kind='variable_ref', strip_prefix='😀')
+  Variable ::= 'v(' TEXT @name ')';
+  @mapping(Binary, params=[left, op, right])
+  @eval(kind='binary_arithmetic')
+  Binary ::= 'b(' Literal @left { '+' @op Literal @right } ')';
+  @mapping(BinaryInteger, params=[left, op, right])
+  @eval(kind='binary_arithmetic')
+  BinaryInteger ::= 'i(' NUM @left { '+' @op NUM @right } ')';
+  @mapping(Conditional, params=[condition, thenExpr, elseExpr])
+  @eval(kind='conditional')
+  Conditional ::= 'c(' Literal @condition ',' Manual @thenExpr ',' Manual @elseExpr ')';
+  @mapping(Conditional, params=[condition, thenExpr, elseExpr])
+  SharedConditional ::= 'd(' Unknown @condition ',' Literal @thenExpr ',' Unknown @elseExpr ')';
+  @mapping(Conditional, params=[condition, thenExpr, elseExpr])
+  GroupConditional ::= 'g(' (Literal | Unknown) @condition ',' (Manual | Literal) @thenExpr ',' (Manual | Unknown) @elseExpr ')';
+  @mapping(Manual, params=[value])
+  @eval(kind='literal', strategy='manual')
+  Manual ::= 'm(' TEXT @value ')';
+  @mapping(Unknown, params=[value])
+  @eval(kind='user_operation')
+  Unknown ::= 'u(' TEXT @value ')';
+}

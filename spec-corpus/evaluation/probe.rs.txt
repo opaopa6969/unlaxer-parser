@@ -1,0 +1,37 @@
+mod generated;
+use generated::{ast::Ast,evaluator::{Semantics,EvalValue,evaluate}};
+use serde_json::{Value,json};
+use unlaxer_runtime::{Span,ParseOptions,Memoization,Diagnostics};
+#[derive(Default)]struct Probe{events:Vec<String>}
+fn value(text:&str)->Value{match text{"true"=>json!(true),"false"=>json!(false),_=>text.parse::<i64>().map_or_else(|_|json!(text),|n|json!(n))}}
+impl Semantics for Probe{
+    type Output=Result<Value,&'static str>;
+    fn convert_value(&mut self,v:EvalValue<'_>,_:Span)->Self::Output{let EvalValue::Text(text)=v else{panic!("unexpected input")};self.events.push(format!("literal:{text}"));if text=="fail"{return Err("literal failure")};Ok(value(text))}
+    fn eval_manual(&mut self,text:&str,_:Span)->Self::Output{self.events.push(format!("manual:{text}"));if text=="fail"{Err("requested failure")}else{Ok(value(text))}}
+    fn eval_unknown(&mut self,text:&str,_:Span)->Self::Output{self.events.push(format!("unknown:{text}"));Ok(value(text))}
+    fn resolve_variable(&mut self,name:&str)->Self::Output{self.events.push(format!("variable:{name}"));if name=="missing"{return Err("variable failure")};Ok(json!(format!("resolved:{name}")))}
+    fn evaluate_literal(&mut self,text:&str)->Self::Output{self.events.push(format!("leaf:{text}"));Ok(value(text))}
+    fn apply_binary(&mut self,op:&str,left:Self::Output,right:Self::Output)->Self::Output{self.events.push(format!("binary:{op}"));let right=right?.as_i64().unwrap();if right==13{return Err("binary failure")};Ok(json!(left?.as_i64().unwrap()+right))}
+    fn is_failure(&self,value:&Self::Output)->bool{value.is_err()}
+    fn is_truthy(&mut self,result:&Self::Output)->bool{let value=result.as_ref().unwrap();*value==json!(true)||value.as_str().is_some_and(|v|v.eq_ignore_ascii_case("true"))}
+}
+fn main(){
+    let invalid=Ast::Binary {span:Span{start:0,end:1},left:Box::new(Ast::Literal{span:Span{start:0,end:1},value:"1".into()}),op:vec!["+".into()],right:vec![]};
+    let mut invalid_probe=Probe::default();
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(||evaluate(&invalid,&mut invalid_probe))).is_err());
+    assert!(invalid_probe.events.is_empty());
+    let cases:Value=serde_json::from_str(&std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap()).unwrap();
+    for row in cases.as_array().unwrap(){let source=row["input"].as_str().unwrap();
+        for memoization in [Memoization::Off,Memoization::SafeFailures]{
+            for diagnostics in [Diagnostics::Auto,Diagnostics::Detailed,Diagnostics::DetailedOnFailure]{
+                let tree=generated::parser::parse_tree_with_options(source,ParseOptions{memoization,diagnostics,..ParseOptions::default()}).unwrap();
+                let ast=generated::mapper::map(&tree).unwrap();let mut p=Probe::default();
+                let result=evaluate(&ast,&mut p);
+                if row.get("error").is_some(){assert_eq!(row["error"].as_str().unwrap(),result.unwrap_err(),"{source}");}else{assert_eq!(row["value"],result.unwrap(),"{source}");}
+                assert_eq!(row["events"],json!(p.events),"{source}");
+                assert_eq!(row["span"],json!([ast.span().start,ast.span().end]),"{source}");
+            }
+        }
+    }
+    println!("evaluation oracle passed");
+}

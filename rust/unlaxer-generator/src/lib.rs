@@ -2,6 +2,7 @@
 pub mod adapters;
 mod common_fields;
 mod embedded;
+mod evaluation;
 pub mod impact;
 mod lexical;
 mod lexical_contexts;
@@ -40,6 +41,11 @@ pub(crate) fn generate_grammar(
 ) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
     let ir = lowering::lower(grammar)?;
     let mut files = unlaxer_codegen::generate(&ir).map_err(|error| error.to_string())?;
+    let evaluator = files
+        .iter_mut()
+        .find(|f| f.relative_path == "evaluator.rs")
+        .unwrap();
+    evaluator.content = evaluation::apply(grammar, &ir, std::mem::take(&mut evaluator.content))?;
     files
         .iter_mut()
         .find(|f| f.relative_path == "ast.rs")
