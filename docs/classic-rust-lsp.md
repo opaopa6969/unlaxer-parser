@@ -171,7 +171,7 @@ mvn -pl unlaxer-common,unlaxer-dsl -am test \
 Rust transport は serial 実行で、parse 中の cancel notification を読み取って割り込む仕組みは未実装。
 `$/cancelRequest` は未処理 request を捏造せず、すでに完了した同期 request に対して結果を再送しない。
 Java の LSP4J の非同期 cancellation と同等とはしない。
-Rust incremental parse/cache、rename/format/code-action の transport は未対応で、能力を広告しない。DAP は [AST / token inspection](classic-rust-dap.md) に対応する。
+開発版では[同一snapshotの構文cache](incremental-cache.md)をJava/Rustで提供し、編集後は全文解析する。部分CSTの編集再接合、incremental sync、rename/format/code-action の transport は未対応で、能力を広告しない。DAP は [AST / token inspection](classic-rust-dap.md) に対応する。
 provider runtime の対応と protocol method の実装は別であり、親 issue は残す。
 TinyExpression/ubnfc の LSP や Java サーバー起動で Classic Rust LSP の完了を代用しない。
 root retry と性能 freeze の方針は変更しない。

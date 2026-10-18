@@ -4,7 +4,27 @@
 Maven Central の 3.2.0 に以下の修正が含まれるという意味ではない。
 全 Java 文法との互換性、未対応 IDE 機能、任意の負荷に対する性能は別の条件である。
 
-## 受け入れ条件
+## 開発版の品質基準
+
+3.3.0公開後のparity作業は親[#111](https://github.com/opaopa6969/unlaxer-parser/issues/111)で継続している。
+開発版はJava21 / Rust1.85を共通検証の基準とし、Java17固有の互換維持を新機能の制約にしない。
+以下のJava17試験と配布記録は公開済み3.3.0の履歴であり、開発版の全機能をJava17で保証するものではない。
+
+現行の対応範囲は[full-spec表](../rust/FULL-SPEC.md)と各機能の共通fixtureで確認する。
+全体の完了にはJava/Rust両方の実装、生成consumerのcompile/parse/map/eval、原文・位置・失敗後状態の照合、
+対象opt-in試験のskipなし実行、CI成功、各PRのmergeが必要である。
+ローカルの部分的な成功、待機中のCI、openのPRを全体完了の根拠にしない。
+
+2026-10-19の統合記録: 積み上げた#570〜#691のPRを下から順にmergeし、masterは`4e8bd971`（#682のmerge）になった。
+そのtreeは`fe648700`と同一で、同revisionのCI 18 checkがすべて成功した（Rust backend and Java conformance、Downstream smoke (tinyexpression)、JDK17 artifacts、VSIX、packaged IDE、各contract系）。
+途中のPRは同じ内容を先端に含むため、先端のCIで代表させた。
+これは統合済み範囲のCI成功記録であり、下記の残る境界（#583の未対応形、#197の性能deadline）の完了を意味しない。
+
+[REGEX廃止](regex-retirement.md)はユーザー指定の開発版変更であり、旧宣言には移行診断を返す。
+後段の#505は3.3.0の不具合修正履歴であり、今後Java Pattern互換エンジンを開発する計画ではない。
+公開済み成果物・署名・配布記録は保持する。
+
+## 3.3.0の受け入れ条件
 
 1. Java/Rust の共通 corpus で受理・拒否、原文、CP span、UTF-16/UTF-8位置を独立期待値と比較する。
 2. 空入力・EOF・CRLF・補助文字・結合文字・書記素列、および途中位置・範囲外を検証する。位置の単位を暗黙に変更しない。
@@ -40,9 +60,9 @@ graphemeは表示幅ではなく、フォント・端末の列数を計算しな
 Gへのstrict変換では書記素の途中を受理せず、丸めが必要な用途だけ明示的なfloor/ceilingを使う。CP/UTF-16/UTF-8間の変換は従来どおりscalar境界を扱う。
 APIとコード例は[書記素座標の説明](grapheme-coordinates.md)を参照する。長さの変換には開始位置が必要である。`ab`も`e\u0301`も2CPだが、それぞれ2Gと1Gなので、範囲の両端を変換して差を取る。
 
-## 再現手順
+## 開発版の再現手順（Java21）
 
-Linux x86_64、JDK 21（Java 17 artifactはJDK 17）、Rust 1.85、Maven、Node/npm、Chromiumを使用する。
+Linux x86_64、JDK 21、Rust 1.85、Maven、Node/npm、Chromiumを使用する。
 ブラウザ/provider検証には先に以下を実行する。
 
 ```sh
@@ -51,18 +71,19 @@ npm ci --ignore-scripts
 npx playwright install chromium
 ```
 
-リポジトリルートで実行する。`tinyexpression` はCIと同じ `7d7bd1cbfab1bd9548ba53c73cc50502f0437c67` の独立checkoutを用意し、現在のunlaxerを指定してcompileしておく。既存checkoutの未commit変更を上書きしない。
+固定した開発revisionの独立checkoutのルートで実行する。`tinyexpression` はCIと同じ `7d7bd1cbfab1bd9548ba53c73cc50502f0437c67` の独立checkoutを用意し、現在のunlaxerを指定してcompileしておく。token・移植性のoracleはこの固定revisionを使う。p4-smokeだけはClassic既定AST選択で全preferred候補を列挙しない `420757a8ab94ae1bed6dbd7cea2743efb8840bbd`（tinyexpression #261）で実行する。固定revisionではbounded public mapperが `complex-x64.tiny` を `E-MAPPING-LIMIT: preferred candidates` で拒否するためである。既存checkoutの未commit変更を上書きしない。公開版と同じversion名の開発buildを混同しないよう、専用のMaven repositoryでinstall・依存解決する。このlocal installは公開操作ではない。
 
 ```sh
-mvn -B -pl unlaxer-common,unlaxer-dsl -am install -DskipTests -Dgpg.skip=true
-mvn -B -f /absolute/path/to/tinyexpression/pom.xml compile \
+parity_m2=$(mktemp -d)
+mvn -B -Dmaven.repo.local="$parity_m2" -pl unlaxer-common,unlaxer-dsl -am install -DskipTests -Dgpg.skip=true
+mvn -B -Dmaven.repo.local="$parity_m2" -f /absolute/path/to/tinyexpression/pom.xml compile \
   -Dunlaxer.version=3.3.0 -Dtinyexpression.skipRailroad=true
 
 cargo fmt --all --manifest-path rust/Cargo.toml --check
 cargo clippy --locked --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
 cargo test --locked --manifest-path rust/Cargo.toml --workspace
 
-mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
+mvn -B -Dmaven.repo.local="$parity_m2" -pl unlaxer-common,unlaxer-dsl -am test \
   -DrustConformance=true -DtokenStreamBench=true \
   -Dtinyexpression.classes=/absolute/path/to/tinyexpression/target/classes \
   -Dtinyexpression.grammar=/absolute/path/to/tinyexpression/tools/tinyexpression-p4-lsp-vscode/grammar/tinyexpression-p4.ubnf
@@ -70,12 +91,18 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
 
 素の`mvn test`はRust連携をskipする。`-DrustConformance=true`だけでもTinyの外部実装・固定文法とtoken stream測定には別の引数が必要である。
 Surefireの`Tests run / Failures / Errors / Skipped`を確認し、対象のskipがあればその検証は未完了とする。
-JDK 17を選択し、CIと同じ専用artifactの全体packageと、今回の変更に対するRust連携を分けて実行する。最初のcommandではRust opt-inのskipがあるため、後者のskipなしの結果も確認する。
+
+### 公開済み3.3.0のJava17検証を再現する場合
+
+以下は **tag `v3.3.0` の独立checkout専用** の手順であり、開発版のJava17対応を追加要求するものではない。
+そのcheckoutへ移動し、JDK17を選択して専用artifactの全体packageと関連Rust連携を分けて実行する。
+最初のcommandではRust opt-inのskipがあるため、後者のskipなしの結果も確認する。
+`RegexTokenParserTest`は当時のAPIの検証であり、REGEXを廃止した開発版では実行しない。
 
 ```sh
 mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am clean package -Dgpg.skip=true
 mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am test \
-  -Dtest=GraphemeTest,GraphemeConformanceTest,RegexRetirementConformanceTest,ParseDepthLimitTest,JavaParseDepthLimitTest,ClassicLspProtocolConformanceTest,ClassicDapProtocolConformanceTest,RustUbnfFrontendConformanceTest \
+  -Dtest=GraphemeTest,GraphemeConformanceTest,RegexTokenParserTest,ParseDepthLimitTest,JavaParseDepthLimitTest,ClassicLspProtocolConformanceTest,ClassicDapProtocolConformanceTest,RustUbnfFrontendConformanceTest \
   -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
