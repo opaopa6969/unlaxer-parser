@@ -36,6 +36,7 @@ fn canonical(e: &Element) -> String {
             Kind::Value => "V",
             Kind::Optional => "O",
             Kind::List => "L",
+            Kind::Separator => unreachable!("separator is not a snapshot value"),
         },
         e.span().start,
         e.span().end,
@@ -370,4 +371,78 @@ fn memoized_failures_leave_no_boundary_and_preserve_diagnostics() {
             );
         }
     }
+}
+
+#[test]
+fn input_boundary_failure_reset_and_outer_rollback_match_shared_oracle() {
+    let rows: Vec<_> = include_str!("../../../conformance/input-capture-boundary-reset/cases.tsv")
+        .lines()
+        .filter(|row| !row.starts_with('#') && !row.is_empty())
+        .collect();
+    assert_eq!(rows.len(), 8);
+    let mut actual = Vec::new();
+    let mut expected = Vec::new();
+    for (memo, memo_name) in [
+        (Memoization::Off, "OFF"),
+        (Memoization::SafeFailures, "SAFE_FAILURES"),
+    ] {
+        for (diagnostics, diagnostic_name) in [
+            (Diagnostics::Auto, "AUTO"),
+            (Diagnostics::Detailed, "DETAILED"),
+            (Diagnostics::DetailedOnFailure, "DETAILED_ON_FAILURE"),
+        ] {
+            for row in &rows {
+                let f: Vec<_> = row.split('\t').collect();
+                let label = format!("{}\t{}\t{memo_name}\t{diagnostic_name}", f[1], f[2]);
+                let input = decode(f[3]);
+                let mut c = ParseContext::with_options(
+                    &input,
+                    ParseOptions::with_memoization(memo).with_diagnostics(diagnostics),
+                );
+                c.set_reset_matched_with_consumed(f[2] == "true");
+                let parser = Expr::InputCaptureBoundary(Kind::Value, Box::new(Expr::literal("a")));
+                let mut inner = String::new();
+                let rollback: Result<(), _> = c.transaction(|c| {
+                    let kind = match f[1] {
+                        "consumed" => TokenKind::Consumed,
+                        "matchOnly" => TokenKind::MatchOnly,
+                        "virtualTokenConsumed" => TokenKind::VirtualConsumed,
+                        "virtualTokenMatchOnly" => TokenKind::VirtualMatchOnly,
+                        _ => panic!("unknown kind"),
+                    };
+                    let parsed = c.parse_with_token_mode(&parser, kind, false);
+                    inner = format!(
+                        "{}\t{}\t{}\t{}\t{}",
+                        parsed.is_ok(),
+                        c.position(),
+                        c.matched_position(),
+                        c.reset_matched_with_consumed(),
+                        c.node(0).is_none()
+                    );
+                    Err(c.error("force parent rollback"))
+                });
+                assert!(rollback.is_err());
+                actual.push(format!(
+                    "{label}\t{inner}\t{}\t{}\t{}\t{}",
+                    c.position(),
+                    c.matched_position(),
+                    c.reset_matched_with_consumed(),
+                    c.node(0).is_none()
+                ));
+                expected.push(format!(
+                    "{label}\t{}\t{}\t{}\t{}\ttrue\t0\t0\t{}\ttrue",
+                    f[4], f[5], f[6], f[7], f[8]
+                ));
+            }
+        }
+    }
+    let output = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../target/input-capture-boundary-reset-rust.tsv");
+    std::fs::create_dir_all(output.parent().unwrap()).unwrap();
+    std::fs::write(output, actual.join("\n") + "\n").unwrap();
+    assert_eq!(actual.len(), 48);
+    assert_eq!(
+        actual, expected,
+        "all observations recorded before checking reset contract"
+    );
 }

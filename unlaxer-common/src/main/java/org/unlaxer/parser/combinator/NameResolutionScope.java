@@ -19,20 +19,28 @@ public final class NameResolutionScope extends ConstructedAbstractParser impleme
         return new NameResolutionScope(children.get(0),requirements);
     }
     @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
-        context.startParse(this, context, kind, invert);
-        context.begin(this);
-        var frame = NameResolution.begin(context, requirements);
+        context.enterParserCall();
         try {
-            Parsed parsed = frame.failure().isEmpty() ? getChild().parse(context, kind, invert) : Parsed.FAILED;
-            if (parsed.isFailed() || frame.failure().isPresent()) {
-                context.rollback(this);
-                context.endParse(this, Parsed.FAILED, context, kind, invert);
-                return Parsed.FAILED;
-            }
-            // This wrapper does not implement CollectingParser; the original rule root is retained.
-            context.commit(this, kind);
-            context.endParse(this, parsed, context, kind, invert);
-            return parsed;
-        } finally { NameResolution.end(context, frame); }
+            context.startParse(this, context, kind, invert);
+            context.begin(this);
+            var frame = NameResolution.begin(context, requirements);
+            try {
+                Parsed parsed = frame.failure().isEmpty() ? getChild().parse(context, kind, invert) : Parsed.FAILED;
+                if (parsed.isFailed() || frame.failure().isPresent()) {
+                    context.rollback(this);
+                    context.endParse(this, Parsed.FAILED, context, kind, invert);
+                    return Parsed.FAILED;
+                }
+                // This wrapper does not implement CollectingParser; the original rule root is retained.
+                context.commit(this, kind);
+                context.endParse(this, parsed, context, kind, invert);
+                return parsed;
+            } finally { NameResolution.end(context, frame); }
+        } catch (RuntimeException | Error failure) {
+            context.failParserCall(failure);
+            throw failure;
+        } finally {
+            context.leaveParserCall();
+        }
     }
 }

@@ -19,7 +19,7 @@ public class CaptureBoundaryTest {
     private static String decode(String text) { return text.equals("~") ? "" : new String(HexFormat.of().parseHex(text),StandardCharsets.UTF_8); }
     private static String hex(String text) { return text.isEmpty() ? "~" : HexFormat.of().formatHex(text.getBytes(StandardCharsets.UTF_8)); }
     private static String canonical(CaptureSnapshot.Element e) {
-        String kind=switch(e.kind()) {case VALUE->"V";case OPTIONAL->"O";case LIST->"L";};
+        String kind=switch(e.kind()) {case VALUE->"V";case OPTIONAL->"O";case LIST->"L";case SEPARATOR->throw new AssertionError("separator is not a snapshot value");};
         return kind+"@"+e.startCP()+":"+e.endCP()+":"+hex(e.text())+"["+e.children().stream().map(CaptureBoundaryTest::canonical).collect(Collectors.joining(","))+"]";
     }
     private static Parser word(String text) { return new WordParser(text); }
@@ -159,5 +159,35 @@ public class CaptureBoundaryTest {
                 assertEquals(1, context.getTokenStack().size());
             }
         }
+    }
+
+    @Test public void inputBoundaryFailureResetAndOuterRollbackMatchSharedOracle() throws Exception {
+        var rows=Files.readAllLines(Path.of("../conformance/input-capture-boundary-reset/cases.tsv"))
+                .stream().filter(row->!row.startsWith("#")&&!row.isBlank()).toList();
+        assertEquals(8,rows.size());
+        var actual=new java.util.ArrayList<String>();
+        var expected=new java.util.ArrayList<String>();
+        for(var memo:Memoization.values()) for(var diagnostics:ParseOptions.Diagnostics.values()) for(String row:rows) {
+            var fields=row.split("\t");
+            String label=fields[1]+"\t"+fields[2]+"\t"+memo+"\t"+diagnostics;
+            Parser parser=input(Kind.VALUE,word("a"));
+            try(var context=ParseContext.withOptions(StringSource.createRootSource(decode(fields[3])),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                context.getCurrent().setResetMatchedWithConsumed(Boolean.parseBoolean(fields[2]));
+                context.beginPreservingMatched(parser);
+                var parsed=parser.parse(context,TokenKind.valueOf(fields[1]),false);
+                String inner=parsed.isSucceeded()+"\t"+context.position()+"\t"+context.matchedPosition()
+                        +"\t"+context.getCurrent().isResetMatchedWithConsumed()+"\t"+context.getCurrent().getTokens().isEmpty();
+                context.rollback(parser);
+                actual.add(label+"\t"+inner+"\t"+context.position()+"\t"+context.matchedPosition()
+                        +"\t"+context.getCurrent().isResetMatchedWithConsumed()+"\t"+context.getCurrent().getTokens().isEmpty());
+                expected.add(label+"\t"+fields[4]+"\t"+fields[5]+"\t"+fields[6]+"\t"+fields[7]+"\ttrue\t0\t0\t"+fields[8]+"\ttrue");
+                assertEquals("outer frame restored",1,context.getTokenStack().size());
+            }
+        }
+        Files.createDirectories(Path.of("target"));
+        Files.write(Path.of("target/input-capture-boundary-reset-java.tsv"),actual);
+        assertEquals(48,actual.size());
+        assertEquals("all observations recorded before checking reset contract",expected,actual);
     }
 }

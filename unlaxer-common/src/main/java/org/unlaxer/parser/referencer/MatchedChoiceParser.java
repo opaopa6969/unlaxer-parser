@@ -27,29 +27,36 @@ public class MatchedChoiceParser extends NoneChildParser{
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+		parseContext.enterParserCall();
+		try {
 		
-		parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
-		if(false == predicated){
-			matchedParser = findFirstFromRoot(predicate);
-			predicated = true;
-		}
-		Parsed parsed =  
-			matchedParser.map(parser->{
+			if(false == predicated){
+				matchedParser = findFirstFromRoot(predicate);
+				predicated = true;
+			}
+			Parsed parsed =
+				matchedParser.map(parser->{
 				
-					if(false == parser instanceof ChoiceInterface){
-						throw new IllegalArgumentException("you must specify reference to Choice instance");
-					}
-					Optional<Parser> chosen = parseContext.getChosen((ChoiceInterface) parser);
-					return chosen
-						.map(chosenParser->chosenParser.parse(parseContext,tokenKind,invertMatch))
-						.orElse(Parsed.FAILED);
-				})
-				.orElse(Parsed.FAILED);
+						if(false == parser instanceof ChoiceInterface){
+							throw new IllegalArgumentException("you must specify reference to Choice instance");
+						}
+						Optional<Parser> chosen = parseContext.getChosen((ChoiceInterface) parser);
+						return chosen
+							.map(chosenParser->chosenParser.parse(parseContext,tokenKind,invertMatch))
+							.orElse(Parsed.FAILED);
+					})
+					.orElse(Parsed.FAILED);
 		
-		parseContext.endParse(this, parsed , parseContext, tokenKind, invertMatch);
-		return parsed;
-
+			parseContext.endParse(this, parsed , parseContext, tokenKind, invertMatch);
+			return parsed;
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
+		}
 	}
 
 	@Override

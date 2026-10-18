@@ -45,6 +45,54 @@ public class ParseContext implements
   public static final int MAX_PARSE_DEPTH = 1024;
   private ParseLimitException parseLimitFailure;
   private Throwable observerFailure;
+  private Throwable parserCallFailure;
+  private int parserCallDepth;
+  private TransactionElement parserCallEntry;
+  private boolean parserCallResetMatched;
+
+  /** Internal allocation-free guard for built-in parser entry points. */
+  public void enterParserCall() {
+    enterParserCall(false);
+  }
+
+  /** Transparent entries checkpoint before a child that may omit parse notifications. */
+  public void enterParserCall(boolean immediateCallback) {
+    requireParseHealthy();
+    if (parserCallDepth == 0) {
+      parserCallEntry = getCurrent();
+      parserCallResetMatched = parserCallEntry.isResetMatchedWithConsumed();
+    }
+    parserCallDepth++;
+    if (immediateCallback && activeParseDepth() == 0
+        && (!observerBoundaryActive || observerExplicitTransaction)) beginObserverBoundary(false);
+  }
+
+  /** Restore the outer publication boundary once; swallowed errors cannot publish success. */
+  public void failParserCall(Throwable failure) {
+    if (observerFailure != null || parseLimitFailure != null || parserCallFailure != null) return;
+    parserCallFailure = java.util.Objects.requireNonNull(failure);
+    abortPublication();
+  }
+
+  /** Ordinary callbacks permit a fresh parse after every active parser call has unwound. */
+  public void leaveParserCall() {
+    Throwable failure = parserCallFailure;
+    if (--parserCallDepth == 0 && failure != null) {
+      restoreObserverPublication();
+      releaseObserverBoundary();
+      parserCallFailure = null;
+    } else if (parserCallDepth == 0) {
+      releaseObserverBoundaryIfIdle();
+    }
+    if (parserCallDepth == 0) parserCallEntry = null;
+    if (failure != null) rethrowParserCallFailure(failure);
+  }
+
+  private static void rethrowParserCallFailure(Throwable failure) {
+    if (failure instanceof RuntimeException runtime) throw runtime;
+    throw (Error) failure;
+  }
+
   private boolean observerBoundaryActive;
   private TransactionElement observerEntry;
   private ParserCursor observerCursor;
@@ -78,6 +126,10 @@ public class ParseContext implements
 
   /** Internal parser/transaction boundary; controlled resource aborts retain their first error. */
   void requireParseHealthy() {
+    if (parserCallFailure != null) {
+      restoreObserverPublication();
+      rethrowParserCallFailure(parserCallFailure);
+    }
     requireObserverHealthy();
     if (parseLimitFailure != null) {
       restoreObserverPublication();
@@ -114,7 +166,10 @@ public class ParseContext implements
     observerTokenKind = observerEntry.getTokenKind();
     observerTransactionDepth = tokenStack.size();
     observerMemoizationVersion = memoizationStateVersion;
-    observerResetMatched = observerEntry.isResetMatchedWithConsumed();
+    // Chain changes this policy before startParse; keep the public entry value on exceptions.
+    // State checkpoints still occur here, so a pure failure memo hit adds no owner checkpoint.
+    observerResetMatched = parserCallDepth != 0 && observerEntry == parserCallEntry
+        ? parserCallResetMatched : observerEntry.isResetMatchedWithConsumed();
     for (int index = 0; index < transactionalStates.size(); index++) {
       TransactionalState state = transactionalStates.get(index);
       if (!(state instanceof MutationAwareTransactionalState)) checkpointState(observerStateBoundary(), state);
@@ -156,7 +211,7 @@ public class ParseContext implements
   }
 
   private void releaseObserverBoundaryIfIdle() {
-    if (parseLimitFailure == null && parseFrames.isEmpty() && deferredFrameDepth == 0
+    if (parserCallDepth == 0 && observerFailure == null && parserCallFailure == null && parseLimitFailure == null && parseFrames.isEmpty() && deferredFrameDepth == 0
         && (!observerExplicitTransaction || tokenStack.size() <= observerTransactionDepth))
       releaseObserverBoundary();
   }
@@ -973,57 +1028,68 @@ public class ParseContext implements
    * transactional-state contract; external I/O is not rolled back.
    */
   public Parsed parsePegAssertion(Parser owner, Parser child, boolean positive) {
-    startParse(owner, this, TokenKind.consumed, false);
-    DiagnosticSpeculation diagnostics = beginDiagnosticSpeculation();
-    ParseFrame frame = parseFrames.peekFirst();
-    int consumed = frame == null ? 0 : frame.maxConsumedOffset;
-    int matched = frame == null ? 0 : frame.maxMatchedOffset;
-    int tokensBefore = tokenStack.size();
-    int framesBefore = parseFrames.size();
-    int terminalsBefore = terminalFrames.size();
-    int deferredBefore = deferredFrameDepth;
-    int diagnosticsBefore = memoDiagnosticFrames.size();
-    int transactionFramesBefore = memoTransactionFrameCount;
-    boolean completed = false;
-    boolean succeeded;
+    enterParserCall();
     try {
-      begin(owner);
-      succeeded = child.parse(this, TokenKind.consumed, false).isSucceeded() == positive;
-      rollback(owner);
-      completed = true;
-    } finally {
-      if (observerFailure == null && parseLimitFailure == null) {
-        // Unwind only frames opened by this assertion if a callback throws. Resource
-        // failures remain fatal; do not turn them into successful negative assertions.
-        while (tokenStack.size() > tokensBefore) {
-          TransactionElement abandoned = tokenStack.pollFirst();
-          abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
-          finishTransactionalState(abandoned, true);
-        }
-        while (parseFrames.size() > framesBefore) parseFrames.pollFirst();
-        while (terminalFrames.size() > terminalsBefore) terminalFrames.pollFirst();
-        while (memoDiagnosticFrames.size() > diagnosticsBefore) memoDiagnosticFrames.pollFirst();
-        while (memoTransactionFrameCount > transactionFramesBefore) {
-          memoTransactionFrames[--memoTransactionFrameCount] = null;
-        }
-        deferredFrameDepth = deferredBefore;
-        if (frame != null) {
-          frame.maxConsumedOffset = consumed;
-          frame.maxMatchedOffset = matched;
-          frame.snapshot = null;
-        }
-        if (!completed) {
-          if (frame != null && parseFrames.peekFirst() == frame) parseFrames.pollFirst();
-          if (frame != null && terminalFrames.peekFirst() == frame) terminalFrames.pollFirst();
-          if (deferredDiagnostics) deferredFrameDepth--;
-          releaseObserverBoundaryIfIdle();
+      startParse(owner, this, TokenKind.consumed, false);
+      DiagnosticSpeculation diagnostics = beginDiagnosticSpeculation();
+      ParseFrame frame = parseFrames.peekFirst();
+      int consumed = frame == null ? 0 : frame.maxConsumedOffset;
+      int matched = frame == null ? 0 : frame.maxMatchedOffset;
+      int tokensBefore = tokenStack.size();
+      int framesBefore = parseFrames.size();
+      int terminalsBefore = terminalFrames.size();
+      int deferredBefore = deferredFrameDepth;
+      int diagnosticsBefore = memoDiagnosticFrames.size();
+      int transactionFramesBefore = memoTransactionFrameCount;
+      boolean completed = false;
+      boolean succeeded;
+      try {
+        begin(owner);
+        succeeded = child.parse(this, TokenKind.consumed, false).isSucceeded() == positive;
+        rollback(owner);
+        completed = true;
+      } catch (RuntimeException | Error failure) {
+        failParserCall(failure);
+        throw failure;
+      } finally {
+        if (parserCallFailure == null && observerFailure == null && parseLimitFailure == null) {
+          // Unwind only frames opened by this assertion if a callback throws. Resource
+          // failures remain fatal; do not turn them into successful negative assertions.
+          while (tokenStack.size() > tokensBefore) {
+            TransactionElement abandoned = tokenStack.pollFirst();
+            abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
+            finishTransactionalState(abandoned, true);
+          }
+          while (parseFrames.size() > framesBefore) parseFrames.pollFirst();
+          while (terminalFrames.size() > terminalsBefore) terminalFrames.pollFirst();
+          while (memoDiagnosticFrames.size() > diagnosticsBefore) memoDiagnosticFrames.pollFirst();
+          while (memoTransactionFrameCount > transactionFramesBefore) {
+            memoTransactionFrames[--memoTransactionFrameCount] = null;
+          }
+          deferredFrameDepth = deferredBefore;
+          if (frame != null) {
+            frame.maxConsumedOffset = consumed;
+            frame.maxMatchedOffset = matched;
+            frame.snapshot = null;
+          }
+          if (!completed) {
+            if (frame != null && parseFrames.peekFirst() == frame) parseFrames.pollFirst();
+            if (frame != null && terminalFrames.peekFirst() == frame) terminalFrames.pollFirst();
+            if (deferredDiagnostics) deferredFrameDepth--;
+            releaseObserverBoundaryIfIdle();
+          }
         }
       }
+      if (succeeded) discardDiagnosticSpeculation(diagnostics);
+      Parsed result = succeeded ? Parsed.SUCCEEDED : Parsed.FAILED;
+      endParse(owner, result, this, TokenKind.consumed, false);
+      return result;
+    } catch (RuntimeException | Error failure) {
+      failParserCall(failure);
+      throw failure;
+    } finally {
+      leaveParserCall();
     }
-    if (succeeded) discardDiagnosticSpeculation(diagnostics);
-    Parsed result = succeeded ? Parsed.SUCCEEDED : Parsed.FAILED;
-    endParse(owner, result, this, TokenKind.consumed, false);
-    return result;
   }
 
   /**
@@ -1032,54 +1098,65 @@ public class ParseContext implements
    * diagnostics remain visible. A throwing child cannot leave abandoned frames.
    */
   public Parsed parseMatchOnly(Parser owner, Parser child, TokenKind kind, boolean invert) {
-    startParse(owner, this, kind, invert);
-    ParseFrame frame = parseFrames.peekFirst();
-    int tokensBefore = tokenStack.size();
-    int framesBefore = parseFrames.size();
-    int terminalsBefore = terminalFrames.size();
-    int deferredBefore = deferredFrameDepth;
-    int diagnosticsBefore = memoDiagnosticFrames.size();
-    int transactionFramesBefore = memoTransactionFrameCount;
-    boolean completed = false;
+    enterParserCall();
     try {
-      begin(owner);
-      TransactionElement stateBoundary = getCurrent();
-      Parsed parsed = child.parse(this, TokenKind.matchOnly, invert);
-      Parsed result;
-      if (parsed.isFailed()) {
-        rollback(owner);
-        result = Parsed.FAILED;
-      } else {
-        try {
-          result = new Parsed(commit(owner, TokenKind.matchOnly));
-        } finally {
-          if (observerFailure == null && parseLimitFailure == null) stateBoundary.restoreState();
+      startParse(owner, this, kind, invert);
+      ParseFrame frame = parseFrames.peekFirst();
+      int tokensBefore = tokenStack.size();
+      int framesBefore = parseFrames.size();
+      int terminalsBefore = terminalFrames.size();
+      int deferredBefore = deferredFrameDepth;
+      int diagnosticsBefore = memoDiagnosticFrames.size();
+      int transactionFramesBefore = memoTransactionFrameCount;
+      boolean completed = false;
+      try {
+        begin(owner);
+        TransactionElement stateBoundary = getCurrent();
+        Parsed parsed = child.parse(this, TokenKind.matchOnly, invert);
+        Parsed result;
+        if (parsed.isFailed()) {
+          rollback(owner);
+          result = Parsed.FAILED;
+        } else {
+          try {
+            result = new Parsed(commit(owner, TokenKind.matchOnly));
+          } finally {
+            if (parserCallFailure == null && observerFailure == null && parseLimitFailure == null) stateBoundary.restoreState();
+          }
+        }
+        endParse(owner, result, this, kind, invert);
+        completed = true;
+        return result;
+      } catch (RuntimeException | Error failure) {
+        failParserCall(failure);
+        throw failure;
+      } finally {
+        if (!completed && parserCallFailure == null && observerFailure == null && parseLimitFailure == null) {
+          // State owners obey the checkpoint/restore no-throw contract. Keep the
+          // original callback or resource exception; do not synthesize callbacks.
+          while (tokenStack.size() > tokensBefore) {
+            TransactionElement abandoned = tokenStack.pollFirst();
+            abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
+            finishTransactionalState(abandoned, true);
+          }
+          while (parseFrames.size() > framesBefore) parseFrames.pollFirst();
+          while (terminalFrames.size() > terminalsBefore) terminalFrames.pollFirst();
+          while (memoDiagnosticFrames.size() > diagnosticsBefore) memoDiagnosticFrames.pollFirst();
+          while (memoTransactionFrameCount > transactionFramesBefore) {
+            memoTransactionFrames[--memoTransactionFrameCount] = null;
+          }
+          deferredFrameDepth = deferredBefore;
+          if (frame != null && parseFrames.peekFirst() == frame) parseFrames.pollFirst();
+          if (frame != null && terminalFrames.peekFirst() == frame) terminalFrames.pollFirst();
+          if (deferredDiagnostics) deferredFrameDepth--;
+          releaseObserverBoundaryIfIdle();
         }
       }
-      endParse(owner, result, this, kind, invert);
-      completed = true;
-      return result;
+    } catch (RuntimeException | Error failure) {
+      failParserCall(failure);
+      throw failure;
     } finally {
-      if (!completed && observerFailure == null && parseLimitFailure == null) {
-        // State owners obey the checkpoint/restore no-throw contract. Keep the
-        // original callback or resource exception; do not synthesize callbacks.
-        while (tokenStack.size() > tokensBefore) {
-          TransactionElement abandoned = tokenStack.pollFirst();
-          abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
-          finishTransactionalState(abandoned, true);
-        }
-        while (parseFrames.size() > framesBefore) parseFrames.pollFirst();
-        while (terminalFrames.size() > terminalsBefore) terminalFrames.pollFirst();
-        while (memoDiagnosticFrames.size() > diagnosticsBefore) memoDiagnosticFrames.pollFirst();
-        while (memoTransactionFrameCount > transactionFramesBefore) {
-          memoTransactionFrames[--memoTransactionFrameCount] = null;
-        }
-        deferredFrameDepth = deferredBefore;
-        if (frame != null && parseFrames.peekFirst() == frame) parseFrames.pollFirst();
-        if (frame != null && terminalFrames.peekFirst() == frame) terminalFrames.pollFirst();
-        if (deferredDiagnostics) deferredFrameDepth--;
-        releaseObserverBoundaryIfIdle();
-      }
+      leaveParserCall();
     }
   }
 
@@ -1111,51 +1188,62 @@ public class ParseContext implements
   /** Internal transparent capture/scope boundary, including exceptional child cleanup. */
   public Parsed parseCaptureBoundary(Parser owner, Parser child, String binding,
       boolean scoped, TokenKind kind, boolean invert) {
-    startParse(owner, this, kind, invert);
-    ParseFrame frame = parseFrames.peekFirst();
-    int tokensBefore = tokenStack.size();
-    int framesBefore = parseFrames.size();
-    int terminalsBefore = terminalFrames.size();
-    int deferredBefore = deferredFrameDepth;
-    int diagnosticsBefore = memoDiagnosticFrames.size();
-    int transactionFramesBefore = memoTransactionFrameCount;
-    Runnable restoreScope = scoped ? captureBindings().checkpoint() : null;
-    boolean completed = false;
+    enterParserCall();
     try {
-      begin(owner);
-      int anchor = getPosition(kind).value();
-      Parsed result = child.parse(this, kind, invert);
-      if (result.isFailed()) rollback(owner);
-      else {
-        if (!scoped) {
-          Source capturedSource = result.getTokenOptional().isEmpty() && result.getOriginalTokens().isEmpty()
-              ? peek(getPosition(kind), new CodePointLength(0)) : result.getRootToken().source;
-          capture(binding, org.unlaxer.CapturedValue.from(capturedSource, source, anchor));
+      startParse(owner, this, kind, invert);
+      ParseFrame frame = parseFrames.peekFirst();
+      int tokensBefore = tokenStack.size();
+      int framesBefore = parseFrames.size();
+      int terminalsBefore = terminalFrames.size();
+      int deferredBefore = deferredFrameDepth;
+      int diagnosticsBefore = memoDiagnosticFrames.size();
+      int transactionFramesBefore = memoTransactionFrameCount;
+      Runnable restoreScope = scoped ? captureBindings().checkpoint() : null;
+      boolean completed = false;
+      try {
+        begin(owner);
+        int anchor = getPosition(kind).value();
+        Parsed result = child.parse(this, kind, invert);
+        if (result.isFailed()) rollback(owner);
+        else {
+          if (!scoped) {
+            Source capturedSource = result.getTokenOptional().isEmpty() && result.getOriginalTokens().isEmpty()
+                ? peek(getPosition(kind), new CodePointLength(0)) : result.getRootToken().source;
+            capture(binding, org.unlaxer.CapturedValue.from(capturedSource, source, anchor));
+          }
+          if (restoreScope != null) restoreScope.run();
+          commit(owner, kind);
         }
-        if (restoreScope != null) restoreScope.run();
-        commit(owner, kind);
+        endParse(owner, result, this, kind, invert);
+        completed = true;
+        return result;
+      } catch (RuntimeException | Error failure) {
+        failParserCall(failure);
+        throw failure;
+      } finally {
+        if (!completed && parserCallFailure == null && observerFailure == null && parseLimitFailure == null) {
+          while (tokenStack.size() > tokensBefore) {
+            TransactionElement abandoned = tokenStack.pollFirst();
+            abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
+            finishTransactionalState(abandoned, true);
+          }
+          while (parseFrames.size() > framesBefore) parseFrames.pollFirst();
+          while (terminalFrames.size() > terminalsBefore) terminalFrames.pollFirst();
+          while (memoDiagnosticFrames.size() > diagnosticsBefore) memoDiagnosticFrames.pollFirst();
+          while (memoTransactionFrameCount > transactionFramesBefore)
+            memoTransactionFrames[--memoTransactionFrameCount] = null;
+          deferredFrameDepth = deferredBefore;
+          if (frame != null && parseFrames.peekFirst() == frame) parseFrames.pollFirst();
+          if (frame != null && terminalFrames.peekFirst() == frame) terminalFrames.pollFirst();
+          if (deferredDiagnostics) deferredFrameDepth--;
+          releaseObserverBoundaryIfIdle();
+        }
       }
-      endParse(owner, result, this, kind, invert);
-      completed = true;
-      return result;
+    } catch (RuntimeException | Error failure) {
+      failParserCall(failure);
+      throw failure;
     } finally {
-      if (!completed && observerFailure == null && parseLimitFailure == null) {
-        while (tokenStack.size() > tokensBefore) {
-          TransactionElement abandoned = tokenStack.pollFirst();
-          abandoned.restoreSelectionChanges(chosenParserByChoice, orderedParsersByNonOrdered);
-          finishTransactionalState(abandoned, true);
-        }
-        while (parseFrames.size() > framesBefore) parseFrames.pollFirst();
-        while (terminalFrames.size() > terminalsBefore) terminalFrames.pollFirst();
-        while (memoDiagnosticFrames.size() > diagnosticsBefore) memoDiagnosticFrames.pollFirst();
-        while (memoTransactionFrameCount > transactionFramesBefore)
-          memoTransactionFrames[--memoTransactionFrameCount] = null;
-        deferredFrameDepth = deferredBefore;
-        if (frame != null && parseFrames.peekFirst() == frame) parseFrames.pollFirst();
-        if (frame != null && terminalFrames.peekFirst() == frame) terminalFrames.pollFirst();
-        if (deferredDiagnostics) deferredFrameDepth--;
-        releaseObserverBoundaryIfIdle();
-      }
+      leaveParserCall();
     }
   }
 
@@ -1642,7 +1730,7 @@ public class ParseContext implements
   public void startParse(Parser parser, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
     requireParseHealthy();
     int activeDepth = activeParseDepth();
-    if (activeDepth == 0) beginObserverBoundary(false);
+    if (activeDepth == 0 && (!observerBoundaryActive || observerExplicitTransaction)) beginObserverBoundary(false);
     if (activeDepth >= MAX_PARSE_DEPTH) {
       parseLimitFailure = new ParseLimitException(MAX_PARSE_DEPTH, getPosition(tokenKind).value());
       disableMemoizationPermanently();

@@ -305,14 +305,18 @@ impl<'a> Plan<'a> {
     }
     fn nested_atom(&self, a: &AtomicElement, depth: usize, out: &mut Vec<(usize, usize)>) {
         match &a.kind {
-            ElementKind::Group(body)
-            | ElementKind::OwnedCapture { body, .. }
-            | ElementKind::CaptureScope(body) => self.nested_body(body, depth, out),
+            ElementKind::OwnedCapture { body, .. }
+            | ElementKind::CaptureScope(body)
+            | ElementKind::Group(body) => self.nested_body(body, depth, out),
             ElementKind::Optional(body) | ElementKind::Repeat(body) => {
                 self.nested_body(body, depth + 2, out)
             }
             ElementKind::OneOrMore(child) | ElementKind::BoundedRepeat { element: child, .. } => {
                 self.nested_atom(child, depth + 2, out)
+            }
+            ElementKind::Separated { element, separator } => {
+                self.nested_atom(element, depth + 2, out);
+                self.atom(separator, depth + 5, out);
             }
             ElementKind::RuleRef { name, .. } => {
                 if let Some(id) = self.g.rules.iter().position(|r| &r.name == name) {

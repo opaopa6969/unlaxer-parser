@@ -85,6 +85,7 @@ class ParserRuleEmitter {
         record BoundedRepeatOf(ElementModel inner, String min, String max) implements ElementModel {}
         record Captured(ElementModel inner, List<String> bindings) implements ElementModel {}
         record Boundary(String kind, ElementModel inner) implements ElementModel {}
+        record NestedSeparated(ElementModel item, ElementModel separator, String chainClass) implements ElementModel {}
         record OwnedCapture(String name, ElementModel inner) implements ElementModel {}
         record Replay(String name) implements ElementModel {}
         record CaptureScope(ElementModel inner) implements ElementModel {}
@@ -1008,6 +1009,7 @@ class ParserRuleEmitter {
             else if (element instanceof CaptureScopeElement) child=new ElementModel.CaptureScope(child);
             return new ElementModel.Boundary(boundary.kind(),child);
         }
+        if (element instanceof SeparatedElement e) return new ElementModel.Boundary("LIST",new ElementModel.NestedSeparated(resolveNested(ctx,ruleName,e.element()),new ElementModel.Boundary("SEPARATOR",resolveFlatElement(ctx,ruleName,e.separator())),getChainClassName(ctx,ruleName)));
         var plain=resolveFlatElement(ctx,ruleName,element);
         if (plain instanceof ElementModel.Captured c) plain=c.inner();
         return new ElementModel.Boundary("VALUE",plain);
@@ -1182,7 +1184,12 @@ class ParserRuleEmitter {
         if (model instanceof ElementModel.BoundedRepeatOf m) {
             return "new Repeat(" + renderInner(m.inner(), adapterShadowsWordParser, tokenStream) + ", " + m.min() + ", " + m.max() + ")";
         }
-        if (model instanceof ElementModel.Boundary m) return "org.unlaxer.parser.combinator.CaptureBoundaryParser.input(org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind."+m.kind()+", "+renderElement(m.inner(),adapterShadowsWordParser,tokenStream)+")";
+        if (model instanceof ElementModel.NestedSeparated m) {
+            String item=renderElement(m.item(),adapterShadowsWordParser,tokenStream);
+            String separator=renderElement(m.separator(),adapterShadowsWordParser,tokenStream);
+            return "new "+m.chainClass()+"() { @Override public Parsers getLazyParsers() { return new Parsers("+item+", new ZeroOrMore(new "+m.chainClass()+"() { @Override public Parsers getLazyParsers() { return new Parsers("+separator+", "+item+"); } })); } }";
+        }
+        if (model instanceof ElementModel.Boundary m) return "org.unlaxer.parser.combinator.CaptureBoundaryParser."+(m.kind().equals("SEPARATOR")?"wrap":"input")+"(org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind."+m.kind()+", "+renderElement(m.inner(),adapterShadowsWordParser,tokenStream)+")";
         if (model instanceof ElementModel.OwnedCapture m) {
             return "new org.unlaxer.parser.combinator.NamedCapture(\"" + ParserCodegenUtil.escapeString(m.name())
                 + "\", " + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ")";

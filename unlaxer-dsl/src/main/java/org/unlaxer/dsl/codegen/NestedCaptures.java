@@ -102,6 +102,7 @@ public final class NestedCaptures {
         if (depth > 32) throw new IllegalArgumentException("E-NESTED-SHAPE: schema depth exceeds 32");
         if (element instanceof OptionalElement e) return wrap(Cardinality.OPTIONAL,body(grammar,e.body(),depth+1));
         if (element instanceof RepeatElement e) return wrap(Cardinality.MANY,body(grammar,e.body(),depth+1));
+        if (element instanceof SeparatedElement e) return wrap(Cardinality.MANY,shape(grammar,e.element(),depth+1));
         if (element instanceof OneOrMoreElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1));
         if (element instanceof BoundedRepeatElement e) return wrap(Cardinality.MANY,shape(grammar,e.body(),depth+1));
         if (element instanceof TransparentElement e) return body(grammar,e.body(),depth+1);
