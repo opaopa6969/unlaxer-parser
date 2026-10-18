@@ -66,7 +66,7 @@ npm ci --ignore-scripts
 npx playwright install chromium
 ```
 
-固定した開発revisionの独立checkoutのルートで実行する。`tinyexpression` はCIと同じ `7d7bd1cbfab1bd9548ba53c73cc50502f0437c67` の独立checkoutを用意し、現在のunlaxerを指定してcompileしておく。既存checkoutの未commit変更を上書きしない。公開版と同じversion名の開発buildを混同しないよう、専用のMaven repositoryでinstall・依存解決する。このlocal installは公開操作ではない。
+固定した開発revisionの独立checkoutのルートで実行する。`tinyexpression` はCIと同じ `7d7bd1cbfab1bd9548ba53c73cc50502f0437c67` の独立checkoutを用意し、現在のunlaxerを指定してcompileしておく。token・移植性のoracleはこの固定revisionを使う。p4-smokeだけはClassic既定AST選択で全preferred候補を列挙しない `420757a8ab94ae1bed6dbd7cea2743efb8840bbd`（tinyexpression #261）で実行する。固定revisionではbounded public mapperが `complex-x64.tiny` を `E-MAPPING-LIMIT: preferred candidates` で拒否するためである。既存checkoutの未commit変更を上書きしない。公開版と同じversion名の開発buildを混同しないよう、専用のMaven repositoryでinstall・依存解決する。このlocal installは公開操作ではない。
 
 ```sh
 parity_m2=$(mktemp -d)
