@@ -57,8 +57,8 @@ AST field の原文として読み替えることはない。
 optional/list/group/owned capture/scope と今回の separated である。同一 nominal
 shape の shared mapping、mapped family の commonField、preferred metadata、
 manual evaluator を検証する。mixed、透過 rule alias/recursive helper、typeof、
-自動評価、associative projection、token-stream との未対応の組合せは親 #583 の
-残条件であり、既存の位置付き診断を維持する。
+自動評価、associative projection、token-stream との組合せは、この単位では既存の位置付き診断を維持した。
+現在の対応範囲は [typed nested capture の表](typed-nested-captures.md#nested-の対応範囲と拡張先)を参照する。
 
 `spec-corpus/nested-separated-captures/` に手書きの型・AST・値・CP boundary・preferred
 期待値を置く。Java21 の独立 consumer と Java/native の両ホストが生成した Rust1.85

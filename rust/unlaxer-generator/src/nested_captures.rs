@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use unlaxer_codegen::{BoundaryKind, Cardinality, Expression, Kind};
 use unlaxer_ubnf::{
     AnnotationKind, AtomicElement, ElementKind, GrammarDecl, RuleBody, RuleDecl, TokenKind,
@@ -92,11 +92,12 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
         {
             return Err(error(rule, "duplicate annotation"));
         }
-        if grammar.settings.iter().any(|s| s.key == "tokenStream") {
-            return Err(error(
-                rule,
-                "token stream requires remaining #583 implementation",
-            ));
+        // Each unsupported combination names its tracking issue; Java uses the same order and text.
+        let has =
+            |pred: fn(&AnnotationKind) -> bool| rule.annotations.iter().any(|a| pred(&a.kind));
+        // Checked before @mapping: a skipped rule publishes no mapping on either host.
+        if has(|k| matches!(k, AnnotationKind::Skip | AnnotationKind::Enum)) {
+            return Err(error(rule, "@skip/@enum rules cannot own nested captures"));
         }
         let mapping = rule
             .annotations
@@ -109,28 +110,29 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
                 }
             })
             .ok_or_else(|| error(rule, "@mapping required"))?;
-        if rule.annotations.iter().any(|a| {
-            matches!(
-                a.kind,
-                AnnotationKind::LeftAssoc
-                    | AnnotationKind::RightAssoc
-                    | AnnotationKind::Skip
-                    | AnnotationKind::Enum
-                    | AnnotationKind::Eval { .. }
-            )
-        }) {
+        if has(|k| matches!(k, AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc)) {
             return Err(error(
                 rule,
-                "combination requires remaining #583 implementation",
+                "@leftAssoc/@rightAssoc projection of nested captures is not supported yet (#695)",
             ));
         }
-        if !mapping.1.is_empty()
-            && rule
-                .annotations
-                .iter()
-                .any(|a| matches!(a.kind, AnnotationKind::CommonField { .. }))
-        {
-            return Err(error(rule, "commonField requires a mapped sum family"));
+        if has(|k| matches!(k, AnnotationKind::Eval { .. })) {
+            return Err(error(
+                rule,
+                "@eval on a nested capture owner is not supported yet (#694)",
+            ));
+        }
+        if !mapping.1.is_empty() && has(|k| matches!(k, AnnotationKind::CommonField { .. })) {
+            return Err(error(
+                rule,
+                "@commonField on a nested owner with fields is not supported yet (#697)",
+            ));
+        }
+        if grammar.settings.iter().any(|s| s.key == "tokenStream") {
+            return Err(error(
+                rule,
+                "token stream with nested captures is not supported yet (#696)",
+            ));
         }
         let values = sites(rule)?;
         let mut usages = Vec::new();
@@ -140,17 +142,38 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
                 return Err(format!("E-TYPEOF-UNKNOWN-CAPTURE: {reference}"));
             }
         }
+        let typeof_names: Vec<String> = usages.into_iter().flat_map(|(a, b)| [a, b]).collect();
         let names: HashSet<_> = mapping
             .1
             .iter()
             .cloned()
-            .chain(usages.into_iter().flat_map(|(a, b)| [a, b]))
+            .chain(typeof_names.iter().cloned())
             .collect();
         if values.len() != names.len() || !names.iter().all(|p| values.contains_key(p)) {
             return Err(error(rule, "mapping must name each unique outer capture"));
         }
-        for value in values.values() {
+        let local_trivia = has_annotation(rule, |k| {
+            matches!(
+                k,
+                AnnotationKind::Whitespace { .. } | AnnotationKind::Interleave { .. }
+            )
+        });
+        // Same field order as Java's captureNames: mapping params, then typeof captures.
+        let mut ordered: Vec<&String> = Vec::new();
+        for name in mapping.1.iter().chain(typeof_names.iter()) {
+            if !ordered.contains(&name) {
+                ordered.push(name);
+            }
+        }
+        for value in ordered.iter().map(|name| values[*name]) {
             shape(grammar, value, 0).map_err(|e| error(rule, &e))?;
+            // Inlined alias helpers keep the grammar trivia; a rule-local override would differ per host.
+            if local_trivia && expand_aliases(grammar, value) != *value {
+                return Err(error(
+                    rule,
+                    "nested capture through a helper under rule-local trivia is not supported",
+                ));
+            }
         }
         if values
             .values()
@@ -224,6 +247,9 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
 }
 // Rust stores every mapped node in Ast; sharing must still respect Java's nominal leaf type.
 fn nominal_leaf(grammar: &GrammarDecl, atom: &AtomicElement) -> Option<String> {
+    if let Some(element) = inlined_alias(grammar, atom) {
+        return nominal_leaf(grammar, element);
+    }
     match &atom.kind {
         ElementKind::RuleRef { name, .. } => grammar
             .rules
@@ -270,21 +296,45 @@ fn wrap(container: Cardinality, inner: Kind) -> Kind {
     }
 }
 pub fn shape(grammar: &GrammarDecl, atom: &AtomicElement, depth: usize) -> Result<Kind, String> {
+    shape_in(grammar, atom, depth, &mut Expansion::default())
+}
+/// Alias expansion state of one schema query: the active alias chain (cycle detection) and the
+/// successful alias shapes by rule and depth. A shape is a pure function of (rule, depth) once its
+/// expansion is acyclic, so the memo keeps validation linear in the number of helper rules instead
+/// of exponential in shared multi-element helpers. Java (`NestedCaptures.Expansion`) does the same.
+#[derive(Default)]
+struct Expansion {
+    stack: Vec<String>,
+    memo: HashMap<(String, usize), Kind>,
+}
+fn shape_in(
+    grammar: &GrammarDecl,
+    atom: &AtomicElement,
+    depth: usize,
+    helpers: &mut Expansion,
+) -> Result<Kind, String> {
     if depth > 32 {
         return Err("schema depth exceeds 32".into());
     }
     Ok(match &atom.kind {
-        ElementKind::Separated { element, .. } => {
-            wrap(Cardinality::Many, shape(grammar, element, depth + 1)?)
-        }
-        ElementKind::Optional(v) => wrap(Cardinality::Optional, body_shape(grammar, v, depth + 1)?),
-        ElementKind::Repeat(v) => wrap(Cardinality::Many, body_shape(grammar, v, depth + 1)?),
+        ElementKind::Separated { element, .. } => wrap(
+            Cardinality::Many,
+            shape_in(grammar, element, depth + 1, helpers)?,
+        ),
+        ElementKind::Optional(v) => wrap(
+            Cardinality::Optional,
+            body_shape_in(grammar, v, depth + 1, helpers)?,
+        ),
+        ElementKind::Repeat(v) => wrap(
+            Cardinality::Many,
+            body_shape_in(grammar, v, depth + 1, helpers)?,
+        ),
         ElementKind::OneOrMore(v) | ElementKind::BoundedRepeat { element: v, .. } => {
-            wrap(Cardinality::Many, shape(grammar, v, depth + 1)?)
+            wrap(Cardinality::Many, shape_in(grammar, v, depth + 1, helpers)?)
         }
         ElementKind::OwnedCapture { body: v, .. }
         | ElementKind::CaptureScope(v)
-        | ElementKind::Group(v) => body_shape(grammar, v, depth + 1)?,
+        | ElementKind::Group(v) => body_shape_in(grammar, v, depth + 1, helpers)?,
         ElementKind::Terminal(_) | ElementKind::Replay { .. } => Kind::Text,
         ElementKind::RuleRef { name, .. } => {
             let token = grammar.tokens.iter().find(|t| &t.name == name);
@@ -301,41 +351,220 @@ pub fn shape(grammar: &GrammarDecl, atom: &AtomicElement, depth: usize) -> Resul
                     .iter()
                     .find(|r| &r.name == name)
                     .ok_or("unknown nested rule")?;
-                if target
-                    .annotations
-                    .iter()
-                    .any(|a| matches!(a.kind, AnnotationKind::Enum))
-                {
+                if has_annotation(target, |k| matches!(k, AnnotationKind::Enum)) {
                     Kind::Enum(target.name.clone())
-                } else if !target
-                    .annotations
-                    .iter()
-                    .any(|a| matches!(a.kind, AnnotationKind::Skip))
-                    && target
-                        .annotations
-                        .iter()
-                        .any(|a| matches!(a.kind, AnnotationKind::Mapping { .. }))
+                } else if !has_annotation(target, |k| matches!(k, AnnotationKind::Skip))
+                    && has_annotation(target, |k| matches!(k, AnnotationKind::Mapping { .. }))
                 {
                     Kind::Node
                 } else {
-                    return Err(
-                        "unmapped/skip aliases require remaining #583 implementation".into(),
-                    );
+                    alias_shape(grammar, target, depth, helpers)?
                 }
             }
         }
         _ => return Err("unsupported nested element".into()),
     })
 }
+fn has_annotation(rule: &RuleDecl, pred: fn(&AnnotationKind) -> bool) -> bool {
+    rule.annotations.iter().any(|a| pred(&a.kind))
+}
+/// An unmapped, unannotated, non-recursive helper is a transparent alias: its body's shape is the
+/// shape of the reference. Java (`NestedCaptures.aliasShape`) checks the same conditions in the
+/// same order and reports the same text.
+fn alias_shape(
+    grammar: &GrammarDecl,
+    target: &RuleDecl,
+    depth: usize,
+    helpers: &mut Expansion,
+) -> Result<Kind, String> {
+    let name = &target.name;
+    if helpers.stack.contains(name) {
+        return Err(format!(
+            "nested capture through recursive helper {name} is not supported"
+        ));
+    }
+    if let Some(cached) = helpers.memo.get(&(name.clone(), depth)) {
+        return Ok(cached.clone());
+    }
+    if has_annotation(target, |k| matches!(k, AnnotationKind::Skip)) {
+        return Err(format!(
+            "nested capture through @skip rule {name} is not supported"
+        ));
+    }
+    if has_annotation(target, |k| !matches!(k, AnnotationKind::Doc { .. })) {
+        return Err(format!(
+            "nested capture through annotated helper {name} is not supported"
+        ));
+    }
+    if has_bindings(&target.body) {
+        return Err(format!(
+            "nested capture through helper {name} with captures is not supported"
+        ));
+    }
+    helpers.stack.push(name.clone());
+    let result = body_shape_in(grammar, &target.body, depth + 1, helpers);
+    helpers.stack.pop();
+    let result = result?;
+    if matches!(parts(result.clone()), (Kind::Value, _)) {
+        return Err(format!(
+            "nested capture through mixed-choice helper {name} is not supported"
+        ));
+    }
+    helpers.memo.insert((name.clone(), depth), result.clone());
+    Ok(result)
+}
+// AST captures, typeof constraints and general bindings stay owned by the rule that declares them.
+fn has_bindings(body: &RuleBody) -> bool {
+    body.alternatives.iter().any(|sequence| {
+        sequence.elements.iter().any(|element| {
+            element.capture.is_some()
+                || element.typeof_constraint.is_some()
+                || atom_has_bindings(&element.element)
+        })
+    })
+}
+fn atom_has_bindings(atom: &AtomicElement) -> bool {
+    match &atom.kind {
+        ElementKind::OwnedCapture { .. }
+        | ElementKind::CaptureScope(_)
+        | ElementKind::Replay { .. } => true,
+        ElementKind::Group(v) | ElementKind::Optional(v) | ElementKind::Repeat(v) => {
+            has_bindings(v)
+        }
+        ElementKind::OneOrMore(v) | ElementKind::BoundedRepeat { element: v, .. } => {
+            atom_has_bindings(v)
+        }
+        ElementKind::Separated { element, separator } => {
+            atom_has_bindings(element) || atom_has_bindings(separator)
+        }
+        _ => false,
+    }
+}
+/// The transparent alias whose single body element stands for `atom` inside a nested capture, or
+/// `None` when the reference stays an ordinary leaf (token, mapped node, enum, or a helper whose
+/// body is a choice / multi-element sequence and therefore one text or i32 value). Only used after
+/// `validate` accepted the grammar, so no cycle remains.
+pub(crate) fn inlined_alias<'a>(
+    grammar: &'a GrammarDecl,
+    atom: &AtomicElement,
+) -> Option<&'a AtomicElement> {
+    let ElementKind::RuleRef { name, .. } = &atom.kind else {
+        return None;
+    };
+    if grammar.tokens.iter().any(|t| &t.name == name) {
+        return None;
+    }
+    let rule = grammar.rules.iter().find(|r| &r.name == name)?;
+    if has_annotation(rule, |k| {
+        matches!(
+            k,
+            AnnotationKind::Enum | AnnotationKind::Skip | AnnotationKind::Mapping { .. }
+        )
+    }) {
+        return None;
+    }
+    let [sequence] = rule.body.alternatives.as_slice() else {
+        return None;
+    };
+    let [element] = sequence.elements.as_slice() else {
+        return None;
+    };
+    Some(&element.element)
+}
+/// Replaces inlined alias references by their single body element along the nested path, exactly
+/// where Java's `ParserRuleEmitter.resolveNested` descends: single-element bodies, repeated items
+/// and separated items. Multi-element and choice bodies (and separators) stay ordinary parsers.
+pub fn expand_aliases(grammar: &GrammarDecl, atom: &AtomicElement) -> AtomicElement {
+    if let Some(element) = inlined_alias(grammar, atom) {
+        return expand_aliases(grammar, element);
+    }
+    let single = |v: &RuleBody| expand_single(grammar, v);
+    let boxed = |v: &AtomicElement| Box::new(expand_aliases(grammar, v));
+    let kind = match &atom.kind {
+        ElementKind::Group(v) => ElementKind::Group(single(v)),
+        ElementKind::OwnedCapture { name, body: v } => ElementKind::OwnedCapture {
+            name: name.clone(),
+            body: single(v),
+        },
+        ElementKind::CaptureScope(v) => ElementKind::CaptureScope(single(v)),
+        ElementKind::Optional(v) => ElementKind::Optional(single(v)),
+        ElementKind::Repeat(v) => ElementKind::Repeat(single(v)),
+        ElementKind::OneOrMore(v) => ElementKind::OneOrMore(boxed(v)),
+        ElementKind::BoundedRepeat { element, min, max } => ElementKind::BoundedRepeat {
+            element: boxed(element),
+            min: *min,
+            max: *max,
+        },
+        ElementKind::Separated { element, separator } => ElementKind::Separated {
+            element: boxed(element),
+            separator: separator.clone(),
+        },
+        other => other.clone(),
+    };
+    AtomicElement {
+        kind,
+        span: atom.span,
+    }
+}
+fn expand_single(grammar: &GrammarDecl, body: &RuleBody) -> RuleBody {
+    let mut result = body.clone();
+    if let [sequence] = result.alternatives.as_mut_slice() {
+        if let [element] = sequence.elements.as_mut_slice() {
+            element.element = expand_aliases(grammar, &element.element);
+        }
+    }
+    result
+}
+// First helper reference (source order) anywhere in an element, without entering referenced rules.
+fn helper_in<'a>(grammar: &GrammarDecl, atom: &'a AtomicElement) -> Option<&'a str> {
+    let body = |v: &'a RuleBody| {
+        v.alternatives
+            .iter()
+            .flat_map(|sequence| &sequence.elements)
+            .find_map(|element| helper_in(grammar, &element.element))
+    };
+    match &atom.kind {
+        ElementKind::RuleRef { name, .. } => is_helper(grammar, name).then_some(name.as_str()),
+        ElementKind::Group(v)
+        | ElementKind::OwnedCapture { body: v, .. }
+        | ElementKind::CaptureScope(v)
+        | ElementKind::Optional(v)
+        | ElementKind::Repeat(v) => body(v),
+        ElementKind::OneOrMore(v) | ElementKind::BoundedRepeat { element: v, .. } => {
+            helper_in(grammar, v)
+        }
+        ElementKind::Separated { element, separator } => {
+            helper_in(grammar, element).or_else(|| helper_in(grammar, separator))
+        }
+        _ => None,
+    }
+}
+fn is_helper(grammar: &GrammarDecl, name: &str) -> bool {
+    !grammar.tokens.iter().any(|t| t.name == name)
+        && grammar.rules.iter().any(|r| {
+            r.name == name
+                && !has_annotation(r, |k| matches!(k, AnnotationKind::Enum))
+                && (has_annotation(r, |k| matches!(k, AnnotationKind::Skip))
+                    || !has_annotation(r, |k| matches!(k, AnnotationKind::Mapping { .. })))
+        })
+}
 pub fn body_shape(grammar: &GrammarDecl, body: &RuleBody, depth: usize) -> Result<Kind, String> {
+    body_shape_in(grammar, body, depth, &mut Expansion::default())
+}
+fn body_shape_in(
+    grammar: &GrammarDecl,
+    body: &RuleBody,
+    depth: usize,
+    helpers: &mut Expansion,
+) -> Result<Kind, String> {
     let mut result = None;
     for sequence in &body.alternatives {
         let current = if let [element] = sequence.elements.as_slice() {
-            shape(grammar, &element.element, depth + 1)?
+            shape_in(grammar, &element.element, depth + 1, helpers)?
         } else {
             for element in &sequence.elements {
                 if matches!(
-                    shape(grammar, &element.element, depth + 1)?,
+                    shape_in(grammar, &element.element, depth + 1, helpers)?,
                     Kind::Nested { .. } | Kind::Node | Kind::Enum(_) | Kind::Value
                 ) {
                     return Err("multi-element container group needs explicit mapped node".into());
@@ -345,7 +574,9 @@ pub fn body_shape(grammar: &GrammarDecl, body: &RuleBody, depth: usize) -> Resul
         };
         let current = if let Some(old) = &result {
             if matches!(old, Kind::Nested { .. }) || matches!(current, Kind::Nested { .. }) {
-                return Err("container choice requires remaining #583 implementation".into());
+                return Err(
+                    "choice with container alternatives is not supported yet (#693)".into(),
+                );
             }
             if old != &current || matches!(current, Kind::Node | Kind::Enum(_) | Kind::Value) {
                 Kind::Value
@@ -357,7 +588,25 @@ pub fn body_shape(grammar: &GrammarDecl, body: &RuleBody, depth: usize) -> Resul
         };
         result = Some(current);
     }
-    result.ok_or_else(|| "empty body".into())
+    let result = result.ok_or("empty body")?;
+    // Mixed sums classify each alternative by its own CST node; a helper anywhere inside an
+    // alternative would change that classification and its preferred depth. This also keeps mixed
+    // detection of choices outside a capture (lowering `mixed_nested`) unchanged: such choices were
+    // never mixed before helpers had a nested shape.
+    if matches!(result, Kind::Value) {
+        for sequence in &body.alternatives {
+            if let Some(name) = sequence
+                .elements
+                .iter()
+                .find_map(|element| helper_in(grammar, &element.element))
+            {
+                return Err(format!(
+                    "mixed choice alternative through helper {name} is not supported"
+                ));
+            }
+        }
+    }
+    Ok(result)
 }
 pub fn field(grammar: &GrammarDecl, rule: &RuleDecl, name: &str) -> Result<Kind, String> {
     let values = sites(rule)?;
@@ -420,5 +669,32 @@ pub fn boundary(expression: Expression) -> Expression {
     Expression::CaptureBoundary {
         kind,
         child: Box::new(child),
+    }
+}
+#[cfg(test)]
+mod tests {
+    /// 14 levels of helpers that each reference the next one four times: 4^14 alias expansions
+    /// without the per-(rule, depth) memo. Java's NestedAliasCaptureConformanceTest checks the same.
+    #[test]
+    fn shared_multi_element_helpers_validate_in_linear_time() {
+        let mut rules = String::new();
+        for i in 0..14 {
+            let n = i + 1;
+            rules.push_str(&format!("H{i} ::= H{n} H{n} H{n} H{n}; "));
+        }
+        rules.push_str("H14 ::= 'a';");
+        let source = format!("grammar G {{ @package: p @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [ H0 ] @value; {rules} }}");
+        let file = unlaxer_ubnf::parse(&source).unwrap();
+        let started = std::time::Instant::now();
+        super::validate(&file.grammars[0]).unwrap();
+        let rule = &file.grammars[0].rules[0];
+        assert_eq!(
+            super::field(&file.grammars[0], rule, "value").unwrap(),
+            unlaxer_codegen::Kind::Nested {
+                leaf: Box::new(unlaxer_codegen::Kind::Text),
+                containers: vec![unlaxer_codegen::Cardinality::Optional],
+            }
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(10));
     }
 }
