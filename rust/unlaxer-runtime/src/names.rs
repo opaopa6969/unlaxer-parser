@@ -568,23 +568,38 @@ mod tests {
                     name: "recursive",
                     expression: scope(body),
                 }]);
-                let mut context = ParseContext::with_name_snapshots(
-                    "",
-                    &[snapshot("T")],
-                    ParseOptions::with_memoization(memo),
-                )
-                .unwrap();
-                let error = context
-                    .parse_shared_grammar(&grammar, 0, false)
-                    .unwrap_err();
-                assert!(error
-                    .expected
-                    .iter()
-                    .any(|hint| hint == "rule nesting below 256"));
-                assert_eq!(error.offset, 0);
-                assert_eq!(context.position(), 0);
-                assert!(context.names_state.frames.is_empty());
-                assert!(context.nodes.is_empty());
+                for classic in [false, true] {
+                    let mut context = ParseContext::with_name_snapshots(
+                        "",
+                        &[snapshot("T")],
+                        ParseOptions::with_memoization(memo),
+                    )
+                    .unwrap();
+                    struct Entry<'a>(&'a crate::SharedGrammar);
+                    impl crate::Parser for Entry<'_> {
+                        fn parse(&self, context: &mut ParseContext<'_>) -> crate::ParseResult {
+                            context.parse_shared_grammar(self.0, 0, false)
+                        }
+                    }
+                    let result = if classic {
+                        context.parse_with_token_mode(
+                            &Entry(&grammar),
+                            crate::token::TokenKind::Consumed,
+                            false,
+                        )
+                    } else {
+                        context.parse_shared_grammar(&grammar, 0, false)
+                    };
+                    let error = result.unwrap_err();
+                    assert!(error
+                        .expected
+                        .iter()
+                        .any(|hint| hint == "rule nesting below 256"));
+                    assert_eq!(error.offset, 0);
+                    assert_eq!(context.position(), 0);
+                    assert!(context.names_state.frames.is_empty());
+                    assert!(context.nodes.is_empty());
+                }
             }
         }
     }

@@ -71,6 +71,7 @@ public class ParserGenerator implements CodeGenerator {
 
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
+            NestedCaptures.requireValid(grammar);
             TokenStreamGrammar.requireValid(grammar);
             LexicalContexts.requireValid(grammar);
             NamePredicates.requireValid(grammar);

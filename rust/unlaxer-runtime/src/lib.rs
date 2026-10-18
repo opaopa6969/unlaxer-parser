@@ -473,6 +473,12 @@ impl Expr {
     pub fn separated_by(self, separator: Self) -> Self {
         Self::sequence([self.clone(), separator.then(self).zero_or_more()])
     }
+    /// Classic separated list: require the first item, then count a successful
+    /// no-progress separator/item tail once and stop, matching Java Occurs.
+    /// The existing [`Self::separated_by`] retains its pure PEG repeat contract.
+    pub fn separated_by_java(self, separator: Self) -> Self {
+        Self::sequence([self.clone(), separator.then(self).repeat_java(0, None)])
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1024,6 +1030,7 @@ enum ExpectedIds {
 
 #[derive(Debug, Clone, Default)]
 struct FailureDiagnostic {
+    // Only memo entries use this field; diagnostic merging does not change it.
     memo_expression_depth: usize,
     farthest: Option<usize>,
     expected: ExpectedIds,
@@ -2463,10 +2470,8 @@ impl<'a> ParseContext<'a> {
             if let Some(diagnostic) = self
                 .failure_memo
                 .probe(position, &key)
-                .filter(|entry| {
-                    self.token_mode.is_none()
-                        || self.expression_depth <= entry.memo_expression_depth
-                })
+                // A deeper retry must execute its guards in normal and Classic modes.
+                .filter(|entry| self.expression_depth <= entry.memo_expression_depth)
                 .cloned()
             {
                 self.memoized_failure_hits += 1;
@@ -2510,6 +2515,30 @@ impl<'a> ParseContext<'a> {
                 None
             }
         };
+        self.finish_rule_memo(
+            memo_key,
+            success_key.is_some(),
+            record_diagnostics,
+            count,
+            capture_mark,
+            result,
+        );
+        result
+    }
+
+    // Keep completed memo bookkeeping out of recursive rule frames. In debug
+    // builds Classic diagnostic/token snapshots otherwise consume the default
+    // thread stack before the existing rule-depth guard can report an error.
+    #[inline(never)]
+    fn finish_rule_memo(
+        &mut self,
+        memo_key: Option<(usize, FailureMemoKey)>,
+        memoize_success: bool,
+        record_diagnostics: bool,
+        count: usize,
+        capture_mark: usize,
+        result: Option<usize>,
+    ) {
         if let Some((position, key)) = memo_key {
             let diagnostic = if record_diagnostics {
                 let mut diagnostic = self
@@ -2520,7 +2549,6 @@ impl<'a> ParseContext<'a> {
                     parent.merge(&diagnostic);
                 }
                 if result.is_none() && self.token_mode.is_some() {
-                    diagnostic.memo_expression_depth = self.expression_depth;
                     diagnostic.classic_failure_end =
                         Some((self.matched_position, self.match_cursor_policy));
                 }
@@ -2528,7 +2556,6 @@ impl<'a> ParseContext<'a> {
             } else {
                 let mut diagnostic = FailureDiagnostic::default();
                 if result.is_none() && self.token_mode.is_some() {
-                    diagnostic.memo_expression_depth = self.expression_depth;
                     diagnostic.classic_failure_end =
                         Some((self.matched_position, self.match_cursor_policy));
                 }
@@ -2539,19 +2566,20 @@ impl<'a> ParseContext<'a> {
             // their existing memo sharing across wrappers.
             if self.resource_failure.is_none() {
                 if let Some(root) = result {
-                    if success_key.is_some() {
+                    if memoize_success {
                         self.memoize_success(position, key, count, root, capture_mark, diagnostic);
                     }
                 } else {
+                    let mut diagnostic = diagnostic;
+                    diagnostic.memo_expression_depth = self.expression_depth;
                     self.failure_memo
                         .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
                 }
             }
         }
-        if success_key.is_some() {
+        if memoize_success {
             self.captures.commit_checkpoint();
         }
-        result
     }
 
     /// Snapshot only the newly appended pure arena. No public NodeId, mutable
@@ -2928,6 +2956,23 @@ impl<'a> ParseContext<'a> {
                     self.matched_position = self.position;
                 } else if transparent {
                     self.matched_position = failed_matched;
+                }
+                // Java Chain sets this on its owner before beginning the local
+                // transaction, so syntax failure retains it until an enclosing
+                // transaction rolls back. Resource failures keep full rollback.
+                if self.token_mode.is_some()
+                    && matches!(
+                        expression,
+                        Expr::Sequence(_)
+                            | Expr::Number
+                            | Expr::Identifier
+                            | Expr::Quoted(_)
+                            | Expr::CodeStart
+                            | Expr::CodeEnd
+                            | Expr::CaptureBoundary(_, _)
+                    )
+                {
+                    self.match_cursor_policy.reset = false;
                 }
                 if self.token_mode.is_some()
                     && (classic_collector_label(expression).is_some()
