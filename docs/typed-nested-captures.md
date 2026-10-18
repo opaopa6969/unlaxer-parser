@@ -73,7 +73,7 @@ Glyph ::= '😀' | 'a';
 
 共通 oracle は `spec-corpus/nested-alias-captures/`、検査は `NestedAliasCaptureConformanceTest`（`-DrustConformance=true`）である。
 
-## #583 に残る範囲
+## nested の対応範囲と拡張先
 
 | 組合せ | 状態 |
 | --- | --- |
