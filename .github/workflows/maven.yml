@@ -578,9 +578,33 @@ jobs:
         print('Current downstream unlaxer dependencies:', resolved)
         PYTHON
 
+    # The token/portability oracles above stay on the fixed revision. The p4-smoke consumer
+    # runs on a later tinyexpression whose Classic default AST selection no longer enumerates
+    # every preferred candidate (tinyexpression #259 / #261): the fixed revision does, and the
+    # bounded public mapper (#635 / #650) rejects benchmarks/fixtures/complex-x64.tiny there
+    # with E-MAPPING-LIMIT: preferred candidates.
+    - name: Checkout tinyexpression consumer for p4-smoke
+      uses: actions/checkout@v4
+      with:
+        repository: opaopa6969/tinyexpression
+        ref: 420757a8ab94ae1bed6dbd7cea2743efb8840bbd
+        path: tinyexpression-consumer
+
     - name: tinyexpression p4-smoke
-      working-directory: tinyexpression
-      run: mvn -B -P p4-smoke test -Dgpg.skip=true
+      working-directory: tinyexpression-consumer
+      run: |
+        mvn -B org.codehaus.mojo:versions-maven-plugin:2.18.0:set-property \
+          -Dproperty=unlaxer.version -DnewVersion='${{ steps.unlaxer.outputs.version }}' \
+          -DgenerateBackupPoms=false
+        mvn -B org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree \
+          -Dincludes='org.unlaxer:*' -DoutputFile=target/unlaxer-dependencies.txt
+        python3 - '${{ steps.unlaxer.outputs.version }}' target/unlaxer-dependencies.txt <<'PYTHON'
+        import pathlib, re, sys
+        resolved = dict(re.findall(r'org\.unlaxer:(unlaxer-(?:common|dsl)):jar:([^:\s]+):', pathlib.Path(sys.argv[2]).read_text()))
+        assert resolved == {'unlaxer-common': sys.argv[1], 'unlaxer-dsl': sys.argv[1]}, resolved
+        print('Current p4-smoke consumer unlaxer dependencies:', resolved)
+        PYTHON
+        mvn -B -P p4-smoke test -Dgpg.skip=true
 
     - name: tinyexpression generated Node alias contract
       working-directory: tinyexpression
