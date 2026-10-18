@@ -80,6 +80,7 @@ public class NestedCaptureConformanceTest {
             corpusPath()))).getAsJsonArray();
         var report = new ArrayList<>(List.of(
             "fixture\tcase\tinput_json\texpected_ast\tjava_ast\texpected_captures\trust_captures\texpected_declarations\tjava_declarations\trust\tjava_field_types\trust_field_type_constraints\texpected_value_spans\tjava_value_spans\tjava_retained_value_spans"));
+        var nativeReport = new ArrayList<String>(List.of("fixture\tcase\tinput_json\texpected_ast\tnative_result"));
         int fixtureIndex = 0;
         for (JsonElement fixtureElement : corpus) {
             JsonObject fixture = fixtureElement.getAsJsonObject();
@@ -118,6 +119,28 @@ public class NestedCaptureConformanceTest {
             success(rustResult);
             List<String> rustLines = rustResult.output().lines().toList();
             assertEquals(name + " Rust result count", cases.size(), rustLines.size());
+
+            Path nativeMain = fixtureDir.resolve("native-main.rs");
+            Files.writeString(nativeMain, rustProbe(fixture).replace("mod generated;",
+                "#[path=\"native-generated/mod.rs\"] mod generated;"));
+            Path nativeProbe = fixtureDir.resolve("native-probe");
+            success(run(List.of("rustc", "--edition=2021", "--crate-name=native_probe", "--extern",
+                "unlaxer_runtime=" + runtime, nativeMain.toString(), "-o", nativeProbe.toString()), "", false));
+            ProcessResult nativeResult = run(List.of(nativeProbe.toString()), framed, false);
+            success(nativeResult);
+            List<String> nativeLines = nativeResult.output().lines().toList();
+            assertEquals(name + " native Rust result count", cases.size(), nativeLines.size());
+            for (int i = 0; i < cases.size(); i++) {
+                JsonObject row = cases.get(i).getAsJsonObject();
+                JsonObject nativeValue = JsonParser.parseString(nativeLines.get(i)).getAsJsonObject();
+                String label = name + "/" + row.get("id").getAsString() + " native Rust";
+                assertEquals(label + " AST", row.get("ast"), nativeValue.get("ast"));
+                assertEquals(label + " captures", row.get("captures"), nativeValue.get("captures"));
+                assertEquals(label + " retained value spans", row.has("valueSpans") ? row.get("valueSpans") : new JsonArray(), nativeValue.get("valueSpans"));
+                assertEquals(label + " declarations", row.has("declarations") ? row.get("declarations") : new JsonArray(), nativeValue.get("declarations"));
+                assertEquals(label + " independently executed hosts", JsonParser.parseString(rustLines.get(i)), nativeValue);
+                nativeReport.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input") + "\t" + row.get("ast") + "\t" + nativeValue);
+            }
 
             try (URLClassLoader loader = compileJava(grammar)) {
                 JsonObject javaFieldTypes = assertJavaFieldTypes(name, fixture.getAsJsonObject("javaFieldTypes"), grammar, loader);
@@ -175,6 +198,7 @@ public class NestedCaptureConformanceTest {
         Path target = Path.of("target");
         Files.createDirectories(target);
         Files.write(target.resolve(reportName()), report, StandardCharsets.UTF_8);
+        Files.write(target.resolve(reportName().replace(".tsv", "-native.tsv")), nativeReport, StandardCharsets.UTF_8);
     }
 
     private JsonArray declarations(Parser parser, String input) throws Exception {

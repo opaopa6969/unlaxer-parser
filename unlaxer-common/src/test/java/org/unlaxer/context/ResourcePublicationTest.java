@@ -26,6 +26,7 @@ public class ResourcePublicationTest {
     }
     private static Parser wrapped(String name,Parser child){return switch(name){
         case "chain"->child;
+        case "input-boundary"->CaptureBoundaryParser.input(CaptureBoundaryParser.Kind.VALUE,child);
         case "match-only"->new MatchOnly(child);
         case "peg"->new PegLookahead(child);
         case "capture"->new NamedCapture("inside",child);

@@ -11,3 +11,5 @@ scope	false	1	2	1	2	7	p	before
 scope	true	2	2	2	3	11	a	outer
 repeat	false	1	2	1	2	7	p	before
 repeat	true	2	2	2	3	11	a	outer
+input-boundary	false	1	2	1	2	7	p	before
+input-boundary	true	2	2	2	3	11	a	outer

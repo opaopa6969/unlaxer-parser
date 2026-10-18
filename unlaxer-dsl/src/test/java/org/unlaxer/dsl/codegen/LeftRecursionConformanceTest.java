@@ -50,7 +50,7 @@ public class LeftRecursionConformanceTest {
                 });
             }
             Path classes=temporary.newFolder().toPath();
-            var compiler=ToolProvider.getSystemJavaCompiler();
+            var compiler=org.unlaxer.dsl.Java21TestSupport.compiler();
             var diagnostics=new DiagnosticCollector<JavaFileObject>();
             try(var manager=compiler.getStandardFileManager(diagnostics,null,null)) {
                 assertTrue(row.get("name")+" "+diagnostics.getDiagnostics(),compiler.getTask(null,manager,diagnostics,
@@ -69,6 +69,8 @@ public class LeftRecursionConformanceTest {
                             .invoke(null, context.getCurrent().getTokens().get(0));
                         assertNotNull(row.get("name")+" "+input, mapped);
                         assertEquals(input.codePointCount(0,input.length()),context.getConsumedPosition().value());
+                        assertNotNull(loader.loadClass("leftrecprobe.LeftRecMapper")
+                            .getMethod("mapParsedToken", org.unlaxer.Token.class).invoke(null, context.getCurrent().getTokens().get(0)));
                     }
                 }
             }

@@ -261,11 +261,16 @@ public class PureSuccessMemoizationConformanceTest {
                 "",
                 true,
                 true);
-        for (var module : new RustBackend().generate(grammar))
+        Path javaGenerated = Files.createDirectory(dir.resolve("java-generated"));
+        var javaModules = new RustBackend().generate(grammar);
+        assertEquals("all generated Rust modules", 5, javaModules.size());
+        for (var module : javaModules) {
             assertArrayEquals(
                     module.relativePath(),
                     module.content().getBytes(StandardCharsets.UTF_8),
                     Files.readAllBytes(generated.resolve(module.relativePath())));
+            Files.writeString(javaGenerated.resolve(module.relativePath()), module.content());
+        }
         Files.writeString(
                 dir.resolve("main.rs"),
                 """
@@ -308,6 +313,29 @@ public class PureSuccessMemoizationConformanceTest {
                 false,
                 true);
         var nativeRows = run(List.of(binary.toString()), "", true, true).lines().toList();
+        assertEquals("native host: 96 observations including 48 ON hit assertions", 96, nativeRows.size());
+        Path javaMain = dir.resolve("java-main.rs"), javaBinary = dir.resolve("java-probe");
+        Files.writeString(
+                javaMain,
+                Files.readString(dir.resolve("main.rs"))
+                        .replace("mod generated;", "#[path=\"java-generated/mod.rs\"] mod generated;"));
+        run(
+                List.of(
+                        "rustc",
+                        "--edition=2021",
+                        "--crate-name",
+                        "java_host_probe",
+                        "--extern",
+                        "unlaxer_runtime=" + runtime,
+                        javaMain.toString(),
+                        "-o",
+                        javaBinary.toString()),
+                "",
+                false,
+                true);
+        var javaHostRows = run(List.of(javaBinary.toString()), "", true, true).lines().toList();
+        assertEquals("Java host: 96 observations including 48 ON hit assertions", 96, javaHostRows.size());
+        assertEquals("independently executed Rust hosts preserve values and positions", nativeRows, javaHostRows);
         var report = new ArrayList<String>();
         int index = 0;
         try (var loader = compileJava(grammar)) {
@@ -655,7 +683,7 @@ public class PureSuccessMemoizationConformanceTest {
                         }
                     });
         }
-        var compiler = ToolProvider.getSystemJavaCompiler();
+        var compiler = org.unlaxer.dsl.Java21TestSupport.compiler();
         var diagnostics = new DiagnosticCollector<JavaFileObject>();
         Path output = temporary.newFolder().toPath();
         try (var manager =
