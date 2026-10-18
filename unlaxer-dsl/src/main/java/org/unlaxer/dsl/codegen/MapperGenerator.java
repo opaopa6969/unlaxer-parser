@@ -22,6 +22,7 @@ public class MapperGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
         var enumRoots = EnumSchema.rootEnums(grammar);
         String packageName = getPackageName(grammar);

@@ -10,6 +10,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 import org.unlaxer.dsl.codegen.RecoverySupport;
 import org.unlaxer.dsl.codegen.EnumSchema;
+import org.unlaxer.dsl.codegen.CommonFieldSchema;
 import org.unlaxer.dsl.codegen.rust.GrammarIR.*;
 
 /** Validates the entire input before emitting anything; unsupported syntax never silently degrades. */
@@ -49,6 +50,7 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
         org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.declarations(grammar);
         return new RustGrammarLowering(grammar).run();
@@ -143,18 +145,18 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof MappingAnnotation value) {
                     if (mapping != null) throw unsupported("multiple @mapping on " + rule.name());
                     boolean projectsMapping = !skip && !EnumSchema.isEnum(rule);
-                    if (projectsMapping) identifier(value.className());
+                    if (projectsMapping) identifier(CommonFieldSchema.rustName(value.className()));
                     String previous = projectsMapping
-                        ? methods.putIfAbsent(methodName(value.className()), value.className()) : null;
+                        ? methods.putIfAbsent(methodName(CommonFieldSchema.rustName(value.className())), value.className()) : null;
                     if (previous != null && !previous.equals(value.className())) {
                         throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
-                    mapping = value;
+                    mapping = new MappingAnnotation(CommonFieldSchema.rustName(value.className()), value.paramNames());
                 } else if (annotation instanceof NamePredicateAnnotation) {
                     // Applied around this rule body after structural lowering.
                 } else if (annotation instanceof LexicalContextAnnotation) {
                     // Applied around this rule body after structural lowering.
-                } else if (annotation instanceof EnumAnnotation) {
+                } else if (annotation instanceof EnumAnnotation || annotation instanceof CommonFieldAnnotation) {
                     // Typed value schema is lowered separately from recognition.
                 } else if (annotation instanceof DocAnnotation) {
                     // Preserved as ordered tooling metadata on the lowered rule below.
@@ -242,7 +244,7 @@ public final class RustGrammarLowering {
             recoveries.add(recovery);
             hasLocalTrivia |= localWhitespace != null || interleave;
             ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
-            mappings.add(EnumSchema.isEnum(rule) ? null : mapping);
+            mappings.add(EnumSchema.isEnum(rule) || CommonFieldSchema.enabled(grammar) && CommonFieldSchema.isSum(grammar, rule) ? null : mapping);
             skips.add(skip);
             operators.add(leftAssoc || rightAssoc || precedence != null
                 ? new Operator(leftAssoc ? Associativity.LEFT : rightAssoc ? Associativity.RIGHT : Associativity.NONE, precedence == null ? -1 : precedence)

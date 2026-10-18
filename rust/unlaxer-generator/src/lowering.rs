@@ -68,6 +68,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     }
     crate::embedded::validate(grammar)?;
     validate_enum_rules(grammar)?;
+    crate::common_fields::families(grammar)?;
     Lowering {
         grammar,
         ids: HashMap::new(),
@@ -438,10 +439,10 @@ impl Lowering<'_> {
                             return Err(format!("multiple @mapping on {}", rule.name));
                         }
                         if !skip && !is_enum {
-                            identifier(class_name)?;
+                            identifier(&crate::common_fields::rust_name(class_name))?;
                         }
                         if !skip && !is_enum {
-                            let method = method_name(class_name);
+                            let method = method_name(&crate::common_fields::rust_name(class_name));
                             if let Some(previous) = methods.insert(method, class_name.clone()) {
                                 if previous != *class_name {
                                     return Err(format!(
@@ -450,7 +451,8 @@ impl Lowering<'_> {
                                 }
                             }
                         }
-                        mapping = Some((class_name.clone(), params.clone()));
+                        mapping =
+                            Some((crate::common_fields::rust_name(class_name), params.clone()));
                     }
                     AnnotationKind::Skip => {}
                     AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc => {
@@ -553,7 +555,9 @@ impl Lowering<'_> {
                             return Err(format!("duplicate @catalog on {}", rule.name));
                         }
                     }
-                    AnnotationKind::Doc { .. } | AnnotationKind::Enum => {}
+                    AnnotationKind::Doc { .. }
+                    | AnnotationKind::Enum
+                    | AnnotationKind::CommonField { .. } => {}
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }
@@ -620,11 +624,16 @@ impl Lowering<'_> {
             }));
             self.catalogs.push(catalog);
             self.enums.push(enum_literals(rule)?);
-            self.mappings.push(if self.enums[i].is_empty() {
-                mapping
-            } else {
-                None
-            });
+            self.mappings.push(
+                if self.enums[i].is_empty()
+                    && !(crate::common_fields::enabled(self.grammar)
+                        && crate::common_fields::is_sum(self.grammar, rule))
+                {
+                    mapping
+                } else {
+                    None
+                },
+            );
             self.comparisons.push(comparison);
             self.skips.push(skip);
         }
@@ -1066,11 +1075,13 @@ impl Lowering<'_> {
                 requirements: name_versions,
             };
         }
-        Ok(GrammarIr {
+        let ir = GrammarIr {
             rules,
             root,
             java_whitespace: whitespace,
-        })
+        };
+        crate::common_fields::emit(self.grammar, &ir)?;
+        Ok(ir)
     }
 
     fn check_parser_names(&self) -> Result<()> {
@@ -2023,7 +2034,7 @@ fn identifier(value: &str) -> Result<()> {
     Ok(())
 }
 
-fn method_name(value: &str) -> String {
+pub(crate) fn method_name(value: &str) -> String {
     let mut method = String::from("eval_");
     let mut previous = None;
     for ch in value.chars() {
