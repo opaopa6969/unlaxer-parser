@@ -4,6 +4,6 @@ fn map_associative_$NAME(tree: &Tree, capture: &unlaxer_runtime::Capture) -> Res
     let mut values = map_nodes(tree, &capture.nodes)?;
     if values.len() > 1 { return Err(format!("expected one associative operand at CP {}:{}", capture.span.start, capture.span.end)); }
     if let Some(value) = values.pop() { return Ok(value); }
-    let literal = unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned();
+    let literal = unlaxer_runtime::java_capture_text(tree.text(capture.span)?).to_owned();
     Ok(Ast::r#$NAME { span: capture.span, r#left: None, r#op: vec![literal], r#right: Vec::new() })
 }

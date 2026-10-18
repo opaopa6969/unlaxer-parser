@@ -209,3 +209,166 @@ fn repeated_capture_names_replay_in_publication_order() {
     ]);
     context.parse_shared_grammar(&grammar, 0, false).unwrap();
 }
+
+fn counted_unsafe_success(context: &mut ParseContext<'_>) -> ParseResult {
+    let calls = context
+        .state::<std::rc::Rc<std::cell::Cell<usize>>>("calls")
+        .unwrap();
+    calls.set(calls.get() + 1);
+    if *context.state::<&str>("scenario").unwrap() == "state" {
+        assert_eq!(context.state::<usize>("value"), Some(&7));
+        context.set_state("value", 99usize);
+    }
+    context.parse(&Expr::literal("x"))
+}
+
+fn retry_unsafe_success(context: &mut ParseContext<'_>) -> ParseResult {
+    let scenario = *context.state::<&str>("scenario").unwrap();
+    let enabled = *context.state::<bool>("enabled").unwrap();
+    let end = if scenario == "replay" {
+        0
+    } else if scenario == "capture-scope" {
+        2
+    } else {
+        1
+    };
+    if scenario == "replay" {
+        context.parse(&Expr::Empty.capture_owned("owned"))?;
+        assert_eq!(context.captured_text("owned"), Some(""));
+    }
+    let scopes = context.scopes().clone();
+    for attempt in 0..2 {
+        let result: Result<(), ParseError> = context.transaction(|context| {
+            let matched = context
+                .parse(&Expr::Rule(1))
+                .expect("unsafe target must succeed before controlled rollback");
+            assert_eq!((context.position(), context.matched_position()), (end, end));
+            assert_eq!(matched.span, Span { start: 0, end });
+            assert_eq!(
+                context.memoized_success_hits(),
+                if scenario == "pure-control" && enabled {
+                    attempt
+                } else {
+                    0
+                },
+                "{scenario}, attempt {attempt}"
+            );
+            match scenario {
+                "custom" | "state" => {
+                    assert_eq!(
+                        context
+                            .state::<std::rc::Rc<std::cell::Cell<usize>>>("calls")
+                            .unwrap()
+                            .get(),
+                        attempt + 1
+                    );
+                    assert_eq!(
+                        context.state::<usize>("value"),
+                        Some(&if scenario == "state" { 99 } else { 7 })
+                    );
+                }
+                "owned" => assert_eq!(context.captured_text("owned"), Some("x")),
+                "replay" => assert_eq!(context.captured_text("owned"), Some("")),
+                "capture-scope" => assert_eq!(context.captured_text("owned"), None),
+                "rule-effects" => {
+                    assert!(context.scopes().is_declared("x"));
+                    assert_eq!(context.scopes().all_declarations().len(), 1);
+                    assert_eq!(context.scopes().all_references().len(), 1);
+                    assert_eq!(context.scopes().all_references()[0].offset, 0);
+                    assert_eq!(context.scopes().all_references()[0].length, 1);
+                }
+                "recovery" => {
+                    assert_eq!(context.recoveries().len(), 1);
+                    assert_eq!(context.recoveries()[0].span, Span { start: 0, end: 1 });
+                    assert_eq!(context.recoveries()[0].message, "retry recovery");
+                }
+                "pure-control" => (),
+                _ => unreachable!(),
+            }
+            Err(context.error("retry same successful rule"))
+        });
+        assert!(result.is_err());
+        assert_eq!((context.position(), context.matched_position()), (0, 0));
+        assert_eq!(context.scopes(), &scopes);
+        assert!(context.recoveries().is_empty());
+        assert_eq!(context.state::<usize>("value"), Some(&7));
+        assert_eq!(
+            context.captured_text("owned"),
+            if scenario == "replay" { Some("") } else { None }
+        );
+    }
+    Ok(unlaxer_runtime::ParseMatch::empty(Span {
+        start: 0,
+        end: 0,
+    }))
+}
+
+#[test]
+fn unsafe_successful_rules_retry_effects_without_success_hits() {
+    use unlaxer_runtime::{Declaration, RecoveryMode, RuleEffects, ScopeMode};
+    let scenarios = [
+        ("custom", Expr::Custom(counted_unsafe_success)),
+        ("state", Expr::Custom(counted_unsafe_success)),
+        ("owned", Expr::literal("x").capture_owned("owned")),
+        ("replay", Expr::Replay("owned")),
+        (
+            "capture-scope",
+            Expr::literal("x")
+                .capture_owned("owned")
+                .then(Expr::Replay("owned"))
+                .capture_scope(),
+        ),
+        (
+            "rule-effects",
+            Expr::literal("x")
+                .capture("name")
+                .rule_effects(RuleEffects {
+                    scope_mode: Some(ScopeMode::Lexical),
+                    declares: Some(Declaration {
+                        symbol_capture: "name",
+                        description: None,
+                    }),
+                    backref: Some("name"),
+                }),
+        ),
+        (
+            "recovery",
+            Expr::literal("!").recover(RecoveryMode::Skip, [], "retry recovery"),
+        ),
+        ("pure-control", Expr::literal("x")),
+    ];
+    for (scenario, expression) in scenarios {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            for memo in [Memoization::Off, Memoization::SafeFailures] {
+                let mut context = ParseContext::with_options(
+                    "xx",
+                    ParseOptions::with_memoization(memo).with_diagnostics(diagnostics),
+                );
+                context.set_state("scenario", scenario);
+                context.set_state("enabled", memo == Memoization::SafeFailures);
+                context.set_state("value", 7usize);
+                context.set_state("calls", std::rc::Rc::new(std::cell::Cell::new(0usize)));
+                let grammar = share_grammar(vec![
+                    Rule {
+                        name: "driver",
+                        expression: Expr::Custom(retry_unsafe_success),
+                    },
+                    Rule {
+                        name: "target",
+                        expression: expression.clone(),
+                    },
+                ]);
+                context.parse_shared_grammar(&grammar, 0, false).unwrap();
+                assert_eq!(
+                    context.memoized_success_hits(),
+                    usize::from(scenario == "pure-control" && memo == Memoization::SafeFailures),
+                    "{scenario}"
+                );
+            }
+        }
+    }
+}

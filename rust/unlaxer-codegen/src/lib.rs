@@ -664,7 +664,13 @@ fn mapper(ir: &GrammarIr) -> String {
         out.push_str("use super::ast::AstValue;\n");
     }
     out.push_str(&enum_imports(ir));
-    out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\npub fn map(tree: &Tree) -> Result<Ast, String> {\n");
+    out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::mapping::Context as Tree;\n\npub fn map(tree: &unlaxer_runtime::Tree) -> Result<Ast, String> {\n");
+    writeln!(
+        out,
+        "    let tree = &Tree::new(tree, {})?;\n    tree.ensure_mappable(tree.root)?;",
+        ir.rules.len()
+    )
+    .unwrap();
     if ir.rules.iter().any(|rule| contains_recovery(&rule.body)) {
         out.push_str("    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n");
     }
@@ -688,12 +694,12 @@ fn mapper(ir: &GrammarIr) -> String {
             rule.name
         )
         .unwrap();
-        out.push_str("    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n");
-        writeln!(out, "        if node.rule == {index} {{\n            found.push({}::from_text(tree.text(node.span))?);\n        }} else {{\n            found.extend(map_enum_{index}(tree, &node.children)?);\n        }}\n    }}\n    Ok(found)\n}}",rule.name).unwrap();
+        out.push_str("    let mut found = Vec::new();\n    for &id in ids {\n        tree.visit(id)?;\n        let node = &tree.nodes[id];\n");
+        writeln!(out, "        if node.rule == {index} {{\n            found.push({}::from_text(tree.text(node.span)?)?);\n        }} else {{\n            found.extend(map_enum_{index}(tree, &node.children)?);\n        }}\n    }}\n    Ok(found)\n}}",rule.name).unwrap();
     }
     if needs_values(ir) {
-        out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }),\n");
-        out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
+        out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        tree.visit(id)?;\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),\n                span: node.span,\n            }),\n");
+        out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
         for (id, rule) in ir
             .rules
             .iter()
@@ -701,7 +707,7 @@ fn mapper(ir: &GrammarIr) -> String {
             .filter(|(_, r)| !r.enum_literals.is_empty())
         {
             let name = &rule.name;
-            writeln!(out,"            {id} => found.push(AstValue::Enum{name} {{ value: {name}::from_text(tree.text(node.span))?, span: node.span }}),").unwrap();
+            writeln!(out,"            {id} => found.push(AstValue::Enum{name} {{ value: {name}::from_text(tree.text(node.span)?)?, span: node.span }}),").unwrap();
         }
         let ids: Vec<_> = ir
             .rules
@@ -722,7 +728,7 @@ fn mapper(ir: &GrammarIr) -> String {
             .map(|(id, _)| id.to_string())
             .collect();
         if !skipped.is_empty() {
-            writeln!(out, "            {} => found.push(AstValue::Text {{\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }}),", skipped.join(" | ")).unwrap();
+            writeln!(out, "            {} => found.push(AstValue::Text {{\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),\n                span: node.span,\n            }}),", skipped.join(" | ")).unwrap();
         }
         out.push_str("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
     }
@@ -746,7 +752,7 @@ fn mapper(ir: &GrammarIr) -> String {
         if ir.rules.iter().filter_map(|r|r.mapping.as_ref()).flat_map(|m|&m.fields).any(|f|matches!(&f.kind,Kind::Nested{leaf,..} if matches!(leaf.as_ref(),Kind::Node|Kind::Enum(_)))) { out.push_str(nested::PROJECT_HELPERS); }
     }
     out.push_str(&associative::helpers(ir));
-    out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    match tree.nodes[id].rule {\n");
+    out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    tree.visit(id)?;\n    match tree.nodes[id].rule {\n");
     for (index, rule) in ir.rules.iter().enumerate() {
         if rule.skip {
             writeln!(out, "        {index} => Ok(Vec::new()),").unwrap();
@@ -770,7 +776,7 @@ fn mapper(ir: &GrammarIr) -> String {
             if !rule.enum_literals.is_empty() {
                 writeln!(
                     out,
-                    "        r#value: {}::from_text(tree.text(node.span))?,\n    }}])\n}}",
+                    "        r#value: {}::from_text(tree.text(node.span)?)?,\n    }}])\n}}",
                     rule.name
                 )
                 .unwrap();
@@ -819,13 +825,13 @@ fn mapper(ir: &GrammarIr) -> String {
                 } else {
                     out.push_str(match field.kind {
                     Kind::Nested { .. } => unreachable!("handled nested field"),
-                    Kind::Integer => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n",
+                    Kind::Integer => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n",
                     Kind::NullableNode => unreachable!("validated associative projection"),
                     Kind::Node => "                values.extend(map_nodes(tree, &capture.nodes)?);\n",
                     Kind::Value => "                values.extend(map_values(tree, &capture.nodes)?);\n",
-                    Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => "                values.push(tree.text(capture.span).to_owned());\n",
+                    Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => "                values.push(tree.text(capture.span)?.to_owned());\n",
                     Kind::Enum(_) => unreachable!("handled enum field"),
-                    Kind::Text => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n",
+                    Kind::Text => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).to_owned());\n",
                 });
                 }
                 writeln!(

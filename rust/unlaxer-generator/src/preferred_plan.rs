@@ -305,9 +305,9 @@ impl<'a> Plan<'a> {
     }
     fn nested_atom(&self, a: &AtomicElement, depth: usize, out: &mut Vec<(usize, usize)>) {
         match &a.kind {
-            ElementKind::Group(body)
-            | ElementKind::OwnedCapture { body, .. }
-            | ElementKind::CaptureScope(body) => self.nested_body(body, depth, out),
+            ElementKind::OwnedCapture { body, .. }
+            | ElementKind::CaptureScope(body)
+            | ElementKind::Group(body) => self.nested_body(body, depth, out),
             ElementKind::Optional(body) | ElementKind::Repeat(body) => {
                 self.nested_body(body, depth + 2, out)
             }

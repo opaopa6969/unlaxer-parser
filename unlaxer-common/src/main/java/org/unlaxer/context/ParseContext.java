@@ -47,11 +47,24 @@ public class ParseContext implements
   private Throwable observerFailure;
   private Throwable parserCallFailure;
   private int parserCallDepth;
+  private TransactionElement parserCallEntry;
+  private boolean parserCallResetMatched;
 
   /** Internal allocation-free guard for built-in parser entry points. */
   public void enterParserCall() {
+    enterParserCall(false);
+  }
+
+  /** Transparent entries checkpoint before a child that may omit parse notifications. */
+  public void enterParserCall(boolean immediateCallback) {
     requireParseHealthy();
+    if (parserCallDepth == 0) {
+      parserCallEntry = getCurrent();
+      parserCallResetMatched = parserCallEntry.isResetMatchedWithConsumed();
+    }
     parserCallDepth++;
+    if (immediateCallback && activeParseDepth() == 0
+        && (!observerBoundaryActive || observerExplicitTransaction)) beginObserverBoundary(false);
   }
 
   /** Restore the outer publication boundary once; swallowed errors cannot publish success. */
@@ -68,7 +81,10 @@ public class ParseContext implements
       restoreObserverPublication();
       releaseObserverBoundary();
       parserCallFailure = null;
+    } else if (parserCallDepth == 0) {
+      releaseObserverBoundaryIfIdle();
     }
+    if (parserCallDepth == 0) parserCallEntry = null;
     if (failure != null) rethrowParserCallFailure(failure);
   }
 
@@ -150,7 +166,10 @@ public class ParseContext implements
     observerTokenKind = observerEntry.getTokenKind();
     observerTransactionDepth = tokenStack.size();
     observerMemoizationVersion = memoizationStateVersion;
-    observerResetMatched = observerEntry.isResetMatchedWithConsumed();
+    // Chain changes this policy before startParse; keep the public entry value on exceptions.
+    // State checkpoints still occur here, so a pure failure memo hit adds no owner checkpoint.
+    observerResetMatched = parserCallDepth != 0 && observerEntry == parserCallEntry
+        ? parserCallResetMatched : observerEntry.isResetMatchedWithConsumed();
     for (int index = 0; index < transactionalStates.size(); index++) {
       TransactionalState state = transactionalStates.get(index);
       if (!(state instanceof MutationAwareTransactionalState)) checkpointState(observerStateBoundary(), state);
@@ -192,7 +211,7 @@ public class ParseContext implements
   }
 
   private void releaseObserverBoundaryIfIdle() {
-    if (parserCallFailure == null && parseLimitFailure == null && parseFrames.isEmpty() && deferredFrameDepth == 0
+    if (parserCallDepth == 0 && observerFailure == null && parserCallFailure == null && parseLimitFailure == null && parseFrames.isEmpty() && deferredFrameDepth == 0
         && (!observerExplicitTransaction || tokenStack.size() <= observerTransactionDepth))
       releaseObserverBoundary();
   }
@@ -1677,7 +1696,7 @@ public class ParseContext implements
   public void startParse(Parser parser, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
     requireParseHealthy();
     int activeDepth = activeParseDepth();
-    if (activeDepth == 0) beginObserverBoundary(false);
+    if (activeDepth == 0 && (!observerBoundaryActive || observerExplicitTransaction)) beginObserverBoundary(false);
     if (activeDepth >= MAX_PARSE_DEPTH) {
       parseLimitFailure = new ParseLimitException(MAX_PARSE_DEPTH, getPosition(tokenKind).value());
       disableMemoizationPermanently();

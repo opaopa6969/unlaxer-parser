@@ -19,6 +19,7 @@ pub mod language_queries;
 pub mod lexical;
 pub mod lexing;
 mod long_code_fence;
+pub mod mapping;
 #[cfg(test)]
 mod memo_retention_tests;
 pub mod names;
@@ -3005,7 +3006,14 @@ impl<'a> ParseContext<'a> {
                 if self.token_mode.is_some()
                     && matches!(
                         expression,
-                        Expr::Sequence(_) | Expr::Number | Expr::Identifier | Expr::Quoted(_)
+                        Expr::Sequence(_)
+                            | Expr::Number
+                            | Expr::Identifier
+                            | Expr::Quoted(_)
+                            | Expr::CodeStart
+                            | Expr::CodeEnd
+                            | Expr::CaptureBoundary(_, _)
+                            | Expr::InputCaptureBoundary(_, _)
                     )
                 {
                     self.match_cursor_policy.reset = false;
