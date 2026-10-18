@@ -1,0 +1,5 @@
+# id	fixture	input	accepted	consumedCP	outcome	offsetCP	state	captures
+state-success	state-success	a	true	1	success	~	99	1
+state-catch	state-catch	ac	true	2	success	~	7	0
+state-commit	state-commit	ac	false	0	commit	1	7	0
+state-label	state-label	ac	false	0	label	1	7	0

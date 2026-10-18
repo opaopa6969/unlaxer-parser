@@ -30,8 +30,9 @@ public class Not extends ConstructedSingleChildParser {
 
 			Parsed parsed = getChild().parse(parseContext, TokenKind.matchOnly, invertMatch);
 
-			if (parsed.isSucceeded()) {
-				// child succeeded → Not fails; rollback any state changes
+			if (parsed.isSucceeded() || parseContext.hasRaisedFailure()) {
+				// child succeeded → Not fails; rollback any state changes. A committed or
+				// labeled child failure is not an ordinary failure and propagates (#700).
 				parseContext.rollback(this);
 				parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
 				return Parsed.FAILED;

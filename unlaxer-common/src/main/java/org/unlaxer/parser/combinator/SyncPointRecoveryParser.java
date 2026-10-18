@@ -117,6 +117,14 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 			// Child failed — attempt recovery by scanning to next sync point
 			parseContext.rollback(this);
 
+			// A recovery boundary catches ordinary failures and committed errors (#700). A
+			// labeled failure is caught only by a CatchLabels naming it, so it propagates.
+			org.unlaxer.context.RaisedFailure raised = parseContext.raisedFailure();
+			if (raised != null && raised.isLabel()) {
+				parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+				return Parsed.FAILED;
+			}
+
 			// Scan from the active cursor. Match-only lookahead must not consume input.
 			Source remain = parseContext.getRemain(tokenKind);
 			String remainStr = remain.toString();
@@ -153,7 +161,8 @@ public class SyncPointRecoveryParser extends ConstructedSingleChildParser {
 			}
 			CodePointLength skipCodePointLength = new CodePointLength(remainStr.codePointCount(0, skipUtf16));
 
-			// Begin a new transaction for the recovery region
+			// Begin a new transaction for the recovery region; this catches a committed error.
+			parseContext.clearRaisedFailure();
 			parseContext.begin(this);
 
 			if (tokenKind.isMatchOnly()) {

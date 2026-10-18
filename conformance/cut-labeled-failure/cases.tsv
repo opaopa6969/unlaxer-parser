@@ -1,0 +1,46 @@
+# id	fixture	input	accepted	consumedCP	matchedCP	outcome	label	message	offsetCP
+plain-choice-backtracks	plain-choice	(y)	true	3	3	success	~	~	~
+commit-success	commit-choice	(x)	true	3	3	success	~	~	~
+commit-blocks-choice	commit-choice	(y)	false	0	0	commit	~	expected x	1
+ordinary-before-commit	commit-choice	z	false	0	0	ordinary	~	~	~
+ordinary-after-commit	commit-choice	(x]	false	0	0	ordinary	~	~	~
+commit-default-message	commit-default	b	false	0	0	commit	~	unexpected input	0
+commit-optional-success	commit-optional	abac	true	4	4	success	~	~	~
+commit-blocks-optional	commit-optional	ac	false	0	0	commit	~	expected b	1
+commit-repeat-success	commit-repeat	,n,n;	true	5	5	success	~	~	~
+commit-repeat-empty	commit-repeat	;	true	1	1	success	~	~	~
+commit-blocks-repeat	commit-repeat	,n,x;	false	0	0	commit	~	expected n	3
+label-ends-repeat	label-repeat	aa	false	0	0	label	item	item	2
+label-repeat-other	label-repeat	aab	false	0	0	label	item	item	2
+lookahead-commit-success	lookahead-commit	a	true	1	1	success	~	~	~
+lookahead-commit	lookahead-commit	b	false	0	0	commit	~	expected a	0
+not-commit	not-commit	b	false	0	0	commit	~	expected a	0
+not-ordinary	not-commit	a	false	0	0	ordinary	~	~	~
+label-success	label-choice	a	true	1	1	success	~	~	~
+label-blocks-choice	label-choice	b	false	0	0	label	L	L	0
+catch-child	catch-alternative	()	true	2	2	success	~	~	~
+catch-alternative	catch-alternative	(]	true	2	2	success	~	~	~
+catch-alternative-fails	catch-alternative	(x	false	0	0	ordinary	~	~	~
+catch-other-label	catch-other-label	b	false	0	0	label	A	A	0
+catch-ordinary	catch-ordinary	b	false	0	0	ordinary	~	~	~
+catch-commit	catch-commit	b	false	0	0	commit	~	expected a	0
+label-through-commit	label-in-commit	b	false	0	0	label	L	L	0
+commit-through-label	commit-in-label	b	false	0	0	commit	~	m	0
+innermost-label	innermost-label	ax	false	0	0	label	inner	inner	1
+nested-catch-outer	nested-catch	c	true	1	1	success	~	~	~
+nested-catch-inner	nested-catch	b	true	1	1	success	~	~	~
+nested-catch-ordinary	nested-catch	d	false	0	0	ordinary	~	~	~
+recovery-success	recovery-commit	xy!	true	3	3	success	~	~	~
+recovery-catches-commit	recovery-commit	xz;!	true	4	4	success	~	~	~
+recovery-without-sync	recovery-commit	xz	false	0	0	commit	~	expected y	1
+recovery-passes-label	recovery-label	xz;	false	0	0	label	L	L	1
+longest-success	longest-commit	ab	true	2	2	success	~	~	~
+longest-commit	longest-commit	ac	false	0	0	commit	~	expected b	1
+nonordered-success	nonordered-label	ab	true	2	2	success	~	~	~
+nonordered-label	nonordered-label	ba	false	0	0	label	L	L	0
+unicode-success	unicode-label	😀\r\n界	true	4	4	success	~	~	~
+unicode-label	unicode-label	😀\r\nx	false	0	0	label	L	L	3
+match-only-success	match-only-commit	a	true	0	1	success	~	~	~
+match-only-commit	match-only-commit	b	false	0	0	commit	~	expected a	0
+memo-label-success	memo-label	a	true	1	1	success	~	~	~
+memo-label	memo-label	b	false	0	0	label	L	L	0

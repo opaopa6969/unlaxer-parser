@@ -51,6 +51,8 @@ public interface ChoiceInterface extends Parser{
 						memoStart, memoDiagnostic, parser, parsed);
 				}
 				parseContext.rollback(this);
+				// A committed or labeled failure is not caught by an ordinary choice (#700).
+				if (parseContext.hasRaisedFailure()) break;
 			}
 			parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
 			PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);

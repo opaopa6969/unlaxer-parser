@@ -146,6 +146,7 @@ public class ParseFailureDiagnostics {
   private final Set<String> expectedTokens;
   private final String deepestMatchedRule;
   private final int deepestConsumedPosition;
+  private final RaisedFailure raisedFailure;
 
   public ParseFailureDiagnostics(
       int farthestOffset,
@@ -176,6 +177,28 @@ public class ParseFailureDiagnostics {
       Set<String> expectedTokens,
       String deepestMatchedRule,
       int deepestConsumedPosition) {
+    this(farthestOffset, farthestConsumedOffset, farthestMatchedOffset, line, column,
+        maxReachedStackElements, expectedParsers, expectedHintCandidates, hasFailureCandidate,
+        trialHistory, expectedTokens, deepestMatchedRule, deepestConsumedPosition, null);
+  }
+
+  /** As above, for the final error of a committed or labeled failure (#700). */
+  public ParseFailureDiagnostics(
+      int farthestOffset,
+      int farthestConsumedOffset,
+      int farthestMatchedOffset,
+      int line,
+      int column,
+      List<ParseStackElement> maxReachedStackElements,
+      List<String> expectedParsers,
+      List<ExpectedHintCandidate> expectedHintCandidates,
+      boolean hasFailureCandidate,
+      List<TrialRecord> trialHistory,
+      Set<String> expectedTokens,
+      String deepestMatchedRule,
+      int deepestConsumedPosition,
+      RaisedFailure raisedFailure) {
+    this.raisedFailure = raisedFailure;
     this.farthestOffset = farthestOffset;
     this.farthestConsumedOffset = farthestConsumedOffset;
     this.farthestMatchedOffset = farthestMatchedOffset;
@@ -241,5 +264,14 @@ public class ParseFailureDiagnostics {
 
   public int getDeepestConsumedPosition() {
     return deepestConsumedPosition;
+  }
+
+  /**
+   * The committed or labeled failure that ended the parse. When present it takes precedence
+   * over the farthest failure: {@link #getFarthestOffset()} is its offset and
+   * {@link #getExpectedTokens()} holds only its message.
+   */
+  public java.util.Optional<RaisedFailure> getRaisedFailure() {
+    return java.util.Optional.ofNullable(raisedFailure);
   }
 }

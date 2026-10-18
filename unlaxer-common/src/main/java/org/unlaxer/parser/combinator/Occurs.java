@@ -35,6 +35,7 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 	        if (noAttempt) parseContext.beginPreservingMatched(this);
 	        else parseContext.begin(this);
 			int matchCount = 0;
+			boolean raised = false;
 			Optional<Parser> terminator = noAttempt ? Optional.empty() : getTerminator();
 			/*
 			 * Same conservative FIRST-set test as ChoiceInterface: when the body cannot start on the next
@@ -76,12 +77,18 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 					if(terminatorParsed.isSucceeded()){
 						break;
 					}
+					if (parseContext.hasRaisedFailure()) {
+						raised = true;
+						break;
+					}
 				}
 			
 				Parser child = getChild();
 	      Parsed parsed = child.parse(parseContext,tokenKind,invertMatch);
 			
 				if (parsed.isFailed() ||parsed.isStopped() ){
+					// A committed or labeled failure is not an ordinary end of repetition (#700).
+					raised = parsed.isFailed() && parseContext.hasRaisedFailure();
 					break;
 				}
 			
@@ -96,7 +103,7 @@ public interface Occurs extends MetaFunctionParser , NonTerminallSymbol {
 				}
 			}
 		
-			if (!invalidBounds && matchCount >= min() && matchCount <=max()) {
+			if (!raised && !invalidBounds && matchCount >= min() && matchCount <=max()) {
 			
 	            return PackratMemoTable.commitSuccess(parseContext, this, tokenKind, invertMatch,
 	                memoStart, memoDiagnostic, null, null);

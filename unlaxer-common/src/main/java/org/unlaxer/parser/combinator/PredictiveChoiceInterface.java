@@ -48,10 +48,13 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
                         memoStart, memoDiagnostic, parser, parsed);
                 }
                 parseContext.rollback(this);
+                // A committed or labeled failure is not caught by an ordinary choice (#700).
+                if (parseContext.hasRaisedFailure()) break;
             }
             // Preserve ordered Choice correctness and diagnostics if generated metadata is ever
             // too narrow: after the fast path fails, retry the complete list in declaration order.
-            if (!useAllChildren && candidateCount < children.size()) {
+            if (!useAllChildren && candidateCount < children.size()
+                    && false == parseContext.hasRaisedFailure()) {
                 for (Parser parser : children) {
                     parseContext.begin(this);
                     Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
@@ -60,6 +63,7 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
                             memoStart, memoDiagnostic, parser, parsed);
                     }
                     parseContext.rollback(this);
+                    if (parseContext.hasRaisedFailure()) break;
                 }
             }
             parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);

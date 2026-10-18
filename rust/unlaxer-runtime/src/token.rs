@@ -1006,7 +1006,8 @@ impl ParseContext<'_> {
                 }
             }
             self.restore(checkpoint);
-            if self.resource_failure.is_some() {
+            // A committed or labeled failure aborts the whole choice (#700).
+            if self.resource_failure.is_some() || self.raised.is_some() {
                 return None;
             }
         }
