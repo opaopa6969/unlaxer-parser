@@ -82,5 +82,40 @@
     "startCP": 55,
     "endCP": 139,
     "detail": "nested capture through a helper under rule-local trivia is not supported"
+  },
+  {
+    "id": "mixed-sequence-alternative-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [ NUM | 'let' Id ] @value; Id ::= 'a' 'b'; }",
+    "startCP": 110,
+    "endCP": 197,
+    "detail": "mixed choice alternative through helper Id is not supported"
+  },
+  {
+    "id": "mixed-grouped-alternative-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [ NUM | (Id) ] @value; Id ::= 'a'; }",
+    "startCP": 110,
+    "endCP": 193,
+    "detail": "mixed choice alternative through helper Id is not supported"
+  },
+  {
+    "id": "mixed-group-capture-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ( NUM | (Id) ) @value; Id ::= 'a'; }",
+    "startCP": 110,
+    "endCP": 193,
+    "detail": "mixed choice alternative through helper Id is not supported"
+  },
+  {
+    "id": "field-order-recursive-first",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[z,a]) Root ::= R1 @z R2 @a; R1 ::= ['x' R1]; R2 ::= 'y' | NUM; }",
+    "startCP": 110,
+    "endCP": 181,
+    "detail": "nested capture through recursive helper R1 is not supported"
+  },
+  {
+    "id": "field-order-trivia-first",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @whitespace @mapping(Root,params=[z,a]) Root ::= [Q] @z R1 @a; Q ::= {'q'}; R1 ::= ['x' R1]; }",
+    "startCP": 110,
+    "endCP": 194,
+    "detail": "nested capture through a helper under rule-local trivia is not supported"
   }
 ]

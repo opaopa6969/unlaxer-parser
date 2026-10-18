@@ -67,6 +67,37 @@ public class NestedAliasCaptureConformanceTest extends NestedMappedCaptureConfor
         assertEquals(com.google.gson.JsonParser.parseString(org.unlaxer.dsl.impact.ApiImpact.compare("rust",before,after).toJson()),com.google.gson.JsonParser.parseString(result.output()));
     }
 
+    /**
+     * A choice outside every capture keeps its previous lowering: helper references inside it
+     * never made it a nested mixed value, so no #nested:* unit binding / value boundary appears and
+     * both hosts still emit identical Rust (verified against the pre-#583-alias generator output).
+     */
+    @org.junit.Test public void choicesOutsideCapturesKeepTheirExistingLowering() throws Exception {
+        org.junit.Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
+        success(run(List.of("cargo","build","--locked","--manifest-path",repo.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator","--target-dir",nativeTarget().toString()),"",false));
+        String source="grammar G { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ( NUM | 'let' Id ) [ 'x' ] @value; Id ::= 'a' 'b'; }";
+        var grammar=org.unlaxer.dsl.bootstrap.UBNFMapper.parse(source).grammars().get(0);
+        assertTrue(NestedCaptures.problems(grammar).toString(),NestedCaptures.problems(grammar).isEmpty());
+        String parsers=new ParserGenerator().generate(grammar).source();
+        assertFalse(parsers,parsers.contains("#nested:"));
+        var directory=temporary.newFolder().toPath();var input=directory.resolve("fixture.ubnf");var output=directory.resolve("generated");java.nio.file.Files.writeString(input,source);
+        success(run(List.of(nativeTarget().resolve("debug/unlaxer").toString(),"generate","--grammar",input.toString(),"--output",output.toString()),"",true));
+        for(var file:new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar)) {
+            assertEquals(file.relativePath(),file.content(),java.nio.file.Files.readString(output.resolve(file.relativePath())));
+            assertFalse(file.content(),file.content().contains(".value_boundary()")||file.content().contains(".text_value()"));
+        }
+    }
+
+    /** 4^14 alias expansions without the per-(rule, depth) memo; native has the same unit test. */
+    @org.junit.Test(timeout=10_000) public void sharedMultiElementHelpersValidateInLinearTime() {
+        var rules=new StringBuilder();
+        for(int i=0;i<14;i++){String next="H"+(i+1);rules.append("H").append(i).append(" ::= ").append(next).append(' ').append(next).append(' ').append(next).append(' ').append(next).append("; ");}
+        rules.append("H14 ::= 'a';");
+        var grammar=org.unlaxer.dsl.bootstrap.UBNFMapper.parse("grammar G { @package: p @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [ H0 ] @value; "+rules+" }").grammars().get(0);
+        assertTrue(NestedCaptures.problems(grammar).isEmpty());
+        assertEquals("Optional<String>",NestedCaptures.javaType(NestedCaptures.field(grammar,grammar.rules().get(0),"value")));
+    }
+
     /** Alias expansion counts toward the same schema depth limit (32) on both hosts. */
     @org.junit.Test public void aliasExpansionSharesTheSchemaDepthLimit() throws Exception {
         org.junit.Assume.assumeTrue(Boolean.getBoolean("rustConformance"));

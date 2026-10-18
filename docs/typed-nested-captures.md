@@ -58,6 +58,9 @@ Glyph ::= '😀' | 'a';
 - body が choice または複数要素 sequence の alias は、展開せず一つの葉として扱う。形は body から決まり（text / i32 の choice や scalar の並び）、値はその規則 token の原文である。
 - flat capture の「unmapped text alias は text のまま」という契約は変えない。nested では透過性を優先するため、`Cell ::= [NUM]` 経由の葉は直接書いた場合と同じ i32 になる。
 - alias 展開も schema 解析の深さ 32 に数える（`spec-corpus/nested-alias-captures/depth-boundaries.json`）。
+- alias の形は規則と深さごとに memo する。共有される複数要素 helper を何段重ねても検証は helper 規則数に比例する時間で終わる。
+- capture の外にある choice の mixed 判定（Java `CaptureBindingPlan.markNestedMixed`、Rust lowering）は、helper 参照を含む choice を従来どおり mixed と見なさない。既存の受理済み文法の生成物は変わらない。
+- 複数 field の検査は両 host とも mapping params の順、次に `@typeof` capture の出現順で行うので、最初に報告される拒否理由も一致する。
 
 次の形は Java・Java host の Rust 生成・native Rust が同じ `E-NESTED-SHAPE`、同じ規則 CP 範囲、同じ説明文で生成前に拒否する。
 
@@ -68,7 +71,7 @@ Glyph ::= '😀' | 'a';
 | `@doc` 以外の annotation を持つ helper（rule-local trivia 等で host 間の意味が変わり得るため） | `nested capture through annotated helper X is not supported` |
 | AST capture / `@typeof` / `CAPTURE` / `CAPTURE_SCOPE` / `SAME_AS` を含む helper | `nested capture through helper X with captures is not supported` |
 | body が mixed choice（text と i32、node 等）になる helper | `nested capture through mixed-choice helper X is not supported` |
-| mixed choice の alternative 自体が helper 参照 | `mixed choice alternative through helper X is not supported` |
+| mixed choice の alternative の中（直接・group 内・複数要素の一部）に helper 参照がある | `mixed choice alternative through helper X is not supported` |
 | `@whitespace` / `@interleave` を持つ owner 規則での alias 展開 | `nested capture through a helper under rule-local trivia is not supported` |
 
 共通 oracle は `spec-corpus/nested-alias-captures/`、検査は `NestedAliasCaptureConformanceTest`（`-DrustConformance=true`）である。

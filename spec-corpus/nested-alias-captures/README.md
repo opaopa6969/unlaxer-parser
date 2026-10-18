@@ -18,9 +18,13 @@ memoization 2 x diagnostics 3 on both hosts.
 
 `invalid.json` lists the forms both hosts reject before emission with the same
 `E-NESTED-SHAPE`, rule CP range and `detail` text (recursive helpers, `@skip`,
-annotated helpers, helpers with captures, mixed choices, rule-local trivia).
+annotated helpers, helpers with captures, mixed choices and helpers anywhere inside a
+mixed choice alternative, rule-local trivia, and two multi-field rows whose first
+reported reason depends on checking fields in mapping-parameter order).
 `depth-boundaries.json` places the shared schema depth limit inside alias chains,
 and `failures.json` checks mapping failures and parse rollback through an alias.
+The test class also pins that a choice outside every capture keeps its previous
+lowering on both hosts, and that shared multi-element helpers validate in linear time.
 
 ```sh
 RUSTUP_TOOLCHAIN=1.85.0 mvn -pl unlaxer-common,unlaxer-dsl -am test \

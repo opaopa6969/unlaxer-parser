@@ -122,10 +122,19 @@ public final class NestedCaptures {
         else if (value instanceof SeparatedElement e) { checkTraversal(e.element(), depth + 1); checkTraversal(e.separator(), depth + 1); }
     }
     public static GrammarIR.NestedShape shape(GrammarDecl grammar, AtomicElement element, int depth) {
-        return shape(grammar,element,depth,new java.util.ArrayList<>());
+        return shape(grammar,element,depth,new Expansion());
     }
-    // `helpers` is the active chain of expanded transparent aliases, used to reject cycles.
-    private static GrammarIR.NestedShape shape(GrammarDecl grammar, AtomicElement element, int depth, List<String> helpers) {
+    /**
+     * Alias expansion state of one schema query: the active alias chain (cycle detection) and the
+     * successful alias shapes by rule and depth. A shape is a pure function of (rule, depth) once its
+     * expansion is acyclic, so the memo keeps validation linear in the number of helper rules
+     * instead of exponential in shared multi-element helpers. Native Rust uses the same scheme.
+     */
+    private static final class Expansion {
+        final List<String> stack=new ArrayList<>();
+        final java.util.Map<String,GrammarIR.NestedShape> memo=new java.util.HashMap<>();
+    }
+    private static GrammarIR.NestedShape shape(GrammarDecl grammar, AtomicElement element, int depth, Expansion helpers) {
         if (depth > 32) throw new IllegalArgumentException("E-NESTED-SHAPE: schema depth exceeds 32");
         if (element instanceof OptionalElement e) return wrap(Cardinality.OPTIONAL,body(grammar,e.body(),depth+1,helpers));
         if (element instanceof RepeatElement e) return wrap(Cardinality.MANY,body(grammar,e.body(),depth+1,helpers));
@@ -155,17 +164,20 @@ public final class NestedCaptures {
      * shape of the reference. Native Rust (`nested_captures::alias_shape`) checks the same conditions
      * in the same order and reports the same text.
      */
-    private static GrammarIR.NestedShape aliasShape(GrammarDecl grammar, RuleDecl target, int depth, List<String> helpers) {
+    private static GrammarIR.NestedShape aliasShape(GrammarDecl grammar, RuleDecl target, int depth, Expansion helpers) {
         String name=target.name();
-        if (helpers.contains(name)) throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through recursive helper "+name+" is not supported");
+        if (helpers.stack.contains(name)) throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through recursive helper "+name+" is not supported");
+        var cached=helpers.memo.get(name+"@"+depth);
+        if (cached!=null) return cached;
         if (MapperElementUtil.isSkipped(target)) throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through @skip rule "+name+" is not supported");
         if (target.annotations().stream().anyMatch(a -> !(a instanceof DocAnnotation)))
             throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through annotated helper "+name+" is not supported");
         if (hasBindings(target.body())) throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through helper "+name+" with captures is not supported");
-        helpers.add(name);
+        helpers.stack.add(name);
         var result=body(grammar,target.body(),depth+1,helpers);
-        helpers.remove(helpers.size()-1);
+        helpers.stack.remove(helpers.stack.size()-1);
         if (result.leaf()==Kind.VALUE) throw new IllegalArgumentException("E-NESTED-SHAPE: nested capture through mixed-choice helper "+name+" is not supported");
+        helpers.memo.put(name+"@"+depth,result);
         return result;
     }
     // AST captures, typeof constraints and general bindings stay owned by the rule that declares them.
@@ -199,6 +211,25 @@ public final class NestedCaptures {
             .filter(r->!EnumSchema.isEnum(r) && !MapperElementUtil.isSkipped(r) && MapperElementUtil.getMappingAnnotation(r).isEmpty())
             .filter(r->r.body() instanceof SequenceBody s && s.elements().size()==1
                 || r.body() instanceof ChoiceBody c && c.alternatives().size()==1 && c.alternatives().get(0).elements().size()==1);
+    }
+    // First helper reference (source order) anywhere in a body, without entering referenced rules.
+    private static String helperIn(GrammarDecl grammar, RuleBody body) {
+        var sequences=body instanceof ChoiceBody c?c.alternatives():List.of((SequenceBody)body);
+        for (var sequence:sequences) for (var e:sequence.elements()) {
+            var found=helperIn(grammar,e.element());
+            if (found!=null) return found;
+        }
+        return null;
+    }
+    private static String helperIn(GrammarDecl grammar, AtomicElement element) {
+        if (element instanceof RuleRefElement r) return isHelper(grammar,r.name())?r.name():null;
+        if (element instanceof TransparentElement e) return helperIn(grammar,e.body());
+        if (element instanceof OptionalElement e) return helperIn(grammar,e.body());
+        if (element instanceof RepeatElement e) return helperIn(grammar,e.body());
+        if (element instanceof OneOrMoreElement e) return helperIn(grammar,e.body());
+        if (element instanceof BoundedRepeatElement e) return helperIn(grammar,e.body());
+        if (element instanceof SeparatedElement e) { var found=helperIn(grammar,e.element()); return found!=null?found:helperIn(grammar,e.separator()); }
+        return null;
     }
     private static boolean isHelper(GrammarDecl grammar, String name) {
         return grammar.tokens().stream().noneMatch(t->t.name().equals(name)) && grammar.rules().stream().anyMatch(r->r.name().equals(name)
@@ -235,9 +266,9 @@ public final class NestedCaptures {
         return body instanceof ChoiceBody?new ChoiceBody(List.of(replaced)):replaced;
     }
     public static GrammarIR.NestedShape body(GrammarDecl grammar, RuleBody body, int depth) {
-        return body(grammar,body,depth,new java.util.ArrayList<>());
+        return body(grammar,body,depth,new Expansion());
     }
-    private static GrammarIR.NestedShape body(GrammarDecl grammar, RuleBody body, int depth, List<String> helpers) {
+    private static GrammarIR.NestedShape body(GrammarDecl grammar, RuleBody body, int depth, Expansion helpers) {
         var sequences=body instanceof ChoiceBody c?c.alternatives():List.of((SequenceBody)body);
         GrammarIR.NestedShape result=null;
         for (var sequence:sequences) {
@@ -259,10 +290,14 @@ public final class NestedCaptures {
             result=current;
         }
         if (result==null) throw new IllegalArgumentException("E-NESTED-SHAPE: empty body");
-        // Mixed sums classify each alternative by its own CST token; a helper token would hide it.
-        if (result.leaf()==Kind.VALUE) for (var sequence:sequences)
-            if (sequence.elements().size()==1 && sequence.elements().get(0).element() instanceof RuleRefElement r && isHelper(grammar,r.name()))
-                throw new IllegalArgumentException("E-NESTED-SHAPE: mixed choice alternative through helper "+r.name()+" is not supported");
+        // Mixed sums classify each alternative by its own CST token; a helper anywhere inside an
+        // alternative would change that classification and its preferred depth. This also keeps
+        // mixed detection of choices outside a capture (markNestedMixed, Rust lowering) unchanged:
+        // such choices were never mixed before helpers had a nested shape.
+        if (result.leaf()==Kind.VALUE) for (var sequence:sequences) {
+            var helper=helperIn(grammar,sequence);
+            if (helper!=null) throw new IllegalArgumentException("E-NESTED-SHAPE: mixed choice alternative through helper "+helper+" is not supported");
+        }
         return result;
     }
     static java.util.Set<String> captureNames(RuleDecl rule) {
