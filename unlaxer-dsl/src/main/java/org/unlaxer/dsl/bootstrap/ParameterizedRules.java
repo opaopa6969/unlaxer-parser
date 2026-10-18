@@ -43,10 +43,12 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile;
 public final class ParameterizedRules {
     /** Total atomic elements of all expanded instances (the generators' 65536-visit limit). */
     public static final int MAX_EXPANDED_ELEMENTS = 65536;
-    /** Nesting of one expanded instance body or argument (the native frontend's nesting limit). */
+    /**
+     * Inline nesting of the expansion (the native frontend's nesting limit): the rule bodies
+     * open at a call plus the nesting of the instance body or argument created there, as if
+     * every instance were written at its call site. One fixed recursion budget on both hosts.
+     */
     public static final int MAX_EXPANDED_NESTING = 128;
-    /** Instances under expansion at once (the parameterized call chain): a fixed stack budget. */
-    public static final int MAX_EXPANSION_DEPTH = 128;
     static final Set<String> RESERVED = Set.of("CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "ERROR");
     /** NUL never occurs in an identifier, so no user reference can match a placeholder. */
     private static final String CALL_PREFIX = "\0call";
@@ -240,8 +242,8 @@ public final class ParameterizedRules {
         final Set<String> names = new HashSet<>();
         /** Atomic elements materialized so far: call arguments and instance bodies. */
         long total;
-        /** Instances whose bodies are being expanded (the current call chain). */
-        int depth;
+        /** Rule bodies open in the expansion recursion, across instance boundaries. */
+        int level;
 
         Grammar(GrammarDecl grammar, IdentityHashMap<RuleDecl, List<String>> params, List<Call> calls,
                 UBNFSourceSnapshot.Builder origins) {
@@ -416,6 +418,14 @@ public final class ParameterizedRules {
         }
 
         RuleBody body(RuleBody body, Map<String, Rep> env) {
+            // An error aborts the whole expansion, so the level is restored only on success.
+            level++;
+            RuleBody expanded = expandBody(body, env);
+            level--;
+            return expanded;
+        }
+
+        private RuleBody expandBody(RuleBody body, Map<String, Rep> env) {
             if (body instanceof SequenceBody sequence) return sequence(sequence, env);
             ChoiceBody choice = (ChoiceBody) body;
             List<SequenceBody> alternatives = new ArrayList<>();
@@ -461,8 +471,9 @@ public final class ParameterizedRules {
                         size = saturating(size, measured[0]);
                         nesting = Math.max(nesting, measured[1]);
                     }
-                    if (nesting > MAX_EXPANDED_NESTING) throw error(span(ref), "E-PARAM-LIMIT: argument of rule "
-                        + call.name() + " nests " + nesting + " levels; the limit is " + MAX_EXPANDED_NESTING);
+                    long inline = level + nesting;
+                    if (inline > MAX_EXPANDED_NESTING) throw error(span(ref), "E-PARAM-LIMIT: argument of rule "
+                        + call.name() + " nests " + inline + " levels; the limit is " + MAX_EXPANDED_NESTING);
                     charge(size, span(ref));
                     List<RuleBody> args = new ArrayList<>();
                     for (RuleBody argument : call.args()) args.add(body(argument, env));
@@ -527,8 +538,6 @@ public final class ParameterizedRules {
             String name = callee + "_" + String.format("%016x", fnv1a64(key.toString()));
             if (known.contains(name) || names.contains(name)) throw error(at, "E-PARAM-NAME-COLLISION: expanded rule name "
                 + name + " collides with another rule, token or expansion");
-            if (depth + 1 > MAX_EXPANSION_DEPTH) throw error(at, "E-PARAM-LIMIT: expansion of rule " + callee
-                + " is nested " + (depth + 1) + " calls deep; the limit is " + MAX_EXPANSION_DEPTH);
             Def def = defs.get(callee);
             RuleDecl rule = rules.get(def.rule());
             Map<String, Rep> env = new HashMap<>();
@@ -538,16 +547,15 @@ public final class ParameterizedRules {
                 env.put(def.params().get(i), new Rep(element, measured[0], measured[1]));
             }
             long[] measured = measureBody(rule.body(), env);
-            if (measured[1] > MAX_EXPANDED_NESTING) throw error(at, "E-PARAM-LIMIT: expansion of rule " + callee
-                + " nests " + measured[1] + " levels; the limit is " + MAX_EXPANDED_NESTING);
+            long inline = level + measured[1];
+            if (inline > MAX_EXPANDED_NESTING) throw error(at, "E-PARAM-LIMIT: expansion of rule " + callee
+                + " nests " + inline + " levels; the limit is " + MAX_EXPANDED_NESTING);
             charge(measured[0], at);
             byKey.put(key.toString(), name);
             names.add(name);
             int slot = instances.size();
             instances.add(null);
-            depth++;
             RuleBody body = body(rule.body(), env);
-            depth--;
             instances.set(slot, synthetic(origins, new RuleDecl(List.of(), name, body), rule));
             return name;
         }

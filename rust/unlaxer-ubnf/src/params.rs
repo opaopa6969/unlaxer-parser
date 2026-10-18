@@ -19,11 +19,11 @@ use std::collections::{HashMap, HashSet};
 /// Total atomic elements in all expanded instances, aligned with the existing
 /// 65536-visit traversal limits of the generators.
 pub const MAX_EXPANDED_ELEMENTS: usize = 65_536;
-/// Nesting of one expanded instance body or argument, aligned with [`crate::MAX_NESTING`].
+/// Inline nesting of the expansion, aligned with [`crate::MAX_NESTING`]: the rule bodies
+/// open at a call plus the nesting of the instance body or argument created there, as if
+/// every instance were written at its call site. This bounds the expansion recursion
+/// (call chain times body nesting) with one fixed budget on both hosts.
 pub const MAX_EXPANDED_NESTING: usize = crate::MAX_NESTING;
-/// Instances under expansion at once (the parameterized call chain), so that the
-/// recursive expansion has a fixed stack budget on both hosts.
-pub const MAX_EXPANSION_DEPTH: usize = crate::MAX_NESTING;
 /// Builtin call spellings that a parameterized rule must not reuse.
 const RESERVED: [&str; 4] = ["CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "ERROR"];
 /// Placeholder prefix. NUL never occurs in an identifier, so no user name can match.
@@ -239,7 +239,7 @@ pub(crate) fn expand(
         by_key: HashMap::new(),
         names: HashSet::new(),
         total: 0,
-        depth: 0,
+        level: 0,
     };
     let empty = HashMap::new();
     let mut expanded = Vec::with_capacity(rules.len());
@@ -458,8 +458,8 @@ struct Expander<'a> {
     names: HashSet<String>,
     /// Atomic elements materialized so far: call arguments and instance bodies.
     total: usize,
-    /// Instances whose bodies are being expanded (the current call chain).
-    depth: usize,
+    /// Rule bodies open in the expansion recursion, across instance boundaries.
+    level: usize,
 }
 
 /// A substituted argument with its measured size and nesting, so that measuring a
@@ -474,6 +474,8 @@ type Env<'a> = HashMap<&'a str, Rep>;
 
 impl Expander<'_> {
     fn body(&mut self, body: &RuleBody, env: &Env) -> Result<RuleBody> {
+        // An error aborts the whole expansion, so the level is restored only on success.
+        self.level += 1;
         let mut alternatives = Vec::with_capacity(body.alternatives.len());
         for sequence in &body.alternatives {
             let mut elements = Vec::with_capacity(sequence.elements.len());
@@ -492,6 +494,7 @@ impl Expander<'_> {
                 span: sequence.span,
             });
         }
+        self.level -= 1;
         Ok(RuleBody {
             alternatives,
             span: body.span,
@@ -514,9 +517,10 @@ impl Expander<'_> {
                         size = size.saturating_add(n);
                         depth = depth.max(d);
                     }
-                    if depth > MAX_EXPANDED_NESTING {
+                    let inline = self.level.saturating_add(depth);
+                    if inline > MAX_EXPANDED_NESTING {
                         return Err(error(self.source, call.span, format!(
-                            "E-PARAM-LIMIT: argument of rule {} nests {depth} levels; the limit is {MAX_EXPANDED_NESTING}",
+                            "E-PARAM-LIMIT: argument of rule {} nests {inline} levels; the limit is {MAX_EXPANDED_NESTING}",
                             call.name
                         )));
                     }
@@ -598,12 +602,6 @@ impl Expander<'_> {
                 "E-PARAM-NAME-COLLISION: expanded rule name {name} collides with another rule, token or expansion"
             )));
         }
-        if self.depth + 1 > MAX_EXPANSION_DEPTH {
-            return Err(error(self.source, span, format!(
-                "E-PARAM-LIMIT: expansion of rule {callee} is nested {} calls deep; the limit is {MAX_EXPANSION_DEPTH}",
-                self.depth + 1
-            )));
-        }
         let def = &self.defs[callee];
         let rule = &self.rules[def.rule];
         let empty = HashMap::new();
@@ -622,9 +620,10 @@ impl Expander<'_> {
             }))
             .collect();
         let (size, depth) = measure_body(&rule.body, &env);
-        if depth > MAX_EXPANDED_NESTING {
+        let inline = self.level.saturating_add(depth);
+        if inline > MAX_EXPANDED_NESTING {
             return Err(error(self.source, span, format!(
-                "E-PARAM-LIMIT: expansion of rule {callee} nests {depth} levels; the limit is {MAX_EXPANDED_NESTING}"
+                "E-PARAM-LIMIT: expansion of rule {callee} nests {inline} levels; the limit is {MAX_EXPANDED_NESTING}"
             )));
         }
         self.charge(size, span)?;
@@ -632,9 +631,7 @@ impl Expander<'_> {
         self.names.insert(name.clone());
         let slot = self.instances.len();
         self.instances.push(None);
-        self.depth += 1;
         let body = self.body(&rule.body, &env)?;
-        self.depth -= 1;
         self.instances[slot] = Some(RuleDecl {
             annotations: Vec::new(),
             name: name.clone(),

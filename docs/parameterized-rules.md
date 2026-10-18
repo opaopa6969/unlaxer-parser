@@ -46,8 +46,10 @@ frontend は構文解析のあと、文法ごとに次の順で検査し、最�
 4. **展開**: 単相化する。次のどれかで拒否する（`E-PARAM-LIMIT`）。
    - 実体化した atomic 要素の合計が 65536 を超える。数えるのは、呼び出しごとに作る実引数と、
      新しく作る instance の本体（同じ鍵の呼び出しが instance を共有しても、実引数は呼び出しの度に数える）。
-   - 1 個の実引数、または 1 instance の本体の入れ子が 128 段を超える。
-   - 同時に展開中の instance（引数付き呼び出しの連鎖）が 128 段を超える。
+   - **展開の入れ子**が 128 段を超える。展開の入れ子は、呼び出しの位置で開いている規則本体の数
+     （呼び出し側の規則本体と囲む group・optional など、および展開中の instance 本体を、instance の
+     境界をまたいで数える）に、そこで作る実引数または instance 本体の入れ子を足したもの。すべての
+     instance を呼び出しの位置に書いた場合の入れ子にあたる。実引数を先に、instance を後に判定する。
    生成した名前が既存の規則・token・別 instance と重なれば拒否（`E-PARAM-NAME-COLLISION`）。
 5. 展開後の文法に、既存の validator と生成器の検査（`E-LEFT-RECURSION` の nullable 不動点と
    消費前到達グラフ、`E-RULE-UNDEFINED` など）をそのまま当てる。
@@ -58,15 +60,20 @@ frontend は構文解析のあと、文法ごとに次の順で検査し、最�
 位置で数える）。実引数は見積もりが上限内のときだけ作り、正規形の鍵もその後で作る。したがって鍵の
 文字列と作る木は上限に比例する大きさに収まり、呼び出し先が引数を使わない場合
 （`D0(x) ::= 'a'; Dk(x) ::= D(k-1)(x x)`）の指数的な引数の成長も位置付きで拒否する。
-呼び出しの連鎖の上限は、展開の再帰の深さを両 host で固定するためのもの（Java の
-`StackOverflowError` や Rust の stack overflow ではなく `E-PARAM-LIMIT` にする）。
+展開の入れ子の上限は、展開の再帰の深さを両 host で固定するためのもの（Java の
+`StackOverflowError` や Rust の stack overflow ではなく `E-PARAM-LIMIT` にする）。呼び出しの連鎖と
+1 instance の入れ子を別々に 128 で抑えると、再帰はその積（最大で約 16000 段）になる。このため 1 本の
+累積の値で抑える。再帰の深さは、規則本体 1 個あたりの展開関数のフレーム数に 128 を掛けたもの
+（と、instance を作るときの見積もりの再帰）までになる。これは frontend が構文解析で許す入れ子
+128 と同じ規模なので、Rust の debug / release、Java の JIT / インタプリタのどれでも同じ結果になる
+（corpus と再現入力 71 文法で、Rust debug / release と Java の JIT / `-Xint` の結果が一致することを確認した）。
 
 | code | 位置 | 内容 |
 |---|---|---|
 | `E-PARAM-ARITY` | 呼び出し・参照 | 引数の数が定義と違う。定義の行・列も示す |
 | `E-PARAM-UNDEFINED` | 参照 | 定義本体の未定義の名前 |
 | `E-PARAM-CYCLE` | 循環を閉じる呼び出し | `F -> G -> F` の経路を示す |
-| `E-PARAM-LIMIT` | 上限を超えた呼び出し | 要素数 65536、実引数・本体の入れ子 128、呼び出しの連鎖 128 |
+| `E-PARAM-LIMIT` | 上限を超えた呼び出し | 要素数 65536、展開の入れ子 128 |
 | `E-PARAM-ANNOTATION` | 定義 | `@mapping` などの注釈を持つ引数付き規則 |
 | `E-PARAM-CAPTURE` | 呼び出し・定義 | 引数・定義本体の `@capture` / `@typeof` |
 | `E-PARAM-SHADOW` | 定義 | 規則名・token 名と同じ引数名 |
@@ -118,8 +125,8 @@ Java は `ParameterizedRules.ExpansionException`（`code()` `start()` `end()` `l
 rank(H) < rank(F)。H(a1, ..., an) の展開では、まず各 ai を展開して呼び出しを含まない式 ai' にする。
 ai' を H の本体に代入しても呼び出しは増えない（M-PEG-5 `subst_hasCall_eq_false`）。したがって代入後に
 残る呼び出しは H の本体にもともとあったものだけで、その callee の rank は rank(H) より真に小さい。
-手順 4 の上限は展開を途中で拒否するだけで、受理した展開結果は変えない。展開の再帰は呼び出しの連鎖の
-長さ（rank 以下、かつ 128 以下）を超えない。
+手順 4 の上限は展開を途中で拒否するだけで、受理した展開結果は変えない。展開の再帰は、呼び出しの
+連鎖が rank 以下であることに加えて、展開の入れ子 128 以下に収まる。
 （rank, 式の大きさ）の辞書式順序がどの再帰でも下がるので、展開は有限回で終わり、出力に呼び出しは
 残らない（T-fix）。instance の共有は同じ鍵の再計算を省くだけで、この測度を増やさない。
 
@@ -163,8 +170,9 @@ corpus の `ce002-self-argument` と、nullable な接頭辞が展開後にだ�
 
 ## 検証
 
-`spec-corpus/parameterized-rules/cases.json` は 8 文法 22 入力の受理例（#699 の `@nestedCaptures` が
-instance を alias として透過する例を含む）、展開後の検査で拒否する 2 例、位置付きで拒否する 21 例を持つ。
+`spec-corpus/parameterized-rules/cases.json` は 10 文法 26 入力の受理例を持つ。受理例には、#699 の
+`@nestedCaptures` が instance を alias として透過する例と、連鎖の長さと本体の入れ子の積がちょうど 128 段に
+なる 2 例を含む。ほかに、展開後の検査で拒否する 2 例と、位置付きで拒否する 23 例を持つ。
 上限の負例の位置は、生成 script が上記の数え方を手で追って求める。期待値はすべて手書きで、受理例は手で展開した等価文法、
 instance 名は手書きの正規形の鍵から独立に計算した FNV 値、入力ごとの受理・拒否、CP 位置、AST を
 持つ。
@@ -179,8 +187,11 @@ instance 名は手書きの正規形の鍵から独立に計算した FNV 値、
   期待値どおりになること、native の `generate` / `check` / `impact` の結果。
 - `RustUbnfFrontendConformanceTest`: `tests/fixtures/positive/parameterized-rules.ubnf` と、定義が
   grammar 単位で効くことを示す `parameterized-rules-two-grammars.ubnf` の展開後の構文木が両 frontend で
-  一致すること、`negative.tsv` の構文エラー 6 例。上限ちょうど 128 段の呼び出し連鎖は、両 host とも
-  2 MiB の thread stack で展開できることを別に確認する。
+  一致すること、`negative.tsv` の構文エラー 6 例。
+- 展開の入れ子の境界: 平らな連鎖（127 instance で 128 段）と、本体の入れ子 0〜126 段の 8 通りで
+  上限ちょうどの文法を Rust は既定の test thread（2 MiB）で、Java は 512 KiB の thread で展開できることと、
+  1 段増やすと同じ本文で拒否することを確認する。平らな 127 段の連鎖は、手書きで展開しても既存の Rust
+  生成器の構造解析の深さ上限（256）に掛かるため、生成と consumer の比較からは外している。
 
 ```sh
 RUSTUP_TOOLCHAIN=1.85.0 cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-ubnf --test parameterized_rules

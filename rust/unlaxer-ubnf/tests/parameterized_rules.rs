@@ -106,7 +106,7 @@ fn corpus_expansions_equal_hand_written_grammars() {
         }
         accepted += 1;
     }
-    assert_eq!(accepted, 10);
+    assert_eq!(accepted, 12);
 }
 
 #[test]
@@ -136,13 +136,50 @@ fn chain(levels: usize) -> String {
     source
 }
 
+/// Root's body, then one level per flat instance: C0..C{n} reach n + 2 levels.
 #[test]
-fn the_deepest_allowed_call_chain_expands_on_the_default_test_stack() {
-    let limit = unlaxer_ubnf::MAX_EXPANSION_DEPTH;
-    let file = unlaxer_ubnf::parse(&chain(limit - 1)).unwrap();
-    assert_eq!(file.grammars[0].rules.len(), 1 + limit);
-    let error = unlaxer_ubnf::parse(&chain(limit)).unwrap_err();
+fn the_inline_nesting_limit_bounds_flat_chains_on_the_default_test_stack() {
+    let limit = unlaxer_ubnf::MAX_EXPANDED_NESTING;
+    let file = unlaxer_ubnf::parse(&chain(limit - 2)).unwrap();
+    assert_eq!(file.grammars[0].rules.len(), limit);
+    let error = unlaxer_ubnf::parse(&chain(limit - 1)).unwrap_err();
     assert!(error.message.starts_with("E-PARAM-LIMIT:"), "{error}");
+}
+
+/// Chain length times body nesting at the limit, in every split (review of #708).
+#[test]
+fn the_inline_nesting_limit_bounds_nested_chains_on_the_default_test_stack() {
+    for groups in [1usize, 3, 7, 15, 30, 62, 126] {
+        // Root (1) + n bodies of 1 + groups levels + the innermost body (1) <= 128.
+        let n = (unlaxer_ubnf::MAX_EXPANDED_NESTING - 2) / (1 + groups);
+        let mut source = String::from("grammar G { Root ::= C0('a'); ");
+        for k in 0..n {
+            source.push_str(&format!(
+                "C{k}(x) ::= {}C{}(x){} ; ",
+                "( ".repeat(groups),
+                k + 1,
+                " )".repeat(groups)
+            ));
+        }
+        source.push_str(&format!("C{n}(x) ::= x ; }}"));
+        let file = unlaxer_ubnf::parse(&source).unwrap_or_else(|e| panic!("{groups}: {e}"));
+        assert_eq!(file.grammars[0].rules.len(), 2 + n, "{groups}");
+        let deeper = source.replacen(&format!("C{n}(x) ::= x"), &format!("C{n}(x) ::= ( x )"), 1);
+        let levels = 1 + n * (1 + groups) + 2;
+        assert_eq!(
+            unlaxer_ubnf::parse(&deeper)
+                .map(|_| ())
+                .map_err(|e| e.message),
+            if levels > unlaxer_ubnf::MAX_EXPANDED_NESTING {
+                Err(format!(
+                    "E-PARAM-LIMIT: expansion of rule C{n} nests {levels} levels; the limit is 128"
+                ))
+            } else {
+                Ok(())
+            },
+            "{groups}"
+        );
+    }
 }
 
 #[test]

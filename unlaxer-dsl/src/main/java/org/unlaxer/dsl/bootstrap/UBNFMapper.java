@@ -707,8 +707,11 @@ public class UBNFMapper {
                 result.add(toCommonFieldAnnotation(child));
             } else if (child.parser.getClass() == UBNFParsers.SimpleAnnotationParser.class) {
                 result.add(toSimpleAnnotation(child));
-            } else {
-                // ZeroOrMore コンテナなど → 中を再帰検索
+            } else if (child.parser.getClass() != UBNFParsers.RuleBodyParser.class
+                    && child.parser.getClass() != UBNFParsers.ChoiceBodyParser.class
+                    && child.parser.getClass() != UBNFParsers.RuleParameterListParser.class) {
+                // ZeroOrMore コンテナなど → 中を再帰検索。注釈は規則名の前にしかないので、
+                // 入れ子の深い規則本体には降りない（再帰の深さを注釈の並びに限る）。
                 result.addAll(collectAnnotations(child));
             }
         }

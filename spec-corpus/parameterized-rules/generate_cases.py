@@ -352,7 +352,10 @@ reject("reserved-name", g, "E-PARAM-RESERVED", "CAPTURE(x) ::= x;", "parameteriz
 collision = inst("F(" + t("a") + ")")
 g = "grammar Bad { Root ::= F('a'); F(x) ::= x; " + collision + " ::= 'b'; }"
 reject("name-collision", g, "E-PARAM-NAME-COLLISION", "F('a')", "expanded rule name " + collision + " collides with another rule, token or expansion")
-LIMIT, NESTING, CALL_DEPTH = 65536, 128, 128
+LIMIT, NESTING = 65536, 128
+# NESTING bounds the inline nesting: the rule bodies open at a call (the calling rule's
+# body, every enclosing group, and the bodies of the instances being expanded around it)
+# plus the nesting of the instance body or argument created at that call.
 
 def doubling_chain(n, base):
     """Root ::= Dn('a'); D0(x) ::= base; Dk(x) ::= D(k-1)(x x).
@@ -364,18 +367,21 @@ def doubling_chain(n, base):
     g = "grammar Bad { Root ::= D%d('a'); D0(x) ::= %s; " % (n, base) + " ".join(
         "D%d(x) ::= D%d(x x);" % (k, k - 1) for k in range(1, n + 1)) + " }"
     total = 1 + 1                       # Root's argument 'a', then Dn's body (one call)
+    level = 1                           # Root's body; each Dk body adds one level
     rep_size, rep_depth = 1, 0          # 'a' is substituted as itself
     for k in range(n - 1, -1, -1):      # the call D{k}(x x) inside D{k+1}
         call = "D%d(x x)" % k
         site = "D%d(x) ::= D%d(x x);" % (k + 1, k)
         start = g.index(site) + len("D%d(x) ::= " % (k + 1))
+        level += 1                       # inside D{k+1}'s body
         arg_size, arg_depth = 2 * rep_size, 1 + rep_depth
-        assert arg_depth <= NESTING and n - k + 1 <= CALL_DEPTH
+        assert level + arg_depth <= NESTING
         total += arg_size
         if total > LIMIT:
             return g, start, call
         rep_size, rep_depth = 1 + arg_size, arg_depth   # two elements: substituted as a group
         body = 1 if k > 0 else (1 if base == "'a'" else 2 * rep_size)
+        assert level + (1 if k > 0 or base == "'a'" else 1 + rep_depth) <= NESTING
         total += body
         if total > LIMIT:
             return g, start, call
@@ -393,17 +399,72 @@ reject_at("limit-elements", g, start, call, "E-PARAM-LIMIT", "expanded parameter
 # The callee ignores its argument, so instance bodies stay tiny; only the arguments grow.
 g, start, call = doubling_chain(20, "'a'")
 reject_at("limit-unused-argument-growth", g, start, call, "E-PARAM-LIMIT", "expanded parameterized rules exceed 65536 elements")
-# A long call chain: the 129th nested instance is refused before its body is expanded.
-g = "grammar Bad { Root ::= C0('a'); " + " ".join("C%d(x) ::= C%d(x);" % (k, k + 1) for k in range(200)) + " C200(x) ::= x; }"
-reject_at("limit-call-depth", g, g.index("C127(x) ::= C128(x);") + len("C127(x) ::= "), "C128(x)", "E-PARAM-LIMIT",
-          "expansion of rule C128 is nested 129 calls deep; the limit is 128")
-# Arguments wrapped once more per level: N_k receives a replacement k groups deep, and the
-# argument (x) of the call in N_k nests 2 + k levels, so N127's call fails.
+def chain_defs(n, g, d):
+    """Ck(x) ::= g groups around C{k+1}(x) for k < n; Cn(x) ::= d groups around x."""
+    defs = ["C%d(x) ::= %sC%d(x)%s ;" % (k, "( " * g, k + 1, " )" * g) for k in range(n)]
+    return defs + ["C%d(x) ::= %sx%s ;" % (n, "( " * d, " )" * d)]
+
+def chain_inline(n, g, d):
+    """Inline nesting of each instance C0..Cn created from Root ::= C0('a').
+
+    The call of Ck sits inside Root's body and k instance bodies of 1 + g levels each;
+    the argument x (one level) never exceeds the instance created at the same call.
+    """
+    return [1 + k * (1 + g) + ((1 + g) if k < n else (1 + d)) for k in range(n + 1)]
+
+def chain_accept(name, description, n, g, d):
+    assert max(chain_inline(n, g, d)) == NESTING and 1 + n * (1 + g) + 1 <= NESTING
+    defs = chain_defs(n, g, d)
+    grammar = HEAD + "  @root @mapping(Root, params=[text])\n  Root ::= C0('a') @text ;\n" + "".join("  " + x + "\n" for x in defs) + "}\n"
+    keys = ["C%d(%s)" % (k, t("a")) for k in range(n + 1)]
+    names = [inst(k) for k in keys]
+    body = ["%s ::= %s%s%s ;" % (names[k], "( " * g, names[k + 1], " )" * g) for k in range(n)]
+    body.append("%s ::= %s'a'%s ;" % (names[n], "( " * d, " )" * d))
+    expanded = HEAD + "  @root @mapping(Root, params=[text])\n  Root ::= %s @text ;\n" % names[0] + "".join("  " + x + "\n" for x in body) + "}\n"
+    cases.append({"name": name, "description": description, "grammar": grammar, "status": "accept",
+        "instances": [{"key": k, "name": inst(k)} for k in keys], "expanded": expanded,
+        "spans": [{"rule": names[0], "span": list(at(grammar, defs[0]))}, {"rule": names[n], "span": list(at(grammar, defs[n]))}],
+        "inputs": [
+            {"input": "a", "expected": {"status": "ok", "value": node("Root", (0, 1), text="a")}},
+            {"input": "b", "expected": {"status": "syntax", "offset": 0}},
+        ]})
+
+def chain_reject(name, n, g, d):
+    """The first call whose argument (checked first) or new instance exceeds the limit."""
+    inline = chain_inline(n, g, d)
+    for k in range(n + 1):
+        argument = 1 + k * (1 + g) + 1      # open bodies at the call + the one-level argument
+        if argument > NESTING:
+            message = "argument of rule C%d nests %d levels; the limit is %d" % (k, argument, NESTING)
+            break
+        if inline[k] > NESTING:
+            message = "expansion of rule C%d nests %d levels; the limit is %d" % (k, inline[k], NESTING)
+            break
+    defs = chain_defs(n, g, d)
+    grammar = "grammar Bad { Root ::= C0('a'); " + " ".join(defs) + " }"
+    call = "C%d(x)" % k
+    start = grammar.index(call, grammar.index("C%d(x) ::=" % (k - 1)) + len("C%d(x) ::=" % (k - 1)))
+    reject_at(name, grammar, start, call, "E-PARAM-LIMIT", message)
+
+# Boundaries of the inline nesting: chains whose length times body nesting reaches exactly
+# 128 levels; one more level is refused. (A flat chain of 127 instances also reaches 128 and
+# is checked by the frontend tests; the Rust generator's existing structural analysis depth
+# of 256 rejects that many chained rules even when written by hand, so it is no consumer case.)
+chain_accept("chain-nested-at-limit", "chain length times body nesting reaches exactly the limit", 2, 62, 0)
+chain_accept("chain-split-at-limit", "eight instances of 15 levels and a 7-level innermost body", 8, 14, 6)
+chain_reject("limit-chain-flat", 127, 0, 0)
+chain_reject("limit-chain-nested", 2, 62, 1)
+# The review's reproduction shape (48 instances, 30 groups each) fails at the fifth instance.
+chain_reject("limit-chain-times-nesting", 48, 30, 0)
+# Arguments wrapped once more per level: N_k receives a replacement k groups deep. Its call
+# N{k+1}((x)) sits at k + 2 open bodies and the argument nests 2 + k levels.
 g = "grammar Bad { Root ::= N0('a'); " + " ".join("N%d(x) ::= N%d((x));" % (k, k + 1) for k in range(200)) + " N200(x) ::= 'a'; }"
-reject_at("limit-argument-nesting", g, g.index("N127(x) ::= N128((x));") + len("N127(x) ::= "), "N128((x))", "E-PARAM-LIMIT",
-          "argument of rule N128 nests 129 levels; the limit is 128")
+k = next(k for k in range(200) if (k + 2) + (2 + k) > NESTING)
+reject_at("limit-argument-nesting", g, g.index("N%d(x) ::= N%d((x));" % (k, k + 1)) + len("N%d(x) ::= " % k), "N%d((x))" % (k + 1),
+          "E-PARAM-LIMIT", "argument of rule N%d nests %d levels; the limit is %d" % (k + 1, 2 * k + 4, NESTING))
+# Root's body (1) + F's body (1 + 120 groups + the 10-group argument).
 g = "grammar Bad { Root ::= F(" + "(" * 10 + "'a'" + ")" * 10 + "); F(x) ::= " + "(" * 120 + "x" + ")" * 120 + "; }"
-reject("limit-nesting", g, "E-PARAM-LIMIT", "F(" + "(" * 10, "expansion of rule F nests 131 levels; the limit is 128",
+reject("limit-nesting", g, "E-PARAM-LIMIT", "F(" + "(" * 10, "expansion of rule F nests 132 levels; the limit is 128",
        length=len("F(" + "(" * 10 + "'a'" + ")" * 10 + ")"))
 
 json.dump(cases, open(sys.argv[1], "w", encoding="utf-8"), ensure_ascii=False, indent=2)

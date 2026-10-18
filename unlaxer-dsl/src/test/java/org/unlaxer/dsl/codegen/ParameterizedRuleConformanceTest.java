@@ -123,27 +123,45 @@ public class ParameterizedRuleConformanceTest {
             }
             accepted++;
         }
-        assertEquals(List.of(8, 2, 21), List.of(accepted, validated, rejected));
+        assertEquals(List.of(10, 2, 23), List.of(accepted, validated, rejected));
     }
 
-    @Test public void theDeepestAllowedCallChainExpandsOnASmallStack() throws Exception {
-        int limit = ParameterizedRules.MAX_EXPANSION_DEPTH;
+    /**
+     * Chain length times body nesting at the inline nesting limit, in every split, on a
+     * thread smaller than the JVM default (review of #708: the product used to overflow).
+     */
+    @Test public void theInlineNestingLimitBoundsNestedChainsOnASmallStack() throws Exception {
+        int limit = ParameterizedRules.MAX_EXPANDED_NESTING;
         var outcome = new java.util.concurrent.atomic.AtomicReference<Object>();
         var thread = new Thread(null, () -> {
             try {
-                outcome.set(List.of(UBNFMapper.parse(chain(limit - 1)).grammars().get(0).rules().size(),
-                    assertThrows(ParameterizedRules.ExpansionException.class, () -> UBNFMapper.parse(chain(limit))).code()));
+                var results = new ArrayList<Object>();
+                for (int groups : new int[] {0, 1, 3, 7, 15, 30, 62, 126}) {
+                    int n = (limit - 2) / (1 + groups);
+                    results.add(UBNFMapper.parse(chain(n, groups, 0)).grammars().get(0).rules().size() == 2 + n);
+                    int levels = 1 + n * (1 + groups) + 2;
+                    if (levels > limit) {
+                        var error = assertThrows(ParameterizedRules.ExpansionException.class,
+                            () -> UBNFMapper.parse(chain(n, groups, 1)));
+                        results.add(error.diagnostic().equals("E-PARAM-LIMIT: expansion of rule C" + n + " nests "
+                            + levels + " levels; the limit is 128"));
+                    }
+                }
+                outcome.set(results);
             } catch (Throwable error) { outcome.set(error); }
-        }, "parameterized-chain", 2 * 1024 * 1024);
+        }, "parameterized-chain", 512 * 1024);
         thread.start();
-        thread.join(60_000);
-        assertEquals(String.valueOf(outcome.get()), List.of(1 + limit, "E-PARAM-LIMIT"), outcome.get());
+        thread.join(120_000);
+        assertTrue(String.valueOf(outcome.get()), outcome.get() instanceof List<?> list
+            && list.size() >= 8 && list.stream().allMatch(Boolean.TRUE::equals));
     }
 
-    private static String chain(int levels) {
+    private static String chain(int n, int groups, int innermost) {
         StringBuilder source = new StringBuilder("grammar G { Root ::= C0('a'); ");
-        for (int k = 0; k < levels; k++) source.append("C").append(k).append("(x) ::= C").append(k + 1).append("(x); ");
-        return source.append("C").append(levels).append("(x) ::= x; }").toString();
+        for (int k = 0; k < n; k++) source.append("C").append(k).append("(x) ::= ").append("( ".repeat(groups))
+            .append("C").append(k + 1).append("(x)").append(" )".repeat(groups)).append(" ; ");
+        return source.append("C").append(n).append("(x) ::= ").append("( ".repeat(innermost)).append("x")
+            .append(" )".repeat(innermost)).append(" ; }").toString();
     }
 
     @Test public void grammarsWithoutDefinitionsKeepTheirPreviousParse() throws Exception {
