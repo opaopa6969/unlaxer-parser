@@ -102,6 +102,7 @@ public class PureSuccessMemoizationConformanceTest {
                 true);
         Path generator = nativeTarget.resolve("debug/unlaxer").toAbsolutePath();
         var report = new ArrayList<>(List.of("grammar\tcase\tconfiguration\tresult"));
+        var javaHostReport = new ArrayList<>(report);
         for (var element : corpus()) {
             var entry = element.getAsJsonObject();
             GrammarDecl grammar =
@@ -123,11 +124,14 @@ public class PureSuccessMemoizationConformanceTest {
                     true);
             var javaHost = new RustBackend().generate(grammar);
             assertEquals(5, javaHost.size());
+            Path javaGenerated = directory.resolve("java-generated");
+            Files.createDirectories(javaGenerated);
             for (var file : javaHost) {
                 assertArrayEquals(
                         entry.get("name") + ": " + file.relativePath(),
                         file.content().getBytes(StandardCharsets.UTF_8),
                         Files.readAllBytes(generated.resolve(file.relativePath())));
+                Files.writeString(javaGenerated.resolve(file.relativePath()), file.content());
             }
             Files.writeString(directory.resolve("main.rs"), rustProbe());
             Path binary = directory.resolve("probe");
@@ -167,12 +171,37 @@ public class PureSuccessMemoizationConformanceTest {
             List<String> nativeLines =
                     run(List.of(binary.toString()), input, true, true).lines().toList();
             assertEquals(entry.getAsJsonArray("cases").size() * 6, nativeLines.size());
+            String javaHostProbe = rustProbe();
+            assertEquals(1, javaHostProbe.split("mod generated;", -1).length - 1);
+            javaHostProbe =
+                    javaHostProbe.replace(
+                            "mod generated;",
+                            "#[path=\"java-generated/mod.rs\"] mod generated;");
+            Files.writeString(directory.resolve("main_java.rs"), javaHostProbe);
+            Path javaHostBinary = directory.resolve("probe-java");
+            run(
+                    List.of(
+                            "rustc",
+                            "--edition=2021",
+                            "--extern",
+                            "unlaxer_runtime=" + runtime,
+                            directory.resolve("main_java.rs").toString(),
+                            "-o",
+                            javaHostBinary.toString()),
+                    "",
+                    false,
+                    true);
+            List<String> javaHostLines =
+                    run(List.of(javaHostBinary.toString()), input, true, true).lines().toList();
+            assertEquals(nativeLines, javaHostLines);
             try (var loader = compileJava(grammar)) {
                 verifyJava(entry, loader, nativeLines, report);
+                verifyJava(entry, loader, javaHostLines, javaHostReport);
             }
         }
         Files.createDirectories(Path.of("target"));
         Files.write(Path.of("target/pure-success-memo-conformance.tsv"), report);
+        Files.write(Path.of("target/pure-success-memo-java-host.tsv"), javaHostReport);
     }
 
     private void verifyJava(
