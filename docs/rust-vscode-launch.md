@@ -32,7 +32,7 @@ npx vsce package --allow-missing-repository --skip-license --out target/tinycalc
 
 `build:rust` は同じ `grammar/tinycalc.ubnf` からLSP/DAPを生成し、現在のhost向け実行ファイルを `server-dist/<platform>-<arch>/` にコピーする。Rustを省いた従来のJavaのみのpackageも作成できる。Rustを使う場合は実行ファイルを明示設定する。Rust側はJVMを起動しない。
 
-実エディタ試験の対象はLinux x86_64、VS Code 1.96.4。macOS/Windows向け配布物をこの試験で検証したとは扱わない。一般の文法では[生成Rust LSP](classic-rust-lsp.md)と[生成Rust DAP](classic-rust-dap.md)のmain / Cargo設定を使ってnative binaryを作成し、対応する拡張の設定に渡す。
+TinyCalc と新規生成する拡張は VS Code 1.97.2 以上を必要とする。実エディタ試験の対象は Linux x86_64、VS Code 1.97.2。macOS/Windows向け配布物をこの試験で検証したとは扱わない。一般の文法では[生成Rust LSP](classic-rust-lsp.md)と[生成Rust DAP](classic-rust-dap.md)のmain / Cargo設定を使ってnative binaryを作成し、対応する拡張の設定に渡す。
 
 ## 実VSIXの検証
 
@@ -49,3 +49,10 @@ Javaのlibrary API `launch(InputStream, OutputStream)` は完了futureを返し�
 入出力のI/O失敗はfutureへ直ちに通知し、所有executorへ割り込みによる停止を要求する。任意の借用 `InputStream` が割り込みを無視して既にreadでblockしている場合、そのreadを解除するためのclose・EOF等はcallerの責任となる。libraryはその解除を待ってエラー通知を遅らせない。standaloneの生成 `main` だけはprocessの所有者として `System.exit` で正常時0、transport失敗時1を適用するため、非協調的なstdio readもprocessとともに終了する。libraryの `launch` / `launchStdio` は `System.exit` を呼ばない。通常接続中にclientがstreamを開いたまま送信を止めた場合は接続が継続する。
 
 実VSIX試験は各backendのエディタログを `target/ide-<backend>-editor.log` へ保存し、`Invalid debug adapter` と未処理Promise rejectionがないことを検査する。[#555](https://github.com/opaopa6969/unlaxer-parser/issues/555) の切断時ログはこの試験と生成launcherの実通信試験で回帰を防ぐ。
+
+
+VS Code 1.96.4 は正常な切断応答の後、終了済み session に遅れて届く adapter exit で `Invalid debug adapter` を出す場合がある。これは Java/Rust 共通の editor host の終了処理であり、[1.96.4 の実装](https://github.com/microsoft/vscode/blob/1.96.4/src/vs/workbench/api/browser/mainThreadDebugService.ts)と[修正を含む 1.97.2 の実装](https://github.com/microsoft/vscode/blob/1.97.2/src/vs/workbench/api/browser/mainThreadDebugService.ts)を根拠に最低対応版を揃えている。生成 backend に終了待ち時間を追加して回避しない。
+
+実 VSIX 試験では通常操作に加え、実 DAP child の終了と editor の停止要求を受けてから fixture wrapper の exit 通知を遅らせる。同じ AST/token 操作、再起動、無応答時の終了を両 backend で実行し、session 終了後の exit 到達と観測値の一致を検査する。`target/ide-<backend>-late-exit.json` は遅延ケースの観測値、`*-status.json` は各ケースの合否、`*-timeline.jsonl` は request / reply / process / session の順序、`*-pids.jsonl` は所有 child と wrapper を記録する。通常・遅延の両方で editor error と未処理 rejection の禁止を維持する。
+
+一方の backend が失敗しても他方の試験を実行する。失敗ケースの directory は `target/failed-<backend>[-late-exit]/` に保存し、CI は失敗時も観測値・editor logs・終了記録を artifact に添付する。結果が存在しても status が失敗なら合格とは扱わず、`ide-results.json` に全体の合否を残す。
