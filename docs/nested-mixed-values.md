@@ -45,3 +45,5 @@ RUSTUP_TOOLCHAIN=1.85.0 mvn -pl unlaxer-common,unlaxer-dsl -am test \
   -Dtest=NestedMixedValueConformanceTest -DrustConformance=true \
   -Dsurefire.failIfNoSpecifiedTests=false
 ```
+
+公開 mapper の requested-text 予算では、container と leaf の snapshot text、および mixed text/i32 の raw source 取得をそれぞれ計上する。例えば一要素 List の `text` は List snapshot 4 bytes＋Value snapshot 4 bytes＋値取得 4 bytes の合計12 bytes。これは論理的な累計取得量であり、heap 使用量の上限ではない。共有の小予算回帰は実際の上限定数を変えず、事前に予算を消費した公開入口で exact／1 byte 不足を比較する。

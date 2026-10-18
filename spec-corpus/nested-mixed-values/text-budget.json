@@ -1,0 +1,68 @@
+[
+  {
+    "name": "text-exact",
+    "input": "[text]",
+    "budget": 12,
+    "expected": "ok"
+  },
+  {
+    "name": "text-one-below",
+    "input": "[text]",
+    "budget": 11,
+    "expected": "limit"
+  },
+  {
+    "name": "integer-exact",
+    "input": "[42]",
+    "budget": 6,
+    "expected": "ok"
+  },
+  {
+    "name": "integer-one-below",
+    "input": "[42]",
+    "budget": 5,
+    "expected": "limit"
+  },
+  {
+    "name": "enum-exact",
+    "input": "[sync]",
+    "budget": 12,
+    "expected": "ok"
+  },
+  {
+    "name": "enum-one-below",
+    "input": "[sync]",
+    "budget": 11,
+    "expected": "limit"
+  },
+  {
+    "name": "supplementary-exact",
+    "input": "[😀]",
+    "budget": 12,
+    "expected": "ok"
+  },
+  {
+    "name": "supplementary-one-below",
+    "input": "[😀]",
+    "budget": 11,
+    "expected": "limit"
+  },
+  {
+    "name": "CRLF-exact",
+    "input": "[\r\n]",
+    "budget": 6,
+    "expected": "ok"
+  },
+  {
+    "name": "CRLF-one-below",
+    "input": "[\r\n]",
+    "budget": 5,
+    "expected": "limit"
+  },
+  {
+    "name": "empty-zero",
+    "input": "[]",
+    "budget": 0,
+    "expected": "ok"
+  }
+]

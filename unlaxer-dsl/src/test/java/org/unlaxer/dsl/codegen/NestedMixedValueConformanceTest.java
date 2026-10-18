@@ -17,6 +17,7 @@ public class NestedMixedValueConformanceTest extends PreferredAstConformanceTest
     private final Path fixtures=repo.resolve("spec-corpus/nested-mixed-values");
     @Override protected JsonArray corpus()throws Exception{return JsonParser.parseString(Files.readString(fixtures.resolve("cases.json"))).getAsJsonArray();}
     @Override @Test public void javaSnapshots()throws Exception {
+        var report=new ArrayList<String>(List.of("fixture\tcase\tmemo\tdiagnostics\tactual"));
         for(var raw:corpus()) {
             var fixture=raw.getAsJsonObject();var grammar=UBNFMapper.parse(fixture.get("grammar").getAsString()).grammars().get(0);
             var units=new ArrayList<JavaFileObject>();
@@ -31,6 +32,7 @@ public class NestedMixedValueConformanceTest extends PreferredAstConformanceTest
             }
             try(var loader=new URLClassLoader(new URL[]{classes.toUri().toURL()},getClass().getClassLoader())) {
                 var method=loader.loadClass("nestedmixed.Probe").getMethod("run",String.class,String.class,int.class,int.class,String.class);
+                int caseIndex=0;
                 for(var value:fixture.getAsJsonArray("cases")) {
                     var row=value.getAsJsonObject();
                     for(int memo=0;memo<2;memo++)for(int diagnostic=0;diagnostic<3;diagnostic++) {
@@ -38,15 +40,20 @@ public class NestedMixedValueConformanceTest extends PreferredAstConformanceTest
                         try{actual=method.invoke(null,input(row),row.has("stage")?row.get("stage").getAsString():"ok",memo,diagnostic,fixture.get("valid").getAsString());}
                         catch(java.lang.reflect.InvocationTargetException e){throw new AssertionError(fixture.get("name")+" "+row+" mode "+memo+"/"+diagnostic,e.getCause());}
                         assertEquals(fixture.get("name")+" "+row,row.get("expected"),actual);
+                        report.add(fixture.get("name").getAsString()+"\t"+caseIndex+"\t"+memo+"\t"+diagnostic+"\t"+actual);
                     }
+                    caseIndex++;
                 }
             }
         }
+        Files.write(Path.of("target/nested-mixed-java.tsv"),report);
     }
     @Override @Test public void bothHostsSnapshots()throws Exception {
         if(!Boolean.getBoolean("rustConformance"))System.out.println("[assumption] NestedMixedValueConformanceTest requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
         run(List.of("cargo","build","--locked","--manifest-path",repo.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator","-p","unlaxer-dap","-p","unlaxer-runtime"),"",false,true);
+        var reports=new LinkedHashMap<String,List<String>>();
+        for(String host:List.of("java","native"))reports.put(host,new ArrayList<>(List.of("fixture\tcase\tmemo\tdiagnostics\tactual")));
         Path target=repo.resolve("rust/target/debug"),generator=target.resolve("unlaxer");
         for(var raw:corpus()) {
             var fixture=raw.getAsJsonObject();var grammar=UBNFMapper.parse(fixture.get("grammar").getAsString()).grammars().get(0);
@@ -61,12 +68,19 @@ public class NestedMixedValueConformanceTest extends PreferredAstConformanceTest
                 Files.writeString(dir.resolve("main.rs"),template(fixture,true));
                 Path executable=dir.resolve("probe");
                 run(List.of("rustc","--edition=2021",dir.resolve("main.rs").toString(),"-L","dependency="+target.resolve("deps"),"--extern","unlaxer_runtime="+target.resolve("libunlaxer_runtime.rlib"),"--extern","unlaxer_dap="+target.resolve("libunlaxer_dap.rlib"),"-o",executable.toString()),"",false,true);
+                int caseIndex=0;
                 for(var value:fixture.getAsJsonArray("cases")) {
                     var row=value.getAsJsonObject();var lines=run(List.of(executable.toString(),"--stdin",row.has("stage")?row.get("stage").getAsString():"ok",fixture.get("valid").getAsString()),input(row),true,true).lines().toList();
-                    assertEquals(6,lines.size());for(String line:lines)assertEquals(fixture.get("name")+"/"+host+"/"+row,row.get("expected"),JsonParser.parseString(line));
+                    assertEquals(6,lines.size());
+                    for(int mode=0;mode<lines.size();mode++){
+                        String line=lines.get(mode);assertEquals(fixture.get("name")+"/"+host+"/"+row,row.get("expected"),JsonParser.parseString(line));
+                        reports.get(host).add(fixture.get("name").getAsString()+"\t"+caseIndex+"\t"+(mode/3)+"\t"+(mode%3)+"\t"+line);
+                    }
+                    caseIndex++;
                 }
             }
         }
+        for(var report:reports.entrySet())Files.write(Path.of("target/nested-mixed-rust-"+report.getKey()+".tsv"),report.getValue());
     }
     @Test public void schemasDescribeSumVariantsAndRecursiveChanges()throws Exception {
         assumeTrue(Boolean.getBoolean("rustConformance"));
@@ -106,6 +120,77 @@ public class NestedMixedValueConformanceTest extends PreferredAstConformanceTest
             assertTrue(row+nativeError,nativeError.contains("E-NESTED-SHAPE"));
             assertTrue(row+nativeError,nativeError.contains("at CP "+span.start()+".."+span.end()));assertFalse(Files.exists(output));
         }
+    }
+    @Test public void mixedMaterializationRespectsRequestedTextBudget()throws Exception {
+        assumeTrue("enable with -DrustConformance=true",Boolean.getBoolean("rustConformance"));
+        var fixture=corpus().get(0).getAsJsonObject();
+        var grammar=UBNFMapper.parse(fixture.get("grammar").getAsString()).grammars().get(0);
+        var cases=JsonParser.parseString(Files.readString(fixtures.resolve("text-budget.json"))).getAsJsonArray();
+        var report=new ArrayList<String>(List.of("host\tcase\tbudget\tactual\treuse"));
+        Path reportPath=Path.of("target/nested-mixed-text-budget.tsv");
+        run(List.of("cargo","build","--locked","--manifest-path",repo.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator","-p","unlaxer-runtime"),"",false,true);
+        Path target=repo.resolve("rust/target/debug");
+        var files=new RustBackend().generate(grammar);
+        for(String host:List.of("java","native")){
+            Path dir=temporary.newFolder().toPath(),generated=dir.resolve("generated"),input=dir.resolve("grammar.ubnf");
+            Files.writeString(input,fixture.get("grammar").getAsString());
+            if(host.equals("native")){
+                run(List.of(nativeGenerator(),"generate","--grammar",input.toString(),"--output",generated.toString()),"",true,true);
+                for(var file:files)assertEquals(file.relativePath(),file.content(),Files.readString(generated.resolve(file.relativePath())));
+            }else for(var file:files){Files.createDirectories(generated);Files.writeString(generated.resolve(file.relativePath()),file.content());}
+            Path mapper=generated.resolve("mapper.rs");String source=Files.readString(mapper);
+            String anchor="    tree.ensure_mappable(tree.root)?;";
+            assertTrue(source.contains(anchor));
+            // Consume prior allowance through the real guard; production limits and runtime stay unchanged.
+            source=source.replace(anchor,"    tree.charge_text_bytes(unlaxer_runtime::mapping::MAX_TEXT_BYTES - std::env::var(\"NESTED_MIXED_TEXT_BUDGET\").unwrap().parse::<usize>().unwrap())?;\n"+anchor);
+            Files.writeString(mapper,source);
+            Files.writeString(dir.resolve("main.rs"),"""
+                #![allow(dead_code,unused_imports)]
+                mod generated;
+                fn main(){let args=std::env::args().collect::<Vec<_>>();
+                    std::env::set_var("NESTED_MIXED_TEXT_BUDGET",&args[1]);
+                    let tree=generated::parser::parse_tree(&args[2]).unwrap();
+                    let result=generated::mapper::map(&tree);
+                    let status=match result {Ok(_)=>"ok",Err(error)=>{assert!(error.contains("E-MAPPING-LIMIT: requested text"),"{error}");"limit"}};
+                    let good=generated::parser::parse_tree("[]").unwrap();assert!(generated::mapper::map(&good).is_ok());
+                    println!("{status}");
+                }
+                """);
+            Path exe=dir.resolve("probe");
+            run(List.of("rustc","--edition=2021",dir.resolve("main.rs").toString(),"-L","dependency="+target.resolve("deps"),"--extern","unlaxer_runtime="+target.resolve("libunlaxer_runtime.rlib"),"-o",exe.toString()),"",false,true);
+            for(var raw:cases){var row=raw.getAsJsonObject();String actual=run(List.of(exe.toString(),row.get("budget").getAsString(),row.get("input").getAsString()),"",true,true).trim();
+                report.add("rust-"+host+"\t"+row.get("name").getAsString()+"\t"+row.get("budget")+"\t"+actual+"\tok");Files.write(reportPath,report);
+                assertEquals(host+" "+row,row.get("expected").getAsString(),actual);
+            }
+        }
+        var units=new ArrayList<JavaFileObject>();
+        for(CodeGenerator generator:List.of(new ParserGenerator(),new ASTGenerator(),new MapperGenerator())){
+            var file=generator.generate(grammar);String source=file.source();
+            if(generator instanceof MapperGenerator){
+                String anchor="MAPPING_GUARD = org.unlaxer.mapper.MappingGuard.prepare(token);";
+                assertTrue(source.contains(anchor));
+                source=source.replace(anchor,anchor+"\n                    MAPPING_GUARD.chargeTextBytes(org.unlaxer.mapper.MappingGuard.MAX_TEXT_BYTES - Long.getLong(\"nestedMixedTextBudget\"));");
+            }
+            units.add(unit(file.packageName()+"."+file.className(),source));
+        }
+        Path classes=temporary.newFolder().toPath();var compiler=ToolProvider.getSystemJavaCompiler();var diagnostics=new DiagnosticCollector<JavaFileObject>();
+        try(var manager=compiler.getStandardFileManager(diagnostics,null,null)){
+            boolean compiled=compiler.getTask(null,manager,diagnostics,List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",classes.toString()),null,units).call();
+            assertTrue(diagnostics.getDiagnostics().toString(),compiled);
+        }
+        var mismatches=new ArrayList<String>();
+        String prior=System.getProperty("nestedMixedTextBudget");
+        try(var loader=new URLClassLoader(new URL[]{classes.toUri().toURL()},getClass().getClassLoader())){
+            var parse=loader.loadClass("nestedmixed.NestedMixedMapper").getMethod("parse",String.class);
+            for(var raw:cases){var row=raw.getAsJsonObject();System.setProperty("nestedMixedTextBudget",row.get("budget").getAsString());String actual;
+                try{assertNotNull(parse.invoke(null,row.get("input").getAsString()));actual="ok";}
+                catch(java.lang.reflect.InvocationTargetException failure){assertTrue(failure.getCause().toString(),failure.getCause() instanceof IllegalArgumentException && failure.getCause().getMessage().contains("E-MAPPING-LIMIT: requested text"));actual="limit";}
+                assertNotNull(parse.invoke(null,"[]"));
+                report.add("java\t"+row.get("name").getAsString()+"\t"+row.get("budget")+"\t"+actual+"\tok");Files.write(reportPath,report);
+                if(!row.get("expected").getAsString().equals(actual))mismatches.add(row+" actual="+actual);
+            }
+            assertTrue(mismatches.toString(),mismatches.isEmpty());
+        }finally{if(prior==null)System.clearProperty("nestedMixedTextBudget");else System.setProperty("nestedMixedTextBudget",prior);}
     }
     private String nativeGenerator(){return repo.resolve("rust/target/debug/unlaxer").toString();}
     private void buildNative()throws Exception {run(List.of("cargo","build","--locked","--manifest-path",repo.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator"),"",false,true);}

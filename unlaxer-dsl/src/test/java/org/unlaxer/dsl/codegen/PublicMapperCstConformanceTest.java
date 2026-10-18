@@ -54,6 +54,7 @@ public class PublicMapperCstConformanceTest extends PreferredAstConformanceTest 
             for(int i=0;i<ids.length;i++)ids[i]=fixture.getAsJsonArray("cases").get(i).getAsJsonObject().get("id").getAsString();
             var actual=loader.loadClass("guardprobe.JavaProbe").getMethod("run",String.class,String[].class).invoke(null,fixture.get("input").getAsString(),ids);
             assertEquals(expected(fixture, true),actual);
+            Files.write(Path.of("target/public-mapper-cst-java.tsv"), (List<String>) actual);
         }
     }
     @Override @Test public void bothHostsSnapshots() throws Exception {
@@ -82,8 +83,53 @@ public class PublicMapperCstConformanceTest extends PreferredAstConformanceTest 
             Path probe=dir.resolve("probe.rs"), exe=dir.resolve("probe");
             Files.writeString(probe,probe(fixture,"rust-probe.rs",true));
             run(List.of("rustc","--edition=2021",probe.toString(),"--extern","unlaxer_runtime="+runtime,"-o",exe.toString()),"",false,true);
-            assertEquals(host,expected(fixture, false),run(List.of(exe.toString()),"",true,true).lines().toList());
+            var actual=run(List.of(exe.toString()),"",true,true).lines().toList();
+            assertEquals(host,expected(fixture, false),actual);
+            Files.write(Path.of("target/public-mapper-cst-rust-"+host+".tsv"),actual);
         }
+    }
+    @Test public void compositionShapesAndResourcePathsMatchBothHosts() throws Exception {
+        assumeTrue("enable with -DrustConformance=true",Boolean.getBoolean("rustConformance"));
+        var cases=JsonParser.parseString(Files.readString(corpusDir().resolve("composition-cases.json"))).getAsJsonArray();
+        Path workspace=temporary.newFolder().toPath(),runtime=workspace.resolve("libunlaxer_runtime.rlib");
+        run(List.of("rustc","--edition=2021","--crate-type=rlib","--crate-name=unlaxer_runtime",root.resolve("rust/unlaxer-runtime/src/lib.rs").toString(),"-o",runtime.toString()),"",false,true);
+        run(List.of("cargo","build","--locked","--manifest-path",root.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator"),"",false,true);
+        var report=new ArrayList<String>(List.of("fixture\thost\tentry\trejected\tvalue"));
+        for(var raw:cases){
+            var row=raw.getAsJsonObject();String name=row.get("name").getAsString(),input=row.get("input").getAsString(),expected=row.get("expected").toString(),kind=row.get("kind").getAsString();
+            var grammar=UBNFMapper.parse(row.get("grammar").getAsString()).grammars().get(0);
+            Path dir=Files.createDirectory(workspace.resolve(name)),classes=Files.createDirectory(dir.resolve("classes"));
+            var units=new ArrayList<JavaFileObject>();
+            for(CodeGenerator generator:List.of(new ParserGenerator(),new ASTGenerator(),new MapperGenerator())){
+                var file=generator.generate(grammar);units.add(unit(file.packageName()+"."+file.className(),file.source()));
+            }
+            units.add(unit("guardcomposition.CompositionProbe",Files.readString(corpusDir().resolve("CompositionProbe.java"))));
+            var compiler=ToolProvider.getSystemJavaCompiler();var diagnostics=new DiagnosticCollector<JavaFileObject>();
+            try(var manager=compiler.getStandardFileManager(diagnostics,Locale.ROOT,StandardCharsets.UTF_8)){
+                boolean compiled=compiler.getTask(null,manager,diagnostics,List.of("--release","21","-classpath",System.getProperty("java.class.path"),"-d",classes.toString()),null,units).call();
+                assertTrue(name+" "+diagnostics.getDiagnostics(),compiled);
+            }
+            List<String> javaRows;
+            try(var loader=new URLClassLoader(new URL[]{classes.toUri().toURL()},getClass().getClassLoader())){
+                @SuppressWarnings("unchecked") var actual=(List<String>)loader.loadClass("guardcomposition.CompositionProbe").getMethod("run",String.class,String.class,String.class).invoke(null,input,expected,kind);
+                javaRows=actual;
+            }
+            assertEquals(name,6,javaRows.size());for(String value:javaRows)report.add(name+"\tjava\t"+value);
+            Path grammarFile=dir.resolve("grammar.ubnf");Files.writeString(grammarFile,row.get("grammar").getAsString());
+            for(String host:List.of("java","native")){
+                Path generated=Files.createDirectory(dir.resolve(host));
+                if(host.equals("native"))run(List.of(root.resolve("rust/target/debug/unlaxer").toString(),"generate","--grammar",grammarFile.toString(),"--output",generated.toString()),"",true,true);
+                for(var file:new RustBackend().generate(grammar)){
+                    if(host.equals("native"))assertEquals(name+" "+file.relativePath(),file.content(),Files.readString(generated.resolve(file.relativePath())));
+                    else Files.writeString(generated.resolve(file.relativePath()),file.content());
+                }
+                Path main=dir.resolve(host+"-main.rs"),exe=dir.resolve(host+"-probe");Files.writeString(main,Files.readString(corpusDir().resolve("composition-probe.rs")).replace("__MODULE__",host));
+                run(List.of("rustc","--edition=2021","--crate-name",host+"_composition","--extern","unlaxer_runtime="+runtime,main.toString(),"-o",exe.toString()),"",false,true);
+                var actual=run(List.of(exe.toString(),input,expected,kind),"",true,true).lines().toList();assertEquals(name+" "+host,javaRows,actual);
+                for(String value:actual)report.add(name+"\trust-"+host+"\t"+value);
+            }
+        }
+        assertEquals(163,report.size());Files.write(Path.of("target/public-mapper-composition.tsv"),report);
     }
     private String probe(JsonObject fixture,String file,boolean rust) throws Exception {
         var span=fixture.getAsJsonArray("rootSpan");
