@@ -189,6 +189,14 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
                 if !captures.contains(&value.name) {
                     return Err(fail("E-TYPEOF-UNKNOWN-CAPTURE: undeclared capture"));
                 }
+                if value.kind == Kind::NullableNode
+                    && !rule
+                        .mapping
+                        .as_ref()
+                        .is_some_and(|m| m.fields.contains(value))
+                {
+                    return Err(fail("E-ASSOC: NullableNode constraint requires the bound associative left field"));
+                }
                 if let Kind::Enum(name) = &value.kind {
                     if !enum_names.contains(name.as_str()) {
                         return Err(fail("E-TYPEOF: unknown enum value type"));
@@ -206,6 +214,39 @@ pub(super) fn validate(ir: &GrammarIr) -> Result<(), GenerateError> {
         }
         if let Some(mapping) = &rule.mapping {
             identifier(&mapping.name)?;
+            if mapping
+                .fields
+                .iter()
+                .any(|field| field.kind == Kind::NullableNode)
+            {
+                let expected = vec![
+                    Field {
+                        name: "left".into(),
+                        kind: Kind::NullableNode,
+                        cardinality: Cardinality::One,
+                    },
+                    Field {
+                        name: "op".into(),
+                        kind: Kind::Text,
+                        cardinality: Cardinality::Many,
+                    },
+                    Field {
+                        name: "right".into(),
+                        kind: Kind::Node,
+                        cardinality: Cardinality::Many,
+                    },
+                ];
+                if mapping.fields != expected
+                    || !rule.operator.is_some_and(|op| {
+                        matches!(op.associativity, Associativity::Left | Associativity::Right)
+                    })
+                {
+                    return Err(fail(
+                        "E-ASSOC: NullableNode requires an associative literal spine",
+                    ));
+                }
+            }
+
             if enum_names.contains(mapping.name.as_str()) {
                 return Err(fail("E-ENUM: enum type name collision"));
             }

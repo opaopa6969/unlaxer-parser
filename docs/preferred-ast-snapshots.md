@@ -53,7 +53,7 @@ Rust の `MappingLimits` は候補数を既定 4096、展開作業量を 1,000,0
 
 ## 未完の範囲
 
-#547 全体をこの機能だけで完了とはしません。associative mapping、および特殊 lowering で UBNF call site と IR の参照が一対一対応しない構造は #593（親 #569）の対象です。その場合、通常の生成・解析 API は保持し、`mapping_grammar()` は `None`、preferred 解析入口は明示エラーを返します。通常 mapper の [recursive transparent helper](recursive-helpers.md) 投影は対応済みです。nested container などの残差は #568 で継続します。preferred snapshot の適用範囲は上記の source call site と IR の対応制約に従います。公開低水準 IR には Java の source wrapper 情報がないため、IR 単独の `unlaxer-codegen::generate` にはこの source 由来 API を追加しません。
+#547 全体をこの機能だけで完了とはしません。associative mapping の literal leaf・mixed operand・右結合候補深さは [結合演算子の投影](associative-projection.md) の契約で対応します。通常 mapper の [recursive transparent helper](recursive-helpers.md) 投影も対応済みです。nested container などの残差は #568 で継続します。preferred snapshot の適用範囲は上記の source call site と IR の対応制約に従います。公開低水準 IR には Java の source wrapper 情報がないため、IR 単独の `unlaxer-codegen::generate` にはこの source 由来 API を追加しません。
 
 ## 共通検証
 

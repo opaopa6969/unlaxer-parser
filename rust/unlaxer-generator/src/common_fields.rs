@@ -321,7 +321,21 @@ pub(crate) fn emit(grammar: &GrammarDecl, ir: &GrammarIr) -> Result<String, Stri
                         invalid(&family.rule, &format!("missing field {name} on {variant}"))
                     })?;
                 // Value is the normalized mixed contract; its source alternatives need not be nominally identical.
-                if !matches!(actual.kind, Kind::Enum(_) | Kind::Value) {
+                let spine = lowered_mapping
+                    .fields
+                    .iter()
+                    .any(|f| f.kind == Kind::NullableNode);
+                if spine && matches!(name.as_str(), "left" | "right") {
+                    let actual =
+                        HashSet::from([crate::associative_spines::nominal(grammar, variant)?]);
+                    if nominal.as_ref().is_some_and(|previous| previous != &actual) {
+                        return Err(invalid(
+                            &family.rule,
+                            &format!("incompatible field {name} on {variant}"),
+                        ));
+                    }
+                    nominal = Some(actual);
+                } else if !matches!(actual.kind, Kind::Enum(_) | Kind::Value) {
                     for rule in grammar
                         .rules
                         .iter()

@@ -303,7 +303,7 @@ public class RustBackendTest {
             """;
         var ir = RustGrammarLowering.lower(UBNFMapper.parse(source).grammars().get(0));
         assertEquals(ir.rules().get(1).mapping(), ir.rules().get(2).mapping());
-        assertEquals(List.of(GrammarIR.Kind.VALUE, GrammarIR.Kind.TEXT, GrammarIR.Kind.VALUE),
+        assertEquals(List.of(GrammarIR.Kind.NULLABLE_NODE, GrammarIR.Kind.TEXT, GrammarIR.Kind.NODE),
             ir.rules().get(1).mapping().fields().stream().map(GrammarIR.Field::kind).toList());
         reject(source.replace("'a' @right", "Leaf @right"), "@leftAssoc requires");
         reject(source.replace("Leaf @left", "[Leaf] @left"), "@leftAssoc requires");

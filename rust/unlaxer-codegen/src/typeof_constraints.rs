@@ -28,9 +28,10 @@ pub(super) fn helpers(ir: &GrammarIr) -> String {
         .iter()
         .any(|field| field.kind == Kind::Value && field.cardinality == Cardinality::One);
     let nodes = values
-        || fields
-            .iter()
-            .any(|field| field.kind == Kind::Node && field.cardinality == Cardinality::One);
+        || fields.iter().any(|field| {
+            matches!(field.kind, Kind::Node | Kind::NullableNode)
+                && field.cardinality == Cardinality::One
+        });
     let mut out = String::new();
     if nodes {
         out.push_str("\nfn typeof_node(value: &Ast) -> &'static str {\n    match value {\n");
@@ -75,17 +76,22 @@ pub(super) fn rule(ir: &GrammarIr, id: usize) -> String {
     }
     for (index, field) in fields.iter().enumerate() {
         writeln!(out,"    let _value_{index} = {{\n        let mut values = Vec::new();\n        for capture in node.captures.iter().filter(|capture| capture.name == {}) {{",quote(&field.name)).unwrap();
-        match &field.kind {
+        if let Some(code) = associative::capture(rule.mapping.as_ref(), field, "            ") {
+            out.push_str(&code);
+        } else {
+            match &field.kind {
             Kind::Enum(name) => {
                 let enum_id=ir.rules.iter().position(|rule|&rule.name==name).unwrap();
                 writeln!(out,"            values.extend(map_enum_{enum_id}(tree, &capture.nodes)?);").unwrap();
             }
+            Kind::NullableNode => unreachable!("validated associative projection"),
             Kind::Node if rule.mapping.is_none() => out.push_str("            if !capture.nodes.is_empty() { values.extend(projected.iter().cloned()); }\n"),
             Kind::Node => out.push_str("            values.extend(map_nodes(tree, &capture.nodes)?);\n"),
             Kind::Value => out.push_str("            values.extend(map_values(tree, &capture.nodes)?);\n"),
             Kind::Integer => out.push_str("            values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n"),
             Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => out.push_str("            values.push(tree.text(capture.span).to_owned());\n"),
             Kind::Text => out.push_str("            values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n"),
+        }
         }
         let value = mapped_value(field);
         writeln!(out, "        }}\n        {value}\n    }};").unwrap();
@@ -143,6 +149,7 @@ fn type_expression(field: &Field, index: usize) -> String {
             Kind::Text => "\"String\"".into(),
             Kind::Enum(name) => quote(&format!("enum::{name}")),
             Kind::Node => format!("typeof_node(&_value_{index})"),
+            Kind::NullableNode => format!("typeof_node(_value_{index}.as_deref().ok_or(\"missing associative left operand\")?)"),
             Kind::Value => format!("typeof_value(&_value_{index})"),
         },
     }

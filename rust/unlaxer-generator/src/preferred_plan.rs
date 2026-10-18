@@ -313,7 +313,21 @@ pub(crate) fn calls(g: &GrammarDecl) -> Vec<Vec<(usize, usize)>> {
                 p.semantic_body(&r.body)
             }
             let mut out = vec![];
-            p.body(&r.body, 0, &mut out);
+            if r.annotations
+                .iter()
+                .any(|a| matches!(a.kind, AnnotationKind::RightAssoc))
+            {
+                let seq = &r.body.alternatives[0];
+                let ElementKind::Repeat(tail) = &seq.elements[1].element.kind else {
+                    unreachable!("validated right associative source");
+                };
+                p.atom(&seq.elements[0].element, 2, &mut out);
+                p.atom(&tail.alternatives[0].elements[0].element, 2, &mut out);
+                p.atom(&tail.alternatives[0].elements[1].element, 2, &mut out);
+                p.atom(&seq.elements[0].element, 1, &mut out);
+            } else {
+                p.body(&r.body, 0, &mut out);
+            }
             out
         })
         .collect()

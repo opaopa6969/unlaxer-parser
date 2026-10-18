@@ -42,7 +42,8 @@ final class RustEvalEmitter {
                     require(mapping,"op",Kind.TEXT,Cardinality.MANY);
                     if (left.cardinality()!=Cardinality.ONE || right.cardinality()!=Cardinality.MANY)
                         throw new IllegalArgumentException("E-EVAL: binary operands require scalar left and list right on " + mapping.name());
-                    body = "assert_eq!(r#op.len(), r#right.len(), \"binary operator/operand count mismatch\");\n        let mut current = " + operand(ir,left,"r#left") + ";\n        if self.is_failure(&current) { return current; }\n        for (op, right) in r#op.iter().zip(r#right) {\n            let next = " + operand(ir,new Field("right",right.kind(),Cardinality.ONE,right.enumName()),"right") + ";\n            if self.is_failure(&next) { return next; }\n            current = self.apply_binary(op, current, next);\n            if self.is_failure(&current) { return current; }\n        }\n        current";
+                    String leaf = left.kind()==Kind.NULLABLE_NODE ? "let Some(r#left) = r#left else { assert_eq!(r#op.len(), 1, \"invalid associative literal leaf\"); assert!(r#right.is_empty(), \"invalid associative literal leaf\"); return self.evaluate_literal(&r#op[0]); };\n        " : "";
+                    body = leaf + "assert_eq!(r#op.len(), r#right.len(), \"binary operator/operand count mismatch\");\n        let mut current = " + operand(ir,left,"r#left") + ";\n        if self.is_failure(&current) { return current; }\n        for (op, right) in r#op.iter().zip(r#right) {\n            let next = " + operand(ir,new Field("right",right.kind(),Cardinality.ONE,right.enumName()),"right") + ";\n            if self.is_failure(&next) { return next; }\n            current = self.apply_binary(op, current, next);\n            if self.is_failure(&current) { return current; }\n        }\n        current";
                 }
                 default -> throw new AssertionError();
             }
@@ -94,13 +95,14 @@ final class RustEvalEmitter {
             case TEXT -> "EvalValue::Text("+expression+")";
             case INTEGER -> "EvalValue::Integer(*"+expression+")";
             case NODE -> "EvalValue::Node("+expression+")";
+            case NULLABLE_NODE -> throw new IllegalArgumentException("nullable node only permitted as associative left");
             case ENUM -> "EvalValue::Enum { name: "+RustBackend.quote(field.enumName())+", text: "+expression+".text() }";
             case VALUE -> "eval_value("+expression+")";
         };
     }
     private static String operand(GrammarIR ir, Field field, String expression) {
         return switch(field.kind()) {
-            case NODE -> "evaluate("+expression+", self)";
+            case NODE, NULLABLE_NODE -> "evaluate("+expression+", self)";
             case TEXT -> "self.evaluate_literal("+expression+")";
             case INTEGER -> "self.evaluate_literal(&"+expression+".to_string())";
             case ENUM -> "self.evaluate_literal(&format!(\"{:?}\", "+expression+"))";
