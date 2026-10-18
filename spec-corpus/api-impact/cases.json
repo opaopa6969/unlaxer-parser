@@ -69,14 +69,17 @@
     "javaChanges": [
       "FIELD_TYPE_CHANGED:Value.value"
     ],
-    "rustChanges": [],
+    "rustChanges": [
+      "FIELD_TYPE_CHANGED:Value.value",
+      "METHOD_SIGNATURE_CHANGED:eval_value"
+    ],
     "legacySemantics": {
       "java": true,
-      "rust": true
+      "rust": false
     },
     "legacyConsumer": {
       "java": false,
-      "rust": true
+      "rust": false
     },
     "node": "Value",
     "consumer": "field"
@@ -212,7 +215,7 @@
     ],
     "legacySemantics": {
       "java": true,
-      "rust": true
+      "rust": false
     },
     "legacyConsumer": {
       "java": false,

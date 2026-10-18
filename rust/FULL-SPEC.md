@@ -28,7 +28,8 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 | 機能群 | 現状 | 追加の受け入れ条件 |
 |---|---|---|
 | literal enum | Java/Rust両hostで型付きscalar/optional/listとroot wrapperを生成（#537） | [契約・命名移行・出現位置](../docs/enum-values.md)。24文法56入力を6設定で実compile/map/evalし、34負例・生成物/impact一致・exhaustive consumer破壊を検証。enum/Text/Node混在とshared mapping、rootとの併用も対応（#539）。追加9文法116入力×6設定で型・値・出現span・DAP AST stepsを確認。typeof混在制約のRust対応は#542 |
-| typed common fields | `@commonField`を両hostで検証・生成（#541）。Javaは実field型のinterface accessor、Rustはfamily所属を表すborrowed view。flat/dotted/中間sumとmixed enum/Text/Nodeをscalar/optional/listで対応 | [契約](../docs/common-fields.md)。10文法30入力・13負例で実compile/eval、CP位置、生成物/API schema一致。数値変換・preferred type・nested containerは#547 |
+| typed common fields | `@commonField`を両hostで検証・生成（#541）。Javaは実field型のinterface accessor、Rustはfamily所属を表すborrowed view。flat/dotted/中間sumとmixed enum/Text/Nodeをscalar/optional/listで対応 | [契約](../docs/common-fields.md)。10文法30入力・13負例で実compile/eval、CP位置、生成物/API schema一致。preferred type・nested containerは#547 |
+| numeric captures | Javaの既存int契約へRust i32/Option<i32>/Vec<i32>とchecked mappingを統一（#566）。NumberParser/DigitParserの純numeric fieldを対象とし、混合値やtext aliasは変更しない | [契約](../docs/numeric-captures.md)。8文法48入力・実compile/map/eval・上下限/overflow/非整数/CP位置を共有検証。preferred/nested/familyの残差は#567/#568/#569 |
 | Classic LSP構文診断 | Java/Rustで未消費末尾と最遠構文失敗を比較して表示位置を選択（#552） | [表示契約](../docs/classic-lsp-diagnostics.md)。TinyCalc共通20ケースを両生成サーバーの実stdioで検証。UTF-16範囲・offset・必要literalを比較し、public parser primary/farthestと資源失敗は保持。候補全体の表示文言はbackend固有 |
 | Java UBNF frontend → Rust generator | 限定範囲で生成済み。隣接参照の識別子境界 #131、annotation境界・eval既定値・commonField trivia #538 を修正。構文の一致とbackend対応を区別 | 全構文・annotationのpositive/negative fixture、未対応の明示拒否、再生成一致 |
 | UBNF source snapshot | Java `parseWithSource` / Rust `parse_with_source`。同じparseのowned AST・元入力・code-point位置、capture/typeofの範囲を保持（#318） | [契約と検証](../docs/ubnf-source-snapshot.md)。LF/CRLFの共通corpusで全ノードの位置・元textを比較。import展開後の複数ファイル由来は未対応 |
@@ -145,7 +146,7 @@ Java選択テストの成功だけを今回の実行証拠とする。Java全sui
 
 ## 完了の扱いと順序
 
-公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。int変換とRustの字句保持の差は共有corpusで固定し、数値意味論のbackend間統一と外側captureの入れ子container型は未完了事項とする。下流の実装済み評価器・rustcodeblockはその契約とcorpusを利用し、Classic側の未対応と製品側の残る境界を別々に進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
+公開context/combinator、optional/repeatとtyped ASTを基盤として、次はtoken/annotationとcapture互換性を拡げる。追加実験で見つけたJava numeric capture #115とcapture選択 #116の生成コードは修正した。直接numeric captureのchecked int/i32変換は#566で統一し、外側captureの入れ子container型やpreferred AST選択は#547で継続する。下流の実装済み評価器・rustcodeblockはその契約とcorpusを利用し、Classic側の未対応と製品側の残る境界を別々に進める。各行を小さなPRに分け、テスト・CI・merge・子issue closeまで行う。全体issueは未対応行を残したままcloseしない。
 
 Javaの継承階層を一対一に移植するのではなく、文法と観測可能な振る舞いを対象とする。JVM任意オブジェクト・reflection・bytecodeのnative直接実行はできないため、Rust側のhost interfaceと移植コードの境界を明記する。差を消して比較を通したことにせず、意図的な差は独立したfixtureにする。
 

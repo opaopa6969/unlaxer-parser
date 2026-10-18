@@ -91,7 +91,7 @@
     "name": "Numeric",
     "grammar": "grammar Numeric {\n @package: commonprobe\n token NUMBER = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' NUMBER @value;\n @mapping(B,params=[value]) B ::= 'b' NUMBER @value;\n}",
     "java": "return Integer.toString((int)node.value()+1);",
-    "rust": "(view.value.parse::<i32>().unwrap()+1).to_string()",
+    "rust": "(view.value+1).to_string()",
     "cases": [
       [
         "a12",
