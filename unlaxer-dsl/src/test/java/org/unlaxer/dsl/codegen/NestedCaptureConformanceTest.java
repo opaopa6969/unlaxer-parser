@@ -77,6 +77,7 @@ public class NestedCaptureConformanceTest {
             corpusPath()))).getAsJsonArray();
         var report = new ArrayList<>(List.of(
             "fixture\tcase\tinput_json\texpected_ast\tjava_ast\texpected_captures\trust_captures\texpected_declarations\tjava_declarations\trust\tjava_field_types\trust_field_type_constraints\texpected_value_spans\tjava_value_spans\tjava_retained_value_spans"));
+        var nativeReport = new ArrayList<>(List.of("fixture\tcase\tinput_json\trust"));
         int fixtureIndex = 0;
         for (JsonElement fixtureElement : corpus) {
             JsonObject fixture = fixtureElement.getAsJsonObject();
@@ -107,6 +108,14 @@ public class NestedCaptureConformanceTest {
                 "unlaxer_runtime=" + runtime, fixtureDir.resolve("main.rs").toString(), "-o",
                 fixtureDir.resolve("probe").toString()), "", false));
 
+            String nativeProbe = rustProbe(fixture);
+            assertEquals(name + " native probe module binding", 1, nativeProbe.split("mod generated;", -1).length - 1);
+            Files.writeString(fixtureDir.resolve("main_native.rs"), nativeProbe.replace(
+                "mod generated;", "#[path = \"native-generated/mod.rs\"] mod generated;"));
+            success(run(List.of("rustc", "--edition=2021", "--extern",
+                "unlaxer_runtime=" + runtime, fixtureDir.resolve("main_native.rs").toString(), "-o",
+                fixtureDir.resolve("probe-native").toString()), "", false));
+
             JsonArray cases = fixture.getAsJsonArray("cases");
             String framed = String.join("\n", cases.asList().stream().map(element -> HexFormat.of()
                 .formatHex(element.getAsJsonObject().get("input").getAsString()
@@ -115,6 +124,10 @@ public class NestedCaptureConformanceTest {
             success(rustResult);
             List<String> rustLines = rustResult.output().lines().toList();
             assertEquals(name + " Rust result count", cases.size(), rustLines.size());
+            ProcessResult nativeRustResult = run(List.of(fixtureDir.resolve("probe-native").toString()), framed, false);
+            success(nativeRustResult);
+            List<String> nativeRustLines = nativeRustResult.output().lines().toList();
+            assertEquals(name + " native Rust result count", cases.size(), nativeRustLines.size());
 
             try (URLClassLoader loader = compileJava(grammar)) {
                 JsonObject javaFieldTypes = assertJavaFieldTypes(name, fixture.getAsJsonObject("javaFieldTypes"), grammar, loader);
@@ -126,6 +139,9 @@ public class NestedCaptureConformanceTest {
                     String input = row.get("input").getAsString();
                     String context = name + "/" + row.get("id").getAsString();
                     JsonObject rust = JsonParser.parseString(rustLines.get(i)).getAsJsonObject();
+                    JsonObject nativeRust = JsonParser.parseString(nativeRustLines.get(i)).getAsJsonObject();
+                    assertEquals(context + " native Rust AST contract", row.get("ast"), nativeRust.get("ast"));
+                    assertEquals(context + " native Rust capture text/code-point spans", row.get("captures"), nativeRust.get("captures"));
 
                     Optional<?> diagnostic =
                         (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
@@ -137,6 +153,7 @@ public class NestedCaptureConformanceTest {
                         ? row.get("valueSpans") : new JsonArray();
                     assertEquals(context + " Rust owned mixed-value spans after Tree drop",
                         expectedValueSpans, rust.get("valueSpans"));
+                    assertEquals(context + " native Rust owned mixed-value spans after Tree drop", expectedValueSpans, nativeRust.get("valueSpans"));
                     Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
                     Object ast = mapped.getClass().getMethod("ast").invoke(mapped);
                     observeJava(fixture,row,grammar,loader,ast);
@@ -160,6 +177,9 @@ public class NestedCaptureConformanceTest {
                     assertEquals(context + " Java scope events", expectedDeclarations, javaDeclarations);
                     assertEquals(context + " Rust Tree-owned scope events", expectedDeclarations,
                         rust.get("declarations"));
+                    assertEquals(context + " native Rust Tree-owned scope events", expectedDeclarations, nativeRust.get("declarations"));
+                    assertEquals(context + " both generated Rust consumers", rust, nativeRust);
+                    nativeReport.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input") + "\t" + nativeRust);
                     report.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input")
                         + "\t" + row.get("ast") + "\t" + javaAst + "\t" + row.get("captures")
                         + "\t" + rust.get("captures") + "\t" + expectedDeclarations + "\t"
@@ -172,6 +192,7 @@ public class NestedCaptureConformanceTest {
         Path target = Path.of("target");
         Files.createDirectories(target);
         Files.write(target.resolve(reportName()), report, StandardCharsets.UTF_8);
+        Files.write(target.resolve(reportName().replace(".tsv", "-native.tsv")), nativeReport, StandardCharsets.UTF_8);
     }
 
     private JsonArray declarations(Parser parser, String input) throws Exception {
