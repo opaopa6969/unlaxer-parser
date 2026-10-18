@@ -131,6 +131,22 @@ impl FirstSet {
 /// The FIRST set of an expression; `Rule(id)` is looked up in `rules` (the fixed-point table).
 pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
     match expression {
+        Expr::Repeat {
+            min,
+            max: Some(max),
+            ..
+        }
+        | Expr::JavaRepeat {
+            min,
+            max: Some(max),
+            ..
+        } if *max == 0 || *max < *min => {
+            if *min == 0 && *max == 0 {
+                FirstSet::NULLABLE
+            } else {
+                FirstSet::EMPTY
+            }
+        }
         Expr::Literal(text) => text
             .chars()
             .next()
@@ -187,6 +203,8 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::CaptureScope(child)
         | Expr::Capture(_, child)
         | Expr::TextValue(child)
+        | Expr::CaptureBoundary(_, child)
+        | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. } => of(child, rules),
@@ -252,6 +270,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::CustomWith { .. }
         | Expr::Recovery { .. }
         | Expr::Replay(_)
+        | Expr::ZeroMatch(_)
         | Expr::Backreference(_)
         | Expr::NamePredicate { .. }
         | Expr::NameResolutionScope { .. } => FirstSet::UNKNOWN,

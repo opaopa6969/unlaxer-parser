@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.Annotation;
@@ -105,11 +107,18 @@ public final class GrammarValidator {
 
     private static List<ValidationIssue> validate(GrammarDecl grammar, boolean resolveParserClasses) {
         List<ValidationIssue> errors = new ArrayList<>();
+        for (TokenDecl token : grammar.tokens()) {
+            if (org.unlaxer.dsl.bootstrap.RegexRetirement.retired(token)) {
+                errors.add(new ValidationIssue(org.unlaxer.dsl.bootstrap.RegexRetirement.CODE,
+                    org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE, "Use token NAME ::= expression;", token.name()));
+            }
+        }
         try { LeftRecursionAnalysis.requireValid(grammar); }
         catch (IllegalArgumentException error) {
             errors.add(new ValidationIssue(error.getMessage().split(":", 2)[0], error.getMessage(),
                 "Rewrite using repetition or input-consuming right recursion."));
         }
+        errors.addAll(NestedCaptures.problems(grammar));
         validateScalarRanges(grammar, errors);
         errors.addAll(validateCaseInsensitiveTokens(grammar));
 
@@ -153,7 +162,10 @@ public final class GrammarValidator {
         validateUbnfFormat(grammar, errors);
         validateMemoSafeTokens(grammar, errors);
         validateRootPresence(grammar, errors);
-        if (resolveParserClasses) validateTokens(grammar, errors);
+        if (resolveParserClasses) {
+            validateTokens(grammar, errors);
+            errors.addAll(validateJavaTokenBindings(grammar));
+        }
         validateRuleTokenParserNameCollisions(grammar, errors);
         validateAdapterTokenParserNameCollisions(grammar, errors);
         validateBoundedRepeatElements(grammar, errors);
@@ -642,6 +654,56 @@ public final class GrammarValidator {
         }
     }
 
+    /**
+     * Java alias subclasses cannot extend a known final class. This target-specific
+     * probe never initializes classes; absence/linkage restrictions remain deployment
+     * compile concerns. Pure validation and the Rust target do not run this probe.
+     */
+    public static List<ValidationIssue> validateJavaTokenBindings(GrammarDecl grammar) {
+        var registry = TokenAdapterRegistry.build(grammar, null).registry();
+        List<ValidationIssue> issues = new ArrayList<>();
+        for (TokenDecl token : grammar.tokens()) {
+            String className = null;
+            if (token instanceof TokenDecl.Simple simple) className = simple.parserClass();
+            else if (token instanceof TokenDecl.Adapter adapter) {
+                try {
+                    className = registry.find(adapter.id(), Integer.parseInt(adapter.version()))
+                        .map(TokenAdapterRegistry.Descriptor::javaClass).orElse(null);
+                } catch (NumberFormatException invalidVersion) {
+                    continue; // Registry validation reports malformed declarations separately.
+                }
+            }
+            // Short Simple names are used directly; no subclass alias is emitted.
+            if (className == null || !className.contains(".")) continue;
+            Class<?> target = resolveJavaBinding(className);
+            if (target != null && java.lang.reflect.Modifier.isFinal(target.getModifiers())) {
+                issues.add(new ValidationIssue("E-JAVA-TOKEN-FINAL",
+                    "token " + token.name() + " cannot generate a Java alias extending final class " + className,
+                    "Use a public nonfinal Parser with an accessible no-argument constructor for the Java target. Rust bindings are checked separately."));
+            }
+        }
+        return List.copyOf(issues);
+    }
+
+    private static Class<?> resolveJavaBinding(String sourceName) {
+        // Registry declarations use Java source names, including canonical nested names.
+        String binaryName = sourceName;
+        while (true) {
+            try {
+                Class<?> target = Class.forName(binaryName, false, GrammarValidator.class.getClassLoader());
+                // A top-level class may literally contain '$'; it is not that nested source name.
+                if (sourceName.equals(target.getCanonicalName())) return target;
+            } catch (ClassNotFoundException unavailable) {
+                // Try the next canonical member-class boundary below.
+            } catch (LinkageError | SecurityException unavailable) {
+                return null;
+            }
+            int lastDot = binaryName.lastIndexOf('.');
+            if (lastDot < 0) return null;
+            binaryName = binaryName.substring(0, lastDot) + "$" + binaryName.substring(lastDot + 1);
+        }
+    }
+
     private static void validateTokens(GrammarDecl grammar, List<ValidationIssue> errors) {
         Set<String> knownParserPackages = Set.of(
             "org.unlaxer.parser.clang",
@@ -1061,14 +1123,24 @@ public final class GrammarValidator {
         }
     }
 
+    /** Validate repeat definitions even when the repeated child will never execute. */
+    static void requireValidBoundedRepeatElements(GrammarDecl grammar) {
+        var errors = new ArrayList<ValidationIssue>();
+        validateBoundedRepeatElements(grammar, errors);
+        if (!errors.isEmpty()) {
+            var error = errors.get(0);
+            throw new IllegalArgumentException(error.code() + ": " + error.message());
+        }
+    }
+
     private static void validateBoundedRepeatElements(GrammarDecl grammar, List<ValidationIssue> errors) {
         for (RuleDecl rule : grammar.rules()) {
             collectBoundedElements(rule.body()).forEach(bounded -> {
-                if (bounded.max() != UBNFAST.BoundedRepeatElement.UNBOUNDED && bounded.min() > bounded.max()) {
+                if (bounded.min() < 0 || bounded.max() < bounded.min()) {
                     addRuleError(errors, rule.name(),
                         "rule " + rule.name() + " has BoundedRepeatElement with min=" + bounded.min()
-                            + " > max=" + bounded.max(),
-                        "Ensure min <= max in {min,max} quantifier.",
+                            + ", max=" + bounded.max(),
+                        "Ensure 0 <= min <= max in {min,max} quantifier.",
                         "E-BOUNDED-INVALID");
                 }
             });
@@ -1076,32 +1148,35 @@ public final class GrammarValidator {
     }
 
     private static java.util.stream.Stream<UBNFAST.BoundedRepeatElement> collectBoundedElements(UBNFAST.RuleBody body) {
-        if (body instanceof UBNFAST.ChoiceBody choice) {
-            return choice.alternatives().stream()
-                .flatMap(seq -> seq.elements().stream())
-                .flatMap(ae -> collectBoundedFromAtomic(ae.element()));
+        var pending = new java.util.ArrayDeque<UBNFAST>();
+        var bounded = new ArrayList<UBNFAST.BoundedRepeatElement>();
+        pending.push(body);
+        // Iterative traversal also validates nested definitions under dead zero-count bodies.
+        while (!pending.isEmpty()) {
+            UBNFAST current = pending.pop();
+            if (current instanceof UBNFAST.ChoiceBody choice) {
+                var alternatives = choice.alternatives();
+                for (int i = alternatives.size() - 1; i >= 0; i--) pending.push(alternatives.get(i));
+            } else if (current instanceof UBNFAST.SequenceBody sequence) {
+                var elements = sequence.elements();
+                for (int i = elements.size() - 1; i >= 0; i--) pending.push(elements.get(i).element());
+            } else if (current instanceof UBNFAST.BoundedRepeatElement repeat) {
+                bounded.add(repeat);
+                pending.push(repeat.body());
+            } else if (current instanceof UBNFAST.TransparentElement group) {
+                pending.push(group.body());
+            } else if (current instanceof UBNFAST.OptionalElement optional) {
+                pending.push(optional.body());
+            } else if (current instanceof UBNFAST.RepeatElement repeat) {
+                pending.push(repeat.body());
+            } else if (current instanceof UBNFAST.OneOrMoreElement repeat) {
+                pending.push(repeat.body());
+            } else if (current instanceof UBNFAST.SeparatedElement separated) {
+                pending.push(separated.separator());
+                pending.push(separated.element());
+            }
         }
-        if (body instanceof UBNFAST.SequenceBody seq) {
-            return seq.elements().stream()
-                .flatMap(ae -> collectBoundedFromAtomic(ae.element()));
-        }
-        throw new IllegalStateException("unhandled " + body);
-    }
-
-    private static java.util.stream.Stream<UBNFAST.BoundedRepeatElement> collectBoundedFromAtomic(UBNFAST.AtomicElement element) {
-        if (element instanceof UBNFAST.BoundedRepeatElement b) {
-            return java.util.stream.Stream.of(b);
-        }
-        if (element instanceof UBNFAST.GroupElement g) {
-            return collectBoundedElements(g.body());
-        }
-        if (element instanceof UBNFAST.OptionalElement o) {
-            return collectBoundedElements(o.body());
-        }
-        if (element instanceof UBNFAST.RepeatElement r) {
-            return collectBoundedElements(r.body());
-        }
-        return java.util.stream.Stream.empty();
+        return bounded.stream();
     }
 
     private static void addRuleError(
@@ -1174,7 +1249,7 @@ public final class GrammarValidator {
     }
 
     private static void collectCaptureNamesFromAtomic(AtomicElement element, Set<String> captures) {
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             collectCaptureNamesFromBody(group.body(), captures);
         } else if (element instanceof OptionalElement opt) {
             collectCaptureNamesFromBody(opt.body(), captures);
@@ -1223,7 +1298,7 @@ public final class GrammarValidator {
                 .map(ns -> ns + "." + ref.name())
                 .orElse(ref.name());
             refs.add(fullName);
-        } else if (element instanceof GroupElement group) {
+        } else if (element instanceof TransparentElement group) {
             collectReferencedRuleNamesFromBody(group.body(), refs);
         } else if (element instanceof OptionalElement opt) {
             collectReferencedRuleNamesFromBody(opt.body(), refs);
@@ -1258,7 +1333,7 @@ public final class GrammarValidator {
         if (element instanceof RepeatElement rep) {
             return true;
         }
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             return containsRepeat(group.body());
         }
         if (element instanceof OptionalElement opt) {

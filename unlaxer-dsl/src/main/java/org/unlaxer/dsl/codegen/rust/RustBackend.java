@@ -70,11 +70,13 @@ public final class RustBackend {
         else if (expression instanceof RuleEffects v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof CaptureEquality v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Recovery v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof GeneralBody v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Capture v) collectLspKeywords(v.expression(), keywords);
         else if (expression instanceof OptionalExpr v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Repeat v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Delimited v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof TextValue v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof CaptureBoundary v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof ValueBoundary v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof TriviaScope v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof LexicalTriviaScope v) collectLspKeywords(v.child(), keywords);
@@ -104,6 +106,10 @@ public final class RustBackend {
             : "use unlaxer_runtime::{Span, json_string};\n\n");
         out.append(enumDeclarations(ir));
         if (needsValues(ir)) out.append(astValues(ir));
+        if (hasNestedValues(ir)) out.append(astValues(ir).replace("AstValue","NestedValue")
+            .replace("    Node(Box<Ast>),\n","    Integer { value: i32, span: Span },\n    Node(Box<Ast>),\n")
+            .replace("            Self::Node(node) => node.span(),\n","            Self::Integer { span, .. } => *span,\n            Self::Node(node) => node.span(),\n")
+            .replace("            Self::Node(node) => node.canonical_json(),\n","            Self::Integer { value, .. } => value.to_string(),\n            Self::Node(node) => node.canonical_json(),\n"));
         out.append("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
         for (Mapping mapping : ir.mappings()) {
             out.append("    r#").append(mapping.name()).append(" { span: Span");
@@ -456,12 +462,18 @@ public final class RustBackend {
                 + choice.predictors().stream().map(this::predictor).collect(java.util.stream.Collectors.joining(", "))
                 + "] }";
         }
+        if (expression instanceof OwnedCapture capture) {
+            return "Expr::OwnedCapture(" + quote(capture.name()) + ", Box::new(" + expression(capture.child()) + "))";
+        }
+        if (expression instanceof Replay replay) return "Expr::Replay(" + quote(replay.name()) + ")";
+        if (expression instanceof CaptureScope scope) return "Expr::CaptureScope(Box::new(" + expression(scope.child()) + "))";
         if (expression instanceof Capture capture) {
             return "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
         }
         if (expression instanceof TextValue text) {
             return expression(text.child()) + ".text_value()";
         }
+        if (expression instanceof CaptureBoundary b) return "Expr::"+(b.kind()==BoundaryKind.SEPARATOR?"CaptureBoundary":"InputCaptureBoundary")+"(unlaxer_runtime::capture_tree::Kind::"+switch(b.kind()){case VALUE->"Value";case OPTIONAL->"Optional";case LIST->"List";case SEPARATOR->"Separator";}+", Box::new("+expression(b.child())+"))";
         if (expression instanceof ValueBoundary boundary) {
             return expression(boundary.child()) + ".value_boundary()";
         }
@@ -482,8 +494,8 @@ public final class RustBackend {
         if (expression instanceof Separated separated) {
             String child = expression(separated.child()), separator = expression(separated.separator());
             if (PreferredAstEmitter.containsDepth(separated.child()))
-                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::Capture(\"#preferred-extra:2\", Box::new(" + child + "))]).zero_or_more()])";
-            return child + ".separated_by(" + separator + ")";
+                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::Capture(\"#preferred-extra:2\", Box::new(" + child + "))]).repeat_java(0, None)])";
+            return child + ".separated_by_java(" + separator + ")";
         }
         throw new IllegalStateException("unhandled " + expression);
     }
@@ -534,16 +546,14 @@ public final class RustBackend {
     private String mapper(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         if (needsValues(ir)) out.append("use super::ast::AstValue;\n");
+        if (hasNestedValues(ir)) out.append("use super::ast::NestedValue;\n");
         out.append(enumImports(ir));
-        out.append("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\n");
+        out.append("use super::ast::Ast;\nuse unlaxer_runtime::mapping::Context as Tree;\n\npub fn map(tree: &unlaxer_runtime::Tree) -> Result<Ast, String> {\n");
+        out.append("    let tree = &Tree::new(tree, ").append(ir.rules().size()).append(")?;\n    tree.ensure_mappable(tree.root)?;\n");
         if (ir.rules().stream().anyMatch(rule -> containsRecovery(rule.body()))) {
-            out.append("pub fn map(tree: &Tree) -> Result<Ast, String> {\n"
-                + "    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n"
-                + "    required(map_node(tree, tree.root)?, \"root\")\n}\n\n");
-        } else {
-            out.append("pub fn map(tree: &Tree) -> Result<Ast, String> {\n"
-                + "    required(map_node(tree, tree.root)?, \"root\")\n}\n\n");
+            out.append("    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n");
         }
+        out.append("    required(map_node(tree, tree.root)?, \"root\")\n}\n\n");
         out.append("""
             fn required<T>(mut values: Vec<T>, name: &str) -> Result<T, String> {
                 if values.len() != 1 { return Err(format!("expected one value for {name}, got {}", values.len())); }
@@ -568,13 +578,14 @@ public final class RustBackend {
                     .append(
                             "    let mut found = Vec::new();\n"
                                 + "    for &id in ids {\n"
+                                + "        tree.visit(id)?;\n"
                                 + "        let node = &tree.nodes[id];\n")
                     .append("        if node.rule == ")
                     .append(i)
                     .append(" {\n            found.push(")
                     .append(rule.name())
                     .append(
-                            "::from_text(tree.text(node.span))?);\n"
+                            "::from_text(tree.text(node.span)?)?);\n"
                                 + "        } else {\n"
                                 + "            found.extend(map_enum_")
                     .append(i)
@@ -586,17 +597,18 @@ public final class RustBackend {
                 fn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {
                     let mut found = Vec::new();
                     for &id in ids {
+                        tree.visit(id)?;
                         let node = &tree.nodes[id];
                         match node.rule {
                             unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {
-                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
+                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),
                                 span: node.span,
                             }),
                             unlaxer_runtime::VALUE_BOUNDARY_RULE => {
                                 let values = map_values(tree, &node.children)?;
                                 if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {
                                     found.push(AstValue::Text {
-                                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
+                                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),
                                         span: node.span,
                                     });
                                 } else {
@@ -607,7 +619,7 @@ public final class RustBackend {
             for (int i = 0; i < ir.rules().size(); i++) {
                 Rule rule = ir.rules().get(i);
                 if (!rule.enumLiterals().isEmpty()) out.append("            ").append(i).append(" => found.push(AstValue::Enum")
-                    .append(rule.name()).append(" { value: ").append(rule.name()).append("::from_text(tree.text(node.span))?, span: node.span }),\n");
+                    .append(rule.name()).append(" { value: ").append(rule.name()).append("::from_text(tree.text(node.span)?)?, span: node.span }),\n");
             }
             List<String> ids = new ArrayList<>();
             for (int i = 0; i < ir.rules().size(); i++) if ((ir.rules().get(i).mapping() != null || !ir.rules().get(i).typeConstraints().isEmpty()) && ir.rules().get(i).enumLiterals().isEmpty()) ids.add(Integer.toString(i));
@@ -617,7 +629,7 @@ public final class RustBackend {
             for (int i = 0; i < ir.rules().size(); i++) if (ir.rules().get(i).skip()) skipped.add(Integer.toString(i));
             if (!skipped.isEmpty()) out.append("            ").append(String.join(" | ", skipped)).append("""
                  => found.push(AstValue::Text {
-                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),
+                                text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),
                                 span: node.span,
                             }),
                 """);
@@ -631,10 +643,14 @@ public final class RustBackend {
                 Ok(values.pop())
             }
             """);
+        if(hasNestedValues(ir)) out.append(NestedEmitter.mixedMapper(ir));
+        if(ir.rules().stream().flatMap(rule -> TypeofEmitter.fields(rule).stream()).anyMatch(f->f.kind()==Kind.NESTED)) out.append(NestedEmitter.HELPERS);
+        if(ir.rules().stream().flatMap(rule -> TypeofEmitter.fields(rule).stream()).anyMatch(f->f.kind()==Kind.NESTED && (f.nested().leaf()==Kind.NODE || f.nested().leaf()==Kind.ENUM || f.nested().leaf()==Kind.VALUE))) out.append(NestedEmitter.PROJECT_HELPERS);
         out.append(AssociativeSpines.helpers(ir));
         out.append("""
 
             fn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {
+                tree.visit(id)?;
                 match tree.nodes[id].rule {
             """);
         for (int i = 0; i < ir.rules().size(); i++) {
@@ -654,7 +670,7 @@ public final class RustBackend {
             if (!ir.rules().get(i).enumLiterals().isEmpty()) {
                 out.append("        r#value: ")
                     .append(ir.rules().get(i).name())
-                    .append("::from_text(tree.text(node.span))?,\n    }])\n}\n");
+                    .append("::from_text(tree.text(node.span)?)?,\n    }])\n}\n");
                 continue;
             }
             for (Field field : mapping.fields()) {
@@ -677,12 +693,20 @@ public final class RustBackend {
                     .append("            for capture in node.captures.iter().filter(|c| c.name == ").append(quote(field.name())).append(") {\n");
                 String associative = AssociativeSpines.capture(mapping,field,"                ");
                 if (associative != null) out.append(associative);
-                else if (field.kind() == Kind.INTEGER) out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n");
+                else if (field.kind() == Kind.NESTED) {
+                    var shape=field.nested();
+                    String projection=shape.leaf()==Kind.VALUE?"map_nested_values":shape.leaf()==Kind.NODE?"map_nodes":shape.leaf()==Kind.ENUM?"map_enum_"+java.util.stream.IntStream.range(0,ir.rules().size()).filter(id->ir.rules().get(id).name().equals(shape.enumName()) && !ir.rules().get(id).enumLiterals().isEmpty()).findFirst().orElseThrow():null;
+                    out.append("                let nested = nested_capture(tree, capture)?;\n");
+                    if(projection!=null)out.append("                let mut nested_sources = nested_source_nodes(tree, capture.nodes[0])?.into_iter();\n");
+                    out.append("                values.push(").append(NestedEmitter.mapped(shape,"&nested",0,projection)).append("?);\n");
+                    if(projection!=null)out.append("                if nested_sources.next().is_some() { return Err(\"unmapped original nested leaf\".into()); }\n");
+                }
+                else if (field.kind() == Kind.INTEGER) out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n");
                 else if (field.kind() == Kind.NODE) out.append("                values.extend(map_nodes(tree, &capture.nodes)?);\n");
                 else if (field.kind() == Kind.VALUE) out.append("                values.extend(map_values(tree, &capture.nodes)?);\n");
                 else if (graphemeCapture(ir, ir.rules().get(i).body(), field.name()))
-                    out.append("                values.push(tree.text(capture.span).to_owned());\n");
-                else out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n");
+                    out.append("                values.push(tree.text(capture.span)?.to_owned());\n");
+                else out.append("                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).to_owned());\n");
                 out.append("            }\n            ").append(mappedValue(field)).append("\n        },\n");
             }
             out.append("    }])\n}\n");
@@ -693,6 +717,7 @@ public final class RustBackend {
     private String evaluator(GrammarIR ir) {
         StringBuilder out = new StringBuilder(HEADER);
         if (hasValues(ir)) out.append("use super::ast::AstValue;\n");
+        if (hasNestedValues(ir)) out.append("use super::ast::NestedValue;\n");
         out.append(enumImports(ir));
         out.append("use super::ast::Ast;\n");
         if (!ir.mappings().isEmpty()) out.append("use unlaxer_runtime::Span;\n");
@@ -723,7 +748,9 @@ public final class RustBackend {
     }
 
     static String fieldType(Field field, boolean borrowed) {
+        if (field.kind()==Kind.NESTED) return (borrowed?"&":"")+NestedEmitter.type(field.nested());
         String one = switch (field.kind()) {
+            case NESTED -> throw new IllegalStateException("handled nested field");
             case INTEGER -> borrowed ? "&i32" : "i32";
             case NODE -> borrowed ? "&Ast" : "Box<Ast>";
             case NULLABLE_NODE -> borrowed ? "Option<&Ast>" : "Option<Box<Ast>>";
@@ -732,6 +759,7 @@ public final class RustBackend {
             case ENUM -> (borrowed ? "&" : "") + field.enumName();
         };
         String element = switch (field.kind()) {
+            case NESTED -> throw new IllegalStateException("handled nested field");
             case INTEGER -> "i32";
             case NODE -> "Ast";
             case NULLABLE_NODE -> "Option<Box<Ast>>";
@@ -758,6 +786,7 @@ public final class RustBackend {
     private static String fieldJson(Field field) {
         String name = "r#" + field.name();
         if (field.kind() == Kind.NULLABLE_NODE) return name + ".as_ref().map_or_else(|| \"null\".to_owned(), |value| value.canonical_json())";
+        if(field.kind()==Kind.NESTED) return NestedEmitter.json(field.nested(),name,0);
         String value = field.kind() == Kind.INTEGER ? "value.to_string()" : field.kind() != Kind.TEXT ? "value.canonical_json()" : "json_string(value)";
         return switch (field.cardinality()) {
             case ONE -> field.kind() == Kind.INTEGER ? name + ".to_string()" : field.kind() != Kind.TEXT ? name + ".canonical_json()" : "json_string(" + name + ")";
@@ -799,6 +828,7 @@ public final class RustBackend {
             else if (expression instanceof ValueBoundary value) children = List.of(value.child());
             else if (expression instanceof TriviaScope value) children = List.of(value.child());
             else if (expression instanceof RuleEffects value) children = List.of(value.child());
+            else if (expression instanceof GeneralBody value) children = List.of(value.child());
             else if (expression instanceof CaptureEquality value) children = List.of(value.child());
             else if (expression instanceof NamePredicate value) children = List.of(value.child());
             else if (expression instanceof NameResolutionScope value) children = List.of(value.child());
@@ -812,6 +842,7 @@ public final class RustBackend {
     }
 
     private static boolean containsRecovery(Expression expression) {
+        if (expression instanceof GeneralBody value) return containsRecovery(value.child());
         if (expression instanceof Recovery) return true;
         // A user adapter callback can parse a recovery expression inside its own provider.
         if (expression instanceof CustomToken) return true;
@@ -823,6 +854,7 @@ public final class RustBackend {
         if (expression instanceof LexicalContextScope value) return containsRecovery(value.child());
         if (expression instanceof TextValue value) return containsRecovery(value.child());
         if (expression instanceof ValueBoundary value) return containsRecovery(value.child());
+        if (expression instanceof CaptureBoundary value) return containsRecovery(value.child());
         if (expression instanceof Delimited value) return containsRecovery(value.child());
         if (expression instanceof Capture value) return containsRecovery(value.expression());
         if (expression instanceof OptionalExpr value) return containsRecovery(value.child());
@@ -841,6 +873,9 @@ public final class RustBackend {
             .anyMatch(value -> value.capture().kind() == Kind.VALUE || value.reference().kind() == Kind.VALUE);
     }
 
+    private static boolean hasNestedValues(GrammarIR ir) {
+        return ir.rules().stream().flatMap(rule -> TypeofEmitter.fields(rule).stream()).anyMatch(field -> field.kind()==Kind.NESTED && field.nested().leaf()==Kind.VALUE);
+    }
     private static boolean hasValues(GrammarIR ir) {
         return ir.mappings().stream().flatMap(mapping -> mapping.fields().stream()).anyMatch(field -> field.kind() == Kind.VALUE);
     }

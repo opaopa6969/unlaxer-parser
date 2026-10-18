@@ -1,0 +1,285 @@
+{
+  "schema": 1,
+  "tiny_pin": "7d7bd1cbfab1bd9548ba53c73cc50502f0437c67",
+  "grammar": "tools/tinyexpression-p4-lsp-vscode/grammar/tinyexpression-p4.ubnf",
+  "grammar_sha256": "b3ebead02cf9c4ff2c8d8b56767ca51f3665331d7b84cf1f1fce79d600774347",
+  "fraud_source": "src/test/java/org/unlaxer/tinyexpression/evaluator/p4/P4PackratFraudFormulaTest.java",
+  "contracts": {
+    "fraud_parse_map_ms": 1000,
+    "classic_facade_parse_deadline_ms": 10000,
+    "legacy_test_threshold_ms": 2000,
+    "legacy_test_catches_runtime_exception": true
+  },
+  "cases": [
+    {
+      "id": "fraud-1",
+      "file": "corpus/fraud-1.tiny",
+      "group": "fraud",
+      "sha256": "3b69c9eb95cdea2ba20197530b042791b437d2c2fee05bc3b684308a5da7711c",
+      "code_points": 404,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        404
+      ],
+      "deadline_ms": 1000,
+      "entry": "Formula"
+    },
+    {
+      "id": "fraud-2",
+      "file": "corpus/fraud-2.tiny",
+      "group": "fraud",
+      "sha256": "065b7e78a0cbc470f945da584b8a36a34c2ae1a4de4da399e6ac49e444de3163",
+      "code_points": 209,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        209
+      ],
+      "deadline_ms": 1000,
+      "entry": "Formula"
+    },
+    {
+      "id": "fraud-3",
+      "file": "corpus/fraud-3.tiny",
+      "group": "fraud",
+      "sha256": "3917e9283333ef813cd17de5f9b6a26cac6cef97bda148d1b0928fce24556c47",
+      "code_points": 68,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        68
+      ],
+      "deadline_ms": 1000,
+      "entry": "Formula"
+    },
+    {
+      "id": "fraud-4",
+      "file": "corpus/fraud-4.tiny",
+      "group": "fraud",
+      "sha256": "1167d25450f1b142b86e6891394419ed29c818fc39b397e8ab67cf03bf4e137d",
+      "code_points": 707,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        707
+      ],
+      "deadline_ms": 1000,
+      "entry": "Formula"
+    },
+    {
+      "id": "fraud-5",
+      "file": "corpus/fraud-5.tiny",
+      "group": "fraud",
+      "sha256": "4bcdc00f795d398d678a7ba7f35e49ca53de7ae9702892f8b917711917a56c35",
+      "code_points": 459,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        459
+      ],
+      "deadline_ms": 1000,
+      "entry": "Formula"
+    },
+    {
+      "id": "complex",
+      "file": "corpus/complex.tiny",
+      "group": "production",
+      "sha256": "bc7f46e3b93179d67cbdd51b20f6bc74dfe960d8edf6b86e34f46a195fe8e500",
+      "code_points": 325,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        325
+      ],
+      "deadline_ms": 10000,
+      "entry": "Formula"
+    },
+    {
+      "id": "comparison-heavy",
+      "file": "corpus/comparison-heavy.tiny",
+      "group": "production",
+      "sha256": "d421e625f37b2ca6050baff26528d70231cd3ae0639e4d0e4ae4d8d24d3be2eb",
+      "code_points": 179,
+      "accept": true,
+      "root": "BooleanOrExpr",
+      "root_span": [
+        0,
+        179
+      ],
+      "deadline_ms": 10000,
+      "entry": "BooleanExpression",
+      "formula_root_audit": {
+        "accepted": false,
+        "failure_cp": 5,
+        "issue": 187,
+        "reason": "ordered NumberExpression prefix succeeds before the outer EOF"
+      }
+    },
+    {
+      "id": "flat-arithmetic",
+      "file": "corpus/flat-arithmetic.tiny",
+      "group": "production",
+      "sha256": "b2ab194bb5a30cd5e69d34a70db324a1127e6024e42fb41b34afc8797f016ebe",
+      "code_points": 1426,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        1426
+      ],
+      "deadline_ms": 10000,
+      "entry": "Formula"
+    },
+    {
+      "id": "large-match",
+      "file": "corpus/large-match.tiny",
+      "group": "production",
+      "sha256": "81e0e27dba8609d446666ab7720f38f008cfb92538aa8e82cb63abc9874ef2d9",
+      "code_points": 1380,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        1380
+      ],
+      "deadline_ms": 10000,
+      "entry": "Formula"
+    },
+    {
+      "id": "oracle-one",
+      "file": "corpus/oracle-one.tiny",
+      "group": "oracle",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "code_points": 1,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        1
+      ],
+      "required_scalars": [
+        "1"
+      ],
+      "entry": "Formula"
+    },
+    {
+      "id": "oracle-unicode",
+      "file": "corpus/oracle-unicode.tiny",
+      "group": "oracle",
+      "sha256": "53566ab12cf6ef8d377642fb3834ece6d4f25864c2a6e1ffa16534cabb5b2950",
+      "code_points": 3,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        3
+      ],
+      "required_scalars": [
+        "😀"
+      ],
+      "expected_ast": {
+        "type": "FormulaExpr",
+        "span": [
+          0,
+          3
+        ],
+        "fields": {
+          "imports": [],
+          "declarations": [],
+          "expression": {
+            "type": "ExpressionExpr",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "value": {
+                "type": "StringConcatExpr",
+                "span": [
+                  0,
+                  3
+                ],
+                "fields": {
+                  "left": "😀",
+                  "op": [],
+                  "right": []
+                }
+              }
+            }
+          },
+          "methods": [],
+          "codeBlocks": []
+        }
+      },
+      "entry": "Formula"
+    },
+    {
+      "id": "oracle-crlf",
+      "file": "corpus/oracle-crlf.tiny",
+      "group": "oracle",
+      "sha256": "31ced214f66c61e710d72e72a8a841528eaff2b770278812c1e529b3ce73e3b9",
+      "code_points": 6,
+      "accept": true,
+      "root": "FormulaExpr",
+      "root_span": [
+        0,
+        6
+      ],
+      "required_scalars": [
+        "😀\r\n界"
+      ],
+      "expected_ast": {
+        "type": "FormulaExpr",
+        "span": [
+          0,
+          6
+        ],
+        "fields": {
+          "imports": [],
+          "declarations": [],
+          "expression": {
+            "type": "ExpressionExpr",
+            "span": [
+              0,
+              6
+            ],
+            "fields": {
+              "value": {
+                "type": "StringConcatExpr",
+                "span": [
+                  0,
+                  6
+                ],
+                "fields": {
+                  "left": "😀\r\n界",
+                  "op": [],
+                  "right": []
+                }
+              }
+            }
+          },
+          "methods": [],
+          "codeBlocks": []
+        }
+      },
+      "entry": "Formula"
+    },
+    {
+      "id": "oracle-reject",
+      "file": "corpus/oracle-reject.tiny",
+      "group": "oracle",
+      "sha256": "429eea9f4f36b0c0dcc1db497c0524dec3e9587e2a0f7a4da29682072e12b4ff",
+      "code_points": 3,
+      "accept": false,
+      "failure_cp": 3,
+      "entry": "Formula"
+    }
+  ]
+}

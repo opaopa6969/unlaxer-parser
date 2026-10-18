@@ -1,0 +1,38 @@
+#![allow(dead_code, unused_imports)]
+mod generated;
+use generated::ast::*;
+use unlaxer_runtime::{json_string,Span,ParseContext,ParseOptions,Memoization,Diagnostics,Expr};
+trait Observe { fn observe(&self)->String; }
+impl<T:Observe> Observe for Option<T>{fn observe(&self)->String{self.as_ref().map_or_else(||"[\"none\"]".into(),|v|format!("[\"some\",{}]",v.observe()))}}
+impl<T:Observe> Observe for Vec<T>{fn observe(&self)->String{format!("[\"list\",[{}]]",self.iter().map(Observe::observe).collect::<Vec<_>>().join(","))}}
+impl<T:Observe> Observe for Box<T>{fn observe(&self)->String{self.as_ref().observe()}}
+impl Observe for Ast{fn observe(&self)->String{generated::evaluator::evaluate(self,&mut Eval)}}
+__MIXED_HANDLERS__
+struct Eval;
+impl generated::evaluator::Semantics for Eval {
+ type Output=String;
+ fn eval_root(&mut self,values:&__RUST_TYPE__,_span:Span)->String{values.observe()}
+ fn eval_leaf(&mut self,text:&str,span:Span)->String{format!("[\"node\",\"Leaf\",{},{},{}]",json_string(text),span.start,span.end)}
+}
+fn main(){
+ let args=std::env::args().collect::<Vec<_>>();let mut source=args[1].clone();if source=="--stdin"{source.clear();std::io::Read::read_to_string(&mut std::io::stdin(),&mut source).unwrap();}let input=&source;let stage=&args[2];let valid=&args[3];
+ for memo in [Memoization::Off,Memoization::SafeFailures]{for diagnostics in [Diagnostics::Auto,Diagnostics::Detailed,Diagnostics::DetailedOnFailure]{
+  let mut context=ParseContext::with_options(input,ParseOptions::with_memoization(memo).with_diagnostics(diagnostics));
+  let parsed=generated::parser::parse_context(&mut context);
+  if stage=="parse"{assert!(parsed.is_err());assert_eq!(context.position(),0);assert!(context.node(0).is_none());let before=(context.position(),context.matched_position(),context.reset_matched_with_consumed());assert!(generated::parser::parse_context(&mut context).is_err());assert_eq!((context.position(),context.matched_position(),context.reset_matched_with_consumed()),before);assert!(context.node(0).is_none());context.parse(&Expr::Any.repeat_java(input.chars().count(),Some(input.chars().count()))).unwrap();assert_eq!(context.position(),input.chars().count());println!("{{\"stage\":\"parse\"}}");}
+  else {
+   let parsed=parsed.unwrap();assert_eq!(context.position(),input.chars().count());
+   let tree=context.tree(parsed.root_node().unwrap()).unwrap();
+   let mapped=generated::mapper::map(&tree);
+   if stage=="map"{assert!(mapped.is_err());println!("{{\"stage\":\"map\"}}");}
+   else{
+    let ast=mapped.unwrap();let span=ast.span();let mut broken=tree.clone();broken.nodes[broken.root].children.push(broken.root);assert!(generated::mapper::map(&broken).is_err());drop(tree);drop(context);
+    let value=generated::evaluator::evaluate(&ast,&mut Eval);
+    let preferred=generated::mapper::map_parsed_tree(&generated::parser::parse_tree_for_mapping(input).unwrap()).unwrap();assert_eq!(value,generated::evaluator::evaluate(preferred.select_default().ast(),&mut Eval));
+    let steps=generated::dap::steps(input).unwrap().iter().map(|s|format!("[{},{},{}]",json_string(&s.label),s.span.start,s.span.end)).collect::<Vec<_>>().join(",");
+    println!("{{\"value\":{},\"rootSpan\":[{},{}],\"dap\":[{}]}}",value,span.start,span.end,steps);
+   }
+  }
+  generated::mapper::map(&generated::parser::parse_tree(valid).unwrap()).unwrap();
+ }}
+}

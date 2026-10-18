@@ -61,6 +61,7 @@ public class RuleTriviaConformanceTest {
         JsonArray corpus = JsonParser.parseString(Files.readString(fixtureCorpus())).getAsJsonArray();
         var report = new ArrayList<>(List.of(
             "fixture\tcase\tinput_json\texpected_prefix\tjava_prefix\texpected_ast\tjava_ast\trust"));
+        var nativeReport = new ArrayList<>(report);
 
         int fixtureIndex = 0;
         for (JsonElement fixtureElement : corpus) {
@@ -104,6 +105,11 @@ public class RuleTriviaConformanceTest {
             success(run(List.of("rustc", "--edition=2021", "--extern",
                 "unlaxer_runtime=" + runtime, fixtureDir.resolve("main.rs").toString(), "-o",
                 fixtureDir.resolve("probe").toString()), "", false));
+            Files.writeString(fixtureDir.resolve("native_main.rs"), rustProbe().replace(
+                "mod generated;", "#[path = \"native-generated/mod.rs\"] mod generated;"));
+            success(run(List.of("rustc", "--edition=2021", "--extern",
+                "unlaxer_runtime=" + runtime, fixtureDir.resolve("native_main.rs").toString(), "-o",
+                fixtureDir.resolve("native-probe").toString()), "", false));
 
             JsonArray cases = fixture.getAsJsonArray("cases");
             String framed = String.join("\n", cases.asList().stream()
@@ -113,6 +119,12 @@ public class RuleTriviaConformanceTest {
             success(rustResult);
             List<String> rustLines = rustResult.output().lines().toList();
             assertEquals(name + " Rust result count", cases.size(), rustLines.size());
+            ProcessResult nativeRustResult = run(
+                List.of(fixtureDir.resolve("native-probe").toString()), framed, false);
+            success(nativeRustResult);
+            List<String> nativeRustLines = nativeRustResult.output().lines().toList();
+            assertEquals(name + " native-host Rust result count", cases.size(), nativeRustLines.size());
+            assertEquals(name + " independently executed Rust hosts", rustLines, nativeRustLines);
 
             try (URLClassLoader loader = compileJava(grammar)) {
                 Class<?> parsers = loader.loadClass(PACKAGE + "." + grammar.name() + "Parsers");
@@ -123,10 +135,13 @@ public class RuleTriviaConformanceTest {
                     String input = row.get("input").getAsString();
                     String context = name + "/" + row.get("id").getAsString();
                     JsonObject rust = JsonParser.parseString(rustLines.get(i)).getAsJsonObject();
+                    JsonObject nativeRust = JsonParser.parseString(nativeRustLines.get(i)).getAsJsonObject();
 
                     JsonArray javaPrefix = prefix(parser, input);
                     assertEquals(context + " independent prefix cursor oracle", row.get("prefix"), javaPrefix);
                     assertEquals(context + " Java/Rust prefix cursor parity", javaPrefix, rust.get("prefix"));
+                    assertEquals(context + " native-host independent prefix cursor oracle",
+                        row.get("prefix"), nativeRust.get("prefix"));
 
                     boolean accepted = row.get("accepted").getAsBoolean();
                     Optional<?> diagnostic =
@@ -134,6 +149,8 @@ public class RuleTriviaConformanceTest {
                     assertEquals(context + " Java full-input acceptance", accepted, diagnostic.isEmpty());
                     assertEquals(context + " Rust full-input acceptance", accepted,
                         !rust.get("ast").isJsonNull());
+                    assertEquals(context + " native-host full-input acceptance", accepted,
+                        !nativeRust.get("ast").isJsonNull());
 
                     if (row.has("diagnostic")) {
                         Object failure = diagnostic.orElseThrow();
@@ -142,6 +159,8 @@ public class RuleTriviaConformanceTest {
                         javaDiagnostic.add((Integer) failure.getClass().getMethod("offset").invoke(failure));
                         assertEquals(context + " independent diagnostic category/location", row.get("diagnostic"), javaDiagnostic);
                         assertEquals(context + " Java/Rust diagnostic category/location", javaDiagnostic, rust.get("diagnostic"));
+                        assertEquals(context + " native-host independent diagnostic category/location",
+                            row.get("diagnostic"), nativeRust.get("diagnostic"));
                     }
                     JsonElement expected = JsonNull.INSTANCE;
                     JsonElement javaAst = JsonNull.INSTANCE;
@@ -151,11 +170,28 @@ public class RuleTriviaConformanceTest {
                         Object ast = mapped.getClass().getMethod("ast").invoke(mapped);
                         javaAst = canonical(ast, mapped);
                         assertEquals(context + " Java AST all fields/node spans", expected, javaAst);
+                        if (explicitClassicMapping()) {
+                            try (var classic = new ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
+                                var parsed = parser.parse(classic, org.unlaxer.TokenKind.consumed, false);
+                                assertTrue(context, parsed.isSucceeded());
+                                assertArrayEquals(context + " explicit Classic root raw UTF-8",
+                                    input.getBytes(StandardCharsets.UTF_8),
+                                    parsed.getRootToken().source.sourceAsString().getBytes(StandardCharsets.UTF_8));
+                                Object direct = mapper.getMethod("mapParsedTokenWithSourceMap", org.unlaxer.Token.class).invoke(null, parsed.getRootToken());
+                                Object directAst = direct.getClass().getMethod("ast").invoke(direct);
+                                assertEquals(context + " explicit Classic AST/source map", expected, canonical(directAst,direct));
+                            }
+                        }
                         assertEquals(context + " Rust AST all fields/node spans", expected, rust.get("ast"));
+                        assertEquals(context + " native-host independent AST all fields/node spans",
+                            expected, nativeRust.get("ast"));
                     }
                     report.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input")
                         + "\t" + row.get("prefix") + "\t" + javaPrefix + "\t" + expected + "\t"
                         + javaAst + "\t" + rust);
+                    nativeReport.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input")
+                        + "\t" + row.get("prefix") + "\t" + javaPrefix + "\t" + expected + "\t"
+                        + javaAst + "\t" + nativeRust);
                 }
             }
         }
@@ -163,6 +199,7 @@ public class RuleTriviaConformanceTest {
         Path target = Path.of("target");
         Files.createDirectories(target);
         Files.write(target.resolve("rust-rule-trivia.tsv"), report, StandardCharsets.UTF_8);
+        Files.write(target.resolve("rust-rule-trivia-native.tsv"), nativeReport, StandardCharsets.UTF_8);
     }
 
     private URLClassLoader compileJava(GrammarDecl grammar) throws Exception {
@@ -276,6 +313,8 @@ public class RuleTriviaConformanceTest {
             }
             """;
     }
+
+    protected boolean explicitClassicMapping() { return false; }
 
     protected Path fixtureCorpus() {
         return repo.resolve("unlaxer-dsl/src/test/resources/rule-trivia/corpus.json");

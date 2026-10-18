@@ -220,7 +220,7 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
 // Match the Java field's nominal scalar contract, which is stricter than Rust's Node/Text storage.
 fn atom_types(grammar: &GrammarDecl, atom: &AtomicElement, out: &mut HashSet<String>) {
     match &atom.kind {
-        ElementKind::Terminal(_) => {
+        ElementKind::Replay { .. } | ElementKind::Terminal(_) => {
             out.insert("String".into());
         }
         ElementKind::RuleRef { name, .. } => {
@@ -247,7 +247,11 @@ fn atom_types(grammar: &GrammarDecl, atom: &AtomicElement, out: &mut HashSet<Str
                 out.insert(if numeric { "int" } else { "String" }.into());
             }
         }
-        ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
+        ElementKind::OwnedCapture { body, .. }
+        | ElementKind::CaptureScope(body)
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => {
             for seq in &body.alternatives {
                 for child in &seq.elements {
                     atom_types(grammar, &child.element, out);
@@ -279,9 +283,11 @@ fn capture_nested_types(
     out: &mut HashSet<String>,
 ) {
     match &atom.kind {
-        ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
-            capture_types(grammar, body, field, out)
-        }
+        ElementKind::OwnedCapture { body, .. }
+        | ElementKind::CaptureScope(body)
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => capture_types(grammar, body, field, out),
         ElementKind::OneOrMore(child)
         | ElementKind::BoundedRepeat { element: child, .. }
         | ElementKind::Separated { element: child, .. } => {
@@ -335,7 +341,9 @@ pub(crate) fn emit(grammar: &GrammarDecl, ir: &GrammarIr) -> Result<String, Stri
                         ));
                     }
                     nominal = Some(actual);
-                } else if !matches!(actual.kind, Kind::Enum(_) | Kind::Value) {
+                } else if !matches!(actual.kind, Kind::Enum(_) | Kind::Value)
+                    && !matches!(&actual.kind, Kind::Nested { leaf, .. } if **leaf == Kind::Value)
+                {
                     for rule in grammar
                         .rules
                         .iter()

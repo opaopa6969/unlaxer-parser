@@ -1,0 +1,57 @@
+{
+  "grammar": "grammar MapperGuard { @package: guardprobe @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' [ {Leaf} ] @value ']'; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+  "input": "[😀😀]",
+  "rootSpan": [
+    0,
+    4
+  ],
+  "leafSpans": [
+    [
+      1,
+      2
+    ],
+    [
+      2,
+      3
+    ]
+  ],
+  "cases": [
+    {
+      "id": "null-root",
+      "category": "E-MAPPING-CST"
+    },
+    {
+      "id": "metadata",
+      "category": "E-MAPPING-CST"
+    },
+    {
+      "id": "child",
+      "category": "E-MAPPING-CST"
+    },
+    {
+      "id": "cycle",
+      "category": "E-MAPPING-CST"
+    },
+    {
+      "id": "capture-edge",
+      "category": "E-MAPPING-CST"
+    },
+    {
+      "id": "depth",
+      "category": "E-MAPPING-LIMIT"
+    },
+    {
+      "id": "span",
+      "category": "E-MAPPING-CST"
+    }
+  ],
+  "dagGrammar": "grammar MapperDag { @package: guardprobe @root Root ::= Leaf; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+  "dagDepth": 24,
+  "scalingGrammar": "grammar MapperScaling { @package: guardprobe @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' {Leaf} @value ']'; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+  "scalingCounts": [
+    1,
+    64,
+    512,
+    2048
+  ]
+}

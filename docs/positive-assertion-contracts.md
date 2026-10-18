@@ -66,13 +66,15 @@ source span は半開区間で、Java の source-local index をそのまま原�
 |---|---|---|---|
 | literal を match-only cursor で確認し、matched を進める | `MatchOnly(new WordParser(text))` | `Expr::JavaLookahead { pattern: text, positive: true }` | 非空 literal の受理・consumed/matched は共通。token 形状と native diagnostic は同一契約ではない |
 | UBNF token の `LOOKAHEAD('literal')` | 上の Java 形式へ生成 | `JavaLookahead` へ生成 | `TokenAdapterConformanceTest` が生成後の既存契約を検証。PEG `ahead()` へ置換しない |
-| 任意 child の Java match-only token / matched 公開を完全に保存 | `MatchOnly(child)` | 一般 wrapper は未提供 | literal adapter を一般 child に拡張したとは扱わない |
+| 任意 child の Java match-only token / matched 公開を保存 | `MatchOnly(child)` | `Expr::match_only()` と明示 `parse_with_token_mode` | 後続 #571 で実装。kind/invert の伝播と独立 source の契約は [Classic token propagation](classic-token-propagation.md) を参照 |
 | 任意 child の PEG positive assertion | `new PegLookahead(child)` | `child.ahead()` | 新しい共通契約は [PEG assertions](peg-assertions.md)。`Not(Not(child))` へ置換しない |
 | predicate の受理結果と意味状態の rollback だけを利用 | `MatchOnly(child)` | `child.ahead()` | 両 cursor が一致して始まり、child が先読み cursor に依存しない場合の共通部分。入れ子・続く match-only を含む任意 child には拡張しない |
 
 この監査時点では新しい wrapper API は追加しなかった。後続 #545 で Java の
 明示 opt-in `PegLookahead` と共通 fixture を追加した。Rust の一般 `JavaMatchOnly`
-相当と consume/invert 伝播・replay は同 issue の未完条件として残る。
+相当と consume/invert 伝播は後続 #571 で接続した。replay は #572 で別に追跡する。
+先行 matched を含む診断は [入口ごとの共通 oracle](prior-matched-diagnostics.md) で検証し、
+Classic と native PEG の source frontier を混同しない。
 既存 API を黙って同一化すると token を利用する Java caller や、非消費を前提とする
 Rust PEG 文法を壊す。呼出し側では必要な意味を表から選んで明示的に opt-in する。
 

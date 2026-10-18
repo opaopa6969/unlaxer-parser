@@ -101,6 +101,9 @@ public class TransactionElement implements Serializable{
         }
     }
 
+    /** Count the exact selection snapshot before allocating it for memoization. */
+    public int memoChoiceCount() { return previousChosenParsers == null ? 0 : previousChosenParsers.size(); }
+
     /** Snapshot only selections committed inside this transaction, for safe success replay. */
     public Map<ChoiceInterface, Parser> snapshotChosenParsers(Map<ChoiceInterface, Parser> chosenParsers) {
         if (previousChosenParsers == null) return Map.of();
@@ -147,6 +150,11 @@ public class TransactionElement implements Serializable{
 		return new TransactionElement(new ParserCursor(parserCursor,resetMatchedWithConsumed),resetMatchedWithConsumed);
 	}
 	
+    /** Open a no-input operation while preserving independent matched progress. */
+    public TransactionElement createNewPreservingMatched() {
+        return new TransactionElement(new ParserCursor(parserCursor, false), resetMatchedWithConsumed);
+    }
+
 	public void consume(CodePointLength length){
 		parserCursor.addPosition(length.toOffset());
 	}

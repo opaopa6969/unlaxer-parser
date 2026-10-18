@@ -64,6 +64,7 @@ public class PreferredAstConformanceTest {
                 for (var raw : fixture.getAsJsonArray("cases")) {
                     var row = raw.getAsJsonObject();
                     String input = row.get("input").getAsString();
+                    for (var parseOptions : parseOptions(fixture))
                     try (var context =
                             ParseContext.withBindings(
                                     StringSource.createRootSource(input),
@@ -74,13 +75,22 @@ public class PreferredAstConformanceTest {
                                                     "ubnf.name.names.type",
                                                     List.of("T"))
                                             : Map.of(),
-                                    org.unlaxer.context.ParseOptions.DEFAULT)) {
+                                    parseOptions)) {
+                        var parseResult = parser.parse(context);
                         boolean parsed =
-                                parser.parse(context).isSucceeded()
+                                parseResult.isSucceeded()
                                         && input.codePointCount(0, input.length())
                                                 == context.getConsumedPosition().value();
                         if (row.has("stage") && row.get("stage").getAsString().equals("parse")) {
                             assertFalse(input, parsed);
+                            if (row.has("parseCp") && parseOptions.diagnostics()
+                                    == org.unlaxer.context.ParseOptions.Diagnostics.DETAILED) {
+                                int recorded = context.getParseFailureDiagnostics().getFarthestOffset();
+                                int primary = parseResult.isSucceeded() ? context.getConsumedPosition().value() : recorded;
+                                assertEquals(input, row.get("parseCp").getAsInt(), Math.max(primary, recorded));
+                                if (row.has("primaryCp"))
+                                    assertEquals(input, row.get("primaryCp").getAsInt(), primary);
+                            }
                             continue;
                         }
                         assertTrue(input, parsed);
@@ -296,7 +306,8 @@ public class PreferredAstConformanceTest {
                     "",
                     true,
                     true);
-            Path javaOutput = Files.createDirectories(dir.resolve("generated-java"));
+            Path javaOutput = dir.resolve("java-generated");
+            Files.createDirectories(javaOutput);
             for (var file : new RustBackend().generate(grammar)) {
                 assertEquals(
                         grammar.name() + "/" + file.relativePath(),
@@ -320,6 +331,12 @@ public class PreferredAstConformanceTest {
                         code.append("assert!(generated::parser::parse_tree_for_mapping(")
                                 .append(rustString(value))
                                 .append(").is_err());\n");
+                        if (row.has("parseCp")) code.append("assert_eq!(generated::parser::parse_tree_for_mapping(")
+                            .append(rustString(value)).append(").unwrap_err().offset,")
+                            .append(row.get("parseCp").getAsInt()).append(");\n");
+                        if (row.has("primaryCp")) code.append("assert_eq!(generated::parser::parse_tree_detailed(")
+                            .append(rustString(value)).append(").unwrap_err().offset,")
+                            .append(row.get("primaryCp").getAsInt()).append(");\n");
                     } else if (row.has("errorCp")) {
                         String at = "at CP " + row.getAsJsonArray("errorCp").get(0).getAsInt() + ":" + row.getAsJsonArray("errorCp").get(1).getAsInt();
                         code.append("{let tree=generated::parser::parse_tree_for_mapping(").append(rustString(value)).append(").unwrap();let error=generated::mapper::map_parsed_tree(&tree).err().expect(\"mapping failure\");assert!(error.contains(").append(rustString(at)).append("),\"{}\",error);}");
@@ -442,19 +459,38 @@ public class PreferredAstConformanceTest {
                 }
                 code.append("}");
             }
-            for (String host : List.of("native", "java")) {
-                String consumer = code.toString();
-                if (host.equals("java")) {
-                    consumer = consumer.replace("generated/mod.rs", "generated-java/mod.rs")
-                            .replace("foreign/mod.rs", "foreign-java/mod.rs");
+            if (fixture.has("parseOptions")) {
+                String configured = code.toString()
+                    .replace("fn main(){", "fn check(options:unlaxer_runtime::ParseOptions){")
+                    .replace("generated::parser::parse_tree_for_mapping(source)",
+                        "generated::parser::parse_tree_for_mapping_with_options(source,options)")
+                    .replace("generated::parser::parse_tree(source)",
+                        "generated::parser::parse_tree_with_options(source,options)");
+                for (var raw : fixture.getAsJsonArray("cases")) {
+                    String value = rustString(raw.getAsJsonObject().get("input").getAsString());
+                    configured = configured.replace("generated::parser::parse_tree_for_mapping(" + value + ")",
+                        "generated::parser::parse_tree_for_mapping_with_options(" + value + ",options)");
+                    configured = configured.replace("generated::parser::parse_tree_detailed(" + value + ")",
+                        "generated::parser::parse_tree_detailed_with_options(" + value + ",options)");
                 }
-                Path probe = dir.resolve("main-" + host + ".rs"), exe = dir.resolve("probe-" + host);
+                code = new StringBuilder(configured).append(
+                    "fn main(){use unlaxer_runtime::{ParseOptions,Memoization,Diagnostics};"
+                    + "for memo in [Memoization::Off,Memoization::SafeFailures]{"
+                    + "for diagnostic in [Diagnostics::Auto,Diagnostics::Detailed,Diagnostics::DetailedOnFailure]{"
+                    + "check(ParseOptions::with_memoization(memo).with_diagnostics(diagnostic));}}}");
+            }
+            for (String host : List.of("generated", "java-generated")) {
+                Path probe = dir.resolve(host + "-main.rs"), exe = dir.resolve(host + "-probe");
+                String consumer = code.toString().replace(
+                        "#[path=\"generated/mod.rs\"]", "#[path=\"" + host + "/mod.rs\"]");
+                if (host.equals("java-generated")) {
+                    consumer = consumer.replace("#[path=\"foreign/mod.rs\"]", "#[path=\"foreign-java/mod.rs\"]");
+                }
                 Files.writeString(probe, consumer);
                 run(
                         List.of(
-                                "rustc",
+                                "rustc", "--crate-name", "probe",
                                 "--edition=2021",
-                                "--crate-name=preferred_probe",
                                 probe.toString(),
                                 "--extern",
                                 "unlaxer_runtime=" + runtime,
@@ -470,6 +506,17 @@ public class PreferredAstConformanceTest {
             fixtureIndex++;
         }
         Files.write(Path.of("target/" + getClass().getSimpleName() + "-host-execution.tsv"), hostReport);
+    }
+
+    private static List<org.unlaxer.context.ParseOptions> parseOptions(JsonObject fixture) {
+        if (!fixture.has("parseOptions")) return List.of(org.unlaxer.context.ParseOptions.DEFAULT);
+        var result = new ArrayList<org.unlaxer.context.ParseOptions>();
+        for (var memo : org.unlaxer.context.Memoization.values()) {
+            for (var diagnostics : org.unlaxer.context.ParseOptions.Diagnostics.values()) {
+                result.add(org.unlaxer.context.ParseOptions.withMemoization(memo).withDiagnostics(diagnostics));
+            }
+        }
+        return result;
     }
 
     private Token findToken(Token token, Parser parser) {

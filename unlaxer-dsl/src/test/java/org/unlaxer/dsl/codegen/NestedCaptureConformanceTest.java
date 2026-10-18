@@ -46,7 +46,22 @@ public class NestedCaptureConformanceTest {
     private static final String PACKAGE = "org.example.nestedcaptures";
 
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
-    private final Path repo = Path.of("..").toAbsolutePath().normalize();
+    protected final Path repo = Path.of("..").toAbsolutePath().normalize();
+
+    protected String corpusPath() { return "unlaxer-dsl/src/test/resources/nested-captures/corpus.json"; }
+    protected String reportName() { return "rust-nested-captures.tsv"; }
+
+    protected List<GeneratedSource> extraJavaSources(GrammarDecl grammar) { return List.of(); }
+    protected Path nativeTarget() { return temporary.getRoot().toPath().resolve("native-target"); }
+    protected String javaRelease() { return "17"; }
+    protected boolean javaCliParity() { return false; }
+    protected String extraRustSource(JsonObject fixture) { return ""; }
+    protected String extraRustBeforeDrop(JsonObject fixture) { return ""; }
+    protected String extraRustObservation(JsonObject fixture) { return ""; }
+    protected void observeJava(JsonObject fixture, JsonObject row, GrammarDecl grammar, URLClassLoader loader, Object ast) throws Exception {}
+
+    protected void observeJavaMapped(JsonObject fixture, JsonObject row, GrammarDecl grammar, URLClassLoader loader, Object ast, Object mapped) throws Exception { observeJava(fixture,row,grammar,loader,ast); }
+    protected String canonicalType(Object ast) { return ast.getClass().getSimpleName(); }
 
     @Test public void nestedCapturesKeepCompletionOrderAndSemanticCardinality() throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc/cargo)",
@@ -56,16 +71,17 @@ public class NestedCaptureConformanceTest {
         success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib",
             "--crate-name=unlaxer_runtime", repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(),
             "-o", runtime.toString()), "", false));
-        Path nativeTarget = temporary.getRoot().toPath().resolve("native-target");
+        Path nativeTarget = nativeTarget();
         success(run(List.of("cargo", "build", "--locked", "--manifest-path",
             repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator", "--target-dir",
             nativeTarget.toString()), "", false));
         Path nativeGenerator = nativeTarget.resolve("debug/unlaxer").toAbsolutePath();
 
         JsonArray corpus = JsonParser.parseString(Files.readString(repo.resolve(
-            "unlaxer-dsl/src/test/resources/nested-captures/corpus.json"))).getAsJsonArray();
+            corpusPath()))).getAsJsonArray();
         var report = new ArrayList<>(List.of(
             "fixture\tcase\tinput_json\texpected_ast\tjava_ast\texpected_captures\trust_captures\texpected_declarations\tjava_declarations\trust\tjava_field_types\trust_field_type_constraints\texpected_value_spans\tjava_value_spans\tjava_retained_value_spans"));
+        var nativeReport = new ArrayList<String>(List.of("fixture\tcase\tinput_json\texpected_ast\tnative_result"));
         int fixtureIndex = 0;
         for (JsonElement fixtureElement : corpus) {
             JsonObject fixture = fixtureElement.getAsJsonObject();
@@ -88,6 +104,15 @@ public class NestedCaptureConformanceTest {
                     file.content().getBytes(StandardCharsets.UTF_8),
                     Files.readAllBytes(nativeGenerated.resolve(file.relativePath())));
             }
+            if (javaCliParity()) {
+                Path javaCli = fixtureDir.resolve("java-cli-generated");
+                success(run(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),
+                    "--enable-preview", "-cp", System.getProperty("java.class.path"),
+                    "org.unlaxer.dsl.CodegenMain", "generate", "--target", "rust", "--grammar", ubnf.toString(),
+                    "--output", javaCli.toString()), "", false));
+                for (var file : javaFrontend) assertArrayEquals(name + " Java CLI byte parity: " + file.relativePath(),
+                    file.content().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(javaCli.resolve(file.relativePath())));
+            }
             Path generated = Files.createDirectory(fixtureDir.resolve("generated"));
             for (var file : javaFrontend) Files.writeString(
                 generated.resolve(file.relativePath()), file.content());
@@ -104,6 +129,28 @@ public class NestedCaptureConformanceTest {
             success(rustResult);
             List<String> rustLines = rustResult.output().lines().toList();
             assertEquals(name + " Rust result count", cases.size(), rustLines.size());
+
+            Path nativeMain = fixtureDir.resolve("native-main.rs");
+            Files.writeString(nativeMain, rustProbe(fixture).replace("mod generated;",
+                "#[path=\"native-generated/mod.rs\"] mod generated;"));
+            Path nativeProbe = fixtureDir.resolve("native-probe");
+            success(run(List.of("rustc", "--edition=2021", "--crate-name=native_probe", "--extern",
+                "unlaxer_runtime=" + runtime, nativeMain.toString(), "-o", nativeProbe.toString()), "", false));
+            ProcessResult nativeResult = run(List.of(nativeProbe.toString()), framed, false);
+            success(nativeResult);
+            List<String> nativeLines = nativeResult.output().lines().toList();
+            assertEquals(name + " native Rust result count", cases.size(), nativeLines.size());
+            for (int i = 0; i < cases.size(); i++) {
+                JsonObject row = cases.get(i).getAsJsonObject();
+                JsonObject nativeValue = JsonParser.parseString(nativeLines.get(i)).getAsJsonObject();
+                String label = name + "/" + row.get("id").getAsString() + " native Rust";
+                assertEquals(label + " AST", row.get("ast"), nativeValue.get("ast"));
+                assertEquals(label + " captures", row.get("captures"), nativeValue.get("captures"));
+                assertEquals(label + " retained value spans", row.has("valueSpans") ? row.get("valueSpans") : new JsonArray(), nativeValue.get("valueSpans"));
+                assertEquals(label + " declarations", row.has("declarations") ? row.get("declarations") : new JsonArray(), nativeValue.get("declarations"));
+                assertEquals(label + " independently executed hosts", JsonParser.parseString(rustLines.get(i)), nativeValue);
+                nativeReport.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input") + "\t" + row.get("ast") + "\t" + nativeValue);
+            }
 
             try (URLClassLoader loader = compileJava(grammar)) {
                 JsonObject javaFieldTypes = assertJavaFieldTypes(name, fixture.getAsJsonObject("javaFieldTypes"), grammar, loader);
@@ -128,6 +175,7 @@ public class NestedCaptureConformanceTest {
                         expectedValueSpans, rust.get("valueSpans"));
                     Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
                     Object ast = mapped.getClass().getMethod("ast").invoke(mapped);
+                    observeJavaMapped(fixture,row,grammar,loader,ast,mapped);
                     JsonObject javaAst = canonical(ast, mapped);
                     assertEquals(context + " Java AST contract", row.get("ast"), javaAst);
                     JsonArray javaValueSpans = javaValueSpans(fixture, ast, mapped);
@@ -159,7 +207,8 @@ public class NestedCaptureConformanceTest {
         }
         Path target = Path.of("target");
         Files.createDirectories(target);
-        Files.write(target.resolve("rust-nested-captures.tsv"), report, StandardCharsets.UTF_8);
+        Files.write(target.resolve(reportName()), report, StandardCharsets.UTF_8);
+        Files.write(target.resolve(reportName().replace(".tsv", "-native.tsv")), nativeReport, StandardCharsets.UTF_8);
     }
 
     private JsonArray declarations(Parser parser, String input) throws Exception {
@@ -183,7 +232,7 @@ public class NestedCaptureConformanceTest {
             URLClassLoader loader) throws Exception {
         var types = new JsonObject();
         for (var record : expected.entrySet()) {
-            Class<?> type = loader.loadClass(PACKAGE + "." + grammar.name() + "AST$" + record.getKey());
+            Class<?> type = loader.loadClass(PACKAGE + "." + grammar.name() + "AST$" + record.getKey().replace('.', '$'));
             var actual = new JsonObject();
             for (var component : type.getRecordComponents()) {
                 actual.addProperty(component.getName(), javaTypeName(component.getGenericType()));
@@ -222,12 +271,13 @@ public class NestedCaptureConformanceTest {
         return result;
     }
 
-    private URLClassLoader compileJava(GrammarDecl grammar) throws Exception {
+    protected URLClassLoader compileJava(GrammarDecl grammar) throws Exception {
         var sources = new ArrayList<GeneratedSource>();
         for (CodeGenerator generator : List.of(
                 new ParserGenerator(), new ASTGenerator(), new MapperGenerator())) {
             sources.add(generator.generate(grammar));
         }
+        sources.addAll(extraJavaSources(grammar));
         var units = sources.stream().map(source -> new SimpleJavaFileObject(
             URI.create("string:///" + source.packageName().replace('.', '/') + "/"
                 + source.className() + ".java"), JavaFileObject.Kind.SOURCE) {
@@ -242,7 +292,7 @@ public class NestedCaptureConformanceTest {
         try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT,
                 StandardCharsets.UTF_8)) {
             boolean compiled = compiler.getTask(null, manager, diagnostics,
-                List.of("--release", "17", "-classpath",
+                List.of("--release", javaRelease(), "-classpath",
                     System.getProperty("java.class.path") + File.pathSeparator, "-d", output.toString()),
                 null, units).call();
             assertTrue(diagnostics.getDiagnostics().toString(), compiled);
@@ -250,9 +300,9 @@ public class NestedCaptureConformanceTest {
         return new URLClassLoader(new URL[]{output.toUri().toURL()}, getClass().getClassLoader());
     }
 
-    private JsonObject canonical(Object ast, Object mapped) throws Exception {
+    protected JsonObject canonical(Object ast, Object mapped) throws Exception {
         var result = new JsonObject();
-        result.addProperty("type", ast.getClass().getSimpleName());
+        result.addProperty("type", canonicalType(ast));
         int[] span = (int[]) ((Optional<?>) mapped.getClass().getMethod("sourceSpanOf", Object.class)
             .invoke(mapped, ast)).orElseThrow();
         var position = new JsonArray();
@@ -270,6 +320,8 @@ public class NestedCaptureConformanceTest {
     private JsonElement canonicalValue(Object value, Object mapped) throws Exception {
         if (value == null) return JsonNull.INSTANCE;
         if (value instanceof String text) return new JsonPrimitive(text);
+        if (value instanceof Number number) return new JsonPrimitive(number);
+        if (value instanceof Enum<?> item) return new JsonPrimitive(item.name());
         if (value instanceof Optional<?> optional) return canonicalValue(optional.orElse(null), mapped);
         if (value instanceof List<?> list) {
             var result = new JsonArray();
@@ -334,6 +386,7 @@ public class NestedCaptureConformanceTest {
             }
             __VALUE_SPANS__
             __FIELD_TYPES__
+            __EXTRA_SOURCE__
             fn main() {
                 let names = [__NAMES__];
                 for line in io::stdin().lock().lines() {
@@ -349,24 +402,26 @@ public class NestedCaptureConformanceTest {
                     let capture_json = captures(&tree, &names);
                     let declaration_json = declarations(&tree);
                     let ast = generated::mapper::map(&tree).unwrap();
+                    __BEFORE_DROP__
                     drop(tree);
                     assert_field_types(&ast);
+                    __EXTRA_OBSERVATION__
                     println!(concat!(r#"{{\"ast\":{},\"captures\":{},"#,
                         r#"\"valueSpans\":{},\"declarations\":{}}}"#),
                         ast.canonical_json(), capture_json, value_spans(&ast), declaration_json);
                 }
             }
             """.replace("__NAMES__", names).replace("__VALUE_SPANS__", valueSpans)
-                .replace("__FIELD_TYPES__", fieldTypes);
+                .replace("__FIELD_TYPES__", fieldTypes).replace("__EXTRA_SOURCE__",extraRustSource(fixture)).replace("__EXTRA_OBSERVATION__",extraRustObservation(fixture)).replace("__BEFORE_DROP__",extraRustBeforeDrop(fixture));
     }
 
     private String rustString(String value) {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
-    private record ProcessResult(int code, String output) {}
+    protected record ProcessResult(int code, String output) {}
 
-    private ProcessResult run(List<String> command, String input, boolean withoutJava) throws Exception {
+    protected ProcessResult run(List<String> command, String input, boolean withoutJava) throws Exception {
         Path log = temporary.newFile().toPath();
         var builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         if (withoutJava) {
@@ -403,7 +458,7 @@ public class NestedCaptureConformanceTest {
         }
     }
 
-    private void success(ProcessResult result) {
+    protected void success(ProcessResult result) {
         assertEquals(result.output(), 0, result.code());
     }
 }

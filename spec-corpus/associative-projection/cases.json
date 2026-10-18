@@ -1045,5 +1045,374 @@
         "stage": "parse"
       }
     ]
+  },
+  {
+    "name": "DirectLiteralLeft",
+    "grammar": "grammar DirectLiteralLeft { @package: preferredprobe @whitespace: none  @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= 'a' @left { '+' @op 'a' @right }; }",
+    "java": "protected String evalBinary(DirectLiteralLeftAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+a+a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(a,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "UnicodeLiteralLeft",
+    "grammar": "grammar UnicodeLiteralLeft { @package: preferredprobe @whitespace: javaStyle  @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= '😀' @left { '+' @op 'a' @right }; }",
+    "java": "protected String evalBinary(UnicodeLiteralLeftAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "😀",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(😀,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "😀+a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(😀,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "😀+a+a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(😀,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "😀+",
+        "stage": "parse"
+      },
+      {
+        "input": "😀+\r\na",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(😀,+,a)"
+          ]
+        ],
+        "select": 0
+      }
+    ]
+  },
+  {
+    "name": "LexicalLiteralLeft",
+    "grammar": "grammar LexicalLiteralLeft { @package: preferredprobe @whitespace: none @ubnf: v2 @tokenStream: enabled @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= 'a' @left { '+' @op 'a' @right }; }",
+    "java": "protected String evalBinary(LexicalLiteralLeftAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            3,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+a+a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(a,+|+,a|a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "LiteralLevels",
+    "grammar": "grammar LiteralLevels { @package: preferredprobe @whitespace: none @root @mapping(Sum,params=[left,op,right]) @leftAssoc @precedence(level=10) Root ::= Term @left { '+' @op Term @right }; @mapping(Product,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= 'a' @left { '*' @op 'a' @right }; }",
+    "java": "protected String evalSum(LiteralLevelsAST.Sum n){return \"S(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";} protected String evalProduct(LiteralLevelsAST.Product n){return \"P(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_sum(&mut self,left:&Ast,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{format!(\"S({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))} fn eval_product(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"P({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "a",
+        "candidates": [
+          [
+            "Sum",
+            0,
+            0,
+            1,
+            "S(P(a,,),,)"
+          ],
+          [
+            "Product",
+            2,
+            0,
+            1,
+            "P(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a*a+a",
+        "candidates": [
+          [
+            "Sum",
+            0,
+            0,
+            5,
+            "S(P(a,*,a),+,P(a,,))"
+          ],
+          [
+            "Product",
+            2,
+            0,
+            3,
+            "P(a,*,a)"
+          ],
+          [
+            "Product",
+            4,
+            4,
+            5,
+            "P(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a*a+",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "NestedLiteralOperand",
+    "grammar": "grammar NestedLiteralOperand { @package: preferredprobe @whitespace: none @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [Expr] @value; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= 'a' @left { '+' @op 'a' @right }; }",
+    "java": "protected String evalRoot(NestedLiteralOperandAST.Root n){return n.value().map(this::eval).orElse(\"none\");} protected String evalBinary(NestedLiteralOperandAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+String.join(\"|\",n.right())+\")\";}",
+    "rust": "fn eval_root(&mut self,value:&Option<Box<Ast>>,_:unlaxer_runtime::Span)->String{value.as_ref().map(|n|evaluate(n,self)).unwrap_or_else(||\"none\".to_owned())} fn eval_binary(&mut self,left:&str,op:&[String],right:&[String],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "",
+        "candidates": [
+          [
+            "Root",
+            0,
+            0,
+            0,
+            "none"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+a",
+        "candidates": [
+          [
+            "Root",
+            0,
+            0,
+            3,
+            "B(a,+,a)"
+          ],
+          [
+            "Binary",
+            5,
+            0,
+            3,
+            "B(a,+,a)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "DirectLiteralRight",
+    "grammar": "grammar DirectLiteralRight { @package: preferredprobe @whitespace: none @root @mapping(Binary,params=[left,op,right]) @rightAssoc @precedence(level=10) Root ::= 'a' @left { '+' @op Root @right }; }",
+    "java": "protected String evalBinary(DirectLiteralRightAST.Binary n){return \"B(\"+n.left()+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:&str,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{format!(\"B({},{},{})\",left,op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            1,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+a+a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(a,+,B(a,+,B(a,,)))"
+          ],
+          [
+            "Binary",
+            3,
+            2,
+            5,
+            "B(a,+,B(a,,))"
+          ],
+          [
+            "Binary",
+            6,
+            4,
+            5,
+            "B(a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a+",
+        "stage": "parse"
+      }
+    ]
+  },
+  {
+    "name": "SharedLiteralLeaf",
+    "grammar": "grammar SharedLiteralLeaf { @package: preferredprobe @whitespace: none token NUMBER = org.unlaxer.parser.elementary.NumberParser @root @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=10) Expr ::= Term @left { '-' @op Term @right }; @mapping(Binary,params=[left,op,right]) @leftAssoc @precedence(level=20) Term ::= 'a' @left { '/' @op 'a' @right }; }",
+    "java": "protected String evalBinary(SharedLiteralLeafAST.Binary n){if(n.left()==null){if(n.op().size()!=1||!n.right().isEmpty())throw new AssertionError();return \"L:\"+n.op().get(0);}return \"B(\"+eval(n.left())+\",\"+String.join(\"|\",n.op())+\",\"+n.right().stream().map(this::eval).collect(java.util.stream.Collectors.joining(\"|\"))+\")\";}",
+    "rust": "fn eval_binary(&mut self,left:Option<&Ast>,op:&[String],right:&[Ast],_:unlaxer_runtime::Span)->String{if let Some(left)=left {format!(\"B({},{},{})\",evaluate(left,self),op.join(\"|\"),right.iter().map(|n|evaluate(n,self)).collect::<Vec<_>>().join(\"|\"))}else{assert_eq!(op.len(),1);assert!(right.is_empty());format!(\"L:{}\",op[0])}}",
+    "ordinary": true,
+    "cases": [
+      {
+        "input": "a/a-a",
+        "candidates": [
+          [
+            "Binary",
+            0,
+            0,
+            5,
+            "B(B(L:a,/,L:a),-,B(L:a,,))"
+          ],
+          [
+            "Binary",
+            2,
+            0,
+            3,
+            "B(L:a,/,L:a)"
+          ],
+          [
+            "Binary",
+            4,
+            4,
+            5,
+            "B(L:a,,)"
+          ]
+        ],
+        "select": 0
+      },
+      {
+        "input": "a/",
+        "stage": "parse"
+      }
+    ],
+    "rustCheck": "let mut missing=generated::parser::parse_tree(source).unwrap(); missing.nodes[missing.root].captures.retain(|capture|capture.name!=\"left\"); assert!(generated::mapper::map(&missing).is_err());"
   }
 ]

@@ -93,6 +93,7 @@ final class RustEvalEmitter {
     private static String scalar(Field field, String expression) {
         return switch(field.kind()) {
             case TEXT -> "EvalValue::Text("+expression+")";
+            case NESTED -> throw new IllegalArgumentException("E-NESTED-SHAPE: autoEval requires remaining #583 implementation");
             case INTEGER -> "EvalValue::Integer(*"+expression+")";
             case NODE -> "EvalValue::Node("+expression+")";
             case NULLABLE_NODE -> throw new IllegalArgumentException("nullable node only permitted as associative left");
@@ -104,6 +105,7 @@ final class RustEvalEmitter {
         return switch(field.kind()) {
             case NODE, NULLABLE_NODE -> "evaluate("+expression+", self)";
             case TEXT -> "self.evaluate_literal("+expression+")";
+            case NESTED -> throw new IllegalArgumentException("E-NESTED-SHAPE: autoEval requires remaining #583 implementation");
             case INTEGER -> "self.evaluate_literal(&"+expression+".to_string())";
             case ENUM -> "self.evaluate_literal(&format!(\"{:?}\", "+expression+"))";
             case VALUE -> {

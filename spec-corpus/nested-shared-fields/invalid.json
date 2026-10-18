@@ -1,0 +1,86 @@
+[
+  {
+    "id": "container-order",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' [ {Leaf} ] @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' { [Leaf] } @value; }",
+    "rule": "A",
+    "startCP": 143,
+    "endCP": 216
+  },
+  {
+    "id": "inner-depth",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' [ [Leaf] ] @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' [Leaf] @value; }",
+    "rule": "A",
+    "startCP": 143,
+    "endCP": 216
+  },
+  {
+    "id": "nominal-node",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; @mapping(Other,params=[text]) Other ::= 'x' @text; @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' [Leaf] @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' [Other] @value; }",
+    "rule": "A",
+    "startCP": 194,
+    "endCP": 263
+  },
+  {
+    "id": "enum-declaration",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @enum Mode ::= 'x'; @enum Other ::= 'x'; @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' [Mode] @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' [Other] @value; }",
+    "rule": "A",
+    "startCP": 135,
+    "endCP": 204
+  },
+  {
+    "id": "scalar-leaf",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token N = org.unlaxer.parser.elementary.NumberParser @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' ['x'] @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' [N] @value; }",
+    "rule": "A",
+    "startCP": 147,
+    "endCP": 215
+  },
+  {
+    "id": "parameters",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' ['x'] @value; @nestedCaptures @mapping(Row,params=[other]) B ::= 'b' ['x'] @other; }",
+    "rule": "A",
+    "startCP": 95,
+    "endCP": 163
+  },
+  {
+    "id": "parameter-order",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[first,second]) A ::= 'a' ['x'] @first ['y'] @second; @nestedCaptures @mapping(Row,params=[second,first]) B ::= 'b' ['x'] @first ['y'] @second; }",
+    "rule": "A",
+    "startCP": 95,
+    "endCP": 184
+  },
+  {
+    "id": "flat-nested",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures  @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' ['x'] @value;  @mapping(Row,params=[value]) B ::= 'b' ['x'] @value; }",
+    "rule": "A",
+    "startCP": 95,
+    "endCP": 163
+  },
+  {
+    "id": "deep-shared-contributor",
+    "grammar": "grammar DeepShared { @package: org.example.nestedcaptures @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' 'z' @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | ('x' | 'z' @value))))))))))))))))))))))))))))))))); }",
+    "rule": "B",
+    "startCP": 164,
+    "endCP": 494
+  },
+  {
+    "id": "owned-nominal-node",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; @mapping(Other,params=[text]) Other ::= 'x' @text; @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' CAPTURE(word, [Leaf]) @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' CAPTURE(word, [Other]) @value; }",
+    "rule": "A",
+    "startCP": 194,
+    "endCP": 278
+  },
+  {
+    "id": "scope-owned-nominal-node",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; @mapping(Other,params=[text]) Other ::= 'x' @text; @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' CAPTURE_SCOPE(CAPTURE(word, [Leaf])) @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' CAPTURE_SCOPE(CAPTURE(word, [Other])) @value; }",
+    "rule": "A",
+    "startCP": 194,
+    "endCP": 293
+  },
+  {
+    "id": "nested-owned-nominal-node",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @mapping(Leaf,params=[text]) Leaf ::= 'x' @text; @mapping(Other,params=[text]) Other ::= 'x' @text; @root @mapping(Family) Root ::= A | B; @nestedCaptures @mapping(Row,params=[value]) A ::= 'a' CAPTURE(word, [Leaf]) @value; @nestedCaptures @mapping(Row,params=[value]) B ::= 'b' CAPTURE_SCOPE([Other]) @value; }",
+    "rule": "A",
+    "startCP": 194,
+    "endCP": 278
+  }
+]

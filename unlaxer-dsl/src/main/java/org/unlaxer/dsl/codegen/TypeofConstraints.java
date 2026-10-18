@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 
 import java.util.ArrayList;
@@ -36,7 +38,7 @@ public final class TypeofConstraints {
                                                         element.captureName().orElse(null),
                                                         type.captureName())));
                 pending.push(element.element());
-            } else if (value instanceof GroupElement element) pending.push(element.body());
+            } else if (value instanceof TransparentElement element) pending.push(element.body());
             else if (value instanceof OptionalElement element) pending.push(element.body());
             else if (value instanceof RepeatElement element) pending.push(element.body());
             else if (value instanceof OneOrMoreElement element) pending.push(element.body());
@@ -51,6 +53,7 @@ public final class TypeofConstraints {
 
     /** Public fields use the joined constructor schema; private locals stay rule-local. */
     public static String valueType(GrammarDecl grammar, RuleDecl rule, String capture) {
+        if (NestedCaptures.enabled(rule)) return NestedCaptures.javaType(NestedCaptures.field(grammar, rule, capture));
         boolean published =
                 MapperElementUtil.getMappingAnnotation(rule)
                         .map(mapping -> mapping.paramNames().contains(capture))

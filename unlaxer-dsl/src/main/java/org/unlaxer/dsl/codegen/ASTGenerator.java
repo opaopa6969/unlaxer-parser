@@ -5,7 +5,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
-import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.MappingAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.BoundedRepeatElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
@@ -64,6 +64,9 @@ public class ASTGenerator implements CodeGenerator {
 
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        NestedCaptures.requireValid(grammar);
+        GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
@@ -201,6 +204,8 @@ public class ASTGenerator implements CodeGenerator {
 
         if (!enumRules.isEmpty()) sb.append("    /** One enum occurrence in a mixed capture; source maps use this wrapper's identity. */\n")
             .append("    record EnumValue(java.lang.Enum<?> value) { public EnumValue { java.util.Objects.requireNonNull(value); } }\n\n");
+
+        if (NestedCaptures.hasMixed(grammar)) sb.append(NestedMixedEmitter.ast(grammar));
 
         // enum ルール
         for (RuleDecl enumRule : enumRules) {
@@ -350,6 +355,7 @@ public class ASTGenerator implements CodeGenerator {
      * ルール内の指定フィールド名に対応する Java 型を推論する。
      */
     String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
+        if (NestedCaptures.enabled(rule)) return NestedCaptures.javaType(NestedCaptures.field(grammar,rule,fieldName));
         Optional<String> shared = SharedPlainSchema.fieldType(grammar, rule, fieldName);
         if (shared.isPresent()) return shared.get();
         return new SemanticCardinality(grammar).fieldType(rule, fieldName, inferLegacyType(grammar, rule, fieldName));
@@ -447,10 +453,11 @@ public class ASTGenerator implements CodeGenerator {
 
     private String inferTypeFromElement(GrammarDecl grammar, AtomicElement element) {
         String astClassName = grammar.name() + "AST";
+        if (element instanceof UBNFAST.ReplayElement) return "String";
         if (element instanceof TerminalElement t) {
             return "String";
         }
-        if (element instanceof RuleRefElement || element instanceof GroupElement) {
+        if (element instanceof RuleRefElement || element instanceof TransparentElement) {
             var enumType=EnumSchema.enumType(grammar,element);
             if(enumType.isPresent()) return grammar.name()+"AST."+enumType.get();
         }
@@ -491,7 +498,7 @@ public class ASTGenerator implements CodeGenerator {
             String inner = inferTypeFromElement(grammar, sep.element());
             return "List<" + MapperTypeResolver.boxedType(inner) + ">";
         }
-        if (element instanceof GroupElement g) {
+        if (element instanceof TransparentElement g) {
             return "Object";
         }
         if (element instanceof ErrorElement e) {
@@ -582,7 +589,7 @@ public class ASTGenerator implements CodeGenerator {
         if (element instanceof UBNFAST.SeparatedElement separated) {
             return findCapturedElementsInAtomic(separated.element(), captureName, inOptional, true);
         }
-        if (element instanceof GroupElement g) {
+        if (element instanceof TransparentElement g) {
             return findCapturedElementsInBody(g.body(), captureName, inOptional, inRepeat);
         }
         return List.of();

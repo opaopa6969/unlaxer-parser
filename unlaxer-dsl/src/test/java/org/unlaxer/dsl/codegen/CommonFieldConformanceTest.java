@@ -27,7 +27,7 @@ public class CommonFieldConformanceTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
-    private JsonArray corpus(String name) throws Exception {
+    protected JsonArray corpus(String name) throws Exception {
         return JsonParser.parseString(
                         Files.readString(
                                 repo.resolve("spec-corpus/common-fields/" + name + "-cases.json")))

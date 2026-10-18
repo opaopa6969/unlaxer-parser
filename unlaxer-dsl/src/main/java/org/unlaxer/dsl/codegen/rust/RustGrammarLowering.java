@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen.rust;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -33,6 +35,7 @@ public final class RustGrammarLowering {
     private final List<RecoveryAnnotation> recoveries = new ArrayList<>();
     private final Set<Integer> nullableRules = new HashSet<>();
     private int analysisDepth;
+    private boolean nestedRule;
     private final org.unlaxer.dsl.codegen.RecursiveSemanticShapes[] recursiveShapes;
     private record Shape(Kind kind, Cardinality cardinality, String enumName) {
         Shape(Kind kind,Cardinality cardinality) { this(kind,cardinality,null); }
@@ -54,6 +57,8 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        org.unlaxer.dsl.codegen.NestedCaptures.requireValid(grammar);
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
         org.unlaxer.dsl.codegen.TypeofConstraints.validate(grammar);
@@ -221,6 +226,7 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof CatalogAnnotation value) {
                     if (catalog != null) throw unsupported("duplicate @catalog on " + rule.name());
                     catalog = value.context();
+                } else if (annotation instanceof SimpleAnnotation a && a.name().equals("nestedCaptures")) {
                 } else throw unsupported("annotation " + annotation + " on " + rule.name());
             }
             comparisons.add(hasScope ? null : backref);
@@ -262,7 +268,8 @@ public final class RustGrammarLowering {
             catalogs.add(catalog);
         }
         if (root == -1) throw unsupported("exactly one @root is required");
-        for (var rule : grammar.rules()) bodies.add(body(rule.body()));
+        for (var rule : grammar.rules()) { nestedRule=org.unlaxer.dsl.codegen.NestedCaptures.enabled(rule); bodies.add(body(rule.body())); }
+        nestedRule=false;
         boolean changed;
         do {
             changed = false;
@@ -320,7 +327,9 @@ public final class RustGrammarLowering {
                         if (Set.of("span", "semantics").contains(name)) throw unsupported("capture name " + name + " is reserved");
                     }
                     Shape shape = captures.get(name);
-                    fields.add(new Field(name, shape.kind(), shape.cardinality(),shape.enumName()));
+                    fields.add(org.unlaxer.dsl.codegen.NestedCaptures.enabled(grammar.rules().get(i))
+                        ? new Field(name,Kind.NESTED,Cardinality.ONE,null,org.unlaxer.dsl.codegen.NestedCaptures.field(grammar,grammar.rules().get(i),name))
+                        : new Field(name, shape.kind(), shape.cardinality(),shape.enumName()));
                 }
                 mapping = new Mapping(annotation.className(), fields);
             }
@@ -346,9 +355,10 @@ public final class RustGrammarLowering {
             var documentation = grammar.rules().get(i).annotations().stream()
                 .filter(DocAnnotation.class::isInstance).map(DocAnnotation.class::cast)
                 .map(DocAnnotation::text).toList();
+            final int ruleIndex = i;
             rules.add(new Rule(grammar.rules().get(i).name(), ruleBody, mapping, operators.get(i), catalog, skips.get(i), documentation, EnumSchema.isEnum(grammar.rules().get(i)) ? EnumSchema.literals(grammar.rules().get(i)) : List.of(),
                 org.unlaxer.dsl.codegen.TypeofConstraints.collect(grammar.rules().get(i)).stream()
-                    .map(value -> new TypeConstraint(constraintField(value.capture(), captures), constraintField(value.reference(), captures))).toList()));
+                    .map(value -> new TypeConstraint(constraintField(value.capture(), captures, grammar.rules().get(ruleIndex)), constraintField(value.reference(), captures, grammar.rules().get(ruleIndex)))).toList()));
         }
         List<Rule> rewritten = new ArrayList<>();
         boolean hasValues = variants.values().stream().flatMap(mapping -> mapping.fields().stream())
@@ -360,7 +370,7 @@ public final class RustGrammarLowering {
             if (mapping != null) {
                 var declared = grammar.rules().get(i);
                 mapping = new Mapping(mapping.name(), mapping.fields().stream().map(field ->
-                    org.unlaxer.dsl.codegen.NumericFields.isInteger(grammar, declared, field.name())
+                    field.kind()!=Kind.NESTED && org.unlaxer.dsl.codegen.NumericFields.isInteger(grammar, declared, field.name())
                         ? new Field(field.name(), Kind.INTEGER, field.cardinality()) : field).toList());
             }
             Expression expression = hasValues && !rule.skip()
@@ -423,7 +433,8 @@ public final class RustGrammarLowering {
         return new Mapping(mapping.name(), List.copyOf(fields.values()));
     }
 
-    private static Field constraintField(String name, Map<String, Shape> captures) {
+    private Field constraintField(String name, Map<String, Shape> captures, RuleDecl rule) {
+        if (org.unlaxer.dsl.codegen.NestedCaptures.enabled(rule)) return new Field(name, Kind.NESTED, Cardinality.ONE, null, org.unlaxer.dsl.codegen.NestedCaptures.field(grammar, rule, name));
         Shape shape = captures.get(name);
         if (shape == null) throw unsupported("E-TYPEOF-UNKNOWN-CAPTURE: " + name);
         return new Field(name, shape.kind(), shape.cardinality(), shape.enumName());
@@ -436,7 +447,7 @@ public final class RustGrammarLowering {
     private Field boundConstraintField(Field field, Mapping mapping, RuleDecl sourceRule) {
         Field bound = mapping == null ? field : mapping.fields().stream()
             .filter(value -> value.name().equals(field.name())).findFirst().orElse(field);
-        return integerConstraint(grammar, sourceRule, field.name())
+        return bound.kind() != Kind.NESTED && integerConstraint(grammar, sourceRule, field.name())
             ? new Field(field.name(), Kind.INTEGER, field.cardinality()) : bound;
     }
 
@@ -458,6 +469,11 @@ public final class RustGrammarLowering {
             if (!a.name().equals(b.name()) || a.cardinality() != b.cardinality()) {
                 throw unsupported("incompatible shared mapping schema " + left.name());
             }
+            if (a.kind() == Kind.NESTED || b.kind() == Kind.NESTED) {
+                if (!a.equals(b)) throw unsupported("E-NESTED-SHAPE: incompatible shared mapping schema " + left.name());
+                fields.add(a);
+                continue;
+            }
             Kind kind = a.kind() == b.kind() && java.util.Objects.equals(a.enumName(),b.enumName()) ? a.kind() : Kind.VALUE;
             fields.add(new Field(a.name(), kind, a.cardinality(),kind == Kind.ENUM ? a.enumName() : null));
         }
@@ -478,6 +494,7 @@ public final class RustGrammarLowering {
             if (expression instanceof TextValue ignored) {
                 return expression;
             }
+            if (expression instanceof GeneralBody general) return general.withChild(retainTextValues(general.child(), mapping));
             if (expression instanceof Capture capture) {
                 Expression child = retainTextValues(capture.expression(), mapping);
                 if (mapping != null && mapping.fields().stream().anyMatch(field ->
@@ -555,14 +572,41 @@ public final class RustGrammarLowering {
         return new Choice(List.of(new Sequence(List.of(left, tail.elements().get(0), tail.elements().get(1))), left));
     }
 
+    /** Validate only the semantic skeleton; retain every delimiter in the emitted body. */
+    private static List<Expression> assocSkeleton(Expression expression) {
+        if (!(expression instanceof Sequence sequence)) return List.of();
+        return sequence.elements().stream()
+            .filter(element -> !assocDelimiter(element))
+            .toList();
+    }
+
+    private static boolean assocDelimiter(Expression expression) {
+        if (expression instanceof Literal literal) return !literal.text().isEmpty();
+        if (expression instanceof OptionalExpr optional) return literalDelimiterBody(optional.child());
+        if (expression instanceof Repeat repeat)
+            return repeat.min() == 0 && repeat.max() == null && literalDelimiterBody(repeat.child());
+        return false;
+    }
+
+    // Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
+    private static boolean literalDelimiterBody(Expression expression) {
+        if (expression instanceof Literal literal) return !literal.text().isEmpty();
+        return expression instanceof Sequence sequence && !sequence.elements().isEmpty()
+            && sequence.elements().stream().allMatch(element ->
+                element instanceof Literal literal && !literal.text().isEmpty());
+    }
+
     private void checkLeftAssoc(int rule, Mapping mapping) {
+        List<Expression> sequence = assocSkeleton(bodies.get(rule));
+        List<Expression> tail = sequence.size() == 2 && sequence.get(1) instanceof Repeat repeat
+            ? assocSkeleton(repeat.child()) : List.of();
         if (mapping == null || !mapping.fields().stream().map(Field::name).toList().equals(List.of("left", "op", "right"))
-            || !(bodies.get(rule) instanceof Sequence sequence) || sequence.elements().size() != 2
-            || !(sequence.elements().get(0) instanceof Capture left) || !left.name().equals("left")
-            || !(sequence.elements().get(1) instanceof Repeat repeat) || repeat.min() != 0 || repeat.max() != null
-            || !(repeat.child() instanceof Sequence tail) || tail.elements().size() != 2
-            || !(tail.elements().get(0) instanceof Capture op) || !op.name().equals("op")
-            || !(tail.elements().get(1) instanceof Capture right) || !right.name().equals("right")
+            || sequence.size() != 2
+            || !(sequence.get(0) instanceof Capture left) || !left.name().equals("left")
+            || !(sequence.get(1) instanceof Repeat repeat) || repeat.min() != 0 || repeat.max() != null
+            || tail.size() != 2
+            || !(tail.get(0) instanceof Capture op) || !op.name().equals("op")
+            || !(tail.get(1) instanceof Capture right) || !right.name().equals("right")
             || !captures(left.expression()).isEmpty() || !captures(op.expression()).isEmpty()
             || !captures(right.expression()).isEmpty()
             || mapping.fields().get(0).cardinality() != Cardinality.ONE
@@ -611,19 +655,30 @@ public final class RustGrammarLowering {
         return new Choice(List.of(new Sequence(List.of(left, op, right)), left));
     }
 
+    private boolean nestedMixed(RuleBody body) {
+        if(!nestedRule)return false;
+        try { return org.unlaxer.dsl.codegen.NestedCaptures.body(grammar,body,0).leaf()==Kind.VALUE; }
+        catch(IllegalArgumentException ignored){return false;}
+    }
     private Expression body(RuleBody body) {
         if (body instanceof ChoiceBody choice) {
             return choice.alternatives().size() == 1 ? body(choice.alternatives().get(0))
                 : new Choice(choice.alternatives().stream().map(alt -> {
                     Expression lowered = body(alt);
-                    return alt.elements().size() == 1 ? ((Sequence) lowered).elements().get(0) : lowered;
+                    Expression value=alt.elements().size() == 1 ? ((Sequence) lowered).elements().get(0) : lowered;
+                    if (nestedMixed(body)) {
+                        var leaf=org.unlaxer.dsl.codegen.NestedCaptures.body(grammar,alt,0).leaf();
+                        if(leaf==Kind.TEXT)value=new TextValue(value);
+                        else if(leaf==Kind.INTEGER)value=new ValueBoundary(value);
+                    }
+                    return value;
                 }).toList());
         }
         if (body instanceof SequenceBody sequence) {
             return new Sequence(sequence.elements().stream().map(element -> {
                 Expression expression = atomic(element.element());
                 if (element.captureName().isEmpty()) return expression;
-                return capture(element.captureName().get(), expression);
+                return nestedRule ? new Capture(element.captureName().get(), nestedBoundary(expression)) : capture(element.captureName().get(), expression);
             }).toList());
         }
         throw new IllegalStateException("unhandled " + body);
@@ -644,6 +699,11 @@ public final class RustGrammarLowering {
             if (id == null) throw unsupported("unknown reference " + reference.name());
             return new Reference(id);
         }
+        if (element instanceof UBNFAST.OwnedCaptureElement capture) {
+            return new OwnedCapture(scalarText(capture.name()), singleBody(capture.body(), true));
+        }
+        if (element instanceof UBNFAST.ReplayElement replay) return new Replay(scalarText(replay.name()));
+        if (element instanceof UBNFAST.CaptureScopeElement scope) return new CaptureScope(singleBody(scope.body(), true));
         if (element instanceof GroupElement group) {
             return body(group.body());
         }
@@ -688,6 +748,22 @@ public final class RustGrammarLowering {
         if (child instanceof Choice || child instanceof Literal) return new Delimited(child);
         return atom instanceof RuleRefElement || child instanceof Sequence
             ? child : new Sequence(List.of(child));
+    }
+
+    private CaptureBoundary nestedBoundary(Expression expression) {
+        if (expression instanceof Sequence s && s.elements().size()==1) {
+            var inner=nestedBoundary(s.elements().get(0));
+            return new CaptureBoundary(inner.kind(),new Sequence(List.of(inner.child())));
+        }
+        if (expression instanceof GeneralBody general) {
+            var inner=nestedBoundary(general.child());
+            return new CaptureBoundary(inner.kind(),general.withChild(inner.child()));
+        }
+        if (expression instanceof Delimited d) { var inner=nestedBoundary(d.child()); return new CaptureBoundary(inner.kind(),new Delimited(inner.child())); }
+        if (expression instanceof OptionalExpr o) return new CaptureBoundary(BoundaryKind.OPTIONAL,new OptionalExpr(nestedBoundary(o.child())));
+        if (expression instanceof Repeat r) return new CaptureBoundary(BoundaryKind.LIST,new Repeat(nestedBoundary(r.child()),r.min(),r.max()));
+        if (expression instanceof Separated s) return new CaptureBoundary(BoundaryKind.LIST,new Separated(nestedBoundary(s.child()),new CaptureBoundary(BoundaryKind.SEPARATOR,s.separator())));
+        return new CaptureBoundary(BoundaryKind.VALUE,expression);
     }
 
     // A capture on a quantifier denotes its elements, not the concatenated text of the wrapper.
@@ -760,6 +836,7 @@ public final class RustGrammarLowering {
         if (expression instanceof UniqueLongestChoice choice) {
             return combinePredictors(choice.alternatives(), visiting, cache);
         }
+        if (expression instanceof GeneralBody general) return firstPredictor(general.child(), visiting, cache);
         if (expression instanceof Capture capture) {
             return firstPredictor(capture.expression(), visiting, cache);
         }
@@ -769,6 +846,7 @@ public final class RustGrammarLowering {
         if (expression instanceof TextValue text) {
             return firstPredictor(text.child(), visiting, cache);
         }
+        if (expression instanceof CaptureBoundary boundary) return firstPredictor(boundary.child(),visiting,cache);
         if (expression instanceof ValueBoundary boundary) {
             return firstPredictor(boundary.child(), visiting, cache);
         }
@@ -814,6 +892,9 @@ public final class RustGrammarLowering {
     }
 
     private boolean nullable(Expression expression) {
+        if (expression instanceof Replay) return true;
+        if (expression instanceof GeneralBody general) return nullable(general.child());
+        if (expression instanceof CaptureBoundary b) { return nullable(b.child()); }
         if (expression instanceof LexicalToken token) return token.expression().nullable();
         if (expression instanceof ErrorExpected ignored) {
             return false;
@@ -947,11 +1028,13 @@ public final class RustGrammarLowering {
     }
 
     private void checkRepetition(Expression expression) {
+        if (expression instanceof GeneralBody general) { checkRepetition(general.child()); return; }
+        if (expression instanceof CaptureBoundary b) { checkRepetition(b.child()); return; }
         if (expression instanceof Repeat repeat) {
-            if (repeat.max() == null && nullable(repeat.child())) throw unsupported("nullable unbounded repetition");
+            // Generated repeats use JavaRepeat: one successful zero-progress iteration stops.
+            // Nullable bodies are safe here; source left-recursion analysis remains separate.
             checkRepetition(repeat.child());
         } else if (expression instanceof Separated separated) {
-            if (nullable(separated.child()) && nullable(separated.separator())) throw unsupported("nullable unbounded separation");
             if (shape(separated.separator(), new HashSet<>()).kind() != Kind.TEXT) throw unsupported("mapped separator");
             checkRepetition(separated.child()); checkRepetition(separated.separator());
         } else if (expression instanceof OptionalExpr optional) {
@@ -979,6 +1062,8 @@ public final class RustGrammarLowering {
     }
 
     private Set<Integer> leadingRules(Expression expression) {
+        if (expression instanceof GeneralBody general) return leadingRules(general.child());
+        if (expression instanceof CaptureBoundary b) { return leadingRules(b.child()); }
         if (expression instanceof ErrorExpected ignored) return Set.of();
         if (expression instanceof Reference reference) {
             return Set.of(reference.rule());
@@ -993,7 +1078,7 @@ public final class RustGrammarLowering {
             return leadingRules(optional.child());
         }
         if (expression instanceof Repeat repeat) {
-            return leadingRules(repeat.child());
+            return repeat.max() != null && repeat.max() == 0 ? Set.of() : leadingRules(repeat.child());
         }
         if (expression instanceof Separated separated) {
             Set<Integer> result = new HashSet<>(leadingRules(separated.child()));
@@ -1034,6 +1119,7 @@ public final class RustGrammarLowering {
                 if (mappings.get(rule) != null || !visited.add(rule)) return false;
                 return skippedProjection(bodies.get(rule), visited);
             }
+            if (expression instanceof GeneralBody general) return skippedProjection(general.child(), visited);
             if (expression instanceof Capture capture) return skippedProjection(capture.expression(), visited);
             if (expression instanceof Delimited delimited) return skippedProjection(delimited.child(), visited);
             if (expression instanceof OptionalExpr optional) return skippedProjection(optional.child(), visited);
@@ -1084,6 +1170,7 @@ public final class RustGrammarLowering {
     }
 
     private Shape shape(Expression expression, Set<Integer> visiting, boolean enumNodes) {
+        if (expression instanceof CaptureBoundary b) { return b.kind()==BoundaryKind.SEPARATOR ? new Shape(Kind.TEXT,Cardinality.ONE) : shape(b.child(),visiting,enumNodes); }
         enterAnalysis();
         try {
             if (expression instanceof ErrorExpected ignored) {
@@ -1092,6 +1179,7 @@ public final class RustGrammarLowering {
             if (expression instanceof Reference reference) {
                 return shape(reference.rule(), visiting, enumNodes);
             }
+            if (expression instanceof GeneralBody general) return shape(general.child(), visiting, enumNodes);
             if (expression instanceof Capture capture) {
                 return shape(capture.expression(), visiting, enumNodes);
             }
@@ -1160,8 +1248,10 @@ public final class RustGrammarLowering {
     }
 
     private Map<String, Shape> captures(Expression expression) {
+        if (expression instanceof CaptureBoundary b) { return captures(b.child()); }
         enterAnalysis();
         try {
+            if (expression instanceof GeneralBody general) return captures(general.child());
             if (expression instanceof Capture capture) {
                 Map<String, Shape> result = new LinkedHashMap<>(captures(capture.expression()));
                 result.merge(capture.name(), shape(capture.expression(), new HashSet<>()), (a, b) -> merge(a, b, true));

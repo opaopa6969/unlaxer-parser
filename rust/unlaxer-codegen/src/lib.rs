@@ -6,6 +6,7 @@ mod associative;
 pub mod dap;
 mod enums;
 pub mod ir;
+mod nested;
 pub mod preferred;
 pub use enums::{enum_constant_name, validate_enum_type};
 pub mod lexical;
@@ -138,6 +139,12 @@ fn has_values(ir: &GrammarIr) -> bool {
         .any(|f| f.kind == Kind::Value)
 }
 
+fn has_nested_values(ir: &GrammarIr) -> bool {
+    ir.rules
+        .iter()
+        .flat_map(typeof_constraints::fields)
+        .any(|f| matches!(&f.kind,Kind::Nested{leaf,..} if **leaf==Kind::Value))
+}
 fn needs_values(ir: &GrammarIr) -> bool {
     has_values(ir)
         || ir
@@ -159,10 +166,15 @@ fn contains_recovery(expression: &Expression) -> bool {
         | LexicalContextScope { child, .. }
         | TextValue(child)
         | ValueBoundary(child)
+        | CaptureBoundary { child, .. }
         | Delimited(child)
         | OptionalExpr(child)
         | Repeat { child, .. } => contains_recovery(child),
-        Capture { expression, .. } => contains_recovery(expression),
+        Capture { expression, .. }
+        | OwnedCapture {
+            child: expression, ..
+        }
+        | CaptureScope(expression) => contains_recovery(expression),
         Separated { child, separator } => contains_recovery(child) || contains_recovery(separator),
         Sequence(values) | Choice(values) | LongestChoice(values) | UniqueLongestChoice(values) => {
             values.iter().any(contains_recovery)
@@ -182,6 +194,12 @@ fn ast(ir: &GrammarIr) -> String {
     out.push_str(&enum_declarations(ir));
     if needs_values(ir) {
         out.push_str(&ast_values(ir));
+    }
+    if has_nested_values(ir) {
+        out.push_str(&ast_values(ir).replace("AstValue","NestedValue")
+            .replace("    Node(Box<Ast>),\n","    Integer { value: i32, span: Span },\n    Node(Box<Ast>),\n")
+            .replace("            Self::Node(node) => node.span(),\n","            Self::Integer { span, .. } => *span,\n            Self::Node(node) => node.span(),\n")
+            .replace("            Self::Node(node) => node.canonical_json(),\n","            Self::Integer { value, .. } => value.to_string(),\n            Self::Node(node) => node.canonical_json(),\n"));
     }
     out.push_str("#[allow(non_snake_case, non_camel_case_types)]\n#[derive(Debug, Clone, PartialEq)]\npub enum Ast {\n");
     for mapping in mappings(ir) {
@@ -513,6 +531,7 @@ fn expression(expr: &Expression) -> String {
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
         ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
+        CaptureBoundary { kind, child } => format!("Expr::{}(unlaxer_runtime::capture_tree::Kind::{kind:?}, Box::new({}))", if *kind == crate::ir::BoundaryKind::Separator { "CaptureBoundary" } else { "InputCaptureBoundary" }, expression(child)),
         LexicalContextScope { child, terminals } => format!(
             "{}.lexical_context_scope(vec![{}])", expression(child),
             terminals.iter().map(|(name, literal, definition)| format!(
@@ -545,6 +564,9 @@ fn expression(expr: &Expression) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        OwnedCapture { name, child } => format!("Expr::OwnedCapture({}, Box::new({}))", quote(name), expression(child)),
+        Replay(name) => format!("Expr::Replay({})", quote(name)),
+        CaptureScope(child) => format!("Expr::CaptureScope(Box::new({}))", expression(child)),
         Capture {
             name,
             expression: child,
@@ -564,9 +586,9 @@ fn expression(expr: &Expression) -> String {
             let child = expression(child);
             let separator = expression(separator);
             if metadata {
-                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).zero_or_more()])",quote(preferred::EXTRA))
+                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).repeat_java(0, None)])",quote(preferred::EXTRA))
             } else {
-                format!("{child}.separated_by({separator})")
+                format!("{child}.separated_by_java({separator})")
             }
         },
     }
@@ -622,10 +644,13 @@ fn grapheme_capture(ir: &GrammarIr, body: &Expression, name: &str) -> bool {
                 alternatives: children,
                 ..
             } => pending.extend(children.iter().map(|child| (child, captured))),
-            OptionalExpr(child)
+            OwnedCapture { child, .. }
+            | CaptureScope(child)
+            | OptionalExpr(child)
             | Delimited(child)
             | TextValue(child)
             | ValueBoundary(child)
+            | CaptureBoundary { child, .. }
             | Repeat { child, .. }
             | TriviaScope { child, .. }
             | RuleEffects { child, .. }
@@ -650,8 +675,17 @@ fn mapper(ir: &GrammarIr) -> String {
     if needs_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
     }
+    if has_nested_values(ir) {
+        out.push_str("use super::ast::NestedValue;\n");
+    }
     out.push_str(&enum_imports(ir));
-    out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::Tree;\n\npub fn map(tree: &Tree) -> Result<Ast, String> {\n");
+    out.push_str("use super::ast::Ast;\nuse unlaxer_runtime::mapping::Context as Tree;\n\npub fn map(tree: &unlaxer_runtime::Tree) -> Result<Ast, String> {\n");
+    writeln!(
+        out,
+        "    let tree = &Tree::new(tree, {})?;\n    tree.ensure_mappable(tree.root)?;",
+        ir.rules.len()
+    )
+    .unwrap();
     if ir.rules.iter().any(|rule| contains_recovery(&rule.body)) {
         out.push_str("    if !tree.recoveries().is_empty() { return Err(\"cannot map recovered syntax\".into()); }\n");
     }
@@ -675,12 +709,12 @@ fn mapper(ir: &GrammarIr) -> String {
             rule.name
         )
         .unwrap();
-        out.push_str("    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n");
-        writeln!(out, "        if node.rule == {index} {{\n            found.push({}::from_text(tree.text(node.span))?);\n        }} else {{\n            found.extend(map_enum_{index}(tree, &node.children)?);\n        }}\n    }}\n    Ok(found)\n}}",rule.name).unwrap();
+        out.push_str("    let mut found = Vec::new();\n    for &id in ids {\n        tree.visit(id)?;\n        let node = &tree.nodes[id];\n");
+        writeln!(out, "        if node.rule == {index} {{\n            found.push({}::from_text(tree.text(node.span)?)?);\n        }} else {{\n            found.extend(map_enum_{index}(tree, &node.children)?);\n        }}\n    }}\n    Ok(found)\n}}",rule.name).unwrap();
     }
     if needs_values(ir) {
-        out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }),\n");
-        out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
+        out.push_str("\nfn map_values(tree: &Tree, ids: &[usize]) -> Result<Vec<AstValue>, String> {\n    let mut found = Vec::new();\n    for &id in ids {\n        tree.visit(id)?;\n        let node = &tree.nodes[id];\n        match node.rule {\n            unlaxer_runtime::TEXT_VALUE_RULE => found.push(AstValue::Text {\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),\n                span: node.span,\n            }),\n");
+        out.push_str("            unlaxer_runtime::VALUE_BOUNDARY_RULE => {\n                let values = map_values(tree, &node.children)?;\n                if !values.is_empty() && values.iter().all(|value| matches!(value, AstValue::Text { .. })) {\n                    found.push(AstValue::Text {\n                        text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),\n                        span: node.span,\n                    });\n                } else {\n                    found.extend(values);\n                }\n            },\n");
         for (id, rule) in ir
             .rules
             .iter()
@@ -688,7 +722,7 @@ fn mapper(ir: &GrammarIr) -> String {
             .filter(|(_, r)| !r.enum_literals.is_empty())
         {
             let name = &rule.name;
-            writeln!(out,"            {id} => found.push(AstValue::Enum{name} {{ value: {name}::from_text(tree.text(node.span))?, span: node.span }}),").unwrap();
+            writeln!(out,"            {id} => found.push(AstValue::Enum{name} {{ value: {name}::from_text(tree.text(node.span)?)?, span: node.span }}),").unwrap();
         }
         let ids: Vec<_> = ir
             .rules
@@ -709,7 +743,7 @@ fn mapper(ir: &GrammarIr) -> String {
             .map(|(id, _)| id.to_string())
             .collect();
         if !skipped.is_empty() {
-            writeln!(out, "            {} => found.push(AstValue::Text {{\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)).to_owned(),\n                span: node.span,\n            }}),", skipped.join(" | ")).unwrap();
+            writeln!(out, "            {} => found.push(AstValue::Text {{\n                text: unlaxer_runtime::java_capture_text(tree.text(node.span)?).to_owned(),\n                span: node.span,\n            }}),", skipped.join(" | ")).unwrap();
         }
         out.push_str("            _ => found.extend(map_values(tree, &node.children)?),\n        }\n    }\n    Ok(found)\n}\n");
     }
@@ -722,8 +756,20 @@ fn mapper(ir: &GrammarIr) -> String {
     {
         out.push_str("\nfn optional<T>(mut values: Vec<T>, name: &str) -> Result<Option<T>, String> {\n    if values.len() > 1 { return Err(format!(\"expected at most one value for {name}, got {}\", values.len())); }\n    Ok(values.pop())\n}\n");
     }
+    if ir
+        .rules
+        .iter()
+        .flat_map(typeof_constraints::fields)
+        .any(|f| matches!(f.kind, Kind::Nested { .. }))
+    {
+        if has_nested_values(ir) {
+            out.push_str(&nested::mixed_mapper(ir));
+        }
+        out.push_str(nested::HELPERS);
+        if ir.rules.iter().flat_map(typeof_constraints::fields).any(|f|matches!(&f.kind,Kind::Nested{leaf,..} if matches!(leaf.as_ref(),Kind::Node|Kind::Enum(_)|Kind::Value))) { out.push_str(nested::PROJECT_HELPERS); }
+    }
     out.push_str(&associative::helpers(ir));
-    out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    match tree.nodes[id].rule {\n");
+    out.push_str("\nfn map_node(tree: &Tree, id: usize) -> Result<Vec<Ast>, String> {\n    tree.visit(id)?;\n    match tree.nodes[id].rule {\n");
     for (index, rule) in ir.rules.iter().enumerate() {
         if rule.skip {
             writeln!(out, "        {index} => Ok(Vec::new()),").unwrap();
@@ -747,7 +793,7 @@ fn mapper(ir: &GrammarIr) -> String {
             if !rule.enum_literals.is_empty() {
                 writeln!(
                     out,
-                    "        r#value: {}::from_text(tree.text(node.span))?,\n    }}])\n}}",
+                    "        r#value: {}::from_text(tree.text(node.span)?)?,\n    }}])\n}}",
                     rule.name
                 )
                 .unwrap();
@@ -764,17 +810,46 @@ fn mapper(ir: &GrammarIr) -> String {
                     continue;
                 }
                 writeln!(out, "        r#{}: {{\n            let mut values = Vec::new();\n            for capture in node.captures.iter().filter(|c| c.name == {}) {{", field.name, quote(&field.name)).unwrap();
-                if let Some(code) = associative::capture(Some(mapping), field, "                ") {
+                if let Kind::Nested { leaf, containers } = &field.kind {
+                    let projection = match leaf.as_ref() {
+                        Kind::Value => Some("map_nested_values".to_owned()),
+                        Kind::Node => Some("map_nodes".to_owned()),
+                        Kind::Enum(name) => Some(format!(
+                            "map_enum_{}",
+                            ir.rules
+                                .iter()
+                                .position(|r| &r.name == name && !r.enum_literals.is_empty())
+                                .expect("validated nested enum")
+                        )),
+                        _ => None,
+                    };
+                    out.push_str("                let nested = nested_capture(tree, capture)?;\n");
+                    if projection.is_some() {
+                        out.push_str("                let mut nested_sources = nested_source_nodes(tree, capture.nodes[0])?.into_iter();\n");
+                    }
+                    writeln!(
+                        out,
+                        "                values.push({}?);",
+                        nested::mapped(leaf, containers, "&nested", 0, projection.as_deref())
+                    )
+                    .unwrap();
+                    if projection.is_some() {
+                        out.push_str("                if nested_sources.next().is_some() { return Err(\"unmapped original nested leaf\".into()); }\n");
+                    }
+                } else if let Some(code) =
+                    associative::capture(Some(mapping), field, "                ")
+                {
                     out.push_str(&code);
                 } else {
                     out.push_str(match field.kind {
-                    Kind::Integer => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n",
+                    Kind::Nested { .. } => unreachable!("handled nested field"),
+                    Kind::Integer => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n",
                     Kind::NullableNode => unreachable!("validated associative projection"),
                     Kind::Node => "                values.extend(map_nodes(tree, &capture.nodes)?);\n",
                     Kind::Value => "                values.extend(map_values(tree, &capture.nodes)?);\n",
-                    Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => "                values.push(tree.text(capture.span).to_owned());\n",
+                    Kind::Text if grapheme_capture(ir, &rule.body, &field.name) => "                values.push(tree.text(capture.span)?.to_owned());\n",
                     Kind::Enum(_) => unreachable!("handled enum field"),
-                    Kind::Text => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)).to_owned());\n",
+                    Kind::Text => "                values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).to_owned());\n",
                 });
                 }
                 writeln!(
@@ -794,6 +869,9 @@ fn evaluator(ir: &GrammarIr) -> String {
     let mut out = String::from(HEADER);
     if has_values(ir) {
         out.push_str("use super::ast::AstValue;\n");
+    }
+    if has_nested_values(ir) {
+        out.push_str("use super::ast::NestedValue;\n");
     }
     out.push_str(&enum_imports(ir));
     out.push_str("use super::ast::Ast;\n");
@@ -857,7 +935,12 @@ fn pattern(mapping: &Mapping, ty: &str) -> String {
 }
 
 fn field_type(field: &Field, borrowed: bool) -> String {
+    if let Kind::Nested { leaf, containers } = &field.kind {
+        let value = nested::ty(leaf, containers);
+        return if borrowed { format!("&{value}") } else { value };
+    }
     let one = match (&field.kind, borrowed) {
+        (Kind::Nested { .. }, _) => unreachable!("handled nested field"),
         (Kind::Integer, true) => "&i32",
         (Kind::Integer, false) => "i32",
         (Kind::Node, true) => "&Ast",
@@ -887,6 +970,7 @@ fn field_type(field: &Field, borrowed: bool) -> String {
         Cardinality::Optional => format!("Option<{one}>"),
         Cardinality::Many => {
             let element = match field.kind {
+                Kind::Nested { .. } => unreachable!("handled nested field"),
                 Kind::Integer => "i32",
                 Kind::Node => "Ast",
                 Kind::NullableNode => "Option<Box<Ast>>",
@@ -937,6 +1021,9 @@ fn mapped_value(field: &Field) -> String {
 
 fn field_json(field: &Field) -> String {
     let name = format!("r#{}", field.name);
+    if let Kind::Nested { leaf, containers } = &field.kind {
+        return nested::json(leaf, containers, &name, 0);
+    }
     let value = if field.kind == Kind::Integer {
         "value.to_string()"
     } else if field.kind != Kind::Text {

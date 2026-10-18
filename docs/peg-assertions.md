@@ -43,10 +43,12 @@ The existing diagnostic representations remain distinct. Java retains its
 ordinary successful-parse reached offset; Rust's `failure()` reports zero when
 there has been no syntax failure. After an earlier Classic match-only operation,
 a Java assertion or parent combinator's failure frontier can include that pre-existing
-matched position. This diagnostic-frontier gap remains an open #545 acceptance condition; it is
-not treated as complete parity or an inherent language restriction. The current
-diagnostic offsets are separately handwritten
-in the shared oracle; assertion acceptance, cursor restoration and published
+matched position. Rust's explicit `parse_with_token_mode` entry selects this Classic
+frontier for the same assertion, while native `context.parse` retains its source-failure
+frontier. The [prior-matched diagnostic contract](prior-matched-diagnostics.md)
+verifies both preparation APIs, matching transaction boundaries and the practical
+Java-compatible entry. The historical offsets in this native-PEG comparison remain
+separately handwritten; assertion acceptance, cursor restoration and published
 state use common expectations. A reached offset with no expected tokens is not
 an error to publish to an IDE.
 

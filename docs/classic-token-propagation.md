@@ -106,15 +106,17 @@ contract still requires discarding a context after a panicking callback. Neither
 runtime rolls back arbitrary external I/O.
 
 Remaining #545 work is explicit: [capture/replay and name lifetime](https://github.com/opaopa6969/unlaxer-parser/issues/572),
-including its remaining generated UBNF integration, and [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573). The earlier PEG diagnostic-frontier gap
-also remains tracked in #545; new Classic-entry cases do not prove all legacy
-PEG/TokenExpr entry diagnostics equivalent. [General owned capture/replay](owned-capture-replay.md)
+including its remaining generated UBNF integration. The [external Tiny code-fence mode graphs](https://github.com/opaopa6969/unlaxer-parser/issues/573) are implemented as described below. The [prior-matched diagnostic contract](prior-matched-diagnostics.md)
+now compares the existing PEG and TokenExpr entry boundaries explicitly: Java-compatible
+Classic frontiers are selectable without replacing native PEG's source-failure semantics.
+The legacy TokenExpr entry corresponds to an explicit outer Java transaction, not a raw leaf call. [General owned capture/replay](owned-capture-replay.md)
 now has separate runtime APIs for input, projected and generated values (#590).
 The existing Rust AST field capture store retains its original-input boundary:
 it rejects a projected or detached field capture instead of reading a different
-input slice. Generated UBNF integration remains #591 / #572. Native
-code-fence scanners without a mode-aware implementation reject this explicit
-mode; normal native parsing remains available. Classic `JavaUntil` and positive /
+input slice. Generated UBNF integration remains #591 / #572. The Tiny
+code-fence adapters now have mode-aware implementations (see below). Other
+unsupported native scanner shapes still reject this explicit mode; normal native
+parsing remains available. Classic `JavaUntil` and positive /
 negative `JavaLookahead` preserve their distinct runtime APIs and have shared
 handwritten cases. Full generated capture/replay integration must be verified
 separately before claiming that remaining scope.
@@ -134,3 +136,5 @@ policies. Java also checks actual success-memo hits/tree copying and exceptional
 child frames. Rust additionally checks committed trace and the existing standard
 2 MiB recursion/resource tests. Callback exception rows use Java unchecked
 exceptions and Rust `ParseError`; Rust panics are not asserted to be recoverable.
+
+Tiny CodeStart/CodeEnd/LongCodeBlock also support explicit Classic modes; see the [pinned real-parser contract and corpus](tiny-classic-modes.md).

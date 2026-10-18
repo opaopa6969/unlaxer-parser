@@ -159,6 +159,8 @@ The evidence includes [CI](.github/workflows/maven.yml) on Rust 1.85 with Cargo 
 
 The development branch adds [Unicode-pinned `CI('word')` tokens](docs/case-insensitive-tokens.md) to both Java and Rust, removing JDK Unicode-version drift and correcting unsafe Java candidate pruning. This addition is **not included in the published 3.3.0 artifacts**.
 
+The development branch retires `REGEX(...)` and the Java `RegexTokenParser` runtime. Use declarative lexical combinators (`token NAME ::= expression;`); old declarations fail with `E-REGEX-RETIRED`. The [migration guide](docs/regex-retirement.md) covers identifiers, numbers, quotes, Unicode, and the differences in choice and repetition. Published 3.3.0 is unchanged.
+
 The development branch supports [literal enum values](docs/enum-values.md) in Java and Rust, including typed scalar/optional/list fields and source-positioned root wrappers. Mixed enum/Text/Node captures preserve type identity and per-occurrence positions through Java `EnumValue` and Rust tagged `AstValue`, including scalar/optional/list fields and shared mappings ([contract](docs/enum-values.md#mixed-values)). [Typed common fields](docs/common-fields.md) expose the actual Java member type and a borrowed Rust family view, including mixed values and optional/list fields. [Numeric captures](docs/numeric-captures.md) now share checked 32-bit integer scalar/optional/list values, including mapping failures for out-of-range or non-integer forms. [Mapping-time `@typeof` constraints](docs/typeof-constraints.md) compare scalar, enum, node, and container identities in both languages, including private/forward captures, and report mismatches at code-point source intervals. Both languages reject [untransformed left recursion](docs/left-recursion.md) before code generation, including cycles hidden behind nullable helpers. The parity baseline is Java 21; Java 17 compatibility does not limit new feature design.
 
 [Preferred AST snapshots](docs/preferred-ast-snapshots.md) retain mapping candidates and source positions, with Java-compatible name/depth/tie selection in Rust. [Family projections](docs/family-projection.md) preserve concrete children through sum/alias mappings. [Associative projections](docs/associative-projection.md) now preserve Java literal spines and mixed operands, including preferred candidates and DAP traversal. Synthetic literal leaves use an explicit nullable node slot; consumers of that generated Rust field must regenerate and handle `Option`.
@@ -175,7 +177,7 @@ The development branch adds [transactional `NonOrdered`](docs/nonordered-runtime
 
 Java also gains [explicit PEG assertions](docs/peg-assertions.md), matching the state rollback of Rust `ahead()` / `not_ahead()`. Classic match-only remains a separate contract; general consume/invert propagation, replay, and diagnostic-frontier gaps remain tracked in [#545](https://github.com/opaopa6969/unlaxer-parser/issues/545).
 
-The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. Capture/replay integration, external code-fence adapters, and observer exceptions remain tracked separately; this runtime slice does not complete parity.
+The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. [Tiny code-fence adapters](docs/tiny-classic-modes.md) also preserve the four modes, both cursors, retained leaf sources, and atomic failures. Capture/replay integration and observer exceptions remain tracked separately; this runtime slice does not complete parity.
 
 Classic Identifier, Number, and quoted tokens now [isolate their internal lexical scans](docs/classic-atomic-trivia.md) from surrounding grammar trivia. This preserves spaces inside quotes and keeps `A B` as two identifiers. The separate Classic outer-source mapping gap remains tracked in #606.
 
@@ -191,9 +193,17 @@ The development branch aligns [LSP syntax diagnostic positions](docs/classic-lsp
 
 See the [full-spec matrix](rust/FULL-SPEC.md) and [IDE inventory](docs/lsp-dap-ide-gap-inventory.md) for remaining limits: partial CST reparsing, LSP cancellation / rename and formatting transport, and some tokens and annotations are unsupported. DAP implements AST/token stepping, not live evaluator suspension. Some diagnostics and AST candidate/container behavior still differ between Java and Rust; compatibility with every Java grammar is not guaranteed.
 
+[Classic sequence trivia](docs/classic-sequence-trivia.md) now contributes the same collected source and code-point ranges in Java and Rust, including explicit Classic CST-to-AST mapping. The four token kinds retain their distinct source projection semantics.
+
+[Zero-bound repetitions](docs/zero-repetition.md) now perform no child or terminator evaluation in both runtimes and generated grammars. Historical Java `Zero` / `LazyZero` / `EOF` negative checks remain available through distinct semantics, including Rust `zero_match`. These development changes preserve both cursors and transactional state.
+
+[Nullable Classic repetitions](docs/nullable-repetition.md) now generate in both Rust hosts using the same single-success termination rule as Java. A successful zero-progress item is retained once before stopping; pure PEG and lexical repetition keep their separate contracts. Nullable separated lists remain tracked in #616.
+
 Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **ubnfc** engine. Their results do not establish Classic Rust parity or production deployment history. See the [engine guide](docs/engine-selection-guide-ja.md) and [pinned downstream audit](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30).
 
 ---
+
+[Explicit nested capture boundaries](docs/nested-capture-boundaries.md) preserve missing optionals, present empty lists, order, duplicates, and owned source snapshots in both runtimes. This runtime API is a development addition; generated nested field types and mappers remain tracked in [#583](https://github.com/opaopa6969/unlaxer-parser/issues/583).
 
 ## 5-Minute Quick Start
 

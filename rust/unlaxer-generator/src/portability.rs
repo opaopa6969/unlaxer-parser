@@ -75,6 +75,17 @@ fn quote(value: &str) -> String {
 pub fn check(source: &str) -> Report {
     let snapshot = match parse_with_source(source) {
         Ok(snapshot) => snapshot,
+        Err(error) if error.message.starts_with("E-REGEX-RETIRED:") => {
+            return Report {
+                portable: false,
+                structure: "unavailable",
+                diagnostics: vec![Diagnostic {
+                    code: "E-REGEX-RETIRED",
+                    subject: "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)".into(),
+                    span: Some(error.span),
+                }],
+            }
+        }
         Err(_) => {
             return Report {
                 portable: false,
@@ -149,6 +160,12 @@ pub fn check_ast(file: &UbnfFile) -> Report {
                     .and_then(|name| grammar.rules.iter().find(|r| r.name == name))
                 {
                     inventory.add("P-COMMONFIELD", "commonField schema", rule.span);
+                } else if let Some(rule) = error
+                    .strip_prefix("E-NESTED-SHAPE: ")
+                    .and_then(|s| s.split(": ").next())
+                    .and_then(|name| grammar.rules.iter().find(|r| r.name == name))
+                {
+                    inventory.add("P-NESTED-SHAPE", "nested capture schema", rule.span);
                 } else {
                     inventory.add("P-STRUCTURE", "Rust structural constraints", grammar.span);
                 }
@@ -321,7 +338,11 @@ impl Inventory {
             AnnotationKind::Eval { .. } => {}
             AnnotationKind::Doc { .. } | AnnotationKind::Recovery { .. } => {}
             AnnotationKind::Skip => {}
-            AnnotationKind::Simple { name } => self.add("P-ANNOTATION", name, span),
+            AnnotationKind::Simple { name } => {
+                if name != "nestedCaptures" {
+                    self.add("P-ANNOTATION", name, span);
+                }
+            }
             AnnotationKind::CommonField { .. } => {}
             AnnotationKind::Enum => {}
         }
@@ -335,9 +356,11 @@ impl Inventory {
     }
     fn element(&mut self, element: &AtomicElement) {
         match &element.kind {
-            ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
-                self.body(body)
-            }
+            ElementKind::OwnedCapture { body, .. }
+            | ElementKind::CaptureScope(body)
+            | ElementKind::Group(body)
+            | ElementKind::Optional(body)
+            | ElementKind::Repeat(body) => self.body(body),
             ElementKind::OneOrMore(element) | ElementKind::BoundedRepeat { element, .. } => {
                 self.element(element)
             }
@@ -353,7 +376,7 @@ impl Inventory {
                 format!("{namespace}.{name}"),
                 element.span,
             ),
-            ElementKind::Error(_) => {}
+            ElementKind::Replay { .. } | ElementKind::Error(_) => {}
             ElementKind::Terminal(value) if value.is_empty() => {
                 self.add("P-EMPTY-LITERAL", "empty literal", element.span)
             }

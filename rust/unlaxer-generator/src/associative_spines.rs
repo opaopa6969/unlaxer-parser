@@ -28,16 +28,40 @@ fn operands(rule: &RuleDecl) -> Vec<&AtomicElement> {
     let [seq] = rule.body.alternatives.as_slice() else {
         return vec![];
     };
-    let [left, repeat] = seq.elements.as_slice() else {
+    // Lowering has already checked the left/op/right skeleton. Literal delimiters
+    // keep their source positions, so operands must be selected by capture identity.
+    let Some(left) = seq
+        .elements
+        .iter()
+        .find(|element| element.capture.as_deref() == Some("left"))
+    else {
         return vec![];
     };
-    let ElementKind::Repeat(body) = &repeat.element.kind else {
+    // Other repetitions may contain only delimiters. The semantic tail owns both bindings.
+    let Some(tail) = seq.elements.iter().find_map(|element| {
+        let ElementKind::Repeat(body) = &element.element.kind else {
+            return None;
+        };
+        let [tail] = body.alternatives.as_slice() else {
+            return None;
+        };
+        (tail
+            .elements
+            .iter()
+            .any(|element| element.capture.as_deref() == Some("op"))
+            && tail
+                .elements
+                .iter()
+                .any(|element| element.capture.as_deref() == Some("right")))
+        .then_some(tail)
+    }) else {
         return vec![];
     };
-    let [tail] = body.alternatives.as_slice() else {
-        return vec![];
-    };
-    let [_, right] = tail.elements.as_slice() else {
+    let Some(right) = tail
+        .elements
+        .iter()
+        .find(|element| element.capture.as_deref() == Some("right"))
+    else {
         return vec![];
     };
     vec![&left.element, &right.element]
@@ -101,7 +125,9 @@ fn visit(
                 true
             }
         }
-        ElementKind::Group(b) => visit_body(g, b, seen, mapped, depth + 1, work)?,
+        ElementKind::Group(b)
+        | ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b) => visit_body(g, b, seen, mapped, depth + 1, work)?,
         ElementKind::Optional(b) | ElementKind::Repeat(b) => {
             visit_body(g, b, seen, mapped, depth + 1, work)?;
             true

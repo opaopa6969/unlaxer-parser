@@ -1,5 +1,7 @@
 package org.unlaxer.dsl;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -27,6 +29,10 @@ public final class PortabilityCheck {
         UBNFSourceSnapshot snapshot;
         try {
             snapshot = UBNFMapper.parseWithSource(source);
+        } catch (org.unlaxer.dsl.bootstrap.RegexRetirement.MigrationException error) {
+            return new Result(false, "unavailable", List.of(new Diagnostic(
+                org.unlaxer.dsl.bootstrap.RegexRetirement.CODE, new Span(error.start(), error.end()),
+                org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE)));
         } catch (IllegalArgumentException error) {
             return new Result(false, "unavailable", List.of(new Diagnostic("P-SYNTAX", null, "UBNF syntax")));
         }
@@ -38,6 +44,10 @@ public final class PortabilityCheck {
         UBNFSourceSnapshot snapshot;
         try {
             snapshot = UBNFMapper.parseWithSource(java.nio.file.Files.readString(path));
+        } catch (org.unlaxer.dsl.bootstrap.RegexRetirement.MigrationException error) {
+            return new Result(false, "unavailable", List.of(new Diagnostic(
+                org.unlaxer.dsl.bootstrap.RegexRetirement.CODE, new Span(error.start(), error.end()),
+                org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE)));
         } catch (IllegalArgumentException error) {
             return new Result(false, "unavailable", List.of(new Diagnostic("P-SYNTAX", null, "UBNF syntax")));
         }
@@ -76,8 +86,13 @@ public final class PortabilityCheck {
                     && rule.annotations().stream().noneMatch(annotation -> annotation instanceof PrecedenceAnnotation));
             if (invalid) add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
         } catch (RuntimeException error) {
+            var nestedIssues = error.getMessage() != null && error.getMessage().contains("E-NESTED-SHAPE")
+                ? org.unlaxer.dsl.codegen.NestedCaptures.problems(grammar) : List.<GrammarValidator.ValidationIssue>of();
             var commonRule=org.unlaxer.dsl.codegen.CommonFieldSchema.errorRule(error);
-            if(commonRule.isPresent()) {
+            if(!nestedIssues.isEmpty()) {
+                var origin=grammar.rules().stream().filter(r->r.name().equals(nestedIssues.get(0).rule())).findFirst().orElseThrow();
+                add(diagnostics,"P-NESTED-SHAPE",snapshot,origin,"nested capture schema");
+            } else if(commonRule.isPresent()) {
                 var origin=grammar.rules().stream().filter(r->r.name().equals(commonRule.get())).findFirst().orElseThrow();
                 add(diagnostics,"P-COMMONFIELD",snapshot,origin,"commonField schema");
             } else add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
@@ -121,10 +136,11 @@ public final class PortabilityCheck {
             }
         }
         for (TokenDecl token : grammar.tokens()) {
-            if (token instanceof TokenDecl.Simple simple && !RustGrammarLowering.supportsSimpleToken(simple.parserClass())) {
+            if (org.unlaxer.dsl.bootstrap.RegexRetirement.retired(token)) {
+                add(out, org.unlaxer.dsl.bootstrap.RegexRetirement.CODE, snapshot, token,
+                    org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE);
+            } else if (token instanceof TokenDecl.Simple simple && !RustGrammarLowering.supportsSimpleToken(simple.parserClass())) {
                 add(out, "P-EXTERNAL-TOKEN", snapshot, token, simple.parserClass());
-            } else if (token instanceof TokenDecl.Regex) {
-                add(out, "P-TOKEN-KIND", snapshot, token, "REGEX");
             }
         }
         for (RuleDecl rule : grammar.rules()) {
@@ -148,7 +164,7 @@ public final class PortabilityCheck {
 
     private static void scanAnnotation(GrammarDecl grammar, Annotation annotation, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
         String unsupported = null;
-        if (annotation instanceof SimpleAnnotation simple) unsupported = simple.name();
+        if (annotation instanceof SimpleAnnotation simple && !simple.name().equals("nestedCaptures")) unsupported = simple.name();
 
         if (unsupported != null) add(out, "P-ANNOTATION", snapshot, annotation, unsupported);
 
@@ -190,7 +206,7 @@ public final class PortabilityCheck {
             add(out, "P-QUALIFIED-REFERENCE", snapshot, atomic, ref.namespace().get() + "." + ref.name());
         } else if (atomic instanceof TerminalElement terminal && terminal.value().isEmpty()) {
             add(out, "P-EMPTY-LITERAL", snapshot, atomic, "empty literal");
-        } else if (atomic instanceof GroupElement group) {
+        } else if (atomic instanceof TransparentElement group) {
             scanBody(group.body(), snapshot, out);
         } else if (atomic instanceof OptionalElement optional) {
             scanBody(optional.body(), snapshot, out);

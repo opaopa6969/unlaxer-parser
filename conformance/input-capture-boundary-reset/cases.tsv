@@ -1,0 +1,9 @@
+# parser	kind	resetBefore	inputHex	success	consumedCP	matchedCP	resetAfterSyntaxFailure	resetAfterOuterRollback
+input-capture-value	consumed	false	3f	false	0	0	false	false
+input-capture-value	consumed	true	3f	false	0	0	false	true
+input-capture-value	matchOnly	false	3f	false	0	0	false	false
+input-capture-value	matchOnly	true	3f	false	0	0	false	true
+input-capture-value	virtualTokenConsumed	false	3f	false	0	0	false	false
+input-capture-value	virtualTokenConsumed	true	3f	false	0	0	false	true
+input-capture-value	virtualTokenMatchOnly	false	3f	false	0	0	false	false
+input-capture-value	virtualTokenMatchOnly	true	3f	false	0	0	false	true

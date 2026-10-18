@@ -68,7 +68,7 @@ final class RustGenerateCommand {
                     !(setting.key().equals("whitespace")
                         && setting.value() instanceof org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue value
                         && value.value().equals("none"))).toList(), grammar.tokens(), grammar.rules());
-            var errors = GrammarValidator.validate(validationGrammar).stream()
+            var errors = GrammarValidator.validateWithoutClassLoading(validationGrammar).stream()
                 .filter(issue -> "ERROR".equals(issue.severity())).map(GrammarValidator.ValidationIssue::format).toList();
             if (!errors.isEmpty()) throw new IllegalArgumentException("Grammar validation failed:\n - " + String.join("\n - ", errors));
             var generated = new RustBackend().generateWithProtocols(grammar, lsp, dap);

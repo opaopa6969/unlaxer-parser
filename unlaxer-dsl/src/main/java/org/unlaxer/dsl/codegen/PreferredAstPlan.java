@@ -20,6 +20,7 @@ public final class PreferredAstPlan {
                     semantic
                             ? new CaptureBindingPlan(rule, semantics)
                             : new CaptureBindingPlan(rule);
+            plan.markNestedMixed(grammar,rule);
             var calls = new ArrayList<Call>();
             var right = ParserRuleEmitter.getRightAssocShape(rule);
             if (right == null) body(rule.body(), 0, plan, rules, calls);
@@ -74,12 +75,20 @@ public final class PreferredAstPlan {
             CaptureBindingPlan plan,
             List<String> rules,
             List<Call> calls) {
+        if (plan.nested && plan.outerCapture(atom)) {
+            nested(atom, depth + 1, plan, rules, calls);
+            return;
+        }
         if (!plan.bindings(atom).isEmpty()) depth++;
         if (atom instanceof RuleRefElement ref) {
             int id = rules.indexOf(ref.name());
             if (id >= 0) calls.add(new Call(id, depth));
-        } else if (atom instanceof GroupElement group)
-            body(group.body(), depth, plan, rules, calls);
+        } else if (atom instanceof TransparentElement group) {
+            var child=single(group.body());
+            if (!(atom instanceof GroupElement) && child instanceof RuleRefElement)
+                atom(child,depth,plan,rules,calls);
+            else body(group.body(), depth, plan, rules, calls);
+        }
         else if (atom instanceof OptionalElement optional) {
             var child = single(optional.body());
             if (child instanceof RuleRefElement || child instanceof TerminalElement)
@@ -97,6 +106,29 @@ public final class PreferredAstPlan {
             atom(separated.element(), depth + 1, plan, rules, calls);
             atom(separated.separator(), depth + 3, plan, rules, calls);
         }
+    }
+
+    /** Mirror resolveNested: each explicit container and leaf adds a boundary token. */
+    private static void nested(AtomicElement atom, int depth, CaptureBindingPlan plan,
+            List<String> rules, List<Call> calls) {
+        if (atom instanceof TransparentElement group) nestedBody(group.body(),depth,plan,rules,calls);
+        else if (atom instanceof OptionalElement optional) nestedBody(optional.body(),depth+2,plan,rules,calls);
+        else if (atom instanceof RepeatElement repeat) nestedBody(repeat.body(),depth+2,plan,rules,calls);
+        else if (atom instanceof OneOrMoreElement repeat) nested(repeat.body(),depth+2,plan,rules,calls);
+        else if (atom instanceof BoundedRepeatElement repeat) nested(repeat.body(),depth+2,plan,rules,calls);
+        else if (atom instanceof SeparatedElement separated) {
+            nested(separated.element(),depth+2,plan,rules,calls);
+            // Outer list, list chain, tail repetition, tail chain and opaque separator.
+            atom(separated.separator(),depth+5,plan,rules,calls);
+        }
+        else if (atom instanceof RuleRefElement ref) {
+            int id=rules.indexOf(ref.name());if(id>=0)calls.add(new Call(id,depth+1));
+        }
+    }
+    private static void nestedBody(RuleBody value,int depth,CaptureBindingPlan plan,List<String> rules,List<Call> calls) {
+        var child=single(value);
+        if(child!=null)nested(child,depth,plan,rules,calls);
+        else body(value,depth+1,plan,rules,calls);
     }
 
     private static void repeated(

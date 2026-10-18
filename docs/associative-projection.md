@@ -41,3 +41,31 @@ cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml \
 この変更は #593（親 #569）の結合演算子投影です。nested container（#583）と recursive helper（#582）は別の意味単位であり、#547 全体の完了を主張しません。
 
 #631 の `MixedRightOperands` fixture は文字列と mapped leaf の左右順、右再帰の多段入力と末尾失敗を検証します。preferred depth は元 CST の branch/fallback 構造から決めています。演算子のない `x` の Leaf は深さ3、branchを持つ `x+a` では内部Chainが1つ加わるため深さ4です。右側Exprは深さ3ずつ増え、そのExprがbranchを持つかどうかも反映します。
+
+## Literal の capture 識別（#669）
+
+左結合の `left` / `op` / `right` は、生成 parser の capture binding を先に特定し、その範囲内から operand の parser 型を探します。同じ `WordParser`（tokenStream / lexical context では `Lexing.LiteralParser`）を使う別の literal や構造 delimiter を代用しません。例えば `'a' @left { '+' @op 'a' @right }` の `a+a` は、Java / Rust とも `left="a", op=["+"], right=["a"]` になります。従来 Java の `right=["+"]` は誤投影でした。共有 mapping の追加 rule にも同じ選択を適用します。
+
+AST の field 型・コンストラクタ・source span の単位は変更しません。既存の右結合は capture binding による選択を維持し、Rust の mapper 意味も変更しません。通常 associative rule を nested mapped field から参照する経路は対象ですが、nested 所有 rule 自体の associative annotation を新たに許可する変更ではありません。
+
+追加 oracle は直接 literal、同一 literal の別 capture、tokenStream、構造 delimiter、共有 mapping、precedence、補助文字 / CRLF、複数反復、右再帰、nested 参照を扱います。通常 mapper と preferred snapshot の値・候補 CP 範囲・保持値、構文失敗を同じ期待値で確認します。`PreferredAstConformanceTest` の共通 runner は Java / native host の Rust 全生成ファイル一致に加え、各出力を別々に `rustc` で compile/run します。DAP・合成 nullable leaf・mapped/mixed operand・commonField・typeof・autoEval は既存共通 corpus の回帰で検証します。
+
+## 左結合の固定 delimiter（#674）
+
+`Root ::= '(' NUMBER @left { '+' @op NUMBER @right } ')'` のような固定 delimiter を持つ左結合も、Java / native 両 Rust host で生成します。これは基準 Java `6816a2a6` で既に正常だった経路への対応です。Rust の canonical shape 制限を、両版共通の制約として扱い直したものではありません。
+
+検査では、rule の直下 Sequence と、その唯一の無制限 Repeat の直下 Sequence から、capture を持たない**非空の固定 literal**だけを除いた形が `left { op right }` であることを要求します。検査用の列を作るだけで、実 IR・parser・CST から delimiter は取り除きません。prefix、left と Repeat の間、suffix、Repeat 内の op/right の前後に置いた固定 literal は入力として必要で、AST span と preferred source はその原文を保持します。`left` は scalar、`op` と `right` は順序付き List の既存 schema のままです。
+
+#674 単位は固定 literal に限定しました。非捕捉 Optional / Repeat delimiter は後続 #679 の下記範囲で対応します。空 literal、一般的な helper/choice、非 canonical な右結合、nested-owner associative annotation は今回開放しません。Java の全ての左結合文法を同等化したという主張はしません。
+
+`spec-corpus/associative-delimiters` は NUMBER、literal、tokenStream、Unicode / CRLF、複数 precedence の mapped operand、非捕捉 delimiter、0/1/複数回反復と失敗を共有します。Java21 と両 host の Rust1.85 出力を実 compile/map/eval し、memo OFF / SAFE_FAILURES と診断 AUTO / DETAILED / DETAILED_ON_FAILURE の6組を検証します。CP失敗位置は Java の DETAILED で、構文失敗なら farthest、成功した prefix の後に余剰入力がある場合は consumed end と記録済失敗の大きい位置を観測し、Rust の完全入力解析が返す位置と比較します。直接 ParseContext の deferred 診断に、完全入力 API の自動再試行を仮定しません。
+
+## 非捕捉 Optional / Repeat delimiter（#679）
+
+基準 Java `6816a2a6` で正常だった `['('] NUMBER @left { '+' @op NUMBER @right }` と `{ '!' } NUMBER @left { '+' @op NUMBER @right }` を、両 Rust host にも対応させます。前者の `(1+2+3` は `left=1, op=["+","+"], right=[2,3]` / CP `[0,6]`、後者の `!!1+2+3` は同じ値 / CP `[0,7]` です。`''` を置いた対照は Java でも常に構文失敗であり、Rust の empty-literal 生成前拒否を維持します。
+
+検査で除外できる非捕捉要素は、非空固定 literal またはその列を、1段の Optional / zero-or-more Repeat で包んだものです。これは検査用の列だけに適用し、実 parser の試行・rollback・位置・原文は保持します。意味を持つ唯一の `left {op right}` 列は既存 capture 名・順序・型条件で検証します。非捕捉の別 Repeat が先にあっても、shared spine は `op` / `right` capture を持つ Repeat を使うため、delimiter が AST operand や型判定へ混入しません。
+
+直接の入力位置を保つため、delimiter を消した文法で再parseしたり、構文を任意に書き換えたりしません。既存 AST型、コンストラクタ、field順、evaluator引数、nullable synthetic leaf の意味は維持します。任意 helper/choice・匿名再帰形・nested-owner の新合成はこの変更では開放しません。
+
+`spec-corpus/associative-nullable-delimiters` は6文法27入力、memo2×診断3で Java と各 Rust 出力を別compile/map/evalします。Optionalの有無・delimiter反復回数・演算子反復回数、内部delimiter、tokenStream、Unicode/CRLF、shared precedence、preferred/保持snapshot、失敗を手書き期待値と比較します。`(1+` は primary trailing-input CP2 / farthest CP3、`!!1+` は primary CP3 / farthest CP4です。Java direct parserのprefix成功とfull-input消費条件を区別して両位置を観測し、Rust full-input diagnosticと照合します。捕捉値を増やすprefix、意味列が二つあるshape、empty literalは生成前に拒否します。

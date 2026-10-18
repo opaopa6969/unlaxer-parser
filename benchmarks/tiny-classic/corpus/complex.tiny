@@ -1,0 +1,15 @@
+var $price as number set 10;
+var $country as string set 'jp';
+@bench(name='複雑😀')
+if(not($price * 2 <= 10) & $country.in('jp', 'us')) {
+  max(pow($price, 2), abs(-3)) + call bonus($price)
+} else {
+  match {
+    $price > 100 -> 1,
+    $price > 50 -> 2,
+    default -> 0
+  }
+}
+float bonus($x as number) {
+  sqrt($x) + sin(30)
+}

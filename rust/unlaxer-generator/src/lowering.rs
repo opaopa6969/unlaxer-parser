@@ -83,6 +83,15 @@ impl FixedShape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    for token in &grammar.tokens {
+        if matches!(&token.kind, TokenKind::Regex { .. })
+            || matches!(&token.kind, TokenKind::Simple { parser_class }
+                if parser_class == "RegexTokenParser" || parser_class == "org.unlaxer.dsl.runtime.RegexTokenParser")
+        {
+            return Err("E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)".into());
+        }
+    }
+    crate::nested_captures::validate(grammar)?;
     crate::lexical_contexts::validate(grammar)?;
     let format_two = grammar.settings.iter().any(|setting| {
         setting.key == "ubnf"
@@ -102,6 +111,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     crate::common_fields::families(grammar)?;
     let mut ir = Lowering {
         grammar,
+        nested_rule: false,
         ids: HashMap::new(),
         tokens: HashMap::new(),
         bodies: Vec::new(),
@@ -128,6 +138,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
 
 struct Lowering<'a> {
     grammar: &'a ast::GrammarDecl,
+    nested_rule: bool,
     ids: HashMap<String, usize>,
     tokens: HashMap<String, Expression>,
     bodies: Vec<Expression>,
@@ -240,7 +251,10 @@ impl Lowering<'_> {
                     }
                 }
                 match &atom.kind {
-                    ElementKind::Group(inner) | ElementKind::Optional(inner) => {
+                    ElementKind::OwnedCapture { body: inner, .. }
+                    | ElementKind::CaptureScope(inner)
+                    | ElementKind::Group(inner)
+                    | ElementKind::Optional(inner) => {
                         self.follow_body(inner, target, tokens);
                     }
                     ElementKind::Repeat(inner) => {
@@ -300,7 +314,9 @@ impl Lowering<'_> {
                     tokens.push(value.clone());
                 }
             }
-            ElementKind::Group(inner)
+            ElementKind::OwnedCapture { body: inner, .. }
+            | ElementKind::CaptureScope(inner)
+            | ElementKind::Group(inner)
             | ElementKind::Optional(inner)
             | ElementKind::Repeat(inner) => {
                 self.first_body(inner, tokens, visited);
@@ -599,6 +615,7 @@ impl Lowering<'_> {
                     | AnnotationKind::Enum
                     | AnnotationKind::Eval { .. }
                     | AnnotationKind::CommonField { .. } => {}
+                    AnnotationKind::Simple { name } if name == "nestedCaptures" => {}
                     other => {
                         return Err(format!("unsupported annotation {other:?} on {}", rule.name))
                     }
@@ -678,6 +695,7 @@ impl Lowering<'_> {
         let root = root.ok_or("exactly one @root is required")?;
         self.check_parser_names()?;
         for rule in &self.grammar.rules {
+            self.nested_rule = crate::nested_captures::enabled(rule);
             self.bodies.push(self.body(&rule.body)?);
         }
         loop {
@@ -856,8 +874,20 @@ impl Lowering<'_> {
                     let shape = captures[name].clone();
                     fields.push(Field {
                         name: name.clone(),
-                        kind: shape.kind,
-                        cardinality: shape.cardinality,
+                        kind: if crate::nested_captures::enabled(&self.grammar.rules[i]) {
+                            crate::nested_captures::field(
+                                self.grammar,
+                                &self.grammar.rules[i],
+                                name,
+                            )?
+                        } else {
+                            shape.kind
+                        },
+                        cardinality: if crate::nested_captures::enabled(&self.grammar.rules[i]) {
+                            Cardinality::One
+                        } else {
+                            shape.cardinality
+                        },
                     });
                 }
                 let mapping = Mapping {
@@ -1210,7 +1240,22 @@ impl Lowering<'_> {
         if !usages.is_empty() && (self.skips[index] || !self.enums[index].is_empty()) {
             return Err("E-TYPEOF-MAPPING: @typeof requires a non-skipped @mapping rule".into());
         }
+        let nested_sites = if crate::nested_captures::enabled(rule) {
+            Some(crate::nested_captures::sites(rule)?)
+        } else {
+            None
+        };
         let field = |name: &str| -> Result<Field> {
+            if let Some(sites) = &nested_sites {
+                let _element = sites
+                    .get(name)
+                    .ok_or_else(|| format!("E-TYPEOF-UNKNOWN-CAPTURE: {name}"))?;
+                return Ok(Field {
+                    name: name.to_owned(),
+                    kind: crate::nested_captures::field(self.grammar, rule, name)?,
+                    cardinality: Cardinality::One,
+                });
+            }
             let shape = captures
                 .get(name)
                 .ok_or_else(|| format!("E-TYPEOF-UNKNOWN-CAPTURE: {name}"))?;
@@ -1235,6 +1280,11 @@ impl Lowering<'_> {
         if body.alternatives.is_empty() {
             return Err("empty choice".into());
         }
+        let mixed_nested = self.nested_rule
+            && matches!(
+                crate::nested_captures::body_shape(self.grammar, body, 0),
+                Ok(Kind::Value)
+            );
         let mut alternatives = Vec::new();
         for sequence in &body.alternatives {
             if sequence.elements.is_empty() {
@@ -1244,16 +1294,36 @@ impl Lowering<'_> {
             for element in &sequence.elements {
                 let value = self.atomic(&element.element)?;
                 elements.push(if let Some(name) = &element.capture {
-                    capture(name, value)?
+                    if self.nested_rule {
+                        Expression::Capture {
+                            name: name.clone(),
+                            expression: Box::new(crate::nested_captures::boundary(value)),
+                        }
+                    } else {
+                        capture(name, value)?
+                    }
                 } else {
                     value
                 });
             }
-            alternatives.push(if body.alternatives.len() > 1 && elements.len() == 1 {
+            let mut value = if body.alternatives.len() > 1 && elements.len() == 1 {
                 elements.remove(0)
             } else {
                 Expression::Sequence(elements)
-            });
+            };
+            if mixed_nested {
+                let kind = if let [element] = sequence.elements.as_slice() {
+                    crate::nested_captures::shape(self.grammar, &element.element, 0)?
+                } else {
+                    Kind::Text
+                };
+                value = match kind {
+                    Kind::Text => Expression::TextValue(Box::new(value)),
+                    Kind::Integer => Expression::ValueBoundary(Box::new(value)),
+                    _ => value,
+                };
+            }
+            alternatives.push(value);
         }
         Ok(if alternatives.len() == 1 {
             alternatives.remove(0)
@@ -1284,6 +1354,14 @@ impl Lowering<'_> {
                             .ok_or_else(|| format!("unknown reference {name}"))?,
                     )
                 }
+            }
+            ElementKind::OwnedCapture { name, body } => Expression::OwnedCapture {
+                name: name.clone(),
+                child: Box::new(self.single_body(body, true)?),
+            },
+            ElementKind::Replay { name } => Expression::Replay(name.clone()),
+            ElementKind::CaptureScope(body) => {
+                Expression::CaptureScope(Box::new(self.single_body(body, true)?))
             }
             ElementKind::Group(body) => self.body(body)?,
             ElementKind::Optional(body) => {
@@ -1359,14 +1437,22 @@ impl Lowering<'_> {
     fn is_nullable(&self, expression: &Expression) -> bool {
         match expression {
             Expression::LexicalToken { expression, .. } => expression.nullable(),
-            Expression::EmptyToken
+            Expression::Replay(_)
+            | Expression::EmptyToken
             | Expression::EofToken
             | Expression::LookaheadToken { .. }
             | Expression::UntilToken(_)
             | Expression::CustomToken(_)
             | Expression::OptionalExpr(_) => true,
             Expression::Reference(rule) => self.nullable.contains(rule),
-            Expression::Capture { expression, .. }
+            Expression::OwnedCapture {
+                child: expression, ..
+            }
+            | Expression::CaptureScope(expression)
+            | Expression::Capture { expression, .. }
+            | Expression::CaptureBoundary {
+                child: expression, ..
+            }
             | Expression::Delimited(expression)
             | Expression::CaptureEquality {
                 child: expression, ..
@@ -1380,20 +1466,11 @@ impl Lowering<'_> {
     }
 
     fn check_repetition(&self, expression: &Expression) -> Result<()> {
-        if let Expression::Repeat {
-            child, max: None, ..
-        } = expression
-        {
-            if self.is_nullable(child) {
-                return Err("nullable unbounded repetition".into());
-            }
-        }
-        if let Expression::Separated { child, separator } = expression {
+        // Generated repeats use JavaRepeat's successful no-progress termination.
+        // Source left-recursion and lexical nullability are validated independently.
+        if let Expression::Separated { separator, .. } = expression {
             if self.shape(separator, &mut HashSet::new())?.kind != Kind::Text {
                 return Err("mapped separator".into());
-            }
-            if self.is_nullable(child) && self.is_nullable(separator) {
-                return Err("nullable unbounded separation".into());
             }
         }
         for child in children(expression) {
@@ -1432,6 +1509,7 @@ impl Lowering<'_> {
 
     fn leading_rules(&self, expression: &Expression, result: &mut HashSet<usize>) {
         match expression {
+            Expression::Repeat { max: Some(0), .. } => {}
             Expression::Reference(rule) => {
                 result.insert(*rule);
             }
@@ -1603,8 +1681,19 @@ impl Lowering<'_> {
         }
         let _depth = self.enter_analysis()?;
         match expression {
+            Expression::CaptureBoundary {
+                kind: unlaxer_codegen::BoundaryKind::Separator,
+                ..
+            } => Ok(FixedShape::Value(text_shape())),
             Expression::Reference(rule) => Ok(state[*rule].clone()),
-            Expression::Capture { expression, .. }
+            Expression::OwnedCapture {
+                child: expression, ..
+            }
+            | Expression::CaptureScope(expression)
+            | Expression::Capture { expression, .. }
+            | Expression::CaptureBoundary {
+                child: expression, ..
+            }
             | Expression::Delimited(expression)
             | Expression::CaptureEquality {
                 child: expression, ..
@@ -1664,8 +1753,19 @@ impl Lowering<'_> {
     ) -> Result<Shape> {
         let _depth = self.enter_analysis()?;
         match expression {
+            Expression::CaptureBoundary {
+                kind: unlaxer_codegen::BoundaryKind::Separator,
+                ..
+            } => Ok(text_shape()),
             Expression::Reference(rule) => self.rule_shape_projected(*rule, visiting, enum_nodes),
-            Expression::Capture { expression, .. }
+            Expression::OwnedCapture {
+                child: expression, ..
+            }
+            | Expression::CaptureScope(expression)
+            | Expression::Capture { expression, .. }
+            | Expression::CaptureBoundary {
+                child: expression, ..
+            }
             | Expression::Delimited(expression)
             | Expression::CaptureEquality {
                 child: expression, ..
@@ -1807,7 +1907,14 @@ impl Lowering<'_> {
                     _ => Predictor::OneOf(values),
                 }
             }
-            Expression::Capture { expression, .. }
+            Expression::OwnedCapture {
+                child: expression, ..
+            }
+            | Expression::CaptureScope(expression)
+            | Expression::Capture { expression, .. }
+            | Expression::CaptureBoundary {
+                child: expression, ..
+            }
             | Expression::TextValue(expression)
             | Expression::ValueBoundary(expression)
             | Expression::Delimited(expression)
@@ -1834,6 +1941,13 @@ impl Lowering<'_> {
     ) -> Result<Expression> {
         let _depth = self.enter_analysis()?;
         Ok(match expression {
+            Expression::OwnedCapture { name, child } => Expression::OwnedCapture {
+                name: name.clone(),
+                child: Box::new(self.project_text_values(child, mapping)?),
+            },
+            Expression::CaptureScope(child) => {
+                Expression::CaptureScope(Box::new(self.project_text_values(child, mapping)?))
+            }
             Expression::Choice(alternatives) => {
                 let mixed = self.shape(expression, &mut HashSet::new())?.kind == Kind::Value;
                 Expression::Choice(
@@ -2008,9 +2122,11 @@ impl Lowering<'_> {
             Expression::OptionalExpr(child) => {
                 self.wrapped_captures(child, Cardinality::Optional)?
             }
-            Expression::Delimited(child) | Expression::CaptureEquality { child, .. } => {
-                self.captures(child)?
-            }
+            Expression::OwnedCapture { child, .. }
+            | Expression::CaptureScope(child)
+            | Expression::Delimited(child)
+            | Expression::CaptureBoundary { child, .. }
+            | Expression::CaptureEquality { child, .. } => self.captures(child)?,
             Expression::Repeat { child, .. } => self.wrapped_captures(child, Cardinality::Many)?,
             Expression::Separated { child, separator } => {
                 if !self.captures(separator)?.is_empty() {
@@ -2166,9 +2282,7 @@ impl Lowering<'_> {
         {
             return Err(error());
         }
-        let Expression::Sequence(elements) = &self.bodies[rule] else {
-            return Err(error());
-        };
+        let elements = assoc_skeleton(&self.bodies[rule]);
         let [Expression::Capture {
             name: left_name,
             expression: left,
@@ -2180,9 +2294,7 @@ impl Lowering<'_> {
         else {
             return Err(error());
         };
-        let Expression::Sequence(tail) = child.as_ref() else {
-            return Err(error());
-        };
+        let tail = assoc_skeleton(child);
         let [Expression::Capture {
             name: op_name,
             expression: op,
@@ -2213,6 +2325,44 @@ impl Lowering<'_> {
             return Err(error());
         }
         Ok(())
+    }
+}
+
+/// Inspect the semantic skeleton without removing delimiters from the emitted body.
+fn assoc_skeleton(expression: &Expression) -> Vec<&Expression> {
+    match expression {
+        Expression::Sequence(elements) => elements
+            .iter()
+            .filter(|element| !assoc_delimiter(element))
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn assoc_delimiter(expression: &Expression) -> bool {
+    match expression {
+        Expression::Literal(text) => !text.is_empty(),
+        Expression::OptionalExpr(child)
+        | Expression::Repeat {
+            child,
+            min: 0,
+            max: None,
+        } => literal_delimiter_body(child),
+        _ => false,
+    }
+}
+
+// Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
+fn literal_delimiter_body(expression: &Expression) -> bool {
+    match expression {
+        Expression::Literal(text) => !text.is_empty(),
+        Expression::Sequence(elements) => {
+            !elements.is_empty()
+                && elements
+                    .iter()
+                    .all(|element| matches!(element, Expression::Literal(text) if !text.is_empty()))
+        }
+        _ => false,
     }
 }
 
@@ -2416,7 +2566,9 @@ fn annotated_elements(body: &ast::RuleBody) -> Vec<&ast::AnnotatedElement> {
                 pending.push(Pending::Element(&value.element));
             }
             Pending::Element(value) => match &value.kind {
-                ElementKind::Group(body)
+                ElementKind::OwnedCapture { body, .. }
+                | ElementKind::CaptureScope(body)
+                | ElementKind::Group(body)
                 | ElementKind::Optional(body)
                 | ElementKind::Repeat(body) => pending.push(Pending::Body(body)),
                 ElementKind::OneOrMore(child)
@@ -2440,7 +2592,10 @@ fn collect_capture_names(body: &ast::RuleBody, names: &mut HashSet<String>) {
             .filter_map(|value| value.capture.clone()),
     );
 }
-fn collect_typeof(body: &ast::RuleBody, result: &mut Vec<(String, String)>) -> Result<()> {
+pub(crate) fn collect_typeof(
+    body: &ast::RuleBody,
+    result: &mut Vec<(String, String)>,
+) -> Result<()> {
     for value in annotated_elements(body) {
         if let Some(reference) = &value.typeof_constraint {
             let own = value
@@ -2509,7 +2664,14 @@ fn capture(name: &str, expression: Expression) -> Result<Expression> {
 fn children(expression: &Expression) -> Vec<&Expression> {
     match expression {
         Expression::Sequence(elements) | Expression::Choice(elements) => elements.iter().collect(),
-        Expression::Capture { expression, .. }
+        Expression::OwnedCapture {
+            child: expression, ..
+        }
+        | Expression::CaptureScope(expression)
+        | Expression::Capture { expression, .. }
+        | Expression::CaptureBoundary {
+            child: expression, ..
+        }
         | Expression::Delimited(expression)
         | Expression::CaptureEquality {
             child: expression, ..

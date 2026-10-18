@@ -163,7 +163,7 @@ class DAPRuntimeEmitter {
     }
 
     /** collectAstSteps() および関連の AST ウォークメソッドを出力する。 */
-    static void emitAstMethods(IndentedWriter w, String packageName, String grammarName, String mapperClass) {
+    static void emitAstMethods(IndentedWriter w, String packageName, String grammarName, String mapperClass, boolean nestedMixed) {
         w.line("private void collectAstSteps() {");
         w.indent();
         w.line("astStepError = \"\";");
@@ -214,6 +214,7 @@ class DAPRuntimeEmitter {
         w.line("private void collectAstValueMeta(Object value, List<String> types, List<int[]> spans) {");
         w.line("    if (value instanceof java.util.Optional<?> optional) { optional.ifPresent(child -> collectAstValueMeta(child, types, spans)); }");
         w.line("    else if (value instanceof List<?> list) { for (Object child : list) collectAstValueMeta(child, types, spans); }");
+        if(nestedMixed) w.line("    else if (value instanceof "+grammarName+"AST.NestedValue.Node item) { collectAstNodeMeta(item.value(), types, spans); }");
         w.line("    else if (isAstNodeCandidate(value)) { collectAstNodeMeta(value, types, spans); }");
         w.line("}");
         w.dedent();
