@@ -165,6 +165,8 @@ The development branch supports [literal enum values](docs/enum-values.md) in Ja
 
 [Recursive transparent helpers](docs/recursive-helpers.md) now preserve scalar and collected semantic values in both languages with bounded shape analysis.
 
+[Preferred AST snapshots](docs/preferred-ast-snapshots.md) retain mapping candidates and source positions, with Java-compatible name/depth/tie selection in Rust. [AST families and aliases](docs/family-projection.md) now project concrete child variants with or without `@commonField`, including dotted/shared mappings; associative projections remain tracked in #593.
+
 [Automatic evaluation](docs/evaluation-strategies.md) now supports literal, passthrough, conditional, binary arithmetic, and variable-reference strategies in both languages, with explicit conversion hooks, short-circuit order, and fallible Rust outputs. Regenerated automatic Java evaluators must implement the new `convertValue` hook.
 
 The development branch adds [Java/Rust server selection in VS Code](docs/rust-vscode-launch.md) for TinyCalc and newly scaffolded extensions, with packaged editor tests. Java remains the default. This is not included in 3.3.0.

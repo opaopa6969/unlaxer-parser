@@ -254,7 +254,7 @@ public final class RustGrammarLowering {
             recoveries.add(recovery);
             hasLocalTrivia |= localWhitespace != null || interleave;
             ruleWhitespace.add(localWhitespace == null ? whitespace || interleave : localWhitespace);
-            mappings.add(EnumSchema.isEnum(rule) || CommonFieldSchema.enabled(grammar) && CommonFieldSchema.isSum(grammar, rule) ? null : mapping);
+            mappings.add(EnumSchema.isEnum(rule) || CommonFieldSchema.isSum(grammar, rule) ? null : mapping);
             skips.add(skip);
             operators.add(leftAssoc || rightAssoc || precedence != null
                 ? new Operator(leftAssoc ? Associativity.LEFT : rightAssoc ? Associativity.RIGHT : Associativity.NONE, precedence == null ? -1 : precedence)
