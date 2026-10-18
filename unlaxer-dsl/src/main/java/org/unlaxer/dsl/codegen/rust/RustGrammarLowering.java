@@ -711,10 +711,13 @@ public final class RustGrammarLowering {
     }
 
     private CaptureBoundary nestedBoundary(Expression expression) {
-        if (expression instanceof GeneralBody general) { var inner=nestedBoundary(general.child()); return new CaptureBoundary(inner.kind(),general.withChild(inner.child())); }
         if (expression instanceof Sequence s && s.elements().size()==1) {
             var inner=nestedBoundary(s.elements().get(0));
             return new CaptureBoundary(inner.kind(),new Sequence(List.of(inner.child())));
+        }
+        if (expression instanceof GeneralBody general) {
+            var inner=nestedBoundary(general.child());
+            return new CaptureBoundary(inner.kind(),general.withChild(inner.child()));
         }
         if (expression instanceof Delimited d) { var inner=nestedBoundary(d.child()); return new CaptureBoundary(inner.kind(),new Delimited(inner.child())); }
         if (expression instanceof OptionalExpr o) return new CaptureBoundary(BoundaryKind.OPTIONAL,new OptionalExpr(nestedBoundary(o.child())));
@@ -849,9 +852,9 @@ public final class RustGrammarLowering {
     }
 
     private boolean nullable(Expression expression) {
-        if (expression instanceof CaptureBoundary b) { return nullable(b.child()); }
         if (expression instanceof Replay) return true;
         if (expression instanceof GeneralBody general) return nullable(general.child());
+        if (expression instanceof CaptureBoundary b) { return nullable(b.child()); }
         if (expression instanceof LexicalToken token) return token.expression().nullable();
         if (expression instanceof ErrorExpected ignored) {
             return false;
@@ -985,8 +988,8 @@ public final class RustGrammarLowering {
     }
 
     private void checkRepetition(Expression expression) {
-        if (expression instanceof CaptureBoundary b) { checkRepetition(b.child()); return; }
         if (expression instanceof GeneralBody general) { checkRepetition(general.child()); return; }
+        if (expression instanceof CaptureBoundary b) { checkRepetition(b.child()); return; }
         if (expression instanceof Repeat repeat) {
             // Generated repeats use JavaRepeat: one successful zero-progress iteration stops.
             // Nullable bodies are safe here; source left-recursion analysis remains separate.
@@ -1019,8 +1022,8 @@ public final class RustGrammarLowering {
     }
 
     private Set<Integer> leadingRules(Expression expression) {
-        if (expression instanceof CaptureBoundary b) { return leadingRules(b.child()); }
         if (expression instanceof GeneralBody general) return leadingRules(general.child());
+        if (expression instanceof CaptureBoundary b) { return leadingRules(b.child()); }
         if (expression instanceof ErrorExpected ignored) return Set.of();
         if (expression instanceof Reference reference) {
             return Set.of(reference.rule());

@@ -116,3 +116,58 @@ fn depth_boundary_actual_dag_work_and_text_are_bounded_per_call() {
         "😀"
     );
 }
+
+#[test]
+fn exact_node_and_edge_limits_accept_then_reject_one_more() {
+    use unlaxer_runtime::mapping::{MAX_EDGES, MAX_NODES};
+    assert_eq!(MAX_NODES, 1_048_576);
+    assert_eq!(MAX_EDGES, 8_388_608);
+    let mut value = tree();
+    let leaf = Node {
+        rule: 0,
+        span: Span { start: 0, end: 1 },
+        children: vec![],
+        captures: vec![],
+    };
+    value.nodes = vec![leaf.clone(); MAX_NODES];
+    value.root = MAX_NODES - 1;
+    Context::new(&value, 1).unwrap();
+    value.nodes.push(leaf.clone());
+    invalid(&value, "arena nodes");
+    value.nodes = vec![
+        leaf.clone(),
+        Node {
+            children: vec![0; MAX_EDGES],
+            ..leaf
+        },
+    ];
+    value.root = 1;
+    Context::new(&value, 1).unwrap();
+    value.nodes[1].children.push(0);
+    invalid(&value, "arena edges");
+    Context::new(&tree(), 1).unwrap();
+}
+#[test]
+fn forward_capture_ranges_and_exact_utf8_budget_are_checked() {
+    let good = tree();
+    let mut bad = good.clone();
+    bad.nodes[bad.root].captures[0].span.end = usize::MAX;
+    invalid(&bad, "CST");
+    let mut bad = good.clone();
+    bad.nodes.push(bad.nodes[bad.root].clone());
+    let forward = bad.nodes.len() - 1;
+    bad.nodes[bad.root].children.push(forward);
+    invalid(&bad, "CST");
+    assert_eq!(MAX_TEXT_BYTES, 268_435_456);
+    let guard = Context::new(&good, 1).unwrap();
+    guard.charge_text_bytes(MAX_TEXT_BYTES - 4).unwrap();
+    assert_eq!(guard.text(Span { start: 0, end: 1 }).unwrap(), "😀");
+    assert!(guard.text(Span { start: 0, end: 1 }).is_err());
+    assert_eq!(
+        Context::new(&good, 1)
+            .unwrap()
+            .text(Span { start: 0, end: 1 })
+            .unwrap(),
+        "😀"
+    );
+}

@@ -2,7 +2,7 @@
 
 Java の組み込み parser に入った後で子 parser の callback が通常の例外を投げた場合、最外の解析呼び出しが公開する前の状態へ戻し、元の例外オブジェクトを呼び出し元へ再送出する。`RuntimeException` と `AssertionError` を検証対象とする。`VirtualMachineError`、メモリ枯渇、プロセス停止からの復旧を保証するものではない。
 
-復元対象は consumed/matched CP cursor、公開 CST、解析・transaction frame、登録した `TransactionalState`、portable token metadata と関連 ID、owned capture と scope、selection 状態である。失敗した子が残した内部 frame は巻き戻すが、呼び出し側が先に開いた manual transaction は保持する。その transaction を含め、通常例外の伝播が完了した context は再利用できる。失敗中に発行した token ID は無効になり、失敗前に取得した metadata snapshot は変わらない。
+復元対象は consumed/matched CP cursor と reset policy、公開 CST、解析・transaction frame、登録した `TransactionalState`、portable token metadata と関連 ID、owned capture と scope、selection 状態である。失敗した子が残した内部 frame は巻き戻すが、呼び出し側が先に開いた manual transaction は保持する。その transaction を含め、通常例外の伝播が完了した context は再利用できる。失敗中に発行した token ID は無効になり、失敗前に取得した metadata snapshot は変わらない。
 
 組み込み境界の内側で例外を catch し、成功として返す子がいても、外側の解析 guard が unwind し終わるまでは最初の例外が優先される。これは、失敗を一部だけ隠して破損状態を公開しないためである。callback の呼び出しより前の引数検証エラーは、この解析中の復元契約とは別である。任意の custom root が組み込み parser の入口をすべて迂回する場合にまで、自動的な例外境界は追加されない。
 
@@ -38,3 +38,5 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --locked --manifest-path rust/Cargo.toml \
 ```
 
 生成 Rust consumer の検証は `-DrustConformance=true` が必要であり、通常の Maven test だけでは skip される。
+
+追加の入口回帰は Chain と透明な ParserHolder / MappedSingleCharacterParserHolder、finally の二重 cleanup と後続例外を192ケースで確認する。SuggestsCollectorParser の公開 parse 中の suggestion callback も、失敗時に空 token を残さず同 context で再試行できる（12ケース）。成功時の token/CST と引数伝播の既存挙動は変更しない。

@@ -458,7 +458,7 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    }\n\n");
         if (mayRecover) {
             sb.append("    private static void rejectRecoveredSyntax(Token token) {\n");
-            sb.append("        if (!org.unlaxer.parser.combinator.RecoveryDiagnostic.from(token).isEmpty()) {\n");
+            sb.append("        if (MAPPING_GUARD.hasRecoveredSyntax()) {\n");
             sb.append("            throw new IllegalArgumentException(\"cannot map recovered syntax\");\n");
             sb.append("        }\n");
             sb.append("    }\n\n");
@@ -493,6 +493,8 @@ public class MapperGenerator implements CodeGenerator {
                 }
                 private static <T> T guardedMapping(Token token, java.util.function.Supplier<T> operation) {
                     resetMappingMemos();
+                    // Public entry validators retain their root/subtree null argument contract.
+                    if (token == null) return operation.get();
                     MAPPING_GUARD = org.unlaxer.mapper.MappingGuard.prepare(token);
                     try { return operation.get(); }
                     catch (RuntimeException failure) { resetMappingMemos(); throw failure; }

@@ -2,7 +2,7 @@
 
 この防御は更新後に再生成した mapper に適用する。以前生成した source は再生成が必要。
 
-生成された Java mapper の `mapParsedToken` / `mapSubtreeToken` とその SourceMap・preferred snapshot 入口、および Rust の `map` / `map_parsed_tree` / `map_subtree_tree` は、投影前に CST の構造を検証する。構造不正は Java の `IllegalArgumentException`、Rust の `Err(String)` となり、診断には `E-MAPPING-CST` を含む。資源上限は `E-MAPPING-LIMIT` となる。通常の型変換・typeof・必須捕捉・recovery 等の失敗契約も引き続き適用する。
+生成された Java mapper の `mapParsedToken` / `mapSubtreeToken` とその SourceMap・preferred snapshot 入口、および Rust の `map` / `map_parsed_tree` / `map_subtree_tree` は、投影前に CST の構造を検証する。構造不正は Java の `IllegalArgumentException`、Rust の `Err(String)` となり、診断には `E-MAPPING-CST` を含む。資源上限は `E-MAPPING-LIMIT` となる。 Java の null 引数は従来の `rootToken must not be null` / `subtreeToken must not be null` を保持し、その入口の引数検証を先に行う。Rust の存在しない root ID は構造不正として拒否する。通常の型変換・typeof・必須捕捉・recovery 等の失敗契約も引き続き適用する。
 
 検査は公開 CST を改変する consumer の誤りを境界で止めるためのもので、元 parser が実際にこの CST を生成したという認証ではない。Rust の通常 `map` は従来どおり grammar fingerprint を要求せず、preferred 入口は既存の fingerprint と rule metadata を検証する。Java の元 root / alternate-entry parser class 検証も維持する。
 
@@ -30,3 +30,5 @@ Rust preferred `MappingLimits` の既存既定値（candidate 4,096、projection
 budget と検証 table は呼出し単位。Java は各公開 mapping 入口で memo/span layer を新規化し、投影失敗時に部分 memo/span を破棄する。成功して既に返した source snapshot は保持され、後の失敗や別 parse/map で内容を変えない。Rust の公開 map は呼出しのローカル state を破棄して `Err` を返す。
 
 共通 corpus は `spec-corpus/public-mapper-cst/`。`PublicMapperCstConformanceTest` は Java consumer と Java/native 両 host の Rust 生成 consumer を実 compile/run し、入口ごとの不正グラフ分類、共有 DAG の実投影上限、失敗後の正常値、補助文字の CP span、retained snapshot を照合する。型の正常系は既存の preferred・typed nested・mapped leaf・family・enum・typeof corpus を併用する。
+
+追加の合成試験は `composition-cases.json`。scalar/flat/node/enum/mixed/nested/family/typeof/recovery の代表9文法で、6入口の不正metadata拒否後の正常CSTによる値・CP span・保持snapshotをJavaと両Rust生成consumerで比較する。Rustのtransparent typeof検査は既存ASTを参照し、参照展開数をworkに計上する。Javaの公開Token入口のrecovery検査はguardで訪問済みのunique original tokenのmarkerを使い、DAGを診断一覧へ全展開しない。

@@ -45,7 +45,8 @@ Java21/Rust1.85。報告: common `target/classic-memo-java.tsv` / `classic-memo-
 DSL `target/classic-memo-generated.tsv`。shared fixtureから期待値を生成したり、cacheの無効gateを実hitと呼んだりしません。
 source module追加はなく、従来のstandalone rustc/Playground resource契約を維持します。
 
-後続 #629 は [stateful failure](../stateful-failure-memo/README.md)、#634 は通常failureのresource guardへ対応。
+後続 #629 は [stateful failure](../stateful-failure-memo/README.md)へ対応。
+通常failureのresource guard #634は通常/Classic共通の深さ条件と実hit/resource oracleで検証します。
 未完:
 記録付きsuccess replay/production workload #184/#197。
 [保存予算・key・metadata契約](../../docs/classic-memo.md)を参照してください。

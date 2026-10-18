@@ -47,11 +47,24 @@ public class ParseContext implements
   private Throwable observerFailure;
   private Throwable parserCallFailure;
   private int parserCallDepth;
+  private TransactionElement parserCallEntry;
+  private boolean parserCallResetMatched;
 
   /** Internal allocation-free guard for built-in parser entry points. */
   public void enterParserCall() {
+    enterParserCall(false);
+  }
+
+  /** Transparent entries checkpoint before a child that may omit parse notifications. */
+  public void enterParserCall(boolean immediateCallback) {
     requireParseHealthy();
+    if (parserCallDepth == 0) {
+      parserCallEntry = getCurrent();
+      parserCallResetMatched = parserCallEntry.isResetMatchedWithConsumed();
+    }
     parserCallDepth++;
+    if (immediateCallback && activeParseDepth() == 0
+        && (!observerBoundaryActive || observerExplicitTransaction)) beginObserverBoundary(false);
   }
 
   /** Restore the outer publication boundary once; swallowed errors cannot publish success. */
@@ -68,7 +81,10 @@ public class ParseContext implements
       restoreObserverPublication();
       releaseObserverBoundary();
       parserCallFailure = null;
+    } else if (parserCallDepth == 0) {
+      releaseObserverBoundaryIfIdle();
     }
+    if (parserCallDepth == 0) parserCallEntry = null;
     if (failure != null) rethrowParserCallFailure(failure);
   }
 
@@ -150,7 +166,10 @@ public class ParseContext implements
     observerTokenKind = observerEntry.getTokenKind();
     observerTransactionDepth = tokenStack.size();
     observerMemoizationVersion = memoizationStateVersion;
-    observerResetMatched = observerEntry.isResetMatchedWithConsumed();
+    // Chain changes this policy before startParse; keep the public entry value on exceptions.
+    // State checkpoints still occur here, so a pure failure memo hit adds no owner checkpoint.
+    observerResetMatched = parserCallDepth != 0 && observerEntry == parserCallEntry
+        ? parserCallResetMatched : observerEntry.isResetMatchedWithConsumed();
     for (int index = 0; index < transactionalStates.size(); index++) {
       TransactionalState state = transactionalStates.get(index);
       if (!(state instanceof MutationAwareTransactionalState)) checkpointState(observerStateBoundary(), state);
@@ -192,7 +211,7 @@ public class ParseContext implements
   }
 
   private void releaseObserverBoundaryIfIdle() {
-    if (parserCallFailure == null && parseLimitFailure == null && parseFrames.isEmpty() && deferredFrameDepth == 0
+    if (parserCallDepth == 0 && observerFailure == null && parserCallFailure == null && parseLimitFailure == null && parseFrames.isEmpty() && deferredFrameDepth == 0
         && (!observerExplicitTransaction || tokenStack.size() <= observerTransactionDepth))
       releaseObserverBoundary();
   }
@@ -753,6 +772,8 @@ public class ParseContext implements
      */
     private ExpectedSources expected;
     private List<ParseFailureDiagnostics.TrialRecord> trials;
+    // ArrayList.clear() retains storage when an active diagnostic snapshot is restored.
+    private int trialCapacityHighWater;
     private byte[] transactionEvents;
     private int transactionEventCount;
 
@@ -1258,7 +1279,10 @@ public class ParseContext implements
     } else {
       target.expected().copyFrom(source.expected);
     }
-    if (target.trials != null) target.trials.clear();
+    if (target.trials != null) {
+      target.trialCapacityHighWater = Math.max(target.trialCapacityHighWater, target.trials.size());
+      target.trials.clear();
+    }
     if (source.trials != null) target.trials().addAll(source.trials);
   }
 
@@ -1277,6 +1301,35 @@ public class ParseContext implements
   /** A memoized frame is only ever read from here on, so its de-dup indexes can be dropped. */
   static void sealMemoDiagnostic(FailureDiagnostic diagnostic) {
     if (diagnostic.expected != null) diagnostic.expected.releaseIndexes();
+  }
+
+  /** Cache-owned structural charge; excludes shared parser definitions and active diagnostics. */
+  static long failureMemoCharge(FailureDiagnostic diagnostic, long limit) {
+    long bytes = 512; // entry, key, diagnostic, map/index links and object headers
+    bytes = addFailureCharge(bytes, 64L * diagnostic.maxReachedStackElements.size(), limit);
+    bytes = addFailureCharge(bytes, 64L * diagnostic.farthestFailureStackElements.size(), limit);
+    if (diagnostic.expected != null) {
+      ExpectedSources expected = diagnostic.expected;
+      bytes = addFailureCharge(bytes, 64L + 8L * expected.parsers.length
+          + expected.terminal.length + (expected.index == null ? 0 : 4L * expected.index.length), limit);
+    }
+    if (diagnostic.transactionEvents != null)
+      bytes = addFailureCharge(bytes, 16L + diagnostic.transactionEvents.length, limit);
+    if (diagnostic.trials != null) {
+      // Charge slack as well as logical elements, without reflective JDK access.
+      long retainedSlots = Math.max(diagnostic.trials.size(), diagnostic.trialCapacityHighWater);
+      bytes = addFailureCharge(bytes, 128L + 16L * retainedSlots, limit);
+      for (var trial : diagnostic.trials) {
+        if (bytes > limit) break;
+        String name = trial.getParserName();
+        bytes = addFailureCharge(bytes, 64L + (name == null ? 0 : 2L * name.length()), limit);
+      }
+    }
+    return bytes;
+  }
+
+  private static long addFailureCharge(long bytes, long addition, long limit) {
+    return bytes > limit || addition > limit - bytes ? limit + 1 : bytes + addition;
   }
 
   /** One nested operation's code-point diagnostic, without an automatic reparse.
@@ -1677,7 +1730,7 @@ public class ParseContext implements
   public void startParse(Parser parser, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
     requireParseHealthy();
     int activeDepth = activeParseDepth();
-    if (activeDepth == 0) beginObserverBoundary(false);
+    if (activeDepth == 0 && (!observerBoundaryActive || observerExplicitTransaction)) beginObserverBoundary(false);
     if (activeDepth >= MAX_PARSE_DEPTH) {
       parseLimitFailure = new ParseLimitException(MAX_PARSE_DEPTH, getPosition(tokenKind).value());
       disableMemoizationPermanently();
