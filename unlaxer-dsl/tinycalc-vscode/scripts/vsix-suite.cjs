@@ -1,4 +1,5 @@
 const vscode = require('vscode');
+const trace = (event, details={}) => require('node:fs').appendFileSync(process.env.TINYCALC_TIMELINE, JSON.stringify({at:Date.now(),event,...details})+'\n');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -52,10 +53,11 @@ const run = async () => {
   assert.ok(await vscode.workspace.applyEdit(repair)); await document.save();
   await until(() => vscode.languages.getDiagnostics(uri).length === 0, 'diagnostics cleared after repair');
   observations.dap = [];
+  const terminated = vscode.debug.onDidTerminateDebugSession(session=>trace('session-terminated',{id:session.id,name:session.name}));
   for (const mode of ['ast', 'token']) {
     let stops = 0;
     const tracker = vscode.debug.registerDebugAdapterTrackerFactory('tinycalc', {
-      createDebugAdapterTracker: () => ({onDidSendMessage: message => { if (message.event === 'stopped') stops++; }})
+      createDebugAdapterTracker: session => ({onWillStopSession:()=>trace('will-stop',{id:session.id,mode}),onExit:code=>trace('adapter-exit',{id:session.id,mode,code}),onWillReceiveMessage:message=>trace('request',{id:session.id,mode,command:message.command}),onDidSendMessage: message => { trace('message',{id:session.id,mode,type:message.type,command:message.command,dapEvent:message.event}); if (message.event === 'stopped') stops++; }})
     });
     try {
       assert.ok(await vscode.debug.startDebugging(undefined, {type: 'tinycalc', request: 'launch', name: `Inspect ${mode}`, program: uri.fsPath, stopOnEntry: true, steppingMode: mode}));
@@ -76,6 +78,7 @@ const run = async () => {
       await until(() => !vscode.debug.activeDebugSession, `${mode} disconnect`);
     } finally { tracker.dispose(); }
   }
+  terminated.dispose();
   const before = (await journal()).filter(row => row.protocol === 'lsp');
   process.kill(before.at(-1).pid, 'SIGKILL');
   await until(async () => (await journal()).filter(row => row.protocol === 'lsp').length > before.length, 'automatic restart after unexpected exit');
