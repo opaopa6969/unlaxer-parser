@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.*;
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 
@@ -96,9 +98,10 @@ final class LeftRecursionAnalysis {
             if (leading != null) leading.add(ref.name());
             return nullable.contains(ref.name());
         }
+        if (element instanceof ReplayElement) return true; // binding may be empty
         if (element instanceof TerminalElement terminal) return terminal.value().isEmpty();
         if (element instanceof ErrorElement) return false;
-        if (element instanceof GroupElement group) return body(group.body(), leading, depth + 1);
+        if (element instanceof TransparentElement group) return body(group.body(), leading, depth + 1);
         if (element instanceof OptionalElement optional) {
             body(optional.body(), leading, depth + 1);
             return true;

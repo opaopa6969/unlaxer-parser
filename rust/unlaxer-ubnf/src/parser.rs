@@ -927,7 +927,32 @@ impl Parser<'_> {
 
     fn atomic(&mut self) -> Result<AtomicElement> {
         let start = self.current().span;
-        let kind = if self.eat('(') {
+        let owned_call = matches!(&self.current().kind, Kind::Identifier(name)
+            if matches!(name.as_str(), "CAPTURE" | "SAME_AS" | "CAPTURE_SCOPE"))
+            && self.tokens.get(self.pos + 1).is_some_and(|t| {
+                t.kind == Kind::Symbol('(') && self.current().span.byte_end == t.span.byte_start
+            });
+        let kind = if owned_call {
+            let operation = self.identifier()?;
+            self.expect('(')?;
+            let kind = match operation.as_str() {
+                "CAPTURE" => {
+                    let name = self.identifier()?;
+                    self.expect(',')?;
+                    ElementKind::OwnedCapture {
+                        name,
+                        body: self.body()?,
+                    }
+                }
+                "SAME_AS" => ElementKind::Replay {
+                    name: self.identifier()?,
+                },
+                "CAPTURE_SCOPE" => ElementKind::CaptureScope(self.body()?),
+                _ => unreachable!(),
+            };
+            self.expect(')')?;
+            kind
+        } else if self.eat('(') {
             let body = self.body()?;
             self.expect(')')?;
             ElementKind::Group(body)

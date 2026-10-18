@@ -11,7 +11,8 @@ bit0=whitespace、bit1=nonOrdered、bit2=reset、bits3..10=rule depth、bits11..
 active expression depthはkeyへ入れずentryに保持し、現在depthが記録時以下のときだけ再利用します。
 浅い再試行のhitを維持し、残予算が少ない深い呼出しでは通常実行へ戻します。
 resource failureは保存せずstickyであり、optional等が通常の不一致へ変換できません。
-通常failureも #634 の同じ資源guardを使用します。
+通常modeにも同じ深さ条件を適用します（#634）。共通12行を通常/Classicの両経路で検証し、
+同深さ・浅い再試行の実hitと、深い再試行のmiss・sticky resource failureを区別します。
 
 成功snapshotはCSTのrelative edge/capture、両cursorと終了policy、局所診断に加え、
 structural TokenInfo（kind/source/parser label/original token edge）を保持します。

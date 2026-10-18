@@ -16,18 +16,27 @@ public record CapturedValue(String text, Provenance provenance, int start, int e
         }
     }
 
-    /** Snapshot actual text; never reconstruct projected or generated text from input coordinates. */
-    public static CapturedValue from(Source source, Source input, int anchor) {
+    /** Classify a source without materializing or copying its text. */
+    public static Provenance provenanceOf(Source source, Source input) {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(input, "input");
-        String text = source.sourceAsString();
         if (source.sourceKind().isDetached() || source.root() != input.root()) {
-            return new CapturedValue(text, Provenance.GENERATED, anchor, anchor);
+            return Provenance.GENERATED;
+        }
+        boolean slice = source instanceof StringSource value && input instanceof StringSource root
+                && value.sharesCodePointArrayWith(root);
+        return slice ? Provenance.INPUT : Provenance.PROJECTED;
+    }
+
+    /** Snapshot actual text; never reconstruct projected or generated text from input coordinates. */
+    public static CapturedValue from(Source source, Source input, int anchor) {
+        Provenance provenance = provenanceOf(source, input);
+        String text = source.sourceAsString();
+        if (provenance == Provenance.GENERATED) {
+            return new CapturedValue(text, provenance, anchor, anchor);
         }
         int start = source.offsetFromRoot().value() - input.offsetFromRoot().value();
         int end = Math.addExact(start, source.codePointLength().value());
-        boolean slice = source instanceof StringSource value && input instanceof StringSource root
-                && value.sharesCodePointArrayWith(root);
-        return new CapturedValue(text, slice ? Provenance.INPUT : Provenance.PROJECTED, start, end);
+        return new CapturedValue(text, provenance, start, end);
     }
 }

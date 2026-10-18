@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.tools.bnf;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -354,8 +356,14 @@ public final class UBNFToBNFConverter {
         StringBuilder builder,
         ConversionContext context
     ) {
-        if (element instanceof GroupElement groupElement) {
-            builder.append("( ");
+        if (element instanceof UBNFAST.ReplayElement replay) {
+            builder.append("SAME_AS(").append(replay.name()).append(")");
+        } else if (element instanceof TransparentElement groupElement) {
+            if (element instanceof UBNFAST.OwnedCaptureElement capture) {
+                builder.append("CAPTURE(").append(capture.name()).append(", ");
+            } else {
+                builder.append(element instanceof UBNFAST.CaptureScopeElement ? "CAPTURE_SCOPE( " : "( ");
+            }
             convertRuleBody(groupElement.body(), builder, context);
             builder.append(" )");
         } else if (element instanceof OptionalElement optionalElement) {

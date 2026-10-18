@@ -84,6 +84,7 @@ pub(super) fn rule(ir: &GrammarIr, id: usize) -> String {
                 let enum_id=ir.rules.iter().position(|rule|&rule.name==name).unwrap();
                 writeln!(out,"            values.extend(map_enum_{enum_id}(tree, &capture.nodes)?);").unwrap();
             }
+            Kind::Nested { .. } => unreachable!("validated nested typeof restriction"),
             Kind::NullableNode => unreachable!("validated associative projection"),
             Kind::Node if rule.mapping.is_none() => out.push_str("            if !capture.nodes.is_empty() { values.extend(projected.iter().cloned()); }\n"),
             Kind::Node => out.push_str("            values.extend(map_nodes(tree, &capture.nodes)?);\n"),
@@ -145,6 +146,7 @@ fn type_expression(field: &Field, index: usize) -> String {
         Cardinality::Optional => "\"Optional\"".into(),
         Cardinality::Many => "\"List\"".into(),
         Cardinality::One => match &field.kind {
+            Kind::Nested { .. } => unreachable!("validated nested typeof restriction"),
             Kind::Integer => "\"Integer\"".into(),
             Kind::Text => "\"String\"".into(),
             Kind::Enum(name) => quote(&format!("enum::{name}")),

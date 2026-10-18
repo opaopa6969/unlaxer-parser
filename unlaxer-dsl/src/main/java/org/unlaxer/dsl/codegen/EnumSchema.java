@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 
 import java.util.*;
@@ -342,7 +344,7 @@ public final class EnumSchema {
     }
 
     private static void addChildren(AtomicElement element, Deque<AtomicElement> pending) {
-        if (element instanceof GroupElement group) addBody(group.body(), pending);
+        if (element instanceof TransparentElement group) addBody(group.body(), pending);
         else if (element instanceof OptionalElement optional) addBody(optional.body(), pending);
         else if (element instanceof RepeatElement repeat) addBody(repeat.body(), pending);
         else if (element instanceof OneOrMoreElement repeat) pending.add(repeat.body());
@@ -403,7 +405,7 @@ public final class EnumSchema {
             if (MapperElementUtil.getMappingAnnotation(rule).isPresent()) return "#node";
             return valueType(new GroupElement(rule.body()), rules, seen);
         }
-        if (element instanceof GroupElement g) {
+        if (element instanceof TransparentElement g) {
             var alternatives =
                     g.body() instanceof ChoiceBody c
                             ? c.alternatives()

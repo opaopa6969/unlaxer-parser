@@ -36,6 +36,9 @@ pub(crate) fn refine(grammar: &GrammarDecl, ir: &mut GrammarIr) {
             })
             .collect();
         for field in &mut mapped.fields {
+            if matches!(field.kind, Kind::Nested { .. }) {
+                continue;
+            }
             if contributors.iter().all(|r| {
                 let mut captures = Vec::new();
                 collect(grammar, &r.body, &field.name, &mut captures);
@@ -96,9 +99,11 @@ fn collect(grammar: &GrammarDecl, body: &RuleBody, name: &str, values: &mut Vec<
 }
 fn nested(grammar: &GrammarDecl, atom: &AtomicElement, name: &str, values: &mut Vec<bool>) {
     match &atom.kind {
-        ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
-            collect(grammar, body, name, values)
-        }
+        ElementKind::OwnedCapture { body, .. }
+        | ElementKind::CaptureScope(body)
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => collect(grammar, body, name, values),
         ElementKind::OneOrMore(child)
         | ElementKind::BoundedRepeat { element: child, .. }
         | ElementKind::Separated { element: child, .. } => nested(grammar, child, name, values),

@@ -67,6 +67,11 @@ pub struct Field {
 pub enum Kind {
     /// Java generated numeric capture contract: signed 32-bit integer.
     Integer,
+    /// Explicit nested capture; containers are ordered outermost first.
+    Nested {
+        leaf: Box<Kind>,
+        containers: Vec<Cardinality>,
+    },
     Enum(String),
     Text,
     Node,
@@ -80,6 +85,13 @@ pub enum Cardinality {
     One,
     Optional,
     Many,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoundaryKind {
+    Value,
+    Optional,
+    List,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,6 +122,12 @@ pub enum RecoveryMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
+    OwnedCapture {
+        name: String,
+        child: Box<Expression>,
+    },
+    Replay(String),
+    CaptureScope(Box<Expression>),
     NamePredicate {
         child: Box<Expression>,
         snapshot: String,
@@ -183,6 +201,10 @@ pub enum Expression {
     Capture {
         name: String,
         expression: Box<Expression>,
+    },
+    CaptureBoundary {
+        kind: BoundaryKind,
+        child: Box<Expression>,
     },
     OptionalExpr(Box<Expression>),
     Repeat {

@@ -219,7 +219,12 @@ fn build_snapshot(
             fields.push(Field {
                 name: field.name.clone(),
                 r#type: field_type,
-                cardinality: cardinality(field.cardinality),
+                cardinality: cardinality(match &field.kind {
+                    unlaxer_codegen::Kind::Nested { containers, .. } => {
+                        containers.first().copied().unwrap_or(Cardinality::One)
+                    }
+                    _ => field.cardinality,
+                }),
                 generated,
             });
         }
@@ -386,7 +391,12 @@ fn build_snapshot(
             fields.push(Field {
                 name: field.name.clone(),
                 r#type: ty,
-                cardinality: cardinality(field.cardinality),
+                cardinality: cardinality(match &field.kind {
+                    unlaxer_codegen::Kind::Nested { containers, .. } => {
+                        containers.first().copied().unwrap_or(Cardinality::One)
+                    }
+                    _ => field.cardinality,
+                }),
                 generated: Location {
                     path: "ast.rs".into(),
                     span: Span {

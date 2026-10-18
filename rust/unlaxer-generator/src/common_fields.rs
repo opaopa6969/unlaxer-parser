@@ -10,6 +10,13 @@ pub(crate) fn rust_name(name: &str) -> String {
     name.replace('.', "__")
 }
 fn mapping(rule: &RuleDecl) -> Option<(&str, &[String])> {
+    if rule
+        .annotations
+        .iter()
+        .any(|a| matches!(a.kind, AnnotationKind::Skip))
+    {
+        return None;
+    }
     rule.annotations.iter().find_map(|a| match &a.kind {
         AnnotationKind::Mapping { class_name, params } => {
             Some((class_name.as_str(), params.as_slice()))
@@ -213,7 +220,7 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
 // Match the Java field's nominal scalar contract, which is stricter than Rust's Node/Text storage.
 fn atom_types(grammar: &GrammarDecl, atom: &AtomicElement, out: &mut HashSet<String>) {
     match &atom.kind {
-        ElementKind::Terminal(_) => {
+        ElementKind::Replay { .. } | ElementKind::Terminal(_) => {
             out.insert("String".into());
         }
         ElementKind::RuleRef { name, .. } => {
@@ -240,7 +247,11 @@ fn atom_types(grammar: &GrammarDecl, atom: &AtomicElement, out: &mut HashSet<Str
                 out.insert(if numeric { "int" } else { "String" }.into());
             }
         }
-        ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
+        ElementKind::OwnedCapture { body, .. }
+        | ElementKind::CaptureScope(body)
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => {
             for seq in &body.alternatives {
                 for child in &seq.elements {
                     atom_types(grammar, &child.element, out);
@@ -272,9 +283,11 @@ fn capture_nested_types(
     out: &mut HashSet<String>,
 ) {
     match &atom.kind {
-        ElementKind::Group(body) | ElementKind::Optional(body) | ElementKind::Repeat(body) => {
-            capture_types(grammar, body, field, out)
-        }
+        ElementKind::OwnedCapture { body, .. }
+        | ElementKind::CaptureScope(body)
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => capture_types(grammar, body, field, out),
         ElementKind::OneOrMore(child)
         | ElementKind::BoundedRepeat { element: child, .. }
         | ElementKind::Separated { element: child, .. } => {

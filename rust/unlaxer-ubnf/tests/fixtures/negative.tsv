@@ -31,3 +31,12 @@ eval-duplicate-kind	grammar G { @eval(kind='literal', kind='literal') R ::= 'x';
 eval-duplicate-strategy	grammar G { @eval(kind='literal', strategy='manual',strategy='default') R ::= 'x'; }
 eval-duplicate-param	grammar G { @eval(kind='literal', x='a',x='b') R ::= 'x'; }
 unknown-annotation-arguments	grammar G { @rooted('x') R ::= 'x'; }
+owned-capture-missing-body	grammar BadOwned { Root ::= CAPTURE(name); name ::= 'a'; other ::= 'b'; CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; }
+owned-capture-empty-body	grammar BadOwned { Root ::= CAPTURE(name,); name ::= 'a'; other ::= 'b'; CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; }
+owned-capture-missing-name	grammar BadOwned { Root ::= CAPTURE(, 'a'); name ::= 'a'; other ::= 'b'; CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; }
+owned-capture-scope-empty	grammar BadOwned { Root ::= CAPTURE_SCOPE(); name ::= 'a'; other ::= 'b'; CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; }
+owned-capture-scope-extra	grammar BadOwned { Root ::= CAPTURE_SCOPE('a', 'b'); name ::= 'a'; other ::= 'b'; CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; }
+owned-same-as-empty	grammar BadOwned { Root ::= SAME_AS(); name ::= 'a'; other ::= 'b'; CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; }
+owned-same-as-extra	grammar BadOwned { Root ::= SAME_AS(name, other); name ::= 'a'; other ::= 'b'; CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; }
+owned-empty-alternative	grammar Bad { Root ::= CAPTURE(word, 'a' |); }
+owned-empty-leading-alternative	grammar Bad { Root ::= CAPTURE_SCOPE(| 'a'); }

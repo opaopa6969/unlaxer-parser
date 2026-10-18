@@ -89,7 +89,9 @@ fn shape(g: &GrammarDecl, a: &AtomicElement, seen: &mut HashSet<String>) -> Shap
             seen.remove(name);
             out
         }
-        ElementKind::Group(b) => body_shape(g, b, seen),
+        ElementKind::Group(b)
+        | ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b) => body_shape(g, b, seen),
         ElementKind::Optional(b) => wrap(body_shape(g, b, seen), Count::Optional),
         ElementKind::Repeat(b) => wrap(body_shape(g, b, seen), Count::Many),
         ElementKind::OneOrMore(a)
@@ -124,6 +126,7 @@ fn key(tag: u8, s: Span) -> Key {
 }
 struct Plan<'a> {
     g: &'a GrammarDecl,
+    nested: bool,
     bindings: HashSet<Key>,
     sites: Vec<&'a AtomicElement>,
 }
@@ -151,7 +154,11 @@ impl<'a> Plan<'a> {
             for a in &s.elements {
                 if a.capture.is_some() {
                     self.sites.push(&a.element);
-                    self.bind_values(&a.element);
+                    if self.nested {
+                        self.bindings.insert(key(2, a.element.span));
+                    } else {
+                        self.bind_values(&a.element);
+                    }
                 }
                 self.visit_atom(&a.element);
             }
@@ -159,9 +166,11 @@ impl<'a> Plan<'a> {
     }
     fn visit_atom(&mut self, a: &'a AtomicElement) {
         match &a.kind {
-            ElementKind::Group(b) | ElementKind::Optional(b) | ElementKind::Repeat(b) => {
-                self.visit(b)
-            }
+            ElementKind::Group(b)
+            | ElementKind::OwnedCapture { body: b, .. }
+            | ElementKind::CaptureScope(b)
+            | ElementKind::Optional(b)
+            | ElementKind::Repeat(b) => self.visit(b),
             ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
                 self.visit_atom(a)
             }
@@ -210,7 +219,9 @@ impl<'a> Plan<'a> {
     }
     fn semantic_atom(&mut self, a: &'a AtomicElement) {
         match &a.kind {
-            ElementKind::Group(b) => self.semantic_body(b),
+            ElementKind::Group(b)
+            | ElementKind::OwnedCapture { body: b, .. }
+            | ElementKind::CaptureScope(b) => self.semantic_body(b),
             ElementKind::Optional(b) | ElementKind::Repeat(b) => self.semantic_item_body(b),
             ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
                 self.semantic_item_atom(a)
@@ -235,11 +246,24 @@ impl<'a> Plan<'a> {
         }
     }
     fn atom(&self, a: &AtomicElement, depth: usize, out: &mut Vec<(usize, usize)>) {
+        if self.nested && self.bindings.contains(&key(2, a.span)) {
+            self.nested_atom(a, depth + 1, out);
+            return;
+        }
         let depth = depth + usize::from(self.bindings.contains(&key(2, a.span)));
         match &a.kind {
             ElementKind::RuleRef { name, .. } => {
                 if let Some(id) = self.g.rules.iter().position(|r| &r.name == name) {
                     out.push((id, depth));
+                }
+            }
+            ElementKind::OwnedCapture { body: b, .. } | ElementKind::CaptureScope(b) => {
+                if let Some(child) =
+                    one(b).filter(|a| matches!(a.kind, ElementKind::RuleRef { .. }))
+                {
+                    self.atom(child, depth, out)
+                } else {
+                    self.body(b, depth, out)
                 }
             }
             ElementKind::Group(b) => self.body(b, depth, out),
@@ -279,6 +303,32 @@ impl<'a> Plan<'a> {
             _ => {}
         }
     }
+    fn nested_atom(&self, a: &AtomicElement, depth: usize, out: &mut Vec<(usize, usize)>) {
+        match &a.kind {
+            ElementKind::OwnedCapture { body, .. }
+            | ElementKind::CaptureScope(body)
+            | ElementKind::Group(body) => self.nested_body(body, depth, out),
+            ElementKind::Optional(body) | ElementKind::Repeat(body) => {
+                self.nested_body(body, depth + 2, out)
+            }
+            ElementKind::OneOrMore(child) | ElementKind::BoundedRepeat { element: child, .. } => {
+                self.nested_atom(child, depth + 2, out)
+            }
+            ElementKind::RuleRef { name, .. } => {
+                if let Some(id) = self.g.rules.iter().position(|r| &r.name == name) {
+                    out.push((id, depth + 1));
+                }
+            }
+            _ => (),
+        }
+    }
+    fn nested_body(&self, body: &RuleBody, depth: usize, out: &mut Vec<(usize, usize)>) {
+        if let Some(child) = one(body) {
+            self.nested_atom(child, depth, out);
+        } else {
+            self.body(body, depth + 1, out);
+        }
+    }
 }
 pub(crate) fn calls(g: &GrammarDecl) -> Vec<Vec<(usize, usize)>> {
     let mut plans: Vec<_> = g
@@ -287,6 +337,7 @@ pub(crate) fn calls(g: &GrammarDecl) -> Vec<Vec<(usize, usize)>> {
         .map(|r| {
             let mut p = Plan {
                 g,
+                nested: crate::nested_captures::enabled(r),
                 bindings: HashSet::new(),
                 sites: vec![],
             };
@@ -309,7 +360,7 @@ pub(crate) fn calls(g: &GrammarDecl) -> Vec<Vec<(usize, usize)>> {
         .iter_mut()
         .zip(&g.rules)
         .map(|(p, r)| {
-            if semantic {
+            if semantic && !p.nested {
                 p.semantic_body(&r.body)
             }
             let mut out = vec![];

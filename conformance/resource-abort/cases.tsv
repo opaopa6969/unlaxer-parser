@@ -1,0 +1,13 @@
+# wrapper	manual	consumedCP	matchedCP	frames	committedRoots	state	word	label
+chain	false	1	2	1	2	7	p	before
+chain	true	2	2	2	3	11	a	outer
+match-only	false	1	2	1	2	7	p	before
+match-only	true	2	2	2	3	11	a	outer
+peg	false	1	2	1	2	7	p	before
+peg	true	2	2	2	3	11	a	outer
+capture	false	1	2	1	2	7	p	before
+capture	true	2	2	2	3	11	a	outer
+scope	false	1	2	1	2	7	p	before
+scope	true	2	2	2	3	11	a	outer
+repeat	false	1	2	1	2	7	p	before
+repeat	true	2	2	2	3	11	a	outer
