@@ -37,3 +37,31 @@ fn mapping_and_runtime_failures_are_separate_from_rejection() {
     assert!(result.contains("mappingError"), "{result}");
     assert!(grammar.analyze(&"x".repeat(8193)).contains("runtimeError"));
 }
+
+#[test]
+fn generated_enum_corpus_is_rejected_at_the_lesson_compile_boundary() {
+    let corpus: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../spec-corpus/enums/generated-cases.json"
+    ))
+    .unwrap();
+    let mut grammars = corpus
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["grammar"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    grammars.extend([
+        include_str!("../../../spec-corpus/mixed-enums/values.ubnf").to_owned(),
+        include_str!("../../../spec-corpus/mixed-enums/roots.ubnf").to_owned(),
+        include_str!("../../../spec-corpus/mixed-enums/shared.ubnf").to_owned(),
+    ]);
+    for grammar in grammars {
+        // These are the same Java/Rust real compiler and mapper fixtures, not
+        // invalid grammar used to justify an unrelated lesson rejection.
+        assert_eq!(unlaxer_generator::generate(&grammar).unwrap().len(), 5);
+        match LessonGrammar::compile(&grammar) {
+            Ok(_) => panic!("enum silently admitted by the lesson projection: {grammar}"),
+            Err(error) => assert!(error.contains("@enum") && error.contains("CLI"), "{error}"),
+        }
+    }
+}
