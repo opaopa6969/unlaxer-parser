@@ -323,3 +323,71 @@ fn commit_stops_further_alternatives() {
         assert_eq!(context.raised_failure().is_some(), committed);
     }
 }
+
+fn swallow(context: &mut ParseContext<'_>) -> ParseResult {
+    // A caller unaware of #700: it ignores the raised failure and succeeds.
+    let _ = context.parse(&w("a").commit());
+    let at = context.position();
+    Ok(ParseMatch::empty(Span { start: at, end: at }))
+}
+
+/// A raised failure ignored by its caller does not turn a later ordinary failure into a cut.
+#[test]
+fn an_ignored_raised_failure_does_not_turn_a_later_ordinary_failure_into_a_cut() {
+    for (memo, diagnostics) in SETTINGS {
+        let mut context = ParseContext::with_options(
+            "c",
+            ParseOptions::with_memoization(memo).with_diagnostics(diagnostics),
+        );
+        let parser = Expr::choice([seq([Expr::Custom(swallow), w("b")]), w("c")]);
+        assert!(context.parse(&parser).is_ok(), "{memo:?}/{diagnostics:?}");
+        assert_eq!(context.position(), 1);
+        assert_eq!(context.raised_failure(), None);
+    }
+}
+
+thread_local! {
+    static REGISTRY: unlaxer_runtime::shared_calls::Registry = {
+        let grammar = unlaxer_runtime::embedded::CstGrammar {
+            name: "Inner".into(),
+            grammar: unlaxer_runtime::share_grammar(vec![Rule {
+                name: "Root",
+                expression: seq([w("a"), w("b").commit_with("inner cut")]),
+            }]),
+            entries: [("Root".to_owned(), 0)].into_iter().collect(),
+            bindings: Vec::new(),
+            whitespace: false,
+        };
+        unlaxer_runtime::shared_calls::Registry::new([(language(), grammar)].into_iter().collect())
+            .unwrap()
+    };
+}
+fn language() -> unlaxer_runtime::source::Language {
+    unlaxer_runtime::source::Language {
+        id: "inner".into(),
+        package_id: "org.example".into(),
+        version: "1".into(),
+        grammar: "Inner".into(),
+        entry: "Root".into(),
+    }
+}
+fn shared_call(context: &mut ParseContext<'_>) -> ParseResult {
+    REGISTRY
+        .with(|registry| registry.call(context, &language()))
+        .map_err(|failure| failure.error)
+}
+
+/// A shared grammar call returns its failure as data: an inner cut is an ordinary failure outside.
+#[test]
+fn a_shared_grammar_call_does_not_leak_an_inner_cut() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        let mut context = ParseContext::with_options(
+            "ax",
+            ParseOptions::with_memoization(memo).with_diagnostics(Diagnostics::Detailed),
+        );
+        let parser = Expr::choice([Expr::Custom(shared_call), w("ax")]);
+        assert!(context.parse(&parser).is_ok(), "{memo:?}");
+        assert_eq!(context.position(), 2);
+        assert_eq!(context.raised_failure(), None);
+    }
+}

@@ -80,6 +80,8 @@ public final class SharedGrammarCalls {
             if (depth >= 32 || sourceLength > 1_048_576 || before + sourceLength > MAX_RETAINED_CP)
                 return failed(FailureKind.LIMIT, start, "shared call input/depth limit");
             context.disableSpeculativeOptimizations();
+            // A shared call returns its failure as data; an inner cut or label must not escape (#700).
+            var callerRaised = context.raisedFailure();
             context.begin(boundary);
             var global = new HashMap<>(context.getGlobalScopeTreeMap());
             var local = new HashMap<>(context.getParserContextScopeTreeMap());
@@ -102,6 +104,8 @@ public final class SharedGrammarCalls {
                 return new Result(call, null);
             } finally {
                 context.rollback(boundary);
+                if (callerRaised != null) context.raise(callerRaised);
+                else context.clearRaisedFailure();
                 context.getGlobalScopeTreeMap().clear(); context.getGlobalScopeTreeMap().putAll(global);
                 context.getParserContextScopeTreeMap().clear(); context.getParserContextScopeTreeMap().putAll(local);
             }

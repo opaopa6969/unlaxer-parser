@@ -50,6 +50,8 @@ public interface ChainInterface extends Parser{
 			for (Parser parser : children) {
 				if (excludeElements && false == FirstSets.of(parser)
 						.mayStartWith(parseContext.lookaheadCodePoint(tokenKind))) {
+					// The skipped element fails ordinarily; an earlier ignored raise is stale (#700).
+					parseContext.clearRaisedFailure();
 					parseContext.rollback(this);
 					parseContext.endParse(this, Parsed.FAILED , parseContext, tokenKind, invertMatch);
 					PackratMemoTable.memoizeFailure(parseContext, this, tokenKind, invertMatch, memoDiagnostic);

@@ -52,6 +52,16 @@ Every parse outcome is one of four kinds.
   as well as ordinary failures and recover in the same way. A labeled failure
   propagates through a recovery boundary. If recovery itself fails (for example
   no sync token remains), the committed error keeps propagating.
+- Longest and unique-longest choice evaluate every alternative; a raised failure
+  from a later alternative aborts the choice even when an earlier alternative
+  already succeeded, because the choice cannot complete without evaluating it.
+- A `Label` directly inside a repetition always ends that repetition with the
+  labeled failure, as in LPegLabel: the iteration that finds no further item
+  raises instead of failing ordinarily. Put the label after the token that
+  commits to an item (`{ ',' LABEL(item, Item) }`), not around the whole item.
+- A shared grammar call (Java `SharedGrammarCalls`, Rust `shared_calls`) is a
+  boundary: it restores the caller's state and returns its failure as data, so a
+  cut or label inside the called grammar is an ordinary failure for the caller.
 - Every non-success restores cursors, CST, captures, scopes and registered user
   state exactly as an ordinary failure does. The operators add no CST node of
   their own; a successful child is observationally unchanged.
@@ -82,10 +92,20 @@ The final error prefers a raised failure over the farthest failure:
   with that offset and message, without a detailed retry. Resource limits and
   name-resolution failures still take precedence.
 
-A raised failure is cleared when a new attempt begins, so it never leaks into
-an unrelated later failure or into the next parse on a reused context. Custom
-parsers that catch failures themselves can use `clearRaisedFailure()` (Java);
-a successful Rust custom callback clears it automatically.
+Precedence of the final error, highest first: a resource limit (Java
+`ParseLimitException`, Rust `resource_limit`), a name-resolution failure, a raised
+failure, then the farthest failure. The full-input entries agree: Rust
+`parse_detailed*` and the generated Java `diagnose` check name resolution before the
+raised failure. Java `getParseFailureDiagnostics()` has never reported name
+failures (they stay on `NameResolution.failure`), so it starts at the raised failure.
+
+A raised failure is cleared whenever a new attempt starts: every Java parser entry
+(`startParse`, terminals included), a transaction begin or commit, a FIRST-set
+element skip and every memo replay (an ordinary failure entry clears it); in Rust
+every `expression` entry, a memo replay and a successful custom callback. A caller
+that ignores a raised failure therefore never turns a later, unrelated ordinary
+failure into a cut, and the next parse on a reused context starts clean. Custom
+parsers that catch failures themselves can use `clearRaisedFailure()` (Java).
 
 ## UBNF
 
@@ -169,7 +189,8 @@ Both oracles are handwritten, independent of either implementation, and run in
 Java and Rust under both memo policies and all three diagnostic policies,
 comparing acceptance, consumed and matched cursors, outcome kind, label, message
 and code-point offset. Both tests also check that a later parse on the same
-context is unaffected and, as an observation, that a committed error stops a
+context is unaffected, that a raised failure ignored by a custom parser or raised
+inside a shared grammar call does not reach the caller, and, as an observation, that a committed error stops a
 16-alternative choice from evaluating any further alternative (16 evaluations
 without the cut, 0 with it).
 
