@@ -129,6 +129,22 @@ pub enum Expression {
     },
     Replay(String),
     CaptureScope(Box<Expression>),
+    /// Cut (#700); `None` uses the runtime default message. CST-transparent.
+    Commit {
+        child: Box<Expression>,
+        message: Option<String>,
+    },
+    /// Labeled failure (#700). CST-transparent.
+    Label {
+        label: String,
+        child: Box<Expression>,
+    },
+    /// Catch labeled failures (#700); analyses treat it as the choice of both operands.
+    CatchLabels {
+        child: Box<Expression>,
+        alternative: Box<Expression>,
+        labels: Vec<String>,
+    },
     NamePredicate {
         child: Box<Expression>,
         snapshot: String,

@@ -274,8 +274,15 @@ fn atom(
                 name,
             };
         }
+        ElementKind::Catch { choice, operands } => {
+            body(&mut operands.body, imported, tokens, used, synthetic)?;
+            body(&mut operands.alternative, imported, tokens, used, synthetic)?;
+            *choice = unlaxer_ubnf::catch_choice(&operands.body, &operands.alternative);
+        }
         ElementKind::OwnedCapture { body: value, .. }
         | ElementKind::CaptureScope(value)
+        | ElementKind::Commit { body: value, .. }
+        | ElementKind::Label { body: value, .. }
         | ElementKind::Group(value)
         | ElementKind::Optional(value)
         | ElementKind::Repeat(value) => body(value, imported, tokens, used, synthetic)?,

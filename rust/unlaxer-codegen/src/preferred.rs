@@ -64,6 +64,8 @@ fn instrument(
         | ValueBoundary(child)
         | OwnedCapture { child, .. }
         | CaptureScope(child)
+        | Commit { child, .. }
+        | Label { child, .. }
         | CaptureBoundary { child, .. }
         | Repeat { child, .. }
         | RuleEffects { child, .. }
@@ -90,6 +92,12 @@ fn instrument(
             instrument(child, calls)?;
             instrument(separator, calls)?;
         }
+        CatchLabels {
+            child, alternative, ..
+        } => {
+            instrument(child, calls)?;
+            instrument(alternative, calls)?;
+        }
         _ => {}
     }
     Ok(())
@@ -106,6 +114,8 @@ pub(crate) fn contains_depth(expr: &Expression) -> bool {
         | ValueBoundary(child)
         | OwnedCapture { child, .. }
         | CaptureScope(child)
+        | Commit { child, .. }
+        | Label { child, .. }
         | CaptureBoundary { child, .. }
         | Repeat { child, .. }
         | RuleEffects { child, .. }
@@ -125,6 +135,9 @@ pub(crate) fn contains_depth(expr: &Expression) -> bool {
             ..
         } => items.iter().any(contains_depth),
         Separated { child, separator } => contains_depth(child) || contains_depth(separator),
+        CatchLabels {
+            child, alternative, ..
+        } => contains_depth(child) || contains_depth(alternative),
         _ => false,
     }
 }

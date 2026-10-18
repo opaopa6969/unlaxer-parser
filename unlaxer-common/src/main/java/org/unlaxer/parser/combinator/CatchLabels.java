@@ -25,7 +25,8 @@ import org.unlaxer.parser.Parsers;
  * failure with another label propagates unchanged without trying the alternative. The operator
  * adds no CST node of its own.
  */
-public class CatchLabels extends ConstructedAbstractParser implements MetaFunctionParser {
+public class CatchLabels extends ConstructedAbstractParser implements MetaFunctionParser,
+    org.unlaxer.parser.HasChildrenParser {
 
   private static final long serialVersionUID = 1L;
 
@@ -97,5 +98,11 @@ public class CatchLabels extends ConstructedAbstractParser implements MetaFuncti
     } finally {
       parseContext.leaveParserCall();
     }
+  }
+
+  /** Traversable by parser-graph analyses such as DiagnosticsSafety. */
+  @Override
+  public org.unlaxer.parser.HasChildrenParser createWith(Parsers children) {
+    return new CatchLabels(children.get(0), children.get(1), List.copyOf(labels));
   }
 }

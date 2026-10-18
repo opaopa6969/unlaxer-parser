@@ -9,6 +9,27 @@ pub struct Span {
     pub codepoint_end: usize,
 }
 
+/// The operands of `CATCH(body, alternative {, label})`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CatchOperands {
+    pub body: RuleBody,
+    pub alternative: RuleBody,
+    pub labels: Vec<String>,
+}
+
+/// The choice of both CATCH operands, as stored in [`ElementKind::Catch`].
+pub fn catch_choice(body: &RuleBody, alternative: &RuleBody) -> RuleBody {
+    RuleBody {
+        alternatives: body
+            .alternatives
+            .iter()
+            .chain(&alternative.alternatives)
+            .cloned()
+            .collect(),
+        span: body.span.through(alternative.span),
+    }
+}
+
 impl Span {
     pub(crate) fn through(self, end: Self) -> Self {
         Self {
@@ -236,6 +257,25 @@ pub enum ElementKind {
         name: String,
     },
     CaptureScope(RuleBody),
+    /// `COMMIT(body [, 'message'])`: cut (#700). CST-transparent like a group.
+    Commit {
+        body: RuleBody,
+        message: Option<String>,
+    },
+    /// `LABEL(label, body)`: labeled failure (#700). CST-transparent like a group.
+    Label {
+        label: String,
+        body: RuleBody,
+    },
+    /// `CATCH(body, alternative {, label})`: catch labeled failures (#700).
+    /// An empty label list is syntax; validation rejects it with this element's span.
+    Catch {
+        /// Exactly one operand produces the CST, so shape analyses see the choice of both
+        /// operands' alternatives (Java `CatchElement.body()`). Build it with [`catch_choice`].
+        choice: RuleBody,
+        /// Boxed so that the recursive element type does not grow (deep nesting limit).
+        operands: Box<CatchOperands>,
+    },
     Group(RuleBody),
     Optional(RuleBody),
     Repeat(RuleBody),

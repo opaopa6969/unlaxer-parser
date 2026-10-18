@@ -925,33 +925,74 @@ impl Parser<'_> {
         Ok(values)
     }
 
+    // Builtin calls stay out of the recursive atomic() frame, so deep nesting reaches
+    // the nesting-limit diagnostic instead of the thread's stack limit.
+    #[inline(never)]
+    fn builtin_call(&mut self) -> Result<ElementKind> {
+        let operation = self.identifier()?;
+        self.expect('(')?;
+        let kind = match operation.as_str() {
+            "CAPTURE" => {
+                let name = self.identifier()?;
+                self.expect(',')?;
+                ElementKind::OwnedCapture {
+                    name,
+                    body: self.body()?,
+                }
+            }
+            "SAME_AS" => ElementKind::Replay {
+                name: self.identifier()?,
+            },
+            "CAPTURE_SCOPE" => ElementKind::CaptureScope(self.body()?),
+            "COMMIT" => {
+                let body = self.body()?;
+                let message = if self.eat(',') {
+                    Some(self.quoted()?)
+                } else {
+                    None
+                };
+                ElementKind::Commit { body, message }
+            }
+            "LABEL" => {
+                let label = self.identifier()?;
+                self.expect(',')?;
+                ElementKind::Label {
+                    label,
+                    body: self.body()?,
+                }
+            }
+            "CATCH" => {
+                let body = self.body()?;
+                self.expect(',')?;
+                let alternative = self.body()?;
+                let mut labels = Vec::new();
+                while self.eat(',') {
+                    labels.push(self.identifier()?);
+                }
+                ElementKind::Catch {
+                    choice: crate::ast::catch_choice(&body, &alternative),
+                    operands: Box::new(crate::ast::CatchOperands {
+                        body,
+                        alternative,
+                        labels,
+                    }),
+                }
+            }
+            _ => unreachable!(),
+        };
+        self.expect(')')?;
+        Ok(kind)
+    }
+
     fn atomic(&mut self) -> Result<AtomicElement> {
         let start = self.current().span;
         let owned_call = matches!(&self.current().kind, Kind::Identifier(name)
-            if matches!(name.as_str(), "CAPTURE" | "SAME_AS" | "CAPTURE_SCOPE"))
+            if matches!(name.as_str(), "CAPTURE" | "SAME_AS" | "CAPTURE_SCOPE" | "COMMIT" | "LABEL" | "CATCH"))
             && self.tokens.get(self.pos + 1).is_some_and(|t| {
                 t.kind == Kind::Symbol('(') && self.current().span.byte_end == t.span.byte_start
             });
         let kind = if owned_call {
-            let operation = self.identifier()?;
-            self.expect('(')?;
-            let kind = match operation.as_str() {
-                "CAPTURE" => {
-                    let name = self.identifier()?;
-                    self.expect(',')?;
-                    ElementKind::OwnedCapture {
-                        name,
-                        body: self.body()?,
-                    }
-                }
-                "SAME_AS" => ElementKind::Replay {
-                    name: self.identifier()?,
-                },
-                "CAPTURE_SCOPE" => ElementKind::CaptureScope(self.body()?),
-                _ => unreachable!(),
-            };
-            self.expect(')')?;
-            kind
+            self.builtin_call()?
         } else if self.eat('(') {
             let body = self.body()?;
             self.expect(')')?;

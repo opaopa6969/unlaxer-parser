@@ -1,0 +1,30 @@
+[
+  {
+    "id": "unknown-label",
+    "grammar": "grammar Bad { @root Root ::= CATCH('a', 'b', missing) ; }",
+    "code": "E-CATCH-UNKNOWN-LABEL",
+    "startCP": 29,
+    "endCP": 53
+  },
+  {
+    "id": "empty-catch",
+    "grammar": "grammar Bad { @root Root ::= LABEL(L, 'a') CATCH('a', 'b') ; }",
+    "code": "E-CATCH-EMPTY",
+    "startCP": 43,
+    "endCP": 58
+  },
+  {
+    "id": "duplicate-label",
+    "grammar": "grammar Bad { @root Root ::= CATCH(LABEL(L, 'a'), 'b', L, L) ; }",
+    "code": "E-CATCH-DUPLICATE-LABEL",
+    "startCP": 29,
+    "endCP": 60
+  },
+  {
+    "id": "empty-message",
+    "grammar": "grammar Bad { @root Root ::= COMMIT('a', '') ; }",
+    "code": "E-COMMIT-EMPTY-MESSAGE",
+    "startCP": 29,
+    "endCP": 44
+  }
+]

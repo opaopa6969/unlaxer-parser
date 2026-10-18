@@ -227,6 +227,9 @@ impl Inventory {
         for issue in crate::token_stream::problems(grammar) {
             self.add(issue.code, issue.subject, issue.span);
         }
+        for problem in crate::raising::problems(grammar) {
+            self.add(problem.code, problem.subject, problem.span);
+        }
         for import in &grammar.imports {
             self.add("P-IMPORT", &import.path, import.span);
         }
@@ -358,6 +361,9 @@ impl Inventory {
         match &element.kind {
             ElementKind::OwnedCapture { body, .. }
             | ElementKind::CaptureScope(body)
+            | ElementKind::Commit { body, .. }
+            | ElementKind::Label { body, .. }
+            | ElementKind::Catch { choice: body, .. }
             | ElementKind::Group(body)
             | ElementKind::Optional(body)
             | ElementKind::Repeat(body) => self.body(body),

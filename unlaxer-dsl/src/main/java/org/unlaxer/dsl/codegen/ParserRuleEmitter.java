@@ -10,6 +10,7 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.DocAnnotation;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ErrorElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.OwnedCaptureElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ReplayElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.CaptureScopeElement;
@@ -89,6 +90,9 @@ class ParserRuleEmitter {
         record OwnedCapture(String name, ElementModel inner) implements ElementModel {}
         record Replay(String name) implements ElementModel {}
         record CaptureScope(ElementModel inner) implements ElementModel {}
+        record Commit(ElementModel inner, java.util.Optional<String> message) implements ElementModel {}
+        record Label(String label, ElementModel inner) implements ElementModel {}
+        record CatchLabels(ElementModel child, ElementModel alternative, List<String> labels) implements ElementModel {}
     }
 
     // =========================================================================
@@ -158,6 +162,10 @@ class ParserRuleEmitter {
                 analyzeHelpersInBody(ctx, ruleName, bounded.body(), specs);
                 specs.add(new HelperSpec.ChainHelper(helperName, atomicAsRuleBody(bounded.body())));
             }
+        } else if (element instanceof UBNFAST.CatchElement caught) {
+            // Each operand is an ordinary group with its own helper; the CATCH itself has none.
+            analyzeHelpersInElement(ctx, ruleName, caught.child(), specs);
+            analyzeHelpersInElement(ctx, ruleName, caught.alternative(), specs);
         } else if (element instanceof TransparentElement g) {
             int n = ctx.nextGroup(ruleName);
             String helperName = ruleName + "Group" + n + "Parser";
@@ -1002,11 +1010,12 @@ class ParserRuleEmitter {
         if (element instanceof RepeatElement e) return new ElementModel.Boundary("LIST",new ElementModel.ZeroOrMoreOf(nestedBody(ctx,ruleName,e.body(),element)));
         if (element instanceof OneOrMoreElement e) return new ElementModel.Boundary("LIST",new ElementModel.OneOrMoreOf(resolveNested(ctx,ruleName,e.body())));
         if (element instanceof BoundedRepeatElement e) return new ElementModel.Boundary("LIST",new ElementModel.BoundedRepeatOf(resolveNested(ctx,ruleName,e.body()),Integer.toString(e.min()),e.max()==BoundedRepeatElement.UNBOUNDED?"Integer.MAX_VALUE":Integer.toString(e.max())));
-        if (element instanceof TransparentElement e) {
+        if (element instanceof TransparentElement e && !(element instanceof UBNFAST.CatchElement)) {
             var boundary=(ElementModel.Boundary)nestedBody(ctx,ruleName,e.body(),element);
             ElementModel child=boundary.inner();
             if (element instanceof OwnedCaptureElement capture) child=new ElementModel.OwnedCapture(capture.name(),child);
             else if (element instanceof CaptureScopeElement) child=new ElementModel.CaptureScope(child);
+            else child=raising(element,child);
             return new ElementModel.Boundary(boundary.kind(),child);
         }
         if (element instanceof SeparatedElement e) return new ElementModel.Boundary("LIST",new ElementModel.NestedSeparated(resolveNested(ctx,ruleName,e.element()),new ElementModel.Boundary("SEPARATOR",resolveFlatElement(ctx,ruleName,e.separator())),getChainClassName(ctx,ruleName)));
@@ -1069,6 +1078,9 @@ class ParserRuleEmitter {
             }
         } else if (element instanceof ReplayElement replay) {
             model = new ElementModel.Replay(replay.name());
+        } else if (element instanceof UBNFAST.CatchElement caught) {
+            model = new ElementModel.CatchLabels(resolveElement(ctx, ruleName, caught.child()),
+                resolveElement(ctx, ruleName, caught.alternative()), caught.labels());
         } else if (element instanceof TransparentElement g) {
             String helperName = ctx.helperName(ruleName, element);
             // A bare reference must reach the owned boundary directly: collecting
@@ -1078,7 +1090,7 @@ class ParserRuleEmitter {
                 : new ElementModel.ClassRef(helperName + ".class");
             model = element instanceof OwnedCaptureElement capture
                 ? new ElementModel.OwnedCapture(capture.name(), child)
-                : element instanceof CaptureScopeElement ? new ElementModel.CaptureScope(child) : child;
+                : element instanceof CaptureScopeElement ? new ElementModel.CaptureScope(child) : raising(element, child);
         } else if (element instanceof SeparatedElement sep) {
             String outerHelperName = ctx.helperName(ruleName, element);
             model = new ElementModel.ClassRef(outerHelperName + ".class");
@@ -1089,6 +1101,13 @@ class ParserRuleEmitter {
         }
         List<String> bindings = ctx.captureBindings.get(ruleName).bindings(element);
         return bindings.isEmpty() ? model : new ElementModel.Captured(model, bindings);
+    }
+
+    /** COMMIT / LABEL wrap their group child (#700); other transparent elements pass through. */
+    private static ElementModel raising(AtomicElement element, ElementModel child) {
+        if (element instanceof UBNFAST.CommitElement commit) return new ElementModel.Commit(child, commit.message());
+        if (element instanceof UBNFAST.LabelElement label) return new ElementModel.Label(label.label(), child);
+        return child;
     }
 
     private static String bindingArguments(List<String> bindings) {
@@ -1199,6 +1218,20 @@ class ParserRuleEmitter {
         }
         if (model instanceof ElementModel.CaptureScope m) {
             return "new org.unlaxer.parser.combinator.CaptureScope(" + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ")";
+        }
+        if (model instanceof ElementModel.Commit m) {
+            return "new org.unlaxer.parser.combinator.Commit(" + renderElement(m.inner(), adapterShadowsWordParser, tokenStream)
+                + m.message().map(message -> ", \"" + ParserCodegenUtil.escapeString(message) + "\"").orElse("") + ")";
+        }
+        if (model instanceof ElementModel.Label m) {
+            return "new org.unlaxer.parser.combinator.Label(\"" + ParserCodegenUtil.escapeString(m.label()) + "\", "
+                + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ")";
+        }
+        if (model instanceof ElementModel.CatchLabels m) {
+            return "new org.unlaxer.parser.combinator.CatchLabels(" + renderElement(m.child(), adapterShadowsWordParser, tokenStream)
+                + ", " + renderElement(m.alternative(), adapterShadowsWordParser, tokenStream) + ", "
+                + m.labels().stream().map(label -> "\"" + ParserCodegenUtil.escapeString(label) + "\"")
+                    .collect(java.util.stream.Collectors.joining(", ")) + ")";
         }
         if (model instanceof ElementModel.Captured m) {
             return "new __CaptureSite(" + renderElement(m.inner(), adapterShadowsWordParser, tokenStream) + ", " + bindingArguments(m.bindings()) + ")";

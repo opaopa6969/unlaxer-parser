@@ -342,7 +342,7 @@ public sealed interface UBNFAST permits
 
     /** ( RuleBody ) */
     sealed interface TransparentElement extends AtomicElement permits
-        GroupElement, OwnedCaptureElement, CaptureScopeElement {
+        GroupElement, OwnedCaptureElement, CaptureScopeElement, CommitElement, LabelElement, CatchElement {
         RuleBody body();
     }
 
@@ -352,6 +352,32 @@ public sealed interface UBNFAST permits
     record OwnedCaptureElement(String name, RuleBody body) implements TransparentElement {}
     record ReplayElement(String name) implements AtomicElement {}
     record CaptureScopeElement(RuleBody body) implements TransparentElement {}
+
+    /** COMMIT(body [, 'message']): cut (#700). CST-transparent, so shape analyses see a group. */
+    record CommitElement(RuleBody body, Optional<String> message) implements TransparentElement {}
+
+    /** LABEL(label, body): labeled failure (#700). CST-transparent, so shape analyses see a group. */
+    record LabelElement(String label, RuleBody body) implements TransparentElement {}
+
+    /**
+     * CATCH(body, alternative, label {, label}): catch labeled failures (#700).
+     * Exactly one of the two groups produces the CST, so shape analyses see their choice.
+     */
+    record CatchElement(GroupElement child, GroupElement alternative, List<String> labels)
+        implements TransparentElement {
+        public CatchElement {
+            labels = List.copyOf(labels);
+        }
+
+        @Override public RuleBody body() {
+            List<SequenceBody> alternatives = new java.util.ArrayList<>();
+            for (RuleBody part : List.of(child.body(), alternative.body())) {
+                if (part instanceof ChoiceBody choice) alternatives.addAll(choice.alternatives());
+                else alternatives.add((SequenceBody) part);
+            }
+            return new ChoiceBody(List.copyOf(alternatives));
+        }
+    }
 
     /** [ RuleBody ] */
     record OptionalElement(RuleBody body) implements AtomicElement {}

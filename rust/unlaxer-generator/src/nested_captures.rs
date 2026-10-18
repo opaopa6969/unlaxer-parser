@@ -57,6 +57,9 @@ pub fn sites(rule: &RuleDecl) -> Result<BTreeMap<String, &AtomicElement>, String
         match &value.kind {
             ElementKind::OwnedCapture { body: v, .. }
             | ElementKind::CaptureScope(v)
+            | ElementKind::Commit { body: v, .. }
+            | ElementKind::Label { body: v, .. }
+            | ElementKind::Catch { choice: v, .. }
             | ElementKind::Group(v) => body(rule, v, inside, depth + 1, result)?,
             ElementKind::Optional(v) | ElementKind::Repeat(v) => {
                 body(rule, v, true, depth + 1, result)?
@@ -237,6 +240,9 @@ fn nominal_leaf(grammar: &GrammarDecl, atom: &AtomicElement) -> Option<String> {
             }),
         ElementKind::OwnedCapture { body, .. }
         | ElementKind::CaptureScope(body)
+        | ElementKind::Commit { body, .. }
+        | ElementKind::Label { body, .. }
+        | ElementKind::Catch { choice: body, .. }
         | ElementKind::Group(body)
         | ElementKind::Optional(body)
         | ElementKind::Repeat(body) => {
@@ -284,6 +290,9 @@ pub fn shape(grammar: &GrammarDecl, atom: &AtomicElement, depth: usize) -> Resul
         }
         ElementKind::OwnedCapture { body: v, .. }
         | ElementKind::CaptureScope(v)
+        | ElementKind::Commit { body: v, .. }
+        | ElementKind::Label { body: v, .. }
+        | ElementKind::Catch { choice: v, .. }
         | ElementKind::Group(v) => body_shape(grammar, v, depth + 1)?,
         ElementKind::Terminal(_) | ElementKind::Replay { .. } => Kind::Text,
         ElementKind::RuleRef { name, .. } => {
@@ -386,6 +395,18 @@ pub fn boundary(expression: Expression) -> Expression {
                 unreachable!()
             };
             (kind, Expression::CaptureScope(child))
+        }
+        Expression::Commit { child, message } => {
+            let Expression::CaptureBoundary { kind, child } = boundary(*child) else {
+                unreachable!()
+            };
+            (kind, Expression::Commit { child, message })
+        }
+        Expression::Label { label, child } => {
+            let Expression::CaptureBoundary { kind, child } = boundary(*child) else {
+                unreachable!()
+            };
+            (kind, Expression::Label { label, child })
         }
         Expression::Delimited(v) => {
             let Expression::CaptureBoundary { kind, child } = boundary(*v) else {

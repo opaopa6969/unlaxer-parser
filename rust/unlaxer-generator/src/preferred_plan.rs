@@ -91,7 +91,10 @@ fn shape(g: &GrammarDecl, a: &AtomicElement, seen: &mut HashSet<String>) -> Shap
         }
         ElementKind::Group(b)
         | ElementKind::OwnedCapture { body: b, .. }
-        | ElementKind::CaptureScope(b) => body_shape(g, b, seen),
+        | ElementKind::CaptureScope(b)
+        | ElementKind::Commit { body: b, .. }
+        | ElementKind::Label { body: b, .. }
+        | ElementKind::Catch { choice: b, .. } => body_shape(g, b, seen),
         ElementKind::Optional(b) => wrap(body_shape(g, b, seen), Count::Optional),
         ElementKind::Repeat(b) => wrap(body_shape(g, b, seen), Count::Many),
         ElementKind::OneOrMore(a)
@@ -169,6 +172,9 @@ impl<'a> Plan<'a> {
             ElementKind::Group(b)
             | ElementKind::OwnedCapture { body: b, .. }
             | ElementKind::CaptureScope(b)
+            | ElementKind::Commit { body: b, .. }
+            | ElementKind::Label { body: b, .. }
+            | ElementKind::Catch { choice: b, .. }
             | ElementKind::Optional(b)
             | ElementKind::Repeat(b) => self.visit(b),
             ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
@@ -221,7 +227,10 @@ impl<'a> Plan<'a> {
         match &a.kind {
             ElementKind::Group(b)
             | ElementKind::OwnedCapture { body: b, .. }
-            | ElementKind::CaptureScope(b) => self.semantic_body(b),
+            | ElementKind::CaptureScope(b)
+            | ElementKind::Commit { body: b, .. }
+            | ElementKind::Label { body: b, .. }
+            | ElementKind::Catch { choice: b, .. } => self.semantic_body(b),
             ElementKind::Optional(b) | ElementKind::Repeat(b) => self.semantic_item_body(b),
             ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
                 self.semantic_item_atom(a)
@@ -257,7 +266,11 @@ impl<'a> Plan<'a> {
                     out.push((id, depth));
                 }
             }
-            ElementKind::OwnedCapture { body: b, .. } | ElementKind::CaptureScope(b) => {
+            ElementKind::OwnedCapture { body: b, .. }
+            | ElementKind::CaptureScope(b)
+            | ElementKind::Commit { body: b, .. }
+            | ElementKind::Label { body: b, .. }
+            | ElementKind::Catch { choice: b, .. } => {
                 if let Some(child) =
                     one(b).filter(|a| matches!(a.kind, ElementKind::RuleRef { .. }))
                 {
@@ -307,6 +320,9 @@ impl<'a> Plan<'a> {
         match &a.kind {
             ElementKind::OwnedCapture { body, .. }
             | ElementKind::CaptureScope(body)
+            | ElementKind::Commit { body, .. }
+            | ElementKind::Label { body, .. }
+            | ElementKind::Catch { choice: body, .. }
             | ElementKind::Group(body) => self.nested_body(body, depth, out),
             ElementKind::Optional(body) | ElementKind::Repeat(body) => {
                 self.nested_body(body, depth + 2, out)

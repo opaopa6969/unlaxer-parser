@@ -40,3 +40,12 @@ owned-same-as-empty	grammar BadOwned { Root ::= SAME_AS(); name ::= 'a'; other :
 owned-same-as-extra	grammar BadOwned { Root ::= SAME_AS(name, other); name ::= 'a'; other ::= 'b'; CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; }
 owned-empty-alternative	grammar Bad { Root ::= CAPTURE(word, 'a' |); }
 owned-empty-leading-alternative	grammar Bad { Root ::= CAPTURE_SCOPE(| 'a'); }
+commit-empty	grammar Bad { Root ::= COMMIT(); COMMIT ::= 'c'; }
+commit-missing-message	grammar Bad { Root ::= COMMIT('a',); }
+commit-identifier-message	grammar Bad { Root ::= COMMIT('a', b); b ::= 'b'; }
+label-missing-body	grammar Bad { Root ::= LABEL(name); name ::= 'a'; LABEL ::= 'l'; }
+label-missing-name	grammar Bad { Root ::= LABEL(, 'a'); }
+label-string-name	grammar Bad { Root ::= LABEL('name', 'a'); }
+catch-missing-alternative	grammar Bad { Root ::= CATCH('a'); CATCH ::= 'c'; }
+catch-string-label	grammar Bad { Root ::= CATCH('a', 'b', 'L'); }
+catch-empty-alternative	grammar Bad { Root ::= CATCH('a',, L); }

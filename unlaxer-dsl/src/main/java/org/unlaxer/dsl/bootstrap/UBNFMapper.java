@@ -1173,6 +1173,30 @@ public class UBNFMapper {
             var bodies = findDescendants(scopes.get(0), UBNFParsers.ChoiceBodyParser.class);
             return new CaptureScopeElement(toChoiceBody(bodies.get(0)));
         }
+        var commits = findAtElementLevel(token, UBNFParsers.CommitElementParser.class);
+        if (!commits.isEmpty()) {
+            Token call = commits.get(0);
+            var bodies = findDescendants(call, UBNFParsers.ChoiceBodyParser.class);
+            var messages = findOutsideBodies(call, SingleQuotedParser.class);
+            return new UBNFAST.CommitElement(toChoiceBody(bodies.get(0)), messages.isEmpty()
+                ? Optional.empty() : Optional.of(stripQuotes(messages.get(0).source.toString().trim())));
+        }
+        var labels = findAtElementLevel(token, UBNFParsers.LabelElementParser.class);
+        if (!labels.isEmpty()) {
+            Token call = labels.get(0);
+            String label = findOutsideBodies(call, UBNFParsers.IdentifierParser.class).get(0).source.toString().trim();
+            var bodies = findDescendants(call, UBNFParsers.ChoiceBodyParser.class);
+            return new UBNFAST.LabelElement(label, toChoiceBody(bodies.get(0)));
+        }
+        var catches = findAtElementLevel(token, UBNFParsers.CatchElementParser.class);
+        if (!catches.isEmpty()) {
+            Token call = catches.get(0);
+            var bodies = findDescendants(call, UBNFParsers.ChoiceBodyParser.class);
+            List<String> names = findOutsideBodies(call, UBNFParsers.IdentifierParser.class).stream()
+                .map(name -> name.source.toString().trim()).toList();
+            return new UBNFAST.CatchElement(new GroupElement(toChoiceBody(bodies.get(0))),
+                new GroupElement(toChoiceBody(bodies.get(1))), names);
+        }
         // GroupElement
         List<Token> groupTokens = findAtElementLevel(token, UBNFParsers.GroupElementParser.class);
         if (false == groupTokens.isEmpty()) {
@@ -1331,6 +1355,19 @@ public class UBNFMapper {
         return results;
     }
 
+    /** Search a builtin call's own arguments, never inside its rule bodies. */
+    private static List<Token> findOutsideBodies(Token token, Class<? extends Parser> parserClass) {
+        List<Token> results = new ArrayList<>();
+        for (Token child : token.filteredChildren) {
+            if (child.parser.getClass() == parserClass) results.add(child);
+            else if (child.parser.getClass() != UBNFParsers.ChoiceBodyParser.class
+                && child.parser.getClass() != UBNFParsers.RuleBodyParser.class) {
+                results.addAll(findOutsideBodies(child, parserClass));
+            }
+        }
+        return results;
+    }
+
     /** Search the current element, never stealing syntax from a nested group/quantifier. */
     private static List<Token> findAtElementLevel(Token token, Class<? extends Parser> parserClass) {
         List<Token> results = new ArrayList<>();
@@ -1446,6 +1483,9 @@ public class UBNFMapper {
         return clazz == UBNFParsers.OwnedCaptureElementParser.class
             || clazz == UBNFParsers.ReplayElementParser.class
             || clazz == UBNFParsers.CaptureScopeElementParser.class
+            || clazz == UBNFParsers.CommitElementParser.class
+            || clazz == UBNFParsers.LabelElementParser.class
+            || clazz == UBNFParsers.CatchElementParser.class
             || clazz == UBNFParsers.GroupElementParser.class
             || clazz == UBNFParsers.OptionalElementParser.class
             || clazz == UBNFParsers.RepeatElementParser.class

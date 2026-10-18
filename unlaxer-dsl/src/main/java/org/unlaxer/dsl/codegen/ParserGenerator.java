@@ -187,6 +187,7 @@ public class ParserGenerator implements CodeGenerator {
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
+        RaisingOperators.requireValid(grammar);
         TypeofConstraints.validate(grammar);
         var ciErrors = GrammarValidator.validateCaseInsensitiveTokens(grammar);
         if (!ciErrors.isEmpty()) throw new IllegalArgumentException(ciErrors.toString());
@@ -518,6 +519,17 @@ public class ParserGenerator implements CodeGenerator {
         }
         if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.GroupElement group) {
             return collectMemoDependencies(ctx, group.body(), refs);
+        }
+        // Failure memo entries record committed / labeled failures (#700), so these stay safe.
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.CommitElement commit) {
+            return collectMemoDependencies(ctx, commit.body(), refs);
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.LabelElement label) {
+            return collectMemoDependencies(ctx, label.body(), refs);
+        }
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.CatchElement caught) {
+            return collectMemoDependencies(ctx, caught.child(), refs)
+                    & collectMemoDependencies(ctx, caught.alternative(), refs);
         }
         if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement separated) {
             return collectMemoDependencies(ctx, separated.element(), refs)

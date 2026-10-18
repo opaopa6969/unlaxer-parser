@@ -4,8 +4,8 @@ The runtime slice of [#700](https://github.com/opaopa6969/unlaxer-parser/issues/
 adds three operators modelled on kmizu/scomb's `commit` / `withErrorMessage`
 (cut) and `labeled` / `|~` (labeled failures), and on LPegLabel. They stop an
 error from being reported at the farthest speculative failure and stop
-backtracking that cannot succeed. UBNF syntax and the three generators are a
-separate slice.
+backtracking that cannot succeed. UBNF exposes them as builtin calls, generated
+by the Java generator and by both Rust generator hosts (see [UBNF](#ubnf)).
 
 ```java
 Parser cut      = new Commit(child, "expected ')'");   // or new Commit(child)
@@ -87,6 +87,46 @@ an unrelated later failure or into the next parse on a reused context. Custom
 parsers that catch failures themselves can use `clearRaisedFailure()` (Java);
 a successful Rust custom callback clears it automatically.
 
+## UBNF
+
+```ubnf
+grammar Statements {
+  @root @mapping(Doc)
+  Root ::= { Statement } ;
+  @recovery(sync=';')
+  Statement ::= 'let' COMMIT(Name, 'expected a name') ';'
+              | CATCH('(' Expr LABEL(close, ')'), '(' Expr ']', close) ;
+  ...
+}
+```
+
+- `COMMIT(body)` and `COMMIT(body, 'message')` are `Commit` / `commit()` /
+  `commit_with(message)`; the message is a string literal with the usual escapes.
+- `LABEL(label, body)` is `Label` / `label(label)`; the label is an identifier.
+- `CATCH(body, alternative, label {, label})` is `CatchLabels` / `catch_labels`.
+- As with `CAPTURE(`, only the spelling immediately followed by `(` is a builtin
+  call. `COMMIT ('a')` with trivia is still a rule reference followed by a group,
+  and `COMMIT`, `LABEL` and `CATCH` remain usable rule names.
+- The three calls are CST-transparent like a group: mapping, AST shape and
+  captures see their body, and for `CATCH` the choice of both operands.
+- Rules using them stay memoizable in both generators; FIRST-based predictive
+  choice treats them as unknown, so a predictor never skips a raising alternative.
+
+The validator rejects, with the code-point span of the offending call, in Java
+`GrammarValidator` / `RaisingOperators`, in the native generator (`at CP s..e`)
+and in both portability checks:
+
+| Code | Rejected |
+| --- | --- |
+| `E-CATCH-UNKNOWN-LABEL` | a `CATCH` label that no `LABEL(...)` in the grammar raises |
+| `E-CATCH-EMPTY` | a `CATCH` without labels (the syntax admits it so the error is positioned) |
+| `E-CATCH-DUPLICATE-LABEL` | a label listed twice in one `CATCH` |
+| `E-COMMIT-EMPTY-MESSAGE` | `COMMIT(body, '')` |
+
+The generated Java `diagnose` and the Rust `parse_tree_detailed*` functions
+return kind `commit` or `label` with the raised offset and message, and both
+generated language servers publish that message at that position.
+
 ## API names
 
 `commit`, `label` and `catchLabels` are the provisional names of #700, kept
@@ -138,6 +178,21 @@ mvn -pl unlaxer-common -am test -Dtest=CutLabeledFailureTest \
   -Dsurefire.failIfNoSpecifiedTests=false
 RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml \
   -p unlaxer-runtime --test cut_labeled_failure
+```
+
+The UBNF slice uses [`spec-corpus/cut-labeled-failure`](../spec-corpus/cut-labeled-failure):
+`cases.json` has 9 grammars and 25 inputs covering choice, optional, repetition,
+nested catch, a memoized rule, recovery and supplementary scalars with CRLF;
+`invalid.json` has the 4 positioned rejections. `RaisingOperatorConformanceTest`
+compiles and runs the Java consumer, generates Rust from both hosts, checks the
+files byte for byte, and builds and runs both Rust consumers under all six
+memo × diagnostics settings, plus both language servers over JSON-RPC.
+The frontend fixtures `rust/unlaxer-ubnf/tests/fixtures/positive/cut-labeled-failure.ubnf`
+and `negative.tsv` compare both UBNF frontends.
+
+```sh
+mvn -pl unlaxer-common,unlaxer-dsl -am test -Dtest=RaisingOperatorConformanceTest \
+  -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 Out of scope: inferring cuts automatically (a separate issue), and whole-snapshot

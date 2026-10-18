@@ -124,6 +124,8 @@ public final class PortabilityCheck {
             add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (var issue : org.unlaxer.dsl.codegen.TokenStreamGrammar.problems(grammar))
             add(out, issue.code(), snapshot, issue.node(), issue.subject());
+        for (var problem : org.unlaxer.dsl.codegen.RaisingOperators.problems(grammar))
+            add(out, problem.code(), snapshot, problem.element(), problem.subject());
         for (ImportDecl decl : grammar.imports()) add(out, "P-IMPORT", snapshot, decl, decl.path());
         for (GlobalSetting setting : grammar.settings()) {
             if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream", "embedded", "embedding").contains(setting.key())

@@ -11,3 +11,4 @@ assoc-without-precedence.ubnf	failed	1
 mixed-associativity.ubnf	failed	1
 parser-name-collision.ubnf	failed	1
 syntax.ubnf	unavailable	1
+raising-operators.ubnf	blocked	4

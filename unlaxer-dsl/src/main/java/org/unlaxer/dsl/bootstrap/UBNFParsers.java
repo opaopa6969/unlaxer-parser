@@ -1390,7 +1390,8 @@ public class UBNFParsers {
         public Parsers getLazyParsers() {
             return new Parsers(
                 new org.unlaxer.parser.combinator.Not(new Choice(
-                    ownedCallStart("CAPTURE"), ownedCallStart("SAME_AS"), ownedCallStart("CAPTURE_SCOPE"))),
+                    ownedCallStart("CAPTURE"), ownedCallStart("SAME_AS"), ownedCallStart("CAPTURE_SCOPE"),
+                    ownedCallStart("COMMIT"), ownedCallStart("LABEL"), ownedCallStart("CATCH"))),
                 Parser.get(RuleRefElementParser.class)
             );
         }
@@ -1424,6 +1425,45 @@ public class UBNFParsers {
         private static final long serialVersionUID = 1L;
         @Override public Parsers getLazyParsers() {
             return new Parsers(ownedCallStart("CAPTURE_SCOPE"), Parser.get(RuleBodyParser.class), Parser.get(RightParenthesisParser.class));
+        }
+    }
+
+    /** COMMIT(body [, 'message']) — cut (#700). */
+    public static class CommitElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(ownedCallStart("COMMIT"), Parser.get(RuleBodyParser.class),
+                new org.unlaxer.parser.combinator.Optional(Parser.get(CommitMessageParser.class)),
+                Parser.get(RightParenthesisParser.class));
+        }
+    }
+    public static class CommitMessageParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(Parser.get(CommaParser.class), Parser.get(SingleQuotedParser.class));
+        }
+    }
+    /** LABEL(label, body) — labeled failure (#700). */
+    public static class LabelElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(ownedCallStart("LABEL"), Parser.get(IdentifierParser.class),
+                Parser.get(CommaParser.class), Parser.get(RuleBodyParser.class), Parser.get(RightParenthesisParser.class));
+        }
+    }
+    /** CATCH(body, alternative {, label}) — catch labeled failures (#700); labels are validated. */
+    public static class CatchElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(ownedCallStart("CATCH"), Parser.get(RuleBodyParser.class),
+                Parser.get(CommaParser.class), Parser.get(RuleBodyParser.class),
+                new ZeroOrMore(Parser.get(CatchLabelParser.class)), Parser.get(RightParenthesisParser.class));
+        }
+    }
+    public static class CatchLabelParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override public Parsers getLazyParsers() {
+            return new Parsers(Parser.get(CommaParser.class), Parser.get(IdentifierParser.class));
         }
     }
 
@@ -1507,6 +1547,9 @@ public class UBNFParsers {
                 Parser.get(OwnedCaptureElementParser.class),
                 Parser.get(ReplayElementParser.class),
                 Parser.get(CaptureScopeElementParser.class),
+                Parser.get(CommitElementParser.class),
+                Parser.get(LabelElementParser.class),
+                Parser.get(CatchElementParser.class),
                 Parser.get(GroupElementParser.class),    // (
                 Parser.get(OptionalElementParser.class), // [
                 Parser.get(RepeatElementParser.class),   // { (BoundedQuantifier より先)
