@@ -16,6 +16,9 @@ public class AtomicTriviaConformanceTest extends RuleTriviaConformanceTest {
             let classic_ok = classic_parsed.is_ok();
             if let Ok(parsed) = classic_parsed {
                 if classic.position() == input.chars().count() {
+                    let root_id = classic.token_node_id(parsed.nodes[0]).unwrap();
+                    assert_eq!(classic.token_text(root_id).unwrap().as_bytes(), input.as_bytes(),
+                        "Classic root raw UTF-8: {input}");
                     let tree = classic.tree(parsed.nodes[0]).unwrap();
                     let native = generated::parser::parse_tree(&input).unwrap();
                     assert_eq!(generated::mapper::map(&tree).unwrap().canonical_json(),
