@@ -36,10 +36,19 @@ public final class NestedCaptures {
             checkTraversal(rule.body(), 0);
             if (rule.annotations().stream().filter(a -> a instanceof SimpleAnnotation s && s.name().equals("nestedCaptures")).count() != 1)
                 throw invalid(rule, "duplicate annotation");
+            // Checked before @mapping: a skipped rule publishes no mapping on either host.
+            if (rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation || a instanceof EnumAnnotation))
+                throw invalid(rule,"@skip/@enum rules cannot own nested captures");
             var mapping = MapperElementUtil.getMappingAnnotation(rule).orElseThrow(() -> invalid(rule,"@mapping required"));
-            if (rule.annotations().stream().anyMatch(a -> a instanceof LeftAssocAnnotation || a instanceof RightAssocAnnotation || a instanceof SkipAnnotation || a instanceof EnumAnnotation || a instanceof EvalAnnotation || a instanceof CommonFieldAnnotation && !mapping.paramNames().isEmpty())
-                    || TokenStreamGrammar.enabled(grammar))
-                throw invalid(rule,"combination requires the remaining #583 implementation");
+            // Each unsupported combination names its tracking issue; native Rust uses the same order and text.
+            if (rule.annotations().stream().anyMatch(a -> a instanceof LeftAssocAnnotation || a instanceof RightAssocAnnotation))
+                throw invalid(rule,"@leftAssoc/@rightAssoc projection of nested captures is not supported yet (#695)");
+            if (rule.annotations().stream().anyMatch(a -> a instanceof EvalAnnotation))
+                throw invalid(rule,"@eval on a nested capture owner is not supported yet (#694)");
+            if (rule.annotations().stream().anyMatch(a -> a instanceof CommonFieldAnnotation) && !mapping.paramNames().isEmpty())
+                throw invalid(rule,"@commonField on a nested owner with fields is not supported yet (#697)");
+            if (TokenStreamGrammar.enabled(grammar))
+                throw invalid(rule,"token stream with nested captures is not supported yet (#696)");
             for (var problem : TypeofConstraints.problems(rule))
                 throw new IllegalArgumentException(problem.code() + ": " + problem.message());
             var sites = new CaptureBindingPlan(rule);
@@ -147,7 +156,7 @@ public final class NestedCaptures {
             }
             if (result != null) {
                 if (!result.containers().isEmpty() || !current.containers().isEmpty())
-                    throw new IllegalArgumentException("E-NESTED-SHAPE: container choice requires the remaining #583 implementation");
+                    throw new IllegalArgumentException("E-NESTED-SHAPE: choice with container alternatives is not supported yet (#693)");
                 if (!result.equals(current) || current.javaLeafType() != null)
                     current = new GrammarIR.NestedShape(Kind.VALUE,null,List.of(),grammar.name()+"AST.NestedValue");
             }

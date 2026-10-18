@@ -46,15 +46,19 @@ capture / typeof の準備走査も深さ 64 で停止し、schema 解析の再�
 | --- | --- |
 | text / i32 の直接 optional/list/group と manual evaluator | 本単位で両言語対応 |
 | 直接 mapped node / enum の再帰 container | 後続 #626 で対応。[契約と検証範囲](nested-mapped-leaves.md)参照 |
-| mixed value の再帰 container | #653 で直接 scalar choice の text/i32/node/enum を保持する専用 sum を生成。[型・CP・DAP・separated 合成](nested-mixed-values.md)参照。container alternative の choice は未対応 |
+| mixed value の再帰 container | #653 で直接 scalar choice の text/i32/node/enum を保持する専用 sum を生成。[型・CP・DAP・separated 合成](nested-mixed-values.md)参照。container alternative の choice は両版で位置付き拒否、拡張は #693 |
 | 透過 rule alias / recursive helper を経由する container | 未対応、capture 内の rule reference を拒否 |
 | separated list | #646 で対応。[型・値・separator 境界の契約](nested-separated-captures.md)参照 |
 | 同一 mapping 型を共有する複数規則 | #637 で全 recursive shape / nominal leaf / opt-in が一致する場合に対応 |
-| nested family の `@commonField` | #637 で nested field の実 accessor と、field を持たない mapped sum の opt-in を検証 |
+| nested family の `@commonField` | #637 で nested field の実 accessor と、field を持たない mapped sum の opt-in を検証。field を持つ nested owner 自身の `@commonField`（grouped sum owner）は両版で位置付き拒否、拡張は #697 |
 | nested 規則の `@typeof` | #660で既存の浅い意味型比較へ接続。[private/forward・空位置・shared/mixed](nested-typeof.md)参照 |
-| nested 規則の associative projection / `@eval` | 未対応、明示拒否 |
-| token-stream と nested の併用 | 未対応、明示拒否 |
+| nested 規則の `@leftAssoc` / `@rightAssoc` | 両版で位置付き拒否、拡張は #695 |
+| nested 所有規則自身の `@eval`（literal / passthrough / `strategy='manual'`） | 両版で位置付き拒否、拡張は #694。通常 leaf の auto-eval との合成は [nested-auto-eval](../spec-corpus/nested-auto-eval/README.md) で検証済み |
+| nested 所有規則の `@skip` / `@enum` | 公開 mapping / 列挙値と nested field が両立しないため、両版で位置付き拒否で確定 |
+| token-stream と nested の併用 | 両版で位置付き拒否、拡張は #696 |
 | nested 値を扱う family commonField / preferred snapshot | #626 で直接 mapped family 葉の commonField と preferred を実検証。全組合せは #583 に残す |
+
+上表の「位置付き拒否」は Java（`NestedCaptures`）・Java host の Rust 生成・native Rust（`nested_captures.rs`）が同じ `E-NESTED-SHAPE` code、同じ規則 CP 範囲、同じ説明文で生成前に拒否し、出力を書かないことを意味する。説明文には追跡 issue 番号を含め、`spec-corpus/typed-nested-captures/invalid.json` の `detail` で 3 経路の一致を検査する。今後の拡張は各子 issue で扱う。
 
 既存 preferred / flat AST family の契約は変更しない。新しい nested shape と全ての family / preferred / auto-eval 組合せの実用同等性は、この単位の検証だけで完了扱いにしない。
 

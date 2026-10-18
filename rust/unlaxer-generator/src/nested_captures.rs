@@ -92,11 +92,12 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
         {
             return Err(error(rule, "duplicate annotation"));
         }
-        if grammar.settings.iter().any(|s| s.key == "tokenStream") {
-            return Err(error(
-                rule,
-                "token stream requires remaining #583 implementation",
-            ));
+        // Each unsupported combination names its tracking issue; Java uses the same order and text.
+        let has =
+            |pred: fn(&AnnotationKind) -> bool| rule.annotations.iter().any(|a| pred(&a.kind));
+        // Checked before @mapping: a skipped rule publishes no mapping on either host.
+        if has(|k| matches!(k, AnnotationKind::Skip | AnnotationKind::Enum)) {
+            return Err(error(rule, "@skip/@enum rules cannot own nested captures"));
         }
         let mapping = rule
             .annotations
@@ -109,28 +110,29 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
                 }
             })
             .ok_or_else(|| error(rule, "@mapping required"))?;
-        if rule.annotations.iter().any(|a| {
-            matches!(
-                a.kind,
-                AnnotationKind::LeftAssoc
-                    | AnnotationKind::RightAssoc
-                    | AnnotationKind::Skip
-                    | AnnotationKind::Enum
-                    | AnnotationKind::Eval { .. }
-            )
-        }) {
+        if has(|k| matches!(k, AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc)) {
             return Err(error(
                 rule,
-                "combination requires remaining #583 implementation",
+                "@leftAssoc/@rightAssoc projection of nested captures is not supported yet (#695)",
             ));
         }
-        if !mapping.1.is_empty()
-            && rule
-                .annotations
-                .iter()
-                .any(|a| matches!(a.kind, AnnotationKind::CommonField { .. }))
-        {
-            return Err(error(rule, "commonField requires a mapped sum family"));
+        if has(|k| matches!(k, AnnotationKind::Eval { .. })) {
+            return Err(error(
+                rule,
+                "@eval on a nested capture owner is not supported yet (#694)",
+            ));
+        }
+        if !mapping.1.is_empty() && has(|k| matches!(k, AnnotationKind::CommonField { .. })) {
+            return Err(error(
+                rule,
+                "@commonField on a nested owner with fields is not supported yet (#697)",
+            ));
+        }
+        if grammar.settings.iter().any(|s| s.key == "tokenStream") {
+            return Err(error(
+                rule,
+                "token stream with nested captures is not supported yet (#696)",
+            ));
         }
         let values = sites(rule)?;
         let mut usages = Vec::new();
@@ -345,7 +347,9 @@ pub fn body_shape(grammar: &GrammarDecl, body: &RuleBody, depth: usize) -> Resul
         };
         let current = if let Some(old) = &result {
             if matches!(old, Kind::Nested { .. }) || matches!(current, Kind::Nested { .. }) {
-                return Err("container choice requires remaining #583 implementation".into());
+                return Err(
+                    "choice with container alternatives is not supported yet (#693)".into(),
+                );
             }
             if old != &current || matches!(current, Kind::Node | Kind::Enum(_) | Kind::Value) {
                 Kind::Value

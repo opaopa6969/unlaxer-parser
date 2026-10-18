@@ -220,15 +220,21 @@ public class TypedNestedCaptureConformanceTest extends NestedCaptureConformanceT
             var rule=grammar.rules().stream().filter(r->r.name().equals(diagnostic.rule())).findFirst().orElseThrow();
             var position=source.spanOf(rule).orElseThrow();
             assertEquals(row.get("startCP").getAsInt(),position.start());assertEquals(row.get("endCP").getAsInt(),position.end());
+            // Optional detail: the same tracking text is reported by Java, Java-host Rust and native Rust.
+            String detail=row.has("detail")?row.get("detail").getAsString():"E-NESTED-SHAPE";
+            assertTrue(row.get("id").getAsString()+": "+diagnostic.message(),diagnostic.message().contains(detail));
             for(CodeGenerator generator:List.of(new ParserGenerator(),new ASTGenerator(),new MapperGenerator())) {
-                assertTrue(assertThrows(IllegalArgumentException.class,()->generator.generate(grammar)).getMessage().contains("E-NESTED-SHAPE"));
+                String message=assertThrows(IllegalArgumentException.class,()->generator.generate(grammar)).getMessage();
+                assertTrue(message,message.contains("E-NESTED-SHAPE") && message.contains(detail));
             }
-            assertTrue(assertThrows(IllegalArgumentException.class,()->new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar)).getMessage().contains("E-NESTED-SHAPE"));
+            String rustMessage=assertThrows(IllegalArgumentException.class,()->new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar)).getMessage();
+            assertTrue(rustMessage,rustMessage.contains("E-NESTED-SHAPE") && rustMessage.contains(detail));
             var directory=temporary.newFolder().toPath();var input=directory.resolve("invalid.ubnf");var output=directory.resolve("output");java.nio.file.Files.writeString(input,text);
             var nativeResult=run(List.of(nativeTarget().resolve("debug/unlaxer").toString(),"generate","--grammar",input.toString(),"--output",output.toString()),"",true);
             assertNotEquals(row.get("id").getAsString()+nativeResult.output(),0,nativeResult.code());
             assertTrue(nativeResult.output(),nativeResult.output().contains("E-NESTED-SHAPE"));
             assertTrue(nativeResult.output(),nativeResult.output().contains("at CP "+position.start()+".."+position.end()));
+            assertTrue(nativeResult.output(),nativeResult.output().contains(detail));
             assertFalse(java.nio.file.Files.exists(output));
         }
     }
