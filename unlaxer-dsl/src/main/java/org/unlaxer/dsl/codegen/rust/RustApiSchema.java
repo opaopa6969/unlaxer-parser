@@ -30,7 +30,7 @@ public final class RustApiSchema {
                 String declaration = "r#" + field.name() + ": " + type;
                 int fieldStart = requireIndex(ast, declaration, start);
                 if (fieldStart + declaration.length() > end) throw new IllegalStateException("field outside variant declaration");
-                fields.add(new Field(field.name(), type, field.cardinality().name().toLowerCase(Locale.ROOT),
+                fields.add(new Field(field.name(), type, (field.kind()==GrammarIR.Kind.NESTED && !field.nested().containers().isEmpty() ? field.nested().containers().get(0) : field.cardinality()).name().toLowerCase(Locale.ROOT),
                     ApiImpact.location("ast.rs", ast, fieldStart, fieldStart + declaration.length())));
                 parameters.add(new Parameter(field.name(), RustBackend.fieldType(field, true)));
             }
@@ -91,7 +91,7 @@ public final class RustApiSchema {
                         new Field(
                                 field.name(),
                                 type,
-                                field.cardinality().name().toLowerCase(Locale.ROOT),
+                                (field.kind()==GrammarIR.Kind.NESTED && !field.nested().containers().isEmpty() ? field.nested().containers().get(0) : field.cardinality()).name().toLowerCase(Locale.ROOT),
                                 ApiImpact.location(
                                         "ast.rs",
                                         ast,

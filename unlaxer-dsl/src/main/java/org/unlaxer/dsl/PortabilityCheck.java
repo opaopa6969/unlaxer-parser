@@ -86,8 +86,13 @@ public final class PortabilityCheck {
                     && rule.annotations().stream().noneMatch(annotation -> annotation instanceof PrecedenceAnnotation));
             if (invalid) add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
         } catch (RuntimeException error) {
+            var nestedIssues = error.getMessage() != null && error.getMessage().contains("E-NESTED-SHAPE")
+                ? org.unlaxer.dsl.codegen.NestedCaptures.problems(grammar) : List.<GrammarValidator.ValidationIssue>of();
             var commonRule=org.unlaxer.dsl.codegen.CommonFieldSchema.errorRule(error);
-            if(commonRule.isPresent()) {
+            if(!nestedIssues.isEmpty()) {
+                var origin=grammar.rules().stream().filter(r->r.name().equals(nestedIssues.get(0).rule())).findFirst().orElseThrow();
+                add(diagnostics,"P-NESTED-SHAPE",snapshot,origin,"nested capture schema");
+            } else if(commonRule.isPresent()) {
                 var origin=grammar.rules().stream().filter(r->r.name().equals(commonRule.get())).findFirst().orElseThrow();
                 add(diagnostics,"P-COMMONFIELD",snapshot,origin,"commonField schema");
             } else add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
@@ -159,7 +164,7 @@ public final class PortabilityCheck {
 
     private static void scanAnnotation(GrammarDecl grammar, Annotation annotation, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
         String unsupported = null;
-        if (annotation instanceof SimpleAnnotation simple) unsupported = simple.name();
+        if (annotation instanceof SimpleAnnotation simple && !simple.name().equals("nestedCaptures")) unsupported = simple.name();
 
         if (unsupported != null) add(out, "P-ANNOTATION", snapshot, annotation, unsupported);
 

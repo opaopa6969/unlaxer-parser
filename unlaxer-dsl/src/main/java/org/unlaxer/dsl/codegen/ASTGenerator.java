@@ -65,6 +65,7 @@ public class ASTGenerator implements CodeGenerator {
     @Override
     public GeneratedSource generate(GrammarDecl grammar) {
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+        NestedCaptures.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         CommonFieldSchema.build(grammar);
@@ -352,6 +353,7 @@ public class ASTGenerator implements CodeGenerator {
      * ルール内の指定フィールド名に対応する Java 型を推論する。
      */
     String inferType(GrammarDecl grammar, RuleDecl rule, String fieldName) {
+        if (NestedCaptures.enabled(rule)) return NestedCaptures.javaType(NestedCaptures.field(grammar,rule,fieldName));
         Optional<String> shared = SharedPlainSchema.fieldType(grammar, rule, fieldName);
         if (shared.isPresent()) return shared.get();
         return new SemanticCardinality(grammar).fieldType(rule, fieldName, inferLegacyType(grammar, rule, fieldName));
