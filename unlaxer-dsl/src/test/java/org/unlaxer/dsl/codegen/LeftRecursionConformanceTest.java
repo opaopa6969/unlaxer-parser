@@ -80,6 +80,7 @@ public class LeftRecursionConformanceTest {
         if(!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] LeftRecursionConformanceTest requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
         run(List.of("cargo","build","--locked","--manifest-path",ROOT.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator"),0);
+        var hostReport=new ArrayList<String>(List.of("fixture\tbinary\tinputs\tstatus"));
         for(var raw:cases()) {
             var row=raw.getAsJsonObject();
             String source=row.get("grammar").getAsString();
@@ -94,15 +95,24 @@ public class LeftRecursionConformanceTest {
                 assertTrue(assertThrows(IllegalArgumentException.class,()->new RustBackend().generate(grammar)).getMessage().contains("E-LEFT-RECURSION"));
                 continue;
             }
-            for(var file:new RustBackend().generate(grammar)) assertEquals(row.get("name")+" "+file.relativePath(),file.content(),Files.readString(out.resolve(file.relativePath())));
+            Path javaOut=Files.createDirectories(dir.resolve("generated-java"));
+            for(var file:new RustBackend().generate(grammar)) {
+                assertEquals(row.get("name")+" "+file.relativePath(),file.content(),Files.readString(out.resolve(file.relativePath())));
+                Files.writeString(javaOut.resolve(file.relativePath()),file.content());
+            }
             Files.writeString(dir.resolve("main.rs"),"#![allow(dead_code,unused_imports)]\nmod generated; fn main(){for input in std::env::args().skip(1){for memo in [unlaxer_runtime::Memoization::Off,unlaxer_runtime::Memoization::SafeFailures] {for mode in [unlaxer_runtime::Diagnostics::Auto,unlaxer_runtime::Diagnostics::Detailed,unlaxer_runtime::Diagnostics::DetailedOnFailure] {let tree=generated::parser::parse_tree_with_options(&input,unlaxer_runtime::ParseOptions::with_memoization(memo).with_diagnostics(mode)).unwrap(); generated::mapper::map(&tree).unwrap(); assert_eq!(tree.nodes[tree.root].span, unlaxer_runtime::Span { start: 0, end: input.chars().count() });}}}}\n");
-            Files.writeString(dir.resolve("Cargo.toml"),"[package]\nname=\"left-recursion-probe\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[[bin]]\nname=\"probe\"\npath=\"main.rs\"\n[dependencies]\nunlaxer-runtime={path=\""+ROOT.resolve("rust/unlaxer-runtime")+"\"}\n");
+            Files.writeString(dir.resolve("main-java.rs"),Files.readString(dir.resolve("main.rs")).replace("mod generated;","#[path=\"generated-java/mod.rs\"] mod generated;"));
+            Files.writeString(dir.resolve("Cargo.toml"),"[package]\nname=\"left-recursion-probe\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[[bin]]\nname=\"probe\"\npath=\"main.rs\"\n[[bin]]\nname=\"probe-java\"\npath=\"main-java.rs\"\n[dependencies]\nunlaxer-runtime={path=\""+ROOT.resolve("rust/unlaxer-runtime")+"\"}\n");
             Path target=ROOT.resolve("rust/target/left-recursion-probe");
             run(List.of("cargo","build","--offline","--quiet","--manifest-path",dir.resolve("Cargo.toml").toString(),"--target-dir",target.toString()),0);
-            var command=new ArrayList<String>(List.of(target.resolve("debug/probe").toString()));
-            row.getAsJsonArray("inputs").forEach(item->command.add(item.getAsString()));
-            run(command,0);
+            for(String binary:List.of("probe","probe-java")) {
+                var command=new ArrayList<String>(List.of(target.resolve("debug/"+binary).toString()));
+                row.getAsJsonArray("inputs").forEach(item->command.add(item.getAsString()));
+                run(command,0);
+                hostReport.add(row.get("name").getAsString()+"\t"+binary+"\t"+row.getAsJsonArray("inputs").size()+"\tchecked");
+            }
         }
+        Files.write(Path.of("target/left-recursion-host-execution.tsv"),hostReport);
     }
     @Test public void sourceAnalysisHasControlledDepthOnSmallThreadStack() throws Exception {
         var rules = new ArrayList<org.unlaxer.dsl.bootstrap.UBNFAST.RuleDecl>();
