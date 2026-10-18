@@ -98,15 +98,63 @@ const run = async () => {
       return hover?.some(item => item.contents.some(content => content.value.includes('Valid')));
     }, 'functional LSP after interrupted startup');
   };
+  // Fail the initialized notification after the real backend has answered initialize.
+  // Use an actual destroyed Node stream while keeping close delivery independent: a
+  // writer failure may reach the client before its reader reports the connection close.
+  const {createRequire} = require('node:module');
+  const {PassThrough} = require('node:stream');
+  const packagedRequire = createRequire(path.join(extension.extensionPath, 'package.json'));
+  const {StreamMessageWriter} = packagedRequire('vscode-jsonrpc/node');
+  const {LanguageClient} = packagedRequire('vscode-languageclient/node');
+  const originalStop = LanguageClient.prototype.stop;
+  let completedShutdowns = 0;
+  LanguageClient.prototype.stop = function(timeout) {
+    return originalStop.call(this, timeout).then(() => {
+      completedShutdowns++;
+      trace('normal-lsp-shutdown-completed', {backend: settings['server.backend']});
+    });
+  };
+  const originalWrite = StreamMessageWriter.prototype.write;
+  let failedWriter, originalStream, injected = false, prematureShutdowns = 0;
+  StreamMessageWriter.prototype.write = function(message) {
+    if (!injected && message.method === 'initialized') {
+      injected = true;
+      failedWriter = this;
+      originalStream = this.writable.stream;
+      const destroyed = new PassThrough();
+      destroyed.destroy();
+      this.writable.stream = destroyed;
+      trace('injected-initialized-stream-destroyed', {backend: settings['server.backend']});
+    }
+    if (this === failedWriter && message.method === 'shutdown') {
+      prematureShutdowns++;
+      trace('premature-shutdown-request');
+    }
+    return originalWrite.call(this, message);
+  };
+  try {
+    await assert.rejects(bounded(restart(), 'initialized stream failure'), /stream was destroyed/);
+    assert.ok(injected, 'real backend completed initialize before the injected transport failure');
+    assert.ok(completedShutdowns >= 1, 'the preceding healthy client still completes normal protocol shutdown');
+    await delay(1500); // Let Node report any unhandled rejection before asserting the transition.
+    assert.equal(prematureShutdowns, 0, 'failed initialization cannot send an LSP shutdown request');
+  } finally {
+    StreamMessageWriter.prototype.write = originalWrite;
+    LanguageClient.prototype.stop = originalStop;
+    if (failedWriter) failedWriter.writable.stream = originalStream;
+  }
+  await healthy();
+  observations.initializationFailure = {rejected: true, prematureShutdowns, recovered: true, normalShutdownCompleted: true};
   const restore = async () => {
+    await config.update('server.javaPath', settings['server.javaPath'] ?? 'java', vscode.ConfigurationTarget.Global);
     await config.update('server.rustLspPath', settings['server.rustLspPath'] ?? '', vscode.ConfigurationTarget.Global);
     await config.update('server.backend', settings['server.backend'], vscode.ConfigurationTarget.Global);
   };
   const hang = async timeout => {
     const offset = (await journal()).length;
     await config.update('server.startupTimeoutMs', timeout, vscode.ConfigurationTarget.Global);
-    await config.update('server.rustLspPath', unresponsive, vscode.ConfigurationTarget.Global);
-    await config.update('server.backend', 'rust', vscode.ConfigurationTarget.Global);
+    await config.update(settings['server.backend'] === 'java' ? 'server.javaPath' : 'server.rustLspPath', unresponsive, vscode.ConfigurationTarget.Global);
+    await config.update('server.backend', settings['server.backend'], vscode.ConfigurationTarget.Global);
     return until(async () => (await journal()).slice(offset).find(row => row.fixture === 'unresponsive' && row.event === 'initialize' && !dead(row.pid)), 'unresponsive server actually receives initialize');
   };
   const stoppedHangs = async () => until(async () => (await journal()).filter(row => row.fixture === 'unresponsive').every(({pid}) => dead(pid)), 'all unresponsive children terminate', 10000);
