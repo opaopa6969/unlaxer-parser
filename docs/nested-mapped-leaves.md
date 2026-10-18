@@ -29,5 +29,5 @@ manual evaluator は nested 集約値全体を受け取る。Rust は `&Option<V
 
 - mixed value 葉、unmapped rule alias / recursive helper を介した nested shape、separated list は引き続き早期拒否する。
 - mapped / enum 葉を含む複数要素 group や choice は早期拒否する。直接参照した mapped sum rule が family node へ投影される経路は対応する。
-- nested 規則自身の shared mapping、`@commonField`、`@typeof`、associative projection、`@eval`、token-stream 併用は既存の拒否を維持する。
-- family 葉の commonField と通常 preferred snapshot は実 consumer で確認済み。nested field 自体を family commonField として公開する全組合せ、recursive node を含む全組合せ、auto-eval / typeof との組合せはこの単位では未検証であり、完了としない。
+- shared mapping と nested field の family commonField は後続 [#637 の契約](nested-shared-fields.md)で扱う。`@typeof`、associative projection、`@eval`、token-stream 併用は既存の拒否を維持する。
+- family 葉の commonField と通常 preferred snapshot は実 consumer で確認済み。nested field 自体の family commonField は #637 で追加検証する。recursive node を含む全組合せ、auto-eval / typeof との組合せはこの単位では未検証であり、完了としない。

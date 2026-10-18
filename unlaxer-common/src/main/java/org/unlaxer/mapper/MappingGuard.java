@@ -20,6 +20,7 @@ public final class MappingGuard {
     private long textBytes;
     private long validationWork;
     private int edges;
+    private boolean recoveredSyntax;
 
     private static final class State {
         int originalHeight;
@@ -105,6 +106,7 @@ public final class MappingGuard {
             if (start < 0 || length < 0 || (long) start + length > Integer.MAX_VALUE) {
                 throw invalid("invalid source span");
             }
+            recoveredSyntax |= token.parser instanceof org.unlaxer.parser.combinator.RecoveryDiagnostic.Marker;
             state = new State();
             state.cost = 1L + token.getOriginalChildren().size() + token.filteredChildren.size();
             if (state.cost - 1 > MAX_EDGES - edges) throw limit("edges");
@@ -154,6 +156,9 @@ public final class MappingGuard {
     private void chargeValidation() {
         if (++validationWork > MAX_WORK) throw limit("filtered reachability");
     }
+
+    /** Recovery detection shares the bounded, identity-based original graph validation. */
+    public boolean hasRecoveredSyntax() { return recoveredSyntax; }
 
     /** Charge actual visits, including repeated expansion of a shared DAG. */
     public void visit(Token token) {

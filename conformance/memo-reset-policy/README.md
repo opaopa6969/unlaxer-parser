@@ -10,10 +10,10 @@ Javaはfalse↔trueでcacheを分離し、同policyは実hitを維持します�
 保持したwarm tokenの変更が次の結果へ漏れず、外側rollbackで両cursorとcommitted CSTが戻ることも検証します。
 診断は両hostそれぞれのOFF/ONで比較します。共通位置・token期待値をnativeの既存hint名へ変形しません。
 
-Rust Classic一般modeは現在cache対象外です。`memo_reset_policy.rs` は同じoracleの意味を検証して
-**hit0を要求**します。これを一般mode memo対応の証拠とはしません。別の独立試験では同一grammar session内の
-pure child ruleを公開APIから呼び、通常modeでreset=false→true→falseのhit数が0→0→1になること、
-Classicでは3回とも0になることを検証します。Rust runtime製品のkey/gateはこの修正で変更しません。
+Rustではこのfixtureのwarm/nextが独立grammar sessionを開くため、同じcontextでもentryを共有せずhit0です。
+これはClassic cache対象外の証明ではありません。同一grammar session内の別probeではpure child ruleを呼び、
+通常/Classic双方でreset=false→true→falseのhit数が0→0→1になることを検証します。
+Classic全kind/invert/両policyの実success/failure hitは [後続#628](../classic-memo/) で検証します。
 
 ```sh
 mvn -pl unlaxer-common -am test -Dtest=MemoResetPolicyTest \

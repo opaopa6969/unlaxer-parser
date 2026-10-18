@@ -288,7 +288,7 @@ public class NumericCaptureConformanceTest {
                                 + expression
                                 + "; } }"));
         Path output = temporary.newFolder().toPath();
-        var compiler = ToolProvider.getSystemJavaCompiler();
+        var compiler = org.unlaxer.dsl.Java21TestSupport.compiler();
         var diagnostics = new DiagnosticCollector<JavaFileObject>();
         try (var manager =
                 compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {

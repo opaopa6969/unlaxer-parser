@@ -168,5 +168,23 @@
     "inputs": [
       "😀"
     ]
+  },
+  {
+    "name": "owned-capture-cycle",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= CAPTURE(word, Root); }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "owned-scope-cycle",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= CAPTURE_SCOPE(Root); }",
+    "status": "reject",
+    "inputs": []
+  },
+  {
+    "name": "owned-replay-nullable-prefix",
+    "grammar": "grammar LeftRec { @package: leftrecprobe @root @mapping(Node) Root ::= SAME_AS(word) Root | 'x'; }",
+    "status": "reject",
+    "inputs": []
   }
 ]

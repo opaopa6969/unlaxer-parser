@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.Annotation;
@@ -160,7 +162,10 @@ public final class GrammarValidator {
         validateUbnfFormat(grammar, errors);
         validateMemoSafeTokens(grammar, errors);
         validateRootPresence(grammar, errors);
-        if (resolveParserClasses) validateTokens(grammar, errors);
+        if (resolveParserClasses) {
+            validateTokens(grammar, errors);
+            errors.addAll(validateJavaTokenBindings(grammar));
+        }
         validateRuleTokenParserNameCollisions(grammar, errors);
         validateAdapterTokenParserNameCollisions(grammar, errors);
         validateBoundedRepeatElements(grammar, errors);
@@ -649,6 +654,56 @@ public final class GrammarValidator {
         }
     }
 
+    /**
+     * Java alias subclasses cannot extend a known final class. This target-specific
+     * probe never initializes classes; absence/linkage restrictions remain deployment
+     * compile concerns. Pure validation and the Rust target do not run this probe.
+     */
+    public static List<ValidationIssue> validateJavaTokenBindings(GrammarDecl grammar) {
+        var registry = TokenAdapterRegistry.build(grammar, null).registry();
+        List<ValidationIssue> issues = new ArrayList<>();
+        for (TokenDecl token : grammar.tokens()) {
+            String className = null;
+            if (token instanceof TokenDecl.Simple simple) className = simple.parserClass();
+            else if (token instanceof TokenDecl.Adapter adapter) {
+                try {
+                    className = registry.find(adapter.id(), Integer.parseInt(adapter.version()))
+                        .map(TokenAdapterRegistry.Descriptor::javaClass).orElse(null);
+                } catch (NumberFormatException invalidVersion) {
+                    continue; // Registry validation reports malformed declarations separately.
+                }
+            }
+            // Short Simple names are used directly; no subclass alias is emitted.
+            if (className == null || !className.contains(".")) continue;
+            Class<?> target = resolveJavaBinding(className);
+            if (target != null && java.lang.reflect.Modifier.isFinal(target.getModifiers())) {
+                issues.add(new ValidationIssue("E-JAVA-TOKEN-FINAL",
+                    "token " + token.name() + " cannot generate a Java alias extending final class " + className,
+                    "Use a public nonfinal Parser with an accessible no-argument constructor for the Java target. Rust bindings are checked separately."));
+            }
+        }
+        return List.copyOf(issues);
+    }
+
+    private static Class<?> resolveJavaBinding(String sourceName) {
+        // Registry declarations use Java source names, including canonical nested names.
+        String binaryName = sourceName;
+        while (true) {
+            try {
+                Class<?> target = Class.forName(binaryName, false, GrammarValidator.class.getClassLoader());
+                // A top-level class may literally contain '$'; it is not that nested source name.
+                if (sourceName.equals(target.getCanonicalName())) return target;
+            } catch (ClassNotFoundException unavailable) {
+                // Try the next canonical member-class boundary below.
+            } catch (LinkageError | SecurityException unavailable) {
+                return null;
+            }
+            int lastDot = binaryName.lastIndexOf('.');
+            if (lastDot < 0) return null;
+            binaryName = binaryName.substring(0, lastDot) + "$" + binaryName.substring(lastDot + 1);
+        }
+    }
+
     private static void validateTokens(GrammarDecl grammar, List<ValidationIssue> errors) {
         Set<String> knownParserPackages = Set.of(
             "org.unlaxer.parser.clang",
@@ -1108,7 +1163,7 @@ public final class GrammarValidator {
             } else if (current instanceof UBNFAST.BoundedRepeatElement repeat) {
                 bounded.add(repeat);
                 pending.push(repeat.body());
-            } else if (current instanceof UBNFAST.GroupElement group) {
+            } else if (current instanceof UBNFAST.TransparentElement group) {
                 pending.push(group.body());
             } else if (current instanceof UBNFAST.OptionalElement optional) {
                 pending.push(optional.body());
@@ -1194,7 +1249,7 @@ public final class GrammarValidator {
     }
 
     private static void collectCaptureNamesFromAtomic(AtomicElement element, Set<String> captures) {
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             collectCaptureNamesFromBody(group.body(), captures);
         } else if (element instanceof OptionalElement opt) {
             collectCaptureNamesFromBody(opt.body(), captures);
@@ -1243,7 +1298,7 @@ public final class GrammarValidator {
                 .map(ns -> ns + "." + ref.name())
                 .orElse(ref.name());
             refs.add(fullName);
-        } else if (element instanceof GroupElement group) {
+        } else if (element instanceof TransparentElement group) {
             collectReferencedRuleNamesFromBody(group.body(), refs);
         } else if (element instanceof OptionalElement opt) {
             collectReferencedRuleNamesFromBody(opt.body(), refs);
@@ -1278,7 +1333,7 @@ public final class GrammarValidator {
         if (element instanceof RepeatElement rep) {
             return true;
         }
-        if (element instanceof GroupElement group) {
+        if (element instanceof TransparentElement group) {
             return containsRepeat(group.body());
         }
         if (element instanceof OptionalElement opt) {

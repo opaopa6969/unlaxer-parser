@@ -164,7 +164,11 @@ fn contains_recovery(expression: &Expression) -> bool {
         | Delimited(child)
         | OptionalExpr(child)
         | Repeat { child, .. } => contains_recovery(child),
-        Capture { expression, .. } => contains_recovery(expression),
+        Capture { expression, .. }
+        | OwnedCapture {
+            child: expression, ..
+        }
+        | CaptureScope(expression) => contains_recovery(expression),
         Separated { child, separator } => contains_recovery(child) || contains_recovery(separator),
         Sequence(values) | Choice(values) | LongestChoice(values) | UniqueLongestChoice(values) => {
             values.iter().any(contains_recovery)
@@ -515,7 +519,7 @@ fn expression(expr: &Expression) -> String {
         Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
         TextValue(child) => format!("{}.text_value()", expression(child)),
         ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
-        CaptureBoundary { kind, child } => format!("Expr::CaptureBoundary(unlaxer_runtime::capture_tree::Kind::{kind:?}, Box::new({}))", expression(child)),
+        CaptureBoundary { kind, child } => format!("Expr::InputCaptureBoundary(unlaxer_runtime::capture_tree::Kind::{kind:?}, Box::new({}))", expression(child)),
         LexicalContextScope { child, terminals } => format!(
             "{}.lexical_context_scope(vec![{}])", expression(child),
             terminals.iter().map(|(name, literal, definition)| format!(
@@ -548,6 +552,9 @@ fn expression(expr: &Expression) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        OwnedCapture { name, child } => format!("Expr::OwnedCapture({}, Box::new({}))", quote(name), expression(child)),
+        Replay(name) => format!("Expr::Replay({})", quote(name)),
+        CaptureScope(child) => format!("Expr::CaptureScope(Box::new({}))", expression(child)),
         Capture {
             name,
             expression: child,
@@ -625,7 +632,9 @@ fn grapheme_capture(ir: &GrammarIr, body: &Expression, name: &str) -> bool {
                 alternatives: children,
                 ..
             } => pending.extend(children.iter().map(|child| (child, captured))),
-            OptionalExpr(child)
+            OwnedCapture { child, .. }
+            | CaptureScope(child)
+            | OptionalExpr(child)
             | Delimited(child)
             | TextValue(child)
             | ValueBoundary(child)

@@ -195,6 +195,8 @@ public class ParserGenerator implements CodeGenerator {
                 .filter(issue -> issue.code().startsWith("E-UNIQUE-LONGEST-")).toList();
             if (!profileErrors.isEmpty()) throw new IllegalArgumentException(profileErrors.toString());
         }
+        var javaBindingErrors = GrammarValidator.validateJavaTokenBindings(grammar);
+        if (!javaBindingErrors.isEmpty()) throw new IllegalArgumentException(javaBindingErrors.toString());
         String packageName = ParserCodegenUtil.getPackageName(grammar);
         String grammarName = grammar.name();
         String className = grammarName + "Parsers";
@@ -255,6 +257,20 @@ public class ParserGenerator implements CodeGenerator {
                     }
                     @Override public java.util.List<String> captureBindings() { return bindings; }
                     @Override public Parsers getLazyParsers() { return new Parsers(child); }
+                    // Inspect the actual result before Chain filters virtual tokens.
+                    @Override public org.unlaxer.Parsed parseChainElement(Parser child,
+                            org.unlaxer.context.ParseContext context, org.unlaxer.TokenKind kind, boolean invert) {
+                        org.unlaxer.Parsed parsed = child.parse(context, kind, invert);
+                        if (parsed.isSucceeded() && (parsed.getTokenOptional().isPresent() || !parsed.getOriginalTokens().isEmpty())) {
+                            if (org.unlaxer.CapturedValue.provenanceOf(parsed.getRootToken().source, context.getSource())
+                                    != org.unlaxer.CapturedValue.Provenance.INPUT) {
+                                return org.unlaxer.parser.ErrorMessageParser.expected(
+                                    "AST field capture requires original input source; use CAPTURE/SAME_AS for general replay")
+                                    .parse(context, kind, invert);
+                            }
+                        }
+                        return parsed;
+                    }
                     @Override public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() {
                         return java.util.Optional.empty();
                     }
@@ -463,6 +479,10 @@ public class ParserGenerator implements CodeGenerator {
     }
 
     private static boolean collectMemoDependencies(GenContext ctx, AtomicElement element, Set<String> refs) {
+        // General bindings are context-dependent state, not AST capture-site metadata.
+        if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.OwnedCaptureElement
+            || element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.ReplayElement
+            || element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.CaptureScopeElement) return false;
         if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.RuleRefElement ref) {
             if (ref.namespace().isPresent()) return false;
             if (ctx.ruleNames.contains(ref.name())) {

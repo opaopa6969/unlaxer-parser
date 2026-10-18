@@ -43,7 +43,7 @@ fn rollback(context: &ParseContext<'_>) -> ParseError {
 }
 
 #[test]
-fn classic_shared_oracle_preserves_results_and_deliberately_has_no_memo_hits() {
+fn classic_shared_oracle_preserves_results_across_independent_grammar_sessions() {
     for line in include_str!("../../../conformance/memo-reset-policy/cases.tsv")
         .lines()
         .filter(|line| !line.starts_with('#') && !line.is_empty())
@@ -136,7 +136,7 @@ fn classic_shared_oracle_preserves_results_and_deliberately_has_no_memo_hits() {
             if let Some(node_id) = node_id {
                 assert!(context.token_info(node_id).is_none());
             }
-            // This is a no-hit contract, not proof of Classic memoization support.
+            // Separate grammar sessions do not share entries; real same-session hits are checked below.
             assert_eq!(0, context.memoized_failure_hits(), "{id}");
             println!(
                 "\nMEMO\t{id}\t{}\t{summary}",
@@ -164,16 +164,13 @@ fn inspect_keys(context: &mut ParseContext<'_>) -> ParseResult {
             context.parse(&child)
         };
         assert!(result.is_err());
-        assert_eq!(
-            if classic { 0 } else { expected_hits },
-            context.memoized_failure_hits()
-        );
+        assert_eq!(expected_hits, context.memoized_failure_hits());
     }
     Ok(ParseMatch::empty(Span { start: 0, end: 0 }))
 }
 
 #[test]
-fn normal_reset_keys_are_distinct_and_classic_gate_is_observed_within_one_grammar_session() {
+fn normal_and_classic_reset_keys_are_distinct_within_one_grammar_session() {
     let grammar = share_grammar(vec![
         Rule {
             name: "opaque_driver",
@@ -192,6 +189,6 @@ fn normal_reset_keys_are_distinct_and_classic_gate_is_observed_within_one_gramma
         );
         context.set_state("classic", classic);
         context.parse_shared_grammar(&grammar, 0, false).unwrap();
-        assert_eq!(if classic { 0 } else { 1 }, context.memoized_failure_hits());
+        assert_eq!(1, context.memoized_failure_hits());
     }
 }

@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.ChoiceBody;
@@ -1047,7 +1049,7 @@ class LSPServerEmitter {
         if (element instanceof TerminalElement t) {
             // TerminalElement already contains the decoded literal, including genuine quotes.
             acc.add(t.value());
-        } else if (element instanceof GroupElement g) {
+        } else if (element instanceof TransparentElement g) {
             collectFromBody(g.body(), acc);
         } else if (element instanceof OptionalElement o) {
             collectFromBody(o.body(), acc);

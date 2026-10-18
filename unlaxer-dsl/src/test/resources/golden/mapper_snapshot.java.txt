@@ -260,7 +260,7 @@ public class SnapshotMapper {
     }
 
     private static void rejectRecoveredSyntax(Token token) {
-        if (!org.unlaxer.parser.combinator.RecoveryDiagnostic.from(token).isEmpty()) {
+        if (MAPPING_GUARD.hasRecoveredSyntax()) {
             throw new IllegalArgumentException("cannot map recovered syntax");
         }
     }

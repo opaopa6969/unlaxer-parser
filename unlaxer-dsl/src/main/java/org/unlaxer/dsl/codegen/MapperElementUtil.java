@@ -1,5 +1,7 @@
 package org.unlaxer.dsl.codegen;
 
+import org.unlaxer.dsl.bootstrap.UBNFAST.TransparentElement;
+
 import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AnnotatedElement;
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
@@ -203,7 +205,7 @@ class MapperElementUtil {
     private static void collectRuleRefsFromElement(AtomicElement element, List<RuleRefElement> refs) {
         if (element instanceof RuleRefElement ref) {
             refs.add(ref);
-        } else if (element instanceof GroupElement g) {
+        } else if (element instanceof TransparentElement g) {
             collectRuleRefsFromBody(g.body(), refs);
         } else if (element instanceof OptionalElement o) {
             collectRuleRefsFromBody(o.body(), refs);
@@ -253,7 +255,7 @@ class MapperElementUtil {
     }
 
     static Optional<AtomicElement> findCapturedElementInAtomic(AtomicElement element, String captureName) {
-        if (element instanceof GroupElement groupElement) {
+        if (element instanceof TransparentElement groupElement) {
             return findCapturedElement(groupElement.body(), captureName);
         }
         if (element instanceof OptionalElement optionalElement) {
@@ -294,7 +296,7 @@ class MapperElementUtil {
     }
 
     static List<AtomicElement> findCapturedElementsInAtomic(AtomicElement element, String captureName) {
-        if (element instanceof GroupElement groupElement) {
+        if (element instanceof TransparentElement groupElement) {
             return findCapturedElements(groupElement.body(), captureName);
         }
         if (element instanceof OptionalElement optionalElement) {
@@ -478,7 +480,7 @@ class MapperElementUtil {
         }
         Object value = captureValueShape(element);
         if (value instanceof RuleRefElement ref) return containsMappedValue(ref, ruleByName, visited);
-        RuleBody body = value instanceof GroupElement group ? group.body()
+        RuleBody body = value instanceof TransparentElement group ? group.body()
             : value instanceof RuleBody compound ? compound : null;
         return body != null && collectRuleRefs(body).stream().anyMatch(ref -> containsMappedValue(ref, ruleByName, visited));
     }
@@ -503,7 +505,7 @@ class MapperElementUtil {
                 && !containsMappedValue(ref, ruleByName);
         }
         final RuleBody body;
-        if (value instanceof GroupElement group) {
+        if (value instanceof TransparentElement group) {
             body = group.body();
         } else if (value instanceof RuleBody compound) {
             body = compound;
@@ -522,7 +524,7 @@ class MapperElementUtil {
         Object value = captureValueShape(element);
         var visited = new java.util.HashSet<String>();
         if (value instanceof RuleRefElement ref) return reachesGrapheme(ref.name(), rules, tokens, visited);
-        RuleBody body = value instanceof GroupElement group ? group.body()
+        RuleBody body = value instanceof TransparentElement group ? group.body()
             : value instanceof RuleBody compound ? compound : null;
         return body != null && collectRuleRefs(body).stream().anyMatch(ref -> reachesGrapheme(ref.name(), rules, tokens, visited));
     }
@@ -544,7 +546,7 @@ class MapperElementUtil {
         if (value instanceof RuleRefElement ref) {
             return reachesSkippedRule(ref.name(), ruleByName, new java.util.HashSet<>());
         }
-        RuleBody body = value instanceof GroupElement group ? group.body()
+        RuleBody body = value instanceof TransparentElement group ? group.body()
             : value instanceof RuleBody compound ? compound : null;
         return body != null && collectRuleRefs(body).stream()
             .anyMatch(ref -> reachesSkippedRule(ref.name(), ruleByName, new java.util.HashSet<>()));
@@ -603,7 +605,7 @@ class MapperElementUtil {
     }
 
     static Optional<AtomicElement> normalizeCapturedElement(AtomicElement element) {
-        if (element instanceof GroupElement groupElement) {
+        if (element instanceof TransparentElement groupElement) {
             return firstAtomicElement(groupElement.body());
         }
         if (element instanceof OptionalElement optionalElement) {

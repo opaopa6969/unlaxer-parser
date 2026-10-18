@@ -17,7 +17,7 @@ rollbackしたIDはstaleのまま、再生tokenには新しいgenerationのIDを
 既存のtransactionが再生CST/capture/新metadataもrollbackします。診断は通常のspeculative failureと同様に保持します。
 
 keyは既存のrule、両byte cursor、rule depth、whitespace、reset/nonOrdered policyを使います。
-成功replayはさらにactive expression depthが保存時と等しい場合に限定します。
+成功replayはさらにactive expression depthが保存時以下の場合に限定します。
 高いframeからのcache hitでresource limitを飛び越さず、resource failureは保存せずsessionを中断します。
 異なるgrammar呼出しは独立したmemo tableを使い、終了時に親のtableを復元します。
 
@@ -34,12 +34,12 @@ failure同様、CP位置のbucketを保持窓に従って解放し、successの�
 | 通常のpure rule | success/failure memo | success/failure memo |
 | listener / scope等の成功 | success対象外 | `RuleEffects`等はsuccess対象外 |
 | custom/stateful rule | exact marker/epoch等の既存契約 | purity未証明のため対象外 |
-| 明示Classic token mode | exact marker条件下で対応 | 今回もmemo対象外（hit0） |
+| 明示Classic token mode | exact marker条件下で対応 | #628でpure success/failureに対応 |
 | trial/terminal traceの記録中 | trial recordingはmemoを停止 | opt-in terminal traceはsuccess replayを停止 |
 
 Rust traceを停止するのではなく、success memoをmissにして元のparserを実行します。
 traceをcache hitで欠落させることはありません。failure memoはそのままです。
-Classic/general modeは #628、version付きstateful failureは #629、記録付きsuccess replayの差は親 #184 / #197 に残ります。
+[Classic/general modeは #628で実hitへ対応](classic-memo.md)。[version付きstateful failureは #629で対応](stateful-failure-memo.md)、記録付きsuccess replayの差は親 #184 / #197 に残ります。
 この単位だけでproduction workloadのdeadlineや全stateful parityの完了とはしません。
 
 `ParseContext::memoized_success_hits()` は実際に成功entryを再生した数を返します。

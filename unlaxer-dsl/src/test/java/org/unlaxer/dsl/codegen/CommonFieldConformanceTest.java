@@ -27,7 +27,7 @@ public class CommonFieldConformanceTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
-    private JsonArray corpus(String name) throws Exception {
+    protected JsonArray corpus(String name) throws Exception {
         return JsonParser.parseString(
                         Files.readString(
                                 repo.resolve("spec-corpus/common-fields/" + name + "-cases.json")))
@@ -338,7 +338,7 @@ public class CommonFieldConformanceTest {
                                 + expression
                                 + " } }"));
         Path output = temporary.newFolder().toPath();
-        var compiler = ToolProvider.getSystemJavaCompiler();
+        var compiler = org.unlaxer.dsl.Java21TestSupport.compiler();
         var diagnostics = new DiagnosticCollector<JavaFileObject>();
         try (var manager =
                 compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {

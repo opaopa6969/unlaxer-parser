@@ -153,6 +153,8 @@ pub enum Expr {
     ValueBoundary(Box<Expr>),
     /// Explicit nested capture CST boundary; existing flat Capture remains unchanged.
     CaptureBoundary(capture_tree::Kind, Box<Expr>),
+    /// AST field boundary: validate input provenance before Classic collection.
+    InputCaptureBoundary(capture_tree::Kind, Box<Expr>),
     /// Apply rule-local symbol effects to this child's captures after a successful parse.
     RuleEffects {
         child: Box<Expr>,
@@ -502,7 +504,8 @@ pub enum Memoization {
     Off,
     /// Cache failures for context-independent rules and successes for their statically
     /// pure subset. The historical variant name is retained for compatibility.
-    /// Classic mode and opt-in token tracing do not replay successes.
+    /// Explicit Classic modes retain their kind/inversion in the key. Opt-in
+    /// token tracing does not replay successes.
     SafeFailures,
 }
 
@@ -952,7 +955,7 @@ struct Checkpoint {
     captures_journal_mark: usize,
     owned_captures_journal_mark: usize,
     state: Option<Rc<StateMap>>,
-    scopes_journal_mark: usize,
+    scopes_journal_mark: scope::Checkpoint,
     recoveries: usize,
     tokens: Rc<token::Store>,
     token_trace: token_trace::Mark,
@@ -1034,6 +1037,9 @@ struct FailureDiagnostic {
     memo_expression_depth: usize,
     farthest: Option<usize>,
     expected: ExpectedIds,
+    classic_max_reached: Option<usize>,
+    classic_failure_seen: bool,
+    classic_failure_end: Option<(usize, MatchCursorPolicy)>,
 }
 
 impl FailureDiagnostic {
@@ -1070,6 +1076,10 @@ impl FailureDiagnostic {
     }
 
     fn merge(&mut self, other: &Self) {
+        self.classic_failure_seen |= other.classic_failure_seen;
+        if let Some(reached) = other.classic_max_reached {
+            self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+        }
         let Some(position) = other.farthest else {
             return;
         };
@@ -1111,6 +1121,7 @@ struct FailureMemoKey {
     position: usize,
     matched_position: usize,
     depth_and_modes: usize,
+    state_version: usize,
 }
 
 impl FailureMemoKey {
@@ -1126,7 +1137,25 @@ impl FailureMemoKey {
             position,
             matched_position,
             depth_and_modes: depth * 8 + 4 + usize::from(whitespace),
+            state_version: 0,
         }
+    }
+    fn with_state_version(mut self, version: usize) -> Self {
+        self.state_version = version;
+        self
+    }
+    fn with_token_mode(mut self, mode: Option<token::ParseMode>) -> Self {
+        if let Some(mode) = mode {
+            let kind = match mode.kind {
+                token::TokenKind::Consumed => 1,
+                token::TokenKind::MatchOnly => 2,
+                token::TokenKind::VirtualConsumed => 3,
+                token::TokenKind::VirtualMatchOnly => 4,
+            };
+            // Rule depth occupies bits3..10; preserve every normal-mode key bit.
+            self.depth_and_modes |= (kind << 11) | (usize::from(mode.invert) << 14);
+        }
+        self
     }
     fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
         self.depth_and_modes = (self.depth_and_modes & !6)
@@ -1175,6 +1204,17 @@ impl Hasher for FailureMemoHasher {
     }
 }
 
+// Only this compact call record lives across recursive execution. Probe/replay
+// and snapshot construction use separate non-recursive frames.
+struct MemoCall {
+    key: FailureMemoKey,
+    position: usize,
+    count: usize,
+    capture_mark: usize,
+    detailed: bool,
+    success: bool,
+}
+
 type MemoMap<V> = HashMap<FailureMemoKey, V, FailureMemoBuildHasher>;
 type FailureMemoBuckets = MemoBuckets<FailureDiagnostic>;
 type SuccessMemoBuckets = MemoBuckets<Rc<SuccessMemo>>;
@@ -1195,6 +1235,7 @@ impl MemoValue for FailureDiagnostic {
 /// relative to this snapshot; spans remain absolute original-source CP offsets.
 struct SuccessMemo {
     nodes: Vec<Node>,
+    tokens: token::MemoTokens,
     root: usize,
     captures: Vec<(&'static str, Span)>,
     consumed: usize,
@@ -1341,7 +1382,7 @@ impl<V: MemoValue> MemoBuckets<V> {
 // Java Chain switches its current transaction to an advancing matched cursor.
 // NonOrdered inherits that policy; its Java children otherwise reset on begin.
 // `non_ordered` confines the compatibility policy to the new combinator.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct MatchCursorPolicy {
     reset: bool,
     non_ordered: bool,
@@ -1812,8 +1853,8 @@ impl<'a> ParseContext<'a> {
         self.memoized_failure_hits
     }
 
-    /// Actual successful rule replays in this context's pass. Classic mode,
-    /// tracing, unsafe rules and snapshots exceeding the memo budgets are misses.
+    /// Actual successful rule replays in this context's pass. Tracing, unsafe
+    /// rules and snapshots exceeding the memo budgets are misses.
     pub fn memoized_success_hits(&self) -> usize {
         self.memoized_success_hits
     }
@@ -1964,6 +2005,20 @@ impl<'a> ParseContext<'a> {
 
     pub fn scopes(&self) -> &ScopeStore {
         &self.scopes
+    }
+
+    /// Current parse-visible state epoch. Rollback restores it; later mutations
+    /// never reuse a prior branch's epoch. None means the allocator is exhausted
+    /// and all memo lookups/inserts are permanently disabled for this context.
+    pub fn memoization_state_version(&self) -> Option<usize> {
+        self.scopes.memo_version()
+    }
+
+    /// Notify memoization before retrying a rule whose result can observe a
+    /// caller-owned state mutation. This does not make opaque custom parsers safe
+    /// or permit replay of stateful successes. Scope mutations do this internally.
+    pub fn mark_memoization_state_changed(&mut self) {
+        self.scopes.mark_memo_changed();
     }
 
     /// Changes participate in all parser checkpoints, independently of named user state.
@@ -2329,6 +2384,9 @@ impl<'a> ParseContext<'a> {
     fn fail_without_expected(&mut self) {
         if self.token_mode.is_some() && self.options.diagnostics == Diagnostics::Detailed {
             self.classic_failure_seen = true;
+            if let Some(frame) = self.diagnostic_frames.last_mut() {
+                frame.classic_failure_seen = true;
+            }
         }
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
@@ -2346,6 +2404,9 @@ impl<'a> ParseContext<'a> {
     fn fail_at(&mut self, position: usize, expected: &str) {
         if self.token_mode.is_some() && self.options.diagnostics == Diagnostics::Detailed {
             self.classic_failure_seen = true;
+            if let Some(frame) = self.diagnostic_frames.last_mut() {
+                frame.classic_failure_seen = true;
+            }
         }
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
@@ -2375,6 +2436,17 @@ impl<'a> ParseContext<'a> {
     fn replay_failure(&mut self, diagnostic: &FailureDiagnostic) {
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
+        }
+        self.classic_failure_seen |= diagnostic.classic_failure_seen;
+        if let Some(reached) = diagnostic.classic_max_reached {
+            self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+        }
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.classic_failure_seen |= diagnostic.classic_failure_seen;
+            if let Some(reached) = diagnostic.classic_max_reached {
+                frame.classic_max_reached =
+                    Some(frame.classic_max_reached.unwrap_or(0).max(reached));
+            }
         }
         let Some(position) = diagnostic.farthest else {
             return;
@@ -2408,101 +2480,147 @@ impl<'a> ParseContext<'a> {
             self.fail("valid rule reference");
             return None;
         }
-        let memo_key = (self.options.memoization == Memoization::SafeFailures
-            && self.token_mode.is_none()
+        if self.options.memoization == Memoization::SafeFailures
             && self.names_state.frames.is_empty()
             && self.lexical_trivia.is_none()
             && self.lexical_context.is_none()
-            && self.memo_safe_rules.get(id).copied().unwrap_or(false))
-        .then(|| {
-            (
-                // Route by scalar position; keep the existing byte-based key intact.
-                self.code_point(self.position),
-                FailureMemoKey::new(
-                    id,
-                    self.position,
-                    self.matched_position,
-                    self.whitespace,
-                    depth,
-                )
-                .with_match_policy(self.match_cursor_policy),
-            )
-        });
-        if let Some((position, key)) = memo_key {
-            if let Some(diagnostic) = self.failure_memo.probe(position, &key).cloned() {
-                // A deeper retry has less budget and must execute its guards.
-                // Shallower retries retain the existing diagnostic/memo reuse.
-                if self.expression_depth <= diagnostic.memo_expression_depth {
-                    self.memoized_failure_hits += 1;
-                    self.replay_failure(&diagnostic);
-                    return None;
-                }
-            }
-        }
-        let success_key = memo_key.filter(|_| self.token_trace.is_none());
-        if let Some((position, key)) = success_key {
-            if let Some(entry) = self.success_memo.probe(position, &key).cloned() {
-                // Reuse only with at least the original expression budget.
-                if self.expression_depth <= entry.expression_depth {
-                    self.memoized_success_hits += 1;
-                    return Some(self.replay_success(&entry));
-                }
-            }
-        }
-        let capture_mark = if success_key.is_some() {
-            self.captures.checkpoint()
+            && self.scopes.memo_version().is_some()
+            && self.memo_safe_rules.get(id).copied().unwrap_or(false)
+        {
+            self.memoized_rule(id, depth)
         } else {
-            self.captures.journal.len()
-        };
-        let rules = Arc::clone(&self.rules);
-        let rule = &rules[id];
-        let record_diagnostics = self.options.diagnostics == Diagnostics::Detailed;
-        if memo_key.is_some() && record_diagnostics {
-            self.diagnostic_frames.push(FailureDiagnostic::default());
+            self.execute_rule(id, depth)
         }
+    }
+
+    // A no-cache recursive rule must not retain the large memo snapshot/key
+    // frame. In particular name-resolution rules still reach their depth guard
+    // on the default 2 MiB thread stack after the state-version key was added.
+    #[inline(never)]
+    fn execute_rule(&mut self, id: usize, depth: usize) -> Option<usize> {
+        let rules = Arc::clone(&self.rules);
         let start = self.position;
         let count = self.nodes.len();
-        let result = match self.expression(&rule.expression, depth + 1) {
+        match self.expression(&rules[id].expression, depth + 1) {
             Some(fragment) => Some(self.build_rule_node(id, start, fragment)),
             None => {
                 self.position = start;
                 self.nodes.truncate(count);
                 None
             }
+        }
+    }
+
+    #[inline(never)]
+    fn memoized_rule(&mut self, id: usize, depth: usize) -> Option<usize> {
+        let key = FailureMemoKey::new(
+            id,
+            self.position,
+            self.matched_position,
+            self.whitespace,
+            depth,
+        )
+        .with_match_policy(self.match_cursor_policy)
+        .with_token_mode(self.token_mode)
+        .with_state_version(self.scopes.memo_version().expect("memo version checked"));
+        let position = self.code_point(self.position);
+        if let Some(result) = self.probe_rule_memo(position, &key) {
+            return result;
+        }
+        let success = self.token_trace.is_none();
+        let capture_mark = if success {
+            self.captures.checkpoint()
+        } else {
+            self.captures.journal.len()
         };
-        if let Some((position, key)) = memo_key {
-            let diagnostic = if record_diagnostics {
-                let diagnostic = self
-                    .diagnostic_frames
-                    .pop()
-                    .expect("memoized rule installed a diagnostic frame");
-                if let Some(parent) = self.diagnostic_frames.last_mut() {
-                    parent.merge(&diagnostic);
-                }
-                diagnostic
-            } else {
-                FailureDiagnostic::default()
-            };
-            // Resource exhaustion depends on active wrapper frames. Do not reuse
-            // that failure from a shallower call; ordinary syntax failures retain
-            // their existing memo sharing across wrappers.
-            if self.resource_failure.is_none() {
-                if let Some(root) = result {
-                    if success_key.is_some() {
-                        self.memoize_success(position, key, count, root, capture_mark, diagnostic);
-                    }
-                } else {
-                    let mut diagnostic = diagnostic;
-                    diagnostic.memo_expression_depth = self.expression_depth;
-                    self.failure_memo
-                        .insert(position / FAILURE_MEMO_BUCKET_SIZE, key, diagnostic);
+        let detailed = self.options.diagnostics == Diagnostics::Detailed;
+        if detailed {
+            self.diagnostic_frames.push(FailureDiagnostic::default());
+        }
+        let call = MemoCall {
+            key,
+            position,
+            count: self.nodes.len(),
+            capture_mark,
+            detailed,
+            success,
+        };
+        let result = self.execute_rule(id, depth);
+        self.finish_rule_memo(call, result);
+        result
+    }
+
+    #[inline(never)]
+    fn probe_rule_memo(&mut self, position: usize, key: &FailureMemoKey) -> Option<Option<usize>> {
+        if let Some(diagnostic) = self
+            .failure_memo
+            .probe(position, key)
+            .filter(|entry| self.expression_depth <= entry.memo_expression_depth)
+            .cloned()
+        {
+            self.memoized_failure_hits += 1;
+            self.replay_failure(&diagnostic);
+            if let Some((matched, policy)) = diagnostic.classic_failure_end {
+                self.matched_position = matched;
+                self.match_cursor_policy = policy;
+            }
+            return Some(None);
+        }
+        if self.token_trace.is_none() {
+            if let Some(entry) = self.success_memo.probe(position, key).cloned() {
+                // A shallower retry has at least the saved remaining budget.
+                if self.expression_depth <= entry.expression_depth {
+                    self.memoized_success_hits += 1;
+                    return Some(Some(self.replay_success(&entry)));
                 }
             }
         }
-        if success_key.is_some() {
+        None
+    }
+
+    #[inline(never)]
+    fn finish_rule_memo(&mut self, call: MemoCall, result: Option<usize>) {
+        let mut diagnostic = if call.detailed {
+            let diagnostic = self
+                .diagnostic_frames
+                .pop()
+                .expect("memoized rule installed a diagnostic frame");
+            if let Some(parent) = self.diagnostic_frames.last_mut() {
+                parent.merge(&diagnostic);
+            }
+            diagnostic
+        } else {
+            FailureDiagnostic::default()
+        };
+        if result.is_none() && self.token_mode.is_some() {
+            diagnostic.classic_failure_end =
+                Some((self.matched_position, self.match_cursor_policy));
+        }
+        // Resource exhaustion and epoch exhaustion are never cacheable failures.
+        if self.resource_failure.is_none() && self.scopes.memo_version().is_some() {
+            if let Some(root) = result {
+                if call.success {
+                    self.memoize_success(
+                        call.position,
+                        call.key,
+                        call.count,
+                        root,
+                        call.capture_mark,
+                        diagnostic,
+                    );
+                }
+            } else {
+                diagnostic.memo_expression_depth = self.expression_depth;
+                self.failure_memo.insert(
+                    call.position / FAILURE_MEMO_BUCKET_SIZE,
+                    call.key,
+                    diagnostic,
+                );
+            }
+        }
+        if call.success {
             self.captures.commit_checkpoint();
         }
-        result
     }
 
     /// Snapshot only the newly appended pure arena. No public NodeId, mutable
@@ -2560,16 +2678,21 @@ impl<'a> ParseContext<'a> {
                 return;
             }
         }
+        let Some(token_bytes) = token::MemoTokens::measure(&self.tokens, start, self.nodes.len())
+        else {
+            return;
+        };
+        bytes = bytes.saturating_add(token_bytes);
         let old_bytes = self
             .success_memo
             .get(position / FAILURE_MEMO_BUCKET_SIZE, &key)
             .map_or(0, MemoValue::retained_bytes);
-        if bytes
-            > self
-                .success_memo
-                .max_bytes
-                .saturating_sub(self.success_memo.retained_bytes - old_bytes)
-            || self.tokens.values.range(start..).next().is_some()
+        if bytes > MAX_SUCCESS_MEMO_BYTES
+            || bytes
+                > self
+                    .success_memo
+                    .max_bytes
+                    .saturating_sub(self.success_memo.retained_bytes - old_bytes)
             || self.tokens.calls.range(start..).next().is_some()
         {
             return;
@@ -2600,6 +2723,7 @@ impl<'a> ParseContext<'a> {
             key,
             Rc::new(SuccessMemo {
                 nodes,
+                tokens: token::MemoTokens::capture(&self.tokens, start, self.nodes.len()),
                 root: root - start,
                 captures,
                 consumed: self.position,
@@ -2626,6 +2750,7 @@ impl<'a> ParseContext<'a> {
             }
             self.nodes.push(node);
         }
+        entry.tokens.replay(self, start);
         for &(name, span) in &entry.captures {
             self.captures.push(name, span);
         }
@@ -2684,6 +2809,7 @@ impl<'a> ParseContext<'a> {
                 | Expr::CodeStart
                 | Expr::CodeEnd
                 | Expr::CaptureBoundary(_, _)
+                | Expr::InputCaptureBoundary(_, _)
         ) {
             self.match_cursor_policy.reset = false;
         }
@@ -2794,9 +2920,10 @@ impl<'a> ParseContext<'a> {
             Expr::CaptureScope(child) => self.expression_capture_scope(child, depth),
             Expr::RuleEffects { .. } => self.expression_rule_effects(expression, depth),
             Expr::CaptureEquality { .. } => self.expression_capture_equality(expression, depth),
-            Expr::TextValue(_) | Expr::ValueBoundary(_) | Expr::CaptureBoundary(_, _) => {
-                self.expression_value_boundary(expression, depth)
-            }
+            Expr::TextValue(_)
+            | Expr::ValueBoundary(_)
+            | Expr::CaptureBoundary(_, _)
+            | Expr::InputCaptureBoundary(_, _) => self.expression_value_boundary(expression, depth),
             Expr::Character { .. } => self.classic_atom(expression, depth),
             _ if self.token_mode.is_some() => self.classic_atom(expression, depth),
             _ => self.expression_inner(expression, depth),
@@ -2879,7 +3006,14 @@ impl<'a> ParseContext<'a> {
                 if self.token_mode.is_some()
                     && matches!(
                         expression,
-                        Expr::Sequence(_) | Expr::Number | Expr::Identifier | Expr::Quoted(_)
+                        Expr::Sequence(_)
+                            | Expr::Number
+                            | Expr::Identifier
+                            | Expr::Quoted(_)
+                            | Expr::CodeStart
+                            | Expr::CodeEnd
+                            | Expr::CaptureBoundary(_, _)
+                            | Expr::InputCaptureBoundary(_, _)
                     )
                 {
                     self.match_cursor_policy.reset = false;
@@ -2889,6 +3023,7 @@ impl<'a> ParseContext<'a> {
                         || matches!(
                             expression,
                             Expr::CaptureBoundary(_, _)
+                                | Expr::InputCaptureBoundary(_, _)
                                 | Expr::Rule(_)
                                 | Expr::MatchOnly(_)
                                 | Expr::InvertMatch(_)
@@ -2911,6 +3046,7 @@ impl<'a> ParseContext<'a> {
                     || matches!(
                         expression,
                         Expr::CaptureBoundary(_, _)
+                            | Expr::InputCaptureBoundary(_, _)
                             | Expr::MatchOnly(_)
                             | Expr::InvertMatch(_)
                             | Expr::Rule(_)
@@ -3372,7 +3508,10 @@ impl<'a> ParseContext<'a> {
             | Expr::TriviaScope { .. } => {
                 unreachable!("trivia scopes are dispatched by expression")
             }
-            Expr::TextValue(_) | Expr::ValueBoundary(_) | Expr::CaptureBoundary(_, _) => {
+            Expr::TextValue(_)
+            | Expr::ValueBoundary(_)
+            | Expr::CaptureBoundary(_, _)
+            | Expr::InputCaptureBoundary(_, _) => {
                 unreachable!("recursive expression dispatched by expression")
             }
         }
@@ -3769,6 +3908,7 @@ impl<'a> ParseContext<'a> {
             _ => token::TokenSource::Input(span),
         };
         self.owned_captures.push(name, source);
+        self.mark_memoization_state_changed();
         Some(fragment)
     }
 
@@ -3878,10 +4018,22 @@ impl<'a> ParseContext<'a> {
         match expression {
             Expr::TextValue(child)
             | Expr::ValueBoundary(child)
-            | Expr::CaptureBoundary(_, child) => {
+            | Expr::CaptureBoundary(_, child)
+            | Expr::InputCaptureBoundary(_, child) => {
                 let start = self.position;
                 let fragment = self.expression(child, depth)?;
-                if let Expr::CaptureBoundary(kind, _) = expression {
+                if matches!(expression, Expr::InputCaptureBoundary(_, _))
+                    && fragment
+                        .source
+                        .as_deref()
+                        .is_some_and(|source| source.text.is_some() || source.generated)
+                {
+                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
+                    return None;
+                }
+                if let Expr::CaptureBoundary(kind, _) | Expr::InputCaptureBoundary(kind, _) =
+                    expression
+                {
                     if self.token_mode.is_some() {
                         let fragment = self.classic_meta_node(
                             fragment,
@@ -3894,7 +4046,9 @@ impl<'a> ParseContext<'a> {
                 }
                 let node_id = self.nodes.len();
                 self.nodes.push(Node {
-                    rule: if let Expr::CaptureBoundary(kind, _) = expression {
+                    rule: if let Expr::CaptureBoundary(kind, _)
+                    | Expr::InputCaptureBoundary(kind, _) = expression
+                    {
                         kind.rule()
                     } else if matches!(expression, Expr::TextValue(_)) {
                         TEXT_VALUE_RULE
@@ -4107,6 +4261,7 @@ impl<'a> ParseContext<'a> {
             winner
                 .scopes
                 .retain_journal_entry_count(self.scopes.journal_entries_created());
+            winner.scopes.retain_memo_allocator(&self.scopes);
             self.scopes = winner.scopes;
             self.recoveries = winner.recoveries;
             winner.fragment
@@ -4361,6 +4516,7 @@ impl<'a> ParseContext<'a> {
         }
         if let Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
+        | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. }
@@ -4492,6 +4648,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
+        | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
@@ -4579,11 +4736,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         return false; // Successful symbol/listener effects are not replayable.
     }
     match expression {
-        Expr::MatchOnly(_)
-        | Expr::InvertMatch(_)
-        | Expr::StopInvert(_)
-        | Expr::StopConsume(_)
-        | Expr::Character { .. } => false,
+        Expr::Character { .. } => false,
         Expr::Custom(_)
         | Expr::CustomWith { .. }
         | Expr::Replay(_)
@@ -4608,9 +4761,14 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         Expr::PredictiveChoice { alternatives, .. } => alternatives
             .iter()
             .all(|child| expression_is_memo_safe(child, references, success)),
-        Expr::Capture(_, child)
+        Expr::MatchOnly(child)
+        | Expr::InvertMatch(child)
+        | Expr::StopInvert(child)
+        | Expr::StopConsume(child)
+        | Expr::Capture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
+        | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::Optional(child)
         | Expr::JavaOptional(child)
@@ -5906,6 +6064,7 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
             Expr::Capture(_, child)
             | Expr::TextValue(child)
             | Expr::CaptureBoundary(_, child)
+            | Expr::InputCaptureBoundary(_, child)
             | Expr::ValueBoundary(child)
             | Expr::Optional(child)
             | Expr::JavaOptional(child)
@@ -6045,7 +6204,43 @@ mod pure_success_memo_tests {
     }
 
     #[test]
-    fn classic_and_traced_calls_keep_their_committed_observations_without_success_hits() {
+    fn classic_structural_metadata_is_budgeted_and_eviction_releases_it() {
+        let mut context = context("ab", Expr::literal("a").then(Expr::literal("b")));
+        context.token_mode = Some(token::ParseMode::default());
+        let key = FailureMemoKey::new(0, 0, 0, false, 0)
+            .with_match_policy(context.match_cursor_policy)
+            .with_token_mode(context.token_mode);
+        let checkpoint = context.checkpoint();
+        assert!(context.rule(0, 0).is_some());
+        let token_bytes = token::MemoTokens::measure(&context.tokens, 0, context.nodes.len())
+            .expect("pure structural tokens");
+        assert!(token_bytes > 0);
+        let bytes = context.success_memo.get(0, &key).unwrap().bytes;
+        assert!(bytes > token_bytes);
+        context.restore(checkpoint);
+
+        context.success_memo = SuccessMemoBuckets::with_window(Some(1024));
+        // The node-only payload would fit; including structural tokens must miss.
+        context.success_memo.max_bytes = bytes - token_bytes;
+        warm(&mut context);
+        assert_eq!(context.success_memo.retained_bytes, 0);
+        warm(&mut context);
+        assert_eq!(context.memoized_success_hits(), 0);
+        assert!(context.resource_failure.is_none());
+
+        context.success_memo.max_bytes = bytes;
+        warm(&mut context);
+        assert_eq!(context.success_memo.retained_bytes, bytes);
+        warm(&mut context);
+        assert_eq!(context.memoized_success_hits(), 1);
+        context.success_memo.observe_cursor(4000);
+        assert_eq!(context.success_memo.retained_bytes, 0);
+        warm(&mut context);
+        assert_eq!(context.success_memo.retained_bytes, bytes);
+    }
+
+    #[test]
+    fn traced_calls_keep_observations_without_success_hits_while_classic_can_replay() {
         for classic in [false, true] {
             for traced in [false, true] {
                 let mut context = context("a", Expr::literal("a"));
@@ -6058,10 +6253,7 @@ mod pure_success_memo_tests {
                 }
                 warm(&mut context);
                 let root = context.rule(0, 0).unwrap();
-                assert_eq!(
-                    context.memoized_success_hits(),
-                    usize::from(!classic && !traced)
-                );
+                assert_eq!(context.memoized_success_hits(), usize::from(!traced));
                 assert_eq!(context.nodes[root].span, Span { start: 0, end: 1 });
                 if traced {
                     assert_eq!(context.token_trace().unwrap().unwrap().len(), 1);

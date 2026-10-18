@@ -128,7 +128,7 @@ final class TypeofEmitter {
                         out.append(
                                 rule.mapping() == null
                                         ? "            if !capture.nodes.is_empty() {"
-                                                + " values.extend(projected.iter().cloned()); }\n"
+                                                + " tree.charge_work(projected.len())?; values.extend(projected.iter()); }\n"
                                         : "            values.extend(map_nodes(tree,"
                                                 + " &capture.nodes)?);\n");
                 case VALUE ->

@@ -86,7 +86,7 @@ pub(super) fn rule(ir: &GrammarIr, id: usize) -> String {
             }
             Kind::Nested { .. } => unreachable!("validated nested typeof restriction"),
             Kind::NullableNode => unreachable!("validated associative projection"),
-            Kind::Node if rule.mapping.is_none() => out.push_str("            if !capture.nodes.is_empty() { values.extend(projected.iter().cloned()); }\n"),
+            Kind::Node if rule.mapping.is_none() => out.push_str("            if !capture.nodes.is_empty() { tree.charge_work(projected.len())?; values.extend(projected.iter()); }\n"),
             Kind::Node => out.push_str("            values.extend(map_nodes(tree, &capture.nodes)?);\n"),
             Kind::Value => out.push_str("            values.extend(map_values(tree, &capture.nodes)?);\n"),
             Kind::Integer => out.push_str("            values.push(unlaxer_runtime::java_capture_text(tree.text(capture.span)?).parse::<i32>().map_err(|_| format!(\"invalid i32 capture {} at {}..{}\", capture.name, capture.span.start, capture.span.end))?);\n"),

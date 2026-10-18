@@ -82,8 +82,12 @@ public final class PreferredAstPlan {
         if (atom instanceof RuleRefElement ref) {
             int id = rules.indexOf(ref.name());
             if (id >= 0) calls.add(new Call(id, depth));
-        } else if (atom instanceof GroupElement group)
-            body(group.body(), depth, plan, rules, calls);
+        } else if (atom instanceof TransparentElement group) {
+            var child=single(group.body());
+            if (!(atom instanceof GroupElement) && child instanceof RuleRefElement)
+                atom(child,depth,plan,rules,calls);
+            else body(group.body(), depth, plan, rules, calls);
+        }
         else if (atom instanceof OptionalElement optional) {
             var child = single(optional.body());
             if (child instanceof RuleRefElement || child instanceof TerminalElement)
@@ -106,7 +110,7 @@ public final class PreferredAstPlan {
     /** Mirror resolveNested: each explicit container and leaf adds a boundary token. */
     private static void nested(AtomicElement atom, int depth, CaptureBindingPlan plan,
             List<String> rules, List<Call> calls) {
-        if (atom instanceof GroupElement group) nestedBody(group.body(),depth,plan,rules,calls);
+        if (atom instanceof TransparentElement group) nestedBody(group.body(),depth,plan,rules,calls);
         else if (atom instanceof OptionalElement optional) nestedBody(optional.body(),depth+2,plan,rules,calls);
         else if (atom instanceof RepeatElement repeat) nestedBody(repeat.body(),depth+2,plan,rules,calls);
         else if (atom instanceof OneOrMoreElement repeat) nested(repeat.body(),depth+2,plan,rules,calls);

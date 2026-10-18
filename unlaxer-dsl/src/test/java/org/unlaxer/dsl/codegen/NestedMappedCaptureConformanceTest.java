@@ -16,7 +16,7 @@ public class NestedMappedCaptureConformanceTest extends NestedCaptureConformance
     @Override protected java.nio.file.Path nativeTarget() { return java.nio.file.Path.of("target/nested-mapped-native").toAbsolutePath(); }
     @Override protected List<GeneratedSource> extraJavaSources(GrammarDecl grammar) {
         var evaluator=new EvaluatorGenerator(21).generate(grammar);
-        boolean rootValue=!grammar.name().equals("SamePositionNodes");
+        boolean rootValue=!grammar.name().endsWith("SamePositionNodes");
         var methods=java.util.regex.Pattern.compile("protected abstract T (\\w+)\\(([^)]*)\\);").matcher(evaluator.source());
         var body=new StringBuilder("package org.example.nestedcaptures; public class NestedMappedProbe extends "+grammar.name()+"Evaluator<String> {");
         while(methods.find()) {
@@ -73,7 +73,8 @@ public class NestedMappedCaptureConformanceTest extends NestedCaptureConformance
         assertEquals(evaluation,evaluator.getMethod("eval",astType).invoke(evaluator.getConstructor().newInstance(),ast));
         var parser=(org.unlaxer.parser.Parser)loader.loadClass("org.example.nestedcaptures."+grammar.name()+"Parsers").getMethod("getRootParser").invoke(null);
         try(var context=new org.unlaxer.context.ParseContext(org.unlaxer.StringSource.createRootSource(row.get("input").getAsString()))) {
-            var token=parser.parse(context).getRootToken();
+            assertTrue(parser.parse(context).isSucceeded());
+            var token=context.getCurrent().getTokens().stream().filter(t->t.parser==parser).findFirst().orElseThrow();
             var leaves=new com.google.gson.JsonArray();
             collectTokenLeaves(token,leaves);
             assertEquals(grammar.name()+" original nested leaves",row.get("leaves"),leaves);

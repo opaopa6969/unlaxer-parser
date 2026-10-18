@@ -24,6 +24,14 @@ grammar Example {
 - manual evaluator には再帰型全体を渡す。Rust `Semantics` 引数は `&Option<Vec<String>>` のように集約値全体を借用する。既存 flat field の借用型は変更しない。
 - Java API schema と両ホストの Rust API schema / impact は実際の再帰型、外側の cardinality、evaluator 引数型を報告する。
 
+## 一般 capture / scope / replay との合成
+
+`CAPTURE(name, body)` と `CAPTURE_SCOPE(body)` は型を決める際に body の形を引き継ぐ。たとえば `CAPTURE(word, [{'😀'}]) @value` は `Optional<List<String>>` / `Option<Vec<String>>` を生成する。実解析では一般 binding の保存・scope 退出・失敗時 rollback を実行し、型付けのためにその操作を省略しない。`SAME_AS(name)` の葉は text であり、空の binding の replay も present な空文字列として保存する。
+
+この透過性は text / i32 / mapped node / enum、preferred metadata、同一 mapping の共有 shape 判定に適用する。outer / inner AST capture の重複や深さ制限は通常の group と同様に検査する。一般の binding 名と AST の field 名は別のままである。
+
+AST field の入力由来という契約を nested 境界にも適用する。生成 parser は Java の `CaptureBoundaryParser.input` / Rust の `Expr::InputCaptureBoundary` で、子の実結果を collector が包む前に検査する。Generated / Projected token を field の入力 span として扱わない。通常 runtime の `CaptureBoundaryParser.value/optional/list/wrap` と `Expr::CaptureBoundary` は従来どおり Generated / Projected snapshot を扱える。一般 `CAPTURE` 自体の利用範囲を狭める変更ではない。
+
 ## 拒否と資源境界
 
 capture は unique な外側の site であり、mapping params が全 site を列挙する。enclosing repetition 内の部分 capture、同名 site の合流、outer/inner capture の重複、container を含む複数要素 group / choice はこの単位では拒否する。暗黙に flat 化しない。
@@ -41,8 +49,9 @@ capture / typeof の準備走査も深さ 64 で停止し、schema 解析の再�
 | mixed value の再帰 container | 未対応、capture leaf の source shape を拒否 |
 | 透過 rule alias / recursive helper を経由する container | 未対応、capture 内の rule reference を拒否 |
 | separated list | 未対応、nested shape では早期拒否（通常 flat separated は別契約） |
-| 同一 mapping 型を共有する複数規則 | 未対応、nested 規則の shared mapping を拒否 |
-| nested 規則自身の `@commonField` / `@typeof` / associative projection / `@eval` | 未対応、明示拒否 |
+| 同一 mapping 型を共有する複数規則 | #637 で全 recursive shape / nominal leaf / opt-in が一致する場合に対応 |
+| nested family の `@commonField` | #637 で nested field の実 accessor と、field を持たない mapped sum の opt-in を検証 |
+| nested 規則の `@typeof` / associative projection / `@eval` | 未対応、明示拒否 |
 | token-stream と nested の併用 | 未対応、明示拒否 |
 | nested 値を扱う family commonField / preferred snapshot | #626 で直接 mapped family 葉の commonField と preferred を実検証。全組合せは #583 に残す |
 

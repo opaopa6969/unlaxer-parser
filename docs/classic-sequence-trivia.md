@@ -20,6 +20,8 @@ Rust は trace 有無も比較します。成功した source の retained leaf 
 
 `AtomicTriviaConformanceTest` は `generated-atomic-trivia.json` の 8 文法・32 入力に対し、Java と native の両 host の Rust 出力一致、両言語の実 compile、通常入口と明示 Classic CST→mapper の AST/source CP を比較します。javaStyle と宣言 trivia、Identifier / Number / SingleQuoted / DoubleQuoted を含みます。source map の比較は cursor の一致だけを根拠にしません。
 
+固定 TinyExpression `7d7bd1cbfab1bd9548ba53c73cc50502f0437c67` の実 Java token でも、`TinyCodeFenceConformanceTest` の14文法・86入力/route（FQNとadapter）を検証します。外側 trivia のある文法を含め、通常入口と明示 Classic CST→mapper の canonical AST 値・CP範囲を比較し、Java oracle と一致させます。比較対象からの除外はありません。
+
 ```sh
 RUSTUP_TOOLCHAIN=1.85.0 mvn -pl unlaxer-common,unlaxer-dsl -am test \
   -Dtest=GeneralTokenPropagationTest,GeneralLexicalPropagationTest,AtomicTriviaConformanceTest,RuleTriviaConformanceTest,ClassicTokenDapProtocolConformanceTest,RecoveryConformanceTest,RustUbnfFrontendConformanceTest \

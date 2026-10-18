@@ -1,0 +1,98 @@
+[
+  {
+    "name": "FamilyNestedText",
+    "grammar": "grammar FamilyNestedText { @package: commonprobe @root  @mapping(Node) @commonField(value) Root ::= A | B; @nestedCaptures @mapping(A,params=[value]) A ::= 'a' [ {'x'} ] @value; @nestedCaptures @mapping(B,params=[value]) B ::= 'b' [ {'x'} ] @value;  }",
+    "java": "return String.join(\",\",node.value().orElseThrow());",
+    "rust": "view.value.as_ref().unwrap().join(\",\")",
+    "cases": [
+      [
+        "a",
+        "",
+        [
+          0,
+          1
+        ]
+      ],
+      [
+        "axx",
+        "x,x",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "bx",
+        "x",
+        [
+          0,
+          2
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "FamilyNestedNode",
+    "grammar": "grammar FamilyNestedNode { @package: commonprobe @root @nestedCaptures @mapping(Node) @commonField(value) Root ::= A | B; @nestedCaptures @mapping(Node.A,params=[value]) A ::= 'a' [ {Leaf} ] @value; @nestedCaptures @mapping(Node.B,params=[value]) B ::= 'b' [ {Leaf} ] @value; @mapping(Leaf,params=[text]) Leaf ::= '😀' @text; }",
+    "java": "return node.value().orElseThrow().stream().map(FamilyNestedNodeAST.Leaf::text).collect(java.util.stream.Collectors.joining(\",\"));",
+    "rust": "view.value.as_ref().unwrap().iter().map(|v|match v.as_ref(){generated::ast::Ast::Leaf{text,..}=>text.as_str(),_=>panic!(\"wrong leaf\")}).collect::<Vec<_>>().join(\",\")",
+    "cases": [
+      [
+        "a",
+        "",
+        [
+          0,
+          1
+        ]
+      ],
+      [
+        "a😀😀",
+        "😀,😀",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "b😀",
+        "😀",
+        [
+          0,
+          2
+        ]
+      ]
+    ]
+  },
+  {
+    "name": "FamilyNestedEnum",
+    "grammar": "grammar FamilyNestedEnum { @package: commonprobe @root  @mapping(Node) @commonField(value) Root ::= A | B; @nestedCaptures @mapping(Node.A,params=[value]) A ::= 'a' '[' { [Mode] } @value ']'; @nestedCaptures @mapping(Node.B,params=[value]) B ::= 'b' '[' { [Mode] } @value ']'; @enum Mode ::= 'on' | '😀'; }",
+    "java": "return node.value().stream().map(v->v.map(Enum::name).orElse(\"-\")).collect(java.util.stream.Collectors.joining(\",\"));",
+    "rust": "view.value.iter().map(|v|v.as_ref().map_or_else(||\"-\".to_owned(),|v|v.canonical_json().trim_matches(char::from(34)).to_owned())).collect::<Vec<_>>().join(\",\")",
+    "cases": [
+      [
+        "a[]",
+        "-",
+        [
+          0,
+          3
+        ]
+      ],
+      [
+        "a[on😀]",
+        "ON,U1F600_,-",
+        [
+          0,
+          6
+        ]
+      ],
+      [
+        "b[😀]",
+        "U1F600_,-",
+        [
+          0,
+          4
+        ]
+      ]
+    ]
+  }
+]
