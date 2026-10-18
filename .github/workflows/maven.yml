@@ -618,10 +618,11 @@ jobs:
       working-directory: unlaxer-dsl/tinycalc-vscode
       run: xvfb-run -a npm run test:vsix
     - uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: classic-ide-conformance
         path: |
           unlaxer-dsl/tinycalc-vscode/target/tinycalc-smoke.vsix
-          unlaxer-dsl/tinycalc-vscode/target/ide-java.json
-          unlaxer-dsl/tinycalc-vscode/target/ide-rust.json
+          unlaxer-dsl/tinycalc-vscode/target/ide-*
+          unlaxer-dsl/tinycalc-vscode/target/failed-*/**
         if-no-files-found: error
