@@ -971,7 +971,7 @@ public final class RustGrammarLowering {
 
     private void checkLeftRecursion(int rule, Set<Integer> visiting, Set<Integer> done) {
         if (done.contains(rule)) return;
-        if (!visiting.add(rule)) throw unsupported("left recursion at " + grammar.rules().get(rule).name());
+        if (!visiting.add(rule)) throw unsupported("E-LEFT-RECURSION: left recursion at " + grammar.rules().get(rule).name());
         if (visiting.size() > MAX_ANALYSIS_DEPTH) throw unsupported("rule analysis depth exceeds 256");
         for (int child : leadingRules(bodies.get(rule))) checkLeftRecursion(child, visiting, done);
         visiting.remove(rule);

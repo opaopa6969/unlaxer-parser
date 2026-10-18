@@ -1415,7 +1415,7 @@ impl Lowering<'_> {
         }
         if !visiting.insert(rule) {
             return Err(format!(
-                "left recursion at {}",
+                "E-LEFT-RECURSION: left recursion at {}",
                 self.grammar.rules[rule].name
             ));
         }
