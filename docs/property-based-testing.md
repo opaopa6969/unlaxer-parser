@@ -58,6 +58,8 @@ corpus（`spec-corpus/`、`conformance/`）は人が思いつく組み合わせ�
   ため、Rust 側は root span の text で確かめる）。
 - memo の実行経路を通ったことの確認として、run 全体で両 host の成功 memo と失敗 memo の hit が
   それぞれ 1 以上あることを要求する（`regressions.json` の `memo-replay` が必ず両方を起こす）。
+- 受理経路を通ったことの確認として、corpus を除く生成入力だけで受理入力を持つ seed が 60% 以上
+  あることを要求する（CI seed 集合で 20 / 24、seed `1000..1149` で 124 / 150）。
 
 ## 生成対象
 
@@ -76,7 +78,10 @@ corpus（`spec-corpus/`、`conformance/`）は人が思いつく組み合わせ�
 だけ置く）。参照されない rule は作らない。`SAME_AS` は同じ sequence の先行 `CAPTURE` の後にだけ置く。
 
 入力: 文法からの導出（32 文字で打ち切る。受理されるとは限らない）と、それを壊した入力（挿入、削除、置換、補助文字の
-挿入、結合文字 U+0301 の挿入、CRLF の挿入、途中での切断）、および空入力。
+挿入、結合文字 U+0301 の挿入、CRLF の挿入、途中での切断）、および空入力。導出は `LOOKAHEAD` /
+`NEGATIVE_LOOKAHEAD` / `EOF` の制約を見ないので、予備の導出 12 個（各 2 個の破壊入力付き）も作り、
+Java parser が全体を受理する予備を最大 2 組だけ入力に加える（`ParityHarness.RESERVE_GROUPS`）。
+Java parser による選別は決定的で、選んだ入力は両 host で同じに比べる。
 
 [#700](https://github.com/opaopa6969/unlaxer-parser/issues/700) の cut / label、
 [#701](https://github.com/opaopa6969/unlaxer-parser/issues/701) の引数付き規則は、merge 後に
@@ -103,18 +108,30 @@ Rust runtime は文法を `Expr` の表として解釈するので、生成 modu
 `spec-corpus/property-based/regressions.json` に追加できる形（`id`、`kind`、`grammar`、`inputs`）
 で書かれる。縮小前の finding は `original` に残る。
 
+縮小は CI の job timeout を超えないように制限する。finding は縮小の前に
+`target/property-based-parity-raw.json` へ書き出す。縮小するのは種別の異なる代表から最大
+`pbt.shrinkLimit` 件（既定 3）、合計 `pbt.shrinkSeconds` 秒（既定 300）までで、残りは
+`"shrunk": false` のまま `property-based-parity.json` に入る。時間切れで途中までの縮小結果は
+`"budgetExhausted": true` になる。CI はこれらの file を test の成否にかかわらず artifact
+`property-based-parity` として upload する。
+
 - `spec-corpus/property-based/regressions.json`: 過去の run で見つけて固定した縮小例。毎回
   ランダム文法の前に再生する。`expectedRejection` を持つ entry は、両 frontend がその code で
   拒否することを確かめる。
 - `spec-corpus/property-based/known-differences.json`: 既知差。各 entry は `issue` と `reason` を
-  必須とし、`kind`（finding 種別の正規表現）と、任意で `grammar` / `detail` の正規表現で対象を
-  限定する。除外した件数は毎回 `[pbt] ... excludedKnown=` に出る。黙って除外しない。
+  必須とし、`kind`（finding 種別の正規表現）と、任意で `grammar` / `detail` の正規表現、および
+  正規表現で書けない数値条件 `condition` で対象を限定する。現在の `condition` は
+  `java-syntax-offset-after-rust`（両方とも `syntax` 失敗で、Java の offset が Rust より大きい）だけ。
+  除外した件数は毎回 `[pbt] ... excludedKnown=` に出る。1 件も除外しなかった entry があると
+  テストは失敗する（直った差や、範囲がずれた entry を残さないため）。黙って除外しない。
 
 ## CI と手での実行
 
 CI（`.github/workflows/maven.yml` の "Rust backend and Java conformance"）は固定 seed `1..24`
 を 1 batch で回す。予算は 2 分以内（手元の負荷の高い共有機で約 15 秒。生成器の決定性・
-妥当性を 1,000 seed で確かめる Java だけのテストが別に約 6 秒）。
+妥当性を 1,000 seed で確かめる Java だけのテストが別に約 6 秒）。テストコードは Java 17 で
+compile できる書き方にしてあり、`unlaxer-dsl-jdk17` の `--release 17` build でも同じテストが走る
+（Rust を要するテストは `-DrustConformance=true` のときだけ）。
 
 ```sh
 # CI と同じ
@@ -138,6 +155,8 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=PropertyBasedParityTest \
 | `pbt.grammars` | `24` | seed の数（文法の数） |
 | `pbt.batch` | `24` | 1 回の compile にまとめる文法の数 |
 | `pbt.noShrink` | `false` | 縮小を省略する |
+| `pbt.shrinkLimit` | `3` | 縮小する finding の最大数（種別の異なる代表を優先） |
+| `pbt.shrinkSeconds` | `300` | 縮小に使う合計時間の上限（秒） |
 | `pbt.ignoreKnown` | `false` | `known-differences.json` を使わず、既知差も finding として出す |
 | `pbt.injectFault` | `false` | 縮小器の自己確認用。補助文字を含み prefix が受理される入力すべてに合成 finding を出す（テストは失敗する） |
 
@@ -146,7 +165,8 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=PropertyBasedParityTest \
 
 出力:
 
-- `target/property-based-parity.json`: finding（縮小済み、corpus 形式）。空なら成功。
+- `target/property-based-parity-raw.json`: 縮小前の finding（corpus 形式）。縮小の前に書く。
+- `target/property-based-parity.json`: finding（縮小済み、または `"shrunk": false`）。空なら成功。
 - `target/property-based-parity-observations.jsonl`: 入力ごとの既定設定での Java / Rust 観測値。
 - `target/property-based-parity-stats.txt`: 文法数、入力数、受理数、memo hit、生成した構文の内訳。
 
@@ -160,8 +180,9 @@ seed は `java.util.Random` で展開する（JDK 仕様で列が固定）。同
 
 | 範囲 | 文法 | 入力 | 観測（host あたり） | finding |
 |---|---|---|---|---|
-| CI seed `1..24` + corpus | 35（左再帰変種 8 を含む） | 272 | 3,264 | 0（#706 の既知差のみ） |
-| seed `1000..1399` | 536（左再帰変種 133 を含む） | 4,099 | 49,188 | 0（#706 の既知差のみ） |
+| CI seed `1..24` + corpus | 35（左再帰変種 8 を含む） | 370 | 4,440 | 0（#706 の既知差のみ） |
+| seed `1000..1149`（予備入力の導入後） | 203（左再帰変種 50 を含む） | 2,113 | 25,356 | 0（#706 の既知差のみ） |
+| seed `1000..1399`（予備入力の導入前） | 536（左再帰変種 133 を含む） | 4,099 | 49,188 | 0（#706 の既知差のみ） |
 
 生成器の旧 revision での seed `100..399` の run で、次を見つけた。
 
@@ -169,7 +190,8 @@ seed は `java.util.Random` で展開する（JDK 仕様で列が固定）。同
   cursor を進めた後の失敗で、`diagnose` の CP 位置が Java（matched 到達）と Rust（consumed）で
   異なる。受理・cursor・CST・AST は一致する。縮小例 `R0 ::= 'a' AHEAD 'é'`（入力 `ax`）を
   `regressions.json` の `lookahead-diagnostic-offset` に固定し、`known-differences.json` で
-  同じ失敗種別の offset 差だけを、正の `LOOKAHEAD` を含む文法に限って除外している。
+  「正の `LOOKAHEAD` を含む文法」「両方 `syntax` 失敗」「Java の offset > Rust の offset」の差だけを
+  除外している。生成文法では今のところこの形は出ておらず、除外が効いているのは固定 corpus だけ。
 - 数値 field（`NumberParser` の capture）の AST を Java 側の oracle が正規化できなかった。これは
   テスト側の不具合で、修正後に `numeric-field-mapping` として固定した。
 - 両版とも同じ理由で拒否した文法（入れ子 container への field capture、#583 の範囲）は不一致

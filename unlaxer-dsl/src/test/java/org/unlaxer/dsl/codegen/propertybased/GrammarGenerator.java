@@ -218,32 +218,36 @@ public final class GrammarGenerator {
     }
 
     private static Ex repair(Ex ex, int owner, boolean guarded, boolean[] nullable, int count, LinkedHashSet<String> bound, boolean loops) {
-        return switch (ex) {
-            case Ref r -> r.rule() > owner && r.rule() < count || guarded && r.rule() < count ? r : new Lit("a");
-            case Seq s -> {
-                var items = new ArrayList<Item>();
-                boolean g = guarded;
-                var local = new LinkedHashSet<>(bound);
-                for (Item item : s.items()) {
-                    Ex fixed = repair(item.ex(), owner, g, nullable, count, local, loops);
-                    items.add(new Item(fixed, item.field()));
-                    if (fixed instanceof Cap c) local.add(c.name());
-                    g = g || !GrammarModel.nullable(fixed, nullable);
-                }
-                yield new Seq(items);
+        if (ex instanceof Ref r) {
+            return r.rule() > owner && r.rule() < count || guarded && r.rule() < count ? r : new Lit("a");
+        } else if (ex instanceof Seq s) {
+            var items = new ArrayList<Item>();
+            boolean g = guarded;
+            var local = new LinkedHashSet<>(bound);
+            for (Item item : s.items()) {
+                Ex fixed = repair(item.ex(), owner, g, nullable, count, local, loops);
+                items.add(new Item(fixed, item.field()));
+                if (fixed instanceof Cap c) local.add(c.name());
+                g = g || !GrammarModel.nullable(fixed, nullable);
             }
-            case Alt a -> new Alt(a.alternatives().stream().map(x -> repair(x, owner, guarded, nullable, count, bound, loops)).toList());
-            case Opt o -> new Opt(repair(o.body(), owner, guarded, nullable, count, bound, loops));
-            case Rep r -> new Rep(consuming(loops, repair(r.body(), owner, guarded, nullable, count, bound, loops), nullable), r.min(), r.max());
-            case Sep s -> new Sep(
+            return new Seq(items);
+        } else if (ex instanceof Alt a) {
+            return new Alt(a.alternatives().stream().map(x -> repair(x, owner, guarded, nullable, count, bound, loops)).toList());
+        } else if (ex instanceof Opt o) {
+            return new Opt(repair(o.body(), owner, guarded, nullable, count, bound, loops));
+        } else if (ex instanceof Rep r) {
+            return new Rep(consuming(loops, repair(r.body(), owner, guarded, nullable, count, bound, loops), nullable), r.min(), r.max());
+        } else if (ex instanceof Sep s) {
+            return new Sep(
                     consuming(loops, repair(s.element(), owner, guarded, nullable, count, bound, loops), nullable),
                     consuming(loops, repair(s.separator(), owner, guarded, nullable, count, bound, loops), nullable));
-            case Cap c -> new Cap(c.name(), c.body() instanceof Cap inner
-                    ? repair(inner.body(), owner, guarded, nullable, count, bound, loops)
-                    : repair(c.body(), owner, guarded, nullable, count, bound, loops));
-            case Same s -> bound.contains(s.name()) ? s : new Lit("b");
-            default -> ex;
-        };
+        } else if (ex instanceof Cap c) {
+            Ex body = c.body() instanceof Cap inner ? inner.body() : c.body();
+            return new Cap(c.name(), repair(body, owner, guarded, nullable, count, bound, loops));
+        } else if (ex instanceof Same s) {
+            return bound.contains(s.name()) ? s : new Lit("b");
+        }
+        return ex;
     }
 
     private static Ex consuming(boolean loops, Ex ex, boolean[] nullable) {
@@ -271,6 +275,24 @@ public final class GrammarGenerator {
         for (int i = 0; i < mutations; i++) {
             String base = bases.get(random.nextInt(bases.size()));
             result.add(mutate(base));
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Extra derivation groups {derivation, mutations...}. Derivations ignore lookahead and EOF
+     * constraints, so the harness keeps only groups whose derivation the Java parser accepts.
+     */
+    public List<List<String>> reserve(GrammarModel model, int groups, int mutations) {
+        int[] minimum = minimumLengths(model);
+        var result = new ArrayList<List<String>>();
+        for (int i = 0; i < groups; i++) {
+            var out = new StringBuilder();
+            derive(model, model.rules.get(0).body(), out, new HashMap<>(), 0, minimum);
+            var group = new ArrayList<String>();
+            group.add(out.toString());
+            for (int m = 0; m < mutations; m++) group.add(mutate(out.toString()));
+            result.add(List.copyOf(group));
         }
         return List.copyOf(result);
     }
@@ -305,17 +327,39 @@ public final class GrammarGenerator {
     }
 
     private static int minimum(Ex ex, int[] rules) {
-        return switch (ex) {
-            case Lit l -> l.text().codePointCount(0, l.text().length());
-            case Tok t -> t.token().nullable ? 0 : 1;
-            case Ref r -> rules[r.rule()];
-            case Seq s -> Math.min(1_000, s.items().stream().mapToInt(i -> minimum(i.ex(), rules)).sum());
-            case Alt a -> a.alternatives().stream().mapToInt(x -> minimum(x, rules)).min().orElse(0);
-            case Opt o -> 0;
-            case Rep r -> Math.min(1_000, r.min() * minimum(r.body(), rules));
-            case Sep s -> minimum(s.element(), rules);
-            case Cap c -> minimum(c.body(), rules);
-            case Same s -> 0;
+        if (ex instanceof Lit l) {
+            return l.text().codePointCount(0, l.text().length());
+        } else if (ex instanceof Tok t) {
+            return t.token().nullable ? 0 : 1;
+        } else if (ex instanceof Ref r) {
+            return rules[r.rule()];
+        } else if (ex instanceof Seq s) {
+            return Math.min(1_000, s.items().stream().mapToInt(i -> minimum(i.ex(), rules)).sum());
+        } else if (ex instanceof Alt a) {
+            return a.alternatives().stream().mapToInt(x -> minimum(x, rules)).min().orElse(0);
+        } else if (ex instanceof Opt o) {
+            return 0;
+        } else if (ex instanceof Rep r) {
+            return Math.min(1_000, r.min() * minimum(r.body(), rules));
+        } else if (ex instanceof Sep s) {
+            return minimum(s.element(), rules);
+        } else if (ex instanceof Cap c) {
+            return minimum(c.body(), rules);
+        } else if (ex instanceof Same s) {
+            return 0;
+        }
+        throw new AssertionError(ex);
+    }
+
+    private String tokenText(GrammarModel.Token token) {
+        return switch (token) {
+            case ID -> new String[] {"x", "ab", "q1", "_z"}[random.nextInt(4)];
+            case NUM -> new String[] {"7", "42"}[random.nextInt(2)];
+            case RANGE -> new String[] {"a", "b", "c"}[random.nextInt(3)];
+            case ANYC -> new String[] {"a", "😀", "é", ","}[random.nextInt(4)];
+            case NEG -> new String[] {"x", "😀", ","}[random.nextInt(3)];
+            case KW -> new String[] {"ab", "AB", "aB"}[random.nextInt(3)];
+            case AHEAD, NOTAHEAD, END -> "";
         };
     }
 
@@ -323,47 +367,38 @@ public final class GrammarGenerator {
         boolean shallow = depth > 6;
         // Grammars may have no finite derivation; long inputs only make backtracking slower.
         if (depth > 16 || out.length() > MAX_DERIVED_CHARS) return;
-        switch (ex) {
-            case Lit l -> out.append(l.text());
-            case Tok t -> out.append(switch (t.token()) {
-                case ID -> new String[] {"x", "ab", "q1", "_z"}[random.nextInt(4)];
-                case NUM -> new String[] {"7", "42"}[random.nextInt(2)];
-                case RANGE -> new String[] {"a", "b", "c"}[random.nextInt(3)];
-                case ANYC -> new String[] {"a", "😀", "é", ","}[random.nextInt(4)];
-                case NEG -> new String[] {"x", "😀", ","}[random.nextInt(3)];
-                case KW -> new String[] {"ab", "AB", "aB"}[random.nextInt(3)];
-                case AHEAD, NOTAHEAD, END -> "";
-            });
-            case Ref r -> derive(model, model.rules.get(r.rule()).body(), out, owned, depth + 1, min);
-            case Seq s -> {
-                var local = new HashMap<>(owned);
-                for (Item item : s.items()) derive(model, item.ex(), out, local, depth, min);
+        if (ex instanceof Lit l) {
+            out.append(l.text());
+        } else if (ex instanceof Tok t) {
+            out.append(tokenText(t.token()));
+        } else if (ex instanceof Ref r) {
+            derive(model, model.rules.get(r.rule()).body(), out, owned, depth + 1, min);
+        } else if (ex instanceof Seq s) {
+            var local = new HashMap<>(owned);
+            for (Item item : s.items()) derive(model, item.ex(), out, local, depth, min);
+        } else if (ex instanceof Alt a) {
+            Ex chosen = a.alternatives().get(random.nextInt(a.alternatives().size()));
+            if (shallow)
+                for (Ex x : a.alternatives()) if (minimum(x, min) < minimum(chosen, min)) chosen = x;
+            derive(model, chosen, out, owned, depth + 1, min);
+        } else if (ex instanceof Opt o) {
+            if (!shallow && random.nextBoolean()) derive(model, o.body(), out, owned, depth + 1, min);
+        } else if (ex instanceof Rep r) {
+            int count = r.min() + (shallow ? 0 : random.nextInt(3));
+            if (r.max() >= 0) count = Math.min(count, r.max());
+            for (int i = 0; i < count; i++) derive(model, r.body(), out, owned, depth + 1, min);
+        } else if (ex instanceof Sep s) {
+            int count = 1 + (shallow ? 0 : random.nextInt(3));
+            for (int i = 0; i < count; i++) {
+                if (i > 0) derive(model, s.separator(), out, owned, depth + 1, min);
+                derive(model, s.element(), out, owned, depth + 1, min);
             }
-            case Alt a -> {
-                Ex chosen = a.alternatives().get(random.nextInt(a.alternatives().size()));
-                if (shallow)
-                    for (Ex x : a.alternatives()) if (minimum(x, min) < minimum(chosen, min)) chosen = x;
-                derive(model, chosen, out, owned, depth + 1, min);
-            }
-            case Opt o -> { if (!shallow && random.nextBoolean()) derive(model, o.body(), out, owned, depth + 1, min); }
-            case Rep r -> {
-                int count = r.min() + (shallow ? 0 : random.nextInt(3));
-                if (r.max() >= 0) count = Math.min(count, r.max());
-                for (int i = 0; i < count; i++) derive(model, r.body(), out, owned, depth + 1, min);
-            }
-            case Sep s -> {
-                int count = 1 + (shallow ? 0 : random.nextInt(3));
-                for (int i = 0; i < count; i++) {
-                    if (i > 0) derive(model, s.separator(), out, owned, depth + 1, min);
-                    derive(model, s.element(), out, owned, depth + 1, min);
-                }
-            }
-            case Cap c -> {
-                int start = out.length();
-                derive(model, c.body(), out, owned, depth + 1, min);
-                owned.put(c.name(), out.substring(start));
-            }
-            case Same s -> out.append(owned.getOrDefault(s.name(), ""));
+        } else if (ex instanceof Cap c) {
+            int start = out.length();
+            derive(model, c.body(), out, owned, depth + 1, min);
+            owned.put(c.name(), out.substring(start));
+        } else if (ex instanceof Same s) {
+            out.append(owned.getOrDefault(s.name(), ""));
         }
     }
 
@@ -447,15 +482,13 @@ public final class GrammarGenerator {
 
     /** Bottom-up structural map. */
     private static Ex map(Ex ex, java.util.function.UnaryOperator<Ex> f) {
-        Ex rebuilt = switch (ex) {
-            case Seq s -> new Seq(s.items().stream().map(i -> new Item(map(i.ex(), f), i.field())).toList());
-            case Alt a -> new Alt(a.alternatives().stream().map(x -> map(x, f)).toList());
-            case Opt o -> new Opt(map(o.body(), f));
-            case Rep r -> new Rep(map(r.body(), f), r.min(), r.max());
-            case Sep s -> new Sep(map(s.element(), f), map(s.separator(), f));
-            case Cap c -> new Cap(c.name(), map(c.body(), f));
-            default -> ex;
-        };
+        Ex rebuilt = ex;
+        if (ex instanceof Seq s) rebuilt = new Seq(s.items().stream().map(i -> new Item(map(i.ex(), f), i.field())).toList());
+        else if (ex instanceof Alt a) rebuilt = new Alt(a.alternatives().stream().map(x -> map(x, f)).toList());
+        else if (ex instanceof Opt o) rebuilt = new Opt(map(o.body(), f));
+        else if (ex instanceof Rep r) rebuilt = new Rep(map(r.body(), f), r.min(), r.max());
+        else if (ex instanceof Sep s) rebuilt = new Sep(map(s.element(), f), map(s.separator(), f));
+        else if (ex instanceof Cap c) rebuilt = new Cap(c.name(), map(c.body(), f));
         return f.apply(rebuilt);
     }
 
@@ -463,76 +496,73 @@ public final class GrammarGenerator {
     static List<Ex> variants(Ex ex) {
         var out = new ArrayList<Ex>();
         // Local replacements.
-        switch (ex) {
-            case Lit l -> {
-                if (l.text().codePointCount(0, l.text().length()) > 1) out.add(new Lit(l.text().substring(0, l.text().offsetByCodePoints(0, 1))));
-                if (!l.text().equals("a")) out.add(new Lit("a"));
-            }
-            case Tok t -> out.add(new Lit("a"));
-            case Ref r -> out.add(new Lit("a"));
-            case Seq s -> {
-                for (int i = 0; i < s.items().size(); i++) {
-                    if (s.items().size() > 1) {
-                        var items = new ArrayList<>(s.items());
-                        items.remove(i);
-                        out.add(new Seq(items));
-                    }
-                    if (s.items().get(i).field() != null) {
-                        var items = new ArrayList<>(s.items());
-                        items.set(i, new Item(s.items().get(i).ex(), null));
-                        out.add(new Seq(items));
-                    }
+        if (ex instanceof Lit l) {
+            if (l.text().codePointCount(0, l.text().length()) > 1) out.add(new Lit(l.text().substring(0, l.text().offsetByCodePoints(0, 1))));
+            if (!l.text().equals("a")) out.add(new Lit("a"));
+        } else if (ex instanceof Tok t) {
+            out.add(new Lit("a"));
+        } else if (ex instanceof Ref r) {
+            out.add(new Lit("a"));
+        } else if (ex instanceof Seq s) {
+            for (int i = 0; i < s.items().size(); i++) {
+                if (s.items().size() > 1) {
+                    var items = new ArrayList<>(s.items());
+                    items.remove(i);
+                    out.add(new Seq(items));
                 }
-                if (s.items().size() == 1 && s.items().get(0).field() == null) out.add(s.items().get(0).ex());
-            }
-            case Alt a -> {
-                for (int i = 0; i < a.alternatives().size(); i++) {
-                    out.add(a.alternatives().get(i));
-                    if (a.alternatives().size() > 2) {
-                        var alternatives = new ArrayList<>(a.alternatives());
-                        alternatives.remove(i);
-                        out.add(new Alt(alternatives));
-                    }
+                if (s.items().get(i).field() != null) {
+                    var items = new ArrayList<>(s.items());
+                    items.set(i, new Item(s.items().get(i).ex(), null));
+                    out.add(new Seq(items));
                 }
             }
-            case Opt o -> out.add(o.body());
-            case Rep r -> {
-                out.add(r.body());
-                if (r.min() > 0 || r.max() >= 0) out.add(new Rep(r.body(), 0, -1));
+            if (s.items().size() == 1 && s.items().get(0).field() == null) out.add(s.items().get(0).ex());
+        } else if (ex instanceof Alt a) {
+            for (int i = 0; i < a.alternatives().size(); i++) {
+                out.add(a.alternatives().get(i));
+                if (a.alternatives().size() > 2) {
+                    var alternatives = new ArrayList<>(a.alternatives());
+                    alternatives.remove(i);
+                    out.add(new Alt(alternatives));
+                }
             }
-            case Sep s -> {
-                out.add(s.element());
-                out.add(new Rep(s.element(), 1, -1));
-            }
-            case Cap c -> out.add(c.body());
-            case Same s -> out.add(new Lit("a"));
+        } else if (ex instanceof Opt o) {
+            out.add(o.body());
+        } else if (ex instanceof Rep r) {
+            out.add(r.body());
+            if (r.min() > 0 || r.max() >= 0) out.add(new Rep(r.body(), 0, -1));
+        } else if (ex instanceof Sep s) {
+            out.add(s.element());
+            out.add(new Rep(s.element(), 1, -1));
+        } else if (ex instanceof Cap c) {
+            out.add(c.body());
+        } else if (ex instanceof Same s) {
+            out.add(new Lit("a"));
         }
         // Descendant replacements.
-        switch (ex) {
-            case Seq s -> {
-                for (int i = 0; i < s.items().size(); i++)
-                    for (Ex v : variants(s.items().get(i).ex())) {
-                        var items = new ArrayList<>(s.items());
-                        items.set(i, new Item(v, s.items().get(i).field()));
-                        out.add(new Seq(items));
-                    }
-            }
-            case Alt a -> {
-                for (int i = 0; i < a.alternatives().size(); i++)
-                    for (Ex v : variants(a.alternatives().get(i))) {
-                        var alternatives = new ArrayList<>(a.alternatives());
-                        alternatives.set(i, v);
-                        out.add(new Alt(alternatives));
-                    }
-            }
-            case Opt o -> variants(o.body()).forEach(v -> out.add(new Opt(v)));
-            case Rep r -> variants(r.body()).forEach(v -> out.add(new Rep(v, r.min(), r.max())));
-            case Sep s -> {
-                variants(s.element()).forEach(v -> out.add(new Sep(v, s.separator())));
-                variants(s.separator()).forEach(v -> out.add(new Sep(s.element(), v)));
-            }
-            case Cap c -> variants(c.body()).forEach(v -> out.add(new Cap(c.name(), v)));
-            default -> {}
+        if (ex instanceof Seq s) {
+            for (int i = 0; i < s.items().size(); i++)
+                for (Ex v : variants(s.items().get(i).ex())) {
+                    var items = new ArrayList<>(s.items());
+                    items.set(i, new Item(v, s.items().get(i).field()));
+                    out.add(new Seq(items));
+                }
+        } else if (ex instanceof Alt a) {
+            for (int i = 0; i < a.alternatives().size(); i++)
+                for (Ex v : variants(a.alternatives().get(i))) {
+                    var alternatives = new ArrayList<>(a.alternatives());
+                    alternatives.set(i, v);
+                    out.add(new Alt(alternatives));
+                }
+        } else if (ex instanceof Opt o) {
+            variants(o.body()).forEach(v -> out.add(new Opt(v)));
+        } else if (ex instanceof Rep r) {
+            variants(r.body()).forEach(v -> out.add(new Rep(v, r.min(), r.max())));
+        } else if (ex instanceof Sep s) {
+            variants(s.element()).forEach(v -> out.add(new Sep(v, s.separator())));
+            variants(s.separator()).forEach(v -> out.add(new Sep(s.element(), v)));
+        } else if (ex instanceof Cap c) {
+            variants(c.body()).forEach(v -> out.add(new Cap(c.name(), v)));
         }
         return out;
     }

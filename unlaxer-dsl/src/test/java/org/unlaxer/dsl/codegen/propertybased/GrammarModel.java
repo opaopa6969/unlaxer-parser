@@ -150,20 +150,28 @@ public final class GrammarModel {
     }
 
     private String atom(Ex ex) {
-        return switch (ex) {
-            case Lit l -> "'" + l.text() + "'";
-            case Tok t -> t.token().name();
-            case Ref r -> "R" + r.rule();
-            case Seq s -> s.items().size() == 1 && s.items().get(0).field() == null
-                    ? atom(s.items().get(0).ex())
-                    : "(" + sequence(s) + ")";
-            case Alt a -> "(" + body(a) + ")";
-            case Opt o -> "[" + body(o.body()) + "]";
-            case Rep r -> repeat(r);
-            case Sep s -> "(" + operand(s.element()) + " % " + operand(s.separator()) + ")";
-            case Cap c -> "CAPTURE(" + c.name() + ", " + body(c.body()) + ")";
-            case Same s -> "SAME_AS(" + s.name() + ")";
-        };
+        if (ex instanceof Lit l) {
+            return "'" + l.text() + "'";
+        } else if (ex instanceof Tok t) {
+            return t.token().name();
+        } else if (ex instanceof Ref r) {
+            return "R" + r.rule();
+        } else if (ex instanceof Seq s) {
+            return s.items().size() == 1 && s.items().get(0).field() == null ? atom(s.items().get(0).ex()) : "(" + sequence(s) + ")";
+        } else if (ex instanceof Alt a) {
+            return "(" + body(a) + ")";
+        } else if (ex instanceof Opt o) {
+            return "[" + body(o.body()) + "]";
+        } else if (ex instanceof Rep r) {
+            return repeat(r);
+        } else if (ex instanceof Sep s) {
+            return "(" + operand(s.element()) + " % " + operand(s.separator()) + ")";
+        } else if (ex instanceof Cap c) {
+            return "CAPTURE(" + c.name() + ", " + body(c.body()) + ")";
+        } else if (ex instanceof Same s) {
+            return "SAME_AS(" + s.name() + ")";
+        }
+        throw new AssertionError(ex);
     }
 
     /** Postfix and {@code %} operands must not themselves be postfix forms ({@code X+ % ','} is a syntax error). */
@@ -216,17 +224,19 @@ public final class GrammarModel {
 
     public static void walk(Ex ex, java.util.function.Consumer<Ex> visitor) {
         visitor.accept(ex);
-        switch (ex) {
-            case Seq s -> s.items().forEach(i -> walk(i.ex(), visitor));
-            case Alt a -> a.alternatives().forEach(x -> walk(x, visitor));
-            case Opt o -> walk(o.body(), visitor);
-            case Rep r -> walk(r.body(), visitor);
-            case Sep s -> {
-                walk(s.element(), visitor);
-                walk(s.separator(), visitor);
-            }
-            case Cap c -> walk(c.body(), visitor);
-            default -> {}
+        if (ex instanceof Seq s) {
+            s.items().forEach(i -> walk(i.ex(), visitor));
+        } else if (ex instanceof Alt a) {
+            a.alternatives().forEach(x -> walk(x, visitor));
+        } else if (ex instanceof Opt o) {
+            walk(o.body(), visitor);
+        } else if (ex instanceof Rep r) {
+            walk(r.body(), visitor);
+        } else if (ex instanceof Sep s) {
+            walk(s.element(), visitor);
+            walk(s.separator(), visitor);
+        } else if (ex instanceof Cap c) {
+            walk(c.body(), visitor);
         }
     }
 
@@ -246,18 +256,28 @@ public final class GrammarModel {
     }
 
     public static boolean nullable(Ex ex, boolean[] rules) {
-        return switch (ex) {
-            case Lit l -> l.text().isEmpty();
-            case Tok t -> t.token().nullable;
-            case Ref r -> rules[r.rule()];
-            case Seq s -> s.items().stream().allMatch(i -> nullable(i.ex(), rules));
-            case Alt a -> a.alternatives().stream().anyMatch(x -> nullable(x, rules));
-            case Opt o -> true;
-            case Rep r -> r.min() == 0 || nullable(r.body(), rules);
-            case Sep s -> nullable(s.element(), rules);
-            case Cap c -> nullable(c.body(), rules);
-            case Same s -> true; // conservative: the replayed text may be empty
-        };
+        if (ex instanceof Lit l) {
+            return l.text().isEmpty();
+        } else if (ex instanceof Tok t) {
+            return t.token().nullable;
+        } else if (ex instanceof Ref r) {
+            return rules[r.rule()];
+        } else if (ex instanceof Seq s) {
+            return s.items().stream().allMatch(i -> nullable(i.ex(), rules));
+        } else if (ex instanceof Alt a) {
+            return a.alternatives().stream().anyMatch(x -> nullable(x, rules));
+        } else if (ex instanceof Opt o) {
+            return true;
+        } else if (ex instanceof Rep r) {
+            return r.min() == 0 || nullable(r.body(), rules);
+        } else if (ex instanceof Sep s) {
+            return nullable(s.element(), rules);
+        } else if (ex instanceof Cap c) {
+            return nullable(c.body(), rules);
+        } else if (ex instanceof Same s) {
+            return true; // conservative: the replayed text may be empty
+        }
+        throw new AssertionError(ex);
     }
 
     /**
@@ -279,34 +299,42 @@ public final class GrammarModel {
     }
 
     private boolean valid(Ex ex, int owner, boolean guarded, boolean[] nullable, Set<String> bound) {
-        return switch (ex) {
-            case Lit l -> !l.text().isEmpty();
-            case Tok t -> true;
-            case Ref r -> r.rule() >= 0 && r.rule() < rules.size() && (r.rule() > owner || guarded);
-            case Seq s -> {
-                if (s.items().isEmpty()) yield false;
-                boolean g = guarded;
-                var local = new LinkedHashSet<>(bound);
-                for (Item item : s.items()) {
-                    if (!valid(item.ex(), owner, g, nullable, local)) yield false;
-                    if (item.ex() instanceof Cap c) local.add(c.name());
-                    g = g || !nullable(item.ex(), nullable);
-                }
-                yield true;
+        if (ex instanceof Lit l) {
+            return !l.text().isEmpty();
+        } else if (ex instanceof Tok t) {
+            return true;
+        } else if (ex instanceof Ref r) {
+            return r.rule() >= 0 && r.rule() < rules.size() && (r.rule() > owner || guarded);
+        } else if (ex instanceof Seq s) {
+            if (s.items().isEmpty()) return false;
+            boolean g = guarded;
+            var local = new LinkedHashSet<>(bound);
+            for (Item item : s.items()) {
+                if (!valid(item.ex(), owner, g, nullable, local)) return false;
+                if (item.ex() instanceof Cap c) local.add(c.name());
+                g = g || !nullable(item.ex(), nullable);
             }
-            case Alt a -> a.alternatives().size() >= 2
+            return true;
+        } else if (ex instanceof Alt a) {
+            return a.alternatives().size() >= 2
                     && a.alternatives().stream().allMatch(x -> valid(x, owner, guarded, nullable, bound));
-            case Opt o -> valid(o.body(), owner, guarded, nullable, bound);
-            case Rep r -> (nullableLoops || !nullable(r.body(), nullable))
+        } else if (ex instanceof Opt o) {
+            return valid(o.body(), owner, guarded, nullable, bound);
+        } else if (ex instanceof Rep r) {
+            return (nullableLoops || !nullable(r.body(), nullable))
                     && r.min() >= 0
                     && (r.max() < 0 || r.max() >= Math.max(1, r.min()))
                     && valid(r.body(), owner, guarded, nullable, bound);
-            case Sep s -> (nullableLoops || !nullable(s.element(), nullable) && !nullable(s.separator(), nullable))
+        } else if (ex instanceof Sep s) {
+            return (nullableLoops || !nullable(s.element(), nullable) && !nullable(s.separator(), nullable))
                     && valid(s.element(), owner, guarded, nullable, bound)
                     && valid(s.separator(), owner, guarded, nullable, bound);
-            case Cap c -> !(c.body() instanceof Cap) && valid(c.body(), owner, guarded, nullable, bound);
-            case Same s -> bound.contains(s.name());
-        };
+        } else if (ex instanceof Cap c) {
+            return !(c.body() instanceof Cap) && valid(c.body(), owner, guarded, nullable, bound);
+        } else if (ex instanceof Same s) {
+            return bound.contains(s.name());
+        }
+        throw new AssertionError(ex);
     }
 
     private boolean reachableAll() {
@@ -336,18 +364,16 @@ public final class GrammarModel {
     public Map<String, Integer> features() {
         var counts = new LinkedHashMap<String, Integer>();
         for (Rule r : rules) walk(r.body(), e -> {
-            String tag = switch (e) {
-                case Lit l -> "literal";
-                case Tok t -> t.token().nullable ? "lookahead/eof" : "token";
-                case Ref ref -> "reference";
-                case Seq s -> s.items().stream().anyMatch(i -> i.field() != null) ? "field-capture" : "sequence";
-                case Alt a -> "choice";
-                case Opt o -> "optional";
-                case Rep rep -> "repeat";
-                case Sep s -> "separated";
-                case Cap c -> "CAPTURE";
-                case Same s -> "SAME_AS";
-            };
+            String tag = e instanceof Lit ? "literal"
+                    : e instanceof Tok t ? (t.token().nullable ? "lookahead/eof" : "token")
+                    : e instanceof Ref ? "reference"
+                    : e instanceof Seq s ? (s.items().stream().anyMatch(i -> i.field() != null) ? "field-capture" : "sequence")
+                    : e instanceof Alt ? "choice"
+                    : e instanceof Opt ? "optional"
+                    : e instanceof Rep ? "repeat"
+                    : e instanceof Sep ? "separated"
+                    : e instanceof Cap ? "CAPTURE"
+                    : "SAME_AS";
             counts.merge(tag, 1, Integer::sum);
         });
         for (Rule r : rules) if (r.mapped()) counts.merge("@mapping", 1, Integer::sum);

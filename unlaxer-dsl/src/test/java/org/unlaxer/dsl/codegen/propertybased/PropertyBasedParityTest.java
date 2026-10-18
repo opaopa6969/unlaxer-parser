@@ -1,6 +1,7 @@
 package org.unlaxer.dsl.codegen.propertybased;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
@@ -35,7 +36,9 @@ public class PropertyBasedParityTest {
     static final long CI_FIRST_SEED = 1;
     static final int CI_GRAMMARS = 24;
     static final int CI_BATCH = 24;
-    static final int DERIVATIONS = 4, MUTATIONS = 7, LEFT_RECURSION_EVERY = 3;
+    static final int DERIVATIONS = 4, MUTATIONS = 7, LEFT_RECURSION_EVERY = 3, RESERVE_DERIVATIONS = 12;
+    /** Lower bound on seeds whose own generated inputs include an accepted one. */
+    static final int MIN_ACCEPTING_SEEDS_PERCENT = 60;
 
     private static long longProperty(String name, long fallback) {
         String value = System.getProperty(name);
@@ -63,6 +66,20 @@ public class PropertyBasedParityTest {
                 assertTrue("shrink never grows", candidate.size() <= ga.size());
             }
         }
+    }
+
+    @Test
+    public void knownDifferenceConditionOnlyMatchesTheTrackedShape() {
+        // #706: syntax failures on both sides, Java offset after the Rust offset.
+        assertTrue(KnownDifferences.javaSyntaxOffsetAfterRust(
+                "java={\"kind\":\"syntax\",\"offset\":2} rust={\"kind\":\"syntax\",\"offset\":1}"));
+        assertFalse(KnownDifferences.javaSyntaxOffsetAfterRust(
+                "java={\"kind\":\"syntax\",\"offset\":1} rust={\"kind\":\"syntax\",\"offset\":2}"));
+        assertFalse(KnownDifferences.javaSyntaxOffsetAfterRust(
+                "java={\"kind\":\"trailing_input\",\"offset\":2} rust={\"kind\":\"trailing_input\",\"offset\":1}"));
+        assertFalse(KnownDifferences.javaSyntaxOffsetAfterRust(
+                "java={\"kind\":\"syntax\",\"offset\":2} rust={\"kind\":\"trailing_input\",\"offset\":1}"));
+        assertFalse(KnownDifferences.javaSyntaxOffsetAfterRust("java=null rust={\"kind\":\"syntax\",\"offset\":1}"));
     }
 
     @Test
@@ -97,12 +114,17 @@ public class PropertyBasedParityTest {
             GrammarModel model = generator.grammar();
             String id = "seed-" + seed;
             models.put(id, model);
-            cases.add(ParityHarness.Case.of(id, model, generator.inputs(model, DERIVATIONS, MUTATIONS)));
+            var inputs = generator.inputs(model, DERIVATIONS, MUTATIONS);
+            cases.add(ParityHarness.Case.of(id, model, inputs, generator.reserve(model, RESERVE_DERIVATIONS, 2)));
             // 3. Every LEFT_RECURSION_EVERY-th seed also yields a left-recursive variant that both
             //    frontends must reject (generated grammars avoid the form by construction).
             if (seed % LEFT_RECURSION_EVERY == 0)
                 cases.add(ParityHarness.Case.rejected(id + "-left-recursive", GrammarGenerator.leftRecursive(model), "E-LEFT-RECURSION"));
         }
+        var gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+        Files.createDirectories(Path.of("target"));
+        var raw = new ArrayList<JsonObject>();
+        var pending = new ArrayList<Object[]>(); // {finding, case, entry}
         for (int from = 0; from < cases.size(); from += batch) {
             var slice = cases.subList(from, Math.min(cases.size(), from + batch));
             var findings = harness.evaluate(slice, stats);
@@ -116,27 +138,50 @@ public class PropertyBasedParityTest {
                 if (!seen.add(finding.caseId() + " " + finding.signature())) continue;
                 var c = caseOf(slice, finding.caseId());
                 var entry = corpusEntry(finding, c);
-                GrammarModel model = models.get(finding.caseId());
-                if (model != null && finding.input() != null && !Boolean.getBoolean("pbt.noShrink"))
-                    entry = new Shrinker(harness, known).shrink(finding, model, entry);
-                reported.add(entry);
+                raw.add(entry);
+                pending.add(new Object[] {finding, c, entry});
             }
+            // Written before any shrinking, so a CI timeout during shrinking still leaves evidence.
+            Files.writeString(Path.of("target/property-based-parity-raw.json"), gson.toJson(raw));
+        }
+        // Shrink a bounded number of representatives (distinct kinds first) within a time budget;
+        // the rest are reported unshrunk. Defaults keep a real discrepancy inside the CI job timeout.
+        int shrinkLimit = (int) longProperty("pbt.shrinkLimit", 3);
+        long shrinkDeadline = System.nanoTime() + longProperty("pbt.shrinkSeconds", 300) * 1_000_000_000L;
+        var order = new ArrayList<Object[]>();
+        var kinds = new java.util.HashSet<String>();
+        for (Object[] p : pending) if (kinds.add(((ParityHarness.Finding) p[0]).kind())) order.add(p);
+        for (Object[] p : pending) if (!order.contains(p)) order.add(p);
+        int shrunk = 0;
+        for (Object[] p : order) {
+            var finding = (ParityHarness.Finding) p[0];
+            var entry = (JsonObject) p[2];
+            GrammarModel model = models.get(finding.caseId());
+            if (model != null && finding.input() != null && !Boolean.getBoolean("pbt.noShrink")
+                    && shrunk < shrinkLimit && System.nanoTime() < shrinkDeadline) {
+                entry = new Shrinker(harness, known, shrinkDeadline).shrink(finding, model, entry);
+                shrunk++;
+            } else entry.addProperty("shrunk", false);
+            reported.add(entry);
+            Files.writeString(Path.of("target/property-based-parity.json"), gson.toJson(reported));
         }
         long seconds = (System.nanoTime() - started) / 1_000_000_000L;
         System.out.println("[pbt] seeds " + first + ".." + (first + grammars - 1) + " corpus=" + corpus.size()
-                + " " + stats + " excludedKnown=" + excluded + " findings=" + reported.size() + " seconds=" + seconds);
-        Files.createDirectories(Path.of("target"));
-        Files.writeString(Path.of("target/property-based-parity.json"),
-                new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(reported));
+                + " " + stats + " excludedKnown=" + excluded + " findings=" + reported.size() + " shrunk=" + shrunk
+                + " seconds=" + seconds);
+        Files.writeString(Path.of("target/property-based-parity.json"), gson.toJson(reported));
         Files.write(Path.of("target/property-based-parity-observations.jsonl"), stats.evidence);
         Files.writeString(Path.of("target/property-based-parity-stats.txt"), stats + "\nexcluded=" + excluded + "\nseconds=" + seconds + "\n");
         assertTrue("both hosts must exercise success memo replay", stats.javaSuccessHits > 0 && stats.rustSuccessHits > 0);
         assertTrue("both hosts must exercise failure memo replay", stats.javaFailureHits > 0 && stats.rustFailureHits > 0);
         assertTrue("most generated grammars must be accepted", stats.rejected * 4 <= stats.grammars);
         assertTrue("left-recursive variants must be rejected by both frontends", stats.rejectedAsExpected >= grammars / LEFT_RECURSION_EVERY);
-        assertTrue("some generated inputs must be accepted", stats.accepted > 0);
-        assertTrue("findings (minimized, corpus form) in target/property-based-parity.json:\n"
-                + new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(reported), reported.isEmpty());
+        // Corpus inputs do not count: generated inputs alone must reach accepted parses (AST, CST).
+        assertTrue("generated inputs must be accepted in at least " + MIN_ACCEPTING_SEEDS_PERCENT + "% of the seeds: "
+                        + stats.generatedAcceptingCases + "/" + grammars,
+                stats.generatedAcceptingCases * 100 >= (long) grammars * MIN_ACCEPTING_SEEDS_PERCENT);
+        assertTrue("known differences that excluded nothing are stale or too narrow: " + known.unused(), known.unused().isEmpty());
+        assertTrue("findings (minimized, corpus form) in target/property-based-parity.json:\n" + gson.toJson(reported), reported.isEmpty());
     }
 
     private static ParityHarness.Case caseOf(List<ParityHarness.Case> cases, String id) {

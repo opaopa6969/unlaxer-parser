@@ -16,10 +16,17 @@ final class Shrinker {
 
     private final ParityHarness harness;
     private final KnownDifferences known;
+    private final long deadlineNanos;
 
-    Shrinker(ParityHarness harness, KnownDifferences known) {
+    /** Stops between rounds once {@code deadlineNanos} ({@link System#nanoTime()}) has passed. */
+    Shrinker(ParityHarness harness, KnownDifferences known, long deadlineNanos) {
         this.harness = harness;
         this.known = known;
+        this.deadlineNanos = deadlineNanos;
+    }
+
+    private boolean expired() {
+        return System.nanoTime() > deadlineNanos;
     }
 
     JsonObject shrink(ParityHarness.Finding finding, GrammarModel model, JsonObject original) throws Exception {
@@ -31,7 +38,7 @@ final class Shrinker {
             input = shrunkInput.input();
             last = shrunkInput;
         }
-        for (int round = 0; round < MAX_ROUNDS; round++) {
+        for (int round = 0; round < MAX_ROUNDS && !expired(); round++) {
             List<GrammarModel> candidates = GrammarGenerator.shrinkGrammar(model);
             if (candidates.isEmpty()) break;
             candidates = candidates.subList(0, Math.min(MAX_CANDIDATES, candidates.size()));
@@ -52,7 +59,7 @@ final class Shrinker {
             model = candidates.get(bestIndex);
             last = best;
         }
-        shrunkInput = shrinkInput(model, input, kind);
+        shrunkInput = expired() ? null : shrinkInput(model, input, kind);
         if (shrunkInput != null) {
             input = shrunkInput.input();
             last = shrunkInput;
@@ -66,6 +73,8 @@ final class Shrinker {
         var inputs = new JsonArray();
         inputs.add(input);
         entry.add("inputs", inputs);
+        entry.addProperty("shrunk", true);
+        entry.addProperty("budgetExhausted", expired());
         entry.add("original", original);
         return entry;
     }
@@ -77,7 +86,7 @@ final class Shrinker {
     /** The finding for the shortest reproducing simplification, or null when none reproduces. */
     private ParityHarness.Finding shrinkInput(GrammarModel model, String input, String kind) throws Exception {
         ParityHarness.Finding best = null;
-        for (int round = 0; round < MAX_ROUNDS; round++) {
+        for (int round = 0; round < MAX_ROUNDS && !expired(); round++) {
             var candidates = GrammarGenerator.shrinkInput(input);
             if (candidates.isEmpty()) break;
             candidates = candidates.subList(0, Math.min(MAX_CANDIDATES, candidates.size()));

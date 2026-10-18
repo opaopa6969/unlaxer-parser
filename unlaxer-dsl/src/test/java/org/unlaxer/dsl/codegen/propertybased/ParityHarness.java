@@ -55,6 +55,7 @@ import javax.tools.SimpleJavaFileObject;
  * crate, so the expensive Rust compilation happens once per batch rather than once per grammar.
  */
 final class ParityHarness {
+    static final int RESERVE_GROUPS = 2;
     static final List<String> MEMO = List.of("OFF", "SAFE_FAILURES");
     static final List<String> DIAGNOSTICS = List.of("AUTO", "DETAILED", "DETAILED_ON_FAILURE");
     static final List<Boolean> RESET = List.of(false, true);
@@ -67,14 +68,32 @@ final class ParityHarness {
      * One grammar and its inputs. The grammar name and {@code @package} are replaced per batch,
      * so corpus entries can be replayed verbatim.
      */
-    record Case(String id, String grammar, List<String> inputs, Map<String, Integer> features, String expectedRejection) {
+    /**
+     * @param reserve extra derivation groups ({derivation, its mutations...}); the harness adds up to
+     *     {@link #RESERVE_GROUPS} groups whose derivation the Java parser accepts, so every seed has a
+     *     good chance to reach accepted parses although derivations ignore lookahead constraints.
+     */
+    record Case(String id, String grammar, List<String> inputs, Map<String, Integer> features, String expectedRejection,
+            List<List<String>> reserve) {
+        Case(String id, String grammar, List<String> inputs, Map<String, Integer> features, String expectedRejection) {
+            this(id, grammar, inputs, features, expectedRejection, List.of());
+        }
+
         static Case of(String id, GrammarModel model, List<String> inputs) {
-            return new Case(id, model.render("Pbt", "pbt.generated"), inputs, model.features(), null);
+            return of(id, model, inputs, List.of());
+        }
+
+        static Case of(String id, GrammarModel model, List<String> inputs, List<List<String>> reserve) {
+            return new Case(id, model.render("Pbt", "pbt.generated"), inputs, model.features(), null, reserve);
         }
 
         /** A grammar both frontends must reject with an error containing {@code code}. */
         static Case rejected(String id, GrammarModel model, String code) {
             return new Case(id, model.render("Pbt", "pbt.generated"), List.of(), Map.of(), code);
+        }
+
+        boolean generated() {
+            return !features.containsKey("corpus") && expectedRejection == null;
         }
 
         String rendered(String name, String pkg) {
@@ -116,6 +135,8 @@ final class ParityHarness {
         long slowestMillis;
         String slowest;
         long javaCompileMillis, rustCompileMillis, rustRunMillis, javaRunMillis;
+        /** Generated (non-corpus) cases with at least one accepted input. */
+        int generatedAcceptingCases;
         int grammars, rejected, rejectedAsExpected, inputs, observations, javaSuccessHits, javaFailureHits, rustSuccessHits, rustFailureHits, accepted;
         final Map<String, Integer> features = new java.util.TreeMap<>();
         /** Frontend rejection reasons of grammars both frontends rejected, by error code. */
@@ -126,7 +147,7 @@ final class ParityHarness {
         @Override
         public String toString() {
             return "grammars=" + grammars + " rejectedByBoth=" + rejected + " rejectedAsExpected=" + rejectedAsExpected + " inputs=" + inputs
-                    + " acceptedInputs=" + accepted + " observationsPerHost=" + observations
+                    + " acceptedInputs=" + accepted + " generatedAcceptingCases=" + generatedAcceptingCases + " observationsPerHost=" + observations
                     + " memoHits(java success/failure)=" + javaSuccessHits + "/" + javaFailureHits
                     + " memoHits(rust success/failure)=" + rustSuccessHits + "/" + rustFailureHits
                     + " millis(javac/rustc/rust-run/java-run)=" + javaCompileMillis + "/" + rustCompileMillis + "/" + rustRunMillis + "/" + javaRunMillis
@@ -257,12 +278,27 @@ final class ParityHarness {
         }
         if (stats != null) stats.rustCompileMillis += System.currentTimeMillis() - clock;
         try (URLClassLoader classes = loader) {
+            var apis = new LinkedHashMap<Prepared, JavaApi>();
+            var effective = new LinkedHashMap<Prepared, List<String>>();
+            for (Prepared p : prepared) {
+                var api = new JavaApi(classes, p.pkg(), p.name(), p.source());
+                apis.put(p, api);
+                var inputs = new java.util.LinkedHashSet<>(p.source().inputs());
+                int added = 0;
+                for (List<String> group : p.source().reserve()) {
+                    if (added == RESERVE_GROUPS) break;
+                    if (inputs.contains(group.get(0)) || !api.accepts(group.get(0))) continue;
+                    inputs.addAll(group);
+                    added++;
+                }
+                effective.put(p, List.copyOf(inputs));
+            }
             var stdin = new StringBuilder();
             int position = 0;
             for (Prepared p : prepared) {
                 String owned = String.join(",", p.source().ownedNames());
                 String fields = String.join(",", p.source().fieldNames());
-                for (String input : p.source().inputs())
+                for (String input : effective.get(p))
                     stdin.append(position).append('\t').append(HexFormat.of().formatHex(input.getBytes(StandardCharsets.UTF_8)))
                             .append('\t').append(owned.isEmpty() ? "-" : owned)
                             .append('\t').append(fields.isEmpty() ? "-" : fields).append('\n');
@@ -299,8 +335,9 @@ final class ParityHarness {
             int line = 0;
             position = 0;
             for (Prepared p : prepared) {
-                var api = new JavaApi(classes, p.pkg(), p.name(), p.source());
-                for (String input : p.source().inputs()) {
+                var api = apis.get(p);
+                boolean anyAccepted = false;
+                for (String input : effective.get(p)) {
                     Map<String, JsonObject> java = new LinkedHashMap<>(), native_ = new LinkedHashMap<>();
                     for (String memo : MEMO)
                         for (String diagnostics : DIAGNOSTICS)
@@ -321,7 +358,10 @@ final class ParityHarness {
                     if (stats != null) {
                         stats.inputs++;
                         stats.observations += java.size();
-                        if (java.values().iterator().next().get("diag").isJsonNull()) stats.accepted++;
+                        if (java.values().iterator().next().get("diag").isJsonNull()) {
+                            stats.accepted++;
+                            anyAccepted = true;
+                        }
                         var row = new JsonObject();
                         row.addProperty("case", p.source().id());
                         row.addProperty("input", input);
@@ -331,6 +371,7 @@ final class ParityHarness {
                     }
                     compare(p.source().id(), input, java, native_, findings, stats);
                 }
+                if (stats != null && anyAccepted && p.source().generated()) stats.generatedAcceptingCases++;
                 position++;
             }
             if (stats != null) stats.javaRunMillis += System.currentTimeMillis() - clock;
@@ -401,6 +442,12 @@ final class ParityHarness {
             mapper = loader.loadClass(pkg + "." + name + "Mapper");
             rules.addAll(source.ruleNames());
             owned = source.ownedNames();
+        }
+
+        /** Full-input acceptance with default options (used only to pick reserve inputs). */
+        boolean accepts(String input) throws Exception {
+            return ((Optional<?>) mapper.getMethod("diagnose", String.class, ParseOptions.class)
+                    .invoke(null, input, ParseOptions.DEFAULT)).isEmpty();
         }
 
         JsonObject observe(String input, String memo, String diagnostics, boolean reset) throws Exception {
