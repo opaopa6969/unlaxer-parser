@@ -317,6 +317,10 @@ impl<'a> Plan<'a> {
         }
     }
     fn nested_atom(&self, a: &AtomicElement, depth: usize, out: &mut Vec<(usize, usize)>) {
+        // A transparent alias stands for its single body element, as in the nested lowering.
+        if let Some(element) = crate::nested_captures::inlined_alias(self.g, a) {
+            return self.nested_atom(element, depth, out);
+        }
         match &a.kind {
             ElementKind::OwnedCapture { body, .. }
             | ElementKind::CaptureScope(body)

@@ -1299,18 +1299,22 @@ impl Lowering<'_> {
             }
             let mut elements = Vec::new();
             for element in &sequence.elements {
-                let value = self.atomic(&element.element)?;
                 elements.push(if let Some(name) = &element.capture {
                     if self.nested_rule {
+                        // Nested captures lower transparent aliases as their single body element.
+                        let expanded =
+                            crate::nested_captures::expand_aliases(self.grammar, &element.element);
                         Expression::Capture {
                             name: name.clone(),
-                            expression: Box::new(crate::nested_captures::boundary(value)),
+                            expression: Box::new(crate::nested_captures::boundary(
+                                self.atomic(&expanded)?,
+                            )),
                         }
                     } else {
-                        capture(name, value)?
+                        capture(name, self.atomic(&element.element)?)?
                     }
                 } else {
-                    value
+                    self.atomic(&element.element)?
                 });
             }
             let mut value = if body.alternatives.len() > 1 && elements.len() == 1 {

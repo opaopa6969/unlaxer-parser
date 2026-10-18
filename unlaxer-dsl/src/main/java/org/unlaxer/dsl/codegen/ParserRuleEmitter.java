@@ -1019,6 +1019,9 @@ class ParserRuleEmitter {
             return new ElementModel.Boundary(boundary.kind(),child);
         }
         if (element instanceof SeparatedElement e) return new ElementModel.Boundary("LIST",new ElementModel.NestedSeparated(resolveNested(ctx,ruleName,e.element()),new ElementModel.Boundary("SEPARATOR",resolveFlatElement(ctx,ruleName,e.separator())),getChainClassName(ctx,ruleName)));
+        // A transparent alias stands for its single body element; its helpers stay registered under the alias rule.
+        var alias=NestedCaptures.inlinedAlias(ctx.grammar,element);
+        if (alias.isPresent()) return resolveNested(ctx,alias.get().name(),NestedCaptures.aliasElement(alias.get()));
         var plain=resolveFlatElement(ctx,ruleName,element);
         if (plain instanceof ElementModel.Captured c) plain=c.inner();
         return new ElementModel.Boundary("VALUE",plain);
