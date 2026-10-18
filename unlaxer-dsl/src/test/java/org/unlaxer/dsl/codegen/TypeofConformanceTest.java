@@ -229,6 +229,7 @@ public class TypeofConformanceTest {
                 "Rust oracle requires -DrustConformance=true",
                 Boolean.getBoolean("rustConformance"));
         var report = new ArrayList<String>(List.of("fixture\tinput\tmode\tstatus"));
+        var nativeReport = new ArrayList<String>(report);
         for (var fixture : corpus("generated")) {
             var row = fixture.getAsJsonObject();
             String source = row.get("grammar").getAsString();
@@ -254,6 +255,10 @@ public class TypeofConformanceTest {
                     Files.readString(FIXTURES.resolve("probe.rs.txt"))
                             .replace("/*METHODS*/", row.get("rustMethods").getAsString()));
             Files.writeString(
+                    dir.resolve("main-native.rs"),
+                    Files.readString(dir.resolve("main.rs"))
+                            .replace("mod generated;", "#[path = \"native/mod.rs\"] mod generated;"));
+            Files.writeString(
                     dir.resolve("Cargo.toml"),
                     "[package]\n"
                             + "name=\"typeof-probe\"\n"
@@ -262,6 +267,9 @@ public class TypeofConformanceTest {
                             + "[[bin]]\n"
                             + "name=\"probe\"\n"
                             + "path=\"main.rs\"\n"
+                            + "[[bin]]\n"
+                            + "name=\"probe-native\"\n"
+                            + "path=\"main-native.rs\"\n"
                             + "[dependencies]\n"
                             + "unlaxer-runtime={path=\""
                             + ROOT.resolve("rust/unlaxer-runtime")
@@ -295,22 +303,25 @@ public class TypeofConformanceTest {
                                                                                                     .UTF_8)))
                                             .toList())
                             + "\n";
-            var lines =
-                    run(List.of(target.resolve("debug/probe").toString()), inputs, 0)
-                            .lines()
-                            .toList();
-            assertEquals(row.getAsJsonArray("cases").size() * 6, lines.size());
-            for (int i = 0; i < lines.size(); i++) {
-                var input = row.getAsJsonArray("cases").get(i / 6).getAsJsonObject();
-                assertEquals(
-                        row.get("name") + "/" + input + "/" + (i % 6),
-                        input.get("expected"),
-                        JsonParser.parseString(lines.get(i)));
-                report.add(
-                        row.get("name") + "\t" + input.get("input") + "\t" + (i % 6) + "\tchecked");
+            for (String binary : List.of("probe", "probe-native")) {
+                var lines =
+                        run(List.of(target.resolve("debug/" + binary).toString()), inputs, 0)
+                                .lines()
+                                .toList();
+                assertEquals(row.getAsJsonArray("cases").size() * 6, lines.size());
+                for (int i = 0; i < lines.size(); i++) {
+                    var input = row.getAsJsonArray("cases").get(i / 6).getAsJsonObject();
+                    assertEquals(
+                            row.get("name") + "/" + binary + "/" + input + "/" + (i % 6),
+                            input.get("expected"),
+                            JsonParser.parseString(lines.get(i)));
+                    (binary.equals("probe") ? report : nativeReport).add(
+                            row.get("name") + "\t" + input.get("input") + "\t" + (i % 6) + "\tchecked");
+                }
             }
         }
         Files.write(Path.of("target/typeof-conformance.tsv"), report);
+        Files.write(Path.of("target/typeof-conformance-native.tsv"), nativeReport);
     }
 
     @Test
