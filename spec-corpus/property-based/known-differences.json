@@ -1,0 +1,10 @@
+[
+  {
+    "id": "positive-lookahead-diagnostic-offset",
+    "issue": "#706",
+    "reason": "After a positive LOOKAHEAD token advances the matched cursor, Java diagnose reports the following failure at the matched reach and Rust at the consumed cursor. Acceptance, cursors, CST and AST agree. Only the diagnostic offset of the same failure kind is excluded, and only for grammars with a positive LOOKAHEAD token.",
+    "kind": "java-rust:diag",
+    "grammar": "(?<!NEGATIVE_)LOOKAHEAD\\(",
+    "detail": "^java=\\{\"kind\":\"(\\w+)\",\"offset\":\\d+\\} rust=\\{\"kind\":\"\\1\",\"offset\":\\d+\\}$"
+  }
+]

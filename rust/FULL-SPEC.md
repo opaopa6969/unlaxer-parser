@@ -11,6 +11,7 @@
 - 「生成済み」は現在の限定UBNFから生成・コンパイル・実行できる範囲。「runtimeのみ」は手書きAPIで使えるがUBNF経路は未対応。「未対応」は今後の作業で、対応済みとして数えない。
 - 共通機能はJava/Rust双方で実装・検証する。片側だけの完了は共通機能の完了とせず、言語固有の表現差・制約を対応表とissueに残す。
 - 共通corpusは既存`evolution/conformance.json`の37入力×4段階、診断境界は`evolution/diagnostics.json`の8入力。full-spec用corpusは各行の拡張とともに追加する。現在の有限corpusは全言語の互換性証明ではない。
+- 人が書いたcorpusに加え、seed付きで生成した文法・入力によるproperty-based差分テスト（#705、[docs](../docs/property-based-testing.md)）を検証手段に使う。Java/native Rustの受理・2つのcursor・rule CSTとspan・`diagnose`の失敗CP位置・`@mapping` AST、memo/診断/cursor reset設定間の一致、rollback・span・決定性・原文再構成の不変条件、Java host/native生成物のbyte一致、左再帰の両frontend拒否を確かめる。CIは固定seed `1..24`。生成対象外の構文は個別corpusが扱い、期待候補文字列の表現差は比べない。見つかった差は個別issue（#706）と`spec-corpus/property-based/`に固定する。全言語互換の証明ではない。
 
 ## 二つの対応軸
 
