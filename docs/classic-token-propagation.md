@@ -105,8 +105,7 @@ Rust `ParseError` and resource failures restore owned state; the existing Rust
 contract still requires discarding a context after a panicking callback. Neither
 runtime rolls back arbitrary external I/O.
 
-The broader #545 acceptance audit remains open. Its generated UBNF connection
-now uses [general owned capture/replay syntax](general-owned-capture-syntax.md)
+The generated UBNF connection uses [general owned capture/replay syntax](general-owned-capture-syntax.md)
 (#591), including [nested fields](typed-nested-captures.md). The
 [prior-matched diagnostic contract](prior-matched-diagnostics.md) compares matching
 Classic and legacy TokenExpr boundaries and separately preserves native PEG's

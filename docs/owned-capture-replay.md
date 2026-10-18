@@ -62,4 +62,5 @@ lexical match; existing lexical `SCOPE` starts an isolated empty environment.
 The runtime unit #590 is connected to general rule expressions by #591:
 `CAPTURE`, `SAME_AS` and `CAPTURE_SCOPE` generate from both hosts. See the
 [syntax and generated-consumer contract](general-owned-capture-syntax.md).
-Completion of the broader #572 / #545 work still requires its remaining checks.
+Acceptance of the broader #572 / #545 work is recorded in those issues; this document
+states the runtime contract only.

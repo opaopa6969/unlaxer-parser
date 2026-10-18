@@ -15,7 +15,7 @@ Java 21.0.9 / Rust 1.85.0 で同じ原文・独立期待値を使って現行 AP
 この文書のfixtureと観測は上記監査revisionのものとして保持する。
 後続#571ではRust `.match_only()` と `parse_with_token_mode` による任意childのClassic入口を追加した。
 現在のAPI選択には[一般Classic伝播](classic-token-propagation.md)を参照する。
-純PEG `ahead()` とClassic match-onlyの契約は引き続き異なり、旧入口の診断frontier差は#545で追跡する。
+純PEG `ahead()` とClassic match-onlyの契約は引き続き異なり、旧入口の診断frontier差は[入口ごとの共通oracle](prior-matched-diagnostics.md)（#655）で検証する。
 
 ## 使い分け
 
@@ -79,7 +79,7 @@ source span は半開区間で、Java の source-local index をそのまま原�
 
 この監査時点では新しい wrapper API は追加しなかった。後続 #545 で Java の
 明示 opt-in `PegLookahead` と共通 fixture を追加した。Rust の一般 `JavaMatchOnly`
-相当と consume/invert 伝播は後続 #571 で接続した。replay は #572 で別に追跡する。
+相当と consume/invert 伝播は後続 #571 で接続した。replay は #572 の [owned capture/replay](owned-capture-replay.md)（#590 / #591）で対応した。
 先行 matched を含む診断は [入口ごとの共通 oracle](prior-matched-diagnostics.md) で検証し、
 Classic と native PEG の source frontier を混同しない。
 既存 API を黙って同一化すると token を利用する Java caller や、非消費を前提とする
