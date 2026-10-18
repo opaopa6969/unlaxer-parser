@@ -1194,8 +1194,9 @@ public class UBNFMapper {
             var bodies = findDescendants(call, UBNFParsers.ChoiceBodyParser.class);
             List<String> names = findOutsideBodies(call, UBNFParsers.IdentifierParser.class).stream()
                 .map(name -> name.source.toString().trim()).toList();
-            return new UBNFAST.CatchElement(new GroupElement(toChoiceBody(bodies.get(0))),
-                new GroupElement(toChoiceBody(bodies.get(1))), names);
+            // Each synthetic operand group shares its body's source span.
+            return new UBNFAST.CatchElement(bind(new GroupElement(toChoiceBody(bodies.get(0))), bodies.get(0)),
+                bind(new GroupElement(toChoiceBody(bodies.get(1))), bodies.get(1)), names);
         }
         // GroupElement
         List<Token> groupTokens = findAtElementLevel(token, UBNFParsers.GroupElementParser.class);
