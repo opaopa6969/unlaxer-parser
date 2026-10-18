@@ -148,17 +148,17 @@ public class JavaApiSchemaTest {
             new String[]{"""
                 @root @mapping(Foo) Root ::= 'x';
                 @enum Foo ::= 'on' | 'off';
-                """, "duplicate generated node: Foo"},
+                """, "enum type name collision: Foo"},
             new String[]{"""
                 @root @mapping(Value) Root ::= 'x';
                 @enum Mode ::= 'on' | 'ON';
-                """, "duplicate generated variant: Mode.ON"}
+                """, "enum constant name collision: ON"}
         )) {
             String source = "grammar Ambiguous {\n" + caseAndCode[0] + "\n}";
             try {
                 JavaApiSchema.build(UBNFMapper.parseWithSource(source));
                 fail("expected schema failure: " + caseAndCode[1]);
-            } catch (IllegalStateException error) {
+            } catch (IllegalArgumentException | IllegalStateException error) {
                 assertTrue(error.getMessage(), error.getMessage().contains(caseAndCode[1]));
             }
         }
