@@ -25,7 +25,9 @@ manual evaluator は nested 集約値全体を受け取る。Rust は `&Option<V
 
 `spec-corpus/nested-mapped-leaves/` と `NestedMappedCaptureConformanceTest` は Java21 / Rust1.85 で両 frontend の Rust 出力 byte 一致、実 compile/map/manual eval、型 schema / impact を検証する。手書き oracle は optional/list の順序・有無・空値、子 AST の CP span と保持 source map、enum 出現境界、同 CP の別 node、scalar preferred、有限の自己再帰 mapped node、mapped family と dotted family の `commonField` 呼出し、preferred 候補の順序・深さ・位置を含む。
 
-## #583 に残る範囲
+## この単位の範囲（#626 時点）
+
+現在の対応範囲は [typed nested capture の表](typed-nested-captures.md#nested-の対応範囲と拡張先)を参照する。
 
 - direct choice の mixed value 葉は [nested mixed values](nested-mixed-values.md) で対応する。unmapped rule alias / recursive helper を介した nested shape は引き続き早期拒否し、[separated list](nested-separated-captures.md) は #646 で対応する。
 - mapped / enum 葉を含む複数要素 group や choice は早期拒否する。直接参照した mapped sum rule が family node へ投影される経路は対応する。

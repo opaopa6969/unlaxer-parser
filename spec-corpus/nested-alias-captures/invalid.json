@@ -1,0 +1,121 @@
+[
+  {
+    "id": "recursive-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= A @value; A ::= ['a' A]; }",
+    "startCP": 55,
+    "endCP": 125,
+    "detail": "nested capture through recursive helper A is not supported"
+  },
+  {
+    "id": "mutual-recursive-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [A] @value; A ::= {B}; B ::= ['b' A]; }",
+    "startCP": 55,
+    "endCP": 127,
+    "detail": "nested capture through recursive helper A is not supported"
+  },
+  {
+    "id": "recursive-text-group",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ('(' E ')') @value; E ::= 'x' | '(' E ')'; }",
+    "startCP": 55,
+    "endCP": 135,
+    "detail": "nested capture through recursive helper E is not supported"
+  },
+  {
+    "id": "skip-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [S] @value; @skip S ::= 'a'; }",
+    "startCP": 55,
+    "endCP": 127,
+    "detail": "nested capture through @skip rule S is not supported"
+  },
+  {
+    "id": "annotated-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [W] @value; @whitespace W ::= {'a'}; }",
+    "startCP": 55,
+    "endCP": 127,
+    "detail": "nested capture through annotated helper W is not supported"
+  },
+  {
+    "id": "helper-capture",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [C] @value; C ::= 'a' @inner; }",
+    "startCP": 55,
+    "endCP": 127,
+    "detail": "nested capture through helper C with captures is not supported"
+  },
+  {
+    "id": "helper-owned-capture",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [C] @value; C ::= CAPTURE(word, 'a'); }",
+    "startCP": 55,
+    "endCP": 127,
+    "detail": "nested capture through helper C with captures is not supported"
+  },
+  {
+    "id": "mixed-choice-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [M] @value; M ::= 'x' | NUM; }",
+    "startCP": 110,
+    "endCP": 182,
+    "detail": "nested capture through mixed-choice helper M is not supported"
+  },
+  {
+    "id": "mixed-alternative-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [(A | Leaf)] @value; A ::= 'x'; @mapping(Leaf,params=[text]) Leaf ::= 'y' @text; }",
+    "startCP": 55,
+    "endCP": 136,
+    "detail": "mixed choice alternative through helper A is not supported"
+  },
+  {
+    "id": "container-choice-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= A @value; A ::= ['a'] | ['b']; }",
+    "startCP": 55,
+    "endCP": 125,
+    "detail": "choice with container alternatives is not supported yet (#693)"
+  },
+  {
+    "id": "multi-element-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= A @value; A ::= 'a' ['b']; }",
+    "startCP": 55,
+    "endCP": 125,
+    "detail": "multi-element container"
+  },
+  {
+    "id": "local-trivia-owner",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures @root @nestedCaptures @whitespace @mapping(Root,params=[value]) Root ::= [A] @value; A ::= {'a'}; }",
+    "startCP": 55,
+    "endCP": 139,
+    "detail": "nested capture through a helper under rule-local trivia is not supported"
+  },
+  {
+    "id": "mixed-sequence-alternative-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [ NUM | 'let' Id ] @value; Id ::= 'a' 'b'; }",
+    "startCP": 110,
+    "endCP": 197,
+    "detail": "mixed choice alternative through helper Id is not supported"
+  },
+  {
+    "id": "mixed-grouped-alternative-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= [ NUM | (Id) ] @value; Id ::= 'a'; }",
+    "startCP": 110,
+    "endCP": 193,
+    "detail": "mixed choice alternative through helper Id is not supported"
+  },
+  {
+    "id": "mixed-group-capture-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= ( NUM | (Id) ) @value; Id ::= 'a'; }",
+    "startCP": 110,
+    "endCP": 193,
+    "detail": "mixed choice alternative through helper Id is not supported"
+  },
+  {
+    "id": "field-order-recursive-first",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[z,a]) Root ::= R1 @z R2 @a; R1 ::= ['x' R1]; R2 ::= 'y' | NUM; }",
+    "startCP": 110,
+    "endCP": 181,
+    "detail": "nested capture through recursive helper R1 is not supported"
+  },
+  {
+    "id": "field-order-trivia-first",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @whitespace @mapping(Root,params=[z,a]) Root ::= [Q] @z R1 @a; Q ::= {'q'}; R1 ::= ['x' R1]; }",
+    "startCP": 110,
+    "endCP": 194,
+    "detail": "nested capture through a helper under rule-local trivia is not supported"
+  }
+]

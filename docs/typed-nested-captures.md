@@ -40,21 +40,62 @@ capture / typeof の準備走査も深さ 64 で停止し、schema 解析の再�
 
 実行時 snapshot は #609 の上限（深さ 256 未満、訪問数 65,536、保持 UTF-8 text 合計 2 MiB）を共有する。これらは source 全体・既存 CST・生成 AST を含めた全プロセスメモリの上限ではない。
 
-## #583 に残る範囲
+## 透過 rule alias
+
+capture 内の rule reference が `@mapping` / `@skip` / `@enum` を持たない規則を指すとき、その規則を透過 alias として扱い、body の形をそのまま field 型と値へ反映する。
+
+```ubnf
+@root @nestedCaptures @mapping(Root,params=[value])
+Root ::= '[' Items @value ']';
+Items ::= [ Many ];
+Many ::= { Glyph };
+Glyph ::= '😀' | 'a';
+```
+
+上の field は Java `Optional<List<String>>`、Rust `Option<Vec<String>>` で、`[ { Glyph } ]` を直接書いた場合と同じ型・値・原文 CP span・preferred candidate（Java wrapper depth を含む）を返す。
+
+- body が 1 要素の alias は、その要素を参照位置に書いたものとして nested path を下る（Java `ParserRuleEmitter.resolveNested`、Rust 両 host の lowering、両 host の preferred plan が同じ規則で展開する）。多段 alias も同様に展開する。この位置では alias 規則自身の CST node は作らない。alias の内側の複数要素 group / choice の helper は従来どおり alias 規則の parser として残る。
+- body が choice または複数要素 sequence の alias は、展開せず一つの葉として扱う。形は body から決まり（text / i32 の choice や scalar の並び）、値はその規則 token の原文である。
+- flat capture の「unmapped text alias は text のまま」という契約は変えない。nested では透過性を優先するため、`Cell ::= [NUM]` 経由の葉は直接書いた場合と同じ i32 になる。
+- alias 展開も schema 解析の深さ 32 に数える（`spec-corpus/nested-alias-captures/depth-boundaries.json`）。
+- alias の形は規則と深さごとに memo する。共有される複数要素 helper を何段重ねても検証は helper 規則数に比例する時間で終わる。
+- capture の外にある choice の mixed 判定（Java `CaptureBindingPlan.markNestedMixed`、Rust lowering）は、helper 参照を含む choice を従来どおり mixed と見なさない。既存の受理済み文法の生成物は変わらない。
+- 複数 field の検査は両 host とも mapping params の順、次に `@typeof` capture の出現順で行うので、最初に報告される拒否理由も一致する。
+
+次の形は Java・Java host の Rust 生成・native Rust が同じ `E-NESTED-SHAPE`、同じ規則 CP 範囲、同じ説明文で生成前に拒否する。
+
+| 形 | 説明文 |
+| --- | --- |
+| 循環する helper（直接・相互再帰、text だけの再帰 group も含む） | `nested capture through recursive helper X is not supported` |
+| `@skip` 規則 | `nested capture through @skip rule X is not supported` |
+| `@doc` 以外の annotation を持つ helper（rule-local trivia 等で host 間の意味が変わり得るため） | `nested capture through annotated helper X is not supported` |
+| AST capture / `@typeof` / `CAPTURE` / `CAPTURE_SCOPE` / `SAME_AS` を含む helper | `nested capture through helper X with captures is not supported` |
+| body が mixed choice（text と i32、node 等）になる helper | `nested capture through mixed-choice helper X is not supported` |
+| mixed choice の alternative の中（直接・group 内・複数要素の一部）に helper 参照がある | `mixed choice alternative through helper X is not supported` |
+| `@whitespace` / `@interleave` を持つ owner 規則での alias 展開 | `nested capture through a helper under rule-local trivia is not supported` |
+
+共通 oracle は `spec-corpus/nested-alias-captures/`、検査は `NestedAliasCaptureConformanceTest`（`-DrustConformance=true`）である。
+
+## nested の対応範囲と拡張先
 
 | 組合せ | 状態 |
 | --- | --- |
 | text / i32 の直接 optional/list/group と manual evaluator | 本単位で両言語対応 |
 | 直接 mapped node / enum の再帰 container | 後続 #626 で対応。[契約と検証範囲](nested-mapped-leaves.md)参照 |
-| mixed value の再帰 container | #653 で直接 scalar choice の text/i32/node/enum を保持する専用 sum を生成。[型・CP・DAP・separated 合成](nested-mixed-values.md)参照。container alternative の choice は未対応 |
-| 透過 rule alias / recursive helper を経由する container | 未対応、capture 内の rule reference を拒否 |
+| mixed value の再帰 container | #653 で直接 scalar choice の text/i32/node/enum を保持する専用 sum を生成。[型・CP・DAP・separated 合成](nested-mixed-values.md)参照。container alternative の choice は両版で位置付き拒否、拡張は #693 |
+| 非再帰の透過 rule alias を経由する container | 両版で対応。下記「透過 rule alias」参照 |
+| 循環（再帰）helper を経由する nested capture | 両版で位置付き拒否で確定（`nested capture through recursive helper X is not supported`） |
 | separated list | #646 で対応。[型・値・separator 境界の契約](nested-separated-captures.md)参照 |
 | 同一 mapping 型を共有する複数規則 | #637 で全 recursive shape / nominal leaf / opt-in が一致する場合に対応 |
-| nested family の `@commonField` | #637 で nested field の実 accessor と、field を持たない mapped sum の opt-in を検証 |
+| nested family の `@commonField` | #637 で nested field の実 accessor と、field を持たない mapped sum の opt-in を検証。field を持つ nested owner 自身の `@commonField`（grouped sum owner）は両版で位置付き拒否、拡張は #697 |
 | nested 規則の `@typeof` | #660で既存の浅い意味型比較へ接続。[private/forward・空位置・shared/mixed](nested-typeof.md)参照 |
-| nested 規則の associative projection / `@eval` | 未対応、明示拒否 |
-| token-stream と nested の併用 | 未対応、明示拒否 |
+| nested 規則の `@leftAssoc` / `@rightAssoc` | 両版で位置付き拒否、拡張は #695 |
+| nested 所有規則自身の `@eval`（literal / passthrough / `strategy='manual'`） | 両版で位置付き拒否、拡張は #694。通常 leaf の auto-eval との合成は [nested-auto-eval](../spec-corpus/nested-auto-eval/README.md) で検証済み |
+| nested 所有規則の `@skip` / `@enum` | 公開 mapping / 列挙値と nested field が両立しないため、両版で位置付き拒否で確定 |
+| token-stream と nested の併用 | 両版で位置付き拒否、拡張は #696 |
 | nested 値を扱う family commonField / preferred snapshot | #626 で直接 mapped family 葉の commonField と preferred を実検証。全組合せは #583 に残す |
+
+上表の「位置付き拒否」は Java（`NestedCaptures`）・Java host の Rust 生成・native Rust（`nested_captures.rs`）が同じ `E-NESTED-SHAPE` code、同じ規則 CP 範囲、同じ説明文で生成前に拒否し、出力を書かないことを意味する。説明文には追跡 issue 番号を含め、`spec-corpus/typed-nested-captures/invalid.json` の `detail` で 3 経路の一致を検査する。今後の拡張は各子 issue で扱う。
 
 既存 preferred / flat AST family の契約は変更しない。新しい nested shape と全ての family / preferred / auto-eval 組合せの実用同等性は、この単位の検証だけで完了扱いにしない。
 

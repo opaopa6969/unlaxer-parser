@@ -1,0 +1,1147 @@
+[
+ {
+  "name": "AliasOptionalList",
+  "grammar": "grammar AliasOptionalList { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' Items @value ']'; Items ::= [ Many ]; Many ::= { Glyph }; Glyph ::= '😀' | 'a'; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "Optional<List<String>>"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Option<Vec<String>>"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "empty",
+    "input": "[]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      2
+     ],
+     "fields": {
+      "value": []
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       1
+      ],
+      "text": ""
+     }
+    ],
+    "structure": "some(list[])",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      2
+     ]
+    ],
+    "leaves": []
+   },
+   {
+    "id": "duplicates",
+    "input": "[😀a😀]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      5
+     ],
+     "fields": {
+      "value": [
+       "😀",
+       "a",
+       "😀"
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       4
+      ],
+      "text": "😀a😀"
+     }
+    ],
+    "structure": "some(list[text(f09f9880),text(61),text(f09f9880)])",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      5
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       1,
+       2
+      ],
+      "text": "😀"
+     },
+     {
+      "span": [
+       2,
+       3
+      ],
+      "text": "a"
+     },
+     {
+      "span": [
+       3,
+       4
+      ],
+      "text": "😀"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "AliasSeparatedIntegers",
+  "grammar": "grammar AliasSeparatedIntegers { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '(' Cells @value ')'; Cells ::= Cell % ','; Cell ::= [NUM]; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "List<Optional<Integer>>"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Vec<Option<i32>>"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "empty",
+    "input": "()",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      2
+     ],
+     "fields": {
+      "value": [
+       null
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       1
+      ],
+      "text": ""
+     }
+    ],
+    "structure": "list[none]",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      2
+     ]
+    ],
+    "leaves": []
+   },
+   {
+    "id": "missing",
+    "input": "(1,,23)",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      7
+     ],
+     "fields": {
+      "value": [
+       1,
+       null,
+       23
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       6
+      ],
+      "text": "1,,23"
+     }
+    ],
+    "structure": "list[some(int(1)),none,some(int(23))]",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      7
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       1,
+       2
+      ],
+      "text": "1"
+     },
+     {
+      "span": [
+       4,
+       6
+      ],
+      "text": "23"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "AliasGroupText",
+  "grammar": "grammar AliasGroupText { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '<' Pairs @value '>'; Pairs ::= { ('k' Accent) }; Accent ::= 'é'; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "List<String>"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Vec<String>"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "empty",
+    "input": "<>",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      2
+     ],
+     "fields": {
+      "value": []
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       1
+      ],
+      "text": ""
+     }
+    ],
+    "structure": "list[]",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      2
+     ]
+    ],
+    "leaves": []
+   },
+   {
+    "id": "two",
+    "input": "<kéké>",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      8
+     ],
+     "fields": {
+      "value": [
+       "ké",
+       "ké"
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       7
+      ],
+      "text": "kéké"
+     }
+    ],
+    "structure": "list[text(6b65cc81),text(6b65cc81)]",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      8
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       1,
+       4
+      ],
+      "text": "ké"
+     },
+     {
+      "span": [
+       4,
+       7
+      ],
+      "text": "ké"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "AliasNodeOptionalList",
+  "grammar": "grammar AliasNodeOptionalList { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' Items @value ']'; Items ::= [ Many ]; Many ::= {Leaf}; @mapping(Leaf,params=[text]) Leaf ::= '(' '😀' @text '\\r\\n' ')'; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "Optional<List<Leaf>>"
+   },
+   "Leaf": {
+    "text": "String"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Option<Vec<Box<Ast>>>"
+   },
+   "Leaf": {
+    "text": "String"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "2",
+    "input": "[]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      2
+     ],
+     "fields": {
+      "value": []
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       1
+      ],
+      "text": ""
+     }
+    ],
+    "structure": "some(list[])",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      2
+     ]
+    ],
+    "leaves": []
+   },
+   {
+    "id": "12",
+    "input": "[(😀\r\n)(😀\r\n)]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      12
+     ],
+     "fields": {
+      "value": [
+       {
+        "type": "Leaf",
+        "span": [
+         1,
+         6
+        ],
+        "fields": {
+         "text": "😀"
+        }
+       },
+       {
+        "type": "Leaf",
+        "span": [
+         6,
+         11
+        ],
+        "fields": {
+         "text": "😀"
+        }
+       }
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       11
+      ],
+      "text": "(😀\r\n)(😀\r\n)"
+     }
+    ],
+    "structure": "some(list[node(Leaf,text(f09f9880)),node(Leaf,text(f09f9880))])",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      12
+     ],
+     [
+      "Leaf",
+      7,
+      1,
+      6
+     ],
+     [
+      "Leaf",
+      7,
+      6,
+      11
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       1,
+       6
+      ],
+      "text": "(😀\r\n)"
+     },
+     {
+      "span": [
+       6,
+       11
+      ],
+      "text": "(😀\r\n)"
+     }
+    ]
+   }
+  ],
+  "mirrors": "nested-mapped-leaves/NodeOptionalList"
+ },
+ {
+  "name": "AliasEnumListOptional",
+  "grammar": "grammar AliasEnumListOptional { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' Modes @value ']'; Modes ::= { MaybeMode }; MaybeMode ::= [Mode]; @enum Mode ::= 'on' | '😀'; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "List<Optional<Mode>>"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Vec<Option<Mode>>"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "2",
+    "input": "[]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      2
+     ],
+     "fields": {
+      "value": [
+       null
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       1
+      ],
+      "text": ""
+     }
+    ],
+    "structure": "list[none]",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      2
+     ]
+    ],
+    "leaves": []
+   },
+   {
+    "id": "7",
+    "input": "[on😀on]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      7
+     ],
+     "fields": {
+      "value": [
+       "ON",
+       "U1F600_",
+       "ON",
+       null
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       6
+      ],
+      "text": "on😀on"
+     }
+    ],
+    "structure": "list[some(enum(Mode,ON)),some(enum(Mode,U1F600_)),some(enum(Mode,ON)),none]",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      7
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       1,
+       3
+      ],
+      "text": "on"
+     },
+     {
+      "span": [
+       3,
+       4
+      ],
+      "text": "😀"
+     },
+     {
+      "span": [
+       4,
+       6
+      ],
+      "text": "on"
+     }
+    ]
+   }
+  ],
+  "enumTypes": [
+   "Mode"
+  ],
+  "mirrors": "nested-mapped-leaves/EnumListOptional"
+ },
+ {
+  "name": "AliasNestedFamily",
+  "grammar": "grammar AliasNestedFamily { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' Items @value ']'; Items ::= [ {Item} ]; @mapping(Node) @commonField(text) Item ::= A | B; @mapping(A,params=[text]) A ::= 'a' @text; @mapping(B,params=[text]) B ::= '😀' @text; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "Optional<List<Node>>"
+   },
+   "A": {
+    "text": "String"
+   },
+   "B": {
+    "text": "String"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Option<Vec<Box<Ast>>>"
+   },
+   "A": {
+    "text": "String"
+   },
+   "B": {
+    "text": "String"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "commonField": "text",
+  "cases": [
+   {
+    "id": "[a😀]",
+    "input": "[a😀]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      4
+     ],
+     "fields": {
+      "value": [
+       {
+        "type": "A",
+        "span": [
+         1,
+         2
+        ],
+        "fields": {
+         "text": "a"
+        }
+       },
+       {
+        "type": "B",
+        "span": [
+         2,
+         3
+        ],
+        "fields": {
+         "text": "😀"
+        }
+       }
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       3
+      ],
+      "text": "a😀"
+     }
+    ],
+    "structure": "some(list[node(A,text(61)),node(B,text(f09f9880))])",
+    "leaves": [
+     {
+      "span": [
+       1,
+       2
+      ],
+      "text": "a"
+     },
+     {
+      "span": [
+       2,
+       3
+      ],
+      "text": "😀"
+     }
+    ],
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      4
+     ],
+     [
+      "A",
+      7,
+      1,
+      2
+     ],
+     [
+      "A",
+      8,
+      1,
+      2
+     ],
+     [
+      "B",
+      7,
+      2,
+      3
+     ],
+     [
+      "B",
+      8,
+      2,
+      3
+     ]
+    ]
+   }
+  ],
+  "mirrors": "nested-mapped-leaves/NestedFamily"
+ },
+ {
+  "name": "AliasTypeof",
+  "grammar": "grammar AliasTypeof { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' Items @value '|' @typeof(value) ['b'] @other ']'; Items ::= [ {'a'} ]; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "Optional<List<String>>"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Option<Vec<String>>"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "empty",
+    "input": "[|]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      3
+     ],
+     "fields": {
+      "value": []
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       1
+      ],
+      "text": ""
+     }
+    ],
+    "structure": "some(list[])",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      3
+     ]
+    ],
+    "leaves": []
+   },
+   {
+    "id": "present",
+    "input": "[aa|b]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      6
+     ],
+     "fields": {
+      "value": [
+       "a",
+       "a"
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       3
+      ],
+      "text": "aa"
+     }
+    ],
+    "structure": "some(list[text(61),text(61)])",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      6
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       1,
+       2
+      ],
+      "text": "a"
+     },
+     {
+      "span": [
+       2,
+       3
+      ],
+      "text": "a"
+     },
+     {
+      "span": [
+       4,
+       5
+      ],
+      "text": "b"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "AliasOwnedBounded",
+  "grammar": "grammar AliasOwnedBounded { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' CAPTURE(word, Smiles) @value ']'; Smiles ::= Smile{1,2}; Smile ::= '😀'; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "List<String>"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Vec<String>"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "one",
+    "input": "[😀]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      3
+     ],
+     "fields": {
+      "value": [
+       "😀"
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       2
+      ],
+      "text": "😀"
+     }
+    ],
+    "structure": "list[text(f09f9880)]",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      3
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       1,
+       2
+      ],
+      "text": "😀"
+     }
+    ]
+   },
+   {
+    "id": "two",
+    "input": "[😀😀]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      4
+     ],
+     "fields": {
+      "value": [
+       "😀",
+       "😀"
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       1,
+       3
+      ],
+      "text": "😀😀"
+     }
+    ],
+    "structure": "list[text(f09f9880),text(f09f9880)]",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      4
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       1,
+       2
+      ],
+      "text": "😀"
+     },
+     {
+      "span": [
+       2,
+       3
+      ],
+      "text": "😀"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "AliasScalar",
+  "grammar": "grammar AliasScalar { @package: org.example.nestedcaptures @root @nestedCaptures @mapping(Root,params=[value]) Root ::= A @value; A ::= '😀'; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "String"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "String"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "one",
+    "input": "😀",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      1
+     ],
+     "fields": {
+      "value": "😀"
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       0,
+       1
+      ],
+      "text": "😀"
+     }
+    ],
+    "structure": "text(f09f9880)",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      1
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       0,
+       1
+      ],
+      "text": "😀"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "DirectTrivia",
+  "grammar": "grammar DirectTrivia { @package: org.example.nestedcaptures @whitespace: javaStyle @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' [ { ('k' 'v') } ] @value ']'; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "Optional<List<String>>"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Option<Vec<String>>"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "spaced",
+    "input": "[ k v kv ]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      10
+     ],
+     "fields": {
+      "value": [
+       "k v ",
+       "kv "
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       2,
+       9
+      ],
+      "text": "k v kv "
+     }
+    ],
+    "structure": "some(list[text(6b207620),text(6b7620)])",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      10
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       2,
+       6
+      ],
+      "text": "k v "
+     },
+     {
+      "span": [
+       6,
+       9
+      ],
+      "text": "kv "
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "AliasTrivia",
+  "grammar": "grammar AliasTrivia { @package: org.example.nestedcaptures @whitespace: javaStyle @root @nestedCaptures @mapping(Root,params=[value]) Root ::= '[' Items @value ']'; Items ::= [ Many ]; Many ::= { ('k' 'v') }; }",
+  "javaFieldTypes": {
+   "Root": {
+    "value": "Optional<List<String>>"
+   }
+  },
+  "rustFieldTypes": {
+   "Root": {
+    "value": "Option<Vec<String>>"
+   }
+  },
+  "captureNames": [
+   "value"
+  ],
+  "cases": [
+   {
+    "id": "spaced",
+    "input": "[ k v kv ]",
+    "ast": {
+     "type": "Root",
+     "span": [
+      0,
+      10
+     ],
+     "fields": {
+      "value": [
+       "k v ",
+       "kv "
+      ]
+     }
+    },
+    "captures": [
+     {
+      "name": "value",
+      "span": [
+       2,
+       9
+      ],
+      "text": "k v kv "
+     }
+    ],
+    "structure": "some(list[text(6b207620),text(6b7620)])",
+    "preferred": [
+     [
+      "Root",
+      0,
+      0,
+      10
+     ]
+    ],
+    "leaves": [
+     {
+      "span": [
+       2,
+       6
+      ],
+      "text": "k v "
+     },
+     {
+      "span": [
+       6,
+       9
+      ],
+      "text": "kv "
+     }
+    ]
+   }
+  ]
+ }
+]

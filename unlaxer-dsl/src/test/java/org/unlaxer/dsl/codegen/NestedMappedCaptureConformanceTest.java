@@ -12,6 +12,8 @@ import org.unlaxer.dsl.codegen.CodeGenerator.GeneratedSource;
 public class NestedMappedCaptureConformanceTest extends NestedCaptureConformanceTest {
     @Override protected String corpusPath() { return "spec-corpus/nested-mapped-leaves/cases.json"; }
     @Override protected String reportName() { return "nested-mapped-leaves.tsv"; }
+    protected String invalidPath() { return "spec-corpus/nested-mapped-leaves/invalid.json"; }
+    protected String failuresPath() { return "spec-corpus/nested-mapped-leaves/failures.json"; }
     @Override protected String javaRelease() { return "21"; }
     @Override protected java.nio.file.Path nativeTarget() { return java.nio.file.Path.of("target/nested-mapped-native").toAbsolutePath(); }
     @Override protected List<GeneratedSource> extraJavaSources(GrammarDecl grammar) {
@@ -202,7 +204,7 @@ public class NestedMappedCaptureConformanceTest extends NestedCaptureConformance
     @org.junit.Test public void unsupportedShapesFailBeforeEmissionWithSourceOrigins() throws Exception {
         org.junit.Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
         success(run(List.of("cargo","build","--locked","--manifest-path",repo.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator","--target-dir",nativeTarget().toString()),"",false));
-        var corpus=com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(repo.resolve("spec-corpus/nested-mapped-leaves/invalid.json"))).getAsJsonArray();
+        var corpus=com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(repo.resolve(invalidPath()))).getAsJsonArray();
         for(var entry:corpus) {
             var row=entry.getAsJsonObject();String text=row.get("grammar").getAsString();
             org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot source;
@@ -213,21 +215,27 @@ public class NestedMappedCaptureConformanceTest extends NestedCaptureConformance
             var rule=grammar.rules().stream().filter(r->r.name().equals(diagnostic.rule())).findFirst().orElseThrow();
             var position=source.spanOf(rule).orElseThrow();
             assertEquals(row.get("startCP").getAsInt(),position.start());assertEquals(row.get("endCP").getAsInt(),position.end());
+            // Optional detail: the same text is reported by Java, Java-host Rust and native Rust.
+            String detail=row.has("detail")?row.get("detail").getAsString():"E-NESTED-SHAPE";
+            assertTrue(row.get("id").getAsString()+": "+diagnostic.message(),diagnostic.message().contains(detail));
             for(CodeGenerator generator:List.of(new ParserGenerator(),new ASTGenerator(),new MapperGenerator())) {
-                assertTrue(assertThrows(IllegalArgumentException.class,()->generator.generate(grammar)).getMessage().contains("E-NESTED-SHAPE"));
+                String message=assertThrows(IllegalArgumentException.class,()->generator.generate(grammar)).getMessage();
+                assertTrue(message,message.contains("E-NESTED-SHAPE") && message.contains(detail));
             }
-            assertTrue(assertThrows(IllegalArgumentException.class,()->new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar)).getMessage().contains("E-NESTED-SHAPE"));
+            String rustMessage=assertThrows(IllegalArgumentException.class,()->new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar)).getMessage();
+            assertTrue(rustMessage,rustMessage.contains("E-NESTED-SHAPE") && rustMessage.contains(detail));
             var directory=temporary.newFolder().toPath();var input=directory.resolve("invalid.ubnf");var output=directory.resolve("output");java.nio.file.Files.writeString(input,text);
             var nativeResult=run(List.of(nativeTarget().resolve("debug/unlaxer").toString(),"generate","--grammar",input.toString(),"--output",output.toString()),"",true);
             assertNotEquals(row.get("id").getAsString()+nativeResult.output(),0,nativeResult.code());
             assertTrue(nativeResult.output(),nativeResult.output().contains("E-NESTED-SHAPE"));
             assertTrue(nativeResult.output(),nativeResult.output().contains("at CP "+position.start()+".."+position.end()));
+            assertTrue(nativeResult.output(),nativeResult.output().contains(detail));
             assertFalse(java.nio.file.Files.exists(output));
         }
     }
     @org.junit.Test public void mappingFailuresAndParseRollbackKeepLaterConsumersUsable() throws Exception {
         org.junit.Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
-        var fixture=com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(repo.resolve("spec-corpus/nested-mapped-leaves/failures.json"))).getAsJsonObject();
+        var fixture=com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(repo.resolve(failuresPath()))).getAsJsonObject();
         var grammar=org.unlaxer.dsl.bootstrap.UBNFMapper.parse(fixture.get("grammar").getAsString()).grammars().get(0);
         var directory=temporary.newFolder().toPath();
         var runtime=directory.resolve("libunlaxer_runtime.rlib");
