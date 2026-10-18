@@ -8,9 +8,12 @@ type Result<T> = std::result::Result<T, Diagnostic>;
 pub(crate) fn parse(source: &str, tokens: Vec<Token>) -> Result<UbnfFile> {
     let mut parser = Parser {
         source,
+        parameterized: crate::params::prescan(&tokens),
         tokens,
         pos: 0,
         depth: 0,
+        calls: Vec::new(),
+        rule_params: Vec::new(),
     };
     let mut grammars = Vec::new();
     while parser.current().kind != Kind::Eof {
@@ -19,10 +22,14 @@ pub(crate) fn parse(source: &str, tokens: Vec<Token>) -> Result<UbnfFile> {
     if grammars.is_empty() {
         return Err(parser.error("expected at least one grammar"));
     }
-    Ok(UbnfFile {
-        grammars,
-        span: Span::default().through(parser.current().span),
-    })
+    let span = Span::default().through(parser.current().span);
+    // Expansion follows the complete syntax parse, as in the Java frontend.
+    let grammars = grammars
+        .into_iter()
+        .zip(std::mem::take(&mut parser.rule_params))
+        .map(|(grammar, params)| crate::params::expand(source, grammar, params, &parser.calls))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(UbnfFile { grammars, span })
 }
 
 struct Parser<'a> {
@@ -30,6 +37,10 @@ struct Parser<'a> {
     tokens: Vec<Token>,
     pos: usize,
     depth: usize,
+    /// Rules defined as `Name(params) ::=` anywhere in this file.
+    parameterized: std::collections::HashSet<String>,
+    calls: Vec<crate::params::Call>,
+    rule_params: Vec<Vec<Option<Vec<String>>>>,
 }
 
 impl Parser<'_> {
@@ -206,10 +217,14 @@ impl Parser<'_> {
             }))?);
         }
         let mut rules = Vec::new();
+        let mut rule_params = Vec::new();
         while !self.is('}') && self.current().kind != Kind::Eof {
-            rules.push(self.rule()?);
+            let (rule, params) = self.rule()?;
+            rules.push(rule);
+            rule_params.push(params);
         }
         self.expect('}')?;
+        self.rule_params.push(rule_params);
         Ok(GrammarDecl {
             name,
             imports,
@@ -521,25 +536,40 @@ impl Parser<'_> {
             )),
         }
     }
-    fn rule(&mut self) -> Result<RuleDecl> {
+    /// True when the current token is '(' immediately after the previous token.
+    fn adjacent_open(&self) -> bool {
+        self.is('(') && self.previous().byte_end == self.current().span.byte_start
+    }
+    fn rule(&mut self) -> Result<(RuleDecl, Option<Vec<String>>)> {
         let start = self.current().span;
         let mut annotations = Vec::new();
         while self.is('@') {
             annotations.push(self.annotation()?);
         }
         let name = self.identifier()?;
+        let params = if self.adjacent_open() {
+            self.pos += 1;
+            let params = self.identifiers()?;
+            self.expect(')')?;
+            Some(params)
+        } else {
+            None
+        };
         if self.current().kind != Kind::Define {
             return Err(self.error("expected ::="));
         }
         self.pos += 1;
         let body = self.body()?;
         self.expect(';')?;
-        Ok(RuleDecl {
-            annotations,
-            name,
-            body,
-            span: self.span_from(start),
-        })
+        Ok((
+            RuleDecl {
+                annotations,
+                name,
+                body,
+                span: self.span_from(start),
+            },
+            params,
+        ))
     }
     fn named_arg(&mut self, name: &str) -> Result<()> {
         self.word(name)?;
@@ -925,7 +955,48 @@ impl Parser<'_> {
         Ok(values)
     }
 
+    /// `Name(` where Name has a `Name(params) ::=` definition in this file. Builtin
+    /// spellings keep their own syntax; their definitions are rejected after parsing.
+    #[inline(never)]
+    fn at_parameterized_call(&self) -> bool {
+        matches!(&self.current().kind, Kind::Identifier(name)
+            if self.parameterized.contains(name)
+                && !matches!(name.as_str(), "CAPTURE" | "SAME_AS" | "CAPTURE_SCOPE" | "ERROR"))
+            && self.tokens.get(self.pos + 1).is_some_and(|t| {
+                t.kind == Kind::Symbol('(') && self.current().span.byte_end == t.span.byte_start
+            })
+    }
+
+    /// Kept out of `atomic` so its recursive frame does not grow (debug nesting budget).
+    #[inline(never)]
+    fn parameterized_call(&mut self) -> Result<AtomicElement> {
+        let start = self.current().span;
+        let name = self.identifier()?;
+        self.expect('(')?;
+        let mut args = vec![self.body()?];
+        while self.eat(',') {
+            args.push(self.body()?);
+        }
+        self.expect(')')?;
+        let index = self.calls.len();
+        self.calls.push(crate::params::Call {
+            name,
+            args,
+            span: self.span_from(start),
+        });
+        Ok(Spanned {
+            kind: ElementKind::RuleRef {
+                namespace: None,
+                name: crate::params::placeholder(index),
+            },
+            span: self.span_from(start),
+        })
+    }
+
     fn atomic(&mut self) -> Result<AtomicElement> {
+        if self.at_parameterized_call() {
+            return self.parameterized_call();
+        }
         let start = self.current().span;
         let owned_call = matches!(&self.current().kind, Kind::Identifier(name)
             if matches!(name.as_str(), "CAPTURE" | "SAME_AS" | "CAPTURE_SCOPE"))

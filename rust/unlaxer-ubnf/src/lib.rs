@@ -3,8 +3,10 @@ pub mod ast;
 mod codepoint_escapes;
 mod lexer;
 pub mod lexical;
+mod params;
 mod parser;
 pub use ast::*;
+pub use params::{MAX_EXPANDED_ELEMENTS, MAX_EXPANDED_NESTING};
 
 /// A finite recursion budget also bounds recursive AST destruction.
 pub const MAX_NESTING: usize = 128;

@@ -76,6 +76,9 @@ import org.unlaxer.parser.elementary.SingleQuotedParser;
 public class UBNFMapper {
 
     private final UBNFSourceSnapshot.Builder sourceSnapshot;
+    /** Side tables of parameterized rules (#701); calls are placeholders until expansion. */
+    private final List<ParameterizedRules.Call> calls = new ArrayList<>();
+    private final java.util.IdentityHashMap<RuleDecl, List<String>> ruleParams = new java.util.IdentityHashMap<>();
 
     private UBNFMapper(UBNFSourceSnapshot.Builder sourceSnapshot) {
         this.sourceSnapshot = sourceSnapshot;
@@ -107,7 +110,11 @@ public class UBNFMapper {
      * @throws IllegalArgumentException パースに失敗した場合、または入力全体を消費できなかった場合
      */
     public static UBNFFile parse(String source) {
-        return new UBNFMapper(null).parseInternal(source);
+        // Parameterized rules need positions for their diagnostics; every other
+        // grammar keeps the original position-free path.
+        java.util.Set<String> parameterized = ParameterizedRules.prescan(source);
+        return new UBNFMapper(parameterized.isEmpty() ? null : new UBNFSourceSnapshot.Builder(source))
+            .parseInternal(source, parameterized);
     }
 
     /**
@@ -117,16 +124,20 @@ public class UBNFMapper {
      */
     public static UBNFSourceSnapshot parseWithSource(String source) {
         UBNFSourceSnapshot.Builder builder = new UBNFSourceSnapshot.Builder(source);
-        UBNFFile ast = new UBNFMapper(builder).parseInternal(source);
+        UBNFFile ast = new UBNFMapper(builder).parseInternal(source, ParameterizedRules.prescan(source));
         builder.origins.put(ast, new UBNFSourceSnapshot.Origin(
             new UBNFSourceSnapshot.Span(0, source.codePointCount(0, source.length())),
             UBNFSourceSnapshot.Kind.SOURCE));
         return new UBNFSourceSnapshot(ast, builder);
     }
 
-    private UBNFFile parseInternal(String source) {
+    private UBNFFile parseInternal(String source, java.util.Set<String> parameterized) {
         StringSource stringSource = StringSource.createRootSource(source);
         try (ParseContext context = new ParseContext(stringSource)) {
+            if (!parameterized.isEmpty()) {
+                context.getGlobalScopeTreeMap().put(UBNFParsers.PARAMETERIZED_SYNTAX,
+                    new UBNFParsers.ParameterizedSyntax(java.util.Set.copyOf(parameterized), source.codePoints().toArray()));
+            }
             Parser rootParser = UBNFParsers.getRootParser();
             Parsed parsed = rootParser.parse(context);
             if (false == parsed.isSucceeded()) {
@@ -138,7 +149,8 @@ public class UBNFMapper {
                     + " に未消費の入力があります: "
                     + source.substring(consumed, Math.min(consumed + 80, source.length())));
             }
-            return toUBNFFile(parsed.getRootToken());
+            UBNFFile file = toUBNFFile(parsed.getRootToken());
+            return sourceSnapshot == null ? file : ParameterizedRules.expand(file, ruleParams, calls, sourceSnapshot);
         }
     }
 
@@ -623,7 +635,13 @@ public class UBNFMapper {
             ? new SequenceBody(List.of())
             : toChoiceBody(bodyTokens.get(0));
 
-        return new RuleDecl(annotations, name, body);
+        RuleDecl rule = new RuleDecl(annotations, name, body);
+        List<Token> parameterLists = findDescendants(token, UBNFParsers.RuleParameterListParser.class);
+        if (!parameterLists.isEmpty()) {
+            ruleParams.put(rule, findDescendants(parameterLists.get(0), UBNFParsers.IdentifierParser.class)
+                .stream().map(identifier -> identifier.source.toString().trim()).toList());
+        }
+        return rule;
     }
 
     // =========================================================================
@@ -1156,6 +1174,15 @@ public class UBNFMapper {
     }
 
     private AtomicElement mapAtomicElement(Token token) {
+        var parameterizedCalls = findAtElementLevel(token, UBNFParsers.ParameterizedCallElementParser.class);
+        if (!parameterizedCalls.isEmpty()) {
+            Token call = parameterizedCalls.get(0);
+            String name = findDescendants(call, UBNFParsers.ParameterizedRuleNameParser.class).get(0).source.toString().trim();
+            List<RuleBody> args = new ArrayList<>();
+            for (Token argument : findDescendants(call, UBNFParsers.ChoiceBodyParser.class)) args.add(toChoiceBody(argument));
+            calls.add(new ParameterizedRules.Call(name, List.copyOf(args)));
+            return new RuleRefElement(ParameterizedRules.placeholder(calls.size() - 1));
+        }
         var captures = findAtElementLevel(token, UBNFParsers.OwnedCaptureElementParser.class);
         if (!captures.isEmpty()) {
             Token call = captures.get(0);
@@ -1444,6 +1471,7 @@ public class UBNFMapper {
 
     private static boolean isAtomicElementParser(Class<?> clazz) {
         return clazz == UBNFParsers.OwnedCaptureElementParser.class
+            || clazz == UBNFParsers.ParameterizedCallElementParser.class
             || clazz == UBNFParsers.ReplayElementParser.class
             || clazz == UBNFParsers.CaptureScopeElementParser.class
             || clazz == UBNFParsers.GroupElementParser.class
