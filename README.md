@@ -167,6 +167,8 @@ The development branch adds [transactional `NonOrdered`](docs/nonordered-runtime
 
 Java also gains [explicit PEG assertions](docs/peg-assertions.md), matching the state rollback of Rust `ahead()` / `not_ahead()`. Classic match-only remains a separate contract; general consume/invert propagation, replay, and diagnostic-frontier gaps remain tracked in [#545](https://github.com/opaopa6969/unlaxer-parser/issues/545).
 
+The development branch also supports [Classic token-mode propagation](docs/classic-token-propagation.md) through general Rust expressions and custom parsers. The four kinds, inherited inversion, both cursors, and source projection are checked against Java. Capture/replay integration, external code-fence adapters, and observer exceptions remain tracked separately; this runtime slice does not complete parity.
+
 The development branch also adds [full semantic-token providers](docs/classic-rust-lsp.md) to Rust and validates the existing Java hook against the same protocol corpus. Both default to empty data; applications supply the token legend and encoded tokens. Range and delta requests remain unsupported. This is not included in 3.3.0.
 
 Java and Rust development runtimes provide [bounded snapshot and chunk caches](docs/incremental-cache.md). Generated LSP servers reuse complete unchanged snapshots and invalidate on edits, configuration and external-state revisions. Edited documents are reparsed in full; partial CST splicing is not implemented in either version. This addition is not included in 3.3.0.
