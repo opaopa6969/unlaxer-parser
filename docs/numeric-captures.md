@@ -62,6 +62,6 @@ and checks original source, CP spans, and snapshots after later failures.
 The common-field corpus also verifies borrowed integer family accessors.
 
 This is child #566 of #547. Preferred **AST candidate** selection is #567; it is
-not a numeric coercion setting. Outer nested containers and recursive unmapped
-helpers remain #568. Sum/dotted/associative family behavior beyond the common-field
-scope remains #569. Parent #547 stays open until all those contracts are complete.
+not a numeric coercion setting. Recursive unmapped helpers are covered by #582 and
+outer nested containers by #583 (parent #568). Sum/dotted/associative family behavior
+beyond the common-field scope is covered by #592 and #593 (parent #569).

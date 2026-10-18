@@ -42,8 +42,8 @@ Handwritten Java `NamedCapture` / `ReplayParser` and Rust `capture_owned` /
 `Expr::Replay` compose with lists: an empty bound replay is a successful empty
 item or separator, an unbound mandatory replay fails, and a failed unbound
 separator ends the tail. UBNF owned-capture syntax and its generated replay tests
-are tracked in [#591](https://github.com/opaopa6969/unlaxer-parser/issues/591).
-This list change does not introduce that syntax.
+are provided by [general owned capture syntax](general-owned-capture-syntax.md)
+(#591). The list progress rules above also apply to that generated entry.
 
 `spec-corpus/nullable-separation/cases.json` gives handwritten inputs and expected
 prefix success, code-point cursors and mapped items for real Java/Rust consumers.

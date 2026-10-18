@@ -3,7 +3,8 @@
 The first runtime slice of [#545](https://github.com/opaopa6969/unlaxer-parser/issues/545)
 adds an explicit Java counterpart to the existing Rust PEG assertion. It does
 not replace Classic `MatchOnly` or `Not`, change UBNF `LOOKAHEAD`, or complete the
-remaining consume/invert propagation and capture/replay work in that issue.
+consume/invert propagation and capture/replay work in that issue; those were
+completed later by #571 and #590 / #591.
 
 ```java
 Parser positive = new PegLookahead(child);

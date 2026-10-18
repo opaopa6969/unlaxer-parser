@@ -39,6 +39,6 @@ Java→Rust lowerer の共有 Field 合流では NestedShape を保持する。�
 
 両 host の portability check も `@nestedCaptures` を既知の annotation として扱う。対応する schema は `portable=true`、不正な nested shape は規則の CP 範囲を持つ `P-NESTED-SHAPE`、family 共通型の不一致は既存の `P-COMMONFIELD` となる。生成前診断の `E-*` と portability の `P-*` を区別する。他の未知 annotation の拒否は維持する。
 
-mixed 葉の追加対応は [nested mixed values](nested-mixed-values.md) を参照。本単位で unmapped alias / recursive helper 経由の shape、nested separated、typeof、auto-eval、associative projection、token-stream の残差を解消したことにはしない。親 #583/#568 は継続する。caller が改変した公開 CST の通常 mapper 防御は別 #635。
+[Nested separated](nested-separated-captures.md)、[mixed 葉](nested-mixed-values.md)、[公開 CST の mapper 防御](public-mapper-cst.md)は #646 / #653 / #635 で実装・共通検証を追加した。通常のauto-literal leafをnested ownerから評価する経路と、通常のauto-passthrough ownerからnested leafへ委譲する経路は[#673の共通consumer](../spec-corpus/nested-auto-eval/README.md)で値・callback順・CP・保持snapshotまで検証する。nested owner自身のauto-eval/associative/token-streamと、未対応のunmapped alias / recursive helper経由のshapeは両hostの生成前拒否を維持する。親 #583/#568の全体回帰・CI・mergeは別の完了条件である。
 
 `@typeof`との合成は [nested typeof](nested-typeof.md)（#660）で対応し、private localとshared constructor fieldの型・空値のCP位置を比較する。
