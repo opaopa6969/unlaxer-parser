@@ -15,7 +15,7 @@ Maven Central の 3.2.0 に以下の修正が含まれるという意味では�
 対象opt-in試験のskipなし実行、CI成功、各PRのmergeが必要である。
 ローカルの部分的な成功、待機中のCI、openのPRを全体完了の根拠にしない。
 
-[REGEX廃止](https://github.com/opaopa6969/unlaxer-parser/issues/612)はユーザー指定の開発版変更として追跡する。
+[REGEX廃止](regex-retirement.md)はユーザー指定の開発版変更であり、旧宣言には移行診断を返す。
 後段の#505は3.3.0の不具合修正履歴であり、今後Java Pattern互換エンジンを開発する計画ではない。
 公開済み成果物・署名・配布記録は保持する。
 

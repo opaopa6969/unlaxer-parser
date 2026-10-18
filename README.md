@@ -181,8 +181,6 @@ Downstream `tinyexpression-rs` and `rustcodeblock` AOT exist on the separate **u
 
 ---
 
-[Explicit nested capture boundaries](docs/nested-capture-boundaries.md) preserve missing optionals, present empty lists, order, duplicates, and owned source snapshots in both runtimes. This runtime API is a development addition; generated nested field types and mappers remain tracked in [#583](https://github.com/opaopa6969/unlaxer-parser/issues/583).
-
 ## 5-Minute Quick Start
 
 ### 1. Add Maven dependencies
