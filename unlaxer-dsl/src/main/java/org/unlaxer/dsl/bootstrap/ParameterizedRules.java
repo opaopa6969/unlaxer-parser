@@ -39,6 +39,10 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile;
  * ordinary zero-arity rules under a size limit. Existing validators run on the
  * expanded grammar only; checking the unexpanded grammar is unsound (lean4-peg CE-002:
  * {@code F(x) ::= x; S ::= F(S)}). See docs/parameterized-rules.md.
+ *
+ * <p>A value parameter {@code =p} (#704) is sugar over the existing owned captures: the
+ * instance body becomes {@code CAPTURE_SCOPE(CAPTURE(F(=p), arg) body)} and each use of
+ * {@code p} becomes {@code SAME_AS(F(=p))}. See docs/call-by-value-arguments.md.
  */
 public final class ParameterizedRules {
     /** Total atomic elements of all expanded instances (the generators' 65536-visit limit). */
@@ -52,10 +56,24 @@ public final class ParameterizedRules {
     static final Set<String> RESERVED = Set.of("CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "ERROR");
     /** NUL never occurs in an identifier, so no user reference can match a placeholder. */
     private static final String CALL_PREFIX = "\0call";
+    /** The hidden by-name parameter that carries a value argument into its CAPTURE. */
+    private static final String VALUE_PREFIX = "\0value";
 
     private ParameterizedRules() {}
 
     record Call(String name, List<RuleBody> args) {}
+
+    /** One declared parameter; {@code =name} declares a value parameter (#704). */
+    record Param(String name, boolean byValue) {}
+
+    /**
+     * The owned capture name of value parameter {@code param} of {@code rule}. It contains
+     * '(', '=' and ')', which no CAPTURE / SAME_AS name written in UBNF (an identifier) can
+     * contain, so expansion never shares a binding with a user capture of any grammar.
+     */
+    static String captureName(String rule, String param) {
+        return rule + "(=" + param + ")";
+    }
 
     static String placeholder(int index) { return CALL_PREFIX + index; }
 
@@ -177,6 +195,7 @@ public final class ParameterizedRules {
             int j = t + 2;
             boolean ok = true;
             while (true) {
+                if (j < tokens.size() && tokens.get(j)[0] == '=') j++;
                 if (j >= tokens.size() || tokens.get(j)[0] != 0) { ok = false; break; }
                 j++;
                 if (j < tokens.size() && tokens.get(j)[0] == ',') j++;
@@ -193,7 +212,7 @@ public final class ParameterizedRules {
     // Expansion
     // =========================================================================
 
-    static UBNFFile expand(UBNFFile file, IdentityHashMap<RuleDecl, List<String>> params,
+    static UBNFFile expand(UBNFFile file, IdentityHashMap<RuleDecl, List<Param>> params,
             List<Call> calls, UBNFSourceSnapshot.Builder origins) {
         if (calls.isEmpty() && params.isEmpty()) return file;
         List<GrammarDecl> grammars = new ArrayList<>();
@@ -217,10 +236,18 @@ public final class ParameterizedRules {
         return origins.derive(node, from, UBNFSourceSnapshot.Kind.SYNTHETIC);
     }
 
-    private record Def(int rule, List<String> params) {}
+    /**
+     * For a rule with value parameters, {@code captures} names each value parameter's
+     * binding (null for a by-name parameter) and {@code template} is the body
+     * {@code CAPTURE_SCOPE(CAPTURE(F(=p), <hidden p>) ... body)} that instances expand.
+     */
+    private record Def(int rule, List<String> params, List<String> captures, RuleBody template) {}
 
-    /** A substituted argument with its measured size and nesting (never re-walked). */
-    private record Rep(AtomicElement element, long size, long depth) {}
+    /**
+     * A substituted argument with its measured size and nesting (never re-walked).
+     * {@code atUse}: a value parameter's SAME_AS, which takes the origin of each use.
+     */
+    private record Rep(AtomicElement element, long size, long depth, boolean atUse) {}
 
     private static long saturating(long a, long b) {
         long sum = a + b;
@@ -230,7 +257,8 @@ public final class ParameterizedRules {
     private static final class Grammar {
         final GrammarDecl grammar;
         final List<RuleDecl> rules;
-        final IdentityHashMap<RuleDecl, List<String>> params;
+        final IdentityHashMap<RuleDecl, List<String>> params = new IdentityHashMap<>();
+        final IdentityHashMap<RuleDecl, List<Param>> declared;
         final List<Call> calls;
         final UBNFSourceSnapshot.Builder origins;
         final Map<String, Def> defs = new HashMap<>();
@@ -245,11 +273,15 @@ public final class ParameterizedRules {
         /** Rule bodies open in the expansion recursion, across instance boundaries. */
         int level;
 
-        Grammar(GrammarDecl grammar, IdentityHashMap<RuleDecl, List<String>> params, List<Call> calls,
+        Grammar(GrammarDecl grammar, IdentityHashMap<RuleDecl, List<Param>> declared, List<Call> calls,
                 UBNFSourceSnapshot.Builder origins) {
             this.grammar = grammar;
             this.rules = grammar.rules();
-            this.params = params;
+            this.declared = declared;
+            for (RuleDecl rule : rules) {
+                List<Param> list = declared.get(rule);
+                if (list != null) params.put(rule, list.stream().map(Param::name).toList());
+            }
             this.calls = calls;
             this.origins = origins;
         }
@@ -295,7 +327,14 @@ public final class ParameterizedRules {
                     if (tokens.contains(parameter) || ruleCounts.containsKey(parameter)) throw error(span(rule), "E-PARAM-SHADOW: parameter " + parameter + " of rule " + name
                         + " has the same name as a rule or token");
                 }
-                defs.put(name, new Def(index, list));
+                List<Param> parameters = declared.get(rule);
+                if (parameters.stream().anyMatch(Param::byValue)) {
+                    List<String> captures = new ArrayList<>();
+                    for (Param parameter : parameters) captures.add(parameter.byValue() ? captureName(name, parameter.name()) : null);
+                    defs.put(name, new Def(index, list, java.util.Collections.unmodifiableList(captures), valueTemplate(rule, captures)));
+                } else {
+                    defs.put(name, new Def(index, list, null, null));
+                }
             }
             known.addAll(tokens);
             for (RuleDecl rule : rules) known.add(rule.name());
@@ -480,6 +519,8 @@ public final class ParameterizedRules {
                     return copy(origins, new RuleRefElement(instance(call.name(), args, span(ref))), ref);
                 }
                 Rep replacement = env.get(ref.name());
+                if (replacement != null && replacement.atUse())
+                    return synthetic(origins, new ReplayElement(((ReplayElement) replacement.element()).name()), ref);
                 return replacement != null ? replacement.element() : ref;
             }
             if (element instanceof GroupElement group) {
@@ -544,9 +585,18 @@ public final class ParameterizedRules {
             for (int i = 0; i < args.size(); i++) {
                 AtomicElement element = replacement(args.get(i));
                 long[] measured = measureAtomic(element, Map.of());
-                env.put(def.params().get(i), new Rep(element, measured[0], measured[1]));
+                Rep argument = new Rep(element, measured[0], measured[1], false);
+                String capture = def.captures() == null ? null : def.captures().get(i);
+                if (capture == null) {
+                    env.put(def.params().get(i), argument);
+                } else {
+                    // The argument goes into the CAPTURE; every use of the parameter replays it.
+                    env.put(VALUE_PREFIX + i, argument);
+                    env.put(def.params().get(i), new Rep(new ReplayElement(capture), 1, 0, true));
+                }
             }
-            long[] measured = measureBody(rule.body(), env);
+            RuleBody template = def.template() == null ? rule.body() : def.template();
+            long[] measured = measureBody(template, env);
             long inline = level + measured[1];
             if (inline > MAX_EXPANDED_NESTING) throw error(at, "E-PARAM-LIMIT: expansion of rule " + callee
                 + " nests " + inline + " levels; the limit is " + MAX_EXPANDED_NESTING);
@@ -555,9 +605,39 @@ public final class ParameterizedRules {
             names.add(name);
             int slot = instances.size();
             instances.add(null);
-            RuleBody body = body(rule.body(), env);
+            RuleBody body = body(template, env);
             instances.set(slot, synthetic(origins, new RuleDecl(List.of(), name, body), rule));
             return name;
+        }
+
+        /**
+         * {@code CAPTURE_SCOPE(CAPTURE(F(=p), <hidden p>) ... body)}, written once per definition
+         * so that measuring and expanding an instance treat it as an ordinary body (as in Rust).
+         * A one-alternative body is spliced after the captures, a choice is grouped. Every
+         * synthetic node takes the definition body's span with a SYNTHETIC origin.
+         */
+        RuleBody valueTemplate(RuleDecl rule, List<String> captures) {
+            RuleBody from = rule.body();
+            List<AnnotatedElement> elements = new ArrayList<>();
+            for (int i = 0; i < captures.size(); i++) {
+                if (captures.get(i) == null) continue;
+                AtomicElement hidden = synthetic(origins, new RuleRefElement(VALUE_PREFIX + i), from);
+                elements.add(plain(synthetic(origins, new OwnedCaptureElement(captures.get(i), sequence(plain(hidden, from), from)), from), from));
+            }
+            List<SequenceBody> alternatives = alternatives(from);
+            if (alternatives.size() == 1) elements.addAll(alternatives.get(0).elements());
+            else elements.add(plain(synthetic(origins, new GroupElement(from), from), from));
+            ChoiceBody scope = synthetic(origins, new ChoiceBody(List.of(synthetic(origins,
+                new SequenceBody(List.copyOf(elements)), from))), from);
+            return sequence(plain(synthetic(origins, new CaptureScopeElement(scope), from), from), from);
+        }
+
+        private AnnotatedElement plain(AtomicElement element, Object from) {
+            return synthetic(origins, new AnnotatedElement(element, java.util.Optional.empty(), java.util.Optional.empty()), from);
+        }
+
+        private ChoiceBody sequence(AnnotatedElement element, Object from) {
+            return synthetic(origins, new ChoiceBody(List.of(synthetic(origins, new SequenceBody(List.of(element)), from))), from);
         }
 
         /** A single plain element is substituted as itself; anything else keeps its grouping. */

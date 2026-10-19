@@ -1463,22 +1463,43 @@ public class UBNFParsers {
         }
     }
 
-    /** RuleParameters: adjacent '(' IDENTIFIER { ',' IDENTIFIER } ')' */
+    /** RuleParameters: adjacent '(' RuleParameter { ',' RuleParameter } ')' */
     public static class RuleParameterListParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
                 Parser.get(AdjacentLeftParenthesisParser.class),
-                Parser.get(IdentifierParser.class),
+                Parser.get(RuleParameterParser.class),
                 new ZeroOrMore(new UBNFLazyChain() {
                     private static final long serialVersionUID = 1L;
                     @Override
                     public Parsers getLazyParsers() {
-                        return new Parsers(Parser.get(CommaParser.class), Parser.get(IdentifierParser.class));
+                        return new Parsers(Parser.get(CommaParser.class), Parser.get(RuleParameterParser.class));
                     }
                 }),
                 Parser.get(RightParenthesisParser.class));
+        }
+    }
+
+    /** The '=' that marks a value parameter (#704). */
+    public static class ValueParameterMarkerParser extends SingleCharacterParser {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean isMatch(char target) {
+            return '=' == target;
+        }
+    }
+
+    /** RuleParameter: [ '=' ] IDENTIFIER; '=' declares a value parameter (#704). */
+    public static class RuleParameterParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new org.unlaxer.parser.combinator.Optional(Parser.get(ValueParameterMarkerParser.class)),
+                Parser.get(IdentifierParser.class));
         }
     }
 

@@ -78,7 +78,7 @@ public class UBNFMapper {
     private final UBNFSourceSnapshot.Builder sourceSnapshot;
     /** Side tables of parameterized rules (#701); calls are placeholders until expansion. */
     private final List<ParameterizedRules.Call> calls = new ArrayList<>();
-    private final java.util.IdentityHashMap<RuleDecl, List<String>> ruleParams = new java.util.IdentityHashMap<>();
+    private final java.util.IdentityHashMap<RuleDecl, List<ParameterizedRules.Param>> ruleParams = new java.util.IdentityHashMap<>();
 
     private UBNFMapper(UBNFSourceSnapshot.Builder sourceSnapshot) {
         this.sourceSnapshot = sourceSnapshot;
@@ -638,8 +638,13 @@ public class UBNFMapper {
         RuleDecl rule = new RuleDecl(annotations, name, body);
         List<Token> parameterLists = findDescendants(token, UBNFParsers.RuleParameterListParser.class);
         if (!parameterLists.isEmpty()) {
-            ruleParams.put(rule, findDescendants(parameterLists.get(0), UBNFParsers.IdentifierParser.class)
-                .stream().map(identifier -> identifier.source.toString().trim()).toList());
+            List<ParameterizedRules.Param> list = new ArrayList<>();
+            for (Token parameter : findDescendants(parameterLists.get(0), UBNFParsers.RuleParameterParser.class)) {
+                String parameterName = findDescendants(parameter, UBNFParsers.IdentifierParser.class).get(0).source.toString().trim();
+                boolean byValue = !findDescendants(parameter, UBNFParsers.ValueParameterMarkerParser.class).isEmpty();
+                list.add(new ParameterizedRules.Param(parameterName, byValue));
+            }
+            ruleParams.put(rule, List.copyOf(list));
         }
         return rule;
     }

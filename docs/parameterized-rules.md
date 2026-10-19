@@ -27,6 +27,8 @@ grammar Let {
   名前だけ**。同じファイルの別の grammar の定義は影響しない。それ以外の `Foo('a')` は従来どおり
   「参照 `Foo` と group `('a')`」のまま。定義を持たない
   文法の構文木・生成物は変わらない（両 frontend は展開処理そのものを通らない）。
+- 定義の引数に `=` を付けると値渡しの引数になる（`Body(=tag) ::= ...`。展開は
+  [値渡しの引数](call-by-value-arguments.md)、#704）。
 - `CAPTURE` `SAME_AS` `CAPTURE_SCOPE` `ERROR` は既存の関数形式の綴りなので、引数付き規則の名前に
   できない（`E-PARAM-RESERVED`）。これらの呼び出しの構文は従来どおり。
 - 定義側の `F (x) ::=`、空の `F()`、末尾 `,`、引数位置の literal は構文エラー。
@@ -160,7 +162,7 @@ corpus の `ce002-self-argument` と、nullable な接頭辞が展開後にだ�
 
 ## 範囲外と制約
 
-- 高階規則、ラムダ、CallByValue（後方参照の値渡しは #704）、型注釈。
+- 高階規則、ラムダ、型注釈。値渡しの引数（後方参照）は [call-by-value-arguments.md](call-by-value-arguments.md)（#704）。
 - 注釈付きの引数付き規則と、実引数・定義本体の中の `@capture` / `@typeof`。capture は
   instance 側の規則に移り、呼び出し側の `@mapping` から見えなくなるため、まず拒否する。
   呼び出し全体への capture（`Either('a' 'b', 'c') @text`）はできる。

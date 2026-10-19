@@ -12,6 +12,10 @@
 //! Existing validators (left recursion, nullable repetition, ...) run afterwards on the
 //! expanded grammar only. Checking the unexpanded grammar is unsound (lean4-peg CE-002:
 //! `F(x) ::= x; S ::= F(S)`). See docs/parameterized-rules.md for the argument.
+//!
+//! A value parameter `=p` (#704) is sugar over the existing owned captures: the instance
+//! body becomes `CAPTURE_SCOPE(CAPTURE(F(=p), arg) body)` and each use of `p` becomes
+//! `SAME_AS(F(=p))`. See docs/call-by-value-arguments.md.
 use crate::ast::*;
 use crate::{diagnostic, Diagnostic, DiagnosticKind};
 use std::collections::{HashMap, HashSet};
@@ -28,6 +32,21 @@ pub const MAX_EXPANDED_NESTING: usize = crate::MAX_NESTING;
 const RESERVED: [&str; 4] = ["CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "ERROR"];
 /// Placeholder prefix. NUL never occurs in an identifier, so no user name can match.
 const CALL_PREFIX: &str = "\u{0}call";
+/// The hidden by-name parameter that carries a value argument into its CAPTURE.
+const VALUE_PREFIX: &str = "\u{0}value";
+
+/// One declared parameter; `=name` declares a value parameter (#704).
+pub(crate) struct Param {
+    pub name: String,
+    pub by_value: bool,
+}
+
+/// The owned capture name of value parameter `param` of `rule`. It contains `(`, `=`
+/// and `)`, which no CAPTURE / SAME_AS name written in UBNF (an identifier) can contain,
+/// so expansion never shares a binding with a user capture of any grammar.
+fn capture_name(rule: &str, param: &str) -> String {
+    format!("{rule}(={param})")
+}
 
 pub(crate) struct Call {
     pub name: String,
@@ -113,6 +132,9 @@ fn definitions(tokens: &[crate::lexer::Token]) -> HashSet<String> {
         }
         let mut j = i + 2;
         loop {
+            if tokens.get(j).is_some_and(|t| t.kind == Kind::Symbol('=')) {
+                j += 1;
+            }
             if !matches!(tokens.get(j).map(|t| &t.kind), Some(Kind::Identifier(_))) {
                 j = usize::MAX;
                 break;
@@ -137,18 +159,28 @@ fn definitions(tokens: &[crate::lexer::Token]) -> HashSet<String> {
 struct Def<'a> {
     rule: usize,
     params: &'a [String],
+    /// For a rule with value parameters: the capture names, indexed like `params`, and the
+    /// body `CAPTURE_SCOPE(CAPTURE(F(=p), <hidden p>) ... body)` that instances expand.
+    values: Option<(Vec<Option<String>>, RuleBody)>,
 }
 
 /// Validate and expand one grammar. `params[i]` belongs to `grammar.rules[i]`.
 pub(crate) fn expand(
     source: &str,
     grammar: GrammarDecl,
-    params: Vec<Option<Vec<String>>>,
+    declared: Vec<Option<Vec<Param>>>,
     calls: &[Call],
 ) -> Result<GrammarDecl> {
-    if calls.is_empty() && params.iter().all(Option::is_none) {
+    if calls.is_empty() && declared.iter().all(Option::is_none) {
         return Ok(grammar);
     }
+    let params: Vec<Option<Vec<String>>> = declared
+        .iter()
+        .map(|list| {
+            list.as_ref()
+                .map(|l| l.iter().map(|p| p.name.clone()).collect())
+        })
+        .collect();
     let rules = &grammar.rules;
     let tokens: HashSet<&str> = grammar.tokens.iter().map(|t| t.name.as_str()).collect();
     let mut rule_counts: HashMap<&str, usize> = HashMap::new();
@@ -195,11 +227,16 @@ pub(crate) fn expand(
                 )));
             }
         }
+        let values = declared[index]
+            .as_deref()
+            .filter(|list| list.iter().any(|p| p.by_value))
+            .map(|list| value_template(rule, list));
         defs.insert(
             name,
             Def {
                 rule: index,
                 params: list,
+                values,
             },
         );
     }
@@ -468,6 +505,8 @@ struct Rep {
     element: AtomicElement,
     size: usize,
     depth: usize,
+    /// A value parameter's SAME_AS, which takes the span of each use it replaces.
+    at_use: bool,
 }
 
 type Env<'a> = HashMap<&'a str, Rep>;
@@ -534,6 +573,12 @@ impl Expander<'_> {
                         name: self.instance(&call.name, args, call.span)?,
                     }
                 } else if let Some(replacement) = env.get(name.as_str()) {
+                    if replacement.at_use {
+                        return Ok(Spanned {
+                            kind: replacement.element.kind.clone(),
+                            span: element.span,
+                        });
+                    }
                     return Ok(replacement.element.clone());
                 } else {
                     return Ok(element.clone());
@@ -605,21 +650,53 @@ impl Expander<'_> {
         let def = &self.defs[callee];
         let rule = &self.rules[def.rule];
         let empty = HashMap::new();
-        let env: Env = def
-            .params
-            .iter()
-            .map(String::as_str)
-            .zip(args.into_iter().map(|argument| {
-                let element = replacement(argument);
-                let (size, depth) = measure_atomic(&element, &empty);
-                Rep {
-                    element,
-                    size,
-                    depth,
+        let hidden: Vec<String> = match &def.values {
+            Some((names, _)) => (0..names.len())
+                .map(|index| format!("{VALUE_PREFIX}{index}"))
+                .collect(),
+            None => Vec::new(),
+        };
+        let mut env: Env = HashMap::with_capacity(args.len());
+        for (index, argument) in args.into_iter().enumerate() {
+            let element = replacement(argument);
+            let (size, depth) = measure_atomic(&element, &empty);
+            let argument = Rep {
+                element,
+                size,
+                depth,
+                at_use: false,
+            };
+            let parameter = def.params[index].as_str();
+            match def
+                .values
+                .as_ref()
+                .and_then(|(names, _)| names[index].as_ref())
+            {
+                // The argument goes into the CAPTURE; every use of the parameter replays it.
+                Some(capture) => {
+                    env.insert(hidden[index].as_str(), argument);
+                    env.insert(
+                        parameter,
+                        Rep {
+                            element: Spanned {
+                                kind: ElementKind::Replay {
+                                    name: capture.clone(),
+                                },
+                                span: rule.span,
+                            },
+                            size: 1,
+                            depth: 0,
+                            at_use: true,
+                        },
+                    );
                 }
-            }))
-            .collect();
-        let (size, depth) = measure_body(&rule.body, &env);
+                None => {
+                    env.insert(parameter, argument);
+                }
+            }
+        }
+        let template = def.values.as_ref().map_or(&rule.body, |(_, body)| body);
+        let (size, depth) = measure_body(template, &env);
         let inline = self.level.saturating_add(depth);
         if inline > MAX_EXPANDED_NESTING {
             return Err(error(self.source, span, format!(
@@ -631,7 +708,7 @@ impl Expander<'_> {
         self.names.insert(name.clone());
         let slot = self.instances.len();
         self.instances.push(None);
-        let body = self.body(&rule.body, &env)?;
+        let body = self.body(template, &env)?;
         self.instances[slot] = Some(RuleDecl {
             annotations: Vec::new(),
             name: name.clone(),
@@ -640,6 +717,51 @@ impl Expander<'_> {
         });
         Ok(name)
     }
+}
+
+/// `CAPTURE_SCOPE(CAPTURE(F(=p), <hidden p>) ... body)` for a rule with value parameters,
+/// written once per definition so that measuring and expanding an instance treat it as an
+/// ordinary body. A one-alternative body is spliced after the captures, a choice is
+/// grouped. Every synthetic node takes the span of the definition body.
+fn value_template(rule: &RuleDecl, list: &[Param]) -> (Vec<Option<String>>, RuleBody) {
+    let span = rule.body.span;
+    let plain = |kind: ElementKind| AnnotatedElement {
+        element: Spanned { kind, span },
+        capture: None,
+        typeof_constraint: None,
+        capture_span: None,
+        typeof_span: None,
+        span,
+    };
+    let sequence = |elements: Vec<AnnotatedElement>| RuleBody {
+        alternatives: vec![Sequence { elements, span }],
+        span,
+    };
+    let mut names = Vec::with_capacity(list.len());
+    let mut elements = Vec::new();
+    for (index, param) in list.iter().enumerate() {
+        if !param.by_value {
+            names.push(None);
+            continue;
+        }
+        let name = capture_name(&rule.name, &param.name);
+        elements.push(plain(ElementKind::OwnedCapture {
+            name: name.clone(),
+            body: sequence(vec![plain(ElementKind::RuleRef {
+                namespace: None,
+                name: format!("{VALUE_PREFIX}{index}"),
+            })]),
+        }));
+        names.push(Some(name));
+    }
+    match rule.body.alternatives.as_slice() {
+        [only] => elements.extend(only.elements.iter().cloned()),
+        _ => elements.push(plain(ElementKind::Group(rule.body.clone()))),
+    }
+    (
+        names,
+        sequence(vec![plain(ElementKind::CaptureScope(sequence(elements)))]),
+    )
 }
 
 /// A single plain element is substituted as itself; anything else keeps its
