@@ -1,0 +1,1181 @@
+[
+  {
+    "name": "token-keyword",
+    "description": "Token/Kw helpers; one instance per distinct argument; call nested in a body",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[name, values])\n  Root ::= Kw('let') Ident @name Token('=') Num @values { Token(',') Num @values } ( Token(';') | Token('😀') ) ;\n  @mapping(Ident, params=[text])\n  Ident ::= Letters @text Spacing ;\n  @mapping(Num, params=[text])\n  Num ::= Digits @text Spacing ;\n  Letters ::= Letter { Letter } ;\n  Letter ::= 'a' | 'b' | 'x' | 'y' ;\n  Digits ::= Digit { Digit } ;\n  Digit ::= '0' | '1' | '2' ;\n  Spacing ::= { ' ' } ;\n  Token(p) ::= p Spacing ;\n  Kw(n) ::= Token(n) ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "Kw(t(6c.65.74))",
+        "name": "Kw_1bc0eb23b0c2c784"
+      },
+      {
+        "key": "Token(t(6c.65.74))",
+        "name": "Token_5222352b57c42933"
+      },
+      {
+        "key": "Token(t(3d))",
+        "name": "Token_abb85d0b94a94107"
+      },
+      {
+        "key": "Token(t(2c))",
+        "name": "Token_2c63160472a433bb"
+      },
+      {
+        "key": "Token(t(3b))",
+        "name": "Token_76e5eb0b76806395"
+      },
+      {
+        "key": "Token(t(1f600))",
+        "name": "Token_fc0f66aa41fdfb2b"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[name, values])\n  Root ::= Kw_1bc0eb23b0c2c784 Ident @name Token_abb85d0b94a94107 Num @values { Token_2c63160472a433bb Num @values } ( Token_76e5eb0b76806395 | Token_fc0f66aa41fdfb2b ) ;\n  @mapping(Ident, params=[text])\n  Ident ::= Letters @text Spacing ;\n  @mapping(Num, params=[text])\n  Num ::= Digits @text Spacing ;\n  Letters ::= Letter { Letter } ;\n  Letter ::= 'a' | 'b' | 'x' | 'y' ;\n  Digits ::= Digit { Digit } ;\n  Digit ::= '0' | '1' | '2' ;\n  Spacing ::= { ' ' } ;\n  Kw_1bc0eb23b0c2c784 ::= Token_5222352b57c42933 ;\n  Token_5222352b57c42933 ::= 'let' Spacing ;\n  Token_abb85d0b94a94107 ::= '=' Spacing ;\n  Token_2c63160472a433bb ::= ',' Spacing ;\n  Token_76e5eb0b76806395 ::= ';' Spacing ;\n  Token_fc0f66aa41fdfb2b ::= '😀' Spacing ;\n}\n",
+    "spans": [
+      {
+        "rule": "Kw_1bc0eb23b0c2c784",
+        "span": [
+          536,
+          556
+        ]
+      },
+      {
+        "rule": "Token_5222352b57c42933",
+        "span": [
+          509,
+          533
+        ]
+      },
+      {
+        "rule": "Token_fc0f66aa41fdfb2b",
+        "span": [
+          509,
+          533
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "let x = 1, 2;",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              13
+            ],
+            "fields": {
+              "name": {
+                "type": "Ident",
+                "span": [
+                  4,
+                  6
+                ],
+                "fields": {
+                  "text": "x"
+                }
+              },
+              "values": [
+                {
+                  "type": "Num",
+                  "span": [
+                    8,
+                    9
+                  ],
+                  "fields": {
+                    "text": "1"
+                  }
+                },
+                {
+                  "type": "Num",
+                  "span": [
+                    11,
+                    12
+                  ],
+                  "fields": {
+                    "text": "2"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "input": "letx=1;",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              7
+            ],
+            "fields": {
+              "name": {
+                "type": "Ident",
+                "span": [
+                  3,
+                  4
+                ],
+                "fields": {
+                  "text": "x"
+                }
+              },
+              "values": [
+                {
+                  "type": "Num",
+                  "span": [
+                    5,
+                    6
+                  ],
+                  "fields": {
+                    "text": "1"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "input": "let y = 2 😀",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              11
+            ],
+            "fields": {
+              "name": {
+                "type": "Ident",
+                "span": [
+                  4,
+                  6
+                ],
+                "fields": {
+                  "text": "y"
+                }
+              },
+              "values": [
+                {
+                  "type": "Num",
+                  "span": [
+                    8,
+                    10
+                  ],
+                  "fields": {
+                    "text": "2"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "input": "let = 1;",
+        "expected": {
+          "status": "syntax",
+          "offset": 4
+        }
+      }
+    ]
+  },
+  {
+    "name": "arguments-and-postfix",
+    "description": "grouped and choice arguments, postfix on a call, bounded repeat and separator",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[items])\n  Root ::= Item @items { Item @items } Tail ;\n  @mapping(Item, params=[text])\n  Item ::= Either('a' 'b', 'c') @text ;\n  Tail ::= Twice('!' | '?')* Opt('.') List('x', ',') ;\n  Either(a, b) ::= a | b ;\n  Twice(x) ::= x{2} ;\n  Opt(x) ::= [ x ] ;\n  List(x, s) ::= x % s ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "Either(t(61) t(62),t(63))",
+        "name": "Either_4191f73e787b582c"
+      },
+      {
+        "key": "Twice(t(21)|t(3f))",
+        "name": "Twice_65f23091ea40e26a"
+      },
+      {
+        "key": "Opt(t(2e))",
+        "name": "Opt_6fe8ac680c9e4109"
+      },
+      {
+        "key": "List(t(78),t(2c))",
+        "name": "List_6aa4cf162f74f404"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[items])\n  Root ::= Item @items { Item @items } Tail ;\n  @mapping(Item, params=[text])\n  Item ::= Either_4191f73e787b582c @text ;\n  Tail ::= Twice_65f23091ea40e26a* Opt_6fe8ac680c9e4109 List_6aa4cf162f74f404 ;\n  Either_4191f73e787b582c ::= ( 'a' 'b' ) | 'c' ;\n  Twice_65f23091ea40e26a ::= ( '!' | '?' ){2} ;\n  Opt_6fe8ac680c9e4109 ::= [ '.' ] ;\n  List_6aa4cf162f74f404 ::= 'x' % ',' ;\n}\n",
+    "spans": [
+      {
+        "rule": "Either_4191f73e787b582c",
+        "span": [
+          273,
+          297
+        ]
+      },
+      {
+        "rule": "List_6aa4cf162f74f404",
+        "span": [
+          343,
+          365
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "abc!!?!.x,x",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              11
+            ],
+            "fields": {
+              "items": [
+                {
+                  "type": "Item",
+                  "span": [
+                    0,
+                    2
+                  ],
+                  "fields": {
+                    "text": "ab"
+                  }
+                },
+                {
+                  "type": "Item",
+                  "span": [
+                    2,
+                    3
+                  ],
+                  "fields": {
+                    "text": "c"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "input": "cx",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "items": [
+                {
+                  "type": "Item",
+                  "span": [
+                    0,
+                    1
+                  ],
+                  "fields": {
+                    "text": "c"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "input": "ab!x",
+        "expected": {
+          "status": "syntax",
+          "offset": 3
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-calls",
+    "description": "a call as an argument; the outer instance takes its slot before its callees",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Outer('a') @text ;\n  Outer(x) ::= Inner(Inner(x)) ;\n  Inner(y) ::= '<' y '>' ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "Outer(t(61))",
+        "name": "Outer_e62aba588e394d83"
+      },
+      {
+        "key": "Inner(t(61))",
+        "name": "Inner_8c44f55cbeadfa1a"
+      },
+      {
+        "key": "Inner(r(Inner_8c44f55cbeadfa1a))",
+        "name": "Inner_cc23f483036e8d53"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Outer_e62aba588e394d83 @text ;\n  Outer_e62aba588e394d83 ::= Inner_cc23f483036e8d53 ;\n  Inner_8c44f55cbeadfa1a ::= '<' 'a' '>' ;\n  Inner_cc23f483036e8d53 ::= '<' Inner_8c44f55cbeadfa1a '>' ;\n}\n",
+    "spans": [
+      {
+        "rule": "Outer_e62aba588e394d83",
+        "span": [
+          129,
+          159
+        ]
+      },
+      {
+        "rule": "Inner_cc23f483036e8d53",
+        "span": [
+          162,
+          186
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "<<a>>",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "text": "<<a>>"
+            }
+          }
+        }
+      },
+      {
+        "input": "<a>",
+        "expected": {
+          "status": "syntax",
+          "offset": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "recursion-through-argument",
+    "description": "zero-arity recursion via an argument is not a parameterized cycle",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Expr @text ;\n  Expr ::= Paren(Expr) | 'n' ;\n  Paren(x) ::= '(' x ')' ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "Paren(r(Expr))",
+        "name": "Paren_2ee472a2dbf93606"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Expr @text ;\n  Expr ::= Paren_2ee472a2dbf93606 | 'n' ;\n  Paren_2ee472a2dbf93606 ::= '(' Expr ')' ;\n}\n",
+    "spans": [
+      {
+        "rule": "Paren_2ee472a2dbf93606",
+        "span": [
+          154,
+          178
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "((n))",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "text": "((n))"
+            }
+          }
+        }
+      },
+      {
+        "input": "n",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "text": "n"
+            }
+          }
+        }
+      },
+      {
+        "input": "((n)",
+        "expected": {
+          "status": "syntax",
+          "offset": 4
+        }
+      }
+    ]
+  },
+  {
+    "name": "shared-instances",
+    "description": "three Token('a') calls share one instance",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Pair(Token('a'), Token('a')) @text Token('a') ;\n  Gap ::= [ ' ' ] ;\n  Token(p) ::= p Gap ;\n  Pair(l, r) ::= l r ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "Token(t(61))",
+        "name": "Token_5027d0274a594239"
+      },
+      {
+        "key": "Pair(r(Token_5027d0274a594239),r(Token_5027d0274a594239))",
+        "name": "Pair_2c4b15361501ece0"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Pair_2c4b15361501ece0 @text Token_5027d0274a594239 ;\n  Gap ::= [ ' ' ] ;\n  Token_5027d0274a594239 ::= 'a' Gap ;\n  Pair_2c4b15361501ece0 ::= Token_5027d0274a594239 Token_5027d0274a594239 ;\n}\n",
+    "spans": [
+      {
+        "rule": "Token_5027d0274a594239",
+        "span": [
+          178,
+          198
+        ]
+      },
+      {
+        "rule": "Pair_2c4b15361501ece0",
+        "span": [
+          201,
+          221
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "a a a",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "text": "a a"
+            }
+          }
+        }
+      },
+      {
+        "input": "aaa",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "text": "aa"
+            }
+          }
+        }
+      },
+      {
+        "input": "a a",
+        "expected": {
+          "status": "syntax",
+          "offset": 3
+        }
+      }
+    ]
+  },
+  {
+    "name": "nullable-repeat-after-expansion",
+    "description": "a nullable repeat body created by expansion behaves as written by hand",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Many(Opt('a')) @text 'b' ;\n  Many(x) ::= { x } ;\n  Opt(x) ::= [ x ] ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "Opt(t(61))",
+        "name": "Opt_18da7087c9e0c2d1"
+      },
+      {
+        "key": "Many(r(Opt_18da7087c9e0c2d1))",
+        "name": "Many_ac4471ce52e9ddab"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Many_ac4471ce52e9ddab @text 'b' ;\n  Opt_18da7087c9e0c2d1 ::= [ 'a' ] ;\n  Many_ac4471ce52e9ddab ::= { Opt_18da7087c9e0c2d1 } ;\n}\n",
+    "spans": [
+      {
+        "rule": "Many_ac4471ce52e9ddab",
+        "span": [
+          137,
+          156
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "aab",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              3
+            ],
+            "fields": {
+              "text": "aa"
+            }
+          }
+        }
+      },
+      {
+        "input": "b",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "text": ""
+            }
+          }
+        }
+      },
+      {
+        "input": "aa",
+        "expected": {
+          "status": "syntax",
+          "offset": 2
+        }
+      }
+    ]
+  },
+  {
+    "name": "compatibility-reference-and-group",
+    "description": "without a Name(params) definition, an adjacent Foo( keeps its previous meaning",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Foo('a') @text ;\n  Foo ::= 'b' ;\n}\n",
+    "status": "accept",
+    "instances": [],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= Foo('a') @text ;\n  Foo ::= 'b' ;\n}\n",
+    "spans": [],
+    "inputs": [
+      {
+        "input": "ba",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "text": "a"
+            }
+          }
+        }
+      },
+      {
+        "input": "b",
+        "expected": {
+          "status": "syntax",
+          "offset": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-captures-through-instances",
+    "description": "#699 alias transparency for @nestedCaptures through expanded instances",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @nestedCaptures @mapping(Root, params=[value])\n  Root ::= '[' Opt(Many(Glyph)) @value ']' ;\n  Glyph ::= '😀' | 'a' ;\n  Opt(x) ::= [ x ] ;\n  Many(x) ::= { x } ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "Many(r(Glyph))",
+        "name": "Many_27658bfa177dcd40"
+      },
+      {
+        "key": "Opt(r(Many_27658bfa177dcd40))",
+        "name": "Opt_503bb3eea8d60543"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @nestedCaptures @mapping(Root, params=[value])\n  Root ::= '[' Opt_503bb3eea8d60543 @value ']' ;\n  Glyph ::= '😀' | 'a' ;\n  Many_27658bfa177dcd40 ::= { Glyph } ;\n  Opt_503bb3eea8d60543 ::= [ Many_27658bfa177dcd40 ] ;\n}\n",
+    "spans": [
+      {
+        "rule": "Many_27658bfa177dcd40",
+        "span": [
+          206,
+          225
+        ]
+      },
+      {
+        "rule": "Opt_503bb3eea8d60543",
+        "span": [
+          185,
+          203
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "[]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              2
+            ],
+            "fields": {
+              "value": []
+            }
+          }
+        }
+      },
+      {
+        "input": "[😀a😀]",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              5
+            ],
+            "fields": {
+              "value": [
+                "😀",
+                "a",
+                "😀"
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "ce002-self-argument",
+    "description": "lean4-peg CE-002: F(x)=x; S=F(S) passes pre-expansion checks but diverges",
+    "grammar": "grammar LeftRec { @package: paramprobe @root @mapping(Node) Root ::= F(Root); F(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "validate",
+      "code": "E-LEFT-RECURSION"
+    },
+    "instances": [
+      {
+        "key": "F(r(Root))",
+        "name": "F_4339f17368d8337b"
+      }
+    ],
+    "expanded": "grammar LeftRec { @package: paramprobe @root @mapping(Node) Root ::= F_4339f17368d8337b; F_4339f17368d8337b ::= Root; }"
+  },
+  {
+    "name": "nullable-prefix-after-expansion",
+    "description": "left recursion behind a nullable prefix exists only after expansion",
+    "grammar": "grammar LeftRec { @package: paramprobe @root @mapping(Node) Root ::= Seq(Opt('n'), Root) | 'x'; Seq(a, b) ::= a b; Opt(x) ::= [ x ]; }",
+    "status": "reject",
+    "error": {
+      "stage": "validate",
+      "code": "E-LEFT-RECURSION"
+    },
+    "instances": [
+      {
+        "key": "Opt(t(6e))",
+        "name": "Opt_56a3c486caef1f75"
+      },
+      {
+        "key": "Seq(r(Opt_56a3c486caef1f75),r(Root))",
+        "name": "Seq_306b3e2f23e55f17"
+      }
+    ],
+    "expanded": "grammar LeftRec { @package: paramprobe @root @mapping(Node) Root ::= Seq_306b3e2f23e55f17 | 'x'; Opt_56a3c486caef1f75 ::= [ 'n' ]; Seq_306b3e2f23e55f17 ::= Opt_56a3c486caef1f75 Root; }"
+  },
+  {
+    "name": "arity-too-many",
+    "grammar": "grammar Bad { Root ::= F('a', 'b'); F(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-ARITY",
+      "start": 23,
+      "end": 34,
+      "line": 1,
+      "column": 24,
+      "message": "E-PARAM-ARITY: rule F expects 1 argument(s), got 2; defined at line 1, column 37"
+    }
+  },
+  {
+    "name": "arity-bare-reference",
+    "grammar": "grammar Bad { Root ::= F 'a'; F(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-ARITY",
+      "start": 23,
+      "end": 24,
+      "line": 1,
+      "column": 24,
+      "message": "E-PARAM-ARITY: rule F expects 1 argument(s), got 0; defined at line 1, column 31"
+    }
+  },
+  {
+    "name": "arity-trivia-before-parenthesis",
+    "grammar": "grammar Bad { Root ::= F ('a'); F(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-ARITY",
+      "start": 23,
+      "end": 24,
+      "line": 1,
+      "column": 24,
+      "message": "E-PARAM-ARITY: rule F expects 1 argument(s), got 0; defined at line 1, column 33"
+    }
+  },
+  {
+    "name": "undefined-parameter",
+    "grammar": "grammar Bad { Root ::= F('a'); F(x) ::= y; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-UNDEFINED",
+      "start": 40,
+      "end": 41,
+      "line": 1,
+      "column": 41,
+      "message": "E-PARAM-UNDEFINED: rule F references undefined parameter, rule or token 'y'"
+    }
+  },
+  {
+    "name": "cycle-self",
+    "grammar": "grammar Bad { Root ::= Copy('a'); Copy(w) ::= Copy(w 'a') | w; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CYCLE",
+      "start": 46,
+      "end": 57,
+      "line": 1,
+      "column": 47,
+      "message": "E-PARAM-CYCLE: parameterized call cycle Copy -> Copy; expansion would not terminate"
+    }
+  },
+  {
+    "name": "cycle-mutual-crlf",
+    "grammar": "grammar Bad {\r\n  Root ::= F('a');\r\n  F(x) ::= G(x);\r\n  G(y) ::= 'b' F(y);\r\n}",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CYCLE",
+      "start": 68,
+      "end": 72,
+      "line": 4,
+      "column": 16,
+      "message": "E-PARAM-CYCLE: parameterized call cycle F -> G -> F; expansion would not terminate"
+    }
+  },
+  {
+    "name": "cycle-identity",
+    "grammar": "grammar Bad { Root ::= F('a'); F(x) ::= F(x); }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CYCLE",
+      "start": 40,
+      "end": 44,
+      "line": 1,
+      "column": 41,
+      "message": "E-PARAM-CYCLE: parameterized call cycle F -> F; expansion would not terminate"
+    }
+  },
+  {
+    "name": "annotation-mapping",
+    "grammar": "grammar Bad { @mapping(Node) F(x) ::= x; Root ::= F('a'); }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-ANNOTATION",
+      "start": 14,
+      "end": 40,
+      "line": 1,
+      "column": 15,
+      "message": "E-PARAM-ANNOTATION: parameterized rule F cannot have annotations; only transparent rules take parameters"
+    }
+  },
+  {
+    "name": "annotation-root",
+    "grammar": "grammar Bad { @root F(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-ANNOTATION",
+      "start": 14,
+      "end": 31,
+      "line": 1,
+      "column": 15,
+      "message": "E-PARAM-ANNOTATION: parameterized rule F cannot have annotations; only transparent rules take parameters"
+    }
+  },
+  {
+    "name": "capture-in-argument",
+    "grammar": "grammar Bad { @root @mapping(Node, params=[t]) Root ::= F('a' @t); F(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 56,
+      "end": 65,
+      "line": 1,
+      "column": 57,
+      "message": "E-PARAM-CAPTURE: captures and @typeof are not allowed in parameterized rule bodies or call arguments"
+    }
+  },
+  {
+    "name": "capture-in-body",
+    "grammar": "grammar Bad { Root ::= F('a'); F(x) ::= x @v; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 31,
+      "end": 45,
+      "line": 1,
+      "column": 32,
+      "message": "E-PARAM-CAPTURE: captures and @typeof are not allowed in parameterized rule bodies or call arguments"
+    }
+  },
+  {
+    "name": "parameter-shadows-rule",
+    "grammar": "grammar Bad { Root ::= F('a'); F(Root) ::= Root; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-SHADOW",
+      "start": 31,
+      "end": 48,
+      "line": 1,
+      "column": 32,
+      "message": "E-PARAM-SHADOW: parameter Root of rule F has the same name as a rule or token"
+    }
+  },
+  {
+    "name": "duplicate-parameter",
+    "grammar": "grammar Bad { Root ::= F('a', 'b'); F(x, x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-DUPLICATE",
+      "start": 36,
+      "end": 50,
+      "line": 1,
+      "column": 37,
+      "message": "E-PARAM-DUPLICATE: parameter x is declared more than once in rule F"
+    }
+  },
+  {
+    "name": "duplicate-rule",
+    "grammar": "grammar Bad { Root ::= F('a'); F ::= 'b'; F(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-DUPLICATE",
+      "start": 42,
+      "end": 53,
+      "line": 1,
+      "column": 43,
+      "message": "E-PARAM-DUPLICATE: rule F is defined more than once"
+    }
+  },
+  {
+    "name": "reserved-name",
+    "grammar": "grammar Bad { Root ::= 'a'; CAPTURE(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-RESERVED",
+      "start": 28,
+      "end": 45,
+      "line": 1,
+      "column": 29,
+      "message": "E-PARAM-RESERVED: parameterized rule name CAPTURE is reserved by a builtin call"
+    }
+  },
+  {
+    "name": "name-collision",
+    "grammar": "grammar Bad { Root ::= F('a'); F(x) ::= x; F_810e17933a076cec ::= 'b'; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-NAME-COLLISION",
+      "start": 23,
+      "end": 29,
+      "line": 1,
+      "column": 24,
+      "message": "E-PARAM-NAME-COLLISION: expanded rule name F_810e17933a076cec collides with another rule, token or expansion"
+    }
+  },
+  {
+    "name": "limit-elements",
+    "grammar": "grammar Bad { Root ::= D15('a'); D0(x) ::= x x; D1(x) ::= D0(x x); D2(x) ::= D1(x x); D3(x) ::= D2(x x); D4(x) ::= D3(x x); D5(x) ::= D4(x x); D6(x) ::= D5(x x); D7(x) ::= D6(x x); D8(x) ::= D7(x x); D9(x) ::= D8(x x); D10(x) ::= D9(x x); D11(x) ::= D10(x x); D12(x) ::= D11(x x); D13(x) ::= D12(x x); D14(x) ::= D13(x x); D15(x) ::= D14(x x); }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 58,
+      "end": 65,
+      "line": 1,
+      "column": 59,
+      "message": "E-PARAM-LIMIT: expanded parameterized rules exceed 65536 elements"
+    }
+  },
+  {
+    "name": "limit-unused-argument-growth",
+    "grammar": "grammar Bad { Root ::= D20('a'); D0(x) ::= 'a'; D1(x) ::= D0(x x); D2(x) ::= D1(x x); D3(x) ::= D2(x x); D4(x) ::= D3(x x); D5(x) ::= D4(x x); D6(x) ::= D5(x x); D7(x) ::= D6(x x); D8(x) ::= D7(x x); D9(x) ::= D8(x x); D10(x) ::= D9(x x); D11(x) ::= D10(x x); D12(x) ::= D11(x x); D13(x) ::= D12(x x); D14(x) ::= D13(x x); D15(x) ::= D14(x x); D16(x) ::= D15(x x); D17(x) ::= D16(x x); D18(x) ::= D17(x x); D19(x) ::= D18(x x); D20(x) ::= D19(x x); }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 153,
+      "end": 160,
+      "line": 1,
+      "column": 154,
+      "message": "E-PARAM-LIMIT: expanded parameterized rules exceed 65536 elements"
+    }
+  },
+  {
+    "name": "chain-nested-at-limit",
+    "description": "chain length times body nesting reaches exactly the limit",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= C0('a') @text ;\n  C0(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C1(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C1(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C2(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C2(x) ::= x ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "C0(t(61))",
+        "name": "C0_a9542f322ce2dd55"
+      },
+      {
+        "key": "C1(t(61))",
+        "name": "C1_ba3551c705c5cfec"
+      },
+      {
+        "key": "C2(t(61))",
+        "name": "C2_0a44235c0ba86297"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= C0_a9542f322ce2dd55 @text ;\n  C0_a9542f322ce2dd55 ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C1_ba3551c705c5cfec ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C1_ba3551c705c5cfec ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C2_0a44235c0ba86297 ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C2_0a44235c0ba86297 ::= 'a' ;\n}\n",
+    "spans": [
+      {
+        "rule": "C0_a9542f322ce2dd55",
+        "span": [
+          126,
+          391
+        ]
+      },
+      {
+        "rule": "C2_0a44235c0ba86297",
+        "span": [
+          662,
+          675
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "a",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "text": "a"
+            }
+          }
+        }
+      },
+      {
+        "input": "b",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "chain-split-at-limit",
+    "description": "eight instances of 15 levels and a 7-level innermost body",
+    "grammar": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= C0('a') @text ;\n  C0(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C1(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C1(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C2(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C2(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C3(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C3(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C4(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C4(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C5(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C5(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C6(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C6(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C7(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C7(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C8(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C8(x) ::= ( ( ( ( ( ( x ) ) ) ) ) ) ;\n}\n",
+    "status": "accept",
+    "instances": [
+      {
+        "key": "C0(t(61))",
+        "name": "C0_a9542f322ce2dd55"
+      },
+      {
+        "key": "C1(t(61))",
+        "name": "C1_ba3551c705c5cfec"
+      },
+      {
+        "key": "C2(t(61))",
+        "name": "C2_0a44235c0ba86297"
+      },
+      {
+        "key": "C3(t(61))",
+        "name": "C3_4a42b4b0088f23ce"
+      },
+      {
+        "key": "C4(t(61))",
+        "name": "C4_475ac7e572e18d59"
+      },
+      {
+        "key": "C5(t(61))",
+        "name": "C5_c621b0e139e55200"
+      },
+      {
+        "key": "C6(t(61))",
+        "name": "C6_27a74e9ec88152ab"
+      },
+      {
+        "key": "C7(t(61))",
+        "name": "C7_3d70a03db594cbe2"
+      },
+      {
+        "key": "C8(t(61))",
+        "name": "C8_0884af60770afb9d"
+      }
+    ],
+    "expanded": "grammar Param {\n  @package: paramprobe\n  @whitespace: none\n  @root @mapping(Root, params=[text])\n  Root ::= C0_a9542f322ce2dd55 @text ;\n  C0_a9542f322ce2dd55 ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C1_ba3551c705c5cfec ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C1_ba3551c705c5cfec ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C2_0a44235c0ba86297 ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C2_0a44235c0ba86297 ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C3_4a42b4b0088f23ce ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C3_4a42b4b0088f23ce ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C4_475ac7e572e18d59 ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C4_475ac7e572e18d59 ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C5_c621b0e139e55200 ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C5_c621b0e139e55200 ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C6_27a74e9ec88152ab ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C6_27a74e9ec88152ab ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C7_3d70a03db594cbe2 ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C7_3d70a03db594cbe2 ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( C8_0884af60770afb9d ) ) ) ) ) ) ) ) ) ) ) ) ) ) ;\n  C8_0884af60770afb9d ::= ( ( ( ( ( ( 'a' ) ) ) ) ) ) ;\n}\n",
+    "spans": [
+      {
+        "rule": "C0_a9542f322ce2dd55",
+        "span": [
+          126,
+          199
+        ]
+      },
+      {
+        "rule": "C8_0884af60770afb9d",
+        "span": [
+          734,
+          771
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "input": "a",
+        "expected": {
+          "status": "ok",
+          "value": {
+            "type": "Root",
+            "span": [
+              0,
+              1
+            ],
+            "fields": {
+              "text": "a"
+            }
+          }
+        }
+      },
+      {
+        "input": "b",
+        "expected": {
+          "status": "syntax",
+          "offset": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "limit-chain-flat",
+    "grammar": "grammar Bad { Root ::= C0('a'); C0(x) ::= C1(x) ; C1(x) ::= C2(x) ; C2(x) ::= C3(x) ; C3(x) ::= C4(x) ; C4(x) ::= C5(x) ; C5(x) ::= C6(x) ; C6(x) ::= C7(x) ; C7(x) ::= C8(x) ; C8(x) ::= C9(x) ; C9(x) ::= C10(x) ; C10(x) ::= C11(x) ; C11(x) ::= C12(x) ; C12(x) ::= C13(x) ; C13(x) ::= C14(x) ; C14(x) ::= C15(x) ; C15(x) ::= C16(x) ; C16(x) ::= C17(x) ; C17(x) ::= C18(x) ; C18(x) ::= C19(x) ; C19(x) ::= C20(x) ; C20(x) ::= C21(x) ; C21(x) ::= C22(x) ; C22(x) ::= C23(x) ; C23(x) ::= C24(x) ; C24(x) ::= C25(x) ; C25(x) ::= C26(x) ; C26(x) ::= C27(x) ; C27(x) ::= C28(x) ; C28(x) ::= C29(x) ; C29(x) ::= C30(x) ; C30(x) ::= C31(x) ; C31(x) ::= C32(x) ; C32(x) ::= C33(x) ; C33(x) ::= C34(x) ; C34(x) ::= C35(x) ; C35(x) ::= C36(x) ; C36(x) ::= C37(x) ; C37(x) ::= C38(x) ; C38(x) ::= C39(x) ; C39(x) ::= C40(x) ; C40(x) ::= C41(x) ; C41(x) ::= C42(x) ; C42(x) ::= C43(x) ; C43(x) ::= C44(x) ; C44(x) ::= C45(x) ; C45(x) ::= C46(x) ; C46(x) ::= C47(x) ; C47(x) ::= C48(x) ; C48(x) ::= C49(x) ; C49(x) ::= C50(x) ; C50(x) ::= C51(x) ; C51(x) ::= C52(x) ; C52(x) ::= C53(x) ; C53(x) ::= C54(x) ; C54(x) ::= C55(x) ; C55(x) ::= C56(x) ; C56(x) ::= C57(x) ; C57(x) ::= C58(x) ; C58(x) ::= C59(x) ; C59(x) ::= C60(x) ; C60(x) ::= C61(x) ; C61(x) ::= C62(x) ; C62(x) ::= C63(x) ; C63(x) ::= C64(x) ; C64(x) ::= C65(x) ; C65(x) ::= C66(x) ; C66(x) ::= C67(x) ; C67(x) ::= C68(x) ; C68(x) ::= C69(x) ; C69(x) ::= C70(x) ; C70(x) ::= C71(x) ; C71(x) ::= C72(x) ; C72(x) ::= C73(x) ; C73(x) ::= C74(x) ; C74(x) ::= C75(x) ; C75(x) ::= C76(x) ; C76(x) ::= C77(x) ; C77(x) ::= C78(x) ; C78(x) ::= C79(x) ; C79(x) ::= C80(x) ; C80(x) ::= C81(x) ; C81(x) ::= C82(x) ; C82(x) ::= C83(x) ; C83(x) ::= C84(x) ; C84(x) ::= C85(x) ; C85(x) ::= C86(x) ; C86(x) ::= C87(x) ; C87(x) ::= C88(x) ; C88(x) ::= C89(x) ; C89(x) ::= C90(x) ; C90(x) ::= C91(x) ; C91(x) ::= C92(x) ; C92(x) ::= C93(x) ; C93(x) ::= C94(x) ; C94(x) ::= C95(x) ; C95(x) ::= C96(x) ; C96(x) ::= C97(x) ; C97(x) ::= C98(x) ; C98(x) ::= C99(x) ; C99(x) ::= C100(x) ; C100(x) ::= C101(x) ; C101(x) ::= C102(x) ; C102(x) ::= C103(x) ; C103(x) ::= C104(x) ; C104(x) ::= C105(x) ; C105(x) ::= C106(x) ; C106(x) ::= C107(x) ; C107(x) ::= C108(x) ; C108(x) ::= C109(x) ; C109(x) ::= C110(x) ; C110(x) ::= C111(x) ; C111(x) ::= C112(x) ; C112(x) ::= C113(x) ; C113(x) ::= C114(x) ; C114(x) ::= C115(x) ; C115(x) ::= C116(x) ; C116(x) ::= C117(x) ; C117(x) ::= C118(x) ; C118(x) ::= C119(x) ; C119(x) ::= C120(x) ; C120(x) ::= C121(x) ; C121(x) ::= C122(x) ; C122(x) ::= C123(x) ; C123(x) ::= C124(x) ; C124(x) ::= C125(x) ; C125(x) ::= C126(x) ; C126(x) ::= C127(x) ; C127(x) ::= x ; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 2598,
+      "end": 2605,
+      "line": 1,
+      "column": 2599,
+      "message": "E-PARAM-LIMIT: argument of rule C127 nests 129 levels; the limit is 128"
+    }
+  },
+  {
+    "name": "limit-chain-nested",
+    "grammar": "grammar Bad { Root ::= C0('a'); C0(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C1(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C1(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C2(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C2(x) ::= ( x ) ; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 432,
+      "end": 437,
+      "line": 1,
+      "column": 433,
+      "message": "E-PARAM-LIMIT: expansion of rule C2 nests 129 levels; the limit is 128"
+    }
+  },
+  {
+    "name": "limit-chain-times-nesting",
+    "grammar": "grammar Bad { Root ::= C0('a'); C0(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C1(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C1(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C2(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C2(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C3(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C3(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C4(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C4(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C5(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C5(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C6(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C6(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C7(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C7(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C8(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C8(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C9(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C9(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C10(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C10(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C11(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C11(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C12(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C12(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C13(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C13(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C14(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C14(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C15(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C15(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C16(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C16(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C17(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C17(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C18(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C18(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C19(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C19(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C20(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C20(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C21(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C21(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C22(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C22(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C23(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C23(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C24(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C24(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C25(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C25(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C26(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C26(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C27(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C27(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C28(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C28(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C29(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C29(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C30(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C30(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C31(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C31(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C32(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C32(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C33(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C33(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C34(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C34(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C35(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C35(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C36(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C36(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C37(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C37(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C38(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C38(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C39(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C39(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C40(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C40(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C41(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C41(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C42(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C42(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C43(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C43(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C44(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C44(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C45(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C45(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C46(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C46(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C47(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C47(x) ::= ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( C48(x) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ; C48(x) ::= x ; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 516,
+      "end": 521,
+      "line": 1,
+      "column": 517,
+      "message": "E-PARAM-LIMIT: expansion of rule C4 nests 156 levels; the limit is 128"
+    }
+  },
+  {
+    "name": "limit-argument-nesting",
+    "grammar": "grammar Bad { Root ::= N0('a'); N0(x) ::= N1((x)); N1(x) ::= N2((x)); N2(x) ::= N3((x)); N3(x) ::= N4((x)); N4(x) ::= N5((x)); N5(x) ::= N6((x)); N6(x) ::= N7((x)); N7(x) ::= N8((x)); N8(x) ::= N9((x)); N9(x) ::= N10((x)); N10(x) ::= N11((x)); N11(x) ::= N12((x)); N12(x) ::= N13((x)); N13(x) ::= N14((x)); N14(x) ::= N15((x)); N15(x) ::= N16((x)); N16(x) ::= N17((x)); N17(x) ::= N18((x)); N18(x) ::= N19((x)); N19(x) ::= N20((x)); N20(x) ::= N21((x)); N21(x) ::= N22((x)); N22(x) ::= N23((x)); N23(x) ::= N24((x)); N24(x) ::= N25((x)); N25(x) ::= N26((x)); N26(x) ::= N27((x)); N27(x) ::= N28((x)); N28(x) ::= N29((x)); N29(x) ::= N30((x)); N30(x) ::= N31((x)); N31(x) ::= N32((x)); N32(x) ::= N33((x)); N33(x) ::= N34((x)); N34(x) ::= N35((x)); N35(x) ::= N36((x)); N36(x) ::= N37((x)); N37(x) ::= N38((x)); N38(x) ::= N39((x)); N39(x) ::= N40((x)); N40(x) ::= N41((x)); N41(x) ::= N42((x)); N42(x) ::= N43((x)); N43(x) ::= N44((x)); N44(x) ::= N45((x)); N45(x) ::= N46((x)); N46(x) ::= N47((x)); N47(x) ::= N48((x)); N48(x) ::= N49((x)); N49(x) ::= N50((x)); N50(x) ::= N51((x)); N51(x) ::= N52((x)); N52(x) ::= N53((x)); N53(x) ::= N54((x)); N54(x) ::= N55((x)); N55(x) ::= N56((x)); N56(x) ::= N57((x)); N57(x) ::= N58((x)); N58(x) ::= N59((x)); N59(x) ::= N60((x)); N60(x) ::= N61((x)); N61(x) ::= N62((x)); N62(x) ::= N63((x)); N63(x) ::= N64((x)); N64(x) ::= N65((x)); N65(x) ::= N66((x)); N66(x) ::= N67((x)); N67(x) ::= N68((x)); N68(x) ::= N69((x)); N69(x) ::= N70((x)); N70(x) ::= N71((x)); N71(x) ::= N72((x)); N72(x) ::= N73((x)); N73(x) ::= N74((x)); N74(x) ::= N75((x)); N75(x) ::= N76((x)); N76(x) ::= N77((x)); N77(x) ::= N78((x)); N78(x) ::= N79((x)); N79(x) ::= N80((x)); N80(x) ::= N81((x)); N81(x) ::= N82((x)); N82(x) ::= N83((x)); N83(x) ::= N84((x)); N84(x) ::= N85((x)); N85(x) ::= N86((x)); N86(x) ::= N87((x)); N87(x) ::= N88((x)); N88(x) ::= N89((x)); N89(x) ::= N90((x)); N90(x) ::= N91((x)); N91(x) ::= N92((x)); N92(x) ::= N93((x)); N93(x) ::= N94((x)); N94(x) ::= N95((x)); N95(x) ::= N96((x)); N96(x) ::= N97((x)); N97(x) ::= N98((x)); N98(x) ::= N99((x)); N99(x) ::= N100((x)); N100(x) ::= N101((x)); N101(x) ::= N102((x)); N102(x) ::= N103((x)); N103(x) ::= N104((x)); N104(x) ::= N105((x)); N105(x) ::= N106((x)); N106(x) ::= N107((x)); N107(x) ::= N108((x)); N108(x) ::= N109((x)); N109(x) ::= N110((x)); N110(x) ::= N111((x)); N111(x) ::= N112((x)); N112(x) ::= N113((x)); N113(x) ::= N114((x)); N114(x) ::= N115((x)); N115(x) ::= N116((x)); N116(x) ::= N117((x)); N117(x) ::= N118((x)); N118(x) ::= N119((x)); N119(x) ::= N120((x)); N120(x) ::= N121((x)); N121(x) ::= N122((x)); N122(x) ::= N123((x)); N123(x) ::= N124((x)); N124(x) ::= N125((x)); N125(x) ::= N126((x)); N126(x) ::= N127((x)); N127(x) ::= N128((x)); N128(x) ::= N129((x)); N129(x) ::= N130((x)); N130(x) ::= N131((x)); N131(x) ::= N132((x)); N132(x) ::= N133((x)); N133(x) ::= N134((x)); N134(x) ::= N135((x)); N135(x) ::= N136((x)); N136(x) ::= N137((x)); N137(x) ::= N138((x)); N138(x) ::= N139((x)); N139(x) ::= N140((x)); N140(x) ::= N141((x)); N141(x) ::= N142((x)); N142(x) ::= N143((x)); N143(x) ::= N144((x)); N144(x) ::= N145((x)); N145(x) ::= N146((x)); N146(x) ::= N147((x)); N147(x) ::= N148((x)); N148(x) ::= N149((x)); N149(x) ::= N150((x)); N150(x) ::= N151((x)); N151(x) ::= N152((x)); N152(x) ::= N153((x)); N153(x) ::= N154((x)); N154(x) ::= N155((x)); N155(x) ::= N156((x)); N156(x) ::= N157((x)); N157(x) ::= N158((x)); N158(x) ::= N159((x)); N159(x) ::= N160((x)); N160(x) ::= N161((x)); N161(x) ::= N162((x)); N162(x) ::= N163((x)); N163(x) ::= N164((x)); N164(x) ::= N165((x)); N165(x) ::= N166((x)); N166(x) ::= N167((x)); N167(x) ::= N168((x)); N168(x) ::= N169((x)); N169(x) ::= N170((x)); N170(x) ::= N171((x)); N171(x) ::= N172((x)); N172(x) ::= N173((x)); N173(x) ::= N174((x)); N174(x) ::= N175((x)); N175(x) ::= N176((x)); N176(x) ::= N177((x)); N177(x) ::= N178((x)); N178(x) ::= N179((x)); N179(x) ::= N180((x)); N180(x) ::= N181((x)); N181(x) ::= N182((x)); N182(x) ::= N183((x)); N183(x) ::= N184((x)); N184(x) ::= N185((x)); N185(x) ::= N186((x)); N186(x) ::= N187((x)); N187(x) ::= N188((x)); N188(x) ::= N189((x)); N189(x) ::= N190((x)); N190(x) ::= N191((x)); N191(x) ::= N192((x)); N192(x) ::= N193((x)); N193(x) ::= N194((x)); N194(x) ::= N195((x)); N195(x) ::= N196((x)); N196(x) ::= N197((x)); N197(x) ::= N198((x)); N198(x) ::= N199((x)); N199(x) ::= N200((x)); N200(x) ::= 'a'; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 1347,
+      "end": 1355,
+      "line": 1,
+      "column": 1348,
+      "message": "E-PARAM-LIMIT: argument of rule N64 nests 130 levels; the limit is 128"
+    }
+  },
+  {
+    "name": "limit-nesting",
+    "grammar": "grammar Bad { Root ::= F((((((((((('a'))))))))))); F(x) ::= ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((x)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))); }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-LIMIT",
+      "start": 23,
+      "end": 49,
+      "line": 1,
+      "column": 24,
+      "message": "E-PARAM-LIMIT: expansion of rule F nests 132 levels; the limit is 128"
+    }
+  }
+]
