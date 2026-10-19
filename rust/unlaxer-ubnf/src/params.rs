@@ -18,7 +18,7 @@
 //! `SAME_AS(F(=p))`. See docs/call-by-value-arguments.md.
 use crate::ast::*;
 use crate::{diagnostic, Diagnostic, DiagnosticKind};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 /// Total atomic elements in all expanded instances, aligned with the existing
 /// 65536-visit traversal limits of the generators.
@@ -778,34 +778,46 @@ impl Expander<'_> {
     }
 }
 
-/// What a walk of a written body meets, with the rules with value parameters whose
-/// CAPTURE_SCOPE encloses it relative to that body.
+/// What a walk of a written body meets, with the enclosing value scopes relative to that
+/// body (as [`Least`]).
 enum Event<'a> {
     Use(&'a str),
     Call(usize),
     Capture(&'a str, Span),
 }
 
-type Rules = BTreeSet<usize>;
+/// A set of rules with value parameters, kept only as what the report needs: whether it
+/// is empty, and otherwise its rule with the smallest name. Merging is `least`, so the
+/// analysis stays linear however many scopes surround a position.
+type Least = Option<usize>;
+
+fn least(rules: &[RuleDecl], a: Least, b: Least) -> Least {
+    match (a, b) {
+        (Some(x), Some(y)) => Some(if rules[y].name < rules[x].name { y } else { x }),
+        (a, None) => a,
+        (None, b) => b,
+    }
+}
 
 /// How each argument of each parameterized rule lands once expanded (#704): whether its
 /// content is materialized at all (`kept`), and which value scopes of that rule's expansion
 /// enclose it (`scopes`). Arguments that are never used are discarded with their content.
 struct Flow<'a> {
+    rules: &'a [RuleDecl],
     calls: &'a [Call],
     defs: &'a HashMap<&'a str, Def<'a>>,
     kept: Vec<Vec<bool>>,
-    scopes: Vec<Vec<Rules>>,
+    scopes: Vec<Vec<Least>>,
 }
 
 impl<'a> Flow<'a> {
-    fn walk(&self, body: &'a RuleBody, rel: &Rules, out: &mut Vec<(Event<'a>, Rules)>) {
+    fn walk(&self, body: &'a RuleBody, rel: Least, out: &mut Vec<(Event<'a>, Least)>) {
         for element in body.alternatives.iter().flat_map(|s| &s.elements) {
             self.atomic(&element.element, rel, out);
         }
     }
 
-    fn atomic(&self, element: &'a AtomicElement, rel: &Rules, out: &mut Vec<(Event<'a>, Rules)>) {
+    fn atomic(&self, element: &'a AtomicElement, rel: Least, out: &mut Vec<(Event<'a>, Least)>) {
         match &element.kind {
             ElementKind::RuleRef {
                 namespace: None,
@@ -814,19 +826,18 @@ impl<'a> Flow<'a> {
                 Some(index) => {
                     let call = &self.calls[index];
                     let callee = self.defs[call.name.as_str()].rule;
-                    out.push((Event::Call(callee), rel.clone()));
+                    out.push((Event::Call(callee), rel));
                     for (j, argument) in call.args.iter().enumerate() {
                         if self.kept[callee][j] {
-                            let inner: Rules =
-                                rel.union(&self.scopes[callee][j]).copied().collect();
-                            self.walk(argument, &inner, out);
+                            let inner = least(self.rules, rel, self.scopes[callee][j]);
+                            self.walk(argument, inner, out);
                         }
                     }
                 }
-                None => out.push((Event::Use(name), rel.clone())),
+                None => out.push((Event::Use(name), rel)),
             },
             ElementKind::OwnedCapture { name, body } => {
-                out.push((Event::Capture(name, element.span), rel.clone()));
+                out.push((Event::Capture(name, element.span), rel));
                 self.walk(body, rel, out);
             }
             ElementKind::RuleRef { .. }
@@ -899,6 +910,7 @@ fn reject_scoped_captures(
         }
     }
     let mut flow = Flow {
+        rules,
         calls,
         defs,
         kept: owned
@@ -907,20 +919,19 @@ fn reject_scoped_captures(
             .collect(),
         scopes: owned
             .iter()
-            .map(|d| vec![Rules::new(); d.map_or(0, |d| d.params.len())])
+            .map(|d| vec![None; d.map_or(0, |d| d.params.len())])
             .collect(),
     };
-    let empty = Rules::new();
     for &rule in &order {
         let def = owned[rule].expect("parameterized definition");
         let mut events = Vec::new();
-        flow.walk(&rules[rule].body, &empty, &mut events);
+        flow.walk(&rules[rule].body, None, &mut events);
         let value = def.values.as_ref().map(|(captures, _)| captures);
         for (event, rel) in events {
             if let Event::Use(name) = event {
                 if let Some(j) = def.params.iter().position(|p| p == name) {
                     flow.kept[rule][j] = true;
-                    flow.scopes[rule][j].extend(rel);
+                    flow.scopes[rule][j] = least(rules, flow.scopes[rule][j], rel);
                 }
             }
         }
@@ -929,21 +940,18 @@ fn reject_scoped_captures(
                 if capture.is_some() {
                     // A value argument is matched by the CAPTURE at the top of the scope.
                     flow.kept[rule][j] = true;
-                    flow.scopes[rule][j] = Rules::from([rule]);
+                    flow.scopes[rule][j] = Some(rule);
                 } else if flow.kept[rule][j] {
-                    flow.scopes[rule][j].insert(rule);
+                    flow.scopes[rule][j] = least(rules, flow.scopes[rule][j], Some(rule));
                 }
             }
         }
     }
     // Scopes around each parameterized rule's expansion, from its callers (callers first).
-    let mut around: Vec<Rules> = owned
+    let mut around: Vec<Least> = owned
         .iter()
         .enumerate()
-        .map(|(i, d)| match d {
-            Some(d) if d.values.is_some() => Rules::from([i]),
-            _ => Rules::new(),
-        })
+        .map(|(i, d)| d.and_then(|d| d.values.as_ref()).map(|_| i))
         .collect();
     let bodies: Vec<usize> = (0..rules.len())
         .filter(|&i| !defs.contains_key(rules[i].name.as_str()))
@@ -951,39 +959,36 @@ fn reject_scoped_captures(
         .collect();
     for &rule in &bodies {
         let mut events = Vec::new();
-        flow.walk(&rules[rule].body, &empty, &mut events);
+        flow.walk(&rules[rule].body, None, &mut events);
         for (event, rel) in events {
             if let Event::Call(callee) = event {
-                let outer: Rules = rel.union(&around[rule]).copied().collect();
-                around[callee].extend(outer);
+                let outer = least(rules, rel, around[rule]);
+                around[callee] = least(rules, around[callee], outer);
             }
         }
     }
-    let mut least: Option<(usize, &str, &str, Span)> = None;
+    let mut found: Option<(usize, &str, &str, Span)> = None;
     for &rule in &bodies {
         let mut events = Vec::new();
-        flow.walk(&rules[rule].body, &empty, &mut events);
+        flow.walk(&rules[rule].body, None, &mut events);
         for (event, rel) in events {
             let Event::Capture(name, span) = event else {
                 continue;
             };
-            let Some(scope) = rel
-                .union(&around[rule])
-                .map(|&r| rules[r].name.as_str())
-                .min()
+            let Some(scope) = least(rules, rel, around[rule]).map(|r| rules[r].name.as_str())
             else {
                 continue;
             };
             let candidate = (span.codepoint_start, scope, name, span);
-            if least
+            if found
                 .as_ref()
                 .is_none_or(|l| (candidate.0, candidate.1) < (l.0, l.1))
             {
-                least = Some(candidate);
+                found = Some(candidate);
             }
         }
     }
-    match least {
+    match found {
         Some((_, scope, name, span)) => Err(error(source, span, format!(
             "E-PARAM-CAPTURE: CAPTURE({name}, ...) cannot appear in the body or call arguments of rule {scope}, whose value parameters restore every capture when it returns"
         ))),

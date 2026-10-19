@@ -273,6 +273,34 @@ public class CallByValueConformanceTest {
         }
     }
 
+    /** {@code Root ::= D0('b'); Dk(y) ::= Ek(D(k+1)(y)) Ek(y); Ek(=x) ::= x;}, or by name. */
+    private static String fan(int n, boolean byValue) {
+        StringBuilder source = new StringBuilder("grammar G { Root ::= D0('b'); ");
+        for (int k = 0; k < n; k++)
+            source.append("D").append(k).append("(y) ::= E").append(k).append("(D").append(k + 1).append("(y)) E").append(k)
+                .append("(y); E").append(k).append(byValue ? "(=x)" : "(x)").append(" ::= x; ");
+        return source.append("D").append(n).append("(y) ::= y; }").toString();
+    }
+
+    /**
+     * The value-scope analysis keeps one rule per scope set, so a wide fan of value calls costs
+     * about what the same grammar costs by name (review of #711: merging whole sets was quadratic
+     * in time and memory). Allocated bytes are deterministic, unlike time.
+     */
+    @Test public void valueScopeAnalysisStaysLinearOnAWideFan() {
+        var bean = (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+        long[] bytes = new long[2];
+        for (int i = 0; i < 2; i++) {
+            String source = fan(4000, i == 0);
+            long before = bean.getCurrentThreadAllocatedBytes();
+            var error = assertThrows(ParameterizedRules.ExpansionException.class, () -> UBNFMapper.parse(source));
+            bytes[i] = bean.getCurrentThreadAllocatedBytes() - before;
+            assertEquals("E-PARAM-LIMIT", error.code());
+        }
+        System.out.println("[fan] value / by-name allocated bytes: " + bytes[0] + " / " + bytes[1]);
+        assertTrue(Arrays.toString(bytes), bytes[0] < bytes[1] + bytes[1] / 20);
+    }
+
     @Test public void generatedCaptureNamesCannotBeWritten() {
         for (String source : List.of("grammar G { Root ::= CAPTURE(F(=x), 'a'); }", "grammar G { Root ::= SAME_AS(F(=x)); }")) {
             var error = assertThrows(source, IllegalArgumentException.class, () -> UBNFMapper.parse(source));

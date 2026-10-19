@@ -449,17 +449,27 @@ public final class ParameterizedRules {
         // Captures inside value scopes (#704), decided on the written grammar
         // =====================================================================
 
-        /** How each argument lands once expanded: materialized at all, and inside which value scopes. */
+        /**
+         * How each argument lands once expanded: materialized at all, and inside which value scopes.
+         * A set of scopes is kept only as what the report needs, as in Rust: null when empty, else
+         * its rule with the smallest name, merged with {@link #least}; the analysis stays linear.
+         */
         boolean[][] kept;
-        List<List<java.util.TreeSet<Integer>>> argumentScopes;
+        Integer[][] argumentScopes;
+
+        Integer least(Integer a, Integer b) {
+            if (a == null) return b;
+            if (b == null) return a;
+            return rules.get(b).name().compareTo(rules.get(a).name()) < 0 ? b : a;
+        }
 
         /** A walk event: {kind ('u' use, 'c' call, 'k' capture), payload, enclosing scopes}. */
-        private void walk(RuleBody body, java.util.TreeSet<Integer> rel, List<Object[]> out) {
+        private void walk(RuleBody body, Integer rel, List<Object[]> out) {
             for (SequenceBody sequence : alternatives(body))
                 for (AnnotatedElement element : sequence.elements()) walk(element.element(), rel, out);
         }
 
-        private void walk(AtomicElement element, java.util.TreeSet<Integer> rel, List<Object[]> out) {
+        private void walk(AtomicElement element, Integer rel, List<Object[]> out) {
             if (element instanceof RuleRefElement ref) {
                 if (ref.namespace().isPresent()) return;
                 int index = callIndex(ref);
@@ -472,9 +482,7 @@ public final class ParameterizedRules {
                 out.add(new Object[] {'c', callee, rel});
                 for (int j = 0; j < call.args().size(); j++) {
                     if (!kept[callee][j]) continue;
-                    var inner = new java.util.TreeSet<Integer>(rel);
-                    inner.addAll(argumentScopes.get(callee).get(j));
-                    walk(call.args().get(j), inner, out);
+                    walk(call.args().get(j), least(rel, argumentScopes[callee][j]), out);
                 }
             } else if (element instanceof OwnedCaptureElement capture) {
                 out.add(new Object[] {'k', capture, rel});
@@ -530,15 +538,13 @@ public final class ParameterizedRules {
                 }
             }
             kept = new boolean[rules.size()][];
-            argumentScopes = new ArrayList<>();
+            argumentScopes = new Integer[rules.size()][];
             for (int i = 0; i < rules.size(); i++) {
                 int n = owned[i] == null ? 0 : owned[i].params().size();
                 kept[i] = new boolean[n];
-                List<java.util.TreeSet<Integer>> list = new ArrayList<>();
-                for (int j = 0; j < n; j++) list.add(new java.util.TreeSet<>());
-                argumentScopes.add(list);
+                argumentScopes[i] = new Integer[n];
             }
-            var empty = new java.util.TreeSet<Integer>();
+            Integer empty = null;
             for (int rule : order) {
                 Def def = owned[rule];
                 List<Object[]> events = new ArrayList<>();
@@ -548,28 +554,23 @@ public final class ParameterizedRules {
                     int j = def.params().indexOf((String) event[1]);
                     if (j < 0) continue;
                     kept[rule][j] = true;
-                    @SuppressWarnings("unchecked") var rel = (java.util.TreeSet<Integer>) event[2];
-                    argumentScopes.get(rule).get(j).addAll(rel);
+                    argumentScopes[rule][j] = least(argumentScopes[rule][j], (Integer) event[2]);
                 }
                 if (def.captures() != null) {
                     for (int j = 0; j < def.params().size(); j++) {
                         if (def.captures().get(j) != null) {
                             // A value argument is matched by the CAPTURE at the top of the scope.
                             kept[rule][j] = true;
-                            argumentScopes.get(rule).set(j, new java.util.TreeSet<>(List.of(rule)));
+                            argumentScopes[rule][j] = rule;
                         } else if (kept[rule][j]) {
-                            argumentScopes.get(rule).get(j).add(rule);
+                            argumentScopes[rule][j] = least(argumentScopes[rule][j], rule);
                         }
                     }
                 }
             }
             // Scopes around each parameterized rule's expansion, from its callers (callers first).
-            List<java.util.TreeSet<Integer>> around = new ArrayList<>();
-            for (int i = 0; i < rules.size(); i++) {
-                var set = new java.util.TreeSet<Integer>();
-                if (owned[i] != null && owned[i].captures() != null) set.add(i);
-                around.add(set);
-            }
+            Integer[] around = new Integer[rules.size()];
+            for (int i = 0; i < rules.size(); i++) if (owned[i] != null && owned[i].captures() != null) around[i] = i;
             List<Integer> bodies = new ArrayList<>();
             for (int i = 0; i < rules.size(); i++) if (!defs.containsKey(rules.get(i).name())) bodies.add(i);
             for (int k = order.size() - 1; k >= 0; k--) bodies.add(order.get(k));
@@ -578,33 +579,30 @@ public final class ParameterizedRules {
                 walk(rules.get(rule).body(), empty, events);
                 for (Object[] event : events) {
                     if ((Character) event[0] != 'c') continue;
-                    @SuppressWarnings("unchecked") var rel = (java.util.TreeSet<Integer>) event[2];
-                    around.get((Integer) event[1]).addAll(rel);
-                    around.get((Integer) event[1]).addAll(around.get(rule));
+                    int callee = (Integer) event[1];
+                    around[callee] = least(around[callee], least((Integer) event[2], around[rule]));
                 }
             }
-            OwnedCaptureElement least = null;
+            OwnedCaptureElement found = null;
             String leastScope = null;
             for (int rule : bodies) {
                 List<Object[]> events = new ArrayList<>();
                 walk(rules.get(rule).body(), empty, events);
                 for (Object[] event : events) {
                     if ((Character) event[0] != 'k') continue;
-                    @SuppressWarnings("unchecked") var rel = (java.util.TreeSet<Integer>) event[2];
-                    String scope = null;
-                    for (var set : List.of(rel, around.get(rule)))
-                        for (int r : set) if (scope == null || rules.get(r).name().compareTo(scope) < 0) scope = rules.get(r).name();
-                    if (scope == null) continue;
+                    Integer enclosing = least((Integer) event[2], around[rule]);
+                    if (enclosing == null) continue;
+                    String scope = rules.get(enclosing).name();
                     var capture = (OwnedCaptureElement) event[1];
                     int start = span(capture).start();
-                    if (least == null || start < span(least).start()
-                            || start == span(least).start() && scope.compareTo(leastScope) < 0) {
-                        least = capture;
+                    if (found == null || start < span(found).start()
+                            || start == span(found).start() && scope.compareTo(leastScope) < 0) {
+                        found = capture;
                         leastScope = scope;
                     }
                 }
             }
-            if (least != null) throw error(span(least), "E-PARAM-CAPTURE: CAPTURE(" + least.name()
+            if (found != null) throw error(span(found), "E-PARAM-CAPTURE: CAPTURE(" + found.name()
                 + ", ...) cannot appear in the body or call arguments of rule " + leastScope
                 + ", whose value parameters restore every capture when it returns");
         }

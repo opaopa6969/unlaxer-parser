@@ -335,3 +335,33 @@ fn reordering_declarations_does_not_change_the_result() {
         }
     }
 }
+
+/// `Root ::= D0('b'); Dk(y) ::= Ek(D(k+1)(y)) Ek(y); Ek(=x) ::= x;`, or by name.
+fn fan(n: usize, by_value: bool) -> String {
+    let mut source = String::from("grammar G { Root ::= D0('b'); ");
+    let marker = if by_value { "=" } else { "" };
+    for k in 0..n {
+        source.push_str(&format!(
+            "D{k}(y) ::= E{k}(D{}(y)) E{k}(y); E{k}({marker}x) ::= x; ",
+            k + 1
+        ));
+    }
+    source.push_str(&format!("D{n}(y) ::= y; }}"));
+    source
+}
+
+/// The value-scope analysis keeps one rule per scope set, so a wide fan of value calls
+/// costs about what the same grammar costs by name (review of #711: merging whole sets was
+/// quadratic, 34 s and 8 GB at this size in release). The bound is loose against load.
+#[test]
+fn value_scope_analysis_stays_linear_on_a_wide_fan() {
+    let mut seconds = Vec::new();
+    for by_value in [true, false] {
+        let source = fan(16_000, by_value);
+        let start = std::time::Instant::now();
+        let error = unlaxer_ubnf::parse(&source).unwrap_err();
+        seconds.push(start.elapsed().as_secs_f64());
+        assert!(error.message.starts_with("E-PARAM-LIMIT:"), "{error}");
+    }
+    assert!(seconds[0] < 10.0 * seconds[1] + 2.0, "{seconds:?}");
+}
