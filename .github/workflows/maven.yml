@@ -261,7 +261,7 @@ jobs:
     - name: Require call-by-value conformance evidence
       run: |
         awk 'END {exit NR != 433}' unlaxer-dsl/target/call-by-value-java.tsv
-        awk 'END {exit NR != 42}' unlaxer-dsl/target/call-by-value-rust.tsv
+        awk 'END {exit NR != 50}' unlaxer-dsl/target/call-by-value-rust.tsv
     - uses: actions/upload-artifact@v4
       with:
         name: rust-conformance

@@ -368,6 +368,40 @@ relayed = [
 ]
 for name, g in relayed:
     reject(name, g, "E-PARAM-CAPTURE", "CAPTURE(u, 'b')", scoped("F", "u"))
+# Decided on the written grammar, not on which call created a shared instance first: a CAPTURE
+# written in a parameterized definition whose call lies inside a value scope is inside it
+# (the review's c10-c13, also when the same instance was created earlier outside the scope),
+# and only the CAPTURE actually relayed into the scope is reported (c14/c15).
+inner = [
+    ("value-capture-in-called-definition",
+     "grammar Bad { Root ::= F('a', Tok('b')); F(=x, z) ::= x z; Tok(p) ::= CAPTURE(u, p) SAME_AS(u); }",
+     "CAPTURE(u, p)", 0),
+    ("value-capture-in-nested-definition",
+     "grammar Bad { Root ::= F('a', Tok('b')); F(=x, z) ::= x z; Tok(p) ::= H2(CAPTURE(u, p)); H2(w) ::= w; }",
+     "CAPTURE(u, p)", 0),
+    ("value-capture-in-nested-definition-shared-earlier",
+     "grammar Bad { Root ::= Tok('b') F('a', Tok('b')); F(=x, z) ::= x z; Tok(p) ::= H2(CAPTURE(u, p)); H2(w) ::= w; }",
+     "CAPTURE(u, p)", 0),
+    ("value-capture-in-definition-of-value-argument",
+     "grammar Bad { Root ::= F(Tok('b')); F(=x) ::= x; Tok(p) ::= H2(CAPTURE(u, p)); H2(w) ::= w; }",
+     "CAPTURE(u, p)", 0),
+    ("value-capture-in-definition-of-value-argument-shared-earlier",
+     "grammar Bad { Root ::= Tok('b') F(Tok('b')); F(=x) ::= x; Tok(p) ::= H2(CAPTURE(u, p)); H2(w) ::= w; }",
+     "CAPTURE(u, p)", 0),
+    ("value-capture-relayed-after-shared-instance",
+     "grammar Bad { Root ::= A(CAPTURE(u, 'b')) B(CAPTURE(u, 'b')); A(y) ::= H2(y); B(y) ::= F('a', H2(y)); F(=x, z) ::= x z; H2(w) ::= w; }",
+     "CAPTURE(u, 'b')", 1),
+    ("value-capture-relayed-before-shared-instance",
+     "grammar Bad { Root ::= B(CAPTURE(u, 'b')) A(CAPTURE(u, 'b')); A(y) ::= H2(y); B(y) ::= F('a', H2(y)); F(=x, z) ::= x z; H2(w) ::= w; }",
+     "CAPTURE(u, 'b')", 0),
+]
+# Checked before expansion, so it precedes an element limit that expansion would hit first.
+chain = " ".join("D%d(y) ::= D%d(y y);" % (k, k - 1) for k in range(1, 15))
+inner.append(("value-capture-before-expansion-limit",
+    "grammar Bad { Root ::= D14('a') A(CAPTURE(u, 'b')); A(y) ::= F('a', y); F(=x, z) ::= x z; D0(y) ::= y; " + chain + " }",
+    "CAPTURE(u, 'b')", 0))
+for name, g, needle, occurrence in inner:
+    reject(name, g, "E-PARAM-CAPTURE", needle, scoped("F", "u"), occurrence=occurrence)
 # SAME_AS(x) would read a user binding x, never the value parameter x.
 g = "grammar Bad { Root ::= F('a'); F(=x) ::= SAME_AS(x) x; }"
 reject("value-same-as-parameter", g, "E-PARAM-SHADOW", "SAME_AS(x)",

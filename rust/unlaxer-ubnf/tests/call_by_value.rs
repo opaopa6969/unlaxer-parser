@@ -132,7 +132,7 @@ fn corpus_expansions_equal_hand_written_capture_grammars() {
         }
         accepted += 1;
     }
-    assert_eq!((accepted, rejected), (8, 25));
+    assert_eq!((accepted, rejected), (8, 33));
 }
 
 /// The SAME_AS replacing a use keeps that use's span; synthetic wrappers take the body's.
@@ -251,16 +251,87 @@ fn by_name_parameters_are_unchanged() {
     assert_eq!(canonical::file(&by_name), canonical::file(&hand));
 }
 
-/// Captures that do not end up inside a value scope stay legal: a relayed CAPTURE used
-/// outside the value call, and a CAPTURE written in a by-name definition (an ordinary rule
-/// body, restored on return exactly as with a hand-written CAPTURE_SCOPE).
+/// Captures that never run inside a value scope stay legal: relayed outside the value
+/// call, discarded by the callee, an unused by-name argument, or by-name rules only.
+const OUTSIDE_VALUE_SCOPES: [&str; 6] = [
+    "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= y F('a'); F(=x) ::= x; }",
+    "grammar G { Root ::= H2(CAPTURE(u, 'b')) F('a') SAME_AS(u); F(=x) ::= x; H2(w) ::= w; }",
+    "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= y F(Drop(y)); F(=x) ::= x; Drop(w) ::= 'c'; }",
+    "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= y F('a', y); F(=x, z) ::= x; }",
+    "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= B(y); B(y) ::= y; }",
+    "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= H(y) F('a'); H(z) ::= z; F(=x) ::= x; }",
+];
+
 #[test]
 fn captures_outside_value_scopes_are_accepted() {
-    for source in [
-        "grammar G { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= y F('a'); F(=x) ::= x x; }",
-        "grammar G { Root ::= F('a', Tok('b')); Tok(p) ::= CAPTURE(u, p) SAME_AS(u); F(=x, k) ::= x k; }",
-        "grammar G { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= H(y) F('a'); H(z) ::= z; F(=x) ::= x; }",
-    ] {
+    for source in OUTSIDE_VALUE_SCOPES {
         unlaxer_ubnf::parse(source).unwrap_or_else(|e| panic!("{source}: {e}"));
+    }
+}
+
+/// `grammar G { d1; d2; ... }` split into its declarations (test grammars only: no `;` or
+/// braces inside literals).
+fn declarations(source: &str) -> (String, Vec<String>) {
+    let open = source.find('{').unwrap() + 1;
+    let close = source.rfind('}').unwrap();
+    let decls = source[open..close]
+        .split(';')
+        .map(str::trim)
+        .filter(|d| !d.is_empty())
+        .map(|d| format!("{d};"))
+        .collect();
+    (source[..open].to_owned(), decls)
+}
+
+/// The outcome with the error position given as (declaration, offset in it), so that it
+/// can be compared across orders of the same declarations.
+fn outcome(head: &str, decls: &[String]) -> Result<(), (String, String, usize)> {
+    let mut source = head.to_owned();
+    let mut starts = Vec::new();
+    for decl in decls {
+        source.push(' ');
+        starts.push(source.chars().count());
+        source.push_str(decl);
+    }
+    source.push_str(" }");
+    unlaxer_ubnf::parse(&source).map(|_| ()).map_err(|e| {
+        let at = e.span.codepoint_start;
+        let k = starts.iter().rposition(|&s| s <= at).unwrap();
+        (e.message, decls[k].clone(), at - starts[k])
+    })
+}
+
+/// Reordering the declarations (so that instances are created, and shared, in another
+/// order) changes neither the verdict nor the reported CAPTURE.
+#[test]
+fn reordering_declarations_does_not_change_the_result() {
+    let mut sources: Vec<String> = OUTSIDE_VALUE_SCOPES.iter().map(|s| s.to_string()).collect();
+    for case in cases() {
+        let code = case
+            .get("error")
+            .and_then(|e| e.get("code"))
+            .and_then(Json::text);
+        if code == Some("E-PARAM-CAPTURE") {
+            sources.push(case.required_text("grammar", "case").to_owned());
+        }
+    }
+    assert!(sources.len() > 20);
+    for source in &sources {
+        let (head, decls) = declarations(source);
+        let expected = outcome(&head, &decls);
+        let n = decls.len();
+        let mut orders: Vec<Vec<String>> = vec![decls.iter().rev().cloned().collect()];
+        for shift in 1..n {
+            orders.push(
+                decls[shift..]
+                    .iter()
+                    .chain(&decls[..shift])
+                    .cloned()
+                    .collect(),
+            );
+        }
+        for order in orders {
+            assert_eq!(outcome(&head, &order), expected, "{source}\n{order:?}");
+        }
     }
 }

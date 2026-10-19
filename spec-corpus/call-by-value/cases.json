@@ -1144,6 +1144,118 @@
     }
   },
   {
+    "name": "value-capture-in-called-definition",
+    "grammar": "grammar Bad { Root ::= F('a', Tok('b')); F(=x, z) ::= x z; Tok(p) ::= CAPTURE(u, p) SAME_AS(u); }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 70,
+      "end": 83,
+      "line": 1,
+      "column": 71,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-in-nested-definition",
+    "grammar": "grammar Bad { Root ::= F('a', Tok('b')); F(=x, z) ::= x z; Tok(p) ::= H2(CAPTURE(u, p)); H2(w) ::= w; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 73,
+      "end": 86,
+      "line": 1,
+      "column": 74,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-in-nested-definition-shared-earlier",
+    "grammar": "grammar Bad { Root ::= Tok('b') F('a', Tok('b')); F(=x, z) ::= x z; Tok(p) ::= H2(CAPTURE(u, p)); H2(w) ::= w; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 82,
+      "end": 95,
+      "line": 1,
+      "column": 83,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-in-definition-of-value-argument",
+    "grammar": "grammar Bad { Root ::= F(Tok('b')); F(=x) ::= x; Tok(p) ::= H2(CAPTURE(u, p)); H2(w) ::= w; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 63,
+      "end": 76,
+      "line": 1,
+      "column": 64,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-in-definition-of-value-argument-shared-earlier",
+    "grammar": "grammar Bad { Root ::= Tok('b') F(Tok('b')); F(=x) ::= x; Tok(p) ::= H2(CAPTURE(u, p)); H2(w) ::= w; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 72,
+      "end": 85,
+      "line": 1,
+      "column": 73,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-relayed-after-shared-instance",
+    "grammar": "grammar Bad { Root ::= A(CAPTURE(u, 'b')) B(CAPTURE(u, 'b')); A(y) ::= H2(y); B(y) ::= F('a', H2(y)); F(=x, z) ::= x z; H2(w) ::= w; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 44,
+      "end": 59,
+      "line": 1,
+      "column": 45,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-relayed-before-shared-instance",
+    "grammar": "grammar Bad { Root ::= B(CAPTURE(u, 'b')) A(CAPTURE(u, 'b')); A(y) ::= H2(y); B(y) ::= F('a', H2(y)); F(=x, z) ::= x z; H2(w) ::= w; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 25,
+      "end": 40,
+      "line": 1,
+      "column": 26,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-before-expansion-limit",
+    "grammar": "grammar Bad { Root ::= D14('a') A(CAPTURE(u, 'b')); A(y) ::= F('a', y); F(=x, z) ::= x z; D0(y) ::= y; D1(y) ::= D0(y y); D2(y) ::= D1(y y); D3(y) ::= D2(y y); D4(y) ::= D3(y y); D5(y) ::= D4(y y); D6(y) ::= D5(y y); D7(y) ::= D6(y y); D8(y) ::= D7(y y); D9(y) ::= D8(y y); D10(y) ::= D9(y y); D11(y) ::= D10(y y); D12(y) ::= D11(y y); D13(y) ::= D12(y y); D14(y) ::= D13(y y); }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 34,
+      "end": 49,
+      "line": 1,
+      "column": 35,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
     "name": "value-same-as-parameter",
     "grammar": "grammar Bad { Root ::= F('a'); F(=x) ::= SAME_AS(x) x; }",
     "status": "reject",

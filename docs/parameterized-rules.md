@@ -43,10 +43,11 @@ frontend は構文解析のあと、文法ごとに次の順で検査し、最�
    引数名の重複（`E-PARAM-DUPLICATE`）、規則名・token 名と同じ引数名（`E-PARAM-SHADOW`）。
 2. **使用**: 引数の数（`E-PARAM-ARITY`。引数なしの裸の参照 `F` と `F ('a')` は 0 個として数える）、
    定義本体の中の未定義の名前（`E-PARAM-UNDEFINED`）、
-   定義本体と実引数の中の `@capture` / `@typeof`（`E-PARAM-CAPTURE`）。値渡しの引数を持つ規則の
-   本体と実引数の中の `CAPTURE(...)`（`E-PARAM-CAPTURE`）と、本体の中で値渡しの引数と同じ名前の
-   `SAME_AS(...)`（`E-PARAM-SHADOW`）も拒否する（[値渡しの引数](call-by-value-arguments.md#値渡しの規則の中の-capture)、#704）。
-3. **循環**: 引数付きの呼び出しのグラフ（下記）が循環すれば拒否（`E-PARAM-CYCLE`）。
+   定義本体と実引数の中の `@capture` / `@typeof`（`E-PARAM-CAPTURE`）。値渡しの規則の本体の中で
+   値渡しの引数と同じ名前の `SAME_AS(...)`（`E-PARAM-SHADOW`、#704）。
+3. **循環**: 引数付きの呼び出しのグラフ（下記）が循環すれば拒否（`E-PARAM-CYCLE`）。その後、展開したときに
+   値渡しの規則の scope の中で照合されるユーザーの `CAPTURE(...)` を拒否する（`E-PARAM-CAPTURE`、
+   [値渡しの引数](call-by-value-arguments.md#値渡しの規則の中の-capture)、#704）。
 4. **展開**: 単相化する。次のどれかで拒否する（`E-PARAM-LIMIT`）。
    - 実体化した atomic 要素の合計が 65536 を超える。数えるのは、呼び出しごとに作る実引数と、
      新しく作る instance の本体（同じ鍵の呼び出しが instance を共有しても、実引数は呼び出しの度に数える）。
@@ -82,7 +83,7 @@ frontend は構文解析のあと、文法ごとに次の順で検査し、最�
 | `E-PARAM-CYCLE` | 循環を閉じる呼び出し | `F -> G -> F` の経路を示す |
 | `E-PARAM-LIMIT` | 上限を超えた呼び出し | 要素数 65536、展開の入れ子 128 |
 | `E-PARAM-ANNOTATION` | 定義 | `@mapping` などの注釈を持つ引数付き規則 |
-| `E-PARAM-CAPTURE` | 呼び出し・定義・CAPTURE | 引数・定義本体の `@capture` / `@typeof`、値渡しの規則の本体・実引数の `CAPTURE` |
+| `E-PARAM-CAPTURE` | 呼び出し・定義・CAPTURE | 引数・定義本体の `@capture` / `@typeof`、値渡しの規則の scope の中で照合される `CAPTURE` |
 | `E-PARAM-SHADOW` | 定義・SAME_AS | 規則名・token 名と同じ引数名、値渡しの引数と同名の `SAME_AS` |
 | `E-PARAM-DUPLICATE` | 定義 | 同名の規則・token、同名の引数 |
 | `E-PARAM-RESERVED` | 定義 | 既存の関数形式の綴り |

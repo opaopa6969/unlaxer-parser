@@ -134,7 +134,7 @@ public class CallByValueConformanceTest {
             }
             accepted++;
         }
-        assertEquals(List.of(8, 25), List.of(accepted, rejected));
+        assertEquals(List.of(8, 33), List.of(accepted, rejected));
     }
 
     /** Each SAME_AS keeps the span of the use it replaces; the wrappers take the body's span. */
@@ -204,13 +204,73 @@ public class CallByValueConformanceTest {
         assertEquals(42, UBNFMapper.parse(source.append("}").toString()).grammars().get(0).rules().size());
     }
 
-    /** Captures that do not end up inside a value scope stay legal (as in Rust). */
+    /**
+     * Captures that never run inside a value scope stay legal: relayed outside the value call,
+     * discarded by the callee, an unused by-name argument, or by-name rules only (as in Rust).
+     */
+    private static final List<String> OUTSIDE_VALUE_SCOPES = List.of(
+        "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= y F('a'); F(=x) ::= x; }",
+        "grammar G { Root ::= H2(CAPTURE(u, 'b')) F('a') SAME_AS(u); F(=x) ::= x; H2(w) ::= w; }",
+        "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= y F(Drop(y)); F(=x) ::= x; Drop(w) ::= 'c'; }",
+        "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= y F('a', y); F(=x, z) ::= x; }",
+        "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= B(y); B(y) ::= y; }",
+        "grammar G { Root ::= A(CAPTURE(u, 'b')) SAME_AS(u); A(y) ::= H(y) F('a'); H(z) ::= z; F(=x) ::= x; }");
+
     @Test public void capturesOutsideValueScopesAreAccepted() {
-        for (String source : List.of(
-                "grammar G { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= y F('a'); F(=x) ::= x x; }",
-                "grammar G { Root ::= F('a', Tok('b')); Tok(p) ::= CAPTURE(u, p) SAME_AS(u); F(=x, k) ::= x k; }",
-                "grammar G { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= H(y) F('a'); H(z) ::= z; F(=x) ::= x; }"))
+        for (String source : OUTSIDE_VALUE_SCOPES)
             assertFalse(source, UBNFMapper.parse(source).grammars().get(0).rules().isEmpty());
+    }
+
+    /** The outcome with the error position as (declaration, offset in it), comparable across orders. */
+    private static String outcome(String head, List<String> declarations) {
+        StringBuilder source = new StringBuilder(head);
+        List<Integer> starts = new ArrayList<>();
+        for (String declaration : declarations) {
+            source.append(' ');
+            starts.add(source.codePointCount(0, source.length()));
+            source.append(declaration);
+        }
+        source.append(" }");
+        try {
+            UBNFMapper.parse(source.toString());
+            return "ok";
+        } catch (ParameterizedRules.ExpansionException error) {
+            int k = starts.size() - 1;
+            while (starts.get(k) > error.start()) k--;
+            return error.diagnostic() + " @ " + declarations.get(k) + " + " + (error.start() - starts.get(k));
+        }
+    }
+
+    /**
+     * Reordering the declarations (so that instances are created, and shared, in another order)
+     * changes neither the verdict nor the reported CAPTURE (as in Rust).
+     */
+    @Test public void reorderingDeclarationsDoesNotChangeTheResult() throws Exception {
+        List<String> sources = new ArrayList<>(OUTSIDE_VALUE_SCOPES);
+        for (var raw : cases()) {
+            var row = raw.getAsJsonObject();
+            if (row.has("error") && row.getAsJsonObject("error").get("code").getAsString().equals("E-PARAM-CAPTURE"))
+                sources.add(row.get("grammar").getAsString());
+        }
+        assertTrue(sources.size() > 20);
+        for (String source : sources) {
+            int open = source.indexOf('{') + 1, close = source.lastIndexOf('}');
+            String head = source.substring(0, open);
+            List<String> declarations = new ArrayList<>();
+            for (String declaration : source.substring(open, close).split(";"))
+                if (!declaration.isBlank()) declarations.add(declaration.trim() + ";");
+            String expected = outcome(head, declarations);
+            List<List<String>> orders = new ArrayList<>();
+            List<String> reversed = new ArrayList<>(declarations);
+            Collections.reverse(reversed);
+            orders.add(reversed);
+            for (int shift = 1; shift < declarations.size(); shift++) {
+                List<String> rotated = new ArrayList<>(declarations.subList(shift, declarations.size()));
+                rotated.addAll(declarations.subList(0, shift));
+                orders.add(rotated);
+            }
+            for (List<String> order : orders) assertEquals(source + "\n" + order, expected, outcome(head, order));
+        }
     }
 
     @Test public void generatedCaptureNamesCannotBeWritten() {
