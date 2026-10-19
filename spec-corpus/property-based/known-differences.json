@@ -1,0 +1,10 @@
+[
+  {
+    "id": "positive-lookahead-diagnostic-offset",
+    "issue": "#706",
+    "reason": "After a positive LOOKAHEAD token advances the matched cursor, Java diagnose reports the following syntax failure at the matched reach and Rust at the consumed cursor, so the Java offset is larger. Acceptance, cursors, CST and AST agree. Only that shape is excluded: java-rust:diag findings in grammars with a positive LOOKAHEAD token where both sides are syntax failures and java offset > rust offset (checked in code). The test fails when this entry excludes nothing.",
+    "kind": "java-rust:diag",
+    "grammar": "(?<!NEGATIVE_)LOOKAHEAD\\(",
+    "condition": "java-syntax-offset-after-rust"
+  }
+]
