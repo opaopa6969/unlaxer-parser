@@ -1004,6 +1004,118 @@
     }
   },
   {
+    "name": "value-capture-in-body",
+    "grammar": "grammar Bad { Root ::= F('a'); F(=x) ::= CAPTURE(u, 'q') x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 41,
+      "end": 56,
+      "line": 1,
+      "column": 42,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-in-by-name-argument",
+    "grammar": "grammar Bad { Root ::= F('a', CAPTURE(u, 'b')) SAME_AS(u); F(=x, y) ::= x y; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 30,
+      "end": 45,
+      "line": 1,
+      "column": 31,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-in-value-argument",
+    "grammar": "grammar Bad { Root ::= F(CAPTURE(u, 'a')) SAME_AS(u); F(=x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 25,
+      "end": 40,
+      "line": 1,
+      "column": 26,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-in-nested-argument",
+    "grammar": "grammar Bad { Root ::= F('a'); F(=x) ::= G(CAPTURE(u, 'q')) x; G(y) ::= y; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 43,
+      "end": 58,
+      "line": 1,
+      "column": 44,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-in-argument-of-argument",
+    "grammar": "grammar Bad { Root ::= G(F(CAPTURE(u, 'a'))); F(=x) ::= x; G(y) ::= y; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 27,
+      "end": 42,
+      "line": 1,
+      "column": 28,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-same-as-parameter",
+    "grammar": "grammar Bad { Root ::= F('a'); F(=x) ::= SAME_AS(x) x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-SHADOW",
+      "start": 41,
+      "end": 51,
+      "line": 1,
+      "column": 42,
+      "message": "E-PARAM-SHADOW: SAME_AS(x) in rule F names value parameter x; write x to replay its value"
+    }
+  },
+  {
+    "name": "value-instance-name-reference",
+    "grammar": "grammar Bad { Root ::= F('a', F('b', H_31c5b985b911e8a0)); F(=p, y) ::= y p H(p); H(y) ::= y; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-UNDEFINED",
+      "start": 37,
+      "end": 55,
+      "line": 1,
+      "column": 38,
+      "message": "E-PARAM-UNDEFINED: rule Root references 'H_31c5b985b911e8a0', which only names a rule created by parameterized expansion"
+    }
+  },
+  {
+    "name": "instance-name-reference",
+    "grammar": "grammar Bad { Root ::= F('a') F_810e17933a076cec; F(x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-UNDEFINED",
+      "start": 30,
+      "end": 48,
+      "line": 1,
+      "column": 31,
+      "message": "E-PARAM-UNDEFINED: rule Root references 'F_810e17933a076cec', which only names a rule created by parameterized expansion"
+    }
+  },
+  {
     "name": "value-name-collision",
     "grammar": "grammar Bad { Root ::= F('a'); F(=x) ::= x; F_810e17933a076cec ::= 'b'; }",
     "status": "reject",

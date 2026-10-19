@@ -132,7 +132,7 @@ fn corpus_expansions_equal_hand_written_capture_grammars() {
         }
         accepted += 1;
     }
-    assert_eq!((accepted, rejected), (8, 12));
+    assert_eq!((accepted, rejected), (8, 20));
 }
 
 /// The SAME_AS replacing a use keeps that use's span; synthetic wrappers take the body's.

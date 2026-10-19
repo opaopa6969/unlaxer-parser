@@ -336,6 +336,35 @@ g = "grammar Bad { Root ::= F('a'); F(=x) ::= y; }"
 reject("value-undefined", g, "E-PARAM-UNDEFINED", "y;", "rule F references undefined parameter, rule or token 'y'", length=1)
 g = "grammar Bad { Root ::= 'a'; SAME_AS(=x) ::= x; }"
 reject("value-reserved-name", g, "E-PARAM-RESERVED", "SAME_AS(=x) ::= x;", "parameterized rule name SAME_AS is reserved by a builtin call")
+# A rule with value parameters wraps its whole instance in CAPTURE_SCOPE, which restores
+# every binding on exit, so a user CAPTURE there would silently vanish: refuse it at the
+# CAPTURE, in the body, in any argument of a call to that rule, and in nested arguments.
+def scoped(rule, name):
+    return ("CAPTURE(%s, ...) cannot appear in the body or call arguments of rule %s, "
+            "whose value parameters restore every capture when it returns") % (name, rule)
+g = "grammar Bad { Root ::= F('a'); F(=x) ::= CAPTURE(u, 'q') x; }"
+reject("value-capture-in-body", g, "E-PARAM-CAPTURE", "CAPTURE(u, 'q')", scoped("F", "u"))
+g = "grammar Bad { Root ::= F('a', CAPTURE(u, 'b')) SAME_AS(u); F(=x, y) ::= x y; }"
+reject("value-capture-in-by-name-argument", g, "E-PARAM-CAPTURE", "CAPTURE(u, 'b')", scoped("F", "u"))
+g = "grammar Bad { Root ::= F(CAPTURE(u, 'a')) SAME_AS(u); F(=x) ::= x; }"
+reject("value-capture-in-value-argument", g, "E-PARAM-CAPTURE", "CAPTURE(u, 'a')", scoped("F", "u"))
+g = "grammar Bad { Root ::= F('a'); F(=x) ::= G(CAPTURE(u, 'q')) x; G(y) ::= y; }"
+reject("value-capture-in-nested-argument", g, "E-PARAM-CAPTURE", "CAPTURE(u, 'q')", scoped("F", "u"))
+g = "grammar Bad { Root ::= G(F(CAPTURE(u, 'a'))); F(=x) ::= x; G(y) ::= y; }"
+reject("value-capture-in-argument-of-argument", g, "E-PARAM-CAPTURE", "CAPTURE(u, 'a')", scoped("F", "u"))
+# SAME_AS(x) would read a user binding x, never the value parameter x.
+g = "grammar Bad { Root ::= F('a'); F(=x) ::= SAME_AS(x) x; }"
+reject("value-same-as-parameter", g, "E-PARAM-SHADOW", "SAME_AS(x)",
+       "SAME_AS(x) in rule F names value parameter x; write x to replay its value")
+# A written reference that only an expansion name satisfies (it would read F(=p) from outside F).
+leak = inst("H(" + y("F(=p)") + ")")
+g = "grammar Bad { Root ::= F('a', F('b', " + leak + ")); F(=p, y) ::= y p H(p); H(y) ::= y; }"
+reject("value-instance-name-reference", g, "E-PARAM-UNDEFINED", leak,
+       "rule Root references '" + leak + "', which only names a rule created by parameterized expansion")
+by_name = inst("F(" + t("a") + ")")
+g = "grammar Bad { Root ::= F('a') " + by_name + "; F(x) ::= x; }"
+reject("instance-name-reference", g, "E-PARAM-UNDEFINED", by_name,
+       "rule Root references '" + by_name + "', which only names a rule created by parameterized expansion")
 collision = inst("F(" + t("a") + ")")
 g = "grammar Bad { Root ::= F('a'); F(=x) ::= x; " + collision + " ::= 'b'; }"
 reject("value-name-collision", g, "E-PARAM-NAME-COLLISION", "F('a')", "expanded rule name " + collision + " collides with another rule, token or expansion")

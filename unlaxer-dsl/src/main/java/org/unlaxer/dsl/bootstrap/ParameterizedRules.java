@@ -344,7 +344,12 @@ public final class ParameterizedRules {
                 Def def = defs.get(rule.name());
                 boolean owner = def != null && def.rule() == index;
                 List<String> list = params.get(rule);
-                checkBody(rule.body(), new Scope(owner ? index : -1, list == null ? List.of() : list, null, span(rule)));
+                // The value parameter names of a definition that owns its name (#704).
+                List<String> values = new ArrayList<>();
+                if (owner && def.captures() != null)
+                    for (int i = 0; i < def.params().size(); i++) if (def.captures().get(i) != null) values.add(def.params().get(i));
+                checkBody(rule.body(), new Scope(owner ? index : -1, list == null ? List.of() : list, null, span(rule),
+                    index, values.isEmpty() ? -1 : index, values));
             }
             rejectCycles();
 
@@ -356,12 +361,29 @@ public final class ParameterizedRules {
                 expanded.add(body == rule.body() ? rule
                     : copy(origins, new RuleDecl(rule.annotations(), rule.name(), body), rule));
             }
+            // A written reference that only an expansion name satisfies would reach the
+            // instance (and its value bindings) from outside the call that created it.
+            for (Object[] reference : unknown) {
+                String name = (String) reference[1];
+                if (names.contains(name)) throw error((UBNFSourceSnapshot.Span) reference[2], "E-PARAM-UNDEFINED: rule "
+                    + rules.get((Integer) reference[0]).name() + " references '" + name
+                    + "', which only names a rule created by parameterized expansion");
+            }
             expanded.addAll(instances);
             return copy(origins, new GrammarDecl(grammar.name(), grammar.imports(), grammar.settings(),
                 grammar.tokens(), List.copyOf(expanded)), grammar);
         }
 
-        record Scope(int owner, List<String> params, UBNFSourceSnapshot.Span call, UBNFSourceSnapshot.Span rule) {}
+        /**
+         * {@code scoped}: the rule with value parameters whose CAPTURE_SCOPE will enclose this
+         * position (the definition being walked, or the callee whose arguments are walked);
+         * {@code values}: the value parameter names of the definition being walked (#704).
+         */
+        record Scope(int owner, List<String> params, UBNFSourceSnapshot.Span call, UBNFSourceSnapshot.Span rule,
+                int index, int scoped, List<String> values) {}
+
+        /** Undefined references outside parameterized definitions: {rule index, name, span}. */
+        final List<Object[]> unknown = new ArrayList<>();
 
         void checkBody(RuleBody body, Scope scope) {
             for (SequenceBody sequence : alternatives(body)) {
@@ -391,7 +413,8 @@ public final class ParameterizedRules {
                         + " expects " + def.params().size() + " argument(s), got " + call.args().size()
                         + "; defined at " + position(span(rules.get(def.rule()))));
                     if (scope.owner() >= 0) edges.get(scope.owner()).add(new Object[] {def.rule(), at});
-                    Scope inner = new Scope(scope.owner(), scope.params(), at, scope.rule());
+                    Scope inner = new Scope(scope.owner(), scope.params(), at, scope.rule(), scope.index(),
+                        def.captures() != null ? def.rule() : scope.scoped(), scope.values());
                     for (RuleBody argument : call.args()) checkBody(argument, inner);
                 } else if (scope.params().contains(name)) {
                     return;
@@ -402,7 +425,17 @@ public final class ParameterizedRules {
                 } else if (scope.owner() >= 0 && !known.contains(name)) {
                     throw error(span(ref), "E-PARAM-UNDEFINED: rule " + rules.get(scope.owner()).name()
                         + " references undefined parameter, rule or token '" + name + "'");
+                } else if (scope.owner() < 0 && !known.contains(name)) {
+                    unknown.add(new Object[] {scope.index(), name, span(ref)});
                 }
+            } else if (element instanceof ReplayElement replay && scope.values().contains(replay.name())) {
+                throw error(span(replay), "E-PARAM-SHADOW: SAME_AS(" + replay.name() + ") in rule "
+                    + rules.get(scope.index()).name() + " names value parameter " + replay.name() + "; write "
+                    + replay.name() + " to replay its value");
+            } else if (element instanceof OwnedCaptureElement capture && scope.scoped() >= 0) {
+                throw error(span(capture), "E-PARAM-CAPTURE: CAPTURE(" + capture.name()
+                    + ", ...) cannot appear in the body or call arguments of rule " + rules.get(scope.scoped()).name()
+                    + ", whose value parameters restore every capture when it returns");
             } else if (element instanceof UBNFAST.TransparentElement transparent) {
                 checkBody(transparent.body(), scope);
             } else if (element instanceof OptionalElement optional) {

@@ -33,8 +33,11 @@ grammar Markup {
 - `F(==x)`、`F(=)`、`F(x=)` は構文エラー。`=` のない定義は #701 と同じに展開する。
 - それ以外の検査（予約名、注釈、重複、規則名・token 名と同じ引数名、引数の数、未定義名、
   呼び出しの循環、実引数と定義本体の `@capture` / `@typeof`、展開の上限、展開名の衝突）は
-  #701 と同じ code・本文・位置で拒否する（[検査の順序](parameterized-rules.md#検査の順序)）。新しい
-  error code はない。
+  #701 と同じ code・本文・位置で拒否する（[検査の順序](parameterized-rules.md#検査の順序)）。
+- 値渡しの規則に固有の検査として、本体と実引数の中の `CAPTURE(...)`（`E-PARAM-CAPTURE`）、本体の中の
+  値渡しの引数と同じ名前の `SAME_AS(...)`（`E-PARAM-SHADOW`）、展開名にだけ一致する参照
+  （`E-PARAM-UNDEFINED`）を位置付きで拒否する（下記）。どれも既存の code で、新しい error code はない。
+  本文と位置（CP 区間・行・列）は両 host で同じ。
 
 この印を使った以前の綴りはすべて構文エラーだったので、既存の文法の意味は変わらない。
 
@@ -51,7 +54,8 @@ F_<hash> ::= CAPTURE_SCOPE(CAPTURE(F(=p1), a1) ... CAPTURE(F(=pk), ak) body') ;
 - `body'` は定義本体で、値渡しの引数の使用をすべて `SAME_AS(F(=pi))` に、名前渡しの引数を実引数に
   置き換えたもの。本体が 1 個の選択肢なら要素を CAPTURE の後に並べ、`|` を含むなら group にする。
 - 値渡しの引数は、本体より前に宣言順（左から右）に照合する（Macro PEG の CallByValueSeq と同じ順）。
-  名前渡しの引数は従来どおり使った位置で照合する。本体で使わない値渡しの引数も入力を消費する。
+  名前渡しの引数は従来どおり使った位置で照合する（ただし `CAPTURE_SCOPE` の中なので、そこでの
+  `CAPTURE` は下記のとおり拒否する）。本体で使わない値渡しの引数も入力を消費する。
 - 値渡しの引数を別の呼び出しに渡すと、その実引数は `SAME_AS(F(=p))` になる。名前渡しに渡せば
   呼び出し先の使用位置で、値渡しに渡せば呼び出し先の CAPTURE で、同じ文字列をもう一度照合する。
 - instance の名前、正規形の鍵、共有、規則の並び、上限の検査は #701 と同じ。鍵は呼び出しの実引数から
@@ -71,6 +75,42 @@ F_<hash> ::= CAPTURE_SCOPE(CAPTURE(F(=p1), a1) ... CAPTURE(F(=pk), ak) body') ;
 
 生成物はこの名前を文字列として持つだけで、識別子にはしない（Java の `NamedCapture("Body(=tag)", ...)`、
 Rust の `Expr::OwnedCapture("Body(=tag)", ...)`）。
+
+### 値渡しの規則の中の capture
+
+`CAPTURE_SCOPE` は、出るときに中で作ったすべての binding を以前の状態に戻す。値渡しの引数を 1 個でも
+持つ instance は本体全体をこの scope で包むので、そこに書いたユーザーの `CAPTURE` は呼び出しの後に
+見えなくなる。名前渡しだけの規則（#701）では見えるので、黙って意味が変わらないように次を拒否する。
+
+- 値渡しの引数を持つ規則 `F` の本体の中の `CAPTURE(name, ...)`。本体の中の呼び出しの実引数も含む。
+- `F` の呼び出しの実引数（名前渡し・値渡しのどちらも、さらにその中の呼び出しの実引数も）の中の
+  `CAPTURE(name, ...)`。どこから呼んでも、その実引数は `F` の scope の中で照合されるため。
+- 位置はその `CAPTURE` 要素。本文は
+  `E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns`。
+
+```ubnf
+Main ::= F('a', CAPTURE(u, 'b')) SAME_AS(u) ;   // E-PARAM-CAPTURE（名前渡しの F(x, y) なら abb を受理する）
+F(=x, y) ::= x y ;
+```
+
+`CAPTURE_SCOPE(...)` と `SAME_AS(...)` は書ける。本体から参照した引数なしの規則や別の引数付き規則の
+本体にある `CAPTURE` は拒否しない。それらの binding も `F` から戻るときに戻る（手で
+`CAPTURE_SCOPE` を書いた場合と同じ）。将来、`CAPTURE_SCOPE` の代わりに値の binding だけを戻す仕組み
+（新しい runtime の操作）を足せば、この拒否は緩められる。この issue は runtime を変えない制約なので、
+拒否を選んだ。
+
+また、本体の中で値渡しの引数と同じ名前の `SAME_AS(x)` は、引数ではなく同名のユーザー binding を読むため
+（`F(=x) ::= SAME_AS(x) x;` は実行時に必ず失敗する）、その位置で `E-PARAM-SHADOW` として拒否する。
+値を照合するには `x` と書く。同名の `CAPTURE(x, ...)` は上の規則で拒否される。
+
+### 展開名への参照
+
+instance の名前 `F_<hash>` は展開が作る名前で、文法に書いた参照からは届かない。引数付きの定義の外で
+書いた参照が、文法に定義がなく展開名にだけ一致するとき、その参照の位置で
+`E-PARAM-UNDEFINED: rule Root references 'H_...', which only names a rule created by parameterized expansion`
+として拒否する（展開の後、最初の 1 個）。このような参照は値渡しの binding を `F` の外から読めて
+しまう。名前渡しだけの規則（#701）にも同じに当てる。展開名と同じ名前の規則を書いた場合は従来どおり
+`E-PARAM-NAME-COLLISION`。
 
 ## 有効範囲と巻き戻し
 
@@ -143,7 +183,7 @@ binding に依存する規則は memo を止めるので、packrat の線形時�
 ## 検証
 
 `spec-corpus/call-by-value/cases.json`（[README](../spec-corpus/call-by-value/README.md)）は 8 文法 36 入力の
-受理例と、位置付きで拒否する 12 例を持つ。受理例は名前付きの閉じタグ、heredoc、複数の値と名前渡しの
+受理例と、位置付きで拒否する 20 例（上の capture・`SAME_AS`・展開名への参照の 8 例を含む）を持つ。受理例は名前付きの閉じタグ、heredoc、複数の値と名前渡しの
 混在、値の転送と同じ規則の入れ子、空の値と使わない値、失敗した選択肢での再試行と選択肢の本体、
 ユーザーの capture と同名の引数、入れ子 128 段ちょうどの境界で、それぞれ CAPTURE_SCOPE / CAPTURE /
 SAME_AS で手書きした等価文法、instance の鍵と名前、入力ごとの受理・拒否、失敗位置、AST、parse 後の

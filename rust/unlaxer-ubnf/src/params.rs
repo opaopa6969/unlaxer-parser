@@ -242,6 +242,24 @@ pub(crate) fn expand(
     }
     let mut known: HashSet<&str> = tokens.clone();
     known.extend(rules.iter().map(|r| r.name.as_str()));
+    // The value parameter names of each definition that owns its name (#704).
+    let value_params: Vec<Vec<&str>> = rules
+        .iter()
+        .enumerate()
+        .map(|(index, rule)| match defs.get(rule.name.as_str()) {
+            Some(Def {
+                rule: owner,
+                params,
+                values: Some((captures, _)),
+            }) if *owner == index => params
+                .iter()
+                .zip(captures)
+                .filter(|(_, capture)| capture.is_some())
+                .map(|(name, _)| name.as_str())
+                .collect(),
+            _ => Vec::new(),
+        })
+        .collect();
     let mut check = Check {
         source,
         grammar: &grammar.name,
@@ -250,20 +268,27 @@ pub(crate) fn expand(
         known: &known,
         rules,
         edges: vec![Vec::new(); rules.len()],
+        unknown: Vec::new(),
     };
     for (index, rule) in rules.iter().enumerate() {
+        let owner = defs
+            .get(rule.name.as_str())
+            .filter(|d| d.rule == index)
+            .map(|_| index);
+        let values = &value_params[index];
         let scope = Scope {
-            owner: defs
-                .get(rule.name.as_str())
-                .filter(|d| d.rule == index)
-                .map(|_| index),
+            owner,
             params: params[index].as_deref().unwrap_or(&[]),
             call: None,
             rule: rule.span,
+            index,
+            scoped: (!values.is_empty()).then_some(index),
+            values,
         };
         check.body(&rule.body, &scope)?;
     }
     let edges = check.edges;
+    let unknown = check.unknown;
     reject_cycles(source, rules, &defs, &edges)?;
 
     let mut expander = Expander {
@@ -291,6 +316,21 @@ pub(crate) fn expand(
             span: rule.span,
         });
     }
+    // A written reference that only an expansion name satisfies would reach the
+    // instance (and its value bindings) from outside the call that created it.
+    if let Some((rule, name, span)) = unknown
+        .into_iter()
+        .find(|(_, name, _)| expander.names.contains(*name))
+    {
+        return Err(error(
+            source,
+            span,
+            format!(
+                "E-PARAM-UNDEFINED: rule {} references '{name}', which only names a rule created by parameterized expansion",
+                rules[rule].name
+            ),
+        ));
+    }
     expanded.extend(
         expander
             .instances
@@ -311,6 +351,13 @@ struct Scope<'a> {
     /// Innermost enclosing call, when walking an argument.
     call: Option<Span>,
     rule: Span,
+    /// Index of the rule being walked.
+    index: usize,
+    /// The rule with value parameters whose CAPTURE_SCOPE will enclose this position: the
+    /// definition being walked, or the callee whose arguments are being walked (#704).
+    scoped: Option<usize>,
+    /// Value parameter names of the definition being walked.
+    values: &'a [&'a str],
 }
 
 struct Check<'a> {
@@ -321,10 +368,13 @@ struct Check<'a> {
     known: &'a HashSet<&'a str>,
     rules: &'a [RuleDecl],
     edges: Vec<Vec<(usize, Span)>>,
+    /// Undefined references outside parameterized definitions, in traversal order; checked
+    /// against the expansion names once they are known.
+    unknown: Vec<(usize, &'a str, Span)>,
 }
 
-impl Check<'_> {
-    fn body(&mut self, body: &RuleBody, scope: &Scope) -> Result<()> {
+impl<'a> Check<'a> {
+    fn body(&mut self, body: &'a RuleBody, scope: &Scope) -> Result<()> {
         for sequence in &body.alternatives {
             for element in &sequence.elements {
                 if (scope.owner.is_some() || scope.call.is_some())
@@ -342,7 +392,7 @@ impl Check<'_> {
         Ok(())
     }
 
-    fn atomic(&mut self, element: &AtomicElement, scope: &Scope) -> Result<()> {
+    fn atomic(&mut self, element: &'a AtomicElement, scope: &Scope) -> Result<()> {
         match &element.kind {
             ElementKind::RuleRef {
                 namespace: None,
@@ -378,6 +428,11 @@ impl Check<'_> {
                     }
                     let inner = Scope {
                         call: Some(call.span),
+                        scoped: if def.values.is_some() {
+                            Some(def.rule)
+                        } else {
+                            scope.scoped
+                        },
                         ..*scope
                     };
                     for argument in &call.args {
@@ -406,7 +461,29 @@ impl Check<'_> {
                             ),
                         ));
                     }
+                } else if !self.known.contains(name.as_str()) {
+                    self.unknown.push((scope.index, name, element.span));
                 }
+            }
+            ElementKind::Replay { name } if scope.values.contains(&name.as_str()) => {
+                return Err(error(
+                    self.source,
+                    element.span,
+                    format!(
+                        "E-PARAM-SHADOW: SAME_AS({name}) in rule {} names value parameter {name}; write {name} to replay its value",
+                        self.rules[scope.index].name
+                    ),
+                ));
+            }
+            ElementKind::OwnedCapture { name, .. } if scope.scoped.is_some() => {
+                return Err(error(
+                    self.source,
+                    element.span,
+                    format!(
+                        "E-PARAM-CAPTURE: CAPTURE({name}, ...) cannot appear in the body or call arguments of rule {}, whose value parameters restore every capture when it returns",
+                        self.rules[scope.scoped.unwrap()].name
+                    ),
+                ));
             }
             ElementKind::RuleRef { .. }
             | ElementKind::Terminal(_)

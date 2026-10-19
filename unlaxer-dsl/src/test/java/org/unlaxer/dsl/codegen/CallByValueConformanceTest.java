@@ -134,7 +134,7 @@ public class CallByValueConformanceTest {
             }
             accepted++;
         }
-        assertEquals(List.of(8, 12), List.of(accepted, rejected));
+        assertEquals(List.of(8, 20), List.of(accepted, rejected));
     }
 
     /** Each SAME_AS keeps the span of the use it replaces; the wrappers take the body's span. */
