@@ -46,3 +46,8 @@ param-definition-literal	grammar Bad { F('x') ::= 'a'; }
 param-call-empty	grammar Bad { Root ::= F(); F(x) ::= x; }
 param-call-trailing-comma	grammar Bad { Root ::= F('a',); F(x) ::= x; }
 param-call-unclosed	grammar Bad { Root ::= F('a'; F(x) ::= x; }
+param-value-double-marker	grammar Bad { Root ::= F('a'); F(==x) ::= x; }
+param-value-marker-only	grammar Bad { Root ::= F('a'); F(=) ::= 'a'; }
+param-value-marker-after	grammar Bad { Root ::= F('a'); F(x=) ::= x; }
+param-value-marker-at-call	grammar Bad { Root ::= F(='a'); F(=x) ::= x; }
+param-value-capture-name	grammar Bad { Root ::= CAPTURE(F(=x), 'a'); }

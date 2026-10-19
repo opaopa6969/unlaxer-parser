@@ -43,7 +43,7 @@ struct Parser<'a> {
     /// The entry of `scans` for the grammar being parsed.
     parameterized: std::collections::HashSet<String>,
     calls: Vec<crate::params::Call>,
-    rule_params: Vec<Vec<Option<Vec<String>>>>,
+    rule_params: Vec<Vec<Option<Vec<crate::params::Param>>>>,
 }
 
 impl Parser<'_> {
@@ -548,7 +548,7 @@ impl Parser<'_> {
     fn adjacent_open(&self) -> bool {
         self.is('(') && self.previous().byte_end == self.current().span.byte_start
     }
-    fn rule(&mut self) -> Result<(RuleDecl, Option<Vec<String>>)> {
+    fn rule(&mut self) -> Result<(RuleDecl, Option<Vec<crate::params::Param>>)> {
         let start = self.current().span;
         let mut annotations = Vec::new();
         while self.is('@') {
@@ -557,7 +557,7 @@ impl Parser<'_> {
         let name = self.identifier()?;
         let params = if self.adjacent_open() {
             self.pos += 1;
-            let params = self.identifiers()?;
+            let params = self.parameters()?;
             self.expect(')')?;
             Some(params)
         } else {
@@ -578,6 +578,20 @@ impl Parser<'_> {
             },
             params,
         ))
+    }
+    /// `p1, =p2, ...`: a leading `=` marks a value parameter (#704).
+    fn parameters(&mut self) -> Result<Vec<crate::params::Param>> {
+        let mut values = Vec::new();
+        loop {
+            let by_value = self.eat('=');
+            values.push(crate::params::Param {
+                name: self.identifier()?,
+                by_value,
+            });
+            if !self.eat(',') {
+                return Ok(values);
+            }
+        }
     }
     fn named_arg(&mut self, name: &str) -> Result<()> {
         self.word(name)?;

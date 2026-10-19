@@ -39,6 +39,10 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile;
  * ordinary zero-arity rules under a size limit. Existing validators run on the
  * expanded grammar only; checking the unexpanded grammar is unsound (lean4-peg CE-002:
  * {@code F(x) ::= x; S ::= F(S)}). See docs/parameterized-rules.md.
+ *
+ * <p>A value parameter {@code =p} (#704) is sugar over the existing owned captures: the
+ * instance body becomes {@code CAPTURE_SCOPE(CAPTURE(F(=p), arg) body)} and each use of
+ * {@code p} becomes {@code SAME_AS(F(=p))}. See docs/call-by-value-arguments.md.
  */
 public final class ParameterizedRules {
     /** Total atomic elements of all expanded instances (the generators' 65536-visit limit). */
@@ -52,10 +56,24 @@ public final class ParameterizedRules {
     static final Set<String> RESERVED = Set.of("CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "ERROR");
     /** NUL never occurs in an identifier, so no user reference can match a placeholder. */
     private static final String CALL_PREFIX = "\0call";
+    /** The hidden by-name parameter that carries a value argument into its CAPTURE. */
+    private static final String VALUE_PREFIX = "\0value";
 
     private ParameterizedRules() {}
 
     record Call(String name, List<RuleBody> args) {}
+
+    /** One declared parameter; {@code =name} declares a value parameter (#704). */
+    record Param(String name, boolean byValue) {}
+
+    /**
+     * The owned capture name of value parameter {@code param} of {@code rule}. It contains
+     * '(', '=' and ')', which no CAPTURE / SAME_AS name written in UBNF (an identifier) can
+     * contain, so expansion never shares a binding with a user capture of any grammar.
+     */
+    static String captureName(String rule, String param) {
+        return rule + "(=" + param + ")";
+    }
 
     static String placeholder(int index) { return CALL_PREFIX + index; }
 
@@ -177,6 +195,7 @@ public final class ParameterizedRules {
             int j = t + 2;
             boolean ok = true;
             while (true) {
+                if (j < tokens.size() && tokens.get(j)[0] == '=') j++;
                 if (j >= tokens.size() || tokens.get(j)[0] != 0) { ok = false; break; }
                 j++;
                 if (j < tokens.size() && tokens.get(j)[0] == ',') j++;
@@ -193,7 +212,7 @@ public final class ParameterizedRules {
     // Expansion
     // =========================================================================
 
-    static UBNFFile expand(UBNFFile file, IdentityHashMap<RuleDecl, List<String>> params,
+    static UBNFFile expand(UBNFFile file, IdentityHashMap<RuleDecl, List<Param>> params,
             List<Call> calls, UBNFSourceSnapshot.Builder origins) {
         if (calls.isEmpty() && params.isEmpty()) return file;
         List<GrammarDecl> grammars = new ArrayList<>();
@@ -217,10 +236,19 @@ public final class ParameterizedRules {
         return origins.derive(node, from, UBNFSourceSnapshot.Kind.SYNTHETIC);
     }
 
-    private record Def(int rule, List<String> params) {}
+    /**
+     * For a rule with value parameters, {@code captures} names each value parameter's
+     * binding (null for a by-name parameter) and {@code template} is the body
+     * {@code CAPTURE_SCOPE(CAPTURE(F(=p), <hidden p>) ... body)} that instances expand.
+     */
+    private record Def(int rule, List<String> params, List<String> captures, RuleBody template) {}
 
-    /** A substituted argument with its measured size and nesting (never re-walked). */
-    private record Rep(AtomicElement element, long size, long depth) {}
+    /**
+     * A substituted argument with its measured size and nesting (never re-walked).
+     * {@code atUse}: a value parameter's SAME_AS, which takes the origin of each use.
+     */
+    private record Rep(AtomicElement element, long size, long depth, boolean atUse) {}
+
 
     private static long saturating(long a, long b) {
         long sum = a + b;
@@ -230,7 +258,8 @@ public final class ParameterizedRules {
     private static final class Grammar {
         final GrammarDecl grammar;
         final List<RuleDecl> rules;
-        final IdentityHashMap<RuleDecl, List<String>> params;
+        final IdentityHashMap<RuleDecl, List<String>> params = new IdentityHashMap<>();
+        final IdentityHashMap<RuleDecl, List<Param>> declared;
         final List<Call> calls;
         final UBNFSourceSnapshot.Builder origins;
         final Map<String, Def> defs = new HashMap<>();
@@ -245,11 +274,15 @@ public final class ParameterizedRules {
         /** Rule bodies open in the expansion recursion, across instance boundaries. */
         int level;
 
-        Grammar(GrammarDecl grammar, IdentityHashMap<RuleDecl, List<String>> params, List<Call> calls,
+        Grammar(GrammarDecl grammar, IdentityHashMap<RuleDecl, List<Param>> declared, List<Call> calls,
                 UBNFSourceSnapshot.Builder origins) {
             this.grammar = grammar;
             this.rules = grammar.rules();
-            this.params = params;
+            this.declared = declared;
+            for (RuleDecl rule : rules) {
+                List<Param> list = declared.get(rule);
+                if (list != null) params.put(rule, list.stream().map(Param::name).toList());
+            }
             this.calls = calls;
             this.origins = origins;
         }
@@ -295,7 +328,14 @@ public final class ParameterizedRules {
                     if (tokens.contains(parameter) || ruleCounts.containsKey(parameter)) throw error(span(rule), "E-PARAM-SHADOW: parameter " + parameter + " of rule " + name
                         + " has the same name as a rule or token");
                 }
-                defs.put(name, new Def(index, list));
+                List<Param> parameters = declared.get(rule);
+                if (parameters.stream().anyMatch(Param::byValue)) {
+                    List<String> captures = new ArrayList<>();
+                    for (Param parameter : parameters) captures.add(parameter.byValue() ? captureName(name, parameter.name()) : null);
+                    defs.put(name, new Def(index, list, java.util.Collections.unmodifiableList(captures), valueTemplate(rule, captures)));
+                } else {
+                    defs.put(name, new Def(index, list, null, null));
+                }
             }
             known.addAll(tokens);
             for (RuleDecl rule : rules) known.add(rule.name());
@@ -305,9 +345,15 @@ public final class ParameterizedRules {
                 Def def = defs.get(rule.name());
                 boolean owner = def != null && def.rule() == index;
                 List<String> list = params.get(rule);
-                checkBody(rule.body(), new Scope(owner ? index : -1, list == null ? List.of() : list, null, span(rule)));
+                // The value parameter names of a definition that owns its name (#704).
+                List<String> values = new ArrayList<>();
+                if (owner && def.captures() != null)
+                    for (int i = 0; i < def.params().size(); i++) if (def.captures().get(i) != null) values.add(def.params().get(i));
+                checkBody(rule.body(), new Scope(owner ? index : -1, list == null ? List.of() : list, null, span(rule),
+                    index, values));
             }
             rejectCycles();
+            rejectScopedCaptures();
 
             Map<String, Rep> empty = Map.of();
             List<RuleDecl> expanded = new ArrayList<>();
@@ -317,12 +363,25 @@ public final class ParameterizedRules {
                 expanded.add(body == rule.body() ? rule
                     : copy(origins, new RuleDecl(rule.annotations(), rule.name(), body), rule));
             }
+            // A written reference that only an expansion name satisfies would reach the
+            // instance (and its value bindings) from outside the call that created it.
+            for (Object[] reference : unknown) {
+                String name = (String) reference[1];
+                if (names.contains(name)) throw error((UBNFSourceSnapshot.Span) reference[2], "E-PARAM-UNDEFINED: rule "
+                    + rules.get((Integer) reference[0]).name() + " references '" + name
+                    + "', which only names a rule created by parameterized expansion");
+            }
             expanded.addAll(instances);
             return copy(origins, new GrammarDecl(grammar.name(), grammar.imports(), grammar.settings(),
                 grammar.tokens(), List.copyOf(expanded)), grammar);
         }
 
-        record Scope(int owner, List<String> params, UBNFSourceSnapshot.Span call, UBNFSourceSnapshot.Span rule) {}
+        /** {@code values}: the value parameter names of the definition being walked (#704). */
+        record Scope(int owner, List<String> params, UBNFSourceSnapshot.Span call, UBNFSourceSnapshot.Span rule,
+                int index, List<String> values) {}
+
+        /** Undefined references outside parameterized definitions: {rule index, name, span}. */
+        final List<Object[]> unknown = new ArrayList<>();
 
         void checkBody(RuleBody body, Scope scope) {
             for (SequenceBody sequence : alternatives(body)) {
@@ -352,7 +411,7 @@ public final class ParameterizedRules {
                         + " expects " + def.params().size() + " argument(s), got " + call.args().size()
                         + "; defined at " + position(span(rules.get(def.rule()))));
                     if (scope.owner() >= 0) edges.get(scope.owner()).add(new Object[] {def.rule(), at});
-                    Scope inner = new Scope(scope.owner(), scope.params(), at, scope.rule());
+                    Scope inner = new Scope(scope.owner(), scope.params(), at, scope.rule(), scope.index(), scope.values());
                     for (RuleBody argument : call.args()) checkBody(argument, inner);
                 } else if (scope.params().contains(name)) {
                     return;
@@ -363,7 +422,13 @@ public final class ParameterizedRules {
                 } else if (scope.owner() >= 0 && !known.contains(name)) {
                     throw error(span(ref), "E-PARAM-UNDEFINED: rule " + rules.get(scope.owner()).name()
                         + " references undefined parameter, rule or token '" + name + "'");
+                } else if (scope.owner() < 0 && !known.contains(name)) {
+                    unknown.add(new Object[] {scope.index(), name, span(ref)});
                 }
+            } else if (element instanceof ReplayElement replay && scope.values().contains(replay.name())) {
+                throw error(span(replay), "E-PARAM-SHADOW: SAME_AS(" + replay.name() + ") in rule "
+                    + rules.get(scope.index()).name() + " names value parameter " + replay.name() + "; write "
+                    + replay.name() + " to replay its value");
             } else if (element instanceof UBNFAST.TransparentElement transparent) {
                 checkBody(transparent.body(), scope);
             } else if (element instanceof OptionalElement optional) {
@@ -378,6 +443,168 @@ public final class ParameterizedRules {
                 checkAtomic(separated.element(), scope);
                 checkAtomic(separated.separator(), scope);
             }
+        }
+
+        // =====================================================================
+        // Captures inside value scopes (#704), decided on the written grammar
+        // =====================================================================
+
+        /**
+         * How each argument lands once expanded: materialized at all, and inside which value scopes.
+         * A set of scopes is kept only as what the report needs, as in Rust: null when empty, else
+         * its rule with the smallest name, merged with {@link #least}; the analysis stays linear.
+         */
+        boolean[][] kept;
+        Integer[][] argumentScopes;
+
+        Integer least(Integer a, Integer b) {
+            if (a == null) return b;
+            if (b == null) return a;
+            return rules.get(b).name().compareTo(rules.get(a).name()) < 0 ? b : a;
+        }
+
+        /** A walk event: {kind ('u' use, 'c' call, 'k' capture), payload, enclosing scopes}. */
+        private void walk(RuleBody body, Integer rel, List<Object[]> out) {
+            for (SequenceBody sequence : alternatives(body))
+                for (AnnotatedElement element : sequence.elements()) walk(element.element(), rel, out);
+        }
+
+        private void walk(AtomicElement element, Integer rel, List<Object[]> out) {
+            if (element instanceof RuleRefElement ref) {
+                if (ref.namespace().isPresent()) return;
+                int index = callIndex(ref);
+                if (index < 0) {
+                    out.add(new Object[] {'u', ref.name(), rel});
+                    return;
+                }
+                Call call = calls.get(index);
+                int callee = defs.get(call.name()).rule();
+                out.add(new Object[] {'c', callee, rel});
+                for (int j = 0; j < call.args().size(); j++) {
+                    if (!kept[callee][j]) continue;
+                    walk(call.args().get(j), least(rel, argumentScopes[callee][j]), out);
+                }
+            } else if (element instanceof OwnedCaptureElement capture) {
+                out.add(new Object[] {'k', capture, rel});
+                walk(capture.body(), rel, out);
+            } else if (element instanceof UBNFAST.TransparentElement transparent) walk(transparent.body(), rel, out);
+            else if (element instanceof OptionalElement optional) walk(optional.body(), rel, out);
+            else if (element instanceof RepeatElement repeat) walk(repeat.body(), rel, out);
+            else if (element instanceof OneOrMoreElement more) walk(more.body(), rel, out);
+            else if (element instanceof BoundedRepeatElement bounded) walk(bounded.body(), rel, out);
+            else if (element instanceof SeparatedElement separated) {
+                walk(separated.element(), rel, out);
+                walk(separated.separator(), rel, out);
+            }
+        }
+
+        /**
+         * Rejects every user CAPTURE that would run inside the CAPTURE_SCOPE of a rule with value
+         * parameters, decided on the written grammar so that neither the order of the declarations
+         * nor instance sharing changes the result; mirrors {@code reject_scoped_captures} in Rust.
+         * The smallest source position is reported, then the smallest rule name.
+         */
+        void rejectScopedCaptures() {
+            boolean anyValue = false;
+            for (Def def : defs.values()) anyValue |= def.captures() != null;
+            if (!anyValue) return;
+            Def[] owned = new Def[rules.size()];
+            for (Def def : defs.values()) owned[def.rule()] = def;
+            // Callees before callers (the parameterized call graph is acyclic here).
+            List<Integer> order = new ArrayList<>();
+            int[] state = new int[rules.size()];
+            List<Integer> roots = new ArrayList<>();
+            for (Def def : defs.values()) roots.add(def.rule());
+            roots.sort(null);
+            for (int root : roots) {
+                if (state[root] != 0) continue;
+                state[root] = 1;
+                List<int[]> stack = new ArrayList<>();
+                stack.add(new int[] {root, 0});
+                while (!stack.isEmpty()) {
+                    int[] top = stack.get(stack.size() - 1);
+                    int node = top[0];
+                    if (top[1] == edges.get(node).size()) {
+                        state[node] = 2;
+                        order.add(node);
+                        stack.remove(stack.size() - 1);
+                        continue;
+                    }
+                    int target = (Integer) edges.get(node).get(top[1]++)[0];
+                    if (state[target] == 0) {
+                        state[target] = 1;
+                        stack.add(new int[] {target, 0});
+                    }
+                }
+            }
+            kept = new boolean[rules.size()][];
+            argumentScopes = new Integer[rules.size()][];
+            for (int i = 0; i < rules.size(); i++) {
+                int n = owned[i] == null ? 0 : owned[i].params().size();
+                kept[i] = new boolean[n];
+                argumentScopes[i] = new Integer[n];
+            }
+            Integer empty = null;
+            for (int rule : order) {
+                Def def = owned[rule];
+                List<Object[]> events = new ArrayList<>();
+                walk(rules.get(rule).body(), empty, events);
+                for (Object[] event : events) {
+                    if ((Character) event[0] != 'u') continue;
+                    int j = def.params().indexOf((String) event[1]);
+                    if (j < 0) continue;
+                    kept[rule][j] = true;
+                    argumentScopes[rule][j] = least(argumentScopes[rule][j], (Integer) event[2]);
+                }
+                if (def.captures() != null) {
+                    for (int j = 0; j < def.params().size(); j++) {
+                        if (def.captures().get(j) != null) {
+                            // A value argument is matched by the CAPTURE at the top of the scope.
+                            kept[rule][j] = true;
+                            argumentScopes[rule][j] = rule;
+                        } else if (kept[rule][j]) {
+                            argumentScopes[rule][j] = least(argumentScopes[rule][j], rule);
+                        }
+                    }
+                }
+            }
+            // Scopes around each parameterized rule's expansion, from its callers (callers first).
+            Integer[] around = new Integer[rules.size()];
+            for (int i = 0; i < rules.size(); i++) if (owned[i] != null && owned[i].captures() != null) around[i] = i;
+            List<Integer> bodies = new ArrayList<>();
+            for (int i = 0; i < rules.size(); i++) if (!defs.containsKey(rules.get(i).name())) bodies.add(i);
+            for (int k = order.size() - 1; k >= 0; k--) bodies.add(order.get(k));
+            for (int rule : bodies) {
+                List<Object[]> events = new ArrayList<>();
+                walk(rules.get(rule).body(), empty, events);
+                for (Object[] event : events) {
+                    if ((Character) event[0] != 'c') continue;
+                    int callee = (Integer) event[1];
+                    around[callee] = least(around[callee], least((Integer) event[2], around[rule]));
+                }
+            }
+            OwnedCaptureElement found = null;
+            String leastScope = null;
+            for (int rule : bodies) {
+                List<Object[]> events = new ArrayList<>();
+                walk(rules.get(rule).body(), empty, events);
+                for (Object[] event : events) {
+                    if ((Character) event[0] != 'k') continue;
+                    Integer enclosing = least((Integer) event[2], around[rule]);
+                    if (enclosing == null) continue;
+                    String scope = rules.get(enclosing).name();
+                    var capture = (OwnedCaptureElement) event[1];
+                    int start = span(capture).start();
+                    if (found == null || start < span(found).start()
+                            || start == span(found).start() && scope.compareTo(leastScope) < 0) {
+                        found = capture;
+                        leastScope = scope;
+                    }
+                }
+            }
+            if (found != null) throw error(span(found), "E-PARAM-CAPTURE: CAPTURE(" + found.name()
+                + ", ...) cannot appear in the body or call arguments of rule " + leastScope
+                + ", whose value parameters restore every capture when it returns");
         }
 
         /** Depth-first in definition order; edges keep body traversal order (as in Rust). */
@@ -480,6 +707,8 @@ public final class ParameterizedRules {
                     return copy(origins, new RuleRefElement(instance(call.name(), args, span(ref))), ref);
                 }
                 Rep replacement = env.get(ref.name());
+                if (replacement != null && replacement.atUse())
+                    return synthetic(origins, new ReplayElement(((ReplayElement) replacement.element()).name()), ref);
                 return replacement != null ? replacement.element() : ref;
             }
             if (element instanceof GroupElement group) {
@@ -544,9 +773,18 @@ public final class ParameterizedRules {
             for (int i = 0; i < args.size(); i++) {
                 AtomicElement element = replacement(args.get(i));
                 long[] measured = measureAtomic(element, Map.of());
-                env.put(def.params().get(i), new Rep(element, measured[0], measured[1]));
+                Rep argument = new Rep(element, measured[0], measured[1], false);
+                String capture = def.captures() == null ? null : def.captures().get(i);
+                if (capture == null) {
+                    env.put(def.params().get(i), argument);
+                } else {
+                    // The argument goes into the CAPTURE; every use of the parameter replays it.
+                    env.put(VALUE_PREFIX + i, argument);
+                    env.put(def.params().get(i), new Rep(new ReplayElement(capture), 1, 0, true));
+                }
             }
-            long[] measured = measureBody(rule.body(), env);
+            RuleBody template = def.template() == null ? rule.body() : def.template();
+            long[] measured = measureBody(template, env);
             long inline = level + measured[1];
             if (inline > MAX_EXPANDED_NESTING) throw error(at, "E-PARAM-LIMIT: expansion of rule " + callee
                 + " nests " + inline + " levels; the limit is " + MAX_EXPANDED_NESTING);
@@ -555,9 +793,39 @@ public final class ParameterizedRules {
             names.add(name);
             int slot = instances.size();
             instances.add(null);
-            RuleBody body = body(rule.body(), env);
+            RuleBody body = body(template, env);
             instances.set(slot, synthetic(origins, new RuleDecl(List.of(), name, body), rule));
             return name;
+        }
+
+        /**
+         * {@code CAPTURE_SCOPE(CAPTURE(F(=p), <hidden p>) ... body)}, written once per definition
+         * so that measuring and expanding an instance treat it as an ordinary body (as in Rust).
+         * A one-alternative body is spliced after the captures, a choice is grouped. Every
+         * synthetic node takes the definition body's span with a SYNTHETIC origin.
+         */
+        RuleBody valueTemplate(RuleDecl rule, List<String> captures) {
+            RuleBody from = rule.body();
+            List<AnnotatedElement> elements = new ArrayList<>();
+            for (int i = 0; i < captures.size(); i++) {
+                if (captures.get(i) == null) continue;
+                AtomicElement hidden = synthetic(origins, new RuleRefElement(VALUE_PREFIX + i), from);
+                elements.add(plain(synthetic(origins, new OwnedCaptureElement(captures.get(i), sequence(plain(hidden, from), from)), from), from));
+            }
+            List<SequenceBody> alternatives = alternatives(from);
+            if (alternatives.size() == 1) elements.addAll(alternatives.get(0).elements());
+            else elements.add(plain(synthetic(origins, new GroupElement(from), from), from));
+            ChoiceBody scope = synthetic(origins, new ChoiceBody(List.of(synthetic(origins,
+                new SequenceBody(List.copyOf(elements)), from))), from);
+            return sequence(plain(synthetic(origins, new CaptureScopeElement(scope), from), from), from);
+        }
+
+        private AnnotatedElement plain(AtomicElement element, Object from) {
+            return synthetic(origins, new AnnotatedElement(element, java.util.Optional.empty(), java.util.Optional.empty()), from);
+        }
+
+        private ChoiceBody sequence(AnnotatedElement element, Object from) {
+            return synthetic(origins, new ChoiceBody(List.of(synthetic(origins, new SequenceBody(List.of(element)), from))), from);
         }
 
         /** A single plain element is substituted as itself; anything else keeps its grouping. */

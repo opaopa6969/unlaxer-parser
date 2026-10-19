@@ -27,6 +27,8 @@ grammar Let {
   名前だけ**。同じファイルの別の grammar の定義は影響しない。それ以外の `Foo('a')` は従来どおり
   「参照 `Foo` と group `('a')`」のまま。定義を持たない
   文法の構文木・生成物は変わらない（両 frontend は展開処理そのものを通らない）。
+- 定義の引数に `=` を付けると値渡しの引数になる（`Body(=tag) ::= ...`。展開は
+  [値渡しの引数](call-by-value-arguments.md)、#704）。
 - `CAPTURE` `SAME_AS` `CAPTURE_SCOPE` `ERROR` は既存の関数形式の綴りなので、引数付き規則の名前に
   できない（`E-PARAM-RESERVED`）。これらの呼び出しの構文は従来どおり。
 - 定義側の `F (x) ::=`、空の `F()`、末尾 `,`、引数位置の literal は構文エラー。
@@ -41,8 +43,11 @@ frontend は構文解析のあと、文法ごとに次の順で検査し、最�
    引数名の重複（`E-PARAM-DUPLICATE`）、規則名・token 名と同じ引数名（`E-PARAM-SHADOW`）。
 2. **使用**: 引数の数（`E-PARAM-ARITY`。引数なしの裸の参照 `F` と `F ('a')` は 0 個として数える）、
    定義本体の中の未定義の名前（`E-PARAM-UNDEFINED`）、
-   定義本体と実引数の中の `@capture` / `@typeof`（`E-PARAM-CAPTURE`）。
-3. **循環**: 引数付きの呼び出しのグラフ（下記）が循環すれば拒否（`E-PARAM-CYCLE`）。
+   定義本体と実引数の中の `@capture` / `@typeof`（`E-PARAM-CAPTURE`）。値渡しの規則の本体の中で
+   値渡しの引数と同じ名前の `SAME_AS(...)`（`E-PARAM-SHADOW`、#704）。
+3. **循環**: 引数付きの呼び出しのグラフ（下記）が循環すれば拒否（`E-PARAM-CYCLE`）。その後、展開したときに
+   値渡しの規則の scope の中で照合されるユーザーの `CAPTURE(...)` を拒否する（`E-PARAM-CAPTURE`、
+   [値渡しの引数](call-by-value-arguments.md#値渡しの規則の中の-capture)、#704）。
 4. **展開**: 単相化する。次のどれかで拒否する（`E-PARAM-LIMIT`）。
    - 実体化した atomic 要素の合計が 65536 を超える。数えるのは、呼び出しごとに作る実引数と、
      新しく作る instance の本体（同じ鍵の呼び出しが instance を共有しても、実引数は呼び出しの度に数える）。
@@ -51,6 +56,9 @@ frontend は構文解析のあと、文法ごとに次の順で検査し、最�
      境界をまたいで数える）に、そこで作る実引数または instance 本体の入れ子を足したもの。すべての
      instance を呼び出しの位置に書いた場合の入れ子にあたる。実引数を先に、instance を後に判定する。
    生成した名前が既存の規則・token・別 instance と重なれば拒否（`E-PARAM-NAME-COLLISION`）。
+   展開の後、引数付きの定義の外で書いた参照のうち、文法に定義がなく展開名にだけ一致するものを、
+   最初の 1 個の位置で拒否する（`E-PARAM-UNDEFINED`、#704）。展開名は実装が作る名前で、書いた参照から
+   instance（値渡しの binding を読む本体を含む）へ届かないようにする。
 5. 展開後の文法に、既存の validator と生成器の検査（`E-LEFT-RECURSION` の nullable 不動点と
    消費前到達グラフ、`E-RULE-UNDEFINED` など）をそのまま当てる。
 
@@ -71,12 +79,12 @@ frontend は構文解析のあと、文法ごとに次の順で検査し、最�
 | code | 位置 | 内容 |
 |---|---|---|
 | `E-PARAM-ARITY` | 呼び出し・参照 | 引数の数が定義と違う。定義の行・列も示す |
-| `E-PARAM-UNDEFINED` | 参照 | 定義本体の未定義の名前 |
+| `E-PARAM-UNDEFINED` | 参照 | 定義本体の未定義の名前、展開名にだけ一致する参照 |
 | `E-PARAM-CYCLE` | 循環を閉じる呼び出し | `F -> G -> F` の経路を示す |
 | `E-PARAM-LIMIT` | 上限を超えた呼び出し | 要素数 65536、展開の入れ子 128 |
 | `E-PARAM-ANNOTATION` | 定義 | `@mapping` などの注釈を持つ引数付き規則 |
-| `E-PARAM-CAPTURE` | 呼び出し・定義 | 引数・定義本体の `@capture` / `@typeof` |
-| `E-PARAM-SHADOW` | 定義 | 規則名・token 名と同じ引数名 |
+| `E-PARAM-CAPTURE` | 呼び出し・定義・CAPTURE | 引数・定義本体の `@capture` / `@typeof`、値渡しの規則の scope の中で照合される `CAPTURE` |
+| `E-PARAM-SHADOW` | 定義・SAME_AS | 規則名・token 名と同じ引数名、値渡しの引数と同名の `SAME_AS` |
 | `E-PARAM-DUPLICATE` | 定義 | 同名の規則・token、同名の引数 |
 | `E-PARAM-RESERVED` | 定義 | 既存の関数形式の綴り |
 | `E-PARAM-NAME-COLLISION` | 呼び出し | 展開名が既存の名前と重なる |
@@ -160,7 +168,7 @@ corpus の `ce002-self-argument` と、nullable な接頭辞が展開後にだ�
 
 ## 範囲外と制約
 
-- 高階規則、ラムダ、CallByValue（後方参照の値渡しは #704）、型注釈。
+- 高階規則、ラムダ、型注釈。値渡しの引数（後方参照）は [call-by-value-arguments.md](call-by-value-arguments.md)（#704）。
 - 注釈付きの引数付き規則と、実引数・定義本体の中の `@capture` / `@typeof`。capture は
   instance 側の規則に移り、呼び出し側の `@mapping` から見えなくなるため、まず拒否する。
   呼び出し全体への capture（`Either('a' 'b', 'c') @text`）はできる。
