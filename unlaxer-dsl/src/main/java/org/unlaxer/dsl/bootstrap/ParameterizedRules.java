@@ -247,7 +247,10 @@ public final class ParameterizedRules {
      * A substituted argument with its measured size and nesting (never re-walked).
      * {@code atUse}: a value parameter's SAME_AS, which takes the origin of each use.
      */
-    private record Rep(AtomicElement element, long size, long depth, boolean atUse) {}
+    private record Rep(AtomicElement element, long size, long depth, boolean atUse, Found capture) {}
+
+    /** An argument CAPTURE (#704): its name and span. */
+    private record Found(String name, UBNFSourceSnapshot.Span span) {}
 
     private static long saturating(long a, long b) {
         long sum = a + b;
@@ -272,6 +275,12 @@ public final class ParameterizedRules {
         long total;
         /** Rule bodies open in the expansion recursion, across instance boundaries. */
         int level;
+        /** Code-point spans of the user CAPTUREs written inside call arguments (#704). */
+        final Set<UBNFSourceSnapshot.Span> argCaptures = new HashSet<>();
+        /** Rules with value parameters whose call arguments are being expanded, innermost last. */
+        final List<Integer> scoped = new ArrayList<>();
+        /** Per instance, the first argument CAPTURE its body reaches (null value: none). */
+        final Map<String, Found> instanceCaptures = new HashMap<>();
 
         Grammar(GrammarDecl grammar, IdentityHashMap<RuleDecl, List<Param>> declared, List<Call> calls,
                 UBNFSourceSnapshot.Builder origins) {
@@ -353,6 +362,7 @@ public final class ParameterizedRules {
             }
             rejectCycles();
 
+            for (Call call : calls) for (RuleBody argument : call.args()) collectCaptures(argument);
             Map<String, Rep> empty = Map.of();
             List<RuleDecl> expanded = new ArrayList<>();
             for (RuleDecl rule : rules) {
@@ -547,11 +557,19 @@ public final class ParameterizedRules {
                     if (inline > MAX_EXPANDED_NESTING) throw error(span(ref), "E-PARAM-LIMIT: argument of rule "
                         + call.name() + " nests " + inline + " levels; the limit is " + MAX_EXPANDED_NESTING);
                     charge(size, span(ref));
+                    Def callee = defs.get(call.name());
+                    boolean valueScope = callee.captures() != null;
+                    if (valueScope) scoped.add(callee.rule());
                     List<RuleBody> args = new ArrayList<>();
                     for (RuleBody argument : call.args()) args.add(body(argument, env));
+                    if (valueScope) scoped.remove(scoped.size() - 1);
                     return copy(origins, new RuleRefElement(instance(call.name(), args, span(ref))), ref);
                 }
                 Rep replacement = env.get(ref.name());
+                // A by-name argument relayed into the arguments of a rule with value parameters
+                // would run inside its CAPTURE_SCOPE (#704).
+                if (replacement != null && !scoped.isEmpty() && replacement.capture() != null)
+                    throw scopedCapture(replacement.capture(), rules.get(scoped.get(scoped.size() - 1)).name());
                 if (replacement != null && replacement.atUse())
                     return synthetic(origins, new ReplayElement(((ReplayElement) replacement.element()).name()), ref);
                 return replacement != null ? replacement.element() : ref;
@@ -594,6 +612,63 @@ public final class ParameterizedRules {
             return element;
         }
 
+        ExpansionException scopedCapture(Found found, String rule) {
+            return error(found.span(), "E-PARAM-CAPTURE: CAPTURE(" + found.name()
+                + ", ...) cannot appear in the body or call arguments of rule " + rule
+                + ", whose value parameters restore every capture when it returns");
+        }
+
+        void collectCaptures(RuleBody body) {
+            for (SequenceBody sequence : alternatives(body))
+                for (AnnotatedElement element : sequence.elements()) collectCaptures(element.element());
+        }
+
+        void collectCaptures(AtomicElement element) {
+            if (element instanceof OwnedCaptureElement capture) {
+                argCaptures.add(span(capture));
+                collectCaptures(capture.body());
+            } else if (element instanceof UBNFAST.TransparentElement transparent) collectCaptures(transparent.body());
+            else if (element instanceof OptionalElement optional) collectCaptures(optional.body());
+            else if (element instanceof RepeatElement repeat) collectCaptures(repeat.body());
+            else if (element instanceof OneOrMoreElement more) collectCaptures(more.body());
+            else if (element instanceof BoundedRepeatElement bounded) collectCaptures(bounded.body());
+            else if (element instanceof SeparatedElement separated) {
+                collectCaptures(separated.element());
+                collectCaptures(separated.separator());
+            }
+        }
+
+        Found firstCapture(RuleBody body) {
+            for (SequenceBody sequence : alternatives(body))
+                for (AnnotatedElement element : sequence.elements()) {
+                    Found found = firstCapture(element.element());
+                    if (found != null) return found;
+                }
+            return null;
+        }
+
+        /**
+         * The first argument CAPTURE in traversal order, entering referenced instances through
+         * their recorded result (ordinary rules are not entered), as in Rust.
+         */
+        Found firstCapture(AtomicElement element) {
+            if (element instanceof OwnedCaptureElement capture) {
+                if (argCaptures.contains(span(capture))) return new Found(capture.name(), span(capture));
+                return firstCapture(capture.body());
+            }
+            if (element instanceof RuleRefElement ref) return ref.namespace().isPresent() ? null : instanceCaptures.get(ref.name());
+            if (element instanceof UBNFAST.TransparentElement transparent) return firstCapture(transparent.body());
+            if (element instanceof OptionalElement optional) return firstCapture(optional.body());
+            if (element instanceof RepeatElement repeat) return firstCapture(repeat.body());
+            if (element instanceof OneOrMoreElement more) return firstCapture(more.body());
+            if (element instanceof BoundedRepeatElement bounded) return firstCapture(bounded.body());
+            if (element instanceof SeparatedElement separated) {
+                Found found = firstCapture(separated.element());
+                return found != null ? found : firstCapture(separated.separator());
+            }
+            return null;
+        }
+
         void charge(long size, UBNFSourceSnapshot.Span at) {
             total = saturating(total, size);
             if (total > MAX_EXPANDED_ELEMENTS) throw error(at,
@@ -618,14 +693,14 @@ public final class ParameterizedRules {
             for (int i = 0; i < args.size(); i++) {
                 AtomicElement element = replacement(args.get(i));
                 long[] measured = measureAtomic(element, Map.of());
-                Rep argument = new Rep(element, measured[0], measured[1], false);
+                Rep argument = new Rep(element, measured[0], measured[1], false, firstCapture(element));
                 String capture = def.captures() == null ? null : def.captures().get(i);
                 if (capture == null) {
                     env.put(def.params().get(i), argument);
                 } else {
                     // The argument goes into the CAPTURE; every use of the parameter replays it.
                     env.put(VALUE_PREFIX + i, argument);
-                    env.put(def.params().get(i), new Rep(new ReplayElement(capture), 1, 0, true));
+                    env.put(def.params().get(i), new Rep(new ReplayElement(capture), 1, 0, true, null));
                 }
             }
             RuleBody template = def.template() == null ? rule.body() : def.template();
@@ -639,6 +714,7 @@ public final class ParameterizedRules {
             int slot = instances.size();
             instances.add(null);
             RuleBody body = body(template, env);
+            instanceCaptures.put(name, firstCapture(body));
             instances.set(slot, synthetic(origins, new RuleDecl(List.of(), name, body), rule));
             return name;
         }

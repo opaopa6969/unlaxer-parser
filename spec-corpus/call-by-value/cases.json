@@ -1074,6 +1074,76 @@
     }
   },
   {
+    "name": "value-capture-relayed-to-value-argument",
+    "grammar": "grammar Bad { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= F(y); F(=x) ::= x; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 25,
+      "end": 40,
+      "line": 1,
+      "column": 26,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-relayed-to-by-name-argument",
+    "grammar": "grammar Bad { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= F('a', y); F(=x, z) ::= x z; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 25,
+      "end": 40,
+      "line": 1,
+      "column": 26,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-relayed-twice",
+    "grammar": "grammar Bad { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= K(y); K(w) ::= F('a', w); F(=x, z) ::= x z; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 25,
+      "end": 40,
+      "line": 1,
+      "column": 26,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-relayed-into-nested-call",
+    "grammar": "grammar Bad { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= F('a', H(y)); H(z) ::= z; F(=x, k) ::= x k; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 25,
+      "end": 40,
+      "line": 1,
+      "column": 26,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
+    "name": "value-capture-relayed-through-instance",
+    "grammar": "grammar Bad { Root ::= G(H(CAPTURE(u, 'b'))) SAME_AS(u); G(y) ::= F('a', y); H(z) ::= z; F(=x, k) ::= x k; }",
+    "status": "reject",
+    "error": {
+      "stage": "frontend",
+      "code": "E-PARAM-CAPTURE",
+      "start": 27,
+      "end": 42,
+      "line": 1,
+      "column": 28,
+      "message": "E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns"
+    }
+  },
+  {
     "name": "value-same-as-parameter",
     "grammar": "grammar Bad { Root ::= F('a'); F(=x) ::= SAME_AS(x) x; }",
     "status": "reject",

@@ -8,9 +8,9 @@ Rust 生成器に共通の独立期待値を置く。契約は [docs/call-by-val
   対応 `captures`、instance の正規形の鍵と名前 `instances`、instance 規則の定義 span `spans`、
   入力ごとの結果 `expected`（受理なら AST、拒否なら最も遠い失敗位置）と parse 後の context の状態
   `state`（成功・消費位置・一致位置）を持つ。
-- `error.stage: frontend` の 20 文法は `E-PARAM-*` の code、診断本文、CP 区間、行・列を持つ。値渡しの
+- `error.stage: frontend` の 25 文法は `E-PARAM-*` の code、診断本文、CP 区間、行・列を持つ。値渡しの
   引数でも #701 と同じ検査・本文になること、CAPTURE_SCOPE / CAPTURE を含めた要素数・入れ子の上限の
-  数え方、値渡しの規則の本体・実引数の `CAPTURE` と値の引数と同名の `SAME_AS`、展開名への参照の拒否を
+  数え方、値渡しの規則の本体・実引数の `CAPTURE`（名前渡しの引数を中継して届くものを含む）と値の引数と同名の `SAME_AS`、展開名への参照の拒否を
   確かめる。
 
 期待値は実装の出力から作っていない。`generate_cases.py` が手書きの文法・期待値を JSON にし、

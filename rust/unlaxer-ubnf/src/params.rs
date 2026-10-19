@@ -291,6 +291,12 @@ pub(crate) fn expand(
     let unknown = check.unknown;
     reject_cycles(source, rules, &defs, &edges)?;
 
+    let mut arg_captures = HashSet::new();
+    for call in calls {
+        for argument in &call.args {
+            collect_captures(argument, &mut arg_captures);
+        }
+    }
     let mut expander = Expander {
         source,
         calls,
@@ -302,6 +308,9 @@ pub(crate) fn expand(
         names: HashSet::new(),
         total: 0,
         level: 0,
+        arg_captures,
+        scoped: Vec::new(),
+        instance_captures: HashMap::new(),
     };
     let empty = HashMap::new();
     let mut expanded = Vec::with_capacity(rules.len());
@@ -574,7 +583,17 @@ struct Expander<'a> {
     total: usize,
     /// Rule bodies open in the expansion recursion, across instance boundaries.
     level: usize,
+    /// Code-point spans of the user CAPTUREs written inside call arguments (#704).
+    arg_captures: HashSet<(usize, usize)>,
+    /// Rules with value parameters whose call arguments are being expanded, innermost last.
+    scoped: Vec<usize>,
+    /// Per instance, the first argument CAPTURE its body reaches, directly or through the
+    /// instances it references (instances are complete before they are referenced).
+    instance_captures: HashMap<String, Option<Found>>,
 }
+
+/// An argument CAPTURE: its name and span.
+type Found = (String, Span);
 
 /// A substituted argument with its measured size and nesting, so that measuring a
 /// body never walks into a replacement again.
@@ -584,6 +603,8 @@ struct Rep {
     depth: usize,
     /// A value parameter's SAME_AS, which takes the span of each use it replaces.
     at_use: bool,
+    /// The first argument CAPTURE the replacement carries (#704).
+    capture: Option<Found>,
 }
 
 type Env<'a> = HashMap<&'a str, Rep>;
@@ -641,15 +662,35 @@ impl Expander<'_> {
                         )));
                     }
                     self.charge(size, call.span)?;
+                    let def = &self.defs[call.name.as_str()];
+                    let scoped = def.values.is_some();
+                    if scoped {
+                        self.scoped.push(def.rule);
+                    }
                     let mut args = Vec::with_capacity(call.args.len());
                     for argument in &call.args {
                         args.push(self.body(argument, env)?);
+                    }
+                    if scoped {
+                        self.scoped.pop();
                     }
                     ElementKind::RuleRef {
                         namespace: None,
                         name: self.instance(&call.name, args, call.span)?,
                     }
                 } else if let Some(replacement) = env.get(name.as_str()) {
+                    // A by-name argument relayed into the arguments of a rule with value
+                    // parameters would run inside its CAPTURE_SCOPE (#704).
+                    if let (Some(&rule), Some((capture, span))) =
+                        (self.scoped.last(), &replacement.capture)
+                    {
+                        return Err(scoped_capture(
+                            self.source,
+                            *span,
+                            capture,
+                            &self.rules[rule].name,
+                        ));
+                    }
                     if replacement.at_use {
                         return Ok(Spanned {
                             kind: replacement.element.kind.clone(),
@@ -696,6 +737,47 @@ impl Expander<'_> {
         })
     }
 
+    fn first_capture_in(&self, body: &RuleBody) -> Option<Found> {
+        body.alternatives
+            .iter()
+            .flat_map(|sequence| &sequence.elements)
+            .find_map(|element| self.first_capture(&element.element))
+    }
+
+    /// The first argument CAPTURE in `element` in traversal order, entering referenced
+    /// instances through their recorded result (ordinary rules are not entered).
+    fn first_capture(&self, element: &AtomicElement) -> Option<Found> {
+        match &element.kind {
+            ElementKind::OwnedCapture { name, body } => {
+                if self
+                    .arg_captures
+                    .contains(&(element.span.codepoint_start, element.span.codepoint_end))
+                {
+                    return Some((name.clone(), element.span));
+                }
+                self.first_capture_in(body)
+            }
+            ElementKind::RuleRef {
+                namespace: None,
+                name,
+            } => self.instance_captures.get(name).cloned().flatten(),
+            ElementKind::RuleRef { .. }
+            | ElementKind::Terminal(_)
+            | ElementKind::Replay { .. }
+            | ElementKind::Error(_) => None,
+            ElementKind::CaptureScope(body)
+            | ElementKind::Group(body)
+            | ElementKind::Optional(body)
+            | ElementKind::Repeat(body) => self.first_capture_in(body),
+            ElementKind::OneOrMore(inner) | ElementKind::BoundedRepeat { element: inner, .. } => {
+                self.first_capture(inner)
+            }
+            ElementKind::Separated { element, separator } => self
+                .first_capture(element)
+                .or_else(|| self.first_capture(separator)),
+        }
+    }
+
     fn charge(&mut self, size: usize, span: Span) -> Result<()> {
         self.total = self.total.saturating_add(size);
         if self.total > MAX_EXPANDED_ELEMENTS {
@@ -737,11 +819,13 @@ impl Expander<'_> {
         for (index, argument) in args.into_iter().enumerate() {
             let element = replacement(argument);
             let (size, depth) = measure_atomic(&element, &empty);
+            let capture = self.first_capture(&element);
             let argument = Rep {
                 element,
                 size,
                 depth,
                 at_use: false,
+                capture,
             };
             let parameter = def.params[index].as_str();
             match def
@@ -764,6 +848,7 @@ impl Expander<'_> {
                             size: 1,
                             depth: 0,
                             at_use: true,
+                            capture: None,
                         },
                     );
                 }
@@ -786,6 +871,8 @@ impl Expander<'_> {
         let slot = self.instances.len();
         self.instances.push(None);
         let body = self.body(template, &env)?;
+        let found = self.first_capture_in(&body);
+        self.instance_captures.insert(name.clone(), found);
         self.instances[slot] = Some(RuleDecl {
             annotations: Vec::new(),
             name: name.clone(),
@@ -793,6 +880,43 @@ impl Expander<'_> {
             span: rule.span,
         });
         Ok(name)
+    }
+}
+
+fn scoped_capture(source: &str, span: Span, capture: &str, rule: &str) -> Diagnostic {
+    error(source, span, format!(
+        "E-PARAM-CAPTURE: CAPTURE({capture}, ...) cannot appear in the body or call arguments of rule {rule}, whose value parameters restore every capture when it returns"
+    ))
+}
+
+/// The spans of the user CAPTUREs written in `body` (generated names never occur here).
+fn collect_captures(body: &RuleBody, out: &mut HashSet<(usize, usize)>) {
+    for element in body.alternatives.iter().flat_map(|s| &s.elements) {
+        collect_captures_atomic(&element.element, out);
+    }
+}
+
+fn collect_captures_atomic(element: &AtomicElement, out: &mut HashSet<(usize, usize)>) {
+    match &element.kind {
+        ElementKind::OwnedCapture { body, .. } => {
+            out.insert((element.span.codepoint_start, element.span.codepoint_end));
+            collect_captures(body, out);
+        }
+        ElementKind::CaptureScope(body)
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => collect_captures(body, out),
+        ElementKind::OneOrMore(inner) | ElementKind::BoundedRepeat { element: inner, .. } => {
+            collect_captures_atomic(inner, out)
+        }
+        ElementKind::Separated { element, separator } => {
+            collect_captures_atomic(element, out);
+            collect_captures_atomic(separator, out);
+        }
+        ElementKind::RuleRef { .. }
+        | ElementKind::Terminal(_)
+        | ElementKind::Replay { .. }
+        | ElementKind::Error(_) => {}
     }
 }
 

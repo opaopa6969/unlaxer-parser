@@ -132,7 +132,7 @@ fn corpus_expansions_equal_hand_written_capture_grammars() {
         }
         accepted += 1;
     }
-    assert_eq!((accepted, rejected), (8, 20));
+    assert_eq!((accepted, rejected), (8, 25));
 }
 
 /// The SAME_AS replacing a use keeps that use's span; synthetic wrappers take the body's.
@@ -249,4 +249,18 @@ fn by_name_parameters_are_unchanged() {
     ))
     .unwrap();
     assert_eq!(canonical::file(&by_name), canonical::file(&hand));
+}
+
+/// Captures that do not end up inside a value scope stay legal: a relayed CAPTURE used
+/// outside the value call, and a CAPTURE written in a by-name definition (an ordinary rule
+/// body, restored on return exactly as with a hand-written CAPTURE_SCOPE).
+#[test]
+fn captures_outside_value_scopes_are_accepted() {
+    for source in [
+        "grammar G { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= y F('a'); F(=x) ::= x x; }",
+        "grammar G { Root ::= F('a', Tok('b')); Tok(p) ::= CAPTURE(u, p) SAME_AS(u); F(=x, k) ::= x k; }",
+        "grammar G { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= H(y) F('a'); H(z) ::= z; F(=x) ::= x; }",
+    ] {
+        unlaxer_ubnf::parse(source).unwrap_or_else(|e| panic!("{source}: {e}"));
+    }
 }

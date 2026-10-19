@@ -352,6 +352,22 @@ g = "grammar Bad { Root ::= F('a'); F(=x) ::= G(CAPTURE(u, 'q')) x; G(y) ::= y; 
 reject("value-capture-in-nested-argument", g, "E-PARAM-CAPTURE", "CAPTURE(u, 'q')", scoped("F", "u"))
 g = "grammar Bad { Root ::= G(F(CAPTURE(u, 'a'))); F(=x) ::= x; G(y) ::= y; }"
 reject("value-capture-in-argument-of-argument", g, "E-PARAM-CAPTURE", "CAPTURE(u, 'a')", scoped("F", "u"))
+# The same CAPTURE relayed through by-name parameters into the arguments of a rule with value
+# parameters; refused during expansion at the written CAPTURE.
+relayed = [
+    ("value-capture-relayed-to-value-argument",
+     "grammar Bad { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= F(y); F(=x) ::= x; }"),
+    ("value-capture-relayed-to-by-name-argument",
+     "grammar Bad { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= F('a', y); F(=x, z) ::= x z; }"),
+    ("value-capture-relayed-twice",
+     "grammar Bad { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= K(y); K(w) ::= F('a', w); F(=x, z) ::= x z; }"),
+    ("value-capture-relayed-into-nested-call",
+     "grammar Bad { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= F('a', H(y)); H(z) ::= z; F(=x, k) ::= x k; }"),
+    ("value-capture-relayed-through-instance",
+     "grammar Bad { Root ::= G(H(CAPTURE(u, 'b'))) SAME_AS(u); G(y) ::= F('a', y); H(z) ::= z; F(=x, k) ::= x k; }"),
+]
+for name, g in relayed:
+    reject(name, g, "E-PARAM-CAPTURE", "CAPTURE(u, 'b')", scoped("F", "u"))
 # SAME_AS(x) would read a user binding x, never the value parameter x.
 g = "grammar Bad { Root ::= F('a'); F(=x) ::= SAME_AS(x) x; }"
 reject("value-same-as-parameter", g, "E-PARAM-SHADOW", "SAME_AS(x)",

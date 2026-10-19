@@ -85,6 +85,12 @@ Rust の `Expr::OwnedCapture("Body(=tag)", ...)`）。
 - 値渡しの引数を持つ規則 `F` の本体の中の `CAPTURE(name, ...)`。本体の中の呼び出しの実引数も含む。
 - `F` の呼び出しの実引数（名前渡し・値渡しのどちらも、さらにその中の呼び出しの実引数も）の中の
   `CAPTURE(name, ...)`。どこから呼んでも、その実引数は `F` の scope の中で照合されるため。
+- 名前渡しの引数を中継して上の位置に届く `CAPTURE`。たとえば `Root ::= G(CAPTURE(u, 'b')); G(y) ::= F(y);`
+  では `y` が `F` の実引数になるので、`G` に渡した `CAPTURE` も `F` の scope の中で照合される。展開の途中で、
+  値渡しの規則の呼び出しの実引数を展開しているときに、呼び出しの実引数に書いた `CAPTURE` を運ぶ名前渡しの
+  引数を代入すれば拒否する。運ぶとは、代入する要素の中にその `CAPTURE` があるか、その `CAPTURE` を本体に
+  持つ instance（たどれる instance を含む）を参照すること。何段中継しても、別の呼び出しの実引数に
+  包んでも（`F('a', H(y))`）、instance に包んで渡しても（`G(H(CAPTURE(u, 'b')))`）同じ。
 - 位置はその `CAPTURE` 要素。本文は
   `E-PARAM-CAPTURE: CAPTURE(u, ...) cannot appear in the body or call arguments of rule F, whose value parameters restore every capture when it returns`。
 
@@ -93,8 +99,13 @@ Main ::= F('a', CAPTURE(u, 'b')) SAME_AS(u) ;   // E-PARAM-CAPTURE（名前渡�
 F(=x, y) ::= x y ;
 ```
 
-`CAPTURE_SCOPE(...)` と `SAME_AS(...)` は書ける。本体から参照した引数なしの規則や別の引数付き規則の
-本体にある `CAPTURE` は拒否しない。それらの binding も `F` から戻るときに戻る（手で
+検査の順序: 書いた位置で分かるもの（本体と、値渡しの規則の呼び出しに直接書いた実引数）は展開の前の
+使用の検査で、中継されたものは展開の途中（要素数・入れ子の上限と同じ順序の中）で、それぞれ最初の 1 個を
+報告する。両 host で同じ順序になる。
+
+`CAPTURE_SCOPE(...)` と `SAME_AS(...)` は書ける。中継されても値渡しの呼び出しの実引数に入らない `CAPTURE`
+（`G(y) ::= y F('a');` の `y`）は拒否しない。本体から参照した引数なしの規則や、引数付きの定義の本体に
+書いた `CAPTURE`（`Tok(p) ::= CAPTURE(u, p) SAME_AS(u);` を `F('a', Tok('b'))` に渡す場合）も拒否しない。それらの binding も `F` から戻るときに戻る（手で
 `CAPTURE_SCOPE` を書いた場合と同じ）。将来、`CAPTURE_SCOPE` の代わりに値の binding だけを戻す仕組み
 （新しい runtime の操作）を足せば、この拒否は緩められる。この issue は runtime を変えない制約なので、
 拒否を選んだ。
@@ -183,7 +194,7 @@ binding に依存する規則は memo を止めるので、packrat の線形時�
 ## 検証
 
 `spec-corpus/call-by-value/cases.json`（[README](../spec-corpus/call-by-value/README.md)）は 8 文法 36 入力の
-受理例と、位置付きで拒否する 20 例（上の capture・`SAME_AS`・展開名への参照の 8 例を含む）を持つ。受理例は名前付きの閉じタグ、heredoc、複数の値と名前渡しの
+受理例と、位置付きで拒否する 25 例（上の capture・`SAME_AS`・展開名への参照の 13 例。中継の 5 例を含む）を持つ。受理例は名前付きの閉じタグ、heredoc、複数の値と名前渡しの
 混在、値の転送と同じ規則の入れ子、空の値と使わない値、失敗した選択肢での再試行と選択肢の本体、
 ユーザーの capture と同名の引数、入れ子 128 段ちょうどの境界で、それぞれ CAPTURE_SCOPE / CAPTURE /
 SAME_AS で手書きした等価文法、instance の鍵と名前、入力ごとの受理・拒否、失敗位置、AST、parse 後の

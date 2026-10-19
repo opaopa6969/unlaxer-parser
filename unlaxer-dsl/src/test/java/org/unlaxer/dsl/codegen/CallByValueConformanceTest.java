@@ -134,7 +134,7 @@ public class CallByValueConformanceTest {
             }
             accepted++;
         }
-        assertEquals(List.of(8, 20), List.of(accepted, rejected));
+        assertEquals(List.of(8, 25), List.of(accepted, rejected));
     }
 
     /** Each SAME_AS keeps the span of the use it replaces; the wrappers take the body's span. */
@@ -202,6 +202,15 @@ public class CallByValueConformanceTest {
         StringBuilder source = new StringBuilder("grammar G { Root ::= D40('a'); D0(=x) ::= x x; ");
         for (int k = 1; k <= 40; k++) source.append("D").append(k).append("(=x) ::= D").append(k - 1).append("(x x); ");
         assertEquals(42, UBNFMapper.parse(source.append("}").toString()).grammars().get(0).rules().size());
+    }
+
+    /** Captures that do not end up inside a value scope stay legal (as in Rust). */
+    @Test public void capturesOutsideValueScopesAreAccepted() {
+        for (String source : List.of(
+                "grammar G { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= y F('a'); F(=x) ::= x x; }",
+                "grammar G { Root ::= F('a', Tok('b')); Tok(p) ::= CAPTURE(u, p) SAME_AS(u); F(=x, k) ::= x k; }",
+                "grammar G { Root ::= G(CAPTURE(u, 'b')) SAME_AS(u); G(y) ::= H(y) F('a'); H(z) ::= z; F(=x) ::= x; }"))
+            assertFalse(source, UBNFMapper.parse(source).grammars().get(0).rules().isEmpty());
     }
 
     @Test public void generatedCaptureNamesCannotBeWritten() {
