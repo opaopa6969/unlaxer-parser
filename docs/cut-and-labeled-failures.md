@@ -224,9 +224,12 @@ still ends with the label), and a chain of references that the check cannot see 
 ordinarily. Both hosts compute the same least fixed points over rule references, so the
 decision and the code-point span agree. Each fixed point is a worklist over the reference
 graph (a rule is re-examined only when a rule it references, or one referencing it, changes),
-so the work is linear in the references times the number of labels; a grammar without
-`COMMIT` or `LABEL` skips the analysis. A chain of 4000 rules with 2 to 16 labels takes
-under 40 ms in Rust (release) and under 20 ms in Java.
+and a grammar without `COMMIT` or `LABEL` skips the analysis. A rule's label set can grow
+once per label, and each growth re-examines its referencing rules, so the worst case is
+the references times the square of the number of labels. Chains stay close to linear: a
+chain of 4000 rules with 2 to 16 labels takes under 40 ms in Rust (release) and under 20 ms
+in Java. A dense graph does not: 600 rules that each reference the other 599, with 60
+labels, take about 75 s in Rust (release) and 26 s in Java.
 
 This precise check was chosen over turning the error into a warning (option (b) in #722):
 a warning would also have removed the misses and false rejections, but grammars that can
