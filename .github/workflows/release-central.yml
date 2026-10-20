@@ -43,6 +43,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           overwrite-settings: false
+      - uses: ./.github/actions/maven-job-repository
 
       - name: Verify version matches pom revision
         id: version
@@ -102,6 +103,7 @@ jobs:
           server-password: MAVEN_CENTRAL_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - uses: ./.github/actions/maven-job-repository
 
       - name: Skip when already published
         id: check

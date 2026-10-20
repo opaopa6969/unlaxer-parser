@@ -1,0 +1,61 @@
+name: Job-local Maven repository
+description: >-
+  Route every later Maven process of this job, including ones started by scripts
+  and tests, to a fresh local repository owned by this run attempt and job (#718).
+  Development installs then never enter the shared ~/.m2/repository of the
+  self-hosted runners, where they would sit next to signed Central artifacts of
+  the same version. Use after actions/setup-java (the check runs Maven).
+inputs:
+  name:
+    description: Suffix for a second repository in one job (for example a matrix leg).
+    required: false
+    default: ''
+outputs:
+  path:
+    description: Absolute path of the job-local repository.
+    value: ${{ steps.repository.outputs.path }}
+runs:
+  using: composite
+  steps:
+    - id: repository
+      shell: bash
+      env:
+        REPOSITORY_SUFFIX: ${{ inputs.name }}
+      run: |
+        set -euo pipefail
+        # Shell variables, not expressions: github.job is not available everywhere.
+        for variable in RUNNER_TEMP GITHUB_RUN_ID GITHUB_RUN_ATTEMPT GITHUB_JOB GITHUB_ENV GITHUB_OUTPUT; do
+          if [ -z "${!variable:-}" ]; then
+            echo "::error::$variable is not set; cannot create a job-local Maven repository" >&2
+            exit 1
+          fi
+        done
+        case " ${MAVEN_ARGS:-} " in
+          *" -Dmaven.repo.local="*)
+            echo "::error::MAVEN_ARGS already selects a Maven repository: $MAVEN_ARGS" >&2
+            exit 1;;
+        esac
+        repository="$RUNNER_TEMP/maven-repository/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB${REPOSITORY_SUFFIX:+-$REPOSITORY_SUFFIX}"
+        # The mvn launcher word-splits MAVEN_ARGS.
+        if [[ "$repository" =~ [[:space:]] ]]; then
+          echo "::error::Maven repository path contains whitespace: $repository" >&2
+          exit 1
+        fi
+        mkdir -p "$(dirname "$repository")"
+        # Fails if it exists: the repository must start empty in this job.
+        mkdir "$repository"
+        maven_args="${MAVEN_ARGS:+$MAVEN_ARGS }-Dmaven.repo.local=$repository"
+        # Evaluate what Maven itself resolves, not only the variable we set.
+        resolved="$(MAVEN_ARGS="$maven_args" mvn -B -q -N \
+          org.apache.maven.plugins:maven-help-plugin:3.5.1:evaluate \
+          -Dexpression=settings.localRepository -DforceStdout)"
+        if [ "$resolved" != "$repository" ]; then
+          echo "::error::Maven resolves local repository '$resolved', expected '$repository'" >&2
+          exit 1
+        fi
+        {
+          echo "MAVEN_ARGS=$maven_args"
+          echo "UNLAXER_MAVEN_REPOSITORY=$repository"
+        } >> "$GITHUB_ENV"
+        echo "path=$repository" >> "$GITHUB_OUTPUT"
+        echo "Maven local repository for this job: $repository"

@@ -15,6 +15,7 @@ jobs:
           distribution: temurin
           java-version: '21.0.9'
           overwrite-settings: false
+      - uses: ./.github/actions/maven-job-repository
       - uses: actions/setup-node@v4
         with:
           node-version: '20.20.0'

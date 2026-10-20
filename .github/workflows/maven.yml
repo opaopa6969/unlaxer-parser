@@ -3,6 +3,8 @@ name: Java CI with Maven
 # Repository-scoped self-hosted runner (hosted minutes are billed against the
 # account quota even for this public repository; 2026-10 ran out at ~6,400 min).
 # Do not restore or upload the multi-GB local Maven repository as a remote cache.
+# Every Maven job first selects a fresh job-local repository (#718,
+# .github/actions/maven-job-repository) so development installs never reach ~/.m2.
 
 on:
   push:
@@ -32,6 +34,7 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
+    - uses: ./.github/actions/maven-job-repository
     - name: Set up Rust (minimum supported version)
       run: |
         export PATH="$HOME/.cargo/bin:$PATH"
@@ -415,6 +418,7 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
+    - uses: ./.github/actions/maven-job-repository
 
     # Maven's native emitter comparison intentionally runs Cargo offline.
     - name: Prepare locked Rust dependencies for offline generator tests
@@ -427,7 +431,12 @@ jobs:
         python3 scripts/tests/test_central_release_guard.py
         python3 scripts/tests/test_version_sync.py
         bash -n scripts/release-central.sh
-        
+
+    - name: Check job-local Maven repository wiring (#718)
+      run: |
+        python3 scripts/tests/test_maven_job_repository.py
+        bash -n scripts/check-job-maven-repository.sh
+
     - name: Build with Maven
       run: mvn -B clean test
 
@@ -466,6 +475,7 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         overwrite-settings: false
+    - uses: ./.github/actions/maven-job-repository
 
     # Maven's native emitter comparison intentionally runs Cargo offline.
     - name: Prepare locked Rust dependencies for offline generator tests
@@ -519,6 +529,7 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
+    - uses: ./.github/actions/maven-job-repository
 
     - name: Set up Node.js (for vsce)
       uses: actions/setup-node@v4
@@ -572,6 +583,8 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
+    # The parser, tinyexpression and its IDE module all resolve from this one job repository.
+    - uses: ./unlaxer-parser/.github/actions/maven-job-repository
 
     - name: Install unlaxer to local repo
       working-directory: unlaxer-parser
@@ -591,6 +604,10 @@ jobs:
           exit 1
         fi
         printf 'version=%s\n' "${versions[0]}" >> "$GITHUB_OUTPUT"
+
+    - name: Require this checkout's jars in the job Maven repository
+      working-directory: unlaxer-parser
+      run: bash scripts/check-job-maven-repository.sh . '${{ steps.unlaxer.outputs.version }}'
 
     - name: Checkout tinyexpression
       uses: actions/checkout@v4
@@ -751,6 +768,7 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
+    - uses: ./.github/actions/maven-job-repository
     - uses: actions/setup-node@v4
       with:
         node-version: '20'
