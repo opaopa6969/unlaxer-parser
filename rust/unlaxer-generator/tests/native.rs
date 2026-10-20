@@ -596,3 +596,20 @@ fn literal_text_cannot_enable_internal_preferred_captures() {
     assert!(!parser.contains("#preferred-extra:2"));
     assert!(parser.contains(".separated_by_java("));
 }
+
+/// Each process seeds hashing anew, so repeated runs catch a report that depends on hash order.
+#[test]
+fn left_recursion_reports_the_same_rule_on_every_run() {
+    let directory = Directory::new();
+    let grammar = repo().join("../story/code/calc-leftrec.ubnf");
+    for index in 0..16 {
+        let output = directory.0.join(format!("output-{index}"));
+        let result = invoke(&grammar, &output, false);
+        assert_eq!(result.status.code(), Some(3));
+        let diagnostic = String::from_utf8_lossy(&result.stderr);
+        assert!(
+            diagnostic.contains("E-LEFT-RECURSION: left recursion at Expression"),
+            "{index}: {diagnostic}"
+        );
+    }
+}

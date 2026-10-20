@@ -779,7 +779,9 @@ public class UBNFMapper {
             if (key.equals("strategy")) strategy = value;
             else params.put(key, value);
         }
-        return new EvalAnnotation(kind, strategy == null ? "default" : strategy, Map.copyOf(params));
+        // Source order, as the native frontend keeps it; Map.copyOf iterates in a per-JVM order.
+        return new EvalAnnotation(kind, strategy == null ? "default" : strategy,
+            java.util.Collections.unmodifiableMap(params));
     }
 
     WhitespaceAnnotation toWhitespaceAnnotation(Token token) {
