@@ -41,5 +41,48 @@
     "rule": "F_36f58ca21227c6d8",
     "startCP": 120,
     "endCP": 125
+  },
+  {
+    "id": "catch-does-not-catch-commit",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH({ COMMIT('a') }, 'b', L) ;\n  Z ::= LABEL(L, 'z') LABEL(M, 'z') ;\n}\n",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 94,
+    "endCP": 109
+  },
+  {
+    "id": "catch-does-not-catch-other-label",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH({ LABEL(M, 'a') }, 'b', L) ;\n  Z ::= LABEL(L, 'z') LABEL(M, 'z') ;\n}\n",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 94,
+    "endCP": 111
+  },
+  {
+    "id": "catch-alternative-is-not-caught",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH('x', { LABEL(L, 'a') } 'y', L) ;\n  Z ::= LABEL(L, 'z') LABEL(M, 'z') ;\n}\n",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 99,
+    "endCP": 116
+  },
+  {
+    "id": "recovery-does-not-catch-label",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc, params=[s])\n  Root ::= { Statement @s } ;\n  @recovery(sync=';')\n  Statement ::= { LABEL(L, 'a') } ';' ;\n  Z ::= LABEL(L, 'z') ;\n}\n",
+    "code": "E-RAISING-REPETITION",
+    "rule": "Statement",
+    "startCP": 157,
+    "endCP": 174
+  },
+  {
+    "id": "repeated-recovery-rule-raises-again",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc, params=[s])\n  Root ::= { Statement @s } ;\n  @recovery(sync=';')\n  Statement ::= { COMMIT('a', 'need a') } ';' ;\n}\n",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 100,
+    "endCP": 116
+  },
+  {
+    "id": "repeated-recovery-rule-through-reference",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc, params=[s])\n  Root ::= { Statement @s } ;\n  @recovery(sync=';')\n  Statement ::= Item ';' ;\n  Item ::= { COMMIT('a', 'need a') } ;\n}\n",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 100,
+    "endCP": 116
   }
 ]
