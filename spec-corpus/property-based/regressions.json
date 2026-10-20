@@ -95,5 +95,67 @@
       "x",
       "xa"
     ]
+  },
+  {
+    "id": "catch-lookahead-in-body",
+    "issue": "#720",
+    "note": "A positive LOOKAHEAD token only in CATCH's body: the ordinary failure after it is at the matched reach in both hosts (#706).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CATCH('a' AHEAD 'é' | LABEL(L, 'q'), 'z', L) ; }",
+    "inputs": [
+      "ax",
+      "axé",
+      "q",
+      "z",
+      "aé"
+    ]
+  },
+  {
+    "id": "catch-lookahead-in-alternative",
+    "issue": "#720",
+    "note": "A positive LOOKAHEAD token only in CATCH's alternative, reached after a caught label (#706).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CATCH(LABEL(L, 'q'), 'a' AHEAD 'é', L) ; }",
+    "inputs": [
+      "ax",
+      "axé",
+      "aé",
+      "q"
+    ]
+  },
+  {
+    "id": "catch-consuming-cycle",
+    "issue": "#720",
+    "note": "A rule cycle through CATCH's alternative: Rust's pre-parse Classic-mode scan recursed with a fresh visited set and overflowed the stack (#720).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none @root @mapping(N0) R0 ::= CATCH(LABEL(L, 'Z'), 'a' R0, L) ; }",
+    "inputs": [
+      "Z",
+      "aZ",
+      "aaZ",
+      "aab",
+      "a",
+      ""
+    ]
+  },
+  {
+    "id": "catch-classic-alternative",
+    "issue": "#720",
+    "note": "Classic token mode selected only by CAPTURE / SAME_AS in CATCH's alternative (#720): acceptance, cursors and CST stay as before.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none @root @mapping(N0) R0 ::= CATCH(LABEL(L, 'q'), CAPTURE(w0, 'a') SAME_AS(w0), L) ; }",
+    "inputs": [
+      "aa",
+      "ab",
+      "q",
+      "a"
+    ]
+  },
+  {
+    "id": "catch-left-cycle",
+    "issue": "#720",
+    "note": "The left cycle through CATCH's alternative of the #720 report. Both UBNF frontends reject it as left recursion; hand-built runtime graphs end in the rule-nesting resource limit (rust/unlaxer-runtime/tests/catch_preflight.rs, CatchLabelsCycleTest).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none @root @mapping(N0) R0 ::= CATCH(LABEL(L, 'Z'), R0, L) ; }",
+    "expectedRejection": "E-LEFT-RECURSION",
+    "inputs": [
+      "Z",
+      ""
+    ]
   }
 ]

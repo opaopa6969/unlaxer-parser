@@ -6574,15 +6574,20 @@ impl<'a> ClassicModeScan<'a> {
     }
     fn children(&mut self, children: &'a [Expr]) -> Option<&'a Expr> {
         let (first, rest) = children.split_first()?;
-        if !rest.is_empty() {
+        self.defer(rest);
+        Some(first)
+    }
+    /// Visits `later` after the current expression, in this scan and with its visited
+    /// rules (#720): CATCH's alternative, like a sibling of its body.
+    fn defer(&mut self, later: &'a [Expr]) {
+        if !later.is_empty() {
             if self.depth < self.siblings.len() && self.overflow.is_empty() {
-                self.siblings[self.depth] = Some(rest.iter());
+                self.siblings[self.depth] = Some(later.iter());
                 self.depth += 1;
             } else {
-                self.overflow.push(rest.iter());
+                self.overflow.push(later.iter());
             }
         }
-        Some(first)
     }
     fn next(&mut self) -> Option<&'a Expr> {
         while let Some(last) = self.overflow.last_mut() {
@@ -6664,12 +6669,12 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
             | Expr::LexicalContextScope { child, .. }
             | Expr::Commit { child, .. }
             | Expr::Label { child, .. } => Some(child.as_ref()),
+            // Both operands in the same iterative scan: a fresh recursive scan of the
+            // alternative never terminated on a rule cycle through it (#720).
             Expr::CatchLabels {
                 child, alternative, ..
             } => {
-                if requires_classic_mode(alternative, rules) {
-                    return true;
-                }
+                scan.defer(std::slice::from_ref(alternative.as_ref()));
                 Some(child.as_ref())
             }
             _ => None,
@@ -6934,5 +6939,117 @@ mod pure_success_memo_tests {
             memo_success_safe_rules(&rules),
             [false, false, true, false, false, false, false, false, false]
         );
+    }
+}
+
+#[cfg(test)]
+mod classic_mode_scan_tests {
+    use super::*;
+
+    fn rule(name: &'static str, expression: Expr) -> Rule {
+        Rule { name, expression }
+    }
+
+    fn label_z() -> Expr {
+        Expr::literal("Z").label("L")
+    }
+
+    fn on_standard_stack(operation: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(operation)
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn rule_cycles_through_catch_operands_terminate() {
+        on_standard_stack(|| {
+            // The #720 report: the alternative re-enters the rule, and so does the body.
+            for rules in [
+                vec![rule("R0", label_z().catch_labels(Expr::Rule(0), ["L"]))],
+                vec![rule(
+                    "R0",
+                    label_z().catch_labels(Expr::literal("a").then(Expr::Rule(0)), ["L"]),
+                )],
+                vec![rule(
+                    "R0",
+                    Expr::choice([Expr::Rule(0), label_z()]).catch_labels(Expr::Rule(0), ["L"]),
+                )],
+                vec![
+                    rule("R0", label_z().catch_labels(Expr::Rule(1), ["L"])),
+                    rule(
+                        "R1",
+                        Expr::Rule(0)
+                            .commit_with("c")
+                            .catch_labels(Expr::Rule(0).label("M"), ["M"]),
+                    ),
+                ],
+            ] {
+                assert!(!requires_classic_mode(&Expr::Rule(0), &rules));
+            }
+        });
+    }
+
+    #[test]
+    fn classic_constructs_only_in_one_catch_operand_are_detected() {
+        let classic = || Expr::literal("a").match_only();
+        for rules in [
+            // Only in the alternative, behind a cycle through the alternative.
+            vec![
+                rule("R0", label_z().catch_labels(Expr::Rule(1), ["L"])),
+                rule(
+                    "R1",
+                    Expr::choice([Expr::literal("b").then(Expr::Rule(0)), classic()]),
+                ),
+            ],
+            // Only in the body, after a cycle through the body.
+            vec![rule(
+                "R0",
+                Expr::choice([Expr::literal("b").then(Expr::Rule(0)), classic()])
+                    .catch_labels(Expr::literal("z"), ["L"]),
+            )],
+            // In a nested CATCH's alternative, inside COMMIT and LABEL.
+            vec![rule(
+                "R0",
+                label_z().catch_labels(
+                    label_z()
+                        .catch_labels(classic().label("M"), ["L"])
+                        .commit_with("c"),
+                    ["L"],
+                ),
+            )],
+            // Owned capture in the alternative of a rule reached from the alternative.
+            vec![
+                rule("R0", label_z().catch_labels(Expr::Rule(1), ["L"])),
+                rule("R1", Expr::literal("a").capture_owned("c")),
+            ],
+        ] {
+            assert!(requires_classic_mode(&Expr::Rule(0), &rules));
+        }
+    }
+
+    #[test]
+    fn a_deep_rule_chain_through_alternatives_is_scanned_iteratively() {
+        on_standard_stack(|| {
+            // R_i ::= CATCH(LABEL(L, 'Z'), 'a' R_{i+1}, L); the last rule is Classic. A fresh
+            // recursive scan per alternative overflowed this stack long before the end (#720).
+            const RULES: usize = 20_000;
+            let mut rules: Vec<Rule> = (0..RULES - 1)
+                .map(|index| {
+                    rule(
+                        "R",
+                        label_z()
+                            .catch_labels(Expr::literal("a").then(Expr::Rule(index + 1)), ["L"]),
+                    )
+                })
+                .collect();
+            rules.push(rule("Last", Expr::literal("a").match_only()));
+            assert!(requires_classic_mode(&Expr::Rule(0), &rules));
+            rules.pop();
+            rules.push(rule("Last", Expr::literal("Z")));
+            assert!(!requires_classic_mode(&Expr::Rule(0), &rules));
+        });
     }
 }

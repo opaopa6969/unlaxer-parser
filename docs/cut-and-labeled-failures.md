@@ -109,6 +109,31 @@ that ignores a raised failure therefore never turns a later, unrelated ordinary
 failure into a cut, and the next parse on a reused context starts clean. Custom
 parsers that catch failures themselves can use `clearRaisedFailure()` (Java).
 
+### Rule cycles through CATCH
+
+A rule may re-enter itself through a CATCH operand, as `R0 ::= CATCH(LABEL(L, 'Z'), 'a' R0, L)`
+does through its alternative. Before parsing, Rust scans the grammar reachable from the root
+for Classic token-mode constructs (`requires_classic_mode`). That scan used to look at
+CATCH's alternative with a new, recursive scan and its own visited rules, so any rule cycle
+through an alternative recursed without end and aborted the process with a stack overflow,
+before the parse depth guards were reached
+([#720](https://github.com/opaopa6969/unlaxer-parser/issues/720)). The scan now visits both
+operands of CATCH, like the single operand of COMMIT and LABEL, in the same iterative scan with
+one set of visited rules, so it is linear in the grammar and needs no stack per rule, whatever
+the cycles or the depth of the rule graph (a chain of 20,000 rules is checked on a 2 MiB stack).
+A Classic construct found in either operand selects Classic mode as before.
+
+Parsing a cycle then ends with the existing contracts. A consuming cycle parses (`aaZ`) or
+fails ordinarily (`aab`, CP2). A cycle that does not consume, such as the left cycle
+`R0 ::= CATCH(LABEL(L, 'Z'), R0, L)` on the empty input, is a resource limit: Rust reports
+`rule nesting below 256` (full-input kind `resource_limit`) at CP0 with both cursors at 0 and
+registered state unchanged, and the failure is sticky on that context; Java throws
+`ParseLimitException` at `MAX_PARSE_DEPTH`, which is sticky as well and restores registered
+state. A deep consuming input ends the same way. Java has no such pre-parse scan; its graph
+analyses (`DiagnosticsSafety`, `FirstSets`) are already iterative with one identity-visited set,
+and terminate on these cycles (`CatchLabelsCycleTest`). Both UBNF frontends reject the left cycle
+as `E-LEFT-RECURSION`.
+
 ## UBNF
 
 ```ubnf
@@ -309,6 +334,13 @@ with the native generator and portability check (code, rule and code-point span)
 that every accepted grammar generates.
 The frontend fixtures `rust/unlaxer-ubnf/tests/fixtures/positive/cut-labeled-failure.ubnf`
 and `negative.tsv` compare both UBNF frontends.
+Cycles through CATCH (#720) are covered by `rust/unlaxer-runtime/tests/catch_preflight.rs`
+and the scan's unit tests in `lib.rs` (`classic_mode_scan_tests`), Java
+`CatchLabelsCycleTest`, and five `#720` entries of
+[`spec-corpus/property-based/regressions.json`](../spec-corpus/property-based/regressions.json)
+that `PropertyBasedParityTest` runs on both hosts: a consuming cycle, the rejected left cycle,
+Classic mode selected only by CATCH's alternative, and a positive `LOOKAHEAD` only in the body
+or only in the alternative, whose failure is at the matched reach in both versions (#706).
 
 ```sh
 mvn -pl unlaxer-common,unlaxer-dsl -am test -Dtest=RaisingOperatorConformanceTest \
