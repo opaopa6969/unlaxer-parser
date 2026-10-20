@@ -1937,7 +1937,11 @@ fn parse_detailed_stacked(
     if let Some(raised) = parser.raised.filter(|_| !retry_raised) {
         // Structural position and message: no detailed retry can change them.
         return Err(RuleStackDiagnostic {
-            rule_stack: if stacked { parser.rule_stack() } else { None },
+            rule_stack: if stacked {
+                parser.final_rule_stack()
+            } else {
+                None
+            },
             diagnostic: ParseDiagnostic {
                 kind: raised.diagnostic_kind(),
                 offset: raised.offset,
@@ -1961,7 +1965,11 @@ fn parse_detailed_stacked(
             stacked,
         );
     }
-    let rule_stack = if stacked { parser.rule_stack() } else { None };
+    let rule_stack = if stacked {
+        parser.final_rule_stack()
+    } else {
+        None
+    };
     let farthest = ParseError {
         offset: parser.code_point(parser.farthest),
         expected: parser.expected_names.strings(&parser.expected),
@@ -2409,6 +2417,7 @@ impl<'a> ParseContext<'a> {
         self.call_depth += 1;
         let result = self.transaction(|context| parser.parse(context));
         self.call_depth -= 1;
+        self.finish_outermost_parse(result.is_ok());
         result
     }
 
@@ -2523,6 +2532,7 @@ impl<'a> ParseContext<'a> {
         self.first_sets = previous_first_sets;
         self.grammar_session = previous_session;
         self.call_depth -= 1;
+        self.finish_outermost_parse(result.is_ok());
         result
     }
 

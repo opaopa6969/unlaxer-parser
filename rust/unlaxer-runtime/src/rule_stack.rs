@@ -130,6 +130,8 @@ pub(crate) struct RuleStacks {
     backups: Vec<Option<Selected>>,
     /// Rules a raised failure has propagated out of, innermost first, as (name, byte start).
     pub(crate) raised: Vec<(&'static str, usize)>,
+    /// Outcome of the last outermost parse; the rule stack explains failed parses only.
+    pub(crate) parse_succeeded: bool,
 }
 
 /// Raised failure retained by a failure memo entry, with the rules it left inside the rule.
@@ -453,14 +455,44 @@ impl ParseContext<'_> {
         }
     }
 
-    /// The rule stack of the final error with [`Diagnostics::Detailed`].
+    /// The rule stack of the final error of a failed parse with [`Diagnostics::Detailed`].
     ///
     /// For a committed or labeled failure (#700) it is the stack where the raising
     /// operator ran. Otherwise it is the stack of the failed rule invocation that reached
     /// the farthest failure: the one with the most rule frames, the earliest on ties.
-    /// `None` with other diagnostic policies, for resource limits and name-resolution
-    /// failures, and when no failed rule reached the farthest failure.
+    /// `None` after a successful parse (see [`Self::unconsumed_input_rule_stack`]), with
+    /// other diagnostic policies, for resource limits and name-resolution failures, and
+    /// when no failed rule reached the farthest failure.
     pub fn rule_stack(&self) -> Option<RuleStack> {
+        if self.rule_stacks.parse_succeeded {
+            return None;
+        }
+        self.final_rule_stack()
+    }
+
+    /// For a successful parse that did not consume the whole input: the rule stack a
+    /// full-input parse reports for the unconsumed input, as Java's
+    /// `ParseContext#getUnconsumedInputRuleStack()` does.
+    pub fn unconsumed_input_rule_stack(&self) -> Option<RuleStack> {
+        // The unconsumed input is a failure at the cursor, outside every rule: past the
+        // farthest failure it leaves no failed rule at the error.
+        if !self.rule_stacks.parse_succeeded
+            || self.position >= self.input.len()
+            || self.position > self.farthest
+        {
+            return None;
+        }
+        self.final_rule_stack()
+    }
+
+    /// Records the outcome of an outermost parse entry.
+    pub(crate) fn finish_outermost_parse(&mut self, succeeded: bool) {
+        if self.call_depth == 0 {
+            self.rule_stacks.parse_succeeded = succeeded;
+        }
+    }
+
+    pub(crate) fn final_rule_stack(&self) -> Option<RuleStack> {
         if !self.rule_stack_tracked()
             || self.resource_failure.is_some()
             || self.name_failure().is_some()

@@ -60,7 +60,7 @@ final class ParityHarness {
     static final List<String> DIAGNOSTICS = List.of("AUTO", "DETAILED", "DETAILED_ON_FAILURE");
     static final List<Boolean> RESET = List.of(false, true);
     /** Observation keys compared between Java and Rust. */
-    static final List<String> CROSS_HOST = List.of("ok", "pos", "matched", "cst", "owned", "diag", "ast");
+    static final List<String> CROSS_HOST = List.of("ok", "pos", "matched", "cst", "owned", "diag", "ast", "stack");
     /** Observation keys that must not depend on memoization, diagnostics or the cursor reset. */
     static final List<String> CONFIG_INVARIANT = List.of("ok", "pos", "cst", "owned", "diag", "ast", "hint");
 
@@ -391,7 +391,7 @@ final class ParityHarness {
             JsonObject j = entry.getValue(), r = rust.get(cfg);
             for (String key : CROSS_HOST)
                 if (!j.get(key).equals(r.get(key))) {
-                    findings.add(new Finding(id, "java-rust:" + key, input, cfg, "java=" + j.get(key) + " rust=" + r.get(key)
+                    findings.add(new Finding(id, "java-rust:" + key, input, cfg, "java=" + j.get(key) + " rust=" + r.get(key) + (key.equals("stack") ? " far(java/rust)=" + j.get("far") + "/" + r.get("far") + " diag(java/rust)=" + j.get("diag") + "/" + r.get("diag") : "")
                             + (j.has("mapError") ? " javaMapError=" + j.get("mapError").getAsString() : "")));
                     break;
                 }
@@ -407,6 +407,17 @@ final class ParityHarness {
             }
         }
         for (var host : List.of(Map.entry("java", java), Map.entry("rust", rust))) {
+            for (var entry : host.getValue().entrySet()) {
+                String cfg = entry.getKey();
+                String diagnosticsName = cfg.split("/")[1];
+                JsonElement got = entry.getValue().get("stack");
+                if (diagnosticsName.equals("DETAILED_ON_FAILURE")) {
+                    if (!got.getAsString().equals("-")) findings.add(new Finding(id, host.getKey() + "-stack-on-failure", input, cfg, got.toString()));
+                } else {
+                    JsonElement ref = host.getValue().get("OFF/DETAILED/false").get("stack");
+                    if (!ref.equals(got)) findings.add(new Finding(id, host.getKey() + "-stack-config", input, cfg, "OFF/DETAILED/false=" + ref + " " + cfg + "=" + got));
+                }
+            }
             var baseline = host.getValue().values().iterator().next();
             String baseCfg = host.getValue().keySet().iterator().next();
             for (var entry : host.getValue().entrySet()) {
@@ -460,6 +471,9 @@ final class ParityHarness {
                 if (!first.get(key).equals(second.get(key))) violations.add("nondeterministic:" + key);
             var out = new JsonObject();
             for (String key : List.of("ok", "pos", "matched", "cst", "owned")) out.add(key, first.get(key));
+            out.add("stack", first.get("stack"));
+            out.add("far", first.get("far"));
+            if (!first.get("stack").equals(second.get("stack"))) violations.add("nondeterministic:stack");
             var diagnostic = (Optional<?>) mapper.getMethod("diagnose", String.class, ParseOptions.class).invoke(null, input, options);
             if (diagnostic.isPresent()) {
                 Object d = diagnostic.get();
@@ -515,6 +529,9 @@ final class ParityHarness {
                 var parsed = root.parse(context);
                 boolean ok = parsed.isSucceeded();
                 int pos = context.getConsumedPosition().value(), matched = context.getMatchedPosition().value();
+                out.addProperty("stack", context.getRuleStack().map(st -> st.offset() + "|" + st.omitted() + "|"
+                        + String.join(">", st.frames().stream().map(f -> f.rule() + "@" + f.start()).toList())).orElse("-"));
+                out.addProperty("far", context.getParseFailureDiagnostics().getFarthestOffset());
                 out.addProperty("ok", ok);
                 out.addProperty("pos", pos);
                 out.addProperty("matched", matched);
@@ -744,7 +761,7 @@ final class ParityHarness {
                 }
                 if rule.is_some() { out.push(')'); }
             }
-            struct Ctx { ok: bool, pos: usize, matched: usize, cst: String, owned: String, hits: (usize, usize) }
+            struct Ctx { ok: bool, pos: usize, matched: usize, cst: String, owned: String, hits: (usize, usize), stack: String, far: usize }
             fn context_parse<P: Probe>(input: &str, options: ParseOptions, reset: bool, owned: &[&str], fields: &[&str], names: &[&str], v: &mut Vec<String>, checks: bool) -> Ctx {
                 let mut c = ParseContext::with_options(input, options);
                 c.set_reset_matched_with_consumed(reset);
@@ -752,6 +769,8 @@ final class ParityHarness {
                 let r = P::parse(&mut c);
                 let ok = r.is_ok();
                 let (pos, matched) = (c.position(), c.matched_position());
+                let stack = c.rule_stack().map(|s| format!("{}|{}|{}", s.offset, s.omitted, s.frames.iter().map(|f| format!("{}@{}", f.rule, f.start)).collect::<Vec<_>>().join(">"))).unwrap_or_else(|| "-".into());
+                let far = c.failure().offset;
                 let owned_json = owned.iter().map(|n| format!("{}:{}", json_string(n), c.captured_text(n).map(json_string).unwrap_or_else(|| "null".into()))).collect::<Vec<_>>().join(",");
                 let mut cst = String::new();
                 let length = input.chars().count();
@@ -777,7 +796,7 @@ final class ParityHarness {
                     }
                 }
                 if c.state::<i32>("pbt-user") != Some(&7) { sink.push("rollback:user-state".into()); }
-                Ctx { ok, pos, matched, cst, owned: format!("{{{}}}", owned_json), hits: (c.memoized_success_hits(), c.memoized_failure_hits()) }
+                Ctx { ok, pos, matched, cst, owned: format!("{{{}}}", owned_json), hits: (c.memoized_success_hits(), c.memoized_failure_hits()), stack, far }
             }
             fn observe<P: Probe>(index: usize, input: &str, owned: &[&str], fields: &[&str]) {
                 let names = P::names();
@@ -793,6 +812,7 @@ final class ParityHarness {
                             if first.matched != second.matched { v.push("nondeterministic:matched".into()); }
                             if first.cst != second.cst { v.push("nondeterministic:cst".into()); }
                             if first.owned != second.owned { v.push("nondeterministic:owned".into()); }
+                            if first.stack != second.stack { v.push("nondeterministic:stack".into()); }
                             let (diag, hint, ast) = match P::detailed(input, options) {
                                 Ok(tree) => {
                                     if !first.ok || first.pos != input.chars().count() { v.push("diagnose-accepts-unconsumed-input".into()); }
@@ -805,9 +825,9 @@ final class ParityHarness {
                                      "null".to_string())
                                 }
                             };
-                            println!("{}\\t{}/{}/{}\\t{{\\"ok\\":{},\\"pos\\":{},\\"matched\\":{},\\"cst\\":{},\\"owned\\":{},\\"diag\\":{},\\"hint\\":{},\\"ast\\":{},\\"violations\\":[{}],\\"hits\\":[{},{}]}}",
+                            println!("{}\\t{}/{}/{}\\t{{\\"ok\\":{},\\"pos\\":{},\\"matched\\":{},\\"cst\\":{},\\"owned\\":{},\\"diag\\":{},\\"hint\\":{},\\"ast\\":{},\\"violations\\":[{}],\\"hits\\":[{},{}],\\"stack\\":{},\\"far\\":{}}}",
                                 index, memo_name, diagnostics_name, reset, first.ok, first.pos, first.matched, json_string(&first.cst), first.owned, diag, hint, ast,
-                                v.iter().map(|x| json_string(x)).collect::<Vec<_>>().join(","), first.hits.0, first.hits.1);
+                                v.iter().map(|x| json_string(x)).collect::<Vec<_>>().join(","), first.hits.0, first.hits.1, json_string(&first.stack), first.far);
                         }
                     }
                 }

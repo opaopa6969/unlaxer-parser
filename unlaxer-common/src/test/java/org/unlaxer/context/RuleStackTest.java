@@ -162,6 +162,42 @@ public class RuleStackTest {
     }
   }
 
+  /** Mirrors successful_parses_report_no_stack_but_unconsumed_input_does in rule_stack.rs. */
+  @Test
+  public void successfulParsesReportNoStackButUnconsumedInputDoes() {
+    for (var memo : Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+      for (String[] c : new String[][] {{"ab", "~"}, {"az", "Root@0>Opt@1"}, {"a", "~"}}) {
+        String label = c[0] + "/" + memo + "/" + diagnostics;
+        Parser root = new Rule("Root", w("a"), new org.unlaxer.parser.combinator.Optional(new Rule("Opt", w("b"))));
+        try (var context = ParseContext.withOptions(StringSource.createRootSource(c[0]),
+            ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+          assertTrue(label, root.parse(context).isSucceeded());
+          // Opt failed at 1 in every input, but a successful parse reports no stack.
+          assertTrue(label, context.getRuleStack().isEmpty());
+          assertTrue(label, context.getParseFailureDiagnostics().getRuleStack().isEmpty());
+          boolean detailed = context.getOptions().diagnostics() == ParseOptions.Diagnostics.DETAILED;
+          assertEquals(label, (detailed ? c[1] : "~") + "|0", render(context.getUnconsumedInputRuleStack()));
+        }
+      }
+    }
+    try (var context = new ParseContext(StringSource.createRootSource("z"))) {
+      // A failure after a success on the same context reports again.
+      assertFalse(new Rule("Root", w("a")).parse(context).isSucceeded());
+      assertEquals("Root@0|0", render(context.getRuleStack()));
+    }
+  }
+
+  @Test
+  public void namesComeFromTheOverrideOrFallBackToTheClass() {
+    final class FooParser extends Chain implements GrammarRule {
+      private static final long serialVersionUID = 1L;
+      @Override public String grammarRuleName() { return null; }
+    }
+    // A null override falls back to the class-derived name instead of failing.
+    assertEquals("Foo", GrammarRule.nameOf(new FooParser()));
+    assertEquals("Named", GrammarRule.nameOf(new Rule("Named", w("a"))));
+  }
+
   @Test
   public void ruleNamesDefaultToTheGeneratedClassName() {
     final class ExpressionParser extends Chain implements GrammarRule {

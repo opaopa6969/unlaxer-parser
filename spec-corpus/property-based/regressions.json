@@ -31,5 +31,29 @@
       "ac",
       "abz"
     ]
+  },
+  {
+    "id": "rule-stack-success-composite-token",
+    "issue": "#703",
+    "note": "Found by seed 176 in the #723 review. Successful parses must report no rule stack: Java records a failure inside the composite IdentifierParser token at offset 1 that atomic Rust tokens do not, so the farthest failure, and with it any stack, differs on success.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token ID = org.unlaxer.parser.clang.IdentifierParser @root @mapping(N0) R0 ::= R1 | ID ; R1 ::= 'x' ; }",
+    "inputs": [
+      "a",
+      "ab",
+      "a!",
+      "!",
+      "x",
+      "x!"
+    ]
+  },
+  {
+    "id": "rule-stack-success-negation-token",
+    "issue": "#703",
+    "note": "Found by seed 115 in the #723 review. A successful parse reports no rule stack, although the farthest failures of the two versions differ inside NEGATION (Java 8, Rust 2); the failing input agrees on R0@0 at offset 8.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NEG = NEGATION('ab') token END = EOF @root @mapping(N0) R0 ::= ',' (NEG R1 | '界' ('ab' R0 '界') END) ; R1 ::= '界' ; }",
+    "inputs": [
+      ",界ab,😀界界",
+      ",界ab,😀界界x"
+    ]
   }
 ]

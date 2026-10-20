@@ -261,10 +261,48 @@ fn a_raised_stack_does_not_leak_into_a_later_parse() {
 }
 
 #[test]
-fn successful_parses_report_no_raised_stack() {
-    let mut context = ParseContext::new("(x)");
-    assert!(context
-        .parse_grammar(grammar("nested").unwrap(), 0, false)
-        .is_ok());
-    assert_eq!(context.raised_failure(), None);
+fn successful_parses_report_no_stack_but_unconsumed_input_does() {
+    // Root ::= 'a' [Opt] ; Opt ::= 'b' ; mirrored in RuleStackTest.java.
+    let grammar = || {
+        vec![
+            rule("Root", seq([w("a"), r(1).optional()])),
+            rule("Opt", seq([w("b")])),
+        ]
+    };
+    for (memo, diagnostics) in SETTINGS {
+        let options = ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+        let detailed = ParseContext::with_options("", options)
+            .options()
+            .diagnostics
+            == Diagnostics::Detailed;
+        for (input, unconsumed) in [("ab", "~"), ("az", "Root@0>Opt@1"), ("a", "~")] {
+            let label = format!("{input}/{memo:?}/{diagnostics:?}");
+            let mut context = ParseContext::with_options(input, options);
+            assert!(
+                context.parse_grammar(grammar(), 0, false).is_ok(),
+                "{label}"
+            );
+            // Opt failed at 1 in every input, but a successful parse reports no stack.
+            assert_eq!(context.rule_stack(), None, "{label}");
+            let expected = if detailed { unconsumed } else { "~" };
+            assert_eq!(
+                render(&context.unconsumed_input_rule_stack()).0,
+                expected,
+                "{label}"
+            );
+            // The full-input entry reports the same stack for the trailing input.
+            let shared: SharedGrammar = Arc::from(grammar());
+            let full = parse_detailed_shared_with_rule_stack(&shared, 0, false, input, options);
+            assert_eq!(
+                full.err()
+                    .map_or("~".to_owned(), |failure| render(&failure.rule_stack).0),
+                unconsumed,
+                "{label}"
+            );
+        }
+    }
+    // A failure after a success on the same context reports again.
+    let mut context = ParseContext::new("(z)");
+    assert!(context.parse_grammar(grammar(), 0, false).is_err());
+    assert_eq!(render(&context.rule_stack()).0, "Root@0");
 }
