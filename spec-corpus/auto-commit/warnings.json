@@ -1,8 +1,64 @@
 [
   {
     "name": "whitespace",
-    "note": "Automatic whitespace: the grammar is outside the analysed subset.",
+    "note": "Built-in javaStyle whitespace is analysed (#728): an annotated rule with a candidate is not a warning.",
     "grammar": "grammar Spaced {\n  @whitespace: javaStyle\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": []
+  },
+  {
+    "name": "comment",
+    "note": "@comment: the grammar is outside the analysed subset (#712).",
+    "grammar": "grammar Commented {\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "grammar"
+      }
+    ]
+  },
+  {
+    "name": "declarative-whitespace",
+    "note": "A declarative whitespace token: the grammar is outside the analysed subset.",
+    "grammar": "grammar Gapped {\n  @whitespace: GAP\n  token GAP ::= '#'+;\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "grammar"
+      }
+    ]
+  },
+  {
+    "name": "whitespace-left-recursion-check",
+    "note": "'/', ANY and XID_IDENTIFIER consume for the left-recursion check, so the javaStyle grammar is analysed and S is not a warning (#728 review).",
+    "grammar": "grammar SpacedConsuming {\n  @whitespace: javaStyle\n  token ANYC = ANY\n  token ID ::= XID_IDENTIFIER;\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n  P ::= '/' P | 'x' ;\n  Q ::= ANYC Q | 'y' ;\n  X ::= ID X | 'z' ;\n}\n",
+    "warnings": []
+  },
+  {
+    "name": "whitespace-rule-none",
+    "note": "javaStyle with a rule-level @whitespace(none): outside the analysed subset.",
+    "grammar": "grammar SpacedRuleNone {\n  @whitespace: javaStyle\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @whitespace(none)\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "grammar"
+      }
+    ]
+  },
+  {
+    "name": "whitespace-interleave",
+    "note": "javaStyle with a rule-level @interleave: outside the analysed subset.",
+    "grammar": "grammar SpacedInterleave {\n  @whitespace: javaStyle\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @interleave(profile=commentsAndSpaces)\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "grammar"
+      }
+    ]
+  },
+  {
+    "name": "whitespace-lexical-context",
+    "note": "javaStyle with a rule-level @lexicalContext: outside the analysed subset.",
+    "grammar": "grammar SpacedContext {\n  @whitespace: javaStyle\n  token ID ::= 'b';\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @lexicalContext(tokens=['ID'])\n  B ::= ID ;\n}\n",
     "warnings": [
       {
         "rule": "S",

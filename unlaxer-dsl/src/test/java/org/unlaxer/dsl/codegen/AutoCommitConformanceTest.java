@@ -45,7 +45,7 @@ public class AutoCommitConformanceTest {
 
     @Test public void lintReportsTheCorpusPositions() throws Exception {
         var rows = corpus("lint.json");
-        assertEquals(23, rows.size());
+        assertEquals(33, rows.size());
         int reported = 0;
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
@@ -76,13 +76,13 @@ public class AutoCommitConformanceTest {
                 reported++;
             }
         }
-        assertEquals(21, reported);
+        assertEquals(31, reported);
     }
 
     /** {@code W-AUTO-COMMIT-SKIPPED} for annotations the analysis cannot use, located at the annotation. */
     @Test public void skippedAnnotationsAreWarnedAbout() throws Exception {
         var rows = corpus("warnings.json");
-        assertEquals(5, rows.size());
+        assertEquals(11, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String name = row.get("name").getAsString(), source = row.get("grammar").getAsString();
@@ -103,6 +103,8 @@ public class AutoCommitConformanceTest {
             // The rewritten tree no longer carries the annotation.
             var rewritten = UBNFMapper.parseWithSource(source);
             for (var grammar : rewritten.ast().grammars()) assertEquals(name, List.of(), AutoCommit.warnings(grammar, rewritten));
+            // A skipped annotation only disappears: the tree, and so every generated file, is the unannotated one.
+            if (!warnings.isEmpty()) assertEquals(name, UBNFMapper.parse(plain(source)), rewritten.ast());
         }
     }
 
@@ -149,7 +151,7 @@ public class AutoCommitConformanceTest {
     /** The rewrite equals the hand-written grammar and generates byte-identical code on every path. */
     @Test public void rewriteEqualsTheHandWrittenCommits() throws Exception {
         var rows = corpus("cases.json");
-        assertEquals(6, rows.size());
+        assertEquals(10, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String name = row.get("name").getAsString();
@@ -250,7 +252,7 @@ public class AutoCommitConformanceTest {
             for (int option = 0; option < 6; option++, index++) {
                 String line = auto.get(index), before = plain.get(index);
                 assertEquals(label + " " + value + " option=" + option, expected(value.getAsJsonObject()),
-                    line.substring(0, line.lastIndexOf('\t')));
+                    String.join("\t", Arrays.asList(line.split("\t", 5)).subList(0, 4)));
                 boolean success = line.startsWith("success");
                 assertEquals(label + " acceptance before insertion " + value, success, before.startsWith("success"));
                 if (success) {
@@ -274,8 +276,8 @@ public class AutoCommitConformanceTest {
                 runJava(row.get("manual").getAsString(), cases), runJava(plain(grammar), cases));
             observations += auto.size();
         }
-        assertEquals(49 * 6, observations);
-        assertEquals(15 * 6, accepted);
+        assertEquals(108 * 6, observations);
+        assertEquals(40 * 6, accepted);
     }
 
     @Test public void bothRustHostsMatchTheOracleAndTheUnannotatedGrammar() throws Exception {
@@ -329,7 +331,7 @@ public class AutoCommitConformanceTest {
             }
             assertEquals(name + " independently executed Rust hosts", outputs.get("auto"), outputs.get("auto-java"));
         }
-        assertEquals(2 * 15 * 6, accepted);
+        assertEquals(2 * 40 * 6, accepted);
     }
 
     private static final String RUST_PROBE = """

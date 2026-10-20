@@ -15,6 +15,10 @@
 //! `COMMIT(element)` (captures stay inside), which neither the Java nor the Rust CST sees.
 //! It runs after parameterized rules are expanded and removes the annotation, so the
 //! rewritten AST equals that of the grammar with the same `COMMIT` written by hand.
+//!
+//! Under the grammar-wide built-in `@whitespace: javaStyle` (#728) the same rules apply with
+//! code points read after the trivia that sequence boundaries skip; terminals and tokens whose
+//! FIRST meets a code point that can start trivia (a space or `/`) are not modelled.
 use crate::ast::*;
 use crate::lexical::{LexicalExpression, Op};
 use std::cell::{Cell, RefCell};
@@ -423,16 +427,38 @@ struct Analysis<'a> {
     /// FIRST per element (by address, valid while the grammar is borrowed), once `table` is final.
     memo: RefCell<HashMap<usize, First>>,
     frozen: Cell<bool>,
+    /// The grammar skips javaStyle trivia at sequence boundaries (#728).
+    trivia: bool,
 }
 
-/// Settings that leave the code-point semantics of terminals and references unchanged.
+/// Settings the analysis models: those that leave the code-point semantics of terminals and
+/// references unchanged, and the built-in `@whitespace: javaStyle` (#728).
 fn plain_setting(setting: &GlobalSetting) -> bool {
     match (setting.key.as_str(), &setting.value) {
         ("package" | "ubnf" | "memoSafeToken" | "feature", SettingValue::String(_)) => true,
-        ("whitespace", SettingValue::String(value)) => value.trim() == "none",
+        ("whitespace", SettingValue::String(value)) => value.trim() == "none" || java_style(value),
         _ => false,
     }
 }
+
+/// The space characters of javaStyle trivia (Java `SpaceParser`, the runtime `skip`).
+fn trivia_space(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\n' | '\u{b}' | '\u{c}' | '\r')
+}
+
+/// The built-in `javaStyle` trivia, spelled so that every host reads it the same way: ASCII
+/// case-insensitive after removing ASCII spaces at both ends. Both generators trim more and
+/// compare case-insensitively, so whatever this accepts they read as javaStyle.
+fn java_style(style: &str) -> bool {
+    let name = style.trim_matches(trivia_space);
+    name.is_ascii() && name.eq_ignore_ascii_case("javaStyle")
+}
+
+/// Code points that can start javaStyle trivia: its spaces and `/` of both comments.
+const TRIVIA_START: Chars = Chars {
+    ascii: (1u128 << b' ') | (0b11111u128 << b'\t') | (1u128 << b'/'),
+    non_ascii: false,
+};
 
 /// Annotations that leave the rule's recognition as written; anything else makes it opaque.
 fn transparent(annotation: &Annotation) -> bool {
@@ -474,6 +500,35 @@ impl<'a> Analysis<'a> {
         let [root] = roots.as_slice() else {
             return None;
         };
+        let spaced = grammar.settings.iter().any(|setting| {
+            setting.key == "whitespace"
+                && matches!(&setting.value, SettingValue::String(value) if java_style(value))
+        });
+        let mut analysis = Self::solve(grammar, spaced);
+        // Left recursion is about the parser calling a rule again at the same position, so it
+        // uses the FIRST sets of the input as written: a terminal that is unknown under trivia
+        // (such as '/') still consumes (#728 review).
+        let left_recursive = if spaced {
+            Self::solve(grammar, false).left_recursive()
+        } else {
+            analysis.left_recursive()
+        };
+        if left_recursive {
+            return None;
+        }
+        analysis.reach(*root);
+        for index in 0..grammar.rules.len() {
+            if analysis.reachable[index] {
+                let body = &grammar.rules[index].body;
+                let mut ordinal = 0;
+                analysis.index_body(body, BodyParent::Rule(index), index, &mut ordinal, false);
+            }
+        }
+        Some(analysis)
+    }
+
+    /// Name tables and the least-fixpoint FIRST table, with or without the trivia rule.
+    fn solve(grammar: &'a GrammarDecl, trivia: bool) -> Self {
         let mut rules = HashMap::new();
         let mut ambiguous = HashSet::new();
         for (index, rule) in grammar.rules.iter().enumerate() {
@@ -507,6 +562,7 @@ impl<'a> Analysis<'a> {
             sites: HashMap::new(),
             memo: RefCell::new(HashMap::new()),
             frozen: Cell::new(false),
+            trivia,
         };
         for (index, opaque) in analysis.opaque.iter().enumerate() {
             if *opaque {
@@ -530,18 +586,7 @@ impl<'a> Analysis<'a> {
             }
         }
         analysis.frozen.set(true);
-        if analysis.left_recursive() {
-            return None;
-        }
-        analysis.reach(*root);
-        for index in 0..grammar.rules.len() {
-            if analysis.reachable[index] {
-                let body = &grammar.rules[index].body;
-                let mut ordinal = 0;
-                analysis.index_body(body, BodyParent::Rule(index), index, &mut ordinal, false);
-            }
-        }
-        Some(analysis)
+        analysis
     }
 
     fn rule_of(&self, name: &str) -> Option<usize> {
@@ -560,8 +605,19 @@ impl<'a> Analysis<'a> {
             return self.table[rule];
         }
         match self.tokens.get(name) {
-            Some(token) => self.token(token, &mut Vec::new()),
+            Some(token) => self.atom(self.token(token, &mut Vec::new())),
             None => First::UNKNOWN,
+        }
+    }
+
+    /// Under automatic whitespace a terminal or token whose FIRST meets the code points that
+    /// can start trivia is not modelled: it could consume trivia that the next sequence
+    /// boundary would have skipped (docs/auto-commit.md, 空白のある文法).
+    fn atom(&self, first: First) -> First {
+        if self.trivia && !first.unknown && first.chars.meets(TRIVIA_START) {
+            First::UNKNOWN
+        } else {
+            first
         }
     }
 
@@ -673,7 +729,7 @@ impl<'a> Analysis<'a> {
     fn compute(&self, element: &AtomicElement) -> First {
         match &element.kind {
             ElementKind::Terminal(value) => match value.chars().next() {
-                Some(c) => First::consuming(Chars::of(c)),
+                Some(c) => self.atom(First::consuming(Chars::of(c))),
                 None => First::EPSILON,
             },
             ElementKind::RuleRef { namespace, name } => self.reference(namespace, name),

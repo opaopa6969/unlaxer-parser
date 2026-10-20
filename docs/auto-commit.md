@@ -1,10 +1,12 @@
-# FIRST 集合による cut 位置の lint と `@autoCommit`（#702）
+# FIRST 集合による cut 位置の lint と `@autoCommit`（#702、#728）
 
 [#700](cut-and-labeled-failures.md) の `COMMIT` を入れても意味が変わらない位置を、FIRST 集合から
 求める。位置は lint として報告し、規則に `@autoCommit` を付けたときだけ frontend がそこへ
 `COMMIT` を挿入する。既定は OFF で、注釈の無い文法の構文木と生成物は変わらない。参考にしたのは
 kmizu/yapp の `translator/AutoCutInserterUsingFirstSet.java`（PASTE 2010）である。yapp の
 `truncate`（cut 位置より前の memo を捨てる最適化）は性能目的なので、#197 の凍結に従い扱わない。
+文法全体の `@whitespace: javaStyle`（空白とコメントを自動で読み飛ばす文法）も対象にする（#728、
+下の「空白のある文法」）。
 
 ```ubnf
 grammar Stmts {
@@ -112,7 +114,7 @@ span は注釈 `@autoCommit` の位置）を返す。`reason` は次のどれか
 
 | reason | 条件 |
 | --- | --- |
-| `grammar` | 文法が解析の対象外（下の「文法全体の前提」：空白、設定、root が 1 個でない、左再帰） |
+| `grammar` | 文法が解析の対象外（下の「文法全体の前提」：`@comment`・宣言的 token の空白・規則の空白、設定、root が 1 個でない、左再帰） |
 | `opaque` | 規則が不透明（下の「不透明な規則」） |
 | `unreachable` | root からたどれない |
 
@@ -140,6 +142,9 @@ FIRST 集合は runtime の `FirstSet` と同じ表現で持つ。ASCII（0〜12
 | 選択 | 和 |
 | `COMMIT` `LABEL` `CATCH` `CAPTURE` `CAPTURE_SCOPE` `SAME_AS` `ERROR` | unknown（runtime の FIRST 集合による候補除外と同じ扱い） |
 
+`@whitespace: javaStyle` の文法では、上の表で求めた FIRST が空白・コメントの開始（下の T₀）と交わる
+終端記号と token 参照を unknown にする（下の「空白のある文法」）。
+
 規則表は全規則を「空集合・nullable でない」から始め、変化が無くなるまで本体を計算し直す
 （最小不動点）。名前空間付きの参照、規則と token の名前が重なる参照は unknown。
 
@@ -147,12 +152,19 @@ FIRST 集合は runtime の `FirstSet` と同じ表現で持つ。ASCII（0〜12
 
 次のどれかに当たる文法は解析しない（lint は空、挿入しない）。
 
-- 設定が `@package` `@ubnf` `@memoSafeToken` `@feature` `@whitespace: none` 以外を含む。
-  空白の自動挿入（`@whitespace` の none 以外、`@comment`）、トークン列の文法（`@tokenStream`）、
-  埋め込み、token adapter / contract はトークン境界の位置を変えるので対象外。
+- 設定が `@package` `@ubnf` `@memoSafeToken` `@feature` `@whitespace: none` `@whitespace: javaStyle`
+  以外を含む。`@comment`（#712 が入るまで Java と Rust で動きが違う）、宣言的 token を空白にする
+  `@whitespace: 名前`、トークン列の文法（`@tokenStream`）、埋め込み、token adapter / contract は
+  トークン境界の位置を変えるので対象外。javaStyle の綴りは、両端の ASCII 空白（空白・tab・改行・
+  `\v`・`\f`）を除いて ASCII の大文字小文字を区別せずに比べる。両 generator はこれより広く trim し、
+  大文字小文字を区別せずに比べるので、ここで javaStyle と判定した文法は両 host とも javaStyle で生成する。
 - 規則に `@whitespace` `@interleave` `@lexicalContext`（文脈依存の字句）が付いている。
 - `@root` がちょうど 1 個でない。
-- 左再帰がある（消費せずに自分を呼べる規則がある）。
+- 左再帰がある（消費せずに自分を呼べる規則がある）。この検査は書いたとおりの入力に対する FIRST で行う。
+  javaStyle の文法で unknown にする `'/'`・`ANY`・XID 識別子なども、成功すれば必ず消費するので
+  「消費する」と扱う（下の「空白のある文法」の読み替えは使わない）。左再帰は parser が同じ位置で同じ
+  規則を呼ぶかどうかの性質で、generator の `E-LEFT-RECURSION`（[left-recursion.md](left-recursion.md)）
+  も同じ意味である。
 
 ### 不透明な規則
 
@@ -253,6 +265,96 @@ separated list の終わり、列の続き、規則の参照位置）を、PEG �
 変わり得る。別の文法から shared grammar call（Java `SharedGrammarCalls`、Rust `shared_calls`）で
 この文法を呼ぶ場合も、呼び出しは入力の途中で止まるので対象外である。
 
+## 空白のある文法（#728）
+
+### 空白が入る位置
+
+`@whitespace: javaStyle` の文法では、生成された parser が列の境界で空白とコメント（以下 trivia、
+T と書く）を読み飛ばす。どこに T が入るかは、Java の ParserGenerator、Rust の native generator、
+Java host の `RustBackend` の生成物で確かめた。3 つとも同じ形である。
+
+| 構文 | Java | Rust |
+| --- | --- | --- |
+| 本体が列 1 個の規則（要素 1 個でも） | `{G}LazyChain`：`T e1 T e2 T … en T` | `Expr::Sequence`：同じ |
+| 要素 2 個以上の選択肢、本体が列 1 個の group `( … )`（要素 1 個でも） | 匿名の `{G}LazyChain` / group helper：同じ | `Expr::Sequence`：同じ |
+| `e % sep` | `elem` と `ZeroOrMore(sep elem)` の 2 つの chain | 同じ |
+| 要素 1 個の選択肢、`[ ]` `{ }` `+` の本体が要素 1 個のとき | 素のまま（T なし） | 素のまま |
+| 選択肢が 2 個以上の規則の本体 | `LazyChoice`（T なし） | `Expr::Choice`（T なし） |
+
+T は javaStyle の trivia で、`(空白 | // … 行末 | /* … */)*` である。空白は Java の `SpaceParser` と
+Rust の runtime の `skip` で同じ 6 文字（` ` `\t` `\n` `\v` `\f` `\r`）。閉じていない `/*` は trivia
+ではない。`COMMIT(ek)` は chain の 1 要素なので、T は `COMMIT` の外（前と後）に入り、`COMMIT` の子は
+T の後から始まる。確定エラーの位置は子が始まった位置、つまり空白を読み飛ばした後である（corpus の
+`whitespace-statements`：`let x` は 4、`let /* c */ x` は 12）。
+
+### 空白を読み飛ばした後の位置で比べる
+
+位置 p から T を当てた終わりを N(p) と書く。根拠に使う T の性質は次の 3 つだけである。
+
+1. T は必ず成功し、同じ位置からは同じ終わりになる（文脈に依らない）。
+2. N(N(p)) = N(p)。T は繰り返せるだけ繰り返すので、終わった位置ではもう何も読まない。
+3. p の符号位置が T₀ = {空白 6 文字, `/`} に入らなければ N(p) = p。
+
+FIRST と文脈の検査の文字集合は、**N(p) の符号位置**（空白を読み飛ばした後の最初の符号位置）を表すと
+読み替える。nullable は「N(q) = N(p) で成功し得る」（空白しか読まずに成功し得る）と読み替える。
+すると、次の命題が上の表の規則のままで成り立つ。
+
+> 構文 e を位置 p で試し、q で成功し、N(q) ≠ N(p) なら、N(p) の符号位置は FIRST(e) に入る。
+> e が nullable でなければ、N(q) = N(p) で成功することはない。
+
+- 終端記号・token（FIRST が T₀ と交わらないもの）：成功すれば p の符号位置は FIRST に入り T₀ の外
+  なので、性質 3 から N(p) = p。消費すれば N(q) ≥ q > p = N(p)。
+- T：N(q) = N(N(p)) = N(p) で成功するので、nullable で FIRST は空と同じ。列の FIRST の規則
+  （nullable の間だけ和を取る）では T は消える。
+- 列・選択・反復・optional・separated list：上の 2 つから帰納法で、#702 と同じ合成になる。
+
+この議論は **T が列のどの境界に入っても入らなくても**成り立つ。上の表の T の位置（Java と Rust で
+同じ）には依らないので、片方の generator が T の位置を変えても根拠は崩れない。
+
+FIRST が T₀ と交わる終端記号・token は unknown にする。素の終端記号（要素 1 個の選択肢など）は T の後
+とは限らない位置で試されるので、次のことが起きる。
+
+- `'/'` はコメントの最初の `/` を読める。その後の N(p) の符号位置はコメントの後ろの何でもあり得る。
+- `' '` などの空白の終端記号は、T が読み飛ばすはずの空白を 1 文字だけ読み、N(q) = N(p) で成功する。
+- `ANY` `NEGATION` の token も空白や `/` を読める（#702 でも全体を FIRST にしていたので判定は変わらない）。
+
+`spec-corpus/auto-commit/cases.json` の `whitespace-raw-slash` はこの反例である。
+
+```ubnf
+  Root ::= { Item } ;
+  Item ::= DIGIT | 'k' N | '/' | '*' '*' '/' 'k' 'x' ;
+```
+
+`1/**/kx` は、`DIGIT` が `1` を読んだ後の位置 1 で、`'k' N` の T がコメント `/**/` を読み飛ばして
+`k` の後で失敗し、続く `'/'` が位置 1 の `/` を読んで、`* * / k x` で受理される。`'/'` を FIRST `{/}`
+として扱うと `'k' COMMIT(N)` を挿入してしまい、`x` で確定エラーになる。`'/'` を unknown にすると
+`'k' N` は候補にならない。
+
+### 候補・文脈の検査・空の入力と末尾の空白
+
+候補の初期状態は #702 と同じ「`A_i` が FIRST(e1) の符号位置で通常失敗した」である。`A_i` を p で
+試し、`e1` が p₁（T の後なら N(p)、素なら p）から消費して成功したので、命題から N(p₁) = N(p) の
+符号位置は FIRST(e1) に入る。遷移の表もそのまま使える。各遷移の「次に試す構文はその符号位置で必ず
+失敗する」は、試す位置が T の前でも後でも、上の命題（N(p) の符号位置で判定してよい）で成り立つ。
+
+- **空の入力・空白だけの入力**：`COMMIT(ek)` の子が試されるのは、nullable でない `e1` が成功した後
+  だけである。命題から、そのとき N(p) には trivia でない符号位置がある。空の入力や trivia だけの入力
+  では N(p) は常に入力の終わりなので、どの `COMMIT` の子も試されず、結果は元の文法と同じである
+  （corpus の `""`、`"   "`、`"// only a comment"`）。状態の集合も常に「N(p) に符号位置がある」
+  ことを表す。
+- **末尾の空白**：root での NEXT は「root が成功した後、N(q) に trivia でない符号位置が残る」ことを
+  表す。入力全体の解析は、残りを trivia として読み飛ばすかどうかに関係なく、その符号位置で失敗する。
+  入力の終わりの trivia だけが残る場合は N(q) が入力の終わりなので、この状態にはならない
+  （`let n = v ;  ` は受理、`let   ` は位置 6 の確定エラー）。
+
+### まだ対象にしないもの
+
+- `@comment`：Java と Rust で読み飛ばす範囲が違う（#712）。#712 の後に別 issue にする。
+- `@whitespace: 名前`（宣言的 token の空白）：T₀ を token ごとに求める必要がある。`@whitespace`
+  の値として組み込みの javaStyle だけを対象にした。
+- 規則の `@whitespace` / `@interleave`、`@lexicalContext`、`@tokenStream`、埋め込み、token adapter /
+  contract：これまでどおり対象外。
+
 ## runtime の FirstSets（#292）を流用しない理由
 
 runtime の `FirstSets`（Java #292、Rust #300 の `first.rs`）は、生成された parser の combinator
@@ -265,8 +367,9 @@ frontend で UBNF の構文木に対して行うので、次の理由で計算�
    compile する）。
 2. lint は原文の位置を返す。必要なのは構文木の節点ごとの FIRST と、親・兄弟・参照位置を
    たどる文脈の検査で、runtime の表は規則ごとの値しか持たない。
-3. runtime は空白（trivia）を呼び出し側の方針で動的に解く。frontend では空白のある文法を
-   丸ごと対象外にした方が単純で安全である。
+3. runtime は空白（trivia）を呼び出し側の方針で動的に解く。frontend は文法全体の javaStyle だけを
+   扱い、FIRST を「空白を読み飛ばした後の符号位置」と読み替える（上の「空白のある文法」）。規則ごとの
+   空白は対象外にした方が単純で安全である。
 
 表現（ASCII は正確、非 ASCII は 1 bit）と、模型化しない構文を unknown にして判定から外す方針は
 runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする扱いも runtime と同じである。
@@ -284,15 +387,25 @@ runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする�
 
 [`spec-corpus/auto-commit`](../spec-corpus/auto-commit) を両 host が読む。期待値は手書きである。
 
-- `lint.json`: 23 文法、21 件の報告。報告する位置（選択肢と `e1` の原文、包む参照）と、
-  報告しない例（重なる FIRST、外側の選択・optional・`+`・separated list での再開、空白、
+- `lint.json`: 33 文法、31 件の報告。報告する位置（選択肢と `e1` の原文、包む参照）と、
+  報告しない例（重なる FIRST、外側の選択・optional・`+`・separated list での再開、
   `COMMIT` / `LABEL` / `CATCH` / `CAPTURE`、不透明な規則、到達できない規則、`@recovery`、
-  模型化しない token、左再帰、root 2 個、非 ASCII の 1 bit）。
-- `cases.json`: 6 文法 49 入力。自動挿入の文法、同じ位置に手で `COMMIT` を書いた文法、
+  模型化しない token、左再帰、root 2 個、非 ASCII の 1 bit）。javaStyle の文法（#728）は
+  `whitespace`、`whitespace-case`（綴りの大文字小文字）、`whitespace-trivia-start`（`'/'`・`' '`・
+  `ANY` が unknown になる）と、同じ選択肢を空白なしで解析する `whitespace-trivia-start-none`、
+  左再帰の検査で `'/'`・`ANY`・XID 識別子を消費するものとして扱う `whitespace-left-recursion-check`、
+  本当の左再帰がある `whitespace-left-recursion`、まだ対象外の `rule-whitespace`、`comment`、
+  `declarative-whitespace`、javaStyle と規則の `@whitespace(none)` / `@interleave` / `@lexicalContext`
+  の組み合わせ（`whitespace-rule-none`、`whitespace-interleave`、`whitespace-lexical-context`）。
+- `cases.json`: 10 文法 108 入力。自動挿入の文法、同じ位置に手で `COMMIT` を書いた文法、
   それぞれの入力の結果（受理・拒否、確定エラーの位置と message）。`group-after-commit` は
   包んだ参照の後ろに group が続き、Java の group helper の番号が変わらないことを CST で確かめる。
-- `warnings.json`: 5 文法。`W-AUTO-COMMIT-SKIPPED` の規則・reason・位置（`grammar` 2 例、`opaque`、
-  `unreachable`、警告しない例）。
+  javaStyle の 4 文法（`whitespace-statements`、`whitespace-expression`、`whitespace-slash`、
+  `whitespace-raw-slash`）は、空白・tab・CRLF・行コメント・ブロックコメント・閉じていないコメント・
+  単独の `/`・末尾の空白・空白だけの入力を含む。
+- `warnings.json`: 11 文法。`W-AUTO-COMMIT-SKIPPED` の規則・reason・位置（`grammar` 6 例（`@comment`、
+  宣言的 token の空白、javaStyle と規則の `@whitespace(none)` / `@interleave` / `@lexicalContext`、
+  root 2 個）、`opaque`、`unreachable`、警告しない例 3 つ（javaStyle の 2 つを含む））。
 
 `AutoCommitConformanceTest`（Java）は次を確かめる。
 
@@ -308,21 +421,40 @@ runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする�
   一致し、手書きの文法の生成物とも一致する。両 host の生成物を 6 設定で実行し、同じ比較を
   CST（`Tree` の節点列）まで行う。
 
+`AutoCommitWhitespaceFuzzTest`（Java、#728）は差分 fuzz である。property-based の `GrammarGenerator`
+（#705）の文法に `@whitespace: javaStyle` を付け、全規則に `@autoCommit` を付けた文法と付けない文法を
+比べる。`COMMIT` が 1 個以上入った文法だけを使う。生成器の literal は trivia を始めないので、3 分の 2 の
+seed では `y` を `/`、`,` を `*`、`x` を空白に置き換える（文法と入力の両方）。入力は生成器の導出と変異に、
+空白・改行・CRLF・コメント・単独の `/`・`/*`・`*/` を符号位置の間に差し込んだものを加える。
+
+- Java の生成 parser で、6 設定のすべての入力について、受理・拒否が一致し、受理した入力の CST と
+  AST が一致する。
+- `-DrustConformance=true` のとき、native generator と Java host の Rust 生成物が byte 単位で一致し、
+  native Rust の parser で同じ比較を行う。両 frontend の lint と警告（位置・件数・inserted）も
+  全文法で比べる。
+- 既定（CI）は 24 文法。大きく回すときは `-Dacfuzz.seed=1000 -Dacfuzz.grammars=200 -Dacfuzz.variants=6`。
+
 `rust/unlaxer-ubnf/tests/auto_commit.rs` は同じ `lint.json` と `warnings.json`、書き換えた構文木と手書きの構文木の
 canonical 比較を native frontend で確かめる。`rust/unlaxer-ubnf/tests/fixtures/positive/auto-commit.ubnf`
 は既存の frontend 比較（`RustUbnfFrontendConformanceTest` の構文木、`RustUbnfSourceConformanceTest`
 の位置）にも入る。
 
 ```sh
-mvn -pl unlaxer-common,unlaxer-dsl -am test -Dtest=AutoCommitConformanceTest \
+mvn -pl unlaxer-common,unlaxer-dsl -am test -Dtest=AutoCommitConformanceTest,AutoCommitWhitespaceFuzzTest \
   -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ubnf --test auto_commit
 ```
 
 ## 制限事項
 
-- 空白を自動で挟む文法（`@whitespace` が none 以外、`@comment`、規則の `@whitespace` /
-  `@interleave`）は解析しない。実用の文法の多くはこれに当たる。
+- 空白を自動で挟む文法のうち、解析するのは文法全体の `@whitespace: javaStyle` だけである。`@comment`
+  （#712 の後に別 issue）、宣言的 token の空白（`@whitespace: 名前`）、規則の `@whitespace` /
+  `@interleave` は解析しない。
+- javaStyle の文法では、空白か `/` で始まり得る終端記号・token（`'/'`、`' '`、`ANY`、`NEGATION`、
+  XID 識別子（`XID_IDENTIFIER`。FIRST を全体で近似しているため）、空白を含む `CHAR_RANGE` など）は
+  unknown になる。割り算の `'/'` のような演算子があると、その位置を
+  通る文脈の検査は「不可」になり、挿入されない（corpus の `whitespace-slash`）。`'/='` のように
+  2 文字目が `/` でも `*` でもない終端記号はコメントの開始と区別できるが、まだ区別していない。
 - 包むのは規則参照と token 参照だけで、終端記号は包まない（Java の CST が変わるため）。
 - 確定エラーの message は既定の `unexpected input` だけである。
 - 同値性は root 規則から始める入力全体の解析についてだけ保証する。途中で止まってよい解析、
@@ -334,7 +466,7 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ub
 - 非 ASCII の符号位置は 1 bit にまとめるので、非 ASCII で始まる選択肢どうしは常に重なると扱う。
 - 判定は保守的で、意味を変えない位置でも報告しないことがある（例: corpus の
   `separated-trailing`）。
-- 解析の対象外の文法（空白のある文法など）、不透明な規則、到達できない規則では、frontend は注釈を
+- 解析の対象外の文法（`@comment`・宣言的 token の空白などのある文法）、不透明な規則、到達できない規則では、frontend は注釈を
   警告なしに取り除く。警告 `W-AUTO-COMMIT-SKIPPED` は lint の API（`lintWarnings` /
   `lint_warnings`）から得る。解析できたが候補が無い規則は警告しない。
 - lint（すべての規則を調べる）は、候補ごとに文脈を root までたどるので、大きな文法では規則数の
