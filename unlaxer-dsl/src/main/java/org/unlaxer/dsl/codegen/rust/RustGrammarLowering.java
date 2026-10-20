@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 import org.unlaxer.dsl.bootstrap.TokenAdapterRegistry;
 import org.unlaxer.dsl.codegen.RecoverySupport;
@@ -1079,6 +1080,7 @@ public final class RustGrammarLowering {
         done.add(rule);
     }
 
+    /** Ascending rule order keeps the reported left-recursive rule the same as the native generator. */
     private Set<Integer> leadingRules(Expression expression) {
         if (expression instanceof GeneralBody general) return leadingRules(general.child());
         if (expression instanceof CatchLabels caught) return leadingRules(caught.asChoice());
@@ -1100,12 +1102,12 @@ public final class RustGrammarLowering {
             return repeat.max() != null && repeat.max() == 0 ? Set.of() : leadingRules(repeat.child());
         }
         if (expression instanceof Separated separated) {
-            Set<Integer> result = new HashSet<>(leadingRules(separated.child()));
+            Set<Integer> result = new TreeSet<>(leadingRules(separated.child()));
             if (nullable(separated.child())) result.addAll(leadingRules(separated.separator()));
             return result;
         }
         if (expression instanceof Sequence sequence) {
-            Set<Integer> result = new HashSet<>();
+            Set<Integer> result = new TreeSet<>();
             for (Expression child : sequence.elements()) {
                 result.addAll(leadingRules(child));
                 if (!nullable(child)) break;
@@ -1114,13 +1116,13 @@ public final class RustGrammarLowering {
         }
         if (expression instanceof Choice choice) {
             if (choice.alternatives().isEmpty()) throw unsupported("empty choice");
-            Set<Integer> result = new HashSet<>();
+            Set<Integer> result = new TreeSet<>();
             choice.alternatives().forEach(e -> result.addAll(leadingRules(e)));
             return result;
         }
         if (expression instanceof PredictiveChoice choice) {
             if (choice.alternatives().isEmpty()) throw unsupported("empty choice");
-            Set<Integer> result = new HashSet<>();
+            Set<Integer> result = new TreeSet<>();
             choice.alternatives().forEach(e -> result.addAll(leadingRules(e)));
             return result;
         }
