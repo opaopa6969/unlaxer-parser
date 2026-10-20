@@ -197,9 +197,10 @@ impl ParseContext<'_> {
 
     pub(crate) fn enter_rule_frame(&mut self, id: usize) {
         let name = self.rules[id].name;
+        let start = self.frame_start(self.position);
         self.rule_stacks.active.push(ActiveRule {
             name,
-            start: self.position,
+            start,
             reach: None,
             node: None,
         });

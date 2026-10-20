@@ -1,18 +1,1 @@
-[
-  {
-    "id": "positive-lookahead-diagnostic-offset",
-    "issue": "#706",
-    "reason": "After a positive LOOKAHEAD token advances the matched cursor, Java diagnose reports the following syntax failure at the matched reach and Rust at the consumed cursor, so the Java offset is larger. Acceptance, cursors, CST and AST agree. Only that shape is excluded: java-rust:diag findings in grammars with a positive LOOKAHEAD token where both sides are syntax failures and java offset > rust offset (checked in code). The test fails when this entry excludes nothing.",
-    "kind": "java-rust:diag",
-    "grammar": "(?<!NEGATIVE_)LOOKAHEAD\\(",
-    "condition": "java-syntax-offset-after-rust"
-  },
-  {
-    "id": "positive-lookahead-rule-stack-starts",
-    "issue": "#706",
-    "reason": "Same cause as positive-lookahead-diagnostic-offset, seen through the rule stack (#703): Java starts a parse frame, and measures its reach, at max(consumed, matched), so a rule that begins right after a positive LOOKAHEAD advanced the matched cursor starts later in Java than in Rust and can win a different tie. Only that shape is excluded: java-rust:stack findings in grammars with a positive LOOKAHEAD token where both stacks explain the same offset with the same omitted count and, after a common prefix, every Java frame starts later than the Rust one (checked in code, see KnownDifferences.javaStackStartsAfterRust). The test fails when this entry excludes nothing.",
-    "kind": "java-rust:stack",
-    "grammar": "(?<!NEGATIVE_)LOOKAHEAD\\(",
-    "condition": "java-stack-starts-after-rust"
-  }
-]
+[]

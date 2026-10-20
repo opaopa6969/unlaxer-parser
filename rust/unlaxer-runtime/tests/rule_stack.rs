@@ -18,6 +18,13 @@ fn r(index: usize) -> Expr {
 fn rule(name: &'static str, expression: Expr) -> Rule {
     Rule { name, expression }
 }
+/// The UBNF positive LOOKAHEAD token (Java `MatchOnly(WordParser)`).
+fn ahead(pattern: &'static str) -> Expr {
+    Expr::JavaLookahead {
+        pattern,
+        positive: true,
+    }
+}
 
 const DEEP_NAMES: [&str; 40] = [
     "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "D11", "D12", "D13", "D14",
@@ -98,6 +105,19 @@ fn grammar(name: &str) -> Option<Vec<Rule>> {
             rule("Root", seq([w("😀"), r(1)])),
             rule("Item", seq([w("界"), w("x")])),
         ],
+        // Root ::= 'y' (AHEAD Item) ; Item ::= 'x' 'a' ; AHEAD = LOOKAHEAD('x') (#706).
+        "lookahead-start" => vec![
+            rule("Root", seq([w("y"), seq([ahead("x"), r(1)])])),
+            rule("Item", seq([w("x"), w("a")])),
+        ],
+        // Root ::= AHEAD (Item | 'x' 'a') ; Item ::= 'a' ; (#706).
+        "lookahead-frame" => vec![
+            rule(
+                "Root",
+                seq([ahead("x"), Expr::choice([r(1), seq([w("x"), w("a")])])]),
+            ),
+            rule("Item", seq([w("a")])),
+        ],
         "bare" => return None,
         _ => panic!("{name}"),
     })
@@ -116,7 +136,7 @@ fn rows() -> Vec<Vec<&'static str>> {
     for row in &rows {
         assert_eq!(row.len(), 8, "{row:?}");
     }
-    assert_eq!(rows.len(), 15);
+    assert_eq!(rows.len(), 17);
     rows
 }
 

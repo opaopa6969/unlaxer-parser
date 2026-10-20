@@ -7,6 +7,100 @@ const INPUT: &str = "p😀\r\nab!";
 const PEEK: &str = "😀\r\n";
 const BODY: &str = "😀\r\nab";
 
+/// `prefix LOOKAHEAD(pattern) 'é'`: the UBNF positive LOOKAHEAD token advances only the
+/// matched cursor before the literal fails (#706).
+fn lookahead_then(prefix: &'static str, pattern: &'static str) -> Expr {
+    Expr::sequence([
+        Expr::literal(prefix),
+        Expr::JavaLookahead {
+            pattern,
+            positive: true,
+        },
+        Expr::literal("é"),
+    ])
+}
+
+fn lookahead_rules(prefix: &'static str, pattern: &'static str) -> Vec<unlaxer_runtime::Rule> {
+    vec![unlaxer_runtime::Rule {
+        name: "R0",
+        expression: lookahead_then(prefix, pattern),
+    }]
+}
+
+fn expression_entry_inside_a_grammar(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse(&lookahead_then("a", "x"))
+}
+
+fn grammar_entry_inside_an_expression(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse_grammar(lookahead_rules("a", "x"), 0, false)
+}
+
+#[test]
+fn grammar_invocations_measure_failures_at_the_matched_reach() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            let options = options(memo, diagnostics);
+            let detailed = diagnostics != Diagnostics::DetailedOnFailure;
+            // Java: syntax at the matched reach (CP2; CP4 after CRLF and a supplementary scalar).
+            for (prefix, pattern, inputs, offset) in [
+                ("a", "x", ["ax", "axé"], 2),
+                ("a\r\n", "😀", ["a\r\n😀", "a\r\n😀é"], 4),
+            ] {
+                for input in inputs {
+                    let label = format!("{input:?}/{memo:?}/{diagnostics:?}");
+                    let failure = unlaxer_runtime::parse_detailed_with_options(
+                        &lookahead_rules(prefix, pattern),
+                        0,
+                        false,
+                        input,
+                        options,
+                    )
+                    .unwrap_err();
+                    assert_eq!(
+                        (failure.kind, failure.offset),
+                        ("syntax", offset),
+                        "{label}"
+                    );
+
+                    let mut context = ParseContext::with_options(input, options);
+                    assert!(context
+                        .parse_grammar(lookahead_rules(prefix, pattern), 0, false)
+                        .is_err());
+                    assert_eq!(
+                        context.failure().offset,
+                        if detailed { offset } else { 0 },
+                        "{label}"
+                    );
+                    assert_eq!((context.position(), context.matched_position()), (0, 0));
+                }
+            }
+
+            // Expression entries keep the source frontier (CP1), also inside a grammar; the
+            // innermost public entry decides.
+            let mut context = ParseContext::with_options("ax", options);
+            assert!(context.parse(&lookahead_then("a", "x")).is_err());
+            assert_eq!(context.failure().offset, usize::from(detailed));
+            let mut context = ParseContext::with_options("ax", options);
+            let outer = vec![unlaxer_runtime::Rule {
+                name: "outer",
+                expression: Expr::Custom(expression_entry_inside_a_grammar),
+            }];
+            assert!(context.parse_grammar(outer, 0, false).is_err());
+            assert_eq!(context.failure().offset, usize::from(detailed));
+            let mut context = ParseContext::with_options("ax", options);
+            assert!(context
+                .parse(&Expr::Custom(grammar_entry_inside_an_expression))
+                .is_err());
+            assert_eq!(context.failure().offset, if detailed { 2 } else { 0 });
+            assert_eq!((context.position(), context.matched_position()), (0, 0));
+        }
+    }
+}
+
 fn kind(value: &str) -> TokenKind {
     match value {
         "consumed" => TokenKind::Consumed,
