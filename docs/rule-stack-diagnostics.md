@@ -10,10 +10,12 @@ Optional<RuleStack> stack = context.getRuleStack();            // also on getPar
 stack.get().frames();   // [Frame[rule=Root, start=0], Frame[rule=Item, start=1]]
 stack.get().offset();   // the failure it explains, in code points
 stack.get().omitted();  // outer frames dropped beyond RuleStack.LIMIT
+context.getUnconsumedInputRuleStack();  // a successful parse that left input unconsumed
 ```
 
 ```rust
 let stack: Option<RuleStack> = context.rule_stack();
+context.unconsumed_input_rule_stack();  // a successful parse that left input unconsumed
 let failure = parse_detailed_shared_with_rule_stack(&grammar, root, whitespace, input, options)
     .unwrap_err();                       // RuleStackDiagnostic { diagnostic, rule_stack }
 ```
@@ -22,16 +24,36 @@ let failure = parse_detailed_shared_with_rule_stack(&grammar, root, whitespace, 
 
 - **Rules.** A rule is a Rust `Rule` invoked through `Expr::Rule` (every UBNF rule), and in
   Java a parser marked `org.unlaxer.parser.GrammarRule`. The Java generator marks every rule
-  class (`<Rule>Parser`) and no helper class, so both versions see the same invocations.
-  `GrammarRule.grammarRuleName()` defaults to the class name without its `Parser` suffix.
-  Hand-written Java parsers without the marker contribute no frames.
+  class (`<Rule>Parser`) and no helper class, so both versions see the same invocations, and
+  overrides `grammarRuleName()` with the rule name literal, so subclasses (anonymous ones
+  included) keep it. Without an override the name is the class name without its `Parser`
+  suffix; a `null` or blank name falls back to that as well (`GrammarRule.nameOf`). Hand-written
+  Java parsers without the marker contribute no frames.
+- **Names of expanded rules.** Parameterized and call-by-value rules (#701, #704) expand before
+  generation into instance rules named `Name_<16 hex digits>` (see
+  [parameterized-rules.md](parameterized-rules.md)), and stacks report that instance name. Both
+  frontends compute the same name from the canonical arguments, so the two versions agree; the
+  part before the last `_` is the defining rule. Restoring `Name(args)` would need the call text
+  carried from both frontends through both generators, which the expansion intentionally drops.
+- **Failed parses only.** `getRuleStack()` / `rule_stack()` report a stack only when the last
+  outermost parse failed. A successful parse reports none, even though it recorded speculative
+  failures: the two versions record different speculative failures inside composite tokens
+  (property-based testing found `R0 ::= R1 | ID` on `a` reporting `R0>R1` in Rust only). For a
+  successful parse that left input unconsumed, `getUnconsumedInputRuleStack()` /
+  `unconsumed_input_rule_stack()` report what a full-input parse reports for the trailing input:
+  the farthest failed rule, unless the cursor is past the farthest failure (the unconsumed input
+  is then itself the farthest failure, outside every rule).
 - **Detailed only.** Stacks are recorded only with Java `ParseOptions.Diagnostics.DETAILED` and
-  Rust `Diagnostics::Detailed` (`AUTO` resolves to it for direct contexts). With
-  `DETAILED_ON_FAILURE` / `DetailedOnFailure` a direct context reports no stack. The full-input
-  entries that retry failures in a fresh detailed context report the retry's stack: Java's
-  generated `parse` / `diagnose` already retry every failure, and the new Rust
-  `parse_detailed_shared_with_rule_stack` retries every failure, a committed or labeled one
-  included (the existing `parse_detailed*` still return a raised failure without a retry).
+  Rust `Diagnostics::Detailed`. `AUTO` resolves to them for direct contexts, which is the Java
+  default: `new ParseContext(source)` and the generated LSP server parse with `DETAILED`. With
+  `DETAILED_ON_FAILURE` / `DetailedOnFailure` a direct context reports no stack.
+- **Full-input entries.** Rust `parse_detailed_shared_with_rule_stack` returns the stack with the
+  diagnostic, trailing input included, and under `DetailedOnFailure` retries every failure in a
+  detailed pass, a committed or labeled one included (the existing `parse_detailed*` still return
+  a raised failure without a retry). Java's generated `parse` / `diagnose` return no stack (their
+  `ParseDiagnostic` and exception messages are unchanged); a Java caller that wants one parses
+  with a `DETAILED` `ParseContext` and reads `getRuleStack()` / `getUnconsumedInputRuleStack()`,
+  as the generated LSP server does.
 - **Unchanged default output.** `ParseDiagnostic`, its canonical JSON, `ParseError`,
   `ParseFailureDiagnostics` getters, `RaisedFailure` and every existing LSP field are
   unchanged. The stack is a separate accessor, a separate Rust function and new LSP fields.
@@ -104,27 +126,49 @@ reported offset:
 - `data.ruleStack`: `[{"rule": "<Rule>", "offset": <UTF-16 offset>}, ...]` and
   `data.ruleStackOmitted`.
 
+A CRLF is one line terminator, so a frame that starts at the LF of a CRLF starts at its CR, as
+the diagnostic's own start does (`data.ruleStack` carries the adjusted offset). A frame that
+still cannot be located is skipped; it never costs the diagnostic or the other frames. A
+successful parse that left input unconsumed gets the unconsumed-input stack with its
+trailing-input diagnostic.
+
 `relatedInformation` was chosen over the message so the existing message, which clients and
 tests match, stays unchanged and every frame has a navigable position. The Java server reads
-`ParseFailureDiagnostics.getRuleStack()` from its DETAILED parse; the Rust server
+`ParseFailureDiagnostics.getRuleStack()` (or `getUnconsumedInputRuleStack()` after a successful
+parse) from its DETAILED parse; the Rust server
 (`unlaxer-lsp`) calls `parse_detailed_shared_with_rule_stack` and builds `relatedInformation`
 from `data.ruleStack`, so custom backends can supply the same field.
 
 ## Cost
 
-Only the detailed policy does any of this work, and the deferred first pass is unchanged.
+Only the detailed policy does any of this work, and the deferred first pass is unchanged. Note
+that DETAILED is the Java default for a direct `ParseContext` and for the generated LSP server.
 
 - Rust: one push/pop per rule invocation; a failed invocation compares its reach and, when it
   wins, copies the active frames into a reused buffer. An assertion saves the selection only if
-  it replaces it. Memo frames store shared snapshot nodes. Measured on a 7.6 KB arithmetic input
-  (400 × `(1+2*3-(4/5+6))*7+8`, best of 30): `Detailed` +5 allocations per parse (+0.02 %) and
-  +2–3 % time; `DetailedOnFailure` identical allocations, time within noise; `Detailed` with
-  `SafeFailures` +7,206 allocations (+10 %) and +6–9 % time. The allocation audit's first
-  detailed failure grows from 9 to 11 allocations (the frame stack and the selection buffer).
-- Java: `ParseFrame` gains one `int` (inside its existing padding), a failed rule frame
-  compares its reach, and rule depths are counted only on ties. Memo frames gain one reference.
-  Measured with generated TinyCalc on the same input (best of 60): `DETAILED` +0.2 % allocated
-  bytes and +3–6 % time; `DETAILED_ON_FAILURE` +8 bytes per parse, time within noise.
+  it replaces it. Memo frames store shared snapshot nodes.
+- Java: `ParseFrame` gains one `int` (inside its existing padding). The context keeps the rule
+  depth of each open frame in an `int` array and the depth of every selected candidate, so
+  comparing a candidate is O(1) whatever the nesting; whether a parser class is a rule is decided
+  once per class. Memo frames gain one reference.
+
+Measured against `origin/master` 0a976016, median of 5 interleaved runs (Java: generated
+TinyCalc, best of 600 parses, 60 for the flat input; Rust: the same arithmetic grammar built with
+`Expr`, best of 800). The flat input is 400 × `(1+2*3-(4/5+6))*7+8` followed by `+(`; nested-N
+is `(`×N `1` `)`×(N−1) `]`. Rust nesting stops at 80 (rule nesting below 256).
+
+| Input | Java DETAILED | Java DETAILED_ON_FAILURE | Rust Detailed | Rust DetailedOnFailure |
+|---|---|---|---|---|
+| flat | +3.7 % time, +0.2 % bytes | −1.2 %, +8 B | +4.2 % | +2.0 % |
+| nested-20 | +4.5 %, +0.5 % bytes | −0.7 % | +5.3 % | +7.7 % (13 → 14 µs) |
+| nested-60 | +4.2 %, +0.4 % bytes | +0.3 % | +7.4 % | 0 % |
+| nested-120 (Rust 80) | +5.4 %, +0.4 % bytes | −2.8 % | +10.0 % | 0 % |
+
+Rust allocations (flat input): `Detailed` +5 per parse (+0.02 %), `DetailedOnFailure` identical,
+`Detailed` with `SafeFailures` +7,206 (+10 %, the shared memo nodes) and +6–9 % time. The
+allocation audit's first detailed failure grows from 9 to 11 allocations (the frame stack and the
+selection buffer). The first version of this change walked the parse stack on every tie and grew
+superlinearly in Java (+36–43 % at nested-120); the depth array removed that.
 
 ## Verification
 
@@ -137,15 +181,22 @@ Only the detailed policy does any of this work, and the deferred first pass is u
   under both memo policies and every diagnostics policy, check the offset, the raised kind and
   label, and that the memo cases really replay; Rust also runs the full-input entry under every
   policy and checks its diagnostic equals `parse_detailed_shared_with_options`.
-- [`conformance/rule-stack/lsp-tinycalc.json`](../conformance/rule-stack/lsp-tinycalc.json) and
-  [`lsp-raising.json`](../conformance/rule-stack/lsp-raising.json): 11 documents opened in both
+- [`conformance/rule-stack/lsp-tinycalc.json`](../conformance/rule-stack/lsp-tinycalc.json),
+  [`lsp-raising.json`](../conformance/rule-stack/lsp-raising.json) and
+  [`lsp-crlf.json`](../conformance/rule-stack/lsp-crlf.json): 14 documents opened in both
   generated servers over real stdio (`RuleStackLspConformanceTest`, Rust with
   `-DrustConformance=true`), comparing `data.kind`, `data.ruleStack`, `ruleStackOmitted` and every
-  `relatedInformation` message and range. The 8 TinyCalc documents include trailing input, 37
-  nested rules with 5 omitted, and a comment holding a supplementary character before the error,
-  where both versions start `Expression` after the comment. The 3 documents of a grammar with
-  UBNF `COMMIT` / `LABEL` (#710) cover a committed error, a labeled failure and an ordinary
-  failure after committed statements.
+  `relatedInformation` message and multi-line range. The 9 TinyCalc documents include trailing
+  input, 37 nested rules with 5 omitted, a comment holding a supplementary character before the
+  error (both versions start `Expression` after the comment) and a declaration on a CRLF line
+  before it. The 3 documents of a grammar with UBNF `COMMIT` / `LABEL` (#710) cover a committed
+  error, a labeled failure and an ordinary failure after committed statements; the 2 CRLF
+  documents a frame and a failure that start at the LF of a CRLF.
+- Successful parses: `successfulParsesReportNoStackButUnconsumedInputDoes` /
+  `successful_parses_report_no_stack_but_unconsumed_input_does` (and, in Rust, the full-input
+  entry), and `PropertyBasedParityTest`, which observes the context-level stack of every
+  generated case in both versions and requires it to be absent with `DETAILED_ON_FAILURE` and
+  identical across memoization, `AUTO` / `DETAILED` and the cursor reset.
 
 ```sh
 mvn -pl unlaxer-common,unlaxer-dsl -am test -Dtest=RuleStackTest,RuleStackLspConformanceTest \
