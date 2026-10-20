@@ -113,8 +113,9 @@ public class UBNFMapper {
         // Parameterized rules need positions for their diagnostics; every other
         // grammar keeps the original position-free path.
         List<ParameterizedRules.Region> parameterized = ParameterizedRules.prescan(source);
-        return new UBNFMapper(ParameterizedRules.any(parameterized) ? new UBNFSourceSnapshot.Builder(source) : null)
-            .parseInternal(source, parameterized);
+        UBNFSourceSnapshot.Builder builder = ParameterizedRules.any(parameterized) ? new UBNFSourceSnapshot.Builder(source) : null;
+        // @autoCommit rules are rewritten after expansion (#702), as in the native frontend.
+        return AutoCommit.apply(new UBNFMapper(builder).parseInternal(source, parameterized), builder);
     }
 
     /**
@@ -123,8 +124,18 @@ public class UBNFMapper {
      * imported source separately to retain its own origin.
      */
     public static UBNFSourceSnapshot parseWithSource(String source) {
+        return parseWithSource(source, true);
+    }
+
+    /** The source as written: expanded, but without the {@code @autoCommit} rewrite (lint, #702). */
+    static UBNFSourceSnapshot parseWithSourceBeforeAutoCommit(String source) {
+        return parseWithSource(source, false);
+    }
+
+    private static UBNFSourceSnapshot parseWithSource(String source, boolean autoCommit) {
         UBNFSourceSnapshot.Builder builder = new UBNFSourceSnapshot.Builder(source);
         UBNFFile ast = new UBNFMapper(builder).parseInternal(source, ParameterizedRules.prescan(source));
+        if (autoCommit) ast = AutoCommit.apply(ast, builder);
         builder.origins.put(ast, new UBNFSourceSnapshot.Origin(
             new UBNFSourceSnapshot.Span(0, source.codePointCount(0, source.length())),
             UBNFSourceSnapshot.Kind.SOURCE));

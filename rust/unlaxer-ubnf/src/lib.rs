@@ -1,5 +1,6 @@
 //! Java-free UBNF syntax frontend. No imports are opened and no code is executed.
 pub mod ast;
+pub mod auto_commit;
 mod codepoint_escapes;
 mod lexer;
 pub mod lexical;
@@ -69,8 +70,10 @@ pub(crate) fn diagnostic(
 
 /// Parse the entire UTF-8 input. The first syntax error is returned; no partial AST
 /// is presented as success. Backend validation is a separate operation.
+/// Parameterized rules are expanded and then `@autoCommit` rules are rewritten
+/// ([`auto_commit`], #702), as in the Java frontend.
 pub fn parse(source: &str) -> Result<UbnfFile, Diagnostic> {
-    parser::parse(source, lexer::lex(source)?)
+    parser::parse(source, lexer::lex(source)?).map(auto_commit::apply_file)
 }
 
 /// Source and AST owned by one parse, independent of subsequent parser activity.

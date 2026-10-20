@@ -1,0 +1,248 @@
+[
+  {
+    "name": "statements",
+    "note": "Two annotated rules, one of them recursive: the innermost commit wins.",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  Root ::= { Statement } ;\n  @autoCommit\n  Statement ::= 'let' Name '=' Value ';' | 'print' Value ';' ;\n  Name ::= 'n' ;\n  @autoCommit\n  Value ::= 'v' | '(' Value ')' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  Root ::= { Statement } ;\n  Statement ::= 'let' COMMIT(Name) '=' COMMIT(Value) ';' | 'print' COMMIT(Value) ';' ;\n  Name ::= 'n' ;\n  Value ::= 'v' | '(' COMMIT(Value) ')' ;\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "letn=v;",
+        "outcome": "success"
+      },
+      {
+        "input": "printv;letn=((v));",
+        "outcome": "success"
+      },
+      {
+        "input": "let",
+        "outcome": "commit",
+        "offset": 3,
+        "message": "unexpected input"
+      },
+      {
+        "input": "letx",
+        "outcome": "commit",
+        "offset": 3,
+        "message": "unexpected input"
+      },
+      {
+        "input": "letn=x;",
+        "outcome": "commit",
+        "offset": 5,
+        "message": "unexpected input"
+      },
+      {
+        "input": "printx",
+        "outcome": "commit",
+        "offset": 5,
+        "message": "unexpected input"
+      },
+      {
+        "input": "letn=(x)",
+        "outcome": "commit",
+        "offset": 6,
+        "message": "unexpected input"
+      },
+      {
+        "input": "printv;print((x",
+        "outcome": "commit",
+        "offset": 14,
+        "message": "unexpected input"
+      },
+      {
+        "input": "letn=v",
+        "outcome": "syntax"
+      },
+      {
+        "input": "letn=(v;",
+        "outcome": "commit",
+        "offset": 5,
+        "message": "unexpected input"
+      },
+      {
+        "input": "x",
+        "outcome": "syntax"
+      },
+      {
+        "input": "printv;x",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "block",
+    "note": "A repetition closed by a terminal; the commit is inside a recursive rule.",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  Root ::= Block ;\n  Block ::= '{' { Stmt } '}' ;\n  @autoCommit\n  Stmt ::= 'x' Semi | Block ;\n  Semi ::= ';' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  Root ::= Block ;\n  Block ::= '{' { Stmt } '}' ;\n  Stmt ::= 'x' COMMIT(Semi) | Block ;\n  Semi ::= ';' ;\n}\n",
+    "cases": [
+      {
+        "input": "{}",
+        "outcome": "success"
+      },
+      {
+        "input": "{x;{x;}{}}",
+        "outcome": "success"
+      },
+      {
+        "input": "{x}",
+        "outcome": "commit",
+        "offset": 2,
+        "message": "unexpected input"
+      },
+      {
+        "input": "{{x}}",
+        "outcome": "commit",
+        "offset": 3,
+        "message": "unexpected input"
+      },
+      {
+        "input": "{x;{x;x",
+        "outcome": "commit",
+        "offset": 7,
+        "message": "unexpected input"
+      },
+      {
+        "input": "{x;",
+        "outcome": "syntax"
+      },
+      {
+        "input": "{y}",
+        "outcome": "syntax"
+      },
+      {
+        "input": "{}}",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "separated",
+    "note": "Items of a separated list followed by a closing terminal.",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  Root ::= Call ;\n  Call ::= 'f' '(' Arg % ',' ')' ;\n  @autoCommit\n  Arg ::= 'k' Name | 'v' ;\n  Name ::= 'n' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  Root ::= Call ;\n  Call ::= 'f' '(' Arg % ',' ')' ;\n  Arg ::= 'k' COMMIT(Name) | 'v' ;\n  Name ::= 'n' ;\n}\n",
+    "cases": [
+      {
+        "input": "f(v)",
+        "outcome": "success"
+      },
+      {
+        "input": "f(kn,v,kn)",
+        "outcome": "success"
+      },
+      {
+        "input": "f(k)",
+        "outcome": "commit",
+        "offset": 3,
+        "message": "unexpected input"
+      },
+      {
+        "input": "f(v,kx)",
+        "outcome": "commit",
+        "offset": 5,
+        "message": "unexpected input"
+      },
+      {
+        "input": "f(v,)",
+        "outcome": "syntax"
+      },
+      {
+        "input": "f()",
+        "outcome": "syntax"
+      },
+      {
+        "input": "f(v",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "parameterized-mapping",
+    "note": "Expanded calls, a token and AST captures: captures stay inside COMMIT.",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  token Digit = CHAR_RANGE('0','9')\n  @root @mapping(Doc)\n  Root ::= { Stmt } ;\n  @autoCommit @mapping(Assign, params=[name, value])\n  Stmt ::= Kw('let') Name @name Tok('=') Digit @value Tok(';') ;\n  Kw(w) ::= w ;\n  Tok(t) ::= t ;\n  Name ::= 'n' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  token Digit = CHAR_RANGE('0','9')\n  @root @mapping(Doc)\n  Root ::= { Stmt } ;\n  @mapping(Assign, params=[name, value])\n  Stmt ::= Kw('let') COMMIT(Name @name) COMMIT(Tok('=')) COMMIT(Digit @value) COMMIT(Tok(';')) ;\n  Kw(w) ::= w ;\n  Tok(t) ::= t ;\n  Name ::= 'n' ;\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "letn=5;",
+        "outcome": "success"
+      },
+      {
+        "input": "letn=5;letn=0;",
+        "outcome": "success"
+      },
+      {
+        "input": "letx",
+        "outcome": "commit",
+        "offset": 3,
+        "message": "unexpected input"
+      },
+      {
+        "input": "letn5",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "letn=x",
+        "outcome": "commit",
+        "offset": 5,
+        "message": "unexpected input"
+      },
+      {
+        "input": "letn=5",
+        "outcome": "commit",
+        "offset": 6,
+        "message": "unexpected input"
+      },
+      {
+        "input": "letn=5;let",
+        "outcome": "commit",
+        "offset": 10,
+        "message": "unexpected input"
+      },
+      {
+        "input": "x",
+        "outcome": "syntax"
+      },
+      {
+        "input": "le",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "not-inserted",
+    "note": "@autoCommit on a rule whose failure an enclosing choice can resume inserts nothing: 'ay' stays accepted.",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  Root ::= Item 'x' | 'a' 'y' ;\n  @autoCommit\n  Item ::= 'a' B ;\n  B ::= 'b' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  Root ::= Item 'x' | 'a' 'y' ;\n  Item ::= 'a' B ;\n  B ::= 'b' ;\n}\n",
+    "cases": [
+      {
+        "input": "abx",
+        "outcome": "success"
+      },
+      {
+        "input": "ay",
+        "outcome": "success"
+      },
+      {
+        "input": "ab",
+        "outcome": "syntax"
+      },
+      {
+        "input": "ax",
+        "outcome": "syntax"
+      },
+      {
+        "input": "b",
+        "outcome": "syntax"
+      }
+    ]
+  }
+]
