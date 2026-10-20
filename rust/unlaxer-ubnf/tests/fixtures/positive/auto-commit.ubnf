@@ -1,0 +1,33 @@
+// @autoCommit (#702): both frontends rewrite after expansion and drop the annotation.
+grammar AutoCommit {
+  @package: org.example.autocommit
+  token Digit = CHAR_RANGE('0','9')
+  @root @mapping(Doc)
+  Root ::= { Statement } ;
+  @autoCommit @mapping(Assign, params=[name, value])
+  Statement ::= Kw('let') Name @name '=' Value @value ';'
+              | 'call' '(' ( Arg % ',' ) ')' ';'
+              | 'print' Value ';' ;
+  @autoCommit
+  Arg ::= 'k' Name | Digit ;
+  Kw(w) ::= w ;
+  Name ::= 'n' ;
+  @autoCommit
+  Value ::= 'v' | '(' Value ')' | 'q' [ Name ] Digit ;
+}
+// Not rewritten: the enclosing choice resumes, and whitespace disables the analysis.
+grammar Kept {
+  @root
+  Root ::= Item 'x' | 'a' 'y' ;
+  @autoCommit
+  Item ::= 'a' B ;
+  B ::= 'b' ;
+}
+grammar Spaced {
+  @whitespace: javaStyle
+  @root
+  Root ::= { S } ;
+  @autoCommit
+  S ::= 'k' B ;
+  B ::= 'b' ;
+}

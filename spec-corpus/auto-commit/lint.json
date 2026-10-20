@@ -1,0 +1,345 @@
+[
+  {
+    "name": "statements",
+    "note": "Keyword-led alternatives, a repetition at the end of the root and a nested reference.",
+    "grammar": "grammar Stmts {\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name '=' Value ';' | 'print' Value ';' ;\n  Name ::= 'n' ;\n  Value ::= 'v' | '(' Value ')' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Statement",
+        "alternative": "'let' Name '=' Value ';'",
+        "first": "'let'",
+        "commits": [
+          "Name",
+          "Value"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Statement",
+        "alternative": "'print' Value ';'",
+        "first": "'print'",
+        "commits": [
+          "Value"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Value",
+        "alternative": "'(' Value ')'",
+        "first": "'('",
+        "commits": [
+          "Value"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "annotated",
+    "note": "The same grammar with @autoCommit on one rule: only that rule is rewritten; the lint reports both.",
+    "grammar": "grammar Stmts {\n  @root\n  Root ::= { Statement } ;\n  @autoCommit\n  Statement ::= 'let' Name '=' Value ';' | 'print' Value ';' ;\n  Name ::= 'n' ;\n  Value ::= 'v' | '(' Value ')' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Statement",
+        "alternative": "'let' Name '=' Value ';'",
+        "first": "'let'",
+        "commits": [
+          "Name",
+          "Value"
+        ],
+        "inserted": true
+      },
+      {
+        "rule": "Statement",
+        "alternative": "'print' Value ';'",
+        "first": "'print'",
+        "commits": [
+          "Value"
+        ],
+        "inserted": true
+      },
+      {
+        "rule": "Value",
+        "alternative": "'(' Value ')'",
+        "first": "'('",
+        "commits": [
+          "Value"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "overlap",
+    "note": "Overlapping FIRST sets: the first alternative is not reported, the last one is.",
+    "grammar": "grammar Overlap {\n  @root\n  Root ::= 'a' B | 'a' C ;\n  B ::= 'b' ;\n  C ::= 'c' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Root",
+        "alternative": "'a' C",
+        "first": "'a'",
+        "commits": [
+          "C"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "enclosing-choice",
+    "note": "Locally cut-safe, but the enclosing choice resumes at the same position: 'ay' is accepted only by backtracking out of Item.",
+    "grammar": "grammar Resume {\n  @root\n  Root ::= Item 'x' | 'a' 'y' ;\n  Item ::= 'a' B ;\n  B ::= 'b' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "optional-follow",
+    "note": "An optional absorbs the failure and its continuation starts with the same code point; a different site of the rule is still reported.",
+    "grammar": "grammar Follow {\n  @root\n  Root ::= [ Item ] Tail | Other ;\n  Item ::= 'a' B ;\n  Tail ::= 'a' 'z' ;\n  Other ::= 'o' Item ;\n  B ::= 'b' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Other",
+        "alternative": "'o' Item",
+        "first": "'o'",
+        "commits": [
+          "Item"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "optional-follow-disjoint",
+    "note": "The continuation after the optional cannot start with 'a'.",
+    "grammar": "grammar FollowOk {\n  @root\n  Root ::= [ Item ] Tail ;\n  Item ::= 'a' B ;\n  Tail ::= 'z' 'z' ;\n  B ::= 'b' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Item",
+        "alternative": "'a' B",
+        "first": "'a'",
+        "commits": [
+          "B"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "block",
+    "note": "A repetition closed by a terminal, with a recursive alternative.",
+    "grammar": "grammar Blocks {\n  @root\n  Root ::= Block ;\n  Block ::= '{' { Stmt } '}' ;\n  Stmt ::= 'x' Semi | Block ;\n  Semi ::= ';' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Stmt",
+        "alternative": "'x' Semi",
+        "first": "'x'",
+        "commits": [
+          "Semi"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "one-or-more",
+    "note": "After a repetition the continuation starts like the item: 'abac' is accepted only by ending the repetition.",
+    "grammar": "grammar Plus {\n  @root\n  Root ::= ( 'a' B )+ 'a' 'c' ;\n  B ::= 'b' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "separated",
+    "note": "A separated list followed by a closing terminal.",
+    "grammar": "grammar Lists {\n  @root\n  Root ::= Call ;\n  Call ::= 'f' '(' Arg % ',' ')' ;\n  Arg ::= 'k' Name | 'v' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Arg",
+        "alternative": "'k' Name",
+        "first": "'k'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "separated-trailing",
+    "note": "The list may end before a separator that the continuation also accepts (conservative).",
+    "grammar": "grammar TrailingComma {\n  @root\n  Root ::= 'f' '(' Arg % ',' [ ',' ] ')' ;\n  Arg ::= 'k' Name | 'v' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "whitespace",
+    "note": "Automatic whitespace makes the analysis inapplicable to the whole grammar.",
+    "grammar": "grammar Spaced {\n  @whitespace: javaStyle\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "rule-whitespace",
+    "note": "A rule-level whitespace annotation also disables the grammar.",
+    "grammar": "grammar RuleSpaced {\n  @root\n  Root ::= { Statement } ;\n  @whitespace(javaStyle)\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "raising-and-labels",
+    "note": "An alternative followed by a raising operator is not reported, and nothing inside COMMIT, LABEL or CATCH is.",
+    "grammar": "grammar Raised {\n  @root\n  Root ::= 'k' Name | LABEL(lbl, 'c' Name) | CATCH('d' Name, 'e', lbl) | COMMIT('f' Name) ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "capture",
+    "note": "Owned captures and replays are not modelled.",
+    "grammar": "grammar Captured {\n  @root\n  Root ::= 'k' Name | CAPTURE(word, 'w' Name) SAME_AS(word) ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "opaque-rules",
+    "note": "A longest choice is opaque: nothing inside it is reported and a walk that reaches it stops; unreachable rules are not reported.",
+    "grammar": "grammar Longest {\n  @root\n  Root ::= Pick ;\n  @longestChoice\n  Pick ::= Item | 'z' Name ;\n  Item ::= 'a' Name ;\n  Unused ::= 'u' Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "recovery",
+    "note": "A recovery rule is opaque.",
+    "grammar": "grammar Recover {\n  @root\n  Root ::= { Statement } ;\n  @recovery(sync=';')\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "tokens",
+    "note": "Declarative tokens (with references and CHAR_RANGE) are modelled exactly in ASCII.",
+    "grammar": "grammar Tokens {\n  @ubnf: v2\n  token DIGIT ::= CHAR_RANGE('0','9');\n  token NUM ::= DIGIT+ ;\n  token KW ::= 'let' | 'var' ;\n  @root\n  Root ::= { Stmt } ;\n  Stmt ::= KW Name | NUM Name | 'q' Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Stmt",
+        "alternative": "KW Name",
+        "first": "KW",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Stmt",
+        "alternative": "NUM Name",
+        "first": "NUM",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Stmt",
+        "alternative": "'q' Name",
+        "first": "'q'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "tokens-unknown",
+    "note": "LOOKAHEAD and CI tokens are not modelled: alternatives before them are not reported, alternatives after them are.",
+    "grammar": "grammar Unknown {\n  token Ahead = LOOKAHEAD('x')\n  token Insensitive = CI('k')\n  @root\n  Root ::= { Stmt } ;\n  Stmt ::= 'k' Name | Ahead Name | Insensitive Name | 'z' Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Stmt",
+        "alternative": "'z' Name",
+        "first": "'z'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "token-range",
+    "note": "A CHAR_RANGE token disjoint from the other alternatives, and a token reference that is wrapped.",
+    "grammar": "grammar Ranges {\n  token Lower = CHAR_RANGE('a','z')\n  token Digit = CHAR_RANGE('0','9')\n  @root\n  Root ::= { Stmt } ;\n  Stmt ::= Lower Digit | 'Z' Lower ;\n}\n",
+    "findings": [
+      {
+        "rule": "Stmt",
+        "alternative": "Lower Digit",
+        "first": "Lower",
+        "commits": [
+          "Digit"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Stmt",
+        "alternative": "'Z' Lower",
+        "first": "'Z'",
+        "commits": [
+          "Lower"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "parameterized",
+    "note": "Commits are found after parameterized rules are expanded; instances are wrapped by their expanded name.",
+    "grammar": "grammar Params {\n  @root\n  Root ::= { Stmt } ;\n  Stmt ::= Kw('let') Name Tok('=') Name | 'print' Name ;\n  Kw(w) ::= w ;\n  Tok(t) ::= t ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Stmt",
+        "alternative": "Kw('let') Name Tok('=') Name",
+        "first": "Kw('let')",
+        "commits": [
+          "Name",
+          "Tok_dd2f667955b1687a",
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Stmt",
+        "alternative": "'print' Name",
+        "first": "'print'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "left-recursion",
+    "note": "A left-recursive grammar is not analysed.",
+    "grammar": "grammar LeftRec {\n  @root\n  Root ::= Root '+' Name | 'k' Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "two-roots",
+    "note": "Exactly one root is required.",
+    "grammar": "grammar Roots {\n  @root\n  A ::= 'a' Name ;\n  @root\n  B ::= 'b' Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "non-ascii",
+    "note": "Code points above ASCII share one flag, so two non-ASCII alternatives overlap.",
+    "grammar": "grammar Wide {\n  @root\n  Root ::= { Stmt } ;\n  Stmt ::= 'α' Name | 'β' Name | 'k' Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Stmt",
+        "alternative": "'β' Name",
+        "first": "'β'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Stmt",
+        "alternative": "'k' Name",
+        "first": "'k'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  }
+]

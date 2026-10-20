@@ -4,7 +4,7 @@ use crate::adapters::{
     BuiltinAdapter,
 };
 use std::cell::Cell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use unlaxer_codegen::ir::*;
 use unlaxer_ubnf::ast::{self, AnnotationKind, ElementKind, SettingValue, TokenKind};
 
@@ -1528,7 +1528,8 @@ impl Lowering<'_> {
         if visiting.len() > 256 {
             return Err("rule analysis depth exceeds 256".into());
         }
-        let mut leading = HashSet::new();
+        // Ordered so the reported rule does not depend on hash iteration order; Java visits in this order too.
+        let mut leading = BTreeSet::new();
         self.leading_rules(&self.bodies[rule], &mut leading);
         for child in leading {
             self.check_left_recursion(child, visiting, done)?;
@@ -1538,7 +1539,7 @@ impl Lowering<'_> {
         Ok(())
     }
 
-    fn leading_rules(&self, expression: &Expression, result: &mut HashSet<usize>) {
+    fn leading_rules(&self, expression: &Expression, result: &mut BTreeSet<usize>) {
         match expression {
             Expression::Repeat { max: Some(0), .. } => {}
             Expression::Reference(rule) => {

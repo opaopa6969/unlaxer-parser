@@ -87,6 +87,13 @@ public final class UBNFSourceSnapshot {
             return node;
         }
 
+        /** The origin of {@code from}, unchanged, for a rebuilt node (#702). */
+        <T> T copy(T node, Object from) {
+            Origin origin = origins.get(from);
+            if (origin != null) origins.put(node, origin);
+            return node;
+        }
+
         <T> T extend(T node, Object from, Token last) {
             Origin origin = origins.get(from);
             if (origin != null) tokenSpan(last).ifPresent(span ->

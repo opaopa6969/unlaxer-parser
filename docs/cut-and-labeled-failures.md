@@ -245,6 +245,9 @@ mvn -pl unlaxer-common,unlaxer-dsl -am test -Dtest=RaisingOperatorConformanceTes
   -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
-Out of scope: inferring cuts automatically (a separate issue), and whole-snapshot
+Inferring cuts automatically is [#702](auto-commit.md): a FIRST-set lint of cut-safe
+alternatives and the opt-in `@autoCommit` rule annotation, which inserts these `COMMIT`s.
+
+Out of scope: whole-snapshot
 incremental caching of grammars that use these operators, which stays disabled
 until reviewed.
