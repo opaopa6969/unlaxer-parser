@@ -125,7 +125,7 @@ jobs:
     - name: Require real Java and Rust syntax diagnostic evidence
       run: test -s unlaxer-dsl/target/classic-lsp-diagnostics.tsv
     - name: Require real Java and Rust rule-stack diagnostic evidence
-      run: grep -qxP 'Rust\t11\tPASS' unlaxer-dsl/target/rule-stack-lsp.tsv
+      run: grep -qxP 'Rust\t14\tPASS' unlaxer-dsl/target/rule-stack-lsp.tsv
     - name: Require Java and native Rust literal enum evidence
       run: |
         test -s unlaxer-dsl/target/enum-java.tsv

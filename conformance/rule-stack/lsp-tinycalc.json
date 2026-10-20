@@ -129,5 +129,20 @@
       "MulOp@8"
     ],
     "omitted": 0
+  },
+  {
+    "id": "multi-line-crlf",
+    "text": "var x set 1;\r\n(x",
+    "offset": 16,
+    "stack": [
+      "TinyCalc@0",
+      "Expression@14",
+      "Term@14",
+      "Factor@14",
+      "Expression@15",
+      "Term@15",
+      "MulOp@16"
+    ],
+    "omitted": 0
   }
 ]

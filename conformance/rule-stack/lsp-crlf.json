@@ -1,0 +1,28 @@
+{
+  "grammar": "grammar Crlf {\n  @package: org.unlaxer.rulestack.crlf\n  @whitespace: none\n  @root @mapping(Doc)\n  Doc ::= 'a' '\\r' Nl | 'b' '\\r' Bad ;\n  Nl ::= '\\n' Tail ;\n  Tail ::= 'c' 'd' ;\n  Bad ::= 'q' ;\n}\n",
+  "cases": [
+    {
+      "id": "frame-starts-inside-crlf",
+      "text": "a\r\ncz",
+      "kind": "syntax",
+      "offset": 4,
+      "stack": [
+        "Doc@0",
+        "Nl@1",
+        "Tail@3"
+      ],
+      "omitted": 0
+    },
+    {
+      "id": "failure-inside-crlf",
+      "text": "b\r\n",
+      "kind": "syntax",
+      "offset": 1,
+      "stack": [
+        "Doc@0",
+        "Bad@1"
+      ],
+      "omitted": 0
+    }
+  ]
+}

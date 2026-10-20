@@ -21,14 +21,16 @@ public class RuleStackLspConformanceTest {
     @Rule public org.junit.rules.TemporaryFolder temporary = new org.junit.rules.TemporaryFolder();
     private static final Gson JSON = new GsonBuilder().serializeNulls().create();
     private static final Path ROOT = Path.of("..").toAbsolutePath().normalize();
-    private static final int CASES = 11;
+    private static final int CASES = 14;
 
     /** One grammar and its handwritten cases. */
     private record Fixture(String name, String grammarText, JsonArray cases) {}
 
     private static List<Fixture> fixtures() throws Exception {
         var raising = JsonParser.parseString(Files.readString(ROOT.resolve("conformance/rule-stack/lsp-raising.json"))).getAsJsonObject();
+        var crlf = JsonParser.parseString(Files.readString(ROOT.resolve("conformance/rule-stack/lsp-crlf.json"))).getAsJsonObject();
         return List.of(
+            new Fixture("crlf", crlf.get("grammar").getAsString(), crlf.getAsJsonArray("cases")),
             new Fixture("tinycalc", Files.readString(ROOT.resolve("unlaxer-dsl/tinycalc-vscode/grammar/tinycalc.ubnf")),
                 JsonParser.parseString(Files.readString(ROOT.resolve("conformance/rule-stack/lsp-tinycalc.json"))).getAsJsonArray()),
             new Fixture("raising", raising.get("grammar").getAsString(), raising.getAsJsonArray("cases")));
@@ -167,8 +169,7 @@ public class RuleStackLspConformanceTest {
                     var location = information.getAsJsonObject("location");
                     assertEquals(label, uri, location.get("uri").getAsString());
                     var range = location.getAsJsonObject("range");
-                    // Single-line fixtures: the UTF-16 offset is the LSP character.
-                    assertEquals(label, JsonParser.parseString("{\"line\":0,\"character\":" + offset + "}"),
+                    assertEquals(label, position(text, offset),
                         range.get("start"));
                     assertEquals(label, start, range.get("end"));
                 }
@@ -181,6 +182,17 @@ public class RuleStackLspConformanceTest {
         assertTrue(backend, wire.process.waitFor(5, TimeUnit.SECONDS));
         assertEquals(backend, 0, wire.process.exitValue());
     }
+    /** LSP position of a UTF-16 offset; CRLF, LF and CR each end a line. */
+    private static JsonElement position(String text, int offset) {
+        int line = 0, lineStart = 0;
+        for (int index = 0; index < offset; index++) {
+            char unit = text.charAt(index);
+            if (unit == '\r' && index + 1 < text.length() && text.charAt(index + 1) == '\n') continue;
+            if (unit == '\n' || unit == '\r') { line++; lineStart = index + 1; }
+        }
+        return JsonParser.parseString("{\"line\":" + line + ",\"character\":" + (offset - lineStart) + "}");
+    }
+
     private void run(List<String> command) throws Exception {
         var builder = new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true);
         builder.environment().put("CARGO_INCREMENTAL", "0");

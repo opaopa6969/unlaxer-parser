@@ -310,7 +310,8 @@ class LSPServerEmitter {
         if (raising) {
             w.line("    failure.getRaisedFailure().map(raised -> raised.isCommit() ? \"commit\" : \"label\").orElse(null),");
         }
-        w.line("    failure.getRuleStack().orElse(null));");
+        // A successful parse with unconsumed input reports the stack a full-input parse would (#703).
+        w.line("    (result.isSucceeded() ? context.getUnconsumedInputRuleStack() : failure.getRuleStack()).orElse(null));");
         w.line("}");
         w.dedent();
         w.line("}");
@@ -446,12 +447,16 @@ class LSPServerEmitter {
         w.line("var ruleFrames = new ArrayList<Map<String, Object>>();");
         w.line("for (var frame : stack.frames()) {");
         w.line("    int frameStart = Math.min(codePointOffsetToStringOffset(content, frame.start()), errorStart);");
-        w.line("    String note = related.isEmpty() && stack.omitted() > 0 ? \" (\" + stack.omitted() + \" outer rules omitted)\" : \"\";");
-        w.line("    related.add(new DiagnosticRelatedInformation(new Location(uri, new Range(offsetToPosition(content, frameStart), startPos)),");
-        w.line("        \"in rule \" + frame.rule() + note));");
+        // A CRLF is one line terminator: a frame starting at its LF starts at its CR, as errorStart does.
+        w.line("    if (frameStart > 0 && frameStart < content.length() && content.charAt(frameStart - 1) == '\\r' && content.charAt(frameStart) == '\\n') frameStart--;");
+        w.line("    String note = ruleFrames.isEmpty() && stack.omitted() > 0 ? \" (\" + stack.omitted() + \" outer rules omitted)\" : \"\";");
+        w.line("    try {");
+        w.line("        related.add(new DiagnosticRelatedInformation(new Location(uri, new Range(offsetToPosition(content, frameStart), startPos)),");
+        w.line("            \"in rule \" + frame.rule() + note));");
+        w.line("    } catch (RuntimeException unmappable) { continue; } // one frame never costs the diagnostic");
         w.line("    ruleFrames.add(Map.<String, Object>of(\"rule\", frame.rule(), \"offset\", frameStart));");
         w.line("}");
-        w.line("diagnostic.setRelatedInformation(related);");
+        w.line("if (!related.isEmpty()) diagnostic.setRelatedInformation(related);");
         w.line("data.put(\"ruleStack\", ruleFrames);");
         w.line("data.put(\"ruleStackOmitted\", stack.omitted());");
         w.dedent();

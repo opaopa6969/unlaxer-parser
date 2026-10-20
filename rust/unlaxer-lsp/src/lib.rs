@@ -861,7 +861,13 @@ fn rule_stack_data(
             .frames
             .iter()
             .map(|frame| {
-                json!({"rule":frame.rule,"offset":snapshot.utf16(frame.start.min(error_start)).unwrap_or(0)})
+                let mut start = frame.start.min(error_start);
+                // A CRLF is one line terminator: a frame starting at its LF starts at its CR,
+                // as the diagnostic itself does.
+                if snapshot.lsp(start).is_err() {
+                    start = start.saturating_sub(1);
+                }
+                json!({"rule":frame.rule,"offset":snapshot.utf16(start).unwrap_or(0)})
             })
             .collect();
         data["ruleStackOmitted"] = json!(stack.omitted);
@@ -870,7 +876,8 @@ fn rule_stack_data(
 }
 
 /// relatedInformation for `data.ruleStack`: one location per rule, from where the rule
-/// started to the diagnostic, outermost first. The first notes any omitted outer rules.
+/// started to the diagnostic, outermost first. The first notes any omitted outer rules. A
+/// frame that cannot be located is skipped; it never costs the other frames.
 fn rule_stack_related(snapshot: &Snapshot, diagnostic: &Diagnostic) -> Option<Value> {
     let frames = diagnostic.data.get("ruleStack")?.as_array()?;
     let omitted = diagnostic
@@ -880,20 +887,26 @@ fn rule_stack_related(snapshot: &Snapshot, diagnostic: &Diagnostic) -> Option<Va
         .unwrap_or(0);
     let mut related = vec![];
     for frame in frames {
-        let rule = frame.get("rule")?.as_str()?;
-        let start = snapshot
-            .from_utf16(usize::try_from(frame.get("offset")?.as_u64()?).ok()?)
-            .ok()?;
-        let span = Span {
-            start: start.min(diagnostic.span.start),
-            end: diagnostic.span.start,
+        let located = || -> Option<(&str, Value)> {
+            let rule = frame.get("rule")?.as_str()?;
+            let start = snapshot
+                .from_utf16(usize::try_from(frame.get("offset")?.as_u64()?).ok()?)
+                .ok()?;
+            let span = Span {
+                start: start.min(diagnostic.span.start),
+                end: diagnostic.span.start,
+            };
+            Some((rule, range(snapshot, span).ok()?))
+        };
+        let Some((rule, location)) = located() else {
+            continue;
         };
         let note = if related.is_empty() && omitted > 0 {
             format!(" ({omitted} outer rules omitted)")
         } else {
             String::new()
         };
-        related.push(json!({"location":{"uri":snapshot.uri,"range":range(snapshot, span).ok()?},"message":format!("in rule {rule}{note}")}));
+        related.push(json!({"location":{"uri":snapshot.uri,"range":location},"message":format!("in rule {rule}{note}")}));
     }
     (!related.is_empty()).then(|| json!(related))
 }
