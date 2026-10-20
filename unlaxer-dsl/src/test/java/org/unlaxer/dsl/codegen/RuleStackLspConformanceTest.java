@@ -13,30 +13,68 @@ import org.junit.*;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.codegen.rust.RustBackend;
 
-/** Rule stacks of TinyCalc syntax errors (#703) in both generated servers, over real Content-Length frames. */
+/**
+ * Rule stacks of syntax errors (#703) in both generated servers, over real Content-Length frames:
+ * TinyCalc (ordinary failures, javaStyle trivia) and a grammar with COMMIT / LABEL (#700).
+ */
 public class RuleStackLspConformanceTest {
     @Rule public org.junit.rules.TemporaryFolder temporary = new org.junit.rules.TemporaryFolder();
     private static final Gson JSON = new GsonBuilder().serializeNulls().create();
     private static final Path ROOT = Path.of("..").toAbsolutePath().normalize();
+    private static final int CASES = 11;
+
+    /** One grammar and its handwritten cases. */
+    private record Fixture(String name, String grammarText, JsonArray cases) {}
+
+    private static List<Fixture> fixtures() throws Exception {
+        var raising = JsonParser.parseString(Files.readString(ROOT.resolve("conformance/rule-stack/lsp-raising.json"))).getAsJsonObject();
+        return List.of(
+            new Fixture("tinycalc", Files.readString(ROOT.resolve("unlaxer-dsl/tinycalc-vscode/grammar/tinycalc.ubnf")),
+                JsonParser.parseString(Files.readString(ROOT.resolve("conformance/rule-stack/lsp-tinycalc.json"))).getAsJsonArray()),
+            new Fixture("raising", raising.get("grammar").getAsString(), raising.getAsJsonArray("cases")));
+    }
 
     @Test public void generatedServersReportTheRuleStack() throws Exception {
-        var grammarFile = ROOT.resolve("unlaxer-dsl/tinycalc-vscode/grammar/tinycalc.ubnf");
-        var grammar = UBNFMapper.parse(Files.readString(grammarFile)).grammars().get(0);
+        var fixtures = fixtures();
+        assertEquals(CASES, fixtures.stream().mapToInt(fixture -> fixture.cases().size()).sum());
+        for (var fixture : fixtures) {
+            try (var wire = javaServer(fixture)) {
+                exercise(wire, "Java " + fixture.name(), fixture.cases());
+            }
+        }
+        if (!Boolean.getBoolean("rustConformance")) {
+            System.out.println("[assumption] Rust rule-stack cross-check requires -DrustConformance=true; Java oracle ran");
+            return;
+        }
+        for (var fixture : fixtures) {
+            try (var wire = rustServer(fixture)) {
+                exercise(wire, "Rust " + fixture.name(), fixture.cases());
+            }
+        }
+        Files.writeString(Path.of("target/rule-stack-lsp.tsv"),
+            "backend\tcases\tstatus\nJava\t" + CASES + "\tPASS\nRust\t" + CASES + "\tPASS\n");
+    }
+
+    private Wire javaServer(Fixture fixture) throws Exception {
+        var grammar = UBNFMapper.parse(fixture.grammarText()).grammars().get(0);
         var sources = new ArrayList<JavaFileObject>();
+        String packageName = null;
         for (var generated : List.of(new ParserGenerator().generate(grammar), new ASTGenerator().generate(grammar), new MapperGenerator().generate(grammar),
                 new LSPGenerator().generate(grammar), new LSPLauncherGenerator().generate(grammar))) {
             sources.add(source(generated.packageName() + "." + generated.className(), generated.source()));
+            packageName = generated.packageName();
         }
-        sources.add(source("org.unlaxer.tinycalc.generated.DiagnosticMain", """
-            package org.unlaxer.tinycalc.generated;
-            public final class DiagnosticMain extends TinyCalcLspLauncher {
-                @Override protected TinyCalcLanguageServer createServer() { return new TinyCalcLanguageServer() {}; }
+        String name = grammar.name();
+        sources.add(source(packageName + ".DiagnosticMain", """
+            package %s;
+            public final class DiagnosticMain extends %sLspLauncher {
+                @Override protected %sLanguageServer createServer() { return new %sLanguageServer() {}; }
                 public static void main(String[] args) throws Exception {
                     System.exit(new DiagnosticMain().launchStdio());
                 }
             }
-            """));
-        Path classes = temporary.newFolder("java-classes").toPath();
+            """.formatted(packageName, name, name, name)));
+        Path classes = temporary.newFolder("java-classes-" + fixture.name()).toPath();
         var errors = new StringWriter();
         var compiler = ToolProvider.getSystemJavaCompiler();
         try (var manager = compiler.getStandardFileManager(null, null, null)) {
@@ -46,19 +84,19 @@ public class RuleStackLspConformanceTest {
             assertTrue(errors.toString(), compiled);
         }
         String javaExecutable = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        try (var wire = new Wire(new ProcessBuilder(javaExecutable, "-cp",
+        return new Wire(new ProcessBuilder(javaExecutable, "-cp",
                 classes + File.pathSeparator + System.getProperty("java.class.path"),
-                "org.unlaxer.tinycalc.generated.DiagnosticMain")
-                .redirectError(temporary.newFile("java-stderr.log")).start())) {
-            exercise(wire, "Java");
-        }
-        if (!Boolean.getBoolean("rustConformance")) {
-            System.out.println("[assumption] Rust rule-stack cross-check requires -DrustConformance=true; Java oracle ran");
-            return;
-        }
-        Path project = temporary.newFolder("rust-project").toPath();
+                packageName + ".DiagnosticMain")
+                .redirectError(temporary.newFile("java-stderr-" + fixture.name() + ".log")).start());
+    }
+
+    private Wire rustServer(Fixture fixture) throws Exception {
+        var grammar = UBNFMapper.parse(fixture.grammarText()).grammars().get(0);
+        Path project = temporary.newFolder("rust-project-" + fixture.name()).toPath();
         Path modules = project.resolve("src/generated");
         Files.createDirectories(modules);
+        Path grammarFile = project.resolve("grammar.ubnf");
+        Files.writeString(grammarFile, fixture.grammarText());
         Path nativeOutput = project.resolve("native");
         run(List.of("cargo", "run", "--quiet", "--locked", "--manifest-path",
             ROOT.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator", "--bin", "unlaxer", "--",
@@ -69,31 +107,24 @@ public class RuleStackLspConformanceTest {
                 Files.readString(nativeOutput.resolve(file.relativePath())));
             Files.writeString(modules.resolve(file.relativePath()), file.content());
         }
+        String crate = "rule-stack-lsp-" + fixture.name();
         Files.writeString(project.resolve("Cargo.toml"), """
             [package]
-            name="rule-stack-lsp-fixture"
+            name="%s"
             version="0.1.0"
             edition="2021"
             [dependencies]
             unlaxer-runtime={path="%s"}
             unlaxer-lsp={path="%s"}
-            """.formatted(ROOT.resolve("rust/unlaxer-runtime"), ROOT.resolve("rust/unlaxer-lsp")));
+            """.formatted(crate, ROOT.resolve("rust/unlaxer-runtime"), ROOT.resolve("rust/unlaxer-lsp")));
         Files.writeString(project.resolve("src/main.rs"),
             "mod generated; fn main() { std::process::exit(generated::lsp::serve_stdio_status().unwrap()); }\n");
         run(List.of("cargo", "build", "--quiet", "--offline", "--manifest-path", project.resolve("Cargo.toml").toString()));
-        try (var wire = new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/rule-stack-lsp-fixture").toString())
-                .redirectError(temporary.newFile("rust-stderr.log")).start())) {
-            exercise(wire, "Rust");
-        }
-        Files.writeString(Path.of("target/rule-stack-lsp.tsv"),
-            "backend\tcases\tstatus\nJava\t" + CASES + "\tPASS\nRust\t" + CASES + "\tPASS\n");
+        return new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/" + crate).toString())
+                .redirectError(temporary.newFile("rust-stderr-" + fixture.name() + ".log")).start());
     }
 
-    private static final int CASES = 8;
-
-    private void exercise(Wire wire, String backend) throws Exception {
-        var cases = JsonParser.parseString(Files.readString(ROOT.resolve("conformance/rule-stack/lsp-tinycalc.json"))).getAsJsonArray();
-        assertEquals(CASES, cases.size());
+    private void exercise(Wire wire, String backend, JsonArray cases) throws Exception {
         wire.request("initialize", Map.of("capabilities", Map.of()));
         wire.notify("initialized", Map.of());
         int version = 0;
@@ -111,6 +142,7 @@ public class RuleStackLspConformanceTest {
                 var diagnostic = diagnostics.get(0).getAsJsonObject();
                 var data = diagnostic.getAsJsonObject("data");
                 assertEquals(label, row.get("offset").getAsInt(), data.get("offset").getAsInt());
+                if (row.has("kind")) assertEquals(label, row.get("kind").getAsString(), data.get("kind").getAsString());
                 // data.ruleStack: outermost first, UTF-16 offsets of where each rule started.
                 var expected = new ArrayList<String>();
                 for (var frame : row.getAsJsonArray("stack")) expected.add(frame.getAsString());

@@ -137,12 +137,15 @@ Only the detailed policy does any of this work, and the deferred first pass is u
   under both memo policies and every diagnostics policy, check the offset, the raised kind and
   label, and that the memo cases really replay; Rust also runs the full-input entry under every
   policy and checks its diagnostic equals `parse_detailed_shared_with_options`.
-- [`conformance/rule-stack/lsp-tinycalc.json`](../conformance/rule-stack/lsp-tinycalc.json): 8
-  TinyCalc documents opened in both generated servers over real stdio
-  (`RuleStackLspConformanceTest`, Rust with `-DrustConformance=true`), comparing
-  `data.ruleStack`, `ruleStackOmitted` and every `relatedInformation` message and range. They
-  include trailing input, 37 nested rules with 5 omitted, and a comment holding a supplementary
-  character before the error, where both versions start `Expression` after the comment.
+- [`conformance/rule-stack/lsp-tinycalc.json`](../conformance/rule-stack/lsp-tinycalc.json) and
+  [`lsp-raising.json`](../conformance/rule-stack/lsp-raising.json): 11 documents opened in both
+  generated servers over real stdio (`RuleStackLspConformanceTest`, Rust with
+  `-DrustConformance=true`), comparing `data.kind`, `data.ruleStack`, `ruleStackOmitted` and every
+  `relatedInformation` message and range. The 8 TinyCalc documents include trailing input, 37
+  nested rules with 5 omitted, and a comment holding a supplementary character before the error,
+  where both versions start `Expression` after the comment. The 3 documents of a grammar with
+  UBNF `COMMIT` / `LABEL` (#710) cover a committed error, a labeled failure and an ordinary
+  failure after committed statements.
 
 ```sh
 mvn -pl unlaxer-common,unlaxer-dsl -am test -Dtest=RuleStackTest,RuleStackLspConformanceTest \
@@ -152,8 +155,6 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ru
 
 ## Limitations
 
-- UBNF `COMMIT` / `LABEL` / `CATCH` syntax (#710) is not merged, so raised-failure stacks are
-  verified at the runtime level only, not through either LSP.
 - Shared grammar calls carry stacks with the called grammar's rule names; no shared corpus
   covers them yet.
 - A Java grammar built by hand must mark its rule parsers with `GrammarRule` to get stacks.
