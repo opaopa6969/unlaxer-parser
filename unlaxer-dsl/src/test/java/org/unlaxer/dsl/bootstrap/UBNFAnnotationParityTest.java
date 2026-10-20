@@ -20,6 +20,12 @@ public class UBNFAnnotationParityTest {
         }
     }
 
+    @Test public void evalParametersKeepSourceOrder() {
+        var eval = (UBNFAST.EvalAnnotation) annotation("@eval(kind='literal', z='1', a='2', m='3', b='4')");
+        assertEquals(List.of("z", "a", "m", "b"), List.copyOf(eval.params().keySet()));
+        assertThrows(UnsupportedOperationException.class, () -> eval.params().put("c", "5"));
+    }
+
     @Test public void builtinPrefixesRemainWholeSimpleAnnotationNames() {
         for (String keyword : List.of("root", "whitespace", "leftAssoc", "rightAssoc", "longestChoice",
                 "uniqueLongestChoice", "predictiveChoice", "skip", "enum")) {
