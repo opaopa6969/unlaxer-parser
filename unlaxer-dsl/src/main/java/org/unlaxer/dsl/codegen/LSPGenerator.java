@@ -55,7 +55,7 @@ public class LSPGenerator implements CodeGenerator {
         LSPDiagnosticEmitter.emit(w);
 
         // ----- parseDocument & utilities -----
-        LSPServerEmitter.emitParseDocument(w, parsersClass, hasScopeStore);
+        LSPServerEmitter.emitParseDocument(w, parsersClass, hasScopeStore, RaisingOperators.used(grammar));
         w.line("protected boolean parseCacheEnabled() { return " + snapshotCacheable(grammar) + "; }");
 
         // ----- Hook methods -----
@@ -67,7 +67,7 @@ public class LSPGenerator implements CodeGenerator {
         }
 
         // ----- Records -----
-        LSPServerEmitter.emitRecords(w);
+        LSPServerEmitter.emitRecords(w, RaisingOperators.used(grammar));
 
         // ----- TextDocumentService inner class -----
         LSPServerEmitter.emitTextDocumentService(w, serverClass, grammarName);

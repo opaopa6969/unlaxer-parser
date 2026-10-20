@@ -225,7 +225,9 @@ public class SelfHostingRoundTripTest {
                 "CAPTURE(word, 'a') SAME_AS(word)",
                 "CAPTURE_SCOPE(CAPTURE(word, ('a' | 'b')) SAME_AS(word))",
                 "CAPTURE ('a') SAME_AS // comment\n('a') CAPTURE_SCOPE\n('a')",
-                "CAPTURE_MORE('a') ns.CAPTURE('a')")) {
+                "CAPTURE_MORE('a') ns.CAPTURE('a')",
+                "COMMIT('a') COMMIT(B, 'm') LABEL(L, 'b' | B) CATCH('c', 'd', L) CATCH('e', 'f')",
+                "COMMIT ('a') LABEL ('b') CATCH ('c')")) {
             String source = "grammar OwnedSyntax { Root ::= " + body + "; }";
             try (var context = new ParseContext(StringSource.createRootSource(source))) {
                 Parsed parsed = root.parse(context);
@@ -234,7 +236,8 @@ public class SelfHostingRoundTripTest {
         }
         for (String body : List.of("CAPTURE(name)", "CAPTURE(name,)", "CAPTURE(, 'a')",
                 "SAME_AS()", "SAME_AS(name, other)", "CAPTURE_SCOPE()", "CAPTURE_SCOPE('a', 'b')",
-                "CAPTURE(name, 'a' |)", "CAPTURE_SCOPE(| 'a')")) {
+                "CAPTURE(name, 'a' |)", "CAPTURE_SCOPE(| 'a')",
+                "COMMIT()", "COMMIT('a', b)", "LABEL(L)", "LABEL('L', 'a')", "CATCH('a')", "CATCH('a', 'b', 'L')")) {
             String source = "grammar OwnedSyntax { Root ::= " + body + "; }";
             try (var context = new ParseContext(StringSource.createRootSource(source))) {
                 Parsed parsed = root.parse(context);

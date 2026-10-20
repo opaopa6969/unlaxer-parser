@@ -319,3 +319,37 @@ fn typeof_is_not_accidentally_the_previous_elements_capture() {
         assert_eq!(elements[1].typeof_constraint.as_deref(), Some("a"));
     }
 }
+
+/// Nested CATCH stores each operand once (#700): the AST grows linearly with depth.
+#[test]
+fn nested_catch_operands_are_stored_once() {
+    fn count(body: &RuleBody) -> usize {
+        body.alternatives
+            .iter()
+            .flat_map(|sequence| &sequence.elements)
+            .map(|element| {
+                1 + match &element.element.kind {
+                    ElementKind::Catch { choice, .. } | ElementKind::Label { body: choice, .. } => {
+                        count(choice)
+                    }
+                    _ => 0,
+                }
+            })
+            .sum()
+    }
+    let depth = 60;
+    let mut body = "LABEL(L, 'a')".to_owned();
+    for _ in 0..depth {
+        body = format!("CATCH({body}, 'b', L)");
+    }
+    let file = unlaxer_ubnf::parse(&format!("grammar Deep {{ Root ::= {body} ; }}")).unwrap();
+    let root = &file.grammars[0].rules[0].body;
+    assert_eq!(count(root), 2 * depth + 2);
+    let ElementKind::Catch { choice, operands } = &root.alternatives[0].elements[0].element.kind
+    else {
+        panic!("outer CATCH");
+    };
+    assert_eq!(operands.split, 1);
+    assert_eq!(operands.labels, ["L"]);
+    assert_eq!(operands.alternative(choice).alternatives.len(), 1);
+}

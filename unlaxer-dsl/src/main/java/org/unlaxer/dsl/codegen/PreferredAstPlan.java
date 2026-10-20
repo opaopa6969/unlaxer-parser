@@ -84,6 +84,10 @@ public final class PreferredAstPlan {
         if (atom instanceof RuleRefElement ref) {
             int id = rules.indexOf(ref.name());
             if (id >= 0) calls.add(new Call(id, depth));
+        } else if (atom instanceof org.unlaxer.dsl.bootstrap.UBNFAST.CatchElement caught) {
+            // CatchLabels adds no CST node: each operand is its own group helper (#700).
+            atom(caught.child(), depth, plan, rules, calls);
+            atom(caught.alternative(), depth, plan, rules, calls);
         } else if (atom instanceof TransparentElement group) {
             var child=single(group.body());
             if (!(atom instanceof GroupElement) && child instanceof RuleRefElement)

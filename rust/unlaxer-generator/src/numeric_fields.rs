@@ -101,6 +101,9 @@ fn nested(grammar: &GrammarDecl, atom: &AtomicElement, name: &str, values: &mut 
     match &atom.kind {
         ElementKind::OwnedCapture { body, .. }
         | ElementKind::CaptureScope(body)
+        | ElementKind::Commit { body, .. }
+        | ElementKind::Label { body, .. }
+        | ElementKind::Catch { choice: body, .. }
         | ElementKind::Group(body)
         | ElementKind::Optional(body)
         | ElementKind::Repeat(body) => collect(grammar, body, name, values),

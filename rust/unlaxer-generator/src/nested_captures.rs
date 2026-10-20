@@ -57,6 +57,9 @@ pub fn sites(rule: &RuleDecl) -> Result<BTreeMap<String, &AtomicElement>, String
         match &value.kind {
             ElementKind::OwnedCapture { body: v, .. }
             | ElementKind::CaptureScope(v)
+            | ElementKind::Commit { body: v, .. }
+            | ElementKind::Label { body: v, .. }
+            | ElementKind::Catch { choice: v, .. }
             | ElementKind::Group(v) => body(rule, v, inside, depth + 1, result)?,
             ElementKind::Optional(v) | ElementKind::Repeat(v) => {
                 body(rule, v, true, depth + 1, result)?
@@ -263,6 +266,9 @@ fn nominal_leaf(grammar: &GrammarDecl, atom: &AtomicElement) -> Option<String> {
             }),
         ElementKind::OwnedCapture { body, .. }
         | ElementKind::CaptureScope(body)
+        | ElementKind::Commit { body, .. }
+        | ElementKind::Label { body, .. }
+        | ElementKind::Catch { choice: body, .. }
         | ElementKind::Group(body)
         | ElementKind::Optional(body)
         | ElementKind::Repeat(body) => {
@@ -334,6 +340,9 @@ fn shape_in(
         }
         ElementKind::OwnedCapture { body: v, .. }
         | ElementKind::CaptureScope(v)
+        | ElementKind::Commit { body: v, .. }
+        | ElementKind::Label { body: v, .. }
+        | ElementKind::Catch { choice: v, .. }
         | ElementKind::Group(v) => body_shape_in(grammar, v, depth + 1, helpers)?,
         ElementKind::Terminal(_) | ElementKind::Replay { .. } => Kind::Text,
         ElementKind::RuleRef { name, .. } => {
@@ -428,9 +437,12 @@ fn atom_has_bindings(atom: &AtomicElement) -> bool {
         ElementKind::OwnedCapture { .. }
         | ElementKind::CaptureScope(_)
         | ElementKind::Replay { .. } => true,
-        ElementKind::Group(v) | ElementKind::Optional(v) | ElementKind::Repeat(v) => {
-            has_bindings(v)
-        }
+        ElementKind::Group(v)
+        | ElementKind::Commit { body: v, .. }
+        | ElementKind::Label { body: v, .. }
+        | ElementKind::Catch { choice: v, .. }
+        | ElementKind::Optional(v)
+        | ElementKind::Repeat(v) => has_bindings(v),
         ElementKind::OneOrMore(v) | ElementKind::BoundedRepeat { element: v, .. } => {
             atom_has_bindings(v)
         }
@@ -528,6 +540,9 @@ fn helper_in<'a>(grammar: &GrammarDecl, atom: &'a AtomicElement) -> Option<&'a s
         ElementKind::Group(v)
         | ElementKind::OwnedCapture { body: v, .. }
         | ElementKind::CaptureScope(v)
+        | ElementKind::Commit { body: v, .. }
+        | ElementKind::Label { body: v, .. }
+        | ElementKind::Catch { choice: v, .. }
         | ElementKind::Optional(v)
         | ElementKind::Repeat(v) => body(v),
         ElementKind::OneOrMore(v) | ElementKind::BoundedRepeat { element: v, .. } => {
@@ -635,6 +650,18 @@ pub fn boundary(expression: Expression) -> Expression {
                 unreachable!()
             };
             (kind, Expression::CaptureScope(child))
+        }
+        Expression::Commit { child, message } => {
+            let Expression::CaptureBoundary { kind, child } = boundary(*child) else {
+                unreachable!()
+            };
+            (kind, Expression::Commit { child, message })
+        }
+        Expression::Label { label, child } => {
+            let Expression::CaptureBoundary { kind, child } = boundary(*child) else {
+                unreachable!()
+            };
+            (kind, Expression::Label { label, child })
         }
         Expression::Delimited(v) => {
             let Expression::CaptureBoundary { kind, child } = boundary(*v) else {

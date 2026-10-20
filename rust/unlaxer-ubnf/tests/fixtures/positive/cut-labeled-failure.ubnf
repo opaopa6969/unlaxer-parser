@@ -1,0 +1,12 @@
+// Cut and labeled failures (#700): only an adjacent '(' reserves the builtin call.
+grammar CutSyntax {
+  @root
+  Root ::= COMMIT('(' Item ')', 'expected \')\'') CATCH(Item | 'x', LABEL(other, '😀'), missing, other) ;
+  Item ::= LABEL(missing, 'a' COMMIT(Names)) ;
+  Names ::= COMMIT LABEL CATCH ;
+  OldGroups ::= COMMIT ('x') LABEL // old reference, not a call
+      ('x') CATCH ('x') ;
+  COMMIT ::= 'commit' ;
+  LABEL ::= 'label' ;
+  CATCH ::= 'catch' ;
+}

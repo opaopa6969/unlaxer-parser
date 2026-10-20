@@ -92,6 +92,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
         }
     }
     crate::nested_captures::validate(grammar)?;
+    crate::raising::validate(grammar)?;
     crate::lexical_contexts::validate(grammar)?;
     let format_two = grammar.settings.iter().any(|setting| {
         setting.key == "ubnf"
@@ -253,6 +254,9 @@ impl Lowering<'_> {
                 match &atom.kind {
                     ElementKind::OwnedCapture { body: inner, .. }
                     | ElementKind::CaptureScope(inner)
+                    | ElementKind::Commit { body: inner, .. }
+                    | ElementKind::Label { body: inner, .. }
+                    | ElementKind::Catch { choice: inner, .. }
                     | ElementKind::Group(inner)
                     | ElementKind::Optional(inner) => {
                         self.follow_body(inner, target, tokens);
@@ -316,6 +320,9 @@ impl Lowering<'_> {
             }
             ElementKind::OwnedCapture { body: inner, .. }
             | ElementKind::CaptureScope(inner)
+            | ElementKind::Commit { body: inner, .. }
+            | ElementKind::Label { body: inner, .. }
+            | ElementKind::Catch { choice: inner, .. }
             | ElementKind::Group(inner)
             | ElementKind::Optional(inner)
             | ElementKind::Repeat(inner) => {
@@ -1367,6 +1374,19 @@ impl Lowering<'_> {
             ElementKind::CaptureScope(body) => {
                 Expression::CaptureScope(Box::new(self.single_body(body, true)?))
             }
+            ElementKind::Commit { body, message } => Expression::Commit {
+                child: Box::new(self.single_body(body, true)?),
+                message: message.clone(),
+            },
+            ElementKind::Label { label, body } => Expression::Label {
+                label: label.clone(),
+                child: Box::new(self.single_body(body, true)?),
+            },
+            ElementKind::Catch { choice, operands } => Expression::CatchLabels {
+                child: Box::new(self.single_body(&operands.body(choice), true)?),
+                alternative: Box::new(self.single_body(&operands.alternative(choice), true)?),
+                labels: operands.labels.clone(),
+            },
             ElementKind::Group(body) => self.body(body)?,
             ElementKind::Optional(body) => {
                 Expression::OptionalExpr(Box::new(self.single_body(body, false)?))
@@ -1440,6 +1460,7 @@ impl Lowering<'_> {
 
     fn is_nullable(&self, expression: &Expression) -> bool {
         match expression {
+            Expression::CatchLabels { .. } => self.is_nullable(&catch_choice(expression)),
             Expression::LexicalToken { expression, .. } => expression.nullable(),
             Expression::Replay(_)
             | Expression::EmptyToken
@@ -1453,6 +1474,12 @@ impl Lowering<'_> {
                 child: expression, ..
             }
             | Expression::CaptureScope(expression)
+            | Expression::Commit {
+                child: expression, ..
+            }
+            | Expression::Label {
+                child: expression, ..
+            }
             | Expression::Capture { expression, .. }
             | Expression::CaptureBoundary {
                 child: expression, ..
@@ -1685,6 +1712,9 @@ impl Lowering<'_> {
         }
         let _depth = self.enter_analysis()?;
         match expression {
+            Expression::CatchLabels { .. } => {
+                self.fixed_shape(&catch_choice(expression), state, work)
+            }
             Expression::CaptureBoundary {
                 kind: unlaxer_codegen::BoundaryKind::Separator,
                 ..
@@ -1694,6 +1724,12 @@ impl Lowering<'_> {
                 child: expression, ..
             }
             | Expression::CaptureScope(expression)
+            | Expression::Commit {
+                child: expression, ..
+            }
+            | Expression::Label {
+                child: expression, ..
+            }
             | Expression::Capture { expression, .. }
             | Expression::CaptureBoundary {
                 child: expression, ..
@@ -1757,6 +1793,9 @@ impl Lowering<'_> {
     ) -> Result<Shape> {
         let _depth = self.enter_analysis()?;
         match expression {
+            Expression::CatchLabels { .. } => {
+                self.shape_projected(&catch_choice(expression), visiting, enum_nodes)
+            }
             Expression::CaptureBoundary {
                 kind: unlaxer_codegen::BoundaryKind::Separator,
                 ..
@@ -1766,6 +1805,12 @@ impl Lowering<'_> {
                 child: expression, ..
             }
             | Expression::CaptureScope(expression)
+            | Expression::Commit {
+                child: expression, ..
+            }
+            | Expression::Label {
+                child: expression, ..
+            }
             | Expression::Capture { expression, .. }
             | Expression::CaptureBoundary {
                 child: expression, ..
@@ -1952,6 +1997,23 @@ impl Lowering<'_> {
             Expression::CaptureScope(child) => {
                 Expression::CaptureScope(Box::new(self.project_text_values(child, mapping)?))
             }
+            Expression::Commit { child, message } => Expression::Commit {
+                child: Box::new(self.project_text_values(child, mapping)?),
+                message: message.clone(),
+            },
+            Expression::Label { label, child } => Expression::Label {
+                label: label.clone(),
+                child: Box::new(self.project_text_values(child, mapping)?),
+            },
+            Expression::CatchLabels {
+                child,
+                alternative,
+                labels,
+            } => Expression::CatchLabels {
+                child: Box::new(self.project_text_values(child, mapping)?),
+                alternative: Box::new(self.project_text_values(alternative, mapping)?),
+                labels: labels.clone(),
+            },
             Expression::Choice(alternatives) => {
                 let mixed = self.shape(expression, &mut HashSet::new())?.kind == Kind::Value;
                 Expression::Choice(
@@ -2113,6 +2175,7 @@ impl Lowering<'_> {
     fn captures(&self, expression: &Expression) -> Result<HashMap<String, Shape>> {
         let _depth = self.enter_analysis()?;
         Ok(match expression {
+            Expression::CatchLabels { .. } => self.captures(&catch_choice(expression))?,
             Expression::Capture { name, expression } => {
                 let mut result = self.captures(expression)?;
                 insert_capture(
@@ -2128,6 +2191,8 @@ impl Lowering<'_> {
             }
             Expression::OwnedCapture { child, .. }
             | Expression::CaptureScope(child)
+            | Expression::Commit { child, .. }
+            | Expression::Label { child, .. }
             | Expression::Delimited(child)
             | Expression::CaptureBoundary { child, .. }
             | Expression::CaptureEquality { child, .. } => self.captures(child)?,
@@ -2572,6 +2637,9 @@ fn annotated_elements(body: &ast::RuleBody) -> Vec<&ast::AnnotatedElement> {
             Pending::Element(value) => match &value.kind {
                 ElementKind::OwnedCapture { body, .. }
                 | ElementKind::CaptureScope(body)
+                | ElementKind::Commit { body, .. }
+                | ElementKind::Label { body, .. }
+                | ElementKind::Catch { choice: body, .. }
                 | ElementKind::Group(body)
                 | ElementKind::Optional(body)
                 | ElementKind::Repeat(body) => pending.push(Pending::Body(body)),
@@ -2665,13 +2733,32 @@ fn capture(name: &str, expression: Expression) -> Result<Expression> {
     })
 }
 
+/// Analyses see a CATCH (#700) as the choice of its operands, as on the Java host.
+fn catch_choice(expression: &Expression) -> Expression {
+    match expression {
+        Expression::CatchLabels {
+            child, alternative, ..
+        } => Expression::Choice(vec![(**child).clone(), (**alternative).clone()]),
+        _ => unreachable!("catch_choice of a non-CATCH expression"),
+    }
+}
+
 fn children(expression: &Expression) -> Vec<&Expression> {
     match expression {
+        Expression::CatchLabels {
+            child, alternative, ..
+        } => vec![child, alternative],
         Expression::Sequence(elements) | Expression::Choice(elements) => elements.iter().collect(),
         Expression::OwnedCapture {
             child: expression, ..
         }
         | Expression::CaptureScope(expression)
+        | Expression::Commit {
+            child: expression, ..
+        }
+        | Expression::Label {
+            child: expression, ..
+        }
         | Expression::Capture { expression, .. }
         | Expression::CaptureBoundary {
             child: expression, ..

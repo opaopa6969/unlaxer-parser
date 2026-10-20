@@ -367,6 +367,12 @@ fn transparent_constraint_projection(root: &Expression) -> bool {
                 child: expression, ..
             }
             | CaptureScope(expression)
+            | Commit {
+                child: expression, ..
+            }
+            | Label {
+                child: expression, ..
+            }
             | Capture { expression, .. }
             | Delimited(expression)
             | ValueBoundary(expression)
@@ -436,6 +442,12 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
                     child: expression, ..
                 }
                 | CaptureScope(expression)
+                | Commit {
+                    child: expression, ..
+                }
+                | Label {
+                    child: expression, ..
+                }
                 | Capture { expression, .. }
                 | OptionalExpr(expression)
                 | Delimited(expression)
@@ -463,6 +475,12 @@ fn root_reaches_projection_boundary(ir: &GrammarIr) -> bool {
                 Separated { child, separator } => {
                     pending.push(child);
                     pending.push(separator);
+                }
+                CatchLabels {
+                    child, alternative, ..
+                } => {
+                    pending.push(child);
+                    pending.push(alternative);
                 }
                 _ => {}
             }
@@ -598,12 +616,25 @@ fn expression(
         }
         OwnedCapture { child, .. }
         | CaptureScope(child)
+        | Commit { child, .. }
+        | Label { child, .. }
         | OptionalExpr(child)
         | Delimited(child)
         | TextValue(child)
         | ValueBoundary(child)
         | CaptureBoundary { child, .. }
         | TriviaScope { child, .. } => expression(child, count, captures)?,
+        CatchLabels {
+            child,
+            alternative,
+            labels,
+        } => {
+            if labels.is_empty() || labels.iter().any(String::is_empty) {
+                return Err(fail("E-CATCH-EMPTY: CATCH requires nonempty labels"));
+            }
+            expression(child, count, captures)?;
+            expression(alternative, count, captures)?;
+        }
         LexicalContextScope { child, terminals } => {
             if terminals.len() > 256 {
                 return Err(fail("lexical context exceeds 256 terminals"));

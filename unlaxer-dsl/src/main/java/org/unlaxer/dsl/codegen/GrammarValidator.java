@@ -158,6 +158,10 @@ public final class GrammarValidator {
         catch (IllegalArgumentException error) {
             errors.add(new ValidationIssue("E-EMBEDDING", error.getMessage(), "Use one scalar body capture and exact language identity."));
         }
+        for (var problem : RaisingOperators.problems(grammar)) {
+            errors.add(new ValidationIssue(problem.code(), problem.message(),
+                "Name only labels raised by LABEL(...) and give CATCH at least one label.", problem.rule()));
+        }
         validateGlobalWhitespace(grammar, errors);
         validateUbnfFormat(grammar, errors);
         validateMemoSafeTokens(grammar, errors);

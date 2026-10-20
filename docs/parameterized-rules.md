@@ -29,7 +29,7 @@ grammar Let {
   文法の構文木・生成物は変わらない（両 frontend は展開処理そのものを通らない）。
 - 定義の引数に `=` を付けると値渡しの引数になる（`Body(=tag) ::= ...`。展開は
   [値渡しの引数](call-by-value-arguments.md)、#704）。
-- `CAPTURE` `SAME_AS` `CAPTURE_SCOPE` `ERROR` は既存の関数形式の綴りなので、引数付き規則の名前に
+- `CAPTURE` `SAME_AS` `CAPTURE_SCOPE` `COMMIT` `LABEL` `CATCH` `ERROR` は既存の関数形式の綴りなので、引数付き規則の名前に
   できない（`E-PARAM-RESERVED`）。これらの呼び出しの構文は従来どおり。
 - 定義側の `F (x) ::=`、空の `F()`、末尾 `,`、引数位置の literal は構文エラー。
 - UBNF 自身を記述した `unlaxer-dsl/grammar/ubnf.ubnf` には入れていない。呼び出しかどうかが
@@ -104,7 +104,9 @@ Java は `ParameterizedRules.ExpansionException`（`code()` `start()` `end()` `l
   正規形の鍵は `Name(arg1,arg2,...)` で、各引数は `|` で区切った選択肢・空白で区切った列と、
   次の要素表記からなる（`t(` 符号位置の 16 進を `.` で区切る `)` が literal、`r(名前)` が参照、
   `g(...)` `o(...)` `z(...)` `k(...)` が group・optional・repeat・capture scope、`p(x)` が `x+`、
-  `b(min,max,x)`（上限なしは `*`）、`s(x,sep)`、`c(名前,...)`、`y(名前)`、`e(...)` が ERROR）。
+  `b(min,max,x)`（上限なしは `*`）、`s(x,sep)`、`c(名前,...)`、`y(名前)`、`e(...)` が ERROR、
+  `m(...)` と `n(メッセージの符号位置,...)` が COMMIT、`l(ラベル,...)` が LABEL、
+  `h(g(本体),g(代替),ラベル,...)` が CATCH）。
   鍵は単射なので、**同じ鍵の呼び出しだけが 1 個の instance を共有する**。
   名前に `__` を含めないのは、import の `alias.Rule` が生成物で `alias__Rule` になるのと重ねないため。
 - 規則の並びは、引数なしの規則を元の順に置き、その後に instance を作った順に並べる。instance は

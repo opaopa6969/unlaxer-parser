@@ -29,7 +29,15 @@ pub const MAX_EXPANDED_ELEMENTS: usize = 65_536;
 /// (call chain times body nesting) with one fixed budget on both hosts.
 pub const MAX_EXPANDED_NESTING: usize = crate::MAX_NESTING;
 /// Builtin call spellings that a parameterized rule must not reuse.
-const RESERVED: [&str; 4] = ["CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "ERROR"];
+const RESERVED: [&str; 7] = [
+    "CAPTURE",
+    "SAME_AS",
+    "CAPTURE_SCOPE",
+    "COMMIT",
+    "LABEL",
+    "CATCH",
+    "ERROR",
+];
 /// Placeholder prefix. NUL never occurs in an identifier, so no user name can match.
 const CALL_PREFIX: &str = "\u{0}call";
 /// The hidden by-name parameter that carries a value argument into its CAPTURE.
@@ -473,6 +481,9 @@ impl<'a> Check<'a> {
             | ElementKind::Error(_) => {}
             ElementKind::OwnedCapture { body, .. }
             | ElementKind::CaptureScope(body)
+            | ElementKind::Commit { body, .. }
+            | ElementKind::Label { body, .. }
+            | ElementKind::Catch { choice: body, .. }
             | ElementKind::Group(body)
             | ElementKind::Optional(body)
             | ElementKind::Repeat(body) => self.body(body, scope)?,
@@ -652,6 +663,19 @@ impl Expander<'_> {
                 body: self.body(body, env)?,
             },
             ElementKind::CaptureScope(body) => ElementKind::CaptureScope(self.body(body, env)?),
+            ElementKind::Commit { body, message } => ElementKind::Commit {
+                body: self.body(body, env)?,
+                message: message.clone(),
+            },
+            ElementKind::Label { label, body } => ElementKind::Label {
+                label: label.clone(),
+                body: self.body(body, env)?,
+            },
+            // Substitution keeps every alternative, so the operand split stays valid.
+            ElementKind::Catch { choice, operands } => ElementKind::Catch {
+                choice: self.body(choice, env)?,
+                operands: operands.clone(),
+            },
             ElementKind::Group(body) => ElementKind::Group(self.body(body, env)?),
             ElementKind::Optional(body) => ElementKind::Optional(self.body(body, env)?),
             ElementKind::Repeat(body) => ElementKind::Repeat(self.body(body, env)?),
@@ -845,6 +869,9 @@ impl<'a> Flow<'a> {
             | ElementKind::Replay { .. }
             | ElementKind::Error(_) => {}
             ElementKind::CaptureScope(body)
+            | ElementKind::Commit { body, .. }
+            | ElementKind::Label { body, .. }
+            | ElementKind::Catch { choice: body, .. }
             | ElementKind::Group(body)
             | ElementKind::Optional(body)
             | ElementKind::Repeat(body) => self.walk(body, rel, out),
@@ -1086,6 +1113,9 @@ fn measure_atomic(element: &AtomicElement, env: &Env) -> (usize, usize) {
         | ElementKind::Error(_) => (1, 0),
         ElementKind::OwnedCapture { body, .. }
         | ElementKind::CaptureScope(body)
+        | ElementKind::Commit { body, .. }
+        | ElementKind::Label { body, .. }
+        | ElementKind::Catch { choice: body, .. }
         | ElementKind::Group(body)
         | ElementKind::Optional(body)
         | ElementKind::Repeat(body) => {
@@ -1165,6 +1195,39 @@ fn write_atomic(out: &mut String, element: &AtomicElement) {
         ElementKind::Optional(body) => wrap(out, "o", body),
         ElementKind::Repeat(body) => wrap(out, "z", body),
         ElementKind::CaptureScope(body) => wrap(out, "k", body),
+        // #700: m(...) / n(message,...) COMMIT, l(label,...) LABEL, h(g(..),g(..),labels) CATCH.
+        ElementKind::Commit {
+            body,
+            message: None,
+        } => wrap(out, "m", body),
+        ElementKind::Commit {
+            body,
+            message: Some(message),
+        } => {
+            out.push_str("n(");
+            write_codepoints(out, message);
+            out.push(',');
+            write_body(out, body);
+            out.push(')');
+        }
+        ElementKind::Label { label, body } => {
+            out.push_str("l(");
+            out.push_str(label);
+            out.push(',');
+            write_body(out, body);
+            out.push(')');
+        }
+        ElementKind::Catch { choice, operands } => {
+            out.push_str("h(");
+            wrap(out, "g", &operands.body(choice));
+            out.push(',');
+            wrap(out, "g", &operands.alternative(choice));
+            for label in &operands.labels {
+                out.push(',');
+                out.push_str(label);
+            }
+            out.push(')');
+        }
         ElementKind::OwnedCapture { name, body } => {
             out.push_str("c(");
             out.push_str(name);

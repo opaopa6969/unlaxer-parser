@@ -17,6 +17,7 @@ pub mod playground;
 pub mod portability;
 mod preferred;
 mod preferred_plan;
+mod raising;
 pub mod semantic_rules;
 mod token_stream;
 

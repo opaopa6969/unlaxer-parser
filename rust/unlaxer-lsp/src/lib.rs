@@ -149,9 +149,13 @@ impl Backend for GrammarBackend {
                 if snapshot.lsp(end).is_err() {
                     end = (end + 1).min(snapshot.len());
                 }
+                // A committed or labeled failure (#700) reports its declared message as is.
+                let raised = matches!(error.kind, "commit" | "label");
                 vec![Diagnostic {
                     span: Span { start, end },
-                    message: if expected.is_empty() {
+                    message: if raised {
+                        expected.join(" or ")
+                    } else if expected.is_empty() {
                         format!(
                             "Parse error at offset {}",
                             snapshot.utf16(start).unwrap_or(0)
@@ -159,7 +163,7 @@ impl Backend for GrammarBackend {
                     } else {
                         format!("Expected {}", expected.join(" or "))
                     },
-                    data: json!({"schemaVersion":1,"code":"ULX-PARSE-001","kind":"syntax","offset":snapshot.utf16(start).unwrap_or(0),"totalLength":snapshot.utf16(snapshot.len()).unwrap_or(0),"expectedTokens":expected}),
+                    data: json!({"schemaVersion":1,"code":"ULX-PARSE-001","kind":if raised { error.kind } else { "syntax" },"offset":snapshot.utf16(start).unwrap_or(0),"totalLength":snapshot.utf16(snapshot.len()).unwrap_or(0),"expectedTokens":expected}),
                 }]
             }
         }

@@ -219,6 +219,18 @@ fn atomic(e: &AtomicElement) -> String {
         }
         ElementKind::Replay { name } => tag("ReplayElement", [quote(name)]),
         ElementKind::CaptureScope(b) => tag("CaptureScopeElement", [body(b)]),
+        ElementKind::Commit { body: b, message } => {
+            tag("CommitElement", [body(b), optional(message)])
+        }
+        ElementKind::Label { label, body: b } => tag("LabelElement", [quote(label), body(b)]),
+        ElementKind::Catch { choice, operands } => tag(
+            "CatchElement",
+            [
+                tag("GroupElement", [body(&operands.body(choice))]),
+                tag("GroupElement", [body(&operands.alternative(choice))]),
+                strings(&operands.labels),
+            ],
+        ),
         ElementKind::Group(b) => tag("GroupElement", [body(b)]),
         ElementKind::Optional(b) => tag("OptionalElement", [body(b)]),
         ElementKind::Repeat(b) => tag("RepeatElement", [body(b)]),

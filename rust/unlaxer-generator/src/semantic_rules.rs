@@ -195,6 +195,9 @@ fn atomic(
     match &value.kind {
         ElementKind::OwnedCapture { body: value, .. }
         | ElementKind::CaptureScope(value)
+        | ElementKind::Commit { body: value, .. }
+        | ElementKind::Label { body: value, .. }
+        | ElementKind::Catch { choice: value, .. }
         | ElementKind::Group(value)
         | ElementKind::Optional(value)
         | ElementKind::Repeat(value) => body(value, captures, count, depth + 1)?,

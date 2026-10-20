@@ -249,6 +249,9 @@ fn atom_types(grammar: &GrammarDecl, atom: &AtomicElement, out: &mut HashSet<Str
         }
         ElementKind::OwnedCapture { body, .. }
         | ElementKind::CaptureScope(body)
+        | ElementKind::Commit { body, .. }
+        | ElementKind::Label { body, .. }
+        | ElementKind::Catch { choice: body, .. }
         | ElementKind::Group(body)
         | ElementKind::Optional(body)
         | ElementKind::Repeat(body) => {
@@ -285,6 +288,9 @@ fn capture_nested_types(
     match &atom.kind {
         ElementKind::OwnedCapture { body, .. }
         | ElementKind::CaptureScope(body)
+        | ElementKind::Commit { body, .. }
+        | ElementKind::Label { body, .. }
+        | ElementKind::Catch { choice: body, .. }
         | ElementKind::Group(body)
         | ElementKind::Optional(body)
         | ElementKind::Repeat(body) => capture_types(grammar, body, field, out),

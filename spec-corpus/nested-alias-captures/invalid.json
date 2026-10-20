@@ -117,5 +117,47 @@
     "startCP": 110,
     "endCP": 194,
     "detail": "nested capture through a helper under rule-local trivia is not supported"
+  },
+  {
+    "id": "commit-mixed-choice-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value])  Root ::= { ('x' | COMMIT(N)) } @value; N ::= NUM; }",
+    "startCP": 110,
+    "endCP": 201,
+    "detail": "mixed choice alternative through helper N is not supported"
+  },
+  {
+    "id": "label-mixed-choice-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value])  Root ::= { ('x' | LABEL(L, N)) } @value; N ::= NUM; }",
+    "startCP": 110,
+    "endCP": 203,
+    "detail": "mixed choice alternative through helper N is not supported"
+  },
+  {
+    "id": "catch-mixed-choice-helper",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value])  Root ::= { ('x' | CATCH(N, N, L)) } @value; N ::= NUM; Z ::= LABEL(L, 'z'); }",
+    "startCP": 110,
+    "endCP": 206,
+    "detail": "mixed choice alternative through helper N is not supported"
+  },
+  {
+    "id": "commit-helper-with-captures",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value])  Root ::= [C] @value; C ::= COMMIT('a' @inner); }",
+    "startCP": 110,
+    "endCP": 183,
+    "detail": "nested capture through helper C with captures is not supported"
+  },
+  {
+    "id": "label-helper-with-captures",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value])  Root ::= [C] @value; C ::= LABEL(L, 'a' @inner); }",
+    "startCP": 110,
+    "endCP": 183,
+    "detail": "nested capture through helper C with captures is not supported"
+  },
+  {
+    "id": "catch-helper-with-captures",
+    "grammar": "grammar Invalid { @package: org.example.nestedcaptures token NUM = org.unlaxer.parser.elementary.NumberParser @root @nestedCaptures @mapping(Root,params=[value])  Root ::= [C] @value; C ::= CATCH('a' @inner, 'b', L); Z ::= LABEL(L, 'z'); }",
+    "startCP": 110,
+    "endCP": 183,
+    "detail": "nested capture through helper C with captures is not supported"
   }
 ]

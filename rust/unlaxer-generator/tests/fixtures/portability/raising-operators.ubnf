@@ -1,0 +1,7 @@
+// #700: CATCH labels must be raised by a LABEL, CATCH needs a label, COMMIT messages are nonempty,
+// and an unbounded repetition of a single COMMIT / LABEL cannot succeed.
+grammar Raising {
+  @root @mapping(Doc)
+  Root ::= CATCH('a', 'b', missing) LABEL(L, 'x') CATCH('c', 'd')
+      CATCH(LABEL(M, 'e'), 'f', M, M) COMMIT('g', '') { LABEL(L, 'h') } ;
+}

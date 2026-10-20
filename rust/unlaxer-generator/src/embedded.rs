@@ -126,6 +126,9 @@ fn nested_count(element: &ElementKind, name: &str) -> usize {
     match element {
         ElementKind::OwnedCapture { body: b, .. }
         | ElementKind::CaptureScope(b)
+        | ElementKind::Commit { body: b, .. }
+        | ElementKind::Label { body: b, .. }
+        | ElementKind::Catch { choice: b, .. }
         | ElementKind::Group(b)
         | ElementKind::Optional(b)
         | ElementKind::Repeat(b) => count_captures(b, name),

@@ -40,6 +40,15 @@ owned-same-as-empty	grammar BadOwned { Root ::= SAME_AS(); name ::= 'a'; other :
 owned-same-as-extra	grammar BadOwned { Root ::= SAME_AS(name, other); name ::= 'a'; other ::= 'b'; CAPTURE ::= 'c'; SAME_AS ::= 's'; CAPTURE_SCOPE ::= 'g'; }
 owned-empty-alternative	grammar Bad { Root ::= CAPTURE(word, 'a' |); }
 owned-empty-leading-alternative	grammar Bad { Root ::= CAPTURE_SCOPE(| 'a'); }
+commit-empty	grammar Bad { Root ::= COMMIT(); COMMIT ::= 'c'; }
+commit-missing-message	grammar Bad { Root ::= COMMIT('a',); }
+commit-identifier-message	grammar Bad { Root ::= COMMIT('a', b); b ::= 'b'; }
+label-missing-body	grammar Bad { Root ::= LABEL(name); name ::= 'a'; LABEL ::= 'l'; }
+label-missing-name	grammar Bad { Root ::= LABEL(, 'a'); }
+label-string-name	grammar Bad { Root ::= LABEL('name', 'a'); }
+catch-missing-alternative	grammar Bad { Root ::= CATCH('a'); CATCH ::= 'c'; }
+catch-string-label	grammar Bad { Root ::= CATCH('a', 'b', 'L'); }
+catch-empty-alternative	grammar Bad { Root ::= CATCH('a',, L); }
 param-definition-trivia	grammar Bad { Root ::= F('a'); F (x) ::= x; }
 param-definition-empty	grammar Bad { F() ::= 'a'; }
 param-definition-literal	grammar Bad { F('x') ::= 'a'; }
@@ -51,3 +60,6 @@ param-value-marker-only	grammar Bad { Root ::= F('a'); F(=) ::= 'a'; }
 param-value-marker-after	grammar Bad { Root ::= F('a'); F(x=) ::= x; }
 param-value-marker-at-call	grammar Bad { Root ::= F(='a'); F(=x) ::= x; }
 param-value-capture-name	grammar Bad { Root ::= CAPTURE(F(=x), 'a'); }
+param-reserved-commit	grammar Bad { Root ::= COMMIT('a'); COMMIT(x) ::= x 'z'; }
+param-reserved-label	grammar Bad { Root ::= LABEL(L, 'a'); LABEL(x) ::= x 'z'; }
+param-reserved-catch	grammar Bad { Root ::= CATCH('a', 'b', L); CATCH(x) ::= x 'z'; }

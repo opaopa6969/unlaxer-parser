@@ -1,0 +1,45 @@
+[
+  {
+    "id": "unknown-label",
+    "grammar": "grammar Bad { @root Root ::= CATCH('a', 'b', missing) ; }",
+    "code": "E-CATCH-UNKNOWN-LABEL",
+    "startCP": 29,
+    "endCP": 53
+  },
+  {
+    "id": "empty-catch",
+    "grammar": "grammar Bad { @root Root ::= LABEL(L, 'a') CATCH('a', 'b') ; }",
+    "code": "E-CATCH-EMPTY",
+    "startCP": 43,
+    "endCP": 58
+  },
+  {
+    "id": "duplicate-label",
+    "grammar": "grammar Bad { @root Root ::= CATCH(LABEL(L, 'a'), 'b', L, L) ; }",
+    "code": "E-CATCH-DUPLICATE-LABEL",
+    "startCP": 29,
+    "endCP": 60
+  },
+  {
+    "id": "empty-message",
+    "grammar": "grammar Bad { @root Root ::= COMMIT('a', '') ; }",
+    "code": "E-COMMIT-EMPTY-MESSAGE",
+    "startCP": 29,
+    "endCP": 44
+  },
+  {
+    "id": "raising-repetition",
+    "grammar": "grammar Bad { @root Root ::= 'k' COMMIT('a', 'm')+ ; }",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 33,
+    "endCP": 50
+  },
+  {
+    "id": "raising-repetition-through-parameter",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F(COMMIT('a')) 'x' ;\n  F(x) ::= { x } ;\n}\n",
+    "code": "E-RAISING-REPETITION",
+    "rule": "F_36f58ca21227c6d8",
+    "startCP": 120,
+    "endCP": 125
+  }
+]

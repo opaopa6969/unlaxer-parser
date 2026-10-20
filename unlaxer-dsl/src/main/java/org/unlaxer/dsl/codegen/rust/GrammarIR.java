@@ -92,7 +92,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         CaptureBoundary, OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CaseInsensitiveToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, GraphemeToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
-        CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope, GeneralBody, Replay {}
+        CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope, GeneralBody, Replay, CatchLabels {}
     public record LexicalContextScope(Expression child, List<org.unlaxer.dsl.runtime.Lexing.Terminal> terminals) implements Expression {
         public LexicalContextScope { terminals = List.copyOf(terminals); }
     }
@@ -164,7 +164,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
             }
         }
     }
-    public sealed interface GeneralBody extends Expression permits OwnedCapture, CaptureScope {
+    public sealed interface GeneralBody extends Expression permits OwnedCapture, CaptureScope, Commit, Label {
         Expression child();
         GeneralBody withChild(Expression child);
     }
@@ -173,6 +173,19 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     }
     public record CaptureScope(Expression child) implements GeneralBody {
         @Override public GeneralBody withChild(Expression child) { return new CaptureScope(child); }
+    }
+    /** Cut (#700); a null message uses the runtime default. CST-transparent. */
+    public record Commit(Expression child, String message) implements GeneralBody {
+        @Override public GeneralBody withChild(Expression child) { return new Commit(child, message); }
+    }
+    /** Labeled failure (#700). CST-transparent. */
+    public record Label(String label, Expression child) implements GeneralBody {
+        @Override public GeneralBody withChild(Expression child) { return new Label(label, child); }
+    }
+    /** Catch labeled failures (#700); analyses treat it as the choice of both operands. */
+    public record CatchLabels(Expression child, Expression alternative, List<String> labels) implements Expression {
+        public CatchLabels { labels = List.copyOf(labels); }
+        public Choice asChoice() { return new Choice(List.of(child, alternative)); }
     }
     public record Replay(String name) implements Expression {}
     public record Capture(String name, Expression expression) implements Expression {}

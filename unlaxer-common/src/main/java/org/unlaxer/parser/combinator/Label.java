@@ -19,7 +19,8 @@ import org.unlaxer.parser.Parser;
  * child passes through unchanged (the innermost label wins). The operator adds no CST node,
  * transaction or diagnostic frame of its own.
  */
-public class Label extends ConstructedSingleChildParser implements MetaFunctionParser {
+public class Label extends ConstructedSingleChildParser implements MetaFunctionParser,
+    org.unlaxer.parser.HasChildrenParser {
 
   private static final long serialVersionUID = 1L;
 
@@ -62,5 +63,11 @@ public class Label extends ConstructedSingleChildParser implements MetaFunctionP
     } finally {
       parseContext.leaveParserCall();
     }
+  }
+
+  /** Traversable by parser-graph analyses such as DiagnosticsSafety. */
+  @Override
+  public org.unlaxer.parser.HasChildrenParser createWith(org.unlaxer.parser.Parsers children) {
+    return new Label(label, children.get(0));
   }
 }
