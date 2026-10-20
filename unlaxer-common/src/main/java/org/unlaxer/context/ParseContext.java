@@ -63,7 +63,7 @@ public class ParseContext implements
       parserCallResetMatched = parserCallEntry.isResetMatchedWithConsumed();
       // A new outermost parse starts; a failure raised by an earlier one is history.
       raisedFailure = null;
-      lastParseSucceeded = false;
+      if (ruleState != null) ruleState.lastParseSucceeded = false;
     }
     parserCallDepth++;
     if (immediateCallback && activeParseDepth() == 0
@@ -122,27 +122,20 @@ public class ParseContext implements
   public void raise(RaisedFailure failure) {
     raisedFailure = java.util.Objects.requireNonNull(failure, "failure");
     // A new raise: the rules it leaves are recorded from here on (#703).
-    raisedRules = null;
+    if (ruleState != null) ruleState.raised = null;
   }
-
-  /*
-   * Grammar rules a raised failure has propagated out of (#703), outermost first; only
-   * DETAILED records them. Read only while raisedFailure is non-null, so clearing that field
-   * is enough to make the trail stale; raise() starts a new one.
-   */
-  private RaisedRule raisedRules;
 
   /** One rule left by a raised failure; {@code inner} is the rule it was left from. */
   record RaisedRule(Parser rule, int start, RaisedRule inner) {}
 
   RaisedRule raisedRules() {
-    return raisedRules;
+    return ruleState == null ? null : ruleState.raised;
   }
 
   /** Re-raises a memoized failure together with the rules it left inside the memoized parser. */
   void raise(RaisedFailure failure, RaisedRule rules) {
     raise(failure);
-    raisedRules = rules;
+    if (rules != null) ruleState().raised = rules;
   }
 
   /** Catch the current raised failure. Custom catching parsers call this before retrying. */
@@ -554,23 +547,53 @@ public class ParseContext implements
   StackSnapshot maxReachedStackElements = StackSnapshot.EMPTY;
   StackSnapshot farthestFailureStackElements = StackSnapshot.EMPTY;
   /*
-   * The selected failed GrammarRule invocation (#703): ruleStackOffset is its reach, the farthest
-   * failure registered while it was open, and ruleStackElements the parse stack at its end, itself
-   * included. The farthest reach wins, then the most rule frames, then the earliest. Only rule
-   * invocations compete, so failures inside composite tokens and whitespace delimiters (which
-   * Rust's atomic tokens and trivia never record) cannot select a different stack.
+   * Rule-stack state (#703), created by the first DETAILED parse frame or memo replay that needs
+   * it. One reference on the context, so DETAILED_ON_FAILURE contexts allocate nothing for it.
    */
-  int ruleStackOffset = -1;
-  StackSnapshot ruleStackElements;
-  int ruleStackDepth;
-  /*
-   * GrammarRule frames from the root up to each open parse frame, root first, so a candidate's rule
-   * depth and a memo frame's base are read in O(1) instead of walking the stack (#703). An array on
-   * the context keeps ParseFrame and StackSnapshot at their former size.
-   */
-  private int[] openRuleDepths = new int[64];
-  /* Outcome of the last outermost parse (#703): the rule stack explains failed parses only. */
-  private boolean lastParseSucceeded;
+  private RuleStackState ruleState;
+
+  private static final class RuleStackState {
+    /*
+     * The selected failed GrammarRule invocation: offset is its reach, the farthest failure
+     * registered while it was open, elements the parse stack at its end, itself included, and
+     * depth its rule frames. The farthest reach wins, then the most rule frames, then the
+     * earliest. Only rule invocations compete, so failures inside composite tokens and
+     * whitespace delimiters (which Rust's atomic tokens and trivia never record) cannot select
+     * a different stack.
+     */
+    int offset = -1;
+    StackSnapshot elements;
+    int depth;
+    /*
+     * GrammarRule frames from the root up to each open parse frame, root first, so a
+     * candidate's rule depth and a memo frame's base are read in O(1) instead of walking the
+     * stack. Kept here so ParseFrame and StackSnapshot keep their former size.
+     */
+    int[] openDepths = new int[64];
+    /* Outcome of the last outermost parse: the rule stack explains failed parses only. */
+    boolean lastParseSucceeded;
+    /*
+     * Grammar rules a raised failure has propagated out of, outermost first. Read only while
+     * raisedFailure is non-null, so clearing that field makes the trail stale; raise() starts a
+     * new one.
+     */
+    RaisedRule raised;
+
+    void select(int reach, StackSnapshot snapshot, int ruleDepth) {
+      offset = reach;
+      elements = snapshot;
+      depth = ruleDepth;
+    }
+  }
+
+  private RuleStackState ruleState() {
+    RuleStackState state = ruleState;
+    if (state == null) {
+      state = new RuleStackState();
+      ruleState = state;
+    }
+    return state;
+  }
   /*
    * Where expected hints come from at the farthest failure, in first-seen order. Hints are
    * expanded from these sources only when diagnostics are requested; see ExpectedSources.
@@ -1394,7 +1417,9 @@ public class ParseContext implements
     result.farthestFailureOffset = farthestFailureOffset;
     result.maxReachedStackElements = maxReachedStackElements;
     result.farthestFailureStackElements = farthestFailureStackElements;
-    if (ruleStackElements != null) rules(result).select(ruleStackOffset, ruleStackElements, ruleStackDepth, 0);
+    if (ruleState != null && ruleState.elements != null) {
+      rules(result).select(ruleState.offset, ruleState.elements, ruleState.depth, 0);
+    }
     if (expectedAtFarthestFailure.size() > 0) result.expected().copyFrom(expectedAtFarthestFailure);
     if (false == trialHistory.isEmpty()) result.trials().addAll(trialHistory);
     return result;
@@ -1434,9 +1459,9 @@ public class ParseContext implements
     farthestFailureOffset = source.farthestFailureOffset;
     maxReachedStackElements = source.maxReachedStackElements;
     farthestFailureStackElements = source.farthestFailureStackElements;
-    ruleStackOffset = source.rules == null ? -1 : source.rules.offset;
-    ruleStackElements = ruleElements(source);
-    ruleStackDepth = source.rules == null ? 0 : source.rules.depth;
+    StackSnapshot sourceRules = ruleElements(source);
+    if (sourceRules != null) ruleState().select(source.rules.offset, sourceRules, source.rules.depth);
+    else if (ruleState != null) ruleState.select(-1, null, 0);
     expectedAtFarthestFailure.copyFrom(source.expectedOrEmpty());
     trialHistory.clear();
     trialHistory.addAll(source.trialsOrEmpty());
@@ -1579,12 +1604,13 @@ public class ParseContext implements
     // The rule-local frames of the memoized candidate follow the rules open at the replay.
     int rebasedRuleDepth = memoRules == null ? 0
         : openRuleDepth() + diagnostic.rules.depth - diagnostic.rules.baseDepth;
-    if (memoRules != null && (ruleStackElements == null || memoRuleOffset > ruleStackOffset
-        || memoRuleOffset == ruleStackOffset && rebasedRuleDepth > ruleStackDepth)) {
-      rebasedRules = rebaseMemoStack(diagnostic, memoRules);
-      ruleStackOffset = memoRuleOffset;
-      ruleStackElements = rebasedRules;
-      ruleStackDepth = rebasedRuleDepth;
+    if (memoRules != null) {
+      RuleStackState state = ruleState();
+      if (state.elements == null || memoRuleOffset > state.offset
+          || memoRuleOffset == state.offset && rebasedRuleDepth > state.depth) {
+        rebasedRules = rebaseMemoStack(diagnostic, memoRules);
+        state.select(memoRuleOffset, rebasedRules, rebasedRuleDepth);
+      }
     }
 
     farthestConsumedOffset = Math.max(farthestConsumedOffset, diagnostic.farthestConsumedOffset);
@@ -1649,16 +1675,13 @@ public class ParseContext implements
   private void offerRuleCandidate(ParseFrame frame) {
     FailureDiagnostic diagnostic = memoDiagnosticFrames.peekFirst();
     int depth = openRuleDepth();
-    boolean global = ruleStackElements == null || frame.reach > ruleStackOffset
-        || frame.reach == ruleStackOffset && depth > ruleStackDepth;
+    RuleStackState state = ruleState();
+    boolean global = state.elements == null || frame.reach > state.offset
+        || frame.reach == state.offset && depth > state.depth;
     boolean local = diagnostic != null && (diagnostic.rules == null || diagnostic.rules.replacedBy(frame.reach, depth));
     if (false == global && false == local) return;
     StackSnapshot snapshot = snapshotStackElements();
-    if (global) {
-      ruleStackOffset = frame.reach;
-      ruleStackElements = snapshot;
-      ruleStackDepth = depth;
-    }
+    if (global) state.select(frame.reach, snapshot, depth);
     if (local) rules(diagnostic).select(frame.reach, snapshot, depth, openRuleDepthAt(diagnostic.stackBaseDepth));
   }
 
@@ -1680,7 +1703,7 @@ public class ParseContext implements
 
   /** GrammarRule frames among the first {@code frames} open parse frames (root first). */
   private int openRuleDepthAt(int frames) {
-    return frames <= 0 ? 0 : openRuleDepths[frames - 1];
+    return frames <= 0 || ruleState == null ? 0 : ruleState.openDepths[frames - 1];
   }
 
   /** Size {@link #rebaseMemoStack} would produce for a memoized absolute stack at {@code depth} open frames. */
@@ -1964,8 +1987,9 @@ public class ParseContext implements
     } else {
       ParseFrame frame = new ParseFrame(parser, parseFrames.peekFirst(), consumed, matched);
       int depth = parseFrames.size();
-      if (depth == openRuleDepths.length) openRuleDepths = Arrays.copyOf(openRuleDepths, depth * 2);
-      openRuleDepths[depth] = openRuleDepthAt(depth) + (IS_GRAMMAR_RULE.get(parser.getClass()) ? 1 : 0);
+      RuleStackState rules = ruleState();
+      if (depth == rules.openDepths.length) rules.openDepths = Arrays.copyOf(rules.openDepths, depth * 2);
+      rules.openDepths[depth] = openRuleDepthAt(depth) + (IS_GRAMMAR_RULE.get(parser.getClass()) ? 1 : 0);
       parseFrames.push(frame);
       if (parser instanceof TerminalSymbol) terminalFrames.push(frame);
       trackCursorProgress();
@@ -1994,7 +2018,7 @@ public class ParseContext implements
         int frames = parseFrames.size();
         if (openRuleDepthAt(frames) > openRuleDepthAt(frames - 1)) {
           if (frame.reach >= 0) offerRuleCandidate(frame);
-          if (raisedFailure != null) raisedRules = new RaisedRule(frame.parser, frame.startOffset, raisedRules);
+          if (raisedFailure != null) ruleState().raised = new RaisedRule(frame.parser, frame.startOffset, raisedRules());
         }
       }
       // Record trial if trial recording is active
@@ -2017,7 +2041,7 @@ public class ParseContext implements
       // Failures inside a frame were registered while its parent was open as well (#703).
       ParseFrame parent = parseFrames.peekFirst();
       if (parent != null && frame.reach > parent.reach) parent.reach = frame.reach;
-      if (parent == null) lastParseSucceeded = parsed != null && parsed.isSucceeded();
+      if (parent == null) ruleState().lastParseSucceeded = parsed != null && parsed.isSucceeded();
     }
     ParserListenerContainer.super.endParse(parser, parsed, parseContext, tokenKind, invertMatch);
     if (parseFrames.isEmpty()) releaseObserverBoundaryIfIdle();
@@ -2122,7 +2146,7 @@ public class ParseContext implements
    * reached the farthest failure.
    */
   public java.util.Optional<RuleStack> getRuleStack() {
-    if (deferredDiagnostics || lastParseSucceeded) return java.util.Optional.empty();
+    if (deferredDiagnostics || ruleState != null && ruleState.lastParseSucceeded) return java.util.Optional.empty();
     return finalRuleStack();
   }
 
@@ -2134,7 +2158,7 @@ public class ParseContext implements
    * Empty unless DETAILED, after a failed parse, and when the whole input was consumed.
    */
   public java.util.Optional<RuleStack> getUnconsumedInputRuleStack() {
-    if (deferredDiagnostics || false == lastParseSucceeded
+    if (deferredDiagnostics || ruleState == null || false == ruleState.lastParseSucceeded
         || getConsumedPosition().value() >= source.codePointLength().value()
         // The unconsumed input is a failure at the cursor, outside every rule: past the farthest
         // failure it leaves no failed rule at the error.
@@ -2147,13 +2171,14 @@ public class ParseContext implements
   private java.util.Optional<RuleStack> finalRuleStack() {
     if (raisedFailure != null) {
       List<RuleStack.Frame> frames = new ArrayList<>();
-      for (RaisedRule rule = raisedRules; rule != null; rule = rule.inner()) {
+      for (RaisedRule rule = raisedRules(); rule != null; rule = rule.inner()) {
         frames.add(new RuleStack.Frame(org.unlaxer.parser.GrammarRule.nameOf(rule.rule()), rule.start()));
       }
       return java.util.Optional.ofNullable(RuleStack.bounded(raisedFailure.offset(), frames));
     }
-    if (ruleStackElements == null || ruleStackOffset != farthestFailureOffset) return java.util.Optional.empty();
-    return java.util.Optional.ofNullable(RuleStack.bounded(ruleStackOffset, ruleStackElements.ruleFrames()));
+    RuleStackState state = ruleState;
+    if (state == null || state.elements == null || state.offset != farthestFailureOffset) return java.util.Optional.empty();
+    return java.util.Optional.ofNullable(RuleStack.bounded(state.offset, state.elements.ruleFrames()));
   }
 
 
