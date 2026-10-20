@@ -7,6 +7,219 @@ const INPUT: &str = "p😀\r\nab!";
 const PEEK: &str = "😀\r\n";
 const BODY: &str = "😀\r\nab";
 
+/// `prefix LOOKAHEAD(pattern) 'é'`: the UBNF positive LOOKAHEAD token advances only the
+/// matched cursor before the literal fails (#706).
+fn lookahead_then(prefix: &'static str, pattern: &'static str) -> Expr {
+    Expr::sequence([
+        Expr::literal(prefix),
+        Expr::JavaLookahead {
+            pattern,
+            positive: true,
+        },
+        Expr::literal("é"),
+    ])
+}
+
+fn lookahead_rules(prefix: &'static str, pattern: &'static str) -> Vec<unlaxer_runtime::Rule> {
+    vec![unlaxer_runtime::Rule {
+        name: "R0",
+        expression: lookahead_then(prefix, pattern),
+    }]
+}
+
+fn expression_entry_inside_a_grammar(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse(&lookahead_then("a", "x"))
+}
+
+fn grammar_entry_inside_an_expression(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse_grammar(lookahead_rules("a", "x"), 0, false)
+}
+
+#[test]
+fn grammar_invocations_measure_failures_at_the_matched_reach() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            let options = options(memo, diagnostics);
+            let detailed = diagnostics != Diagnostics::DetailedOnFailure;
+            // Java: syntax at the matched reach (CP2; CP4 after CRLF and a supplementary scalar).
+            for (prefix, pattern, inputs, offset) in [
+                ("a", "x", ["ax", "axé"], 2),
+                ("a\r\n", "😀", ["a\r\n😀", "a\r\n😀é"], 4),
+            ] {
+                for input in inputs {
+                    let label = format!("{input:?}/{memo:?}/{diagnostics:?}");
+                    let failure = unlaxer_runtime::parse_detailed_with_options(
+                        &lookahead_rules(prefix, pattern),
+                        0,
+                        false,
+                        input,
+                        options,
+                    )
+                    .unwrap_err();
+                    assert_eq!(
+                        (failure.kind, failure.offset),
+                        ("syntax", offset),
+                        "{label}"
+                    );
+
+                    let mut context = ParseContext::with_options(input, options);
+                    assert!(context
+                        .parse_grammar(lookahead_rules(prefix, pattern), 0, false)
+                        .is_err());
+                    assert_eq!(
+                        context.failure().offset,
+                        if detailed { offset } else { 0 },
+                        "{label}"
+                    );
+                    assert_eq!((context.position(), context.matched_position()), (0, 0));
+                }
+            }
+
+            // Expression entries keep the source frontier (CP1), also inside a grammar; the
+            // innermost public entry decides.
+            let mut context = ParseContext::with_options("ax", options);
+            assert!(context.parse(&lookahead_then("a", "x")).is_err());
+            assert_eq!(context.failure().offset, usize::from(detailed));
+            let mut context = ParseContext::with_options("ax", options);
+            let outer = vec![unlaxer_runtime::Rule {
+                name: "outer",
+                expression: Expr::Custom(expression_entry_inside_a_grammar),
+            }];
+            assert!(context.parse_grammar(outer, 0, false).is_err());
+            assert_eq!(context.failure().offset, usize::from(detailed));
+            let mut context = ParseContext::with_options("ax", options);
+            assert!(context
+                .parse(&Expr::Custom(grammar_entry_inside_an_expression))
+                .is_err());
+            assert_eq!(context.failure().offset, if detailed { 2 } else { 0 });
+            assert_eq!((context.position(), context.matched_position()), (0, 0));
+        }
+    }
+}
+
+thread_local! {
+    static BC_REGISTRY: unlaxer_runtime::shared_calls::Registry = {
+        let grammar = unlaxer_runtime::embedded::CstGrammar {
+            name: "Child".into(),
+            grammar: unlaxer_runtime::share_grammar(vec![unlaxer_runtime::Rule {
+                name: "Root",
+                expression: Expr::sequence([Expr::literal("b"), Expr::literal("c")]),
+            }]),
+            entries: [("Root".to_owned(), 0)].into_iter().collect(),
+            bindings: Vec::new(),
+            whitespace: false,
+        };
+        unlaxer_runtime::shared_calls::Registry::new(
+            [(child_language(), grammar)].into_iter().collect(),
+        )
+        .unwrap()
+    };
+    static BC_FAILURE: std::cell::RefCell<Option<unlaxer_runtime::ParseError>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+fn child_language() -> unlaxer_runtime::source::Language {
+    unlaxer_runtime::source::Language {
+        id: "child".into(),
+        package_id: "org.example".into(),
+        version: "1".into(),
+        grammar: "Child".into(),
+        entry: "Root".into(),
+    }
+}
+
+fn call_child(context: &mut ParseContext<'_>) -> ParseResult {
+    let result = BC_REGISTRY
+        .with(|registry| registry.call(context, &child_language()))
+        .map_err(|failure| failure.error);
+    BC_FAILURE.with(|cell| *cell.borrow_mut() = result.as_ref().err().cloned());
+    result
+}
+
+/// A shared grammar call starts the child at the caller's consumed position with both
+/// cursors there, as Java's SharedGrammarCalls does: the matched reach of a preceding
+/// positive LOOKAHEAD token is not the child's frontier (#706 review).
+#[test]
+fn a_shared_grammar_call_starts_both_cursors_at_the_consumed_position() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for input in ["ax", "axb"] {
+            let label = format!("{input}/{memo:?}");
+            let rules = vec![unlaxer_runtime::Rule {
+                name: "Caller",
+                expression: Expr::sequence([
+                    Expr::literal("a"),
+                    Expr::JavaLookahead {
+                        pattern: "x",
+                        positive: true,
+                    },
+                    Expr::Custom(call_child),
+                ]),
+            }];
+            let mut context =
+                ParseContext::with_options(input, options(memo, Diagnostics::Detailed));
+            assert!(context.parse_grammar(rules, 0, false).is_err(), "{label}");
+            let failure = BC_FAILURE.with(|cell| cell.borrow_mut().take()).unwrap();
+            assert_eq!(failure.offset, 1, "{label}");
+            assert_eq!(failure.expected, ["b"], "{label}");
+            let stack = context.rule_stack().unwrap();
+            let frames: Vec<_> = stack
+                .frames
+                .iter()
+                .map(|frame| format!("{}@{}", frame.rule, frame.start))
+                .collect();
+            assert_eq!(frames, ["Caller@0", "Root@1"], "{label}");
+            assert_eq!((stack.offset, context.failure().offset), (1, 1), "{label}");
+            assert_eq!((context.position(), context.matched_position()), (0, 0));
+        }
+    }
+}
+
+fn nested_b(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse_grammar(
+        vec![unlaxer_runtime::Rule {
+            name: "Inner",
+            expression: Expr::literal("b"),
+        }],
+        0,
+        false,
+    )
+}
+
+/// A grammar called from inside a token-stream session keeps the consumed frontier too,
+/// although its call takes the session: Rust's EMPTY advanced the matched cursor over a
+/// lexeme Java's EMPTY does not match (#706 review).
+#[test]
+fn a_grammar_nested_in_a_token_stream_session_keeps_the_consumed_frontier() {
+    let grammar = unlaxer_runtime::share_grammar(vec![unlaxer_runtime::Rule {
+        name: "Outer",
+        expression: Expr::sequence([Expr::JavaEmpty, Expr::Custom(nested_b)]),
+    }]);
+    for mode in [
+        unlaxer_runtime::lexing::Mode::Direct,
+        unlaxer_runtime::lexing::Mode::TokensEager,
+    ] {
+        let outcome = unlaxer_runtime::lexing::parse(
+            &grammar,
+            0,
+            false,
+            "a",
+            unlaxer_runtime::lexing::Options {
+                mode,
+                preserve_trivia: true,
+            },
+            std::sync::Arc::from([]),
+        )
+        .unwrap();
+        assert!(!outcome.succeeded, "{mode:?}");
+        assert_eq!(outcome.farthest, 0, "{mode:?}");
+        assert_eq!((outcome.consumed, outcome.matched), (0, 0), "{mode:?}");
+    }
+}
+
 fn kind(value: &str) -> TokenKind {
     match value {
         "consumed" => TokenKind::Consumed,

@@ -2,13 +2,40 @@
   {
     "id": "lookahead-diagnostic-offset",
     "issue": "#706",
-    "note": "Found by seed 131 (generator revision of #705). Java diagnose reports CP2, Rust CP1; excluded by known-differences.json until #706 is fixed.",
+    "note": "Found by seed 131 (generator revision of #705). Java diagnose reported CP2, Rust CP1; since #706 both report CP2 (the matched reach of the positive LOOKAHEAD), without an exclusion.",
     "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= 'a' AHEAD 'é' ; }",
     "inputs": [
       "ax",
       "axé",
       "aé",
       "a"
+    ]
+  },
+  {
+    "id": "lookahead-diagnostic-unicode-offset",
+    "issue": "#706",
+    "note": "The lookahead crosses one supplementary scalar after CRLF: both hosts diagnose CP4, a code point offset, not a UTF-8 byte or UTF-16 unit index.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('😀') @root @mapping(N0) R0 ::= 'a\\r\\n' AHEAD 'é' ; }",
+    "inputs": [
+      "a\r\n😀",
+      "a\r\n😀é",
+      "a\r\né",
+      "a\r\n"
+    ]
+  },
+  {
+    "id": "number-incomplete-exponent",
+    "issue": "#717",
+    "note": "Found by seed 27 (and seeds 1000..1399, R0 ::= NUM 'a' on 2e) once the broad #706 exclusion was removed. Java's NumberParser reads an incomplete exponent and fails after it (CP2 on 2e); Rust's Number stops before the e (CP1). Excluded by known-differences.json (number-incomplete-exponent) until #717 is fixed.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(N0) R0 ::= NUM 'a' | 'y' (NUM 'a') ; }",
+    "inputs": [
+      "2e",
+      "2e+",
+      "2E-",
+      "2.5e",
+      "y7e",
+      "2a",
+      "2ea"
     ]
   },
   {
@@ -59,7 +86,7 @@
   {
     "id": "positive-lookahead-rule-stack-later-start",
     "issue": "#706",
-    "note": "Seed 211 minimized in the #723 re-review. After the positive LOOKAHEAD advances the matched cursor, Java starts R1 at CP2 and Rust at CP1 (java R0@0>R1@2, rust R0@0>R1@1); excluded by known-differences.json (positive-lookahead-rule-stack-starts) until #706 is fixed.",
+    "note": "Seed 211 minimized in the #723 re-review. After the positive LOOKAHEAD advances the matched cursor, Java started R1 at CP2 and Rust at CP1 (java R0@0>R1@2, rust R0@0>R1@1); since #706 both start rule frames at max(consumed, matched) and report R0@0>R1@2.",
     "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= 'y' (AHEAD R1) ; R1 ::= 'x' 'a' ; }",
     "inputs": [
       "yx"
@@ -68,10 +95,82 @@
   {
     "id": "positive-lookahead-rule-stack-extra-frame",
     "issue": "#706",
-    "note": "Seed 284 minimized in the #723 re-review. Java's R1 starts at the matched CP1 and reaches the farthest failure, Rust's R1 starts at CP0 and does not (java R0@0>R1@1, rust R0@0); excluded by known-differences.json (positive-lookahead-rule-stack-starts) until #706 is fixed.",
+    "note": "Seed 284 minimized in the #723 re-review. Java's R1 started at the matched CP1 and reached the farthest failure, Rust's R1 started at CP0 and did not (java R0@0>R1@1, rust R0@0); since #706 both record failures and rule frames at max(consumed, matched) and report R0@0>R1@1.",
     "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= AHEAD (R1 | 'x' 'a') ; R1 ::= 'a' ; }",
     "inputs": [
       "x"
+    ]
+  },
+  {
+    "id": "positive-lookahead-rule-stack-classic-mode",
+    "issue": "#706",
+    "note": "Seed 284 minimized again during #706: CAPTURE puts the grammar in Classic token mode, where Rust started R1 at the consumed CP0 (java R0@0>R1@1, rust R0@0>R1@0). Rule frames start at max(consumed, matched) in token mode too.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= AHEAD CAPTURE(w0, R1) ; R1 ::= 'a' ; }",
+    "inputs": [
+      "x",
+      "xa"
+    ]
+  },
+  {
+    "id": "catch-lookahead-in-body",
+    "issue": "#720",
+    "note": "A positive LOOKAHEAD token only in CATCH's body: the ordinary failure after it is at the matched reach in both hosts (#706).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CATCH('a' AHEAD 'é' | LABEL(L, 'q'), 'z', L) ; }",
+    "inputs": [
+      "ax",
+      "axé",
+      "q",
+      "z",
+      "aé"
+    ]
+  },
+  {
+    "id": "catch-lookahead-in-alternative",
+    "issue": "#720",
+    "note": "A positive LOOKAHEAD token only in CATCH's alternative, reached after a caught label (#706).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CATCH(LABEL(L, 'q'), 'a' AHEAD 'é', L) ; }",
+    "inputs": [
+      "ax",
+      "axé",
+      "aé",
+      "q"
+    ]
+  },
+  {
+    "id": "catch-consuming-cycle",
+    "issue": "#720",
+    "note": "A rule cycle through CATCH's alternative: Rust's pre-parse Classic-mode scan recursed with a fresh visited set and overflowed the stack (#720).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none @root @mapping(N0) R0 ::= CATCH(LABEL(L, 'Z'), 'a' R0, L) ; }",
+    "inputs": [
+      "Z",
+      "aZ",
+      "aaZ",
+      "aab",
+      "a",
+      ""
+    ]
+  },
+  {
+    "id": "catch-classic-alternative",
+    "issue": "#720",
+    "note": "Classic token mode selected only by CAPTURE / SAME_AS in CATCH's alternative (#720): acceptance, cursors and CST stay as before.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none @root @mapping(N0) R0 ::= CATCH(LABEL(L, 'q'), CAPTURE(w0, 'a') SAME_AS(w0), L) ; }",
+    "inputs": [
+      "aa",
+      "ab",
+      "q",
+      "a"
+    ]
+  },
+  {
+    "id": "catch-left-cycle",
+    "issue": "#720",
+    "note": "The left cycle through CATCH's alternative of the #720 report. Both UBNF frontends reject it as left recursion; hand-built runtime graphs end in the rule-nesting resource limit (rust/unlaxer-runtime/tests/catch_preflight.rs, CatchLabelsCycleTest).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none @root @mapping(N0) R0 ::= CATCH(LABEL(L, 'Z'), R0, L) ; }",
+    "expectedRejection": "E-LEFT-RECURSION",
+    "inputs": [
+      "Z",
+      ""
     ]
   }
 ]

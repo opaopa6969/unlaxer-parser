@@ -13,4 +13,6 @@ caught-label-then-ordinary	caught	bx	syntax	~	1	Root@0>Q@0	0
 deep-ordinary-limit	deep	((((((((((((((((((((((((((((((((((((((((y	syntax	~	40	D8@8>D9@9>D10@10>D11@11>D12@12>D13@13>D14@14>D15@15>D16@16>D17@17>D18@18>D19@19>D20@20>D21@21>D22@22>D23@23>D24@24>D25@25>D26@26>D27@27>D28@28>D29@29>D30@30>D31@31>D32@32>D33@33>D34@34>D35@35>D36@36>D37@37>D38@38>D39@39	8
 deep-commit-limit	deep-commit	((((((((((((((((((((((((((((((((((((((((y	commit	~	40	D8@8>D9@9>D10@10>D11@11>D12@12>D13@13>D14@14>D15@15>D16@16>D17@17>D18@18>D19@19>D20@20>D21@21>D22@22>D23@23>D24@24>D25@25>D26@26>D27@27>D28@28>D29@29>D30@30>D31@31>D32@32>D33@33>D34@34>D35@35>D36@36>D37@37>D38@38>D39@39	8
 unicode-code-points	unicode	😀界y	syntax	~	2	Root@0>Item@1	0
+lookahead-later-start	lookahead-start	yx	syntax	~	2	Root@0>Item@2	0
+lookahead-extra-frame	lookahead-frame	x	syntax	~	1	Root@0>Item@1	0
 outside-every-rule	bare	ax	syntax	~	1	~	0

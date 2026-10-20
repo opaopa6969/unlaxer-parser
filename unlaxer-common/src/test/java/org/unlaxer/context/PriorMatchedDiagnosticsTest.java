@@ -46,6 +46,82 @@ public class PriorMatchedDiagnosticsTest {
         };
     }
 
+    /** The Java side of #706: a failure after a positive LOOKAHEAD token is at its matched reach. */
+    @Test public void failureAfterAPositiveLookaheadTokenIsAtTheMatchedReach() {
+        for (var memo : Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            for (boolean reset : List.of(false, true)) for (String input : List.of("ax", "axé")) {
+                String label = input + "/" + memo + "/" + diagnostics + "/" + reset;
+                try (var context = ParseContext.withOptions(StringSource.createRootSource(input),
+                        ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                    context.getCurrent().setResetMatchedWithConsumed(reset);
+                    var parser = new Chain(new WordParser("a"), new MatchOnly(new WordParser("x")),
+                            new WordParser("é"));
+                    assertTrue(label, parser.parse(context).isFailed());
+                    assertEquals(label, 0, context.position());
+                    assertEquals(label, 0, context.getMatchedPosition().value());
+                    assertEquals(label, diagnostics == ParseOptions.Diagnostics.DETAILED_ON_FAILURE ? 0 : 2,
+                            context.getParseFailureDiagnostics().getFarthestOffset());
+                }
+            }
+        }
+    }
+
+    /** A PEG assertion after the token reports the same Classic frame frontier (#706). */
+    @Test public void positiveTokenThenPegAssertionUsesTheClassicMatchedFrontier() {
+        for (var memo : Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            for (boolean reset : List.of(false, true)) {
+                try (var context = ParseContext.withOptions(StringSource.createRootSource("ax"),
+                        ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                    context.getCurrent().setResetMatchedWithConsumed(reset);
+                    var parser = new Chain(new WordParser("a"), new MatchOnly(new WordParser("x")),
+                            new PegLookahead(new WordParser("Z")));
+                    assertTrue(parser.parse(context).isFailed());
+                    assertEquals(0, context.position());
+                    assertEquals(0, context.getMatchedPosition().value());
+                    assertEquals(diagnostics == ParseOptions.Diagnostics.DETAILED_ON_FAILURE ? 0 : 2,
+                            context.getParseFailureDiagnostics().getFarthestOffset());
+                }
+            }
+        }
+    }
+
+    /**
+     * A shared grammar call starts its child with both cursors at the caller's consumed position,
+     * so the matched reach of a preceding positive LOOKAHEAD token is not the child's failure
+     * position (#706 review; Rust prior_matched_diagnostics has the same example).
+     */
+    @Test public void aSharedGrammarCallStartsBothCursorsAtTheConsumedPosition() {
+        var language = new org.unlaxer.source.LanguageRegions.Language("child", "org.example", "1", "Child", "Root");
+        var grammar = new org.unlaxer.source.CstGrammar("Child",
+            java.util.Map.of("Root", new Chain(new WordParser("b"), new WordParser("c"))),
+            List.of(), java.util.Set.of(), token -> List.of(), false);
+        var registry = new org.unlaxer.source.SharedGrammarCalls.Registry(java.util.Map.of(language, grammar));
+        var observed = new java.util.ArrayList<org.unlaxer.source.SharedGrammarCalls.Result>();
+        Parser adapter = new org.unlaxer.source.SharedGrammarCalls.Adapter() {
+            private static final long serialVersionUID = 1L;
+            @Override protected org.unlaxer.source.SharedGrammarCalls.Registry registry() { return registry; }
+            @Override protected org.unlaxer.source.LanguageRegions.Language language() { return language; }
+            @Override public org.unlaxer.Token getToken(ParseContext context, TokenKind kind, boolean invert) {
+                observed.add(registry.probe(context, language, this, kind));
+                return super.getToken(context, kind, invert);
+            }
+        };
+        for (var memo : Memoization.values()) for (String input : List.of("ax", "axb")) {
+            String label = input + "/" + memo;
+            observed.clear();
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(input),
+                    ParseOptions.withMemoization(memo).withDiagnostics(ParseOptions.Diagnostics.DETAILED))) {
+                var parser = new Chain(new WordParser("a"), new MatchOnly(new WordParser("x")), adapter);
+                assertTrue(label, parser.parse(context).isFailed());
+                assertFalse(label, observed.isEmpty());
+                for (var result : observed) {
+                    assertFalse(label, result.succeeded());
+                    assertEquals(label, 1, result.failure().offset());
+                }
+            }
+        }
+    }
+
     @Test public void matchingClassicAndTransactionalEntriesShareTheFrontier() throws Exception {
         var rows = Files.readAllLines(Path.of("../conformance/prior-matched-diagnostics/cases.tsv"))
                 .stream().filter(row -> !row.startsWith("#")).toList();

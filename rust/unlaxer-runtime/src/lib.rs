@@ -1635,6 +1635,12 @@ pub struct ParseContext<'a> {
     classic_max_reached: Option<usize>,
     // Historical name: any syntax failure (Classic or native) overrides a success watermark.
     classic_failure_seen: bool,
+    // True while a grammar is invoked (full-input entries and parse_grammar /
+    // parse_shared_grammar): failures and rule frames are measured at
+    // max(consumed, matched), as Java's parse frames are (#706). The innermost
+    // public entry decides; expression entries (parse, parse_with_token_mode,
+    // parse_token) clear it for their duration. Not applied in a token-stream session.
+    grammar_frontier: bool,
     match_cursor_policy: MatchCursorPolicy,
     bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
@@ -1892,6 +1898,7 @@ fn parse_detailed_stacked(
     let mut parser = ParseContext::with_bindings(input, bindings, options);
     parser.rules = rules;
     parser.whitespace = whitespace;
+    parser.grammar_frontier = true;
     if parser.first_sets.is_some() {
         parser.first_sets = Some(first::table(&parser.rules));
     }
@@ -2061,6 +2068,7 @@ impl<'a> ParseContext<'a> {
             token_mode: None,
             classic_max_reached: None,
             classic_failure_seen: false,
+            grammar_frontier: false,
             match_cursor_policy: MatchCursorPolicy::default(),
             whitespace: false,
             lexical_trivia: None,
@@ -2415,7 +2423,10 @@ impl<'a> ParseContext<'a> {
             return Err(self.resource_error("parser calls below 256"));
         }
         self.call_depth += 1;
+        // An expression entry keeps the native source frontier, also inside a grammar.
+        let frontier = std::mem::replace(&mut self.grammar_frontier, false);
         let result = self.transaction(|context| parser.parse(context));
+        self.grammar_frontier = frontier;
         self.call_depth -= 1;
         self.finish_outermost_parse(result.is_ok());
         result
@@ -2495,6 +2506,7 @@ impl<'a> ParseContext<'a> {
         let previous_definition = self.lexical_trivia.take();
         let previous_goal = self.lexical_context.take();
         let outer_entry = self.rules.is_empty();
+        let in_token_stream = self.lexing.is_some();
         let previous_lexing = if outer_entry {
             None
         } else {
@@ -2517,7 +2529,11 @@ impl<'a> ParseContext<'a> {
         let active_session = self.next_grammar_session;
         self.next_grammar_session = self.next_grammar_session.wrapping_add(1);
         self.grammar_session = active_session;
+        // A grammar called inside a token-stream session, also a nested one whose call
+        // took the session above, keeps the consumed frontier (see frame_start).
+        let previous_frontier = std::mem::replace(&mut self.grammar_frontier, !in_token_stream);
         let result = self.parse_expression(&Expr::Rule(root));
+        self.grammar_frontier = previous_frontier;
         self.failure_memo = previous_failure_memo;
         self.success_memo = previous_success_memo;
         self.rules = previous_rules;
@@ -2725,7 +2741,7 @@ impl<'a> ParseContext<'a> {
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
         }
-        let position = self.position;
+        let position = self.frontier(self.position);
         self.note_failure_reach(position);
         if let Some(frame) = self.diagnostic_frames.last_mut() {
             frame.record_position(position);
@@ -2748,6 +2764,7 @@ impl<'a> ParseContext<'a> {
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
             return;
         }
+        let position = self.frontier(position);
         // Failures behind both farthest positions cannot contribute a name.
         if position < self.farthest
             && self
@@ -2768,6 +2785,33 @@ impl<'a> ParseContext<'a> {
         }
         if position == self.farthest && !self.expected.contains(&expected) {
             self.expected.push(expected);
+        }
+    }
+
+    /// Where a failure at `position` (bytes) is recorded. Inside a grammar invocation
+    /// this includes the matched reach, as a Java parse frame does (#706); expression
+    /// entries such as [`Self::parse`] keep the source position. Classic token mode
+    /// already passes the Java Classic position at each failure site.
+    #[inline]
+    pub(crate) fn frontier(&self, position: usize) -> usize {
+        if self.token_mode.is_none() {
+            self.frame_start(position)
+        } else {
+            position
+        }
+    }
+
+    /// Where a rule invocation at `position` (bytes) starts: inside a grammar invocation
+    /// at max(consumed, matched), Java's `ParseFrame` start, in Classic token mode too.
+    /// A token-stream session keeps the consumed position: there the Java match-only
+    /// terminals (`EMPTY`) see lexemes and Rust's matched cursor is not Java's. A grammar
+    /// called inside a session clears `grammar_frontier` even after taking the session.
+    #[inline]
+    pub(crate) fn frame_start(&self, position: usize) -> usize {
+        if self.grammar_frontier && self.lexing.is_none() {
+            position.max(self.matched_position)
+        } else {
+            position
         }
     }
 
@@ -6536,15 +6580,20 @@ impl<'a> ClassicModeScan<'a> {
     }
     fn children(&mut self, children: &'a [Expr]) -> Option<&'a Expr> {
         let (first, rest) = children.split_first()?;
-        if !rest.is_empty() {
+        self.defer(rest);
+        Some(first)
+    }
+    /// Visits `later` after the current expression, in this scan and with its visited
+    /// rules (#720): CATCH's alternative, like a sibling of its body.
+    fn defer(&mut self, later: &'a [Expr]) {
+        if !later.is_empty() {
             if self.depth < self.siblings.len() && self.overflow.is_empty() {
-                self.siblings[self.depth] = Some(rest.iter());
+                self.siblings[self.depth] = Some(later.iter());
                 self.depth += 1;
             } else {
-                self.overflow.push(rest.iter());
+                self.overflow.push(later.iter());
             }
         }
-        Some(first)
     }
     fn next(&mut self) -> Option<&'a Expr> {
         while let Some(last) = self.overflow.last_mut() {
@@ -6626,12 +6675,12 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
             | Expr::LexicalContextScope { child, .. }
             | Expr::Commit { child, .. }
             | Expr::Label { child, .. } => Some(child.as_ref()),
+            // Both operands in the same iterative scan: a fresh recursive scan of the
+            // alternative never terminated on a rule cycle through it (#720).
             Expr::CatchLabels {
                 child, alternative, ..
             } => {
-                if requires_classic_mode(alternative, rules) {
-                    return true;
-                }
+                scan.defer(std::slice::from_ref(alternative.as_ref()));
                 Some(child.as_ref())
             }
             _ => None,
@@ -6896,5 +6945,117 @@ mod pure_success_memo_tests {
             memo_success_safe_rules(&rules),
             [false, false, true, false, false, false, false, false, false]
         );
+    }
+}
+
+#[cfg(test)]
+mod classic_mode_scan_tests {
+    use super::*;
+
+    fn rule(name: &'static str, expression: Expr) -> Rule {
+        Rule { name, expression }
+    }
+
+    fn label_z() -> Expr {
+        Expr::literal("Z").label("L")
+    }
+
+    fn on_standard_stack(operation: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(operation)
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn rule_cycles_through_catch_operands_terminate() {
+        on_standard_stack(|| {
+            // The #720 report: the alternative re-enters the rule, and so does the body.
+            for rules in [
+                vec![rule("R0", label_z().catch_labels(Expr::Rule(0), ["L"]))],
+                vec![rule(
+                    "R0",
+                    label_z().catch_labels(Expr::literal("a").then(Expr::Rule(0)), ["L"]),
+                )],
+                vec![rule(
+                    "R0",
+                    Expr::choice([Expr::Rule(0), label_z()]).catch_labels(Expr::Rule(0), ["L"]),
+                )],
+                vec![
+                    rule("R0", label_z().catch_labels(Expr::Rule(1), ["L"])),
+                    rule(
+                        "R1",
+                        Expr::Rule(0)
+                            .commit_with("c")
+                            .catch_labels(Expr::Rule(0).label("M"), ["M"]),
+                    ),
+                ],
+            ] {
+                assert!(!requires_classic_mode(&Expr::Rule(0), &rules));
+            }
+        });
+    }
+
+    #[test]
+    fn classic_constructs_only_in_one_catch_operand_are_detected() {
+        let classic = || Expr::literal("a").match_only();
+        for rules in [
+            // Only in the alternative, behind a cycle through the alternative.
+            vec![
+                rule("R0", label_z().catch_labels(Expr::Rule(1), ["L"])),
+                rule(
+                    "R1",
+                    Expr::choice([Expr::literal("b").then(Expr::Rule(0)), classic()]),
+                ),
+            ],
+            // Only in the body, after a cycle through the body.
+            vec![rule(
+                "R0",
+                Expr::choice([Expr::literal("b").then(Expr::Rule(0)), classic()])
+                    .catch_labels(Expr::literal("z"), ["L"]),
+            )],
+            // In a nested CATCH's alternative, inside COMMIT and LABEL.
+            vec![rule(
+                "R0",
+                label_z().catch_labels(
+                    label_z()
+                        .catch_labels(classic().label("M"), ["L"])
+                        .commit_with("c"),
+                    ["L"],
+                ),
+            )],
+            // Owned capture in the alternative of a rule reached from the alternative.
+            vec![
+                rule("R0", label_z().catch_labels(Expr::Rule(1), ["L"])),
+                rule("R1", Expr::literal("a").capture_owned("c")),
+            ],
+        ] {
+            assert!(requires_classic_mode(&Expr::Rule(0), &rules));
+        }
+    }
+
+    #[test]
+    fn a_deep_rule_chain_through_alternatives_is_scanned_iteratively() {
+        on_standard_stack(|| {
+            // R_i ::= CATCH(LABEL(L, 'Z'), 'a' R_{i+1}, L); the last rule is Classic. A fresh
+            // recursive scan per alternative overflowed this stack long before the end (#720).
+            const RULES: usize = 20_000;
+            let mut rules: Vec<Rule> = (0..RULES - 1)
+                .map(|index| {
+                    rule(
+                        "R",
+                        label_z()
+                            .catch_labels(Expr::literal("a").then(Expr::Rule(index + 1)), ["L"]),
+                    )
+                })
+                .collect();
+            rules.push(rule("Last", Expr::literal("a").match_only()));
+            assert!(requires_classic_mode(&Expr::Rule(0), &rules));
+            rules.pop();
+            rules.push(rule("Last", Expr::literal("Z")));
+            assert!(!requires_classic_mode(&Expr::Rule(0), &rules));
+        });
     }
 }
