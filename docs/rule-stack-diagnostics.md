@@ -150,7 +150,8 @@ that DETAILED is the Java default for a direct `ParseContext` and for the genera
 - Java: `ParseFrame` gains one `int` (inside its existing padding). The context keeps the rule
   depth of each open frame in an `int` array and the depth of every selected candidate, so
   comparing a candidate is O(1) whatever the nesting; whether a parser class is a rule is decided
-  once per class. Memo frames gain one reference.
+  once per class. All of this lives in one holder that the first DETAILED parse frame creates, so
+  a `DETAILED_ON_FAILURE` context allocates nothing for it. Memo frames gain one reference.
 
 Measured against `origin/master` 0a976016, median of 5 interleaved runs (Java: generated
 TinyCalc, best of 600 parses, 60 for the flat input; Rust: the same arithmetic grammar built with
@@ -159,10 +160,14 @@ is `(`×N `1` `)`×(N−1) `]`. Rust nesting stops at 80 (rule nesting below 256
 
 | Input | Java DETAILED | Java DETAILED_ON_FAILURE | Rust Detailed | Rust DetailedOnFailure |
 |---|---|---|---|---|
-| flat | +3.7 % time, +0.2 % bytes | −1.2 %, +8 B | +4.2 % | +2.0 % |
-| nested-20 | +4.5 %, +0.5 % bytes | −0.7 % | +5.3 % | +7.7 % (13 → 14 µs) |
+| flat | +1.6 – +7.2 % time, +0.2 % bytes | within ±5 % noise, +0 B | +4.2 % | +2.0 % |
+| nested-20 | +4.5 %, +0.4 % bytes | −0.7 %, +0 B | +5.3 % | +7.7 % (13 → 14 µs) |
 | nested-60 | +4.2 %, +0.4 % bytes | +0.3 % | +7.4 % | 0 % |
-| nested-120 (Rust 80) | +5.4 %, +0.4 % bytes | −2.8 % | +10.0 % | 0 % |
+| nested-120 (Rust 80) | +4.2 – +9.8 %, +0.4 % bytes | −0.7 %, +0 B | +10.0 % | 0 % |
+
+The Java flat and nested-120 rows give the range of two sessions of 5 and 7 interleaved runs
+against `origin/master` 9950b944 (the machine is shared, so single sessions vary by about ±5 %);
+the allocated bytes are exact and identical across runs.
 
 Rust allocations (flat input): `Detailed` +5 per parse (+0.02 %), `DetailedOnFailure` identical,
 `Detailed` with `SafeFailures` +7,206 (+10 %, the shared memo nodes) and +6–9 % time. The
@@ -205,6 +210,17 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ru
 ```
 
 ## Limitations
+
+- After a positive `LOOKAHEAD` token advances Java's matched cursor, Java starts the next parse
+  frame, and measures its reach, at max(consumed, matched), so a rule that begins there starts
+  later in Java than in Rust and can win a different tie: `R0 ::= 'y' (AHEAD R1) ; R1 ::= 'x' 'a'`
+  on `yx` reports `R0@0>R1@2` in Java and `R0@0>R1@1` in Rust; `R0 ::= AHEAD (R1 | 'x' 'a') ;
+  R1 ::= 'a'` on `x` reports `R0@0>R1@1` and `R0@0`. It is the cause of
+  [#706](https://github.com/opaopa6969/unlaxer-parser/issues/706) (the diagnostic offset after a
+  positive LOOKAHEAD) and is fixed with it. Until then `PropertyBasedParityTest` excludes exactly
+  that shape (`positive-lookahead-rule-stack-starts` in `known-differences.json`: same offset and
+  omitted count, Java frames starting later after a common prefix, in grammars with a positive
+  LOOKAHEAD), and `regressions.json` pins both examples so the exclusion stays in use.
 
 - Shared grammar calls carry stacks with the called grammar's rule names; no shared corpus
   covers them yet.

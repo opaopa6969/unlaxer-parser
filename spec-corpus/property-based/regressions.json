@@ -55,5 +55,23 @@
       ",界ab,😀界界",
       ",界ab,😀界界x"
     ]
+  },
+  {
+    "id": "positive-lookahead-rule-stack-later-start",
+    "issue": "#706",
+    "note": "Seed 211 minimized in the #723 re-review. After the positive LOOKAHEAD advances the matched cursor, Java starts R1 at CP2 and Rust at CP1 (java R0@0>R1@2, rust R0@0>R1@1); excluded by known-differences.json (positive-lookahead-rule-stack-starts) until #706 is fixed.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= 'y' (AHEAD R1) ; R1 ::= 'x' 'a' ; }",
+    "inputs": [
+      "yx"
+    ]
+  },
+  {
+    "id": "positive-lookahead-rule-stack-extra-frame",
+    "issue": "#706",
+    "note": "Seed 284 minimized in the #723 re-review. Java's R1 starts at the matched CP1 and reaches the farthest failure, Rust's R1 starts at CP0 and does not (java R0@0>R1@1, rust R0@0); excluded by known-differences.json (positive-lookahead-rule-stack-starts) until #706 is fixed.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= AHEAD (R1 | 'x' 'a') ; R1 ::= 'a' ; }",
+    "inputs": [
+      "x"
+    ]
   }
 ]
