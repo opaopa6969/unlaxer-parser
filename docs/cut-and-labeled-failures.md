@@ -142,7 +142,7 @@ and in both portability checks:
 | `E-CATCH-EMPTY` | a `CATCH` without labels (the syntax admits it so the error is positioned) |
 | `E-CATCH-DUPLICATE-LABEL` | a label listed twice in one `CATCH` |
 | `E-COMMIT-EMPTY-MESSAGE` | `COMMIT(body, '')` |
-| `E-RAISING-REPETITION` | an unbounded repetition (`{ X }`, `X*`, `X+`, `X{n,}`) whose whole body is one `COMMIT` or `LABEL`, or a reference to a rule that never fails ordinarily, when nothing can catch what it raises: the attempt that finds no further item raises, so it can never succeed (see [below](#which-repetitions-are-rejected)) |
+| `E-RAISING-REPETITION` | an unbounded repetition (`{ X }`, `X*`, `X+`, `X{n,}`) whose whole body is one `COMMIT` or `LABEL` with a body that cannot match the empty string, or a reference to a rule that never fails ordinarily and consumes input whenever it succeeds, when nothing can catch what it raises: every iteration consumes input, so an attempt eventually finds no further item and raises (see [below](#which-repetitions-are-rejected)) |
 
 The unknown-label check is grammar-wide: a label counts as declared when any
 `LABEL(...)` in the grammar raises it, even in an unreachable rule or only in the
@@ -171,6 +171,20 @@ the boundary), so nested `CATCH` stays linear in size on both frontends.
 `E-RAISING-REPETITION` follows what each construct catches (#722). It runs after
 parameterized rules are expanded, so a monomorphized instance is an ordinary rule.
 
+A repetition can never succeed only when its item never fails ordinarily (it succeeds or
+raises) and consumes input whenever it succeeds: the input then runs out, and the attempt
+that finds no further item raises instead of ending the repetition. A `COMMIT` or `LABEL`
+whose body may match the empty string does not qualify, because a zero-width success ends
+the repetition normally: `{ COMMIT(['a']) } 'x'`, `{ Item } 'x'` with
+`Item ::= COMMIT(['a'])`, `Item ::= LABEL(L, Ws)` and `Ws ::= { ' ' }`, or
+`Item ::= COMMIT(Opt)` and `Opt ::= ['a']` all accept `x`, and are accepted (the first was
+rejected from #710 until #722). The nullable
+analysis is an over-approximation shared by both hosts: an optional, a repetition with
+minimum 0, a replay, an empty literal, a token, a qualified or unknown reference, and a rule
+whose body may match empty all count as nullable, so a body that reaches a token (for
+example `{ LABEL(L, NUMBER) }`) is not rejected; an error is reported only when the
+repetition certainly cannot succeed.
+
 - A labeled failure `L` is caught only inside the body operand of a `CATCH` that lists
   `L`, in the same rule or around a rule reference on some path to the rule:
   `CATCH({ LABEL(L, 'a') }, 'b', L)`, `CATCH(Item, 'b', L)` with
@@ -193,9 +207,12 @@ parameterized rules are expanded, so a monomorphized instance is an ordinary rul
   never fails ordinarily when its body is one alternative that is a single `COMMIT`,
   `LABEL` or such a reference, or that starts with an element that always raises (one of
   these repetitions, or a reference to a rule that always raises). A recovery rule counts
-  only with `@recovery(sync=...)`, whose recovery consumes the sync token; `auto` and
-  `skip` may resume without consuming input. A repetition of a rule that always raises is
-  not rejected again: the repetition inside that rule is.
+  only with `@recovery(sync=...)`: there the position after recovery is the end of a listed
+  sync token. With `auto` and `skip` the resume point is chosen from the follow tokens of
+  the rule's uses, so it cannot be fixed from the rule alone; the check leaves those rules
+  out conservatively (every recovery still advances at least one code point, see
+  [error recovery](error-recovery.md)). A repetition of a rule that always raises is not
+  rejected again: the repetition inside that rule is.
 
 The kinds a repetition may raise are its own operator's and every `COMMIT` and `LABEL`
 nested in its item or reachable through references from it. The repetition is rejected
@@ -205,7 +222,11 @@ reference context catches the failure. A rule referenced both inside and outside
 still ends with the label), and a chain of references that the check cannot see through
 (a choice of several alternatives, an optional, a group) is treated as able to fail
 ordinarily. Both hosts compute the same least fixed points over rule references, so the
-decision and the code-point span agree.
+decision and the code-point span agree. Each fixed point is a worklist over the reference
+graph (a rule is re-examined only when a rule it references, or one referencing it, changes),
+so the work is linear in the references times the number of labels; a grammar without
+`COMMIT` or `LABEL` skips the analysis. A chain of 4000 rules with 2 to 16 labels takes
+under 40 ms in Rust (release) and under 20 ms in Java.
 
 This precise check was chosen over turning the error into a warning (option (b) in #722):
 a warning would also have removed the misses and false rejections, but grammars that can
@@ -270,9 +291,10 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml \
 ```
 
 The UBNF slice uses [`spec-corpus/cut-labeled-failure`](../spec-corpus/cut-labeled-failure):
-`cases.json` has 21 grammars and 60 inputs covering choice, optional, repetition,
+`cases.json` has 28 grammars and 81 inputs covering choice, optional, repetition,
 nested catch, a memoized rule, recovery, supplementary scalars with CRLF and the
-repetitions that #722 accepts through references, instances and recovery;
+repetitions that #722 accepts through references, instances, recovery and bodies that
+may match the empty string;
 `invalid.json` has the 12 positioned rejections, 8 of them `E-RAISING-REPETITION`. `RaisingOperatorConformanceTest`
 compiles and runs the Java consumer, generates Rust from both hosts, checks the
 files byte for byte, and builds and runs both Rust consumers under all six

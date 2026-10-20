@@ -1,5 +1,5 @@
 //! Validation of COMMIT / LABEL / CATCH (#700), mirroring the Java `RaisingOperators`.
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use unlaxer_ubnf::{
     AnnotatedElement, AnnotationKind, AtomicElement, ElementKind, GrammarDecl, RecoveryMode,
     RuleBody, RuleDecl, Span,
@@ -31,7 +31,17 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<Problem> {
     for rule in &grammar.rules {
         walk.body(&rule.name, &rule.body, &BTreeSet::new());
     }
-    let raising = Raising::new(grammar, &walk);
+    // Without COMMIT or LABEL nothing raises, so no repetition is analysed (or rejected).
+    let raising = walk
+        .sites
+        .iter()
+        .any(|site| {
+            matches!(
+                site.element.kind,
+                ElementKind::Commit { .. } | ElementKind::Label { .. }
+            )
+        })
+        .then(|| Raising::new(grammar, &walk));
     let mut problems = Vec::new();
     for site in &walk.sites {
         let problem = |code, subject: String| Problem {
@@ -41,7 +51,10 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<Problem> {
             subject,
         };
         if site.catching.is_some() {
-            if raising.uncaught(site) {
+            if raising
+                .as_ref()
+                .is_some_and(|raising| raising.uncaught(site))
+            {
                 problems.push(problem(
                     "E-RAISING-REPETITION",
                     "unbounded repetition of COMMIT or LABEL always ends with that failure".into(),
@@ -213,10 +226,16 @@ impl<'a> Walk<'a> {
 /// only by a CATCH listing `L` whose body operand encloses the raise, in the same rule or
 /// around a reference on some path to the rule; a committed error only by a `@recovery` rule,
 /// the raising rule itself or one on some path to it. The analysis is conservative: a
-/// repetition is rejected only when no reference context can catch any kind it may raise.
+/// repetition is rejected only when no reference context can catch any kind it may raise, and
+/// only when every successful item consumes input. Each fixed point is a worklist over the
+/// reference graph, so the work is linear in the references times the number of kinds.
 struct Raising<'a> {
-    rules: Vec<&'a RuleDecl>,
-    known: HashSet<&'a str>,
+    rules: HashMap<&'a str, &'a RuleDecl>,
+    /// References into each rule, and out of each rule (indices into the walk's references).
+    into: HashMap<&'a str, Vec<usize>>,
+    out: HashMap<&'a str, Vec<usize>>,
+    /// Rules that may match the empty string; a token or an unknown reference counts as nullable.
+    nullable: HashSet<&'a str>,
     /// Kinds a rule may raise: every COMMIT and LABEL in it and in the rules it references.
     raisable: HashMap<&'a str, BTreeSet<&'a str>>,
     /// Labels caught around some reference path to a rule.
@@ -225,34 +244,54 @@ struct Raising<'a> {
     recovered: HashSet<&'a str>,
     /// Rules whose every outcome is a raised failure.
     always: HashSet<&'a str>,
-    /// Rules that never fail ordinarily: they succeed or raise.
+    /// Rules that never fail ordinarily and consume input whenever they succeed.
     only: HashSet<&'a str>,
 }
 
 impl<'a> Raising<'a> {
     fn new(grammar: &'a GrammarDecl, walk: &Walk<'a>) -> Self {
-        let mut known = HashSet::new();
-        let rules: Vec<&RuleDecl> = grammar
-            .rules
-            .iter()
-            .filter(|rule| known.insert(rule.name.as_str()))
-            .collect();
+        let mut order: Vec<&'a str> = Vec::new();
+        let mut rules = HashMap::new();
+        for rule in &grammar.rules {
+            if !rules.contains_key(rule.name.as_str()) {
+                rules.insert(rule.name.as_str(), rule);
+                order.push(rule.name.as_str());
+            }
+        }
         let mut raising = Self {
             rules,
-            known,
+            into: HashMap::new(),
+            out: HashMap::new(),
+            nullable: HashSet::new(),
             raisable: HashMap::new(),
             catchable: HashMap::new(),
             recovered: HashSet::new(),
             always: HashSet::new(),
             only: HashSet::new(),
         };
-        for rule in &raising.rules {
-            raising.raisable.insert(&rule.name, BTreeSet::new());
-            raising.catchable.insert(&rule.name, BTreeSet::new());
-            if recovery(rule).is_some() {
-                raising.recovered.insert(&rule.name);
+        for name in &order {
+            raising.into.insert(name, Vec::new());
+            raising.out.insert(name, Vec::new());
+            raising.raisable.insert(name, BTreeSet::new());
+            raising.catchable.insert(name, BTreeSet::new());
+        }
+        for (index, reference) in walk.references.iter().enumerate() {
+            if raising.rules.contains_key(reference.to) {
+                raising.into.get_mut(reference.to).unwrap().push(index);
+                raising.out.get_mut(reference.from).unwrap().push(index);
             }
         }
+        // Nullable rules: re-examine the referrers of each rule that becomes nullable.
+        let mut work: VecDeque<&'a str> = order.iter().copied().collect();
+        while let Some(name) = work.pop_front() {
+            if raising.nullable.contains(name) || !raising.nullable_body(&raising.rules[name].body)
+            {
+                continue;
+            }
+            raising.nullable.insert(name);
+            work.extend(raising.into[name].iter().map(|&i| walk.references[i].from));
+        }
+        // Raisable kinds flow backwards along references.
         for site in &walk.sites {
             let kind = match &site.element.kind {
                 ElementKind::Commit { .. } => COMMIT,
@@ -261,53 +300,64 @@ impl<'a> Raising<'a> {
             };
             raising.raisable.get_mut(site.rule).unwrap().insert(kind);
         }
-        let mut changed = true;
-        while changed {
-            changed = false;
-            for reference in &walk.references {
-                if let Some(target) = raising.raisable.get(reference.to).cloned() {
-                    let source = raising.raisable.get_mut(reference.from).unwrap();
-                    let before = source.len();
-                    source.extend(target);
-                    changed |= source.len() != before;
+        work.extend(order.iter().copied());
+        while let Some(name) = work.pop_front() {
+            let kinds = raising.raisable[name].clone();
+            for &index in &raising.into[name] {
+                let from = walk.references[index].from;
+                let source = raising.raisable.get_mut(from).unwrap();
+                let before = source.len();
+                source.extend(kinds.iter().copied());
+                if source.len() != before {
+                    work.push_back(from);
                 }
             }
         }
-        changed = true;
-        while changed {
-            changed = false;
-            for reference in &walk.references {
-                if !raising.known.contains(reference.to) {
-                    continue;
-                }
-                let mut added = reference.catching.clone();
-                added.extend(raising.catchable[reference.from].iter().copied());
+        // Catchable labels and recovery flow forwards along references.
+        for name in &order {
+            if recovery(raising.rules[name]).is_some() {
+                raising.recovered.insert(name);
+            }
+        }
+        work.extend(order.iter().copied());
+        while let Some(name) = work.pop_front() {
+            let labels = raising.catchable[name].clone();
+            let recovered = raising.recovered.contains(name);
+            for &index in &raising.out[name] {
+                let reference = &walk.references[index];
                 let target = raising.catchable.get_mut(reference.to).unwrap();
                 let before = target.len();
-                target.extend(added);
-                changed |= target.len() != before;
-                if raising.recovered.contains(reference.from) {
+                target.extend(reference.catching.iter().copied());
+                target.extend(labels.iter().copied());
+                let mut changed = target.len() != before;
+                if recovered {
                     changed |= raising.recovered.insert(reference.to);
+                }
+                if changed {
+                    work.push_back(reference.to);
                 }
             }
         }
-        changed = true;
-        while changed {
-            changed = false;
-            for index in 0..raising.rules.len() {
-                let rule = raising.rules[index];
-                let recovery = recovery(rule);
-                if raising.always_body(&rule.body)
-                    && (recovery.is_none()
-                        || !raising.raisable[rule.name.as_str()].contains(COMMIT))
-                {
-                    changed |= raising.always.insert(&rule.name);
-                }
-                if raising.only_body(&rule.body)
-                    && (recovery.is_none() || recovery == Some(RecoveryMode::Sync))
-                {
-                    changed |= raising.only.insert(&rule.name);
-                }
+        // Always / only: re-examine the referrers of each rule whose status changes.
+        work.extend(order.iter().copied());
+        while let Some(name) = work.pop_front() {
+            let rule = raising.rules[name];
+            let recovery = recovery(rule);
+            let mut changed = false;
+            if !raising.always.contains(name)
+                && raising.always_body(&rule.body)
+                && (recovery.is_none() || !raising.raisable[name].contains(COMMIT))
+            {
+                changed |= raising.always.insert(name);
+            }
+            if !raising.only.contains(name)
+                && raising.only_body(&rule.body)
+                && (recovery.is_none() || recovery == Some(RecoveryMode::Sync))
+            {
+                changed |= raising.only.insert(name);
+            }
+            if changed {
+                work.extend(raising.into[name].iter().map(|&i| walk.references[i].from));
             }
         }
         raising
@@ -317,6 +367,9 @@ impl<'a> Raising<'a> {
         let Some(item) = repeated(site.element) else {
             return false;
         };
+        if !self.only_raises(item) {
+            return false;
+        }
         let mut kinds = BTreeSet::new();
         match &item.kind {
             ElementKind::Commit { body, .. } => {
@@ -369,9 +422,47 @@ impl<'a> Raising<'a> {
         kinds
     }
 
+    /// Whether a body may match the empty string (an over-approximation).
+    fn nullable_body(&self, body: &RuleBody) -> bool {
+        body.alternatives.iter().any(|sequence| {
+            sequence
+                .elements
+                .iter()
+                .all(|annotated| self.nullable_element(&annotated.element))
+        })
+    }
+
+    fn nullable_element(&self, element: &AtomicElement) -> bool {
+        match &element.kind {
+            ElementKind::Terminal(value) => value.is_empty(),
+            ElementKind::RuleRef { namespace, name } => {
+                namespace.is_some()
+                    || !self.rules.contains_key(name.as_str())
+                    || self.nullable.contains(name.as_str())
+            }
+            ElementKind::Error(_) => false,
+            ElementKind::OwnedCapture { body, .. }
+            | ElementKind::CaptureScope(body)
+            | ElementKind::Group(body)
+            | ElementKind::Commit { body, .. }
+            | ElementKind::Label { body, .. }
+            | ElementKind::Catch { choice: body, .. } => self.nullable_body(body),
+            ElementKind::OneOrMore(item) => self.nullable_element(item),
+            ElementKind::BoundedRepeat { element, min, .. } => {
+                *min == 0 || self.nullable_element(element)
+            }
+            ElementKind::Separated { element, .. } => self.nullable_element(element),
+            // optional, repetition, replay
+            ElementKind::Optional(_) | ElementKind::Repeat(_) | ElementKind::Replay { .. } => true,
+        }
+    }
+
+    /// Never fails ordinarily, and consumes input whenever it succeeds.
     fn only_raises(&self, element: &AtomicElement) -> bool {
         match &element.kind {
-            ElementKind::Commit { .. } | ElementKind::Label { .. } => true,
+            ElementKind::Commit { body, .. } | ElementKind::Label { body, .. } => {
+                !self.nullable_body(body)
+            }
             ElementKind::RuleRef {
                 namespace: None,
                 name,

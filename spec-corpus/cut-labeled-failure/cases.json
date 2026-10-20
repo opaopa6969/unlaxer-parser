@@ -405,5 +405,131 @@
         "message": "need a"
       }
     ]
+  },
+  {
+    "name": "nullable-commit-repetition",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { COMMIT(['a']) } 'x' ;\n}\n",
+    "cases": [
+      {
+        "input": "x",
+        "outcome": "success"
+      },
+      {
+        "input": "ax",
+        "outcome": "success"
+      },
+      {
+        "input": "aax",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "nullable-commit-through-reference",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Item } 'x' ;\n  Item ::= COMMIT(['a']) ;\n}\n",
+    "cases": [
+      {
+        "input": "x",
+        "outcome": "success"
+      },
+      {
+        "input": "ax",
+        "outcome": "success"
+      },
+      {
+        "input": "aax",
+        "outcome": "success"
+      }
+    ]
+  },
+  {
+    "name": "nullable-label-body-rule",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Item } 'x' ;\n  Item ::= LABEL(L, Ws) ;\n  Ws ::= { ' ' } ;\n}\n",
+    "cases": [
+      {
+        "input": "x",
+        "outcome": "success"
+      },
+      {
+        "input": " x",
+        "outcome": "success"
+      },
+      {
+        "input": "  x",
+        "outcome": "success"
+      }
+    ]
+  },
+  {
+    "name": "nullable-commit-body-rule",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Item } 'x' ;\n  Item ::= COMMIT(Opt) ;\n  Opt ::= ['a'] ;\n}\n",
+    "cases": [
+      {
+        "input": "x",
+        "outcome": "success"
+      },
+      {
+        "input": "ax",
+        "outcome": "success"
+      }
+    ]
+  },
+  {
+    "name": "nullable-commit-through-two-references",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Item } 'x' ;\n  Item ::= Inner ;\n  Inner ::= COMMIT(['a']) ;\n}\n",
+    "cases": [
+      {
+        "input": "x",
+        "outcome": "success"
+      },
+      {
+        "input": "ax",
+        "outcome": "success"
+      },
+      {
+        "input": "aax",
+        "outcome": "success"
+      }
+    ]
+  },
+  {
+    "name": "nullable-recursive-rule-inside-label",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Item } 'x' ;\n  Item ::= LABEL(M, COMMIT(H)) ;\n  H ::= 'b' H | { 'a' } ;\n}\n",
+    "cases": [
+      {
+        "input": "x",
+        "outcome": "success"
+      },
+      {
+        "input": "ax",
+        "outcome": "success"
+      },
+      {
+        "input": "bax",
+        "outcome": "success"
+      }
+    ]
+  },
+  {
+    "name": "nullable-commit-repetition-in-recovery-rule",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Item } 'x' ;\n  @recovery(sync=';')\n  Item ::= { COMMIT(['b']) } ;\n}\n",
+    "cases": [
+      {
+        "input": "x",
+        "outcome": "success"
+      },
+      {
+        "input": "bx",
+        "outcome": "success"
+      },
+      {
+        "input": "bbx",
+        "outcome": "success"
+      }
+    ]
   }
 ]

@@ -133,7 +133,7 @@ public class RaisingOperatorConformanceTest {
 
     @Test public void javaGeneratedParsersMatchIndependentOracle() throws Exception {
         var rows = corpus("cases.json");
-        assertEquals(21, rows.size());
+        assertEquals(28, rows.size());
         int observations = 0;
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
@@ -179,7 +179,7 @@ public class RaisingOperatorConformanceTest {
                 }
             }
         }
-        assertEquals(60 * 6, observations);
+        assertEquals(81 * 6, observations);
     }
 
     @Test public void bothRustHostsGenerateAndRunTheSameOracle() throws Exception {

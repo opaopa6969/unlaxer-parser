@@ -1,6 +1,8 @@
 package org.unlaxer.dsl.codegen;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -37,11 +39,13 @@ public final class RaisingOperators {
     public static List<Problem> problems(GrammarDecl grammar) {
         Walk walk = new Walk();
         for (RuleDecl rule : grammar.rules()) walk.body(rule.name(), rule.body(), Set.of());
-        Raising raising = new Raising(grammar, walk);
+        // Without COMMIT or LABEL nothing raises, so no repetition is analysed (or rejected).
+        Raising raising = walk.sites.stream().anyMatch(site -> site.element() instanceof UBNFAST.CommitElement
+            || site.element() instanceof UBNFAST.LabelElement) ? new Raising(grammar, walk) : null;
         List<Problem> problems = new ArrayList<>();
         for (Site site : walk.sites) {
             if (site.catching() != null) {
-                if (raising.uncaught(site)) {
+                if (raising != null && raising.uncaught(site)) {
                     problems.add(new Problem("E-RAISING-REPETITION", site.rule(), site.element(),
                         "unbounded repetition of COMMIT or LABEL always ends with that failure"));
                 }
@@ -148,10 +152,17 @@ public final class RaisingOperators {
      * CATCH listing {@code L} whose body operand encloses the raise, in the same rule or around a
      * reference on some path to the rule; a committed error only by a {@code @recovery} rule, the
      * raising rule itself or one on some path to it. The analysis is conservative: a repetition
-     * is rejected only when no reference context can catch any kind it may raise.
+     * is rejected only when no reference context can catch any kind it may raise, and only when
+     * every successful item consumes input. Each fixed point is a worklist over the reference
+     * graph, so the work is linear in the references times the number of kinds.
      */
     private static final class Raising {
         final Map<String, RuleDecl> rules = new LinkedHashMap<>();
+        /** References into each rule, and out of each rule. */
+        final Map<String, List<Reference>> into = new HashMap<>();
+        final Map<String, List<Reference>> out = new HashMap<>();
+        /** Rules that may match the empty string; a token or an unknown reference counts as nullable. */
+        final Set<String> nullable = new HashSet<>();
         /** Kinds a rule may raise: every COMMIT and LABEL in it and in the rules it references. */
         final Map<String, Set<String>> raisable = new HashMap<>();
         /** Labels caught around some reference path to a rule. */
@@ -160,54 +171,77 @@ public final class RaisingOperators {
         final Set<String> recovered = new HashSet<>();
         /** Rules whose every outcome is a raised failure. */
         final Set<String> always = new HashSet<>();
-        /** Rules that never fail ordinarily: they succeed or raise. */
+        /** Rules that never fail ordinarily and consume input whenever they succeed. */
         final Set<String> only = new HashSet<>();
 
         Raising(GrammarDecl grammar, Walk walk) {
             for (RuleDecl rule : grammar.rules()) rules.putIfAbsent(rule.name(), rule);
             for (RuleDecl rule : rules.values()) {
+                into.put(rule.name(), new ArrayList<>());
+                out.put(rule.name(), new ArrayList<>());
                 raisable.put(rule.name(), new HashSet<>());
                 catchable.put(rule.name(), new HashSet<>());
-                if (recovery(rule) != null) recovered.add(rule.name());
             }
+            for (Reference reference : walk.references) {
+                if (!rules.containsKey(reference.to())) continue;
+                into.get(reference.to()).add(reference);
+                out.get(reference.from()).add(reference);
+            }
+            // Nullable rules: re-examine the referrers of each rule that becomes nullable.
+            Deque<String> work = new ArrayDeque<>(rules.keySet());
+            while (!work.isEmpty()) {
+                String name = work.poll();
+                if (nullable.contains(name) || !nullable(rules.get(name).body())) continue;
+                nullable.add(name);
+                for (Reference reference : into.get(name)) work.add(reference.from());
+            }
+            // Raisable kinds flow backwards along references.
             for (Site site : walk.sites) {
                 if (site.element() instanceof UBNFAST.CommitElement) raisable.get(site.rule()).add(COMMIT);
                 else if (site.element() instanceof UBNFAST.LabelElement label) raisable.get(site.rule()).add(label.label());
             }
-            for (boolean changed = true; changed;) {
-                changed = false;
-                for (Reference reference : walk.references) {
-                    if (rules.containsKey(reference.to())) {
-                        changed |= raisable.get(reference.from()).addAll(raisable.get(reference.to()));
-                    }
+            work.addAll(rules.keySet());
+            while (!work.isEmpty()) {
+                String name = work.poll();
+                for (Reference reference : into.get(name)) {
+                    if (raisable.get(reference.from()).addAll(raisable.get(name))) work.add(reference.from());
                 }
             }
-            for (boolean changed = true; changed;) {
-                changed = false;
-                for (Reference reference : walk.references) {
-                    if (!rules.containsKey(reference.to())) continue;
+            // Catchable labels and recovery flow forwards along references.
+            for (RuleDecl rule : rules.values()) if (recovery(rule) != null) recovered.add(rule.name());
+            work.addAll(rules.keySet());
+            while (!work.isEmpty()) {
+                String name = work.poll();
+                for (Reference reference : out.get(name)) {
                     Set<String> target = catchable.get(reference.to());
-                    changed |= target.addAll(reference.catching());
-                    changed |= target.addAll(catchable.get(reference.from()));
-                    if (recovered.contains(reference.from())) changed |= recovered.add(reference.to());
+                    boolean changed = target.addAll(reference.catching());
+                    changed |= target.addAll(catchable.get(name));
+                    if (recovered.contains(name)) changed |= recovered.add(reference.to());
+                    if (changed) work.add(reference.to());
                 }
             }
-            for (boolean changed = true; changed;) {
-                changed = false;
-                for (RuleDecl rule : rules.values()) {
-                    var recovery = recovery(rule);
-                    if (alwaysBody(rule.body()) && (recovery == null || !raisable.get(rule.name()).contains(COMMIT))) {
-                        changed |= always.add(rule.name());
-                    }
-                    if (onlyBody(rule.body()) && (recovery == null || recovery.mode() == UBNFAST.RecoveryMode.SYNC)) {
-                        changed |= only.add(rule.name());
-                    }
+            // Always / only: re-examine the referrers of each rule whose status changes.
+            work.addAll(rules.keySet());
+            while (!work.isEmpty()) {
+                String name = work.poll();
+                RuleDecl rule = rules.get(name);
+                var recovery = recovery(rule);
+                boolean changed = false;
+                if (!always.contains(name) && alwaysBody(rule.body())
+                    && (recovery == null || !raisable.get(name).contains(COMMIT))) {
+                    changed |= always.add(name);
                 }
+                if (!only.contains(name) && onlyBody(rule.body())
+                    && (recovery == null || recovery.mode() == UBNFAST.RecoveryMode.SYNC)) {
+                    changed |= only.add(name);
+                }
+                if (changed) for (Reference reference : into.get(name)) work.add(reference.from());
             }
         }
 
         boolean uncaught(Site site) {
             AtomicElement item = repeated(site.element());
+            if (item == null || !onlyRaises(item)) return false;
             Set<String> kinds = new HashSet<>();
             if (item instanceof UBNFAST.CommitElement commit) {
                 kinds.add(COMMIT);
@@ -246,9 +280,34 @@ public final class RaisingOperators {
             return kinds;
         }
 
+        /** Whether a body may match the empty string (an over-approximation). */
+        boolean nullable(RuleBody body) {
+            if (body instanceof ChoiceBody choice) {
+                for (SequenceBody sequence : choice.alternatives()) if (nullable(sequence)) return true;
+                return false;
+            }
+            for (var annotated : ((SequenceBody) body).elements()) if (!nullable(annotated.element())) return false;
+            return true;
+        }
+
+        boolean nullable(AtomicElement element) {
+            if (element instanceof UBNFAST.TerminalElement terminal) return terminal.value().isEmpty();
+            if (element instanceof UBNFAST.RuleRefElement ref) {
+                return ref.namespace().isPresent() || !rules.containsKey(ref.name()) || nullable.contains(ref.name());
+            }
+            if (element instanceof UBNFAST.ErrorElement) return false;
+            if (element instanceof UBNFAST.TransparentElement transparent) return nullable(transparent.body());
+            if (element instanceof UBNFAST.OneOrMoreElement repeat) return nullable(repeat.body());
+            if (element instanceof UBNFAST.BoundedRepeatElement repeat) return repeat.min() == 0 || nullable(repeat.body());
+            if (element instanceof UBNFAST.SeparatedElement separated) return nullable(separated.element());
+            return true; // optional, repetition, replay
+        }
+
+        /** Never fails ordinarily, and consumes input whenever it succeeds. */
         boolean onlyRaises(AtomicElement element) {
-            return element instanceof UBNFAST.CommitElement || element instanceof UBNFAST.LabelElement
-                || element instanceof UBNFAST.RuleRefElement ref && ref.namespace().isEmpty() && only.contains(ref.name())
+            if (element instanceof UBNFAST.CommitElement commit) return !nullable(commit.body());
+            if (element instanceof UBNFAST.LabelElement label) return !nullable(label.body());
+            return element instanceof UBNFAST.RuleRefElement ref && ref.namespace().isEmpty() && only.contains(ref.name())
                 || alwaysRaises(element);
         }
 

@@ -53,7 +53,7 @@ fn accepted_grammars_generate_without_a_raising_rejection() {
     let rows = corpus(include_str!(
         "../../../spec-corpus/cut-labeled-failure/cases.json"
     ));
-    assert_eq!(21, rows.len());
+    assert_eq!(28, rows.len());
     for row in &rows {
         let name = row["name"].as_str().unwrap();
         let source = row["grammar"].as_str().unwrap();
