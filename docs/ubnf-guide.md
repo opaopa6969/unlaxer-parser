@@ -288,11 +288,21 @@ Inserts implicit whitespace skipping between rule elements. Supported styles:
 
 ### `@comment: { line: '//' }`
 
-Inserts implicit comment skipping. The block form accepts a `line` key:
+Inserts implicit `//` line-comment skipping into rules that inherit the grammar default.
+The only accepted form is one `@comment` setting whose block holds exactly `line: '//'`:
 
 ```ubnf
 @comment: { line: '//' }
 ```
+
+With `@whitespace: javaStyle` it adds nothing (javaStyle already skips line comments).
+Without global whitespace (or with `none`) inheriting rules skip only `//` up to, not
+including, CR / LF / EOF: line terminators, spaces and block comments stay significant, which
+suits line-oriented grammars that match newlines explicitly. Rule-level `@whitespace(...)` and
+`@interleave` keep their own policy. Other forms, duplicates and the combination with a named
+global whitespace token are rejected with `E-COMMENT-SETTING` / `E-COMMENT-WHITESPACE`.
+Java, Java-hosted Rust and native Rust generation behave the same; see
+[the trivia contract](rule-trivia.md#global-comment712).
 
 ### `@enum`
 

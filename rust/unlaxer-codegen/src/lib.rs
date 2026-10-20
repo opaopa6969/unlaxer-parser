@@ -554,7 +554,13 @@ fn expression(expr: &Expression) -> String {
         ),
         TriviaScope {
             child,
+            line_comments: true,
+            ..
+        } => format!("{}.line_comment_scope()", expression(child)),
+        TriviaScope {
+            child,
             java_whitespace,
+            line_comments: false,
         } => {
             format!("{}.trivia_scope({java_whitespace})", expression(child))
         }

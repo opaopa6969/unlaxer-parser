@@ -21,10 +21,11 @@ import org.unlaxer.dsl.codegen.rust.RustBackend;
 
 /**
  * Global {@code @comment: { line: '//' }} (#712): the shared positive corpus runs through the
- * inherited Java / Java-host Rust / native Rust consumers; invalid settings are rejected with the
- * same code, subject and code-point span by Java and the native generator.
+ * inherited Java / Java-host Rust / native Rust consumers, including their explicit Classic
+ * entries; invalid settings are rejected with the same code, subject and code-point span by Java
+ * and the native generator.
  */
-public class GlobalCommentConformanceTest extends RuleTriviaConformanceTest {
+public class GlobalCommentConformanceTest extends AtomicTriviaConformanceTest {
     private static final Path REPO = Path.of("..").toAbsolutePath().normalize();
     private static final List<String> CODES =
         List.of("E-COMMENT-SETTING", "E-COMMENT-WHITESPACE", "E-TOKEN-STREAM-TRIVIA");

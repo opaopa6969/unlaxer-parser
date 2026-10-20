@@ -42,8 +42,8 @@ Rust backend は既に global `none` を無効として扱っていた。
 `@whitespace: javaStyle` へ明示的に変更する。重複 rule/global whitespace の
 最後の指定が勝つことに依存していた場合も、意図する指定一つへ整理する。
 
-Java の独立した global `@comment` 設定は別機能で、この Rust 移植の対応対象ではない。
-global `none` の変更はそのコメント機能を削除・無効化するものではない。
+global `none` の変更は global `@comment` を削除・無効化するものではない。両者の合成は
+下記の [global `@comment`](#global-comment712) を参照。
 
 ## 実装と検証
 
@@ -66,7 +66,7 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
 CI は `target/rust-rule-trivia.tsv` を必須 artifact にする。Rust 無効の通常ローカル
 test で skip されたことを、この適合性検証の成功には数えない。
 
-任意 trivia parser の登録、global comment 設定、scope metadata、evaluator、
+任意 trivia parser の登録、scope metadata、evaluator、
 full tinyexpression-rs、rustcodeblock、LSP/DAP は別の未完了項目として追跡する。
 
 実 tinyexpression `2a2db7c` の P4 文法を native generator へ渡すと、この変更で
@@ -109,3 +109,63 @@ package / lock / HTTPS / 出典表示は [package仕様](ubnf-packages.md) を�
 原子性を追加し、Java / Rust の受理・拒否、consumed/matched cursor、AST の全 field /
 node span、native frontend の生成物を比較する。既存 lexical module invalid corpus は
 未定義、空文字、名前の大文字小文字違いも両生成経路と portability report で検証する。
+
+## global `@comment`（#712）
+
+`@comment: { line: '//' }` は Java 生成器・Java-host Rust 生成器・native Rust 生成器で同じ
+意味になる。単一 grammar の既存 API（`getRootParser` / `parse_context` / mapper 等）は変わらない。
+
+| grammar 既定 | rule の既定 trivia |
+|---|---|
+| `@whitespace: javaStyle` と併記 | javaStyle のまま（行コメントは既に含まれ、追加効果なし） |
+| `@whitespace` 省略 / `none` と併記 | 行コメントだけ: `//` から CR / LF / EOF の**直前**まで |
+| 名前付き `@whitespace: GAP` と併記 | `E-COMMENT-WHITESPACE` で拒否 |
+| `@tokenStream: enabled` | 従来どおり `E-TOKEN-STREAM-TRIVIA` で拒否 |
+
+行コメントだけの既定では、行末記号・空白・block comment は trivia ではない。改行を構文 token
+として書く行指向の文法で使う。コメントの内部は原子的で、引用符・`/*`・補助文字を区別しない。
+Java の `CPPComment` と同じく、終端の CR / LF / CRLF は消費せずに先読み一致するので、matched
+cursor と失敗診断の位置は終端の後ろへ進む。Rust も同じ cursor・診断位置を返す。
+
+rule の優先順位は上記の 1〜3 のままで、`@comment` は 3 の grammar 既定にだけ効く。明示した
+rule `@whitespace(...)`（`none` / `javaStyle` / 名前付き）と `@interleave` はそれぞれの設定を
+使い、行コメントを追加しない。親の連接と子の連接はそれぞれの rule の設定に従う。
+lexical context の rule でも同じ既定が使える。
+
+受理する形は `@comment` 1 個・block 値・entry は `line: '//'` 1 個だけ。重複、文字列値、
+`line` 以外の key、`line` の重複、`//` 以外の値（`'#'`、空文字、`'\/\/'` など）は
+`E-COMMENT-SETTING` で生成前に拒否する。Java 検証器・Java `ParserGenerator`・Java-host
+Rust 生成器・native 生成器が同じ code を返し、Java / native の portability check は
+setting 全体の code point span を同じ値で報告する。
+
+### Java の変更と移行
+
+変更前の Java は (1) `line` key があれば値に関わらず `//` を読み飛ばし、`line` が無い block や
+文字列値は黙って無視していた。(2) delimiter class を grammar 全体で 1 つ共有していたため、
+別の rule に `@whitespace` / `@interleave` が 1 つでもあると、継承 rule の comment 既定まで
+空白・block comment を読み飛ばしていた。(3) 名前付き global whitespace と併記すると
+`@comment` は黙って無視されていた。
+
+#712 では (2) を優先順位どおりに直し、継承 rule は常に行コメントだけを読み飛ばす
+（生成 class `<Grammar>LineCommentLazyChain`）。(1) と (3) は書いた値と違う意味で黙って
+生成していたため、位置付きで拒否する。`@whitespace: javaStyle` と `line: '//'` を併記する
+既存の文法（tinyexpression P4 等）の Java 生成物は変わらない。空白も読み飛ばしたかった
+場合は `@whitespace: javaStyle` を明示し、名前付き空白でコメントも扱いたい場合は
+その token の定義へコメントを含める。
+
+### 検証
+
+`GlobalCommentConformanceTest` は [共通 corpus](../spec-corpus/global-comment/README.md)
+（7 文法・49 入力）を Java と Java-host / native の Rust 生成物それぞれで compile・実行し、
+受理、prefix の consumed / matched cursor（memo 有無）、診断種別と位置、AST の全 field と
+node span を独立期待値と照合する。明示 Classic 入口（Java の原文・AST/source map、Rust の
+token mode の cursor と CST 原文）も比較する。両 Rust 生成物は byte 一致も確認するが、実行を
+省略しない。
+無効設定 11 件は Java 検証器・両生成器・両 portability check で code / subject / span を比較する。
+
+```sh
+mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
+  -Dtest=GlobalCommentConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+CI は `target/rust-global-comment.tsv` と `target/rust-global-comment-invalid.tsv` を必須 artifact にする。

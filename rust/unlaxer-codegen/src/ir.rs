@@ -247,6 +247,8 @@ pub enum Expression {
     TriviaScope {
         child: Box<Expression>,
         java_whitespace: bool,
+        /// Only the Java `CPPComment` form of a global `@comment` (#712).
+        line_comments: bool,
     },
 }
 

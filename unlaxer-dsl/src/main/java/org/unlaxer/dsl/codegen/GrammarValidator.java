@@ -143,6 +143,11 @@ public final class GrammarValidator {
         for (var issue : TokenStreamGrammar.problems(grammar)) {
             errors.add(new ValidationIssue(issue.code(), issue.subject(), "Use the supported @tokenStream:enabled profile."));
         }
+        for (var issue : GlobalComment.problems(grammar)) {
+            errors.add(new ValidationIssue(issue.code(), issue.subject(), issue.code().equals("E-COMMENT-SETTING")
+                ? "Use a single @comment: { line: '//' } setting."
+                : "Put line comments into the named whitespace token, or use @whitespace: javaStyle."));
+        }
         try { LexicalContexts.requireValid(grammar); }
         catch (IllegalArgumentException error) {
             String code = error.getMessage().startsWith("E-LEXICAL-CONTEXT-") ? error.getMessage().split(":",2)[0] : "E-LEXICAL-CONTEXT";

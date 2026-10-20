@@ -4,6 +4,7 @@ mod associative_spines;
 mod common_fields;
 mod embedded;
 mod evaluation;
+mod global_comment;
 pub mod impact;
 mod lexical;
 mod lexical_contexts;

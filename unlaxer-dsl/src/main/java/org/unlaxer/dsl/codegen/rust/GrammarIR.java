@@ -99,7 +99,10 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record LexicalToken(String name, org.unlaxer.dsl.runtime.LexicalExpression expression) implements Expression {}
     /** Rule-local trivia policy, transparent to captures and semantic values. */
     public record LexicalTriviaScope(Expression child, org.unlaxer.dsl.runtime.LexicalExpression definition) implements Expression {}
-    public record TriviaScope(Expression child, boolean javaWhitespace) implements Expression {}
+    /** {@code lineComments}: only the Java CPPComment form of a global {@code @comment} (#712). */
+    public record TriviaScope(Expression child, boolean javaWhitespace, boolean lineComments) implements Expression {
+        public TriviaScope(Expression child, boolean javaWhitespace) { this(child, javaWhitespace, false); }
+    }
     /** Retains an otherwise unmapped text branch as a source-positioned semantic value. */
     public record TextValue(Expression child) implements Expression {}
     public record ValueBoundary(Expression child) implements Expression {}
