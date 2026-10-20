@@ -528,8 +528,10 @@ public class ParserGenerator implements CodeGenerator {
             return collectMemoDependencies(ctx, label.body(), refs);
         }
         if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.CatchElement caught) {
-            return collectMemoDependencies(ctx, caught.child(), refs)
-                    & collectMemoDependencies(ctx, caught.alternative(), refs);
+            // Visit both operands so refs is complete, as the sequence walk does.
+            boolean childSafe = collectMemoDependencies(ctx, caught.child(), refs);
+            boolean alternativeSafe = collectMemoDependencies(ctx, caught.alternative(), refs);
+            return childSafe && alternativeSafe;
         }
         if (element instanceof org.unlaxer.dsl.bootstrap.UBNFAST.SeparatedElement separated) {
             return collectMemoDependencies(ctx, separated.element(), refs)
