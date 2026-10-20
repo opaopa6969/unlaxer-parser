@@ -87,7 +87,9 @@ fn a_consuming_cycle_parses_and_a_deep_one_is_a_resource_limit() {
             let failure = parse_detailed_with_options(&consuming_cycle(), 0, false, &deep, options)
                 .unwrap_err();
             assert_eq!(failure.kind, "resource_limit", "{label}");
-            assert!(failure.offset < 300, "{label}");
+            // 256 nested rule invocations consumed one 'a' each before the limit.
+            assert_eq!(failure.offset, 256, "{label}");
+            assert_eq!(failure.expected, ["rule nesting below 256"], "{label}");
         }
     });
 }
