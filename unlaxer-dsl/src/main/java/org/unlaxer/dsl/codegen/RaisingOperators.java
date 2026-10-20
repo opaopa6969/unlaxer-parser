@@ -1,9 +1,12 @@
 package org.unlaxer.dsl.codegen;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.unlaxer.dsl.bootstrap.UBNFAST;
@@ -21,6 +24,9 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.SequenceBody;
 public final class RaisingOperators {
     private RaisingOperators() {}
 
+    /** The kind of a committed error among the raised kinds; labels are identifiers, so it never collides. */
+    private static final String COMMIT = "#commit";
+
     /** One rejected operator. {@code element} is the AST node whose span locates it. */
     public record Problem(String code, String rule, AtomicElement element, String subject) {
         public String message() {
@@ -29,14 +35,16 @@ public final class RaisingOperators {
     }
 
     public static List<Problem> problems(GrammarDecl grammar) {
-        Set<String> declared = new HashSet<>();
-        List<Site> sites = new ArrayList<>();
-        for (RuleDecl rule : grammar.rules()) body(rule.name(), rule.body(), declared, sites, recovers(rule));
+        Walk walk = new Walk();
+        for (RuleDecl rule : grammar.rules()) walk.body(rule.name(), rule.body(), Set.of());
+        Raising raising = new Raising(grammar, walk);
         List<Problem> problems = new ArrayList<>();
-        for (Site site : sites) {
-            if (raisingRepetition(site.element())) {
-                problems.add(new Problem("E-RAISING-REPETITION", site.rule(), site.element(),
-                    "unbounded repetition of COMMIT or LABEL always ends with that failure"));
+        for (Site site : walk.sites) {
+            if (site.catching() != null) {
+                if (raising.uncaught(site)) {
+                    problems.add(new Problem("E-RAISING-REPETITION", site.rule(), site.element(),
+                        "unbounded repetition of COMMIT or LABEL always ends with that failure"));
+                }
             } else if (site.element() instanceof UBNFAST.CommitElement commit) {
                 if (commit.message().isPresent() && commit.message().get().isEmpty()) {
                     problems.add(new Problem("E-COMMIT-EMPTY-MESSAGE", site.rule(), commit, "COMMIT message must not be empty"));
@@ -50,7 +58,7 @@ public final class RaisingOperators {
                 for (String label : caught.labels()) {
                     if (!seen.add(label)) {
                         problems.add(new Problem("E-CATCH-DUPLICATE-LABEL", site.rule(), caught, "duplicate CATCH label " + label));
-                    } else if (!declared.contains(label)) {
+                    } else if (!walk.declared.contains(label)) {
                         problems.add(new Problem("E-CATCH-UNKNOWN-LABEL", site.rule(), caught,
                             "CATCH label " + label + " is not raised by any LABEL"));
                     }
@@ -71,74 +79,226 @@ public final class RaisingOperators {
 
     /** Whether a grammar uses any of the three operators. */
     public static boolean used(GrammarDecl grammar) {
-        List<Site> sites = new ArrayList<>();
-        for (RuleDecl rule : grammar.rules()) body(rule.name(), rule.body(), new HashSet<>(), sites, false);
-        return !sites.isEmpty();
+        Walk walk = new Walk();
+        for (RuleDecl rule : grammar.rules()) walk.body(rule.name(), rule.body(), Set.of());
+        return walk.sites.stream().anyMatch(site -> site.catching() == null);
     }
 
-    private record Site(String rule, AtomicElement element) {}
+    /**
+     * An operator site. {@code catching} is null except for an unbounded repetition of a COMMIT,
+     * LABEL or local rule reference, where it holds the labels of the CATCH bodies enclosing it
+     * within its rule.
+     */
+    private record Site(String rule, AtomicElement element, Set<String> catching) {}
 
-    private static void body(String rule, RuleBody body, Set<String> declared, List<Site> sites, boolean exempt) {
-        if (body instanceof ChoiceBody choice) {
-            for (SequenceBody sequence : choice.alternatives()) body(rule, sequence, declared, sites, exempt);
-        } else if (body instanceof SequenceBody sequence) {
-            for (var annotated : sequence.elements()) element(rule, annotated.element(), declared, sites, exempt);
+    /** A local rule reference in {@code from}, inside CATCH bodies of {@code from} catching {@code catching}. */
+    private record Reference(String from, String to, Set<String> catching) {}
+
+    /** Collects operator sites, rule references and the kinds each rule raises syntactically. */
+    private static final class Walk {
+        final Set<String> declared = new HashSet<>();
+        final List<Site> sites = new ArrayList<>();
+        final List<Reference> references = new ArrayList<>();
+
+        void body(String rule, RuleBody body, Set<String> catching) {
+            if (body instanceof ChoiceBody choice) {
+                for (SequenceBody sequence : choice.alternatives()) body(rule, sequence, catching);
+            } else if (body instanceof SequenceBody sequence) {
+                for (var annotated : sequence.elements()) element(rule, annotated.element(), catching);
+            }
+        }
+
+        void element(String rule, AtomicElement element, Set<String> catching) {
+            AtomicElement item = repeated(element);
+            if (item instanceof UBNFAST.CommitElement || item instanceof UBNFAST.LabelElement
+                || item instanceof UBNFAST.RuleRefElement ref && ref.namespace().isEmpty()) {
+                sites.add(new Site(rule, element, catching));
+            }
+            if (element instanceof UBNFAST.CatchElement caught) {
+                sites.add(new Site(rule, caught, null));
+                // Only the body operand is caught; the alternative runs after the catch.
+                Set<String> inner = new HashSet<>(catching);
+                inner.addAll(caught.labels());
+                body(rule, caught.child().body(), Set.copyOf(inner));
+                body(rule, caught.alternative().body(), catching);
+                return;
+            }
+            if (element instanceof UBNFAST.LabelElement label) {
+                declared.add(label.label());
+                sites.add(new Site(rule, label, null));
+            } else if (element instanceof UBNFAST.CommitElement commit) {
+                sites.add(new Site(rule, commit, null));
+            } else if (element instanceof UBNFAST.RuleRefElement ref && ref.namespace().isEmpty()) {
+                references.add(new Reference(rule, ref.name(), catching));
+            }
+            if (element instanceof UBNFAST.TransparentElement transparent) body(rule, transparent.body(), catching);
+            else if (element instanceof UBNFAST.OptionalElement optional) body(rule, optional.body(), catching);
+            else if (element instanceof UBNFAST.RepeatElement repeat) body(rule, repeat.body(), catching);
+            else if (element instanceof UBNFAST.OneOrMoreElement repeat) element(rule, repeat.body(), catching);
+            else if (element instanceof UBNFAST.BoundedRepeatElement repeat) element(rule, repeat.body(), catching);
+            else if (element instanceof UBNFAST.SeparatedElement separated) {
+                element(rule, separated.element(), catching);
+                element(rule, separated.separator(), catching);
+            }
         }
     }
 
     /**
-     * The repetition check is skipped where an enclosing construct can catch the raised failure:
-     * inside a CATCH operand (a label) and in a {@code @recovery} rule (a committed error).
-     * The check stays syntactic and identical on both hosts; it does not follow rule references.
+     * Where a raised failure can be caught (#722). A labeled failure {@code L} is caught only by a
+     * CATCH listing {@code L} whose body operand encloses the raise, in the same rule or around a
+     * reference on some path to the rule; a committed error only by a {@code @recovery} rule, the
+     * raising rule itself or one on some path to it. The analysis is conservative: a repetition
+     * is rejected only when no reference context can catch any kind it may raise.
      */
-    private static boolean recovers(RuleDecl rule) {
-        return rule.annotations().stream().anyMatch(UBNFAST.RecoveryAnnotation.class::isInstance);
+    private static final class Raising {
+        final Map<String, RuleDecl> rules = new LinkedHashMap<>();
+        /** Kinds a rule may raise: every COMMIT and LABEL in it and in the rules it references. */
+        final Map<String, Set<String>> raisable = new HashMap<>();
+        /** Labels caught around some reference path to a rule. */
+        final Map<String, Set<String>> catchable = new HashMap<>();
+        /** Rules on some reference path below a {@code @recovery} rule, recovery rules included. */
+        final Set<String> recovered = new HashSet<>();
+        /** Rules whose every outcome is a raised failure. */
+        final Set<String> always = new HashSet<>();
+        /** Rules that never fail ordinarily: they succeed or raise. */
+        final Set<String> only = new HashSet<>();
+
+        Raising(GrammarDecl grammar, Walk walk) {
+            for (RuleDecl rule : grammar.rules()) rules.putIfAbsent(rule.name(), rule);
+            for (RuleDecl rule : rules.values()) {
+                raisable.put(rule.name(), new HashSet<>());
+                catchable.put(rule.name(), new HashSet<>());
+                if (recovery(rule) != null) recovered.add(rule.name());
+            }
+            for (Site site : walk.sites) {
+                if (site.element() instanceof UBNFAST.CommitElement) raisable.get(site.rule()).add(COMMIT);
+                else if (site.element() instanceof UBNFAST.LabelElement label) raisable.get(site.rule()).add(label.label());
+            }
+            for (boolean changed = true; changed;) {
+                changed = false;
+                for (Reference reference : walk.references) {
+                    if (rules.containsKey(reference.to())) {
+                        changed |= raisable.get(reference.from()).addAll(raisable.get(reference.to()));
+                    }
+                }
+            }
+            for (boolean changed = true; changed;) {
+                changed = false;
+                for (Reference reference : walk.references) {
+                    if (!rules.containsKey(reference.to())) continue;
+                    Set<String> target = catchable.get(reference.to());
+                    changed |= target.addAll(reference.catching());
+                    changed |= target.addAll(catchable.get(reference.from()));
+                    if (recovered.contains(reference.from())) changed |= recovered.add(reference.to());
+                }
+            }
+            for (boolean changed = true; changed;) {
+                changed = false;
+                for (RuleDecl rule : rules.values()) {
+                    var recovery = recovery(rule);
+                    if (alwaysBody(rule.body()) && (recovery == null || !raisable.get(rule.name()).contains(COMMIT))) {
+                        changed |= always.add(rule.name());
+                    }
+                    if (onlyBody(rule.body()) && (recovery == null || recovery.mode() == UBNFAST.RecoveryMode.SYNC)) {
+                        changed |= only.add(rule.name());
+                    }
+                }
+            }
+        }
+
+        boolean uncaught(Site site) {
+            AtomicElement item = repeated(site.element());
+            Set<String> kinds = new HashSet<>();
+            if (item instanceof UBNFAST.CommitElement commit) {
+                kinds.add(COMMIT);
+                kinds.addAll(raisedIn(commit.body()));
+            } else if (item instanceof UBNFAST.LabelElement label) {
+                kinds.add(label.label());
+                kinds.addAll(raisedIn(label.body()));
+            } else if (item instanceof UBNFAST.RuleRefElement ref && only.contains(ref.name()) && !always.contains(ref.name())) {
+                // A rule that always raises is reported inside it; here the repetition makes it certain.
+                kinds.addAll(raisable.get(ref.name()));
+            } else {
+                return false;
+            }
+            for (String kind : kinds) {
+                if (kind.equals(COMMIT) ? recovered.contains(site.rule())
+                    : site.catching().contains(kind) || catchable.get(site.rule()).contains(kind)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /** The kinds raised in a body: its COMMITs and LABELs and those of the rules it references. */
+        Set<String> raisedIn(RuleBody body) {
+            Set<String> kinds = new HashSet<>();
+            Walk walk = new Walk();
+            walk.body("", body, Set.of());
+            for (Site site : walk.sites) {
+                if (site.element() instanceof UBNFAST.CommitElement) kinds.add(COMMIT);
+                else if (site.element() instanceof UBNFAST.LabelElement label) kinds.add(label.label());
+            }
+            for (Reference reference : walk.references) {
+                Set<String> referenced = raisable.get(reference.to());
+                if (referenced != null) kinds.addAll(referenced);
+            }
+            return kinds;
+        }
+
+        boolean onlyRaises(AtomicElement element) {
+            return element instanceof UBNFAST.CommitElement || element instanceof UBNFAST.LabelElement
+                || element instanceof UBNFAST.RuleRefElement ref && ref.namespace().isEmpty() && only.contains(ref.name())
+                || alwaysRaises(element);
+        }
+
+        boolean alwaysRaises(AtomicElement element) {
+            AtomicElement item = repeated(element);
+            if (item != null) return onlyRaises(item);
+            return element instanceof UBNFAST.RuleRefElement ref && ref.namespace().isEmpty() && always.contains(ref.name());
+        }
+
+        boolean onlyBody(RuleBody body) {
+            var elements = sole(body);
+            if (elements == null) return false;
+            return elements.size() == 1 ? onlyRaises(elements.get(0)) : alwaysRaises(elements.get(0));
+        }
+
+        boolean alwaysBody(RuleBody body) {
+            var elements = sole(body);
+            return elements != null && alwaysRaises(elements.get(0));
+        }
     }
 
-    /**
-     * An unbounded repetition whose whole body is one COMMIT or LABEL: the attempt that finds no
-     * further item raises instead of ending the repetition, so it can never succeed.
-     */
-    static boolean raisingRepetition(AtomicElement element) {
-        AtomicElement item = null;
-        if (element instanceof UBNFAST.RepeatElement repeat) item = single(repeat.body());
-        else if (element instanceof UBNFAST.OneOrMoreElement repeat) item = repeat.body();
-        else if (element instanceof UBNFAST.BoundedRepeatElement repeat
-            && repeat.max() == UBNFAST.BoundedRepeatElement.UNBOUNDED) item = repeat.body();
-        return item instanceof UBNFAST.CommitElement || item instanceof UBNFAST.LabelElement;
+    private static UBNFAST.RecoveryAnnotation recovery(RuleDecl rule) {
+        for (var annotation : rule.annotations()) {
+            if (annotation instanceof UBNFAST.RecoveryAnnotation recovery) return recovery;
+        }
+        return null;
     }
 
-    private static AtomicElement single(RuleBody body) {
+    /** The elements of a body with exactly one nonempty alternative, otherwise null. */
+    private static List<AtomicElement> sole(RuleBody body) {
+        SequenceBody sequence;
         if (body instanceof ChoiceBody choice) {
-            return choice.alternatives().size() == 1 ? single(choice.alternatives().get(0)) : null;
+            if (choice.alternatives().size() != 1) return null;
+            sequence = choice.alternatives().get(0);
+        } else {
+            sequence = (SequenceBody) body;
         }
-        var elements = ((SequenceBody) body).elements();
-        return elements.size() == 1 ? elements.get(0).element() : null;
+        if (sequence.elements().isEmpty()) return null;
+        return sequence.elements().stream().map(UBNFAST.AnnotatedElement::element).toList();
     }
 
-    private static void element(String rule, AtomicElement element, Set<String> declared, List<Site> sites,
-            boolean exempt) {
-        if (!exempt && raisingRepetition(element)) sites.add(new Site(rule, element));
-        if (element instanceof UBNFAST.CatchElement caught) {
-            sites.add(new Site(rule, caught));
-            body(rule, caught.child().body(), declared, sites, true);
-            body(rule, caught.alternative().body(), declared, sites, true);
-            return;
+    /** The item of an unbounded repetition ({@code { X }}, {@code X*}, {@code X+}, {@code X{n,}}), otherwise null. */
+    private static AtomicElement repeated(AtomicElement element) {
+        if (element instanceof UBNFAST.RepeatElement repeat) {
+            var elements = sole(repeat.body());
+            return elements != null && elements.size() == 1 ? elements.get(0) : null;
         }
-        if (element instanceof UBNFAST.LabelElement label) {
-            declared.add(label.label());
-            sites.add(new Site(rule, label));
-        } else if (element instanceof UBNFAST.CommitElement commit) {
-            sites.add(new Site(rule, commit));
-        }
-        if (element instanceof UBNFAST.TransparentElement transparent) body(rule, transparent.body(), declared, sites, exempt);
-        else if (element instanceof UBNFAST.OptionalElement optional) body(rule, optional.body(), declared, sites, exempt);
-        else if (element instanceof UBNFAST.RepeatElement repeat) body(rule, repeat.body(), declared, sites, exempt);
-        else if (element instanceof UBNFAST.OneOrMoreElement repeat) element(rule, repeat.body(), declared, sites, exempt);
-        else if (element instanceof UBNFAST.BoundedRepeatElement repeat) element(rule, repeat.body(), declared, sites, exempt);
-        else if (element instanceof UBNFAST.SeparatedElement separated) {
-            element(rule, separated.element(), declared, sites, exempt);
-            element(rule, separated.separator(), declared, sites, exempt);
-        }
+        if (element instanceof UBNFAST.OneOrMoreElement repeat) return repeat.body();
+        if (element instanceof UBNFAST.BoundedRepeatElement repeat
+            && repeat.max() == UBNFAST.BoundedRepeatElement.UNBOUNDED) return repeat.body();
+        return null;
     }
 }

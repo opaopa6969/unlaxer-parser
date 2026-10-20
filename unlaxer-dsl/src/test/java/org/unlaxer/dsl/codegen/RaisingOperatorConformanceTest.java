@@ -76,14 +76,17 @@ public class RaisingOperatorConformanceTest {
 
     @Test public void validatorRejectsWithSourcePositions() throws Exception {
         var rows = corpus("invalid.json");
-        assertEquals(6, rows.size());
+        assertEquals(12, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String id = row.get("id").getAsString(), code = row.get("code").getAsString();
             var snapshot = UBNFMapper.parseWithSource(row.get("grammar").getAsString());
             var grammar = snapshot.ast().grammars().get(0);
-            var problem = RaisingOperators.problems(grammar).stream().filter(p -> p.code().equals(code)).findFirst()
+            var problems = RaisingOperators.problems(grammar);
+            assertEquals(id + " " + problems, 1, problems.size());
+            var problem = problems.stream().filter(p -> p.code().equals(code)).findFirst()
                 .orElseThrow(() -> new AssertionError(id));
+            assertEquals(id, row.has("rule") ? row.get("rule").getAsString() : "Root", problem.rule());
             var span = snapshot.spanOf(problem.element()).orElseThrow();
             assertEquals(id, List.of(row.get("startCP").getAsInt(), row.get("endCP").getAsInt()), List.of(span.start(), span.end()));
             assertTrue(id, GrammarValidator.validateWithoutClassLoading(grammar).stream()
@@ -130,7 +133,7 @@ public class RaisingOperatorConformanceTest {
 
     @Test public void javaGeneratedParsersMatchIndependentOracle() throws Exception {
         var rows = corpus("cases.json");
-        assertEquals(17, rows.size());
+        assertEquals(21, rows.size());
         int observations = 0;
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
@@ -176,7 +179,7 @@ public class RaisingOperatorConformanceTest {
                 }
             }
         }
-        assertEquals(48 * 6, observations);
+        assertEquals(60 * 6, observations);
     }
 
     @Test public void bothRustHostsGenerateAndRunTheSameOracle() throws Exception {

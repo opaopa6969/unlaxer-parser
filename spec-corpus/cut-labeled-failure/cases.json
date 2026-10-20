@@ -323,5 +323,87 @@
         "message": "need a"
       }
     ]
+  },
+  {
+    "name": "label-repetition-through-reference-inside-catch",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH(Item, 'b', L) ;\n  Item ::= { LABEL(L, 'a') } ;\n}\n",
+    "cases": [
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "a",
+        "outcome": "syntax"
+      },
+      {
+        "input": "",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "label-repetition-through-instance-inside-catch",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH(F(LABEL(L, 'a')), 'b', L) ;\n  F(x) ::= { x } ;\n}\n",
+    "cases": [
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "a",
+        "outcome": "syntax"
+      },
+      {
+        "input": "",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "label-repetition-caught-in-one-context",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH(Item, 'b', L) | 'c' Item ;\n  Item ::= { LABEL(L, 'a') } ;\n}\n",
+    "cases": [
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "c",
+        "outcome": "label",
+        "offset": 1,
+        "message": "L",
+        "label": "L"
+      },
+      {
+        "input": "ca",
+        "outcome": "label",
+        "offset": 2,
+        "message": "L",
+        "label": "L"
+      }
+    ]
+  },
+  {
+    "name": "commit-repetition-through-reference-in-recovery-rule",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= Statement 'x' ;\n  @recovery(sync=';')\n  Statement ::= Item ';' ;\n  Item ::= { COMMIT('a', 'need a') } ;\n}\n",
+    "cases": [
+      {
+        "input": "aa;x",
+        "outcome": "recovery",
+        "offset": 0
+      },
+      {
+        "input": ";x",
+        "outcome": "recovery",
+        "offset": 0
+      },
+      {
+        "input": "x",
+        "outcome": "commit",
+        "offset": 0,
+        "message": "need a"
+      }
+    ]
   }
 ]

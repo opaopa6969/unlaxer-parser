@@ -1,6 +1,13 @@
 //! Validation of COMMIT / LABEL / CATCH (#700), mirroring the Java `RaisingOperators`.
-use std::collections::{BTreeSet, HashSet};
-use unlaxer_ubnf::{AnnotationKind, AtomicElement, ElementKind, GrammarDecl, RuleBody, Span};
+use std::collections::{BTreeSet, HashMap, HashSet};
+use unlaxer_ubnf::{
+    AnnotatedElement, AnnotationKind, AtomicElement, ElementKind, GrammarDecl, RecoveryMode,
+    RuleBody, RuleDecl, Span,
+};
+
+/// The kind of a committed error among the raised kinds; labels are identifiers, so it never
+/// collides with one.
+const COMMIT: &str = "#commit";
 
 /// One rejected operator, located by the offending element's span.
 pub struct Problem {
@@ -20,31 +27,29 @@ impl Problem {
 }
 
 pub fn problems(grammar: &GrammarDecl) -> Vec<Problem> {
-    let mut declared = HashSet::new();
-    let mut sites = Vec::new();
+    let mut walk = Walk::default();
     for rule in &grammar.rules {
-        let recovers = rule
-            .annotations
-            .iter()
-            .any(|a| matches!(a.kind, AnnotationKind::Recovery { .. }));
-        body(&rule.name, &rule.body, &mut declared, &mut sites, recovers);
+        walk.body(&rule.name, &rule.body, &BTreeSet::new());
     }
+    let raising = Raising::new(grammar, &walk);
     let mut problems = Vec::new();
-    for (rule, element) in sites {
+    for site in &walk.sites {
         let problem = |code, subject: String| Problem {
             code,
-            rule: rule.to_owned(),
-            span: element.span,
+            rule: site.rule.to_owned(),
+            span: site.element.span,
             subject,
         };
-        if raising_repetition(element) {
-            problems.push(problem(
-                "E-RAISING-REPETITION",
-                "unbounded repetition of COMMIT or LABEL always ends with that failure".into(),
-            ));
+        if site.catching.is_some() {
+            if raising.uncaught(site) {
+                problems.push(problem(
+                    "E-RAISING-REPETITION",
+                    "unbounded repetition of COMMIT or LABEL always ends with that failure".into(),
+                ));
+            }
             continue;
         }
-        match &element.kind {
+        match &site.element.kind {
             ElementKind::Commit {
                 message: Some(message),
                 ..
@@ -63,7 +68,7 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<Problem> {
                             "E-CATCH-DUPLICATE-LABEL",
                             format!("duplicate CATCH label {label}"),
                         ));
-                    } else if !declared.contains(label.as_str()) {
+                    } else if !walk.declared.contains(label.as_str()) {
                         problems.push(problem(
                             "E-CATCH-UNKNOWN-LABEL",
                             format!("CATCH label {label} is not raised by any LABEL"),
@@ -90,29 +95,334 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
         .join("; "))
 }
 
-fn body<'a>(
+/// An operator site. `catching` is `None` except for an unbounded repetition of a COMMIT,
+/// LABEL or local rule reference, where it holds the labels of the CATCH bodies enclosing it
+/// within its rule.
+struct Site<'a> {
     rule: &'a str,
-    value: &'a RuleBody,
-    declared: &mut HashSet<&'a str>,
-    sites: &mut Vec<(&'a str, &'a AtomicElement)>,
-    exempt: bool,
-) {
-    for sequence in &value.alternatives {
-        for annotated in &sequence.elements {
-            element(rule, &annotated.element, declared, sites, exempt);
+    element: &'a AtomicElement,
+    catching: Option<BTreeSet<&'a str>>,
+}
+
+/// A local rule reference in `from`, inside CATCH bodies of `from` catching `catching`.
+struct Reference<'a> {
+    from: &'a str,
+    to: &'a str,
+    catching: BTreeSet<&'a str>,
+}
+
+/// Collects operator sites, rule references and the labels declared anywhere; same walk as Java.
+#[derive(Default)]
+struct Walk<'a> {
+    declared: HashSet<&'a str>,
+    sites: Vec<Site<'a>>,
+    references: Vec<Reference<'a>>,
+}
+
+impl<'a> Walk<'a> {
+    fn body(&mut self, rule: &'a str, value: &'a RuleBody, catching: &BTreeSet<&'a str>) {
+        for sequence in &value.alternatives {
+            for annotated in &sequence.elements {
+                self.element(rule, &annotated.element, catching);
+            }
+        }
+    }
+
+    fn site(&mut self, rule: &'a str, element: &'a AtomicElement) {
+        self.sites.push(Site {
+            rule,
+            element,
+            catching: None,
+        });
+    }
+
+    fn element(&mut self, rule: &'a str, value: &'a AtomicElement, catching: &BTreeSet<&'a str>) {
+        if repeated(value).is_some_and(|item| {
+            matches!(
+                item.kind,
+                ElementKind::Commit { .. }
+                    | ElementKind::Label { .. }
+                    | ElementKind::RuleRef {
+                        namespace: None,
+                        ..
+                    }
+            )
+        }) {
+            self.sites.push(Site {
+                rule,
+                element: value,
+                catching: Some(catching.clone()),
+            });
+        }
+        match &value.kind {
+            ElementKind::Catch { choice, operands } => {
+                self.site(rule, value);
+                // The stored choice is both operands in order. Only the body operand is
+                // caught; the alternative runs after the catch.
+                let mut inner = catching.clone();
+                inner.extend(operands.labels.iter().map(String::as_str));
+                for (index, sequence) in choice.alternatives.iter().enumerate() {
+                    let scope = if index < operands.split {
+                        &inner
+                    } else {
+                        catching
+                    };
+                    for annotated in &sequence.elements {
+                        self.element(rule, &annotated.element, scope);
+                    }
+                }
+            }
+            ElementKind::Label { label, body: inner } => {
+                self.declared.insert(label);
+                self.site(rule, value);
+                self.body(rule, inner, catching);
+            }
+            ElementKind::Commit { body: inner, .. } => {
+                self.site(rule, value);
+                self.body(rule, inner, catching);
+            }
+            ElementKind::RuleRef {
+                namespace: None,
+                name,
+            } => self.references.push(Reference {
+                from: rule,
+                to: name,
+                catching: catching.clone(),
+            }),
+            ElementKind::OwnedCapture { body: inner, .. }
+            | ElementKind::CaptureScope(inner)
+            | ElementKind::Group(inner)
+            | ElementKind::Optional(inner)
+            | ElementKind::Repeat(inner) => self.body(rule, inner, catching),
+            ElementKind::OneOrMore(inner) | ElementKind::BoundedRepeat { element: inner, .. } => {
+                self.element(rule, inner, catching)
+            }
+            ElementKind::Separated {
+                element: item,
+                separator,
+            } => {
+                self.element(rule, item, catching);
+                self.element(rule, separator, catching);
+            }
+            _ => {}
         }
     }
 }
 
-/// An unbounded repetition whose whole body is one COMMIT or LABEL: the attempt that finds
-/// no further item raises instead of ending the repetition, so it can never succeed.
-fn raising_repetition(element: &AtomicElement) -> bool {
-    let item = match &element.kind {
-        ElementKind::Repeat(body) => match body.alternatives.as_slice() {
-            [sequence] => match sequence.elements.as_slice() {
-                [item] => Some(&item.element),
-                _ => None,
-            },
+/// Where a raised failure can be caught (#722), as in Java. A labeled failure `L` is caught
+/// only by a CATCH listing `L` whose body operand encloses the raise, in the same rule or
+/// around a reference on some path to the rule; a committed error only by a `@recovery` rule,
+/// the raising rule itself or one on some path to it. The analysis is conservative: a
+/// repetition is rejected only when no reference context can catch any kind it may raise.
+struct Raising<'a> {
+    rules: Vec<&'a RuleDecl>,
+    known: HashSet<&'a str>,
+    /// Kinds a rule may raise: every COMMIT and LABEL in it and in the rules it references.
+    raisable: HashMap<&'a str, BTreeSet<&'a str>>,
+    /// Labels caught around some reference path to a rule.
+    catchable: HashMap<&'a str, BTreeSet<&'a str>>,
+    /// Rules on some reference path below a `@recovery` rule, recovery rules included.
+    recovered: HashSet<&'a str>,
+    /// Rules whose every outcome is a raised failure.
+    always: HashSet<&'a str>,
+    /// Rules that never fail ordinarily: they succeed or raise.
+    only: HashSet<&'a str>,
+}
+
+impl<'a> Raising<'a> {
+    fn new(grammar: &'a GrammarDecl, walk: &Walk<'a>) -> Self {
+        let mut known = HashSet::new();
+        let rules: Vec<&RuleDecl> = grammar
+            .rules
+            .iter()
+            .filter(|rule| known.insert(rule.name.as_str()))
+            .collect();
+        let mut raising = Self {
+            rules,
+            known,
+            raisable: HashMap::new(),
+            catchable: HashMap::new(),
+            recovered: HashSet::new(),
+            always: HashSet::new(),
+            only: HashSet::new(),
+        };
+        for rule in &raising.rules {
+            raising.raisable.insert(&rule.name, BTreeSet::new());
+            raising.catchable.insert(&rule.name, BTreeSet::new());
+            if recovery(rule).is_some() {
+                raising.recovered.insert(&rule.name);
+            }
+        }
+        for site in &walk.sites {
+            let kind = match &site.element.kind {
+                ElementKind::Commit { .. } => COMMIT,
+                ElementKind::Label { label, .. } => label,
+                _ => continue,
+            };
+            raising.raisable.get_mut(site.rule).unwrap().insert(kind);
+        }
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for reference in &walk.references {
+                if let Some(target) = raising.raisable.get(reference.to).cloned() {
+                    let source = raising.raisable.get_mut(reference.from).unwrap();
+                    let before = source.len();
+                    source.extend(target);
+                    changed |= source.len() != before;
+                }
+            }
+        }
+        changed = true;
+        while changed {
+            changed = false;
+            for reference in &walk.references {
+                if !raising.known.contains(reference.to) {
+                    continue;
+                }
+                let mut added = reference.catching.clone();
+                added.extend(raising.catchable[reference.from].iter().copied());
+                let target = raising.catchable.get_mut(reference.to).unwrap();
+                let before = target.len();
+                target.extend(added);
+                changed |= target.len() != before;
+                if raising.recovered.contains(reference.from) {
+                    changed |= raising.recovered.insert(reference.to);
+                }
+            }
+        }
+        changed = true;
+        while changed {
+            changed = false;
+            for index in 0..raising.rules.len() {
+                let rule = raising.rules[index];
+                let recovery = recovery(rule);
+                if raising.always_body(&rule.body)
+                    && (recovery.is_none()
+                        || !raising.raisable[rule.name.as_str()].contains(COMMIT))
+                {
+                    changed |= raising.always.insert(&rule.name);
+                }
+                if raising.only_body(&rule.body)
+                    && (recovery.is_none() || recovery == Some(RecoveryMode::Sync))
+                {
+                    changed |= raising.only.insert(&rule.name);
+                }
+            }
+        }
+        raising
+    }
+
+    fn uncaught(&self, site: &Site<'a>) -> bool {
+        let Some(item) = repeated(site.element) else {
+            return false;
+        };
+        let mut kinds = BTreeSet::new();
+        match &item.kind {
+            ElementKind::Commit { body, .. } => {
+                kinds.insert(COMMIT);
+                kinds.extend(self.raised_in(body));
+            }
+            ElementKind::Label { label, body } => {
+                kinds.insert(label.as_str());
+                kinds.extend(self.raised_in(body));
+            }
+            // A rule that always raises is reported inside it; here the repetition makes it certain.
+            ElementKind::RuleRef { name, .. }
+                if self.only.contains(name.as_str()) && !self.always.contains(name.as_str()) =>
+            {
+                kinds.extend(self.raisable[name.as_str()].iter().copied());
+            }
+            _ => return false,
+        }
+        let catching = site.catching.as_ref().unwrap();
+        !kinds.iter().any(|kind| {
+            if *kind == COMMIT {
+                self.recovered.contains(site.rule)
+            } else {
+                catching.contains(kind) || self.catchable[site.rule].contains(kind)
+            }
+        })
+    }
+
+    /// The kinds raised in a body: its COMMITs and LABELs and those of the rules it references.
+    fn raised_in(&self, body: &'a RuleBody) -> BTreeSet<&'a str> {
+        let mut walk = Walk::default();
+        walk.body("", body, &BTreeSet::new());
+        let mut kinds = BTreeSet::new();
+        for site in &walk.sites {
+            match &site.element.kind {
+                ElementKind::Commit { .. } => {
+                    kinds.insert(COMMIT);
+                }
+                ElementKind::Label { label, .. } => {
+                    kinds.insert(label.as_str());
+                }
+                _ => {}
+            }
+        }
+        for reference in &walk.references {
+            if let Some(referenced) = self.raisable.get(reference.to) {
+                kinds.extend(referenced.iter().copied());
+            }
+        }
+        kinds
+    }
+
+    fn only_raises(&self, element: &AtomicElement) -> bool {
+        match &element.kind {
+            ElementKind::Commit { .. } | ElementKind::Label { .. } => true,
+            ElementKind::RuleRef {
+                namespace: None,
+                name,
+            } if self.only.contains(name.as_str()) => true,
+            _ => self.always_raises(element),
+        }
+    }
+
+    fn always_raises(&self, element: &AtomicElement) -> bool {
+        if let Some(item) = repeated(element) {
+            return self.only_raises(item);
+        }
+        matches!(&element.kind, ElementKind::RuleRef { namespace: None, name }
+            if self.always.contains(name.as_str()))
+    }
+
+    fn only_body(&self, body: &RuleBody) -> bool {
+        match sole(body) {
+            Some([single]) => self.only_raises(&single.element),
+            Some([first, ..]) => self.always_raises(&first.element),
+            _ => false,
+        }
+    }
+
+    fn always_body(&self, body: &RuleBody) -> bool {
+        sole(body).is_some_and(|elements| self.always_raises(&elements[0].element))
+    }
+}
+
+fn recovery(rule: &RuleDecl) -> Option<RecoveryMode> {
+    rule.annotations
+        .iter()
+        .find_map(|annotation| match &annotation.kind {
+            AnnotationKind::Recovery { mode, .. } => Some(*mode),
+            _ => None,
+        })
+}
+
+/// The elements of a body with exactly one nonempty alternative.
+fn sole(body: &RuleBody) -> Option<&[AnnotatedElement]> {
+    match body.alternatives.as_slice() {
+        [sequence] if !sequence.elements.is_empty() => Some(&sequence.elements),
+        _ => None,
+    }
+}
+
+/// The item of an unbounded repetition (`{ X }`, `X*`, `X+`, `X{n,}`).
+fn repeated(element: &AtomicElement) -> Option<&AtomicElement> {
+    match &element.kind {
+        ElementKind::Repeat(body) => match sole(body) {
+            Some([item]) => Some(&item.element),
             _ => None,
         },
         ElementKind::OneOrMore(item)
@@ -120,59 +430,7 @@ fn raising_repetition(element: &AtomicElement) -> bool {
             element: item,
             max: None,
             ..
-        } => Some(&**item),
+        } => Some(item),
         _ => None,
-    };
-    item.is_some_and(|item| {
-        matches!(
-            item.kind,
-            ElementKind::Commit { .. } | ElementKind::Label { .. }
-        )
-    })
-}
-
-fn element<'a>(
-    rule: &'a str,
-    value: &'a AtomicElement,
-    declared: &mut HashSet<&'a str>,
-    sites: &mut Vec<(&'a str, &'a AtomicElement)>,
-    exempt: bool,
-) {
-    // Skipped where an enclosing construct can catch the raised failure: inside a CATCH
-    // operand (a label) and in a @recovery rule (a committed error); same rule as Java.
-    if !exempt && raising_repetition(value) {
-        sites.push((rule, value));
-    }
-    match &value.kind {
-        ElementKind::Catch { choice, .. } => {
-            sites.push((rule, value));
-            // The stored choice is both operands in order.
-            body(rule, choice, declared, sites, true);
-        }
-        ElementKind::Label { label, body: inner } => {
-            declared.insert(label);
-            sites.push((rule, value));
-            body(rule, inner, declared, sites, exempt);
-        }
-        ElementKind::Commit { body: inner, .. } => {
-            sites.push((rule, value));
-            body(rule, inner, declared, sites, exempt);
-        }
-        ElementKind::OwnedCapture { body: inner, .. }
-        | ElementKind::CaptureScope(inner)
-        | ElementKind::Group(inner)
-        | ElementKind::Optional(inner)
-        | ElementKind::Repeat(inner) => body(rule, inner, declared, sites, exempt),
-        ElementKind::OneOrMore(inner) | ElementKind::BoundedRepeat { element: inner, .. } => {
-            element(rule, inner, declared, sites, exempt)
-        }
-        ElementKind::Separated {
-            element: item,
-            separator,
-        } => {
-            element(rule, item, declared, sites, exempt);
-            element(rule, separator, declared, sites, exempt);
-        }
-        _ => {}
     }
 }

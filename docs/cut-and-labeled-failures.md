@@ -142,21 +142,13 @@ and in both portability checks:
 | `E-CATCH-EMPTY` | a `CATCH` without labels (the syntax admits it so the error is positioned) |
 | `E-CATCH-DUPLICATE-LABEL` | a label listed twice in one `CATCH` |
 | `E-COMMIT-EMPTY-MESSAGE` | `COMMIT(body, '')` |
-| `E-RAISING-REPETITION` | an unbounded repetition (`{ X }`, `X*`, `X+`, `X{n,}`) whose whole body is one `COMMIT` or `LABEL`: the attempt that finds no further item raises, so it can never succeed |
+| `E-RAISING-REPETITION` | an unbounded repetition (`{ X }`, `X*`, `X+`, `X{n,}`) whose whole body is one `COMMIT` or `LABEL`, or a reference to a rule that never fails ordinarily, when nothing can catch what it raises: the attempt that finds no further item raises, so it can never succeed (see [below](#which-repetitions-are-rejected)) |
 
 The unknown-label check is grammar-wide: a label counts as declared when any
 `LABEL(...)` in the grammar raises it, even in an unreachable rule or only in the
 `CATCH` alternative. It does not prove that the label can reach that `CATCH`.
 A bounded repetition (`LABEL(L, 'a'){2,3}`) is not rejected: it succeeds when it
 stops at its maximum, and fails with the label otherwise.
-`E-RAISING-REPETITION` is also skipped where an enclosing construct can catch the
-raised failure: inside a `CATCH` operand (`CATCH({ LABEL(L, 'a') }, 'b', L)` accepts
-`b`) and in a `@recovery` rule (a committed error there is recovered, so
-`Root ::= Statement 'x'` accepts `aa;x`; a recovery rule repeated up to the end of
-input still fails there, because recovery needs a sync token). The check is
-syntactic and identical on both hosts; it runs after parameterized rules are expanded
-and does not follow rule references, so it rejects only the evident cases.
-
 The three calls take part in parameterized rules like any group: parameters and calls
 are substituted inside their bodies (both `CATCH` operands included), argument keys
 spell them as `m(...)` / `n(message,...)`, `l(label,...)` and `h(g(..),g(..),labels)`,
@@ -173,6 +165,55 @@ group, as in the Java runtime CST, so candidate depths agree on all three paths
 (`spec-corpus/preferred-ast` fixture `CatchOperandDepth`). The native AST stores the
 two operands once (`ElementKind::Catch { choice, operands }`, `operands.split` marks
 the boundary), so nested `CATCH` stays linear in size on both frontends.
+
+### Which repetitions are rejected
+
+`E-RAISING-REPETITION` follows what each construct catches (#722). It runs after
+parameterized rules are expanded, so a monomorphized instance is an ordinary rule.
+
+- A labeled failure `L` is caught only inside the body operand of a `CATCH` that lists
+  `L`, in the same rule or around a rule reference on some path to the rule:
+  `CATCH({ LABEL(L, 'a') }, 'b', L)`, `CATCH(Item, 'b', L)` with
+  `Item ::= { LABEL(L, 'a') }` and `CATCH(F(LABEL(L, 'a')), 'b', L)` with
+  `F(x) ::= { x }` are accepted (each accepts `b`). The alternative operand runs after the
+  catch and is not caught by it, a `CATCH` does not catch a label it does not list, and a
+  recovery rule does not catch labels: `CATCH({ LABEL(M, 'a') }, 'b', L)`,
+  `CATCH('x', { LABEL(L, 'a') } 'y', L)` and
+  `@recovery(sync=';') Statement ::= { LABEL(L, 'a') } ';'` are rejected.
+- A committed error is caught only by a `@recovery` rule: the raising rule itself or one on
+  some reference path to it. `CATCH({ COMMIT('a') }, 'b', L)` is rejected, and
+  `Root ::= Statement 'x'` with `@recovery(sync=';') Statement ::= { COMMIT('a', 'need a') } ';'`
+  is accepted (`aa;x` recovers), also when the repetition sits in a rule `Item` that
+  `Statement ::= Item ';'` references.
+- A repetition of a reference is rejected too when the referenced rule never fails
+  ordinarily and can still succeed. A recovery rule whose body always raises is such a rule:
+  it succeeds by recovering, but the attempt with no sync token left raises the committed
+  error again, so `Root ::= { Statement }` with the `Statement` above can never succeed and
+  is rejected at `{ Statement }`, while the repetition inside `Statement` is not. A rule
+  never fails ordinarily when its body is one alternative that is a single `COMMIT`,
+  `LABEL` or such a reference, or that starts with an element that always raises (one of
+  these repetitions, or a reference to a rule that always raises). A recovery rule counts
+  only with `@recovery(sync=...)`, whose recovery consumes the sync token; `auto` and
+  `skip` may resume without consuming input. A repetition of a rule that always raises is
+  not rejected again: the repetition inside that rule is.
+
+The kinds a repetition may raise are its own operator's and every `COMMIT` and `LABEL`
+nested in its item or reachable through references from it. The repetition is rejected
+only when none of them can be caught, so the check never rejects a grammar in which some
+reference context catches the failure. A rule referenced both inside and outside a
+`CATCH` is therefore accepted (`Root ::= CATCH(Item, 'b', L) | 'c' Item` accepts `b`; `c`
+still ends with the label), and a chain of references that the check cannot see through
+(a choice of several alternatives, an optional, a group) is treated as able to fail
+ordinarily. Both hosts compute the same least fixed points over rule references, so the
+decision and the code-point span agree.
+
+This precise check was chosen over turning the error into a warning (option (b) in #722):
+a warning would also have removed the misses and false rejections, but grammars that can
+never succeed would then generate without any error, and the Java generators, the
+native generator and the Rust lowering have no warning channel to carry it. The change is
+confined to `RaisingOperators` and `raising.rs`; reverting it restores the syntactic rule
+of #710. Apart from the cases added for #722, the shared corpora and every `.ubnf` in the
+repository are decided as before (1212 grammars scanned on both hosts).
 
 ## API names
 
@@ -229,12 +270,16 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml \
 ```
 
 The UBNF slice uses [`spec-corpus/cut-labeled-failure`](../spec-corpus/cut-labeled-failure):
-`cases.json` has 9 grammars and 25 inputs covering choice, optional, repetition,
-nested catch, a memoized rule, recovery and supplementary scalars with CRLF;
-`invalid.json` has the 4 positioned rejections. `RaisingOperatorConformanceTest`
+`cases.json` has 21 grammars and 60 inputs covering choice, optional, repetition,
+nested catch, a memoized rule, recovery, supplementary scalars with CRLF and the
+repetitions that #722 accepts through references, instances and recovery;
+`invalid.json` has the 12 positioned rejections, 8 of them `E-RAISING-REPETITION`. `RaisingOperatorConformanceTest`
 compiles and runs the Java consumer, generates Rust from both hosts, checks the
 files byte for byte, and builds and runs both Rust consumers under all six
 memo × diagnostics settings, plus both language servers over JSON-RPC.
+The native test `rust/unlaxer-generator/tests/raising_operators.rs` checks the same rows
+with the native generator and portability check (code, rule and code-point span), and
+that every accepted grammar generates.
 The frontend fixtures `rust/unlaxer-ubnf/tests/fixtures/positive/cut-labeled-failure.ubnf`
 and `negative.tsv` compare both UBNF frontends.
 
