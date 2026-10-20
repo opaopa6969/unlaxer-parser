@@ -1,6 +1,6 @@
 //! Validation of COMMIT / LABEL / CATCH (#700), mirroring the Java `RaisingOperators`.
 use std::collections::{BTreeSet, HashSet};
-use unlaxer_ubnf::{AtomicElement, ElementKind, GrammarDecl, RuleBody, Span};
+use unlaxer_ubnf::{AnnotationKind, AtomicElement, ElementKind, GrammarDecl, RuleBody, Span};
 
 /// One rejected operator, located by the offending element's span.
 pub struct Problem {
@@ -23,7 +23,11 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<Problem> {
     let mut declared = HashSet::new();
     let mut sites = Vec::new();
     for rule in &grammar.rules {
-        body(&rule.name, &rule.body, &mut declared, &mut sites);
+        let recovers = rule
+            .annotations
+            .iter()
+            .any(|a| matches!(a.kind, AnnotationKind::Recovery { .. }));
+        body(&rule.name, &rule.body, &mut declared, &mut sites, recovers);
     }
     let mut problems = Vec::new();
     for (rule, element) in sites {
@@ -91,10 +95,11 @@ fn body<'a>(
     value: &'a RuleBody,
     declared: &mut HashSet<&'a str>,
     sites: &mut Vec<(&'a str, &'a AtomicElement)>,
+    exempt: bool,
 ) {
     for sequence in &value.alternatives {
         for annotated in &sequence.elements {
-            element(rule, &annotated.element, declared, sites);
+            element(rule, &annotated.element, declared, sites, exempt);
         }
     }
 }
@@ -131,39 +136,42 @@ fn element<'a>(
     value: &'a AtomicElement,
     declared: &mut HashSet<&'a str>,
     sites: &mut Vec<(&'a str, &'a AtomicElement)>,
+    exempt: bool,
 ) {
-    if raising_repetition(value) {
+    // Skipped where an enclosing construct can catch the raised failure: inside a CATCH
+    // operand (a label) and in a @recovery rule (a committed error); same rule as Java.
+    if !exempt && raising_repetition(value) {
         sites.push((rule, value));
     }
     match &value.kind {
         ElementKind::Catch { choice, .. } => {
             sites.push((rule, value));
             // The stored choice is both operands in order.
-            body(rule, choice, declared, sites);
+            body(rule, choice, declared, sites, true);
         }
         ElementKind::Label { label, body: inner } => {
             declared.insert(label);
             sites.push((rule, value));
-            body(rule, inner, declared, sites);
+            body(rule, inner, declared, sites, exempt);
         }
         ElementKind::Commit { body: inner, .. } => {
             sites.push((rule, value));
-            body(rule, inner, declared, sites);
+            body(rule, inner, declared, sites, exempt);
         }
         ElementKind::OwnedCapture { body: inner, .. }
         | ElementKind::CaptureScope(inner)
         | ElementKind::Group(inner)
         | ElementKind::Optional(inner)
-        | ElementKind::Repeat(inner) => body(rule, inner, declared, sites),
+        | ElementKind::Repeat(inner) => body(rule, inner, declared, sites, exempt),
         ElementKind::OneOrMore(inner) | ElementKind::BoundedRepeat { element: inner, .. } => {
-            element(rule, inner, declared, sites)
+            element(rule, inner, declared, sites, exempt)
         }
         ElementKind::Separated {
             element: item,
             separator,
         } => {
-            element(rule, item, declared, sites);
-            element(rule, separator, declared, sites);
+            element(rule, item, declared, sites, exempt);
+            element(rule, separator, declared, sites, exempt);
         }
         _ => {}
     }

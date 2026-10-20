@@ -170,5 +170,147 @@
         "label": "L"
       }
     ]
+  },
+  {
+    "name": "parameter-inside-commit",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F('a') ;\n  F(x) ::= COMMIT(x, 'm') ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "commit",
+        "offset": 0,
+        "message": "m"
+      }
+    ]
+  },
+  {
+    "name": "commit-as-argument",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F(COMMIT('a')) ;\n  F(x) ::= x 'b' ;\n}\n",
+    "cases": [
+      {
+        "input": "ab",
+        "outcome": "success"
+      },
+      {
+        "input": "x",
+        "outcome": "commit",
+        "offset": 0,
+        "message": "unexpected input"
+      },
+      {
+        "input": "ac",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "value-parameter-inside-commit",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F('a') ;\n  F(=x) ::= COMMIT(x) x ;\n}\n",
+    "cases": [
+      {
+        "input": "aa",
+        "outcome": "success"
+      },
+      {
+        "input": "ab",
+        "outcome": "syntax"
+      },
+      {
+        "input": "b",
+        "outcome": "commit",
+        "offset": 0,
+        "message": "unexpected input"
+      }
+    ]
+  },
+  {
+    "name": "label-argument-caught-in-callee",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F(LABEL(L, 'a')) ;\n  F(x) ::= CATCH(x, 'b', L) ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "c",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "parameter-in-label-and-catch",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F('a') ;\n  F(x) ::= LABEL(L, x) | CATCH(x, 'b', L) ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "label",
+        "offset": 0,
+        "message": "L",
+        "label": "L"
+      }
+    ]
+  },
+  {
+    "name": "call-inside-catch",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH(F('a'), 'b', L) ;\n  F(x) ::= LABEL(L, x) ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "c",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "label-repetition-inside-catch",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH({ LABEL(L, 'a') }, 'b', L) ;\n}\n",
+    "cases": [
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "a",
+        "outcome": "syntax"
+      },
+      {
+        "input": "",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "commit-repetition-in-recovery-rule",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Statement } ;\n  @recovery(sync=';')\n  Statement ::= { COMMIT('a', 'need a') } ';' ;\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "aa;",
+        "outcome": "recovery",
+        "offset": 0
+      }
+    ]
   }
 ]

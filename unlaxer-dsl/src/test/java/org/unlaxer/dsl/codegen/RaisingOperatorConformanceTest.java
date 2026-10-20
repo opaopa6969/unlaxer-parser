@@ -76,7 +76,7 @@ public class RaisingOperatorConformanceTest {
 
     @Test public void validatorRejectsWithSourcePositions() throws Exception {
         var rows = corpus("invalid.json");
-        assertEquals(5, rows.size());
+        assertEquals(6, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String id = row.get("id").getAsString(), code = row.get("code").getAsString();
@@ -87,7 +87,8 @@ public class RaisingOperatorConformanceTest {
             var span = snapshot.spanOf(problem.element()).orElseThrow();
             assertEquals(id, List.of(row.get("startCP").getAsInt(), row.get("endCP").getAsInt()), List.of(span.start(), span.end()));
             assertTrue(id, GrammarValidator.validateWithoutClassLoading(grammar).stream()
-                .anyMatch(issue -> issue.code().equals(code) && issue.rule().equals("Root")));
+                .anyMatch(issue -> issue.code().equals(code)
+                    && issue.rule().equals(row.has("rule") ? row.get("rule").getAsString() : "Root")));
             for (CodeGenerator generator : List.<CodeGenerator>of(new ParserGenerator())) {
                 assertTrue(id, assertThrows(IllegalArgumentException.class, () -> generator.generate(grammar)).getMessage().contains(code));
             }
@@ -129,7 +130,7 @@ public class RaisingOperatorConformanceTest {
 
     @Test public void javaGeneratedParsersMatchIndependentOracle() throws Exception {
         var rows = corpus("cases.json");
-        assertEquals(9, rows.size());
+        assertEquals(17, rows.size());
         int observations = 0;
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
@@ -175,7 +176,7 @@ public class RaisingOperatorConformanceTest {
                 }
             }
         }
-        assertEquals(25 * 6, observations);
+        assertEquals(46 * 6, observations);
     }
 
     @Test public void bothRustHostsGenerateAndRunTheSameOracle() throws Exception {

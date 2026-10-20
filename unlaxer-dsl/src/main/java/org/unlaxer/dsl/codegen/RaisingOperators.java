@@ -31,7 +31,7 @@ public final class RaisingOperators {
     public static List<Problem> problems(GrammarDecl grammar) {
         Set<String> declared = new HashSet<>();
         List<Site> sites = new ArrayList<>();
-        for (RuleDecl rule : grammar.rules()) body(rule.name(), rule.body(), declared, sites);
+        for (RuleDecl rule : grammar.rules()) body(rule.name(), rule.body(), declared, sites, recovers(rule));
         List<Problem> problems = new ArrayList<>();
         for (Site site : sites) {
             if (raisingRepetition(site.element())) {
@@ -72,18 +72,27 @@ public final class RaisingOperators {
     /** Whether a grammar uses any of the three operators. */
     public static boolean used(GrammarDecl grammar) {
         List<Site> sites = new ArrayList<>();
-        for (RuleDecl rule : grammar.rules()) body(rule.name(), rule.body(), new HashSet<>(), sites);
+        for (RuleDecl rule : grammar.rules()) body(rule.name(), rule.body(), new HashSet<>(), sites, false);
         return !sites.isEmpty();
     }
 
     private record Site(String rule, AtomicElement element) {}
 
-    private static void body(String rule, RuleBody body, Set<String> declared, List<Site> sites) {
+    private static void body(String rule, RuleBody body, Set<String> declared, List<Site> sites, boolean exempt) {
         if (body instanceof ChoiceBody choice) {
-            for (SequenceBody sequence : choice.alternatives()) body(rule, sequence, declared, sites);
+            for (SequenceBody sequence : choice.alternatives()) body(rule, sequence, declared, sites, exempt);
         } else if (body instanceof SequenceBody sequence) {
-            for (var annotated : sequence.elements()) element(rule, annotated.element(), declared, sites);
+            for (var annotated : sequence.elements()) element(rule, annotated.element(), declared, sites, exempt);
         }
+    }
+
+    /**
+     * The repetition check is skipped where an enclosing construct can catch the raised failure:
+     * inside a CATCH operand (a label) and in a {@code @recovery} rule (a committed error).
+     * The check stays syntactic and identical on both hosts; it does not follow rule references.
+     */
+    private static boolean recovers(RuleDecl rule) {
+        return rule.annotations().stream().anyMatch(UBNFAST.RecoveryAnnotation.class::isInstance);
     }
 
     /**
@@ -107,12 +116,13 @@ public final class RaisingOperators {
         return elements.size() == 1 ? elements.get(0).element() : null;
     }
 
-    private static void element(String rule, AtomicElement element, Set<String> declared, List<Site> sites) {
-        if (raisingRepetition(element)) sites.add(new Site(rule, element));
+    private static void element(String rule, AtomicElement element, Set<String> declared, List<Site> sites,
+            boolean exempt) {
+        if (!exempt && raisingRepetition(element)) sites.add(new Site(rule, element));
         if (element instanceof UBNFAST.CatchElement caught) {
             sites.add(new Site(rule, caught));
-            body(rule, caught.child().body(), declared, sites);
-            body(rule, caught.alternative().body(), declared, sites);
+            body(rule, caught.child().body(), declared, sites, true);
+            body(rule, caught.alternative().body(), declared, sites, true);
             return;
         }
         if (element instanceof UBNFAST.LabelElement label) {
@@ -121,14 +131,14 @@ public final class RaisingOperators {
         } else if (element instanceof UBNFAST.CommitElement commit) {
             sites.add(new Site(rule, commit));
         }
-        if (element instanceof UBNFAST.TransparentElement transparent) body(rule, transparent.body(), declared, sites);
-        else if (element instanceof UBNFAST.OptionalElement optional) body(rule, optional.body(), declared, sites);
-        else if (element instanceof UBNFAST.RepeatElement repeat) body(rule, repeat.body(), declared, sites);
-        else if (element instanceof UBNFAST.OneOrMoreElement repeat) element(rule, repeat.body(), declared, sites);
-        else if (element instanceof UBNFAST.BoundedRepeatElement repeat) element(rule, repeat.body(), declared, sites);
+        if (element instanceof UBNFAST.TransparentElement transparent) body(rule, transparent.body(), declared, sites, exempt);
+        else if (element instanceof UBNFAST.OptionalElement optional) body(rule, optional.body(), declared, sites, exempt);
+        else if (element instanceof UBNFAST.RepeatElement repeat) body(rule, repeat.body(), declared, sites, exempt);
+        else if (element instanceof UBNFAST.OneOrMoreElement repeat) element(rule, repeat.body(), declared, sites, exempt);
+        else if (element instanceof UBNFAST.BoundedRepeatElement repeat) element(rule, repeat.body(), declared, sites, exempt);
         else if (element instanceof UBNFAST.SeparatedElement separated) {
-            element(rule, separated.element(), declared, sites);
-            element(rule, separated.separator(), declared, sites);
+            element(rule, separated.element(), declared, sites, exempt);
+            element(rule, separated.separator(), declared, sites, exempt);
         }
     }
 }

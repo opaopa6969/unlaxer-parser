@@ -149,6 +149,16 @@ The unknown-label check is grammar-wide: a label counts as declared when any
 `CATCH` alternative. It does not prove that the label can reach that `CATCH`.
 A bounded repetition (`LABEL(L, 'a'){2,3}`) is not rejected: it succeeds when it
 stops at its maximum, and fails with the label otherwise.
+`E-RAISING-REPETITION` is also skipped where an enclosing construct can catch the
+raised failure: inside a `CATCH` operand (`CATCH({ LABEL(L, 'a') }, 'b', L)` accepts
+`b`) and in a `@recovery` rule (a committed error there is recovered). The check is
+syntactic and identical on both hosts; it runs after parameterized rules are expanded
+and does not follow rule references, so it rejects only the evident cases.
+
+The three calls take part in parameterized rules like any group: parameters and calls
+are substituted inside their bodies (both `CATCH` operands included), argument keys
+spell them as `m(...)` / `n(message,...)`, `l(label,...)` and `h(g(..),g(..),labels)`,
+and `COMMIT`, `LABEL` and `CATCH` are reserved names (`E-PARAM-RESERVED`).
 
 The generated Java `diagnose` and the Rust `parse_tree_detailed*` functions
 return kind `commit` or `label` with the raised offset and message. Both generated

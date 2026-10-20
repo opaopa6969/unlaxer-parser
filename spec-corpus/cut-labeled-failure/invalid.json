@@ -33,5 +33,13 @@
     "code": "E-RAISING-REPETITION",
     "startCP": 33,
     "endCP": 50
+  },
+  {
+    "id": "raising-repetition-through-parameter",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F(COMMIT('a')) 'x' ;\n  F(x) ::= { x } ;\n}\n",
+    "code": "E-RAISING-REPETITION",
+    "rule": "F_36f58ca21227c6d8",
+    "startCP": 120,
+    "endCP": 125
   }
 ]
