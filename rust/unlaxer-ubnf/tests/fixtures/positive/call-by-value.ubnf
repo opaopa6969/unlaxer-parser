@@ -1,0 +1,10 @@
+// Value parameters (#704): '=' marks a parameter whose argument is matched at the call
+// and replayed by every use; trivia may follow the marker.
+grammar CallByValue {
+  @whitespace: none
+  @root
+  Root ::= '<' Body(Name) Pair('a', Pair('b', 'c')) ;
+  Name ::= 'a' { 'a' } ;
+  Body(= tag) ::= '>' '</' tag '>' ;
+  Pair(=l, r) ::= l r l | r ;
+}

@@ -1,0 +1,9 @@
+// A Name(params) definition reserves Name( only inside its own grammar (#701).
+grammar A {
+  Root ::= F('a') ;
+  F(x) ::= x { x } ;
+}
+grammar B {
+  Root ::= F('b') ;
+  F ::= 'c' ;
+}

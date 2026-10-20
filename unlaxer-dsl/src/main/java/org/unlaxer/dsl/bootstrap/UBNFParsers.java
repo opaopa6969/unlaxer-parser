@@ -1396,6 +1396,133 @@ public class UBNFParsers {
         }
     }
 
+    // =========================================================================
+    // First-order parameterized rules (#701)
+    // =========================================================================
+
+    /** Per-parse state installed by {@link UBNFMapper}; absent means no parameterized rule. */
+    record ParameterizedSyntax(List<ParameterizedRules.Region> regions, int[] codePoints) {}
+
+    static final Name PARAMETERIZED_SYNTAX = Name.of(UBNFParsers.class, "parameterizedSyntax");
+
+    private static boolean identifierPart(int codePoint) {
+        return codePoint < 128 && (Character.isLetterOrDigit(codePoint) || codePoint == '_');
+    }
+
+    /**
+     * '(' immediately after an identifier character, so trivia between a rule name and
+     * its parameter list is rejected exactly as in the native Rust frontend.
+     */
+    public static class AdjacentLeftParenthesisParser extends org.unlaxer.parser.elementary.AbstractTokenParser {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public org.unlaxer.Token getToken(org.unlaxer.context.ParseContext context,
+                org.unlaxer.TokenKind tokenKind, boolean invertMatch) {
+            int position = context.getConsumedPosition().value();
+            if (position > 0) {
+                var previous = context.peek(new org.unlaxer.CodePointIndex(position - 1), new org.unlaxer.CodePointLength(1));
+                var current = context.peek(tokenKind, new org.unlaxer.CodePointLength(1));
+                String before = previous.sourceAsString();
+                if (before != null && !before.isEmpty() && identifierPart(before.codePointAt(0))
+                        && "(".equals(current.sourceAsString())) {
+                    return new org.unlaxer.Token(tokenKind, current, this);
+                }
+            }
+            return org.unlaxer.Token.empty(tokenKind, context.getCursor(org.unlaxer.TokenKind.consumed), this);
+        }
+    }
+
+    /**
+     * Name of a rule defined in this file as {@code Name(params) ::=}, followed directly
+     * by '('. Every other spelling keeps its previous meaning (a reference and a group).
+     */
+    public static class ParameterizedRuleNameParser extends org.unlaxer.parser.elementary.AbstractTokenParser {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public org.unlaxer.Token getToken(org.unlaxer.context.ParseContext context,
+                org.unlaxer.TokenKind tokenKind, boolean invertMatch) {
+            Object state = context.getGlobalScopeTreeMap().get(PARAMETERIZED_SYNTAX);
+            if (state instanceof ParameterizedSyntax syntax) {
+                int[] text = syntax.codePoints();
+                int start = context.getConsumedPosition().value(), end = start;
+                java.util.Set<String> names = java.util.Set.of();
+                for (ParameterizedRules.Region region : syntax.regions())
+                    if (region.start() <= start && start < region.end()) names = region.names();
+                if (end < text.length && text[end] < 128 && (Character.isLetter(text[end]) || text[end] == '_')) {
+                    while (end < text.length && identifierPart(text[end])) end++;
+                    String name = new String(text, start, end - start);
+                    // Builtin spellings keep their own syntax; their definitions are rejected later.
+                    if (end < text.length && text[end] == '(' && names.contains(name)
+                            && !ParameterizedRules.RESERVED.contains(name)) {
+                        return new org.unlaxer.Token(tokenKind,
+                            context.peek(tokenKind, new org.unlaxer.CodePointLength(end - start)), this);
+                    }
+                }
+            }
+            return org.unlaxer.Token.empty(tokenKind, context.getCursor(org.unlaxer.TokenKind.consumed), this);
+        }
+    }
+
+    /** RuleParameters: adjacent '(' RuleParameter { ',' RuleParameter } ')' */
+    public static class RuleParameterListParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(AdjacentLeftParenthesisParser.class),
+                Parser.get(RuleParameterParser.class),
+                new ZeroOrMore(new UBNFLazyChain() {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    public Parsers getLazyParsers() {
+                        return new Parsers(Parser.get(CommaParser.class), Parser.get(RuleParameterParser.class));
+                    }
+                }),
+                Parser.get(RightParenthesisParser.class));
+        }
+    }
+
+    /** The '=' that marks a value parameter (#704). */
+    public static class ValueParameterMarkerParser extends SingleCharacterParser {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean isMatch(char target) {
+            return '=' == target;
+        }
+    }
+
+    /** RuleParameter: [ '=' ] IDENTIFIER; '=' declares a value parameter (#704). */
+    public static class RuleParameterParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                new org.unlaxer.parser.combinator.Optional(Parser.get(ValueParameterMarkerParser.class)),
+                Parser.get(IdentifierParser.class));
+        }
+    }
+
+    /** ParameterizedCall: NAME '(' RuleBody { ',' RuleBody } ')' with NAME adjacent to '('. */
+    public static class ParameterizedCallElementParser extends UBNFLazyChain {
+        private static final long serialVersionUID = 1L;
+        @Override
+        public Parsers getLazyParsers() {
+            return new Parsers(
+                Parser.get(ParameterizedRuleNameParser.class),
+                Parser.get(LeftParenthesisParser.class),
+                Parser.get(RuleBodyParser.class),
+                new ZeroOrMore(new UBNFLazyChain() {
+                    private static final long serialVersionUID = 1L;
+                    @Override
+                    public Parsers getLazyParsers() {
+                        return new Parsers(Parser.get(CommaParser.class), Parser.get(RuleBodyParser.class));
+                    }
+                }),
+                Parser.get(RightParenthesisParser.class));
+        }
+    }
+
     /**
      * GroupElement: '(' RuleBody ')'
      * Circular: references RuleBodyParser
@@ -1512,6 +1639,7 @@ public class UBNFParsers {
                 Parser.get(RepeatElementParser.class),   // { (BoundedQuantifier より先)
                 Parser.get(ErrorElementParser.class),    // 'ERROR'
                 Parser.get(TerminalElementParser.class), // '
+                Parser.get(ParameterizedCallElementParser.class), // NAME( with a parameterized NAME
                 Parser.get(QuantifiedRefParser.class)    // IDENTIFIER + optional suffix
             );
         }
@@ -1652,6 +1780,7 @@ public class UBNFParsers {
             return new Parsers(
                 new ZeroOrMore(Parser.get(AnnotationParser.class)),
                 Parser.get(IdentifierParser.class),
+                new org.unlaxer.parser.combinator.Optional(Parser.get(RuleParameterListParser.class)),
                 new WordParser("::="),
                 Parser.get(RuleBodyParser.class),
                 Parser.get(SemicolonParser.class)
