@@ -123,14 +123,16 @@ impl Backend for GrammarBackend {
         })
     }
     fn validate(&mut self, snapshot: &Snapshot) -> Vec<Diagnostic> {
-        match unlaxer_runtime::parse_detailed_shared(
+        match unlaxer_runtime::parse_detailed_shared_with_rule_stack(
             &self.grammar,
             self.root,
             self.whitespace,
             &snapshot.text,
+            unlaxer_runtime::ParseOptions::default(),
         ) {
             Ok(_) => vec![],
-            Err(error) => {
+            Err(failure) => {
+                let error = failure.diagnostic;
                 // Editor diagnostics follow Java's farthest syntax failure, while the
                 // public parse_detailed primary still identifies unconsumed input.
                 // Keep non-syntax failures (in particular resource limits) primary.
@@ -159,7 +161,12 @@ impl Backend for GrammarBackend {
                     } else {
                         format!("Expected {}", expected.join(" or "))
                     },
-                    data: json!({"schemaVersion":1,"code":"ULX-PARSE-001","kind":"syntax","offset":snapshot.utf16(start).unwrap_or(0),"totalLength":snapshot.utf16(snapshot.len()).unwrap_or(0),"expectedTokens":expected}),
+                    data: rule_stack_data(
+                        json!({"schemaVersion":1,"code":"ULX-PARSE-001","kind":"syntax","offset":snapshot.utf16(start).unwrap_or(0),"totalLength":snapshot.utf16(snapshot.len()).unwrap_or(0),"expectedTokens":expected}),
+                        snapshot,
+                        failure.rule_stack.filter(|stack| stack.offset == offset),
+                        start,
+                    ),
                 }]
             }
         }
@@ -662,7 +669,11 @@ impl<B: Backend> Server<B> {
                 let Ok(range) = range(snapshot, diagnostic.span) else {
                     continue;
                 };
-                diagnostics.push(json!({"range":range,"severity":1,"code":"ULX-PARSE-001","source":"unlaxer","message":diagnostic.message,"data":diagnostic.data}));
+                let mut item = json!({"range":range,"severity":1,"code":"ULX-PARSE-001","source":"unlaxer","message":diagnostic.message,"data":diagnostic.data});
+                if let Some(related) = rule_stack_related(snapshot, &diagnostic) {
+                    item["relatedInformation"] = related;
+                }
+                diagnostics.push(item);
             }
         }
         let mut staged = BTreeMap::from([(
@@ -833,6 +844,56 @@ fn notification(method: &str, params: Value) -> Value {
 fn failure(id: Value, code: i64, message: &str) -> Value {
     json!({"jsonrpc":"2.0","id":id,"error":{"code":code,"message":message}})
 }
+/// Adds the rule stack of a syntax failure (#703) to its diagnostic data, outermost
+/// first, with UTF-16 offsets as Java's generated server reports them.
+fn rule_stack_data(
+    mut data: Value,
+    snapshot: &Snapshot,
+    stack: Option<unlaxer_runtime::RuleStack>,
+    error_start: usize,
+) -> Value {
+    if let Some(stack) = stack {
+        data["ruleStack"] = stack
+            .frames
+            .iter()
+            .map(|frame| {
+                json!({"rule":frame.rule,"offset":snapshot.utf16(frame.start.min(error_start)).unwrap_or(0)})
+            })
+            .collect();
+        data["ruleStackOmitted"] = json!(stack.omitted);
+    }
+    data
+}
+
+/// relatedInformation for `data.ruleStack`: one location per rule, from where the rule
+/// started to the diagnostic, outermost first. The first notes any omitted outer rules.
+fn rule_stack_related(snapshot: &Snapshot, diagnostic: &Diagnostic) -> Option<Value> {
+    let frames = diagnostic.data.get("ruleStack")?.as_array()?;
+    let omitted = diagnostic
+        .data
+        .get("ruleStackOmitted")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let mut related = vec![];
+    for frame in frames {
+        let rule = frame.get("rule")?.as_str()?;
+        let start = snapshot
+            .from_utf16(usize::try_from(frame.get("offset")?.as_u64()?).ok()?)
+            .ok()?;
+        let span = Span {
+            start: start.min(diagnostic.span.start),
+            end: diagnostic.span.start,
+        };
+        let note = if related.is_empty() && omitted > 0 {
+            format!(" ({omitted} outer rules omitted)")
+        } else {
+            String::new()
+        };
+        related.push(json!({"location":{"uri":snapshot.uri,"range":range(snapshot, span).ok()?},"message":format!("in rule {rule}{note}")}));
+    }
+    (!related.is_empty()).then(|| json!(related))
+}
+
 fn range(snapshot: &Snapshot, span: Span) -> Result<Value, &'static str> {
     snapshot.check(span)?;
     let start = snapshot.lsp(span.start)?;
