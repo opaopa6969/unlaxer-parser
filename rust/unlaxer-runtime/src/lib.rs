@@ -26,6 +26,7 @@ pub mod names;
 pub mod pipeline;
 pub mod provider_process;
 pub mod provider_protocol;
+mod rule_stack;
 mod scope;
 pub mod semantic;
 pub mod semantic_project;
@@ -44,6 +45,7 @@ mod unicode_grapheme_data;
 mod unicode_xid;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
+pub use rule_stack::{RuleFrame, RuleStack, RuleStackDiagnostic, RULE_STACK_LIMIT};
 pub use scope::{
     Declaration, ReferenceInfo, RuleEffects, ScopeMode, ScopeStore, Severity, SymbolDiagnostic,
     SymbolInfo,
@@ -1136,7 +1138,11 @@ struct FailureDiagnostic {
     classic_failure_seen: bool,
     classic_failure_end: Option<(usize, MatchCursorPolicy)>,
     // Only failure memo entries set this: an ordinary (None) versus raised failure (#700).
-    raised: Option<Rc<RaisedFailure>>,
+    raised: Option<Rc<rule_stack::RaisedMemo>>,
+    // Selected failed rule invocation inside this frame (#703), absolute; detailed only.
+    rules: Option<rule_stack::RuleCandidate>,
+    // Active rule depth when this memo frame was opened; deeper frames are rule-local.
+    rules_base: usize,
 }
 
 impl FailureDiagnostic {
@@ -1177,6 +1183,7 @@ impl FailureDiagnostic {
         if let Some(reached) = other.classic_max_reached {
             self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
         }
+        rule_stack::RuleCandidate::merge_into(&mut self.rules, other.rules.as_ref());
         let Some(position) = other.farthest else {
             return;
         };
@@ -1680,6 +1687,8 @@ pub struct ParseContext<'a> {
     // Committed or labeled failure (#700) propagating towards its catcher; None on every
     // ordinary path. Cleared whenever a new expression attempt starts.
     raised: Option<RaisedFailure>,
+    // Rule stacks of the final error (#703); untouched unless diagnostics are detailed.
+    rule_stacks: rule_stack::RuleStacks,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded
@@ -1829,6 +1838,48 @@ fn parse_detailed_owned(
     options: ParseOptions,
     bindings: BTreeMap<String, Vec<String>>,
 ) -> Result<Tree, ParseDiagnostic> {
+    parse_detailed_stacked(rules, root, whitespace, input, options, bindings, false)
+        .map_err(|failure| failure.diagnostic)
+}
+
+/// Full-input parsing that also returns the rule stack of the failure (#703).
+///
+/// The stack is recorded by a [`Diagnostics::Detailed`] pass. With
+/// [`Diagnostics::DetailedOnFailure`] every failure, a committed or labeled one
+/// included, is therefore parsed again in a fresh detailed context, as the diagnostic
+/// retry of that policy already does for ordinary failures. The diagnostic itself is
+/// the one [`parse_detailed_shared_with_options`] returns.
+pub fn parse_detailed_shared_with_rule_stack(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+) -> Result<Tree, RuleStackDiagnostic> {
+    parse_detailed_stacked(
+        Arc::clone(grammar),
+        root,
+        whitespace,
+        input,
+        options,
+        BTreeMap::new(),
+        true,
+    )
+}
+
+fn parse_detailed_stacked(
+    rules: SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+    bindings: BTreeMap<String, Vec<String>>,
+    stacked: bool,
+) -> Result<Tree, RuleStackDiagnostic> {
+    let unstacked = |diagnostic| RuleStackDiagnostic {
+        diagnostic,
+        rule_stack: None,
+    };
     let options = if options.diagnostics == Diagnostics::Auto {
         options.with_diagnostics(if grammar_allows_deferred_diagnostics(&rules) {
             Diagnostics::DetailedOnFailure
@@ -1866,28 +1917,33 @@ fn parse_detailed_owned(
         parser.fail("end of input");
     }
     if let Some(error) = parser.resource_failure.take() {
-        return Err(ParseDiagnostic {
+        return Err(unstacked(ParseDiagnostic {
             kind: "resource_limit",
             offset: error.offset,
             expected: error.expected.clone(),
             farthest: error,
-        });
+        }));
     }
     if let Some(failure) = parser.name_failure() {
-        return Err(ParseDiagnostic {
+        return Err(unstacked(ParseDiagnostic {
             kind: failure.kind,
             offset: failure.span.start,
             expected: vec![failure.expected.clone()],
             farthest: failure.error(),
-        });
+        }));
     }
-    if let Some(raised) = parser.raised {
+    // Only a detailed pass records the stack of a raised failure.
+    let retry_raised = stacked && options.diagnostics == Diagnostics::DetailedOnFailure;
+    if let Some(raised) = parser.raised.filter(|_| !retry_raised) {
         // Structural position and message: no detailed retry can change them.
-        return Err(ParseDiagnostic {
-            kind: raised.diagnostic_kind(),
-            offset: raised.offset,
-            expected: vec![raised.message.to_owned()],
-            farthest: raised.error(),
+        return Err(RuleStackDiagnostic {
+            rule_stack: if stacked { parser.rule_stack() } else { None },
+            diagnostic: ParseDiagnostic {
+                kind: raised.diagnostic_kind(),
+                offset: raised.offset,
+                expected: vec![raised.message.to_owned()],
+                farthest: raised.error(),
+            },
         });
     }
     if options.diagnostics == Diagnostics::DetailedOnFailure {
@@ -1895,53 +1951,58 @@ fn parse_detailed_owned(
         let rules = Arc::clone(&parser.rules);
         // Release the first pass, including its empty-diagnostic memo entries.
         drop(parser);
-        return parse_detailed_owned(
+        return parse_detailed_stacked(
             rules,
             root,
             whitespace,
             input,
             options.with_diagnostics(Diagnostics::Detailed),
             bindings,
+            stacked,
         );
     }
+    let rule_stack = if stacked { parser.rule_stack() } else { None };
     let farthest = ParseError {
         offset: parser.code_point(parser.farthest),
         expected: parser.expected_names.strings(&parser.expected),
     };
-    Err(ParseDiagnostic {
-        kind: if trailing_offset.is_some() {
-            "trailing_input"
-        } else if parser.unique_choice_failure_seen
-            && farthest
-                .expected
-                .iter()
-                .any(|hint| hint == "unique longest alternative")
-        {
-            "ambiguity"
-        } else if parser.unique_choice_failure_seen
-            && farthest
-                .expected
-                .iter()
-                .any(|hint| hint == "nonempty unique longest alternative")
-        {
-            "empty_choice"
-        } else if parser.unique_choice_failure_seen
-            && farthest
-                .expected
-                .iter()
-                .any(|hint| hint == "2 to 64 unique longest alternatives")
-        {
-            "choice_limit"
-        } else {
-            "syntax"
+    Err(RuleStackDiagnostic {
+        rule_stack,
+        diagnostic: ParseDiagnostic {
+            kind: if trailing_offset.is_some() {
+                "trailing_input"
+            } else if parser.unique_choice_failure_seen
+                && farthest
+                    .expected
+                    .iter()
+                    .any(|hint| hint == "unique longest alternative")
+            {
+                "ambiguity"
+            } else if parser.unique_choice_failure_seen
+                && farthest
+                    .expected
+                    .iter()
+                    .any(|hint| hint == "nonempty unique longest alternative")
+            {
+                "empty_choice"
+            } else if parser.unique_choice_failure_seen
+                && farthest
+                    .expected
+                    .iter()
+                    .any(|hint| hint == "2 to 64 unique longest alternatives")
+            {
+                "choice_limit"
+            } else {
+                "syntax"
+            },
+            offset: trailing_offset.unwrap_or(farthest.offset),
+            expected: if trailing_offset.is_some() {
+                vec!["end of input".to_owned()]
+            } else {
+                farthest.expected.clone()
+            },
+            farthest,
         },
-        offset: trailing_offset.unwrap_or(farthest.offset),
-        expected: if trailing_offset.is_some() {
-            vec!["end of input".to_owned()]
-        } else {
-            farthest.expected.clone()
-        },
-        farthest,
     })
 }
 
@@ -2034,6 +2095,7 @@ impl<'a> ParseContext<'a> {
             token_trace: options.token_trace.map(token_trace::Trace::new),
             trace_custom_contracts: Vec::new(),
             raised: None,
+            rule_stacks: rule_stack::RuleStacks::default(),
         }
         .with_candidate_exclusion()
     }
@@ -2369,6 +2431,7 @@ impl<'a> ParseContext<'a> {
                 .get(error.offset)
                 .filter(|_| self.options.diagnostics == Diagnostics::Detailed)
             {
+                self.note_failure_reach(byte);
                 if byte > self.farthest {
                     self.farthest = byte;
                     self.expected.clear();
@@ -2653,6 +2716,7 @@ impl<'a> ParseContext<'a> {
             return;
         }
         let position = self.position;
+        self.note_failure_reach(position);
         if let Some(frame) = self.diagnostic_frames.last_mut() {
             frame.record_position(position);
         }
@@ -2684,6 +2748,7 @@ impl<'a> ParseContext<'a> {
             return;
         }
         let expected = self.expected_names.intern(expected);
+        self.note_failure_reach(position);
         if let Some(diagnostic) = self.diagnostic_frames.last_mut() {
             diagnostic.record(position, expected);
         }
@@ -2714,8 +2779,12 @@ impl<'a> ParseContext<'a> {
         let Some(position) = diagnostic.farthest else {
             return;
         };
+        self.replay_rule_failure(diagnostic);
         if let Some(frame) = self.diagnostic_frames.last_mut() {
+            // The memoized stack was rebased onto the active rules above.
+            let rules = std::mem::take(&mut frame.rules);
             frame.merge(diagnostic);
+            frame.rules = rules;
         }
         match position.cmp(&self.farthest) {
             std::cmp::Ordering::Greater => {
@@ -2743,7 +2812,11 @@ impl<'a> ParseContext<'a> {
             self.fail("valid rule reference");
             return None;
         }
-        if self.options.memoization == Memoization::SafeFailures
+        let tracked = self.rule_stack_tracked();
+        if tracked {
+            self.enter_rule_frame(id);
+        }
+        let result = if self.options.memoization == Memoization::SafeFailures
             && self.names_state.frames.is_empty()
             && self.lexical_trivia.is_none()
             && self.lexical_context.is_none()
@@ -2753,7 +2826,11 @@ impl<'a> ParseContext<'a> {
             self.memoized_rule(id, depth)
         } else {
             self.execute_rule(id, depth)
+        };
+        if tracked {
+            self.leave_rule_frame(result.is_none());
         }
+        result
     }
 
     // A no-cache recursive rule must not retain the large memo snapshot/key
@@ -2798,7 +2875,10 @@ impl<'a> ParseContext<'a> {
         };
         let detailed = self.options.diagnostics == Diagnostics::Detailed;
         if detailed {
-            self.diagnostic_frames.push(FailureDiagnostic::default());
+            self.diagnostic_frames.push(FailureDiagnostic {
+                rules_base: self.active_rule_depth(),
+                ..FailureDiagnostic::default()
+            });
         }
         let call = MemoCall {
             key,
@@ -2824,7 +2904,11 @@ impl<'a> ParseContext<'a> {
             self.memoized_failure_hits += 1;
             self.replay_failure(&diagnostic);
             // The entry distinguishes ordinary from committed / labeled failures (#700).
-            self.raised = diagnostic.raised.as_deref().copied();
+            self.raised = diagnostic.raised.as_deref().map(|raised| raised.failure);
+            if let Some(raised) = diagnostic.raised.as_deref() {
+                self.rule_stacks.raised.clear();
+                self.rule_stacks.raised.extend_from_slice(&raised.rules);
+            }
             if let Some((matched, policy)) = diagnostic.classic_failure_end {
                 self.matched_position = matched;
                 self.match_cursor_policy = policy;
@@ -2875,7 +2959,12 @@ impl<'a> ParseContext<'a> {
                     );
                 }
             } else {
-                diagnostic.raised = self.raised.map(Rc::new);
+                diagnostic.raised = self.raised.map(|failure| {
+                    Rc::new(rule_stack::RaisedMemo {
+                        failure,
+                        rules: self.rule_stacks.raised.as_slice().into(),
+                    })
+                });
                 diagnostic.memo_expression_depth = self.expression_depth;
                 diagnostic.memo_expected_text_bytes =
                     diagnostic
@@ -4081,6 +4170,8 @@ impl<'a> ParseContext<'a> {
         offset: usize,
     ) {
         if result.is_none() && self.raised.is_none() && self.resource_failure.is_none() {
+            // A new raise: the rules it leaves are recorded from here on (#703).
+            self.rule_stacks.raised.clear();
             self.raised = Some(RaisedFailure {
                 kind,
                 label,
@@ -4221,6 +4312,7 @@ impl<'a> ParseContext<'a> {
             Expr::Lookahead { child, positive } => {
                 let checkpoint = self.checkpoint();
                 let farthest = self.farthest;
+                let rule_speculation = self.begin_rule_speculation();
                 let classic_diagnostics = (self.classic_max_reached, self.classic_failure_seen);
                 let expected = self.expected.clone();
                 let diagnostic_frames = self.diagnostic_frames.clone();
@@ -4234,11 +4326,14 @@ impl<'a> ParseContext<'a> {
                 // A committed or labeled child failure fails either polarity and keeps
                 // its diagnostics (#700).
                 if self.raised.is_some() {
+                    self.end_rule_speculation(rule_speculation, false);
                     return None;
                 }
                 // Successful assertions discard speculative diagnostics. A failed
                 // negative assertion retains failures explored inside its matching child.
-                if matched == *positive {
+                let discard = matched == *positive;
+                self.end_rule_speculation(rule_speculation, discard);
+                if discard {
                     self.farthest = farthest;
                     (self.classic_max_reached, self.classic_failure_seen) = classic_diagnostics;
                     self.expected = expected;

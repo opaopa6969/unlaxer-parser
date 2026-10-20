@@ -116,12 +116,15 @@ impl Registry {
         let lexing = context.lexing.take();
         // The call returns its failure as data; an inner cut or label must not escape (#700).
         let raised = context.raised.take();
+        let raised_rules = std::mem::take(&mut context.rule_stacks.raised);
         context.set_state(DEPTH, depth + 1);
         context.set_state(BUDGET, retained + source_length);
         // Local diagnostics must not report a farther failure from an earlier caller alternative.
         let old_farthest = context.farthest;
         let old_frames = context.diagnostic_frames.clone();
         let old_expected = std::mem::take(&mut context.expected);
+        // The call selects its own failed rule invocation (#703).
+        let rule_call = context.begin_rule_call();
         context.farthest = context.position;
         let parsed = context.parse_shared_grammar(&grammar.grammar, root, grammar.whitespace);
         let end = context.position();
@@ -153,6 +156,7 @@ impl Registry {
                 }
             }
         }
+        context.end_rule_call(rule_call, succeeded);
         context.nodes = nodes;
         context.captures = captures;
         context.state = state;
@@ -162,6 +166,7 @@ impl Registry {
         context.names_state = names;
         context.lexing = lexing;
         context.raised = raised;
+        context.rule_stacks.raised = raised_rules;
         context.position = cursor.0;
         context.matched_position = cursor.1;
         if parsed.is_err() {

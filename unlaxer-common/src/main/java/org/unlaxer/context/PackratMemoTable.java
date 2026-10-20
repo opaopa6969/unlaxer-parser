@@ -141,7 +141,8 @@ public final class PackratMemoTable {
     if (entry.tokens == null) {
       // Restores the failure kind and label exactly as the original evaluation raised them,
       // including "ordinary": a stale raised failure must not survive an ordinary memo hit.
-      if (entry.raised != null) context.raise(entry.raised);
+      if (entry.raised != null) context.raise(entry.raised,
+          entry.diagnostic.rules == null ? null : entry.diagnostic.rules.raised);
       else context.clearRaisedFailure();
       return Parsed.FAILED;
     }
@@ -234,6 +235,11 @@ public final class PackratMemoTable {
     parseContext.discardMemoDiagnosticFrame(diagnostic);
     if (false == parseContext.isMemoizationSessionSafe() || false == isExactSafeClass(parser)) return;
     ParseContext.sealMemoDiagnostic(diagnostic);
+    // The rules the raised failure left inside this parser, itself included; a replay restores
+    // them and the callers' frames add the rest (#703).
+    if (parseContext.raisedFailure() != null && parseContext.raisedRules() != null) {
+      ParseContext.rules(diagnostic).raised = parseContext.raisedRules();
+    }
     parseContext.getPackratMemoTable().put(
         parser, positionKeyOf(parseContext, tokenKind, invertMatch),
         new Entry(diagnostic, parseContext.raisedFailure()));

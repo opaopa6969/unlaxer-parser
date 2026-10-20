@@ -587,6 +587,8 @@ class ParserRuleEmitter {
             interfaces.add("org.unlaxer.context.SafeSuccessMemoizable");
         }
         interfaces.add("org.unlaxer.context.DiagnosticsAgnostic");
+        // Rule frames of the failure rule stack (#703); helper classes stay unmarked.
+        interfaces.add("org.unlaxer.parser.GrammarRule");
         String implSuffix = interfaces.isEmpty() ? "" : " implements " + String.join(", ", interfaces);
         boolean longestChoice = rule.annotations().stream().anyMatch(a -> a instanceof LongestChoiceAnnotation);
         boolean predictiveChoice = rule.annotations().stream().anyMatch(a -> a instanceof PredictiveChoiceAnnotation);
