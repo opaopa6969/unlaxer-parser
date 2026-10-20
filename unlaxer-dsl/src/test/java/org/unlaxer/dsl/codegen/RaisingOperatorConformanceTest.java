@@ -176,7 +176,7 @@ public class RaisingOperatorConformanceTest {
                 }
             }
         }
-        assertEquals(46 * 6, observations);
+        assertEquals(48 * 6, observations);
     }
 
     @Test public void bothRustHostsGenerateAndRunTheSameOracle() throws Exception {

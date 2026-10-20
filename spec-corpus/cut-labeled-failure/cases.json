@@ -212,18 +212,22 @@
     "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F('a') ;\n  F(=x) ::= COMMIT(x) x ;\n}\n",
     "cases": [
       {
-        "input": "aa",
+        "input": "aaa",
         "outcome": "success"
       },
       {
-        "input": "ab",
+        "input": "aa",
         "outcome": "syntax"
       },
       {
-        "input": "b",
+        "input": "a",
         "outcome": "commit",
-        "offset": 0,
+        "offset": 1,
         "message": "unexpected input"
+      },
+      {
+        "input": "b",
+        "outcome": "syntax"
       }
     ]
   },
@@ -300,16 +304,23 @@
   },
   {
     "name": "commit-repetition-in-recovery-rule",
-    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Statement } ;\n  @recovery(sync=';')\n  Statement ::= { COMMIT('a', 'need a') } ';' ;\n}\n",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= Statement 'x' ;\n  @recovery(sync=';')\n  Statement ::= { COMMIT('a', 'need a') } ';' ;\n}\n",
     "cases": [
       {
-        "input": "",
-        "outcome": "success"
-      },
-      {
-        "input": "aa;",
+        "input": "aa;x",
         "outcome": "recovery",
         "offset": 0
+      },
+      {
+        "input": ";x",
+        "outcome": "recovery",
+        "offset": 0
+      },
+      {
+        "input": "x",
+        "outcome": "commit",
+        "offset": 0,
+        "message": "need a"
       }
     ]
   }

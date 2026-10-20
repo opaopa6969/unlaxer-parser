@@ -151,7 +151,9 @@ A bounded repetition (`LABEL(L, 'a'){2,3}`) is not rejected: it succeeds when it
 stops at its maximum, and fails with the label otherwise.
 `E-RAISING-REPETITION` is also skipped where an enclosing construct can catch the
 raised failure: inside a `CATCH` operand (`CATCH({ LABEL(L, 'a') }, 'b', L)` accepts
-`b`) and in a `@recovery` rule (a committed error there is recovered). The check is
+`b`) and in a `@recovery` rule (a committed error there is recovered, so
+`Root ::= Statement 'x'` accepts `aa;x`; a recovery rule repeated up to the end of
+input still fails there, because recovery needs a sync token). The check is
 syntactic and identical on both hosts; it runs after parameterized rules are expanded
 and does not follow rule references, so it rejects only the evident cases.
 
