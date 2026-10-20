@@ -82,6 +82,17 @@ public class PropertyBasedParityTest {
         assertFalse(KnownDifferences.javaSyntaxOffsetAfterRust(
                 "java={\"kind\":\"syntax\",\"offset\":2} rust={\"kind\":\"trailing_input\",\"offset\":1}"));
         assertFalse(KnownDifferences.javaSyntaxOffsetAfterRust("java=null rust={\"kind\":\"syntax\",\"offset\":1}"));
+        // #706 for the rule stack (#703): same offset, Java frames start later than Rust's.
+        String tail = " far(java/rust)=2/2 diag(java/rust)={}/{}";
+        assertTrue(KnownDifferences.javaStackStartsAfterRust("java=\"2|0|R0@0>R1@2\" rust=\"2|0|R0@0>R1@1\"" + tail));
+        assertTrue(KnownDifferences.javaStackStartsAfterRust("java=\"1|0|R0@0>R1@1\" rust=\"1|0|R0@0\"" + tail));
+        assertFalse("earlier Java start", KnownDifferences.javaStackStartsAfterRust("java=\"2|0|R0@0>R1@1\" rust=\"2|0|R0@0>R1@2\"" + tail));
+        assertFalse("different offset", KnownDifferences.javaStackStartsAfterRust("java=\"3|0|R0@0>R1@2\" rust=\"2|0|R0@0>R1@1\"" + tail));
+        assertFalse("different rule", KnownDifferences.javaStackStartsAfterRust("java=\"2|0|R0@0>R2@2\" rust=\"2|0|R0@0>R1@1\"" + tail));
+        assertFalse("Rust-only frame", KnownDifferences.javaStackStartsAfterRust("java=\"1|0|R0@0\" rust=\"1|0|R0@0>R1@1\"" + tail));
+        assertFalse("Java-only frame not later", KnownDifferences.javaStackStartsAfterRust("java=\"1|0|R0@1>R1@1\" rust=\"1|0|R0@1\"" + tail));
+        assertFalse("stack on one side only", KnownDifferences.javaStackStartsAfterRust("java=\"-\" rust=\"1|0|R0@0\"" + tail));
+        assertFalse("different omitted", KnownDifferences.javaStackStartsAfterRust("java=\"2|1|R0@0>R1@2\" rust=\"2|0|R0@0>R1@1\"" + tail));
     }
 
     @Test

@@ -193,8 +193,9 @@ public class SnapshotParsers {
         }
     }
 
-    public static class ExprParser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
+    public static class ExprParser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.parser.GrammarRule {
         private static final long serialVersionUID = 1L;
+        @Override public String grammarRuleName() { return "Expr"; }
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
@@ -215,8 +216,9 @@ public class SnapshotParsers {
         }
     }
 
-    public static class TermParser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
+    public static class TermParser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.parser.GrammarRule {
         private static final long serialVersionUID = 1L;
+        @Override public String grammarRuleName() { return "Term"; }
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
@@ -226,8 +228,9 @@ public class SnapshotParsers {
         }
     }
 
-    public static class FactorParser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
+    public static class FactorParser extends SnapshotLazyChain implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.parser.GrammarRule {
         private static final long serialVersionUID = 1L;
+        @Override public String grammarRuleName() { return "Factor"; }
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(

@@ -183,9 +183,11 @@ fn main() {
         "diagnostic_allocation: 1 failure = {single} allocations, \
          {REPEATED_FAILURES} identical failures = {repeated} allocations"
     );
+    // 9 before #703; detailed diagnostics now also grow the active rule-frame stack and the
+    // reused rule-stack selection buffer once per context (rule_stack.rs).
     assert!(
-        single <= 9,
-        "a first-bucket failure with an inline expected ID must not exceed 9 allocations"
+        single <= 11,
+        "a first-bucket failure with an inline expected ID must not exceed 11 allocations"
     );
     assert_eq!(
         single, repeated,

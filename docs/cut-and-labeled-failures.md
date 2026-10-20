@@ -90,7 +90,9 @@ The final error prefers a raised failure over the farthest failure:
   message, offset }` and `ParseContext::failure()` reports its offset and message.
   The full-input `parse_detailed*` functions return kind `commit` or `label`
   with that offset and message, without a detailed retry. Resource limits and
-  name-resolution failures still take precedence.
+  name-resolution failures still take precedence. `parse_detailed_shared_with_rule_stack`
+  (#703) does retry under `DetailedOnFailure`, to record the
+  [rule stack](rule-stack-diagnostics.md) where the operator raised the failure.
 
 Precedence of the final error, highest first: a resource limit (Java
 `ParseLimitException`, Rust `resource_limit`), a name-resolution failure, a raised

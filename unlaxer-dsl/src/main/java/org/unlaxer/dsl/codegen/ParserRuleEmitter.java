@@ -599,6 +599,8 @@ class ParserRuleEmitter {
             interfaces.add("org.unlaxer.context.SafeSuccessMemoizable");
         }
         interfaces.add("org.unlaxer.context.DiagnosticsAgnostic");
+        // Rule frames of the failure rule stack (#703); helper classes stay unmarked.
+        interfaces.add("org.unlaxer.parser.GrammarRule");
         String implSuffix = interfaces.isEmpty() ? "" : " implements " + String.join(", ", interfaces);
         boolean longestChoice = rule.annotations().stream().anyMatch(a -> a instanceof LongestChoiceAnnotation);
         boolean predictiveChoice = rule.annotations().stream().anyMatch(a -> a instanceof PredictiveChoiceAnnotation);
@@ -610,6 +612,8 @@ class ParserRuleEmitter {
         w.line("public static class " + className + " extends " + baseClass + implSuffix + " {");
         w.indent();
         w.line("private static final long serialVersionUID = 1L;");
+        // The rule name itself (#703), which subclasses and anonymous subclasses keep.
+        w.line("@Override public String grammarRuleName() { return \"" + ParserCodegenUtil.escapeString(ruleName) + "\"; }");
         boolean hasSkip = rule.annotations().stream().anyMatch(a -> a instanceof SkipAnnotation);
         if (hasSkip) {
             w.line("public " + className + "() { addTag(org.unlaxer.reducer.TagBasedReducer.NodeKind.notNode.getTag()); }");

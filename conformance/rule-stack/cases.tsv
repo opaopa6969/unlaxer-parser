@@ -1,0 +1,16 @@
+# id	fixture	input	outcome	label	offsetCP	stack (outermost first, rule@startCP)	omitted
+nested-start	nested	z	syntax	~	0	Root@0	0
+nested-item	nested	(z)	syntax	~	1	Root@0>Item@1	0
+nested-close	nested	(x]	syntax	~	2	Root@0	0
+farther-alternative	alternatives	acx	syntax	~	2	Root@0>B@0	0
+deeper-wins-tie	deeper	az	syntax	~	1	Root@0>B@0>C@1	0
+earliest-wins-equal-depth	equal	az	syntax	~	1	Root@0>A@0	0
+lookahead-discards-and-memo-rebases	lookahead	(abx	syntax	~	3	Root@0>Body@0>M@1>N@2	0
+commit-at-raise	commit	(xz	commit	~	2	Root@0>Body@1>Inner@1	0
+label-at-raise	label	[b]	label	item	1	Root@0>List@0	0
+memo-replayed-label	memo-label	(y	label	L	1	Root@0>B@0>M@1	0
+caught-label-then-ordinary	caught	bx	syntax	~	1	Root@0>Q@0	0
+deep-ordinary-limit	deep	((((((((((((((((((((((((((((((((((((((((y	syntax	~	40	D8@8>D9@9>D10@10>D11@11>D12@12>D13@13>D14@14>D15@15>D16@16>D17@17>D18@18>D19@19>D20@20>D21@21>D22@22>D23@23>D24@24>D25@25>D26@26>D27@27>D28@28>D29@29>D30@30>D31@31>D32@32>D33@33>D34@34>D35@35>D36@36>D37@37>D38@38>D39@39	8
+deep-commit-limit	deep-commit	((((((((((((((((((((((((((((((((((((((((y	commit	~	40	D8@8>D9@9>D10@10>D11@11>D12@12>D13@13>D14@14>D15@15>D16@16>D17@17>D18@18>D19@19>D20@20>D21@21>D22@22>D23@23>D24@24>D25@25>D26@26>D27@27>D28@28>D29@29>D30@30>D31@31>D32@32>D33@33>D34@34>D35@35>D36@36>D37@37>D38@38>D39@39	8
+unicode-code-points	unicode	😀界y	syntax	~	2	Root@0>Item@1	0
+outside-every-rule	bare	ax	syntax	~	1	~	0

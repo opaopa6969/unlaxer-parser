@@ -190,8 +190,9 @@ public class SnapshotRightAssocParsers {
         }
     }
 
-    public static class ExprParser extends LazyChoice implements org.unlaxer.context.DiagnosticsAgnostic {
+    public static class ExprParser extends LazyChoice implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.parser.GrammarRule {
         private static final long serialVersionUID = 1L;
+        @Override public String grammarRuleName() { return "Expr"; }
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(
@@ -213,8 +214,9 @@ public class SnapshotRightAssocParsers {
         public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }
     }
 
-    public static class AtomParser extends SnapshotRightAssocLazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
+    public static class AtomParser extends SnapshotRightAssocLazyChain implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.parser.GrammarRule {
         private static final long serialVersionUID = 1L;
+        @Override public String grammarRuleName() { return "Atom"; }
         @Override
         public Parsers getLazyParsers() {
             return new Parsers(

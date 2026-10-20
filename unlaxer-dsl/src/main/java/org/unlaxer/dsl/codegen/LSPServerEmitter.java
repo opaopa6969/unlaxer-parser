@@ -306,12 +306,12 @@ class LSPServerEmitter {
         w.line("    .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();");
         w.line("String deepestMatchedRule = failure.getDeepestMatchedRule();");
         w.line("return new ParseResult(result.isSucceeded(), consumedLength, content.length(),");
+        w.line("    errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule,");
         if (raising) {
-            w.line("    errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule,");
-            w.line("    failure.getRaisedFailure().map(raised -> raised.isCommit() ? \"commit\" : \"label\").orElse(null));");
-        } else {
-            w.line("    errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule);");
+            w.line("    failure.getRaisedFailure().map(raised -> raised.isCommit() ? \"commit\" : \"label\").orElse(null),");
         }
+        // A successful parse with unconsumed input reports the stack a full-input parse would (#703).
+        w.line("    (result.isSucceeded() ? context.getUnconsumedInputRuleStack() : failure.getRuleStack()).orElse(null));");
         w.line("}");
         w.dedent();
         w.line("}");
@@ -437,6 +437,28 @@ class LSPServerEmitter {
         w.line("if (result.deepestMatchedRule() != null && !result.deepestMatchedRule().isBlank()) {");
         w.indent();
         w.line("data.put(\"deepestMatchedRule\", result.deepestMatchedRule());");
+        w.dedent();
+        w.line("}");
+        // #703: the rules active at the failure, outermost first, when the stack explains it.
+        w.line("var stack = result.ruleStack();");
+        w.line("if (stack != null && codePointOffsetToStringOffset(content, stack.offset()) == result.errorOffset()) {");
+        w.indent();
+        w.line("var related = new ArrayList<DiagnosticRelatedInformation>();");
+        w.line("var ruleFrames = new ArrayList<Map<String, Object>>();");
+        w.line("for (var frame : stack.frames()) {");
+        w.line("    int frameStart = Math.min(codePointOffsetToStringOffset(content, frame.start()), errorStart);");
+        // A CRLF is one line terminator: a frame starting at its LF starts at its CR, as errorStart does.
+        w.line("    if (frameStart > 0 && frameStart < content.length() && content.charAt(frameStart - 1) == '\\r' && content.charAt(frameStart) == '\\n') frameStart--;");
+        w.line("    String note = ruleFrames.isEmpty() && stack.omitted() > 0 ? \" (\" + stack.omitted() + \" outer rules omitted)\" : \"\";");
+        w.line("    try {");
+        w.line("        related.add(new DiagnosticRelatedInformation(new Location(uri, new Range(offsetToPosition(content, frameStart), startPos)),");
+        w.line("            \"in rule \" + frame.rule() + note));");
+        w.line("    } catch (RuntimeException unmappable) { continue; } // one frame never costs the diagnostic");
+        w.line("    ruleFrames.add(Map.<String, Object>of(\"rule\", frame.rule(), \"offset\", frameStart));");
+        w.line("}");
+        w.line("if (!related.isEmpty()) diagnostic.setRelatedInformation(related);");
+        w.line("data.put(\"ruleStack\", ruleFrames);");
+        w.line("data.put(\"ruleStackOmitted\", stack.omitted());");
         w.dedent();
         w.line("}");
         w.line("diagnostic.setData(data);");
@@ -733,13 +755,23 @@ class LSPServerEmitter {
         w.line("    List<String> expectedTokens,");
         w.line("    List<String> expectedHints,");
         w.line("    List<String> expectedParsers,");
-        w.line(raising ? "    String deepestMatchedRule," : "    String deepestMatchedRule) {");
-        if (raising) w.line("    String raisedKind) {");
+        w.line("    String deepestMatchedRule,");
+        if (raising) w.line("    String raisedKind,");
+        w.line("    org.unlaxer.context.RuleStack ruleStack) {");
         w.indent();
         w.line("public ParseResult(boolean succeeded, int consumedLength, int totalLength) {");
         w.indent();
         w.line("this(succeeded, consumedLength, totalLength, consumedLength,");
         w.line(raising ? "    List.of(), List.of(), List.of(), \"\", null);" : "    List.of(), List.of(), List.of(), \"\");");
+        w.dedent();
+        w.line("}");
+        // The canonical signature before #703, without the rule stack.
+        w.line("public ParseResult(boolean succeeded, int consumedLength, int totalLength, int errorOffset,");
+        w.line("        List<String> expectedTokens, List<String> expectedHints, List<String> expectedParsers,");
+        w.line(raising ? "        String deepestMatchedRule, String raisedKind) {" : "        String deepestMatchedRule) {");
+        w.indent();
+        w.line("this(succeeded, consumedLength, totalLength, errorOffset, expectedTokens, expectedHints,");
+        w.line(raising ? "    expectedParsers, deepestMatchedRule, raisedKind, null);" : "    expectedParsers, deepestMatchedRule, null);");
         w.dedent();
         w.line("}");
         w.dedent();

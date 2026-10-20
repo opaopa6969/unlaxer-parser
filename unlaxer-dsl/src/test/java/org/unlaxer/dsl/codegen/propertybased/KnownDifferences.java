@@ -20,11 +20,15 @@ final class KnownDifferences {
     /**
      * {@code condition} is a named, numeric check on the finding that a regular expression cannot
      * express. Supported: {@code java-syntax-offset-after-rust} — both {@code diag} values are
-     * {@code syntax} failures and the Java offset is greater than the Rust offset (#706).
+     * {@code syntax} failures and the Java offset is greater than the Rust offset (#706);
+     * {@code java-stack-starts-after-rust} — see {@link #javaStackStartsAfterRust(String)} (#706).
      */
     private record Entry(String id, Pattern kind, Pattern grammar, Pattern detail, String condition) {}
 
     private static final Pattern DIAG = Pattern.compile("^java=(\\{[^}]*\\}) rust=(\\{[^}]*\\})$");
+    private static final Pattern STACK = Pattern.compile("^java=\"([^\"]*)\" rust=\"([^\"]*)\"(?: |$)");
+    private static final java.util.Set<String> CONDITIONS =
+            java.util.Set.of("java-syntax-offset-after-rust", "java-stack-starts-after-rust");
 
     private final List<Entry> entries;
     private final Map<String, Integer> used = new LinkedHashMap<>();
@@ -42,7 +46,7 @@ final class KnownDifferences {
             var o = element.getAsJsonObject();
             if (!o.has("issue") || !o.has("reason")) throw new IllegalStateException("known difference needs issue and reason: " + o);
             String condition = o.has("condition") ? o.get("condition").getAsString() : null;
-            if (condition != null && !condition.equals("java-syntax-offset-after-rust"))
+            if (condition != null && !CONDITIONS.contains(condition))
                 throw new IllegalStateException("unknown condition " + condition);
             list.add(new Entry(o.get("id").getAsString() + " (" + o.get("issue").getAsString() + ")",
                     Pattern.compile(o.get("kind").getAsString()),
@@ -59,11 +63,54 @@ final class KnownDifferences {
             if (e.kind().matcher(finding.kind()).matches()
                     && (e.grammar() == null || e.grammar().matcher(c.grammar()).find())
                     && (e.detail() == null || e.detail().matcher(String.valueOf(finding.detail())).find())
-                    && (e.condition() == null || javaSyntaxOffsetAfterRust(finding.detail()))) {
+                    && (e.condition() == null || condition(e.condition(), finding.detail()))) {
                 used.merge(e.id(), 1, Integer::sum);
                 return e.id();
             }
         return null;
+    }
+
+    private static boolean condition(String name, String detail) {
+        return name.equals("java-stack-starts-after-rust")
+                ? javaStackStartsAfterRust(detail) : javaSyntaxOffsetAfterRust(detail);
+    }
+
+    /**
+     * A {@code java-rust:stack} finding (#703) of the #706 shape: both stacks explain the same
+     * failure offset with the same omitted count, agree on a common outer prefix, and after it
+     * every Java frame starts later than the Rust frame of the same rule at the same depth, or,
+     * where Rust has no frame, later than Rust's innermost frame. Rust has no frame that Java
+     * lacks. A positive LOOKAHEAD that advanced the matched cursor shifts Java's starts (and the
+     * reach measured from them) forward; any other difference, such as a different offset, a
+     * different rule or an earlier Java start, is a new finding.
+     */
+    static boolean javaStackStartsAfterRust(String detail) {
+        var m = STACK.matcher(String.valueOf(detail));
+        if (!m.find()) return false;
+        String[] java = m.group(1).split("\\|", -1), rust = m.group(2).split("\\|", -1);
+        if (java.length != 3 || rust.length != 3 || !java[0].equals(rust[0]) || !java[1].equals(rust[1])) return false;
+        String[] jf = java[2].split(">"), rf = rust[2].isEmpty() ? new String[0] : rust[2].split(">");
+        if (rf.length > jf.length) return false;
+        int common = 0;
+        while (common < rf.length && rf[common].equals(jf[common])) common++;
+        if (common == jf.length) return false; // identical stacks are no finding
+        int previous = rf.length == 0 ? -1 : start(rf[rf.length - 1]);
+        for (int i = common; i < jf.length; i++) {
+            if (i < rf.length) {
+                if (!rule(jf[i]).equals(rule(rf[i])) || start(jf[i]) <= start(rf[i])) return false;
+            } else if (start(jf[i]) <= previous) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String rule(String frame) {
+        return frame.substring(0, frame.lastIndexOf('@'));
+    }
+
+    private static int start(String frame) {
+        return Integer.parseInt(frame.substring(frame.lastIndexOf('@') + 1));
     }
 
     static boolean javaSyntaxOffsetAfterRust(String detail) {

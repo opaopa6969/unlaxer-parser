@@ -1052,6 +1052,7 @@ impl ParseContext<'_> {
         let checkpoint = self.checkpoint();
         let previous = self.token_mode;
         let farthest = self.farthest;
+        let rule_speculation = self.begin_rule_speculation();
         let expected = self.expected.clone();
         let diagnostics = self.diagnostic_frames.clone();
         let classic = (self.classic_max_reached, self.classic_failure_seen);
@@ -1061,6 +1062,10 @@ impl ParseContext<'_> {
         });
         let matched = self.expression(&Expr::Literal(pattern), depth).is_some();
         self.restore(checkpoint);
+        self.end_rule_speculation(
+            rule_speculation,
+            !matched && self.resource_failure.is_none(),
+        );
         if self.resource_failure.is_some() {
             self.token_mode = previous;
             return None;

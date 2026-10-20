@@ -408,7 +408,8 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             .filter(s -> s != null && !s.isBlank()).distinct().sorted().limit(20).toList();
         String deepestMatchedRule = failure.getDeepestMatchedRule();
         return new ParseResult(result.isSucceeded(), consumedLength, content.length(),
-            errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule);
+            errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule,
+            (result.isSucceeded() ? context.getUnconsumedInputRuleStack() : failure.getRuleStack()).orElse(null));
         }
     }
 
@@ -501,6 +502,24 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
             data.put("expectedParsers", result.expectedParsers());
             if (result.deepestMatchedRule() != null && !result.deepestMatchedRule().isBlank()) {
                 data.put("deepestMatchedRule", result.deepestMatchedRule());
+            }
+            var stack = result.ruleStack();
+            if (stack != null && codePointOffsetToStringOffset(content, stack.offset()) == result.errorOffset()) {
+                var related = new ArrayList<DiagnosticRelatedInformation>();
+                var ruleFrames = new ArrayList<Map<String, Object>>();
+                for (var frame : stack.frames()) {
+                    int frameStart = Math.min(codePointOffsetToStringOffset(content, frame.start()), errorStart);
+                    if (frameStart > 0 && frameStart < content.length() && content.charAt(frameStart - 1) == '\r' && content.charAt(frameStart) == '\n') frameStart--;
+                    String note = ruleFrames.isEmpty() && stack.omitted() > 0 ? " (" + stack.omitted() + " outer rules omitted)" : "";
+                    try {
+                        related.add(new DiagnosticRelatedInformation(new Location(uri, new Range(offsetToPosition(content, frameStart), startPos)),
+                            "in rule " + frame.rule() + note));
+                    } catch (RuntimeException unmappable) { continue; } // one frame never costs the diagnostic
+                    ruleFrames.add(Map.<String, Object>of("rule", frame.rule(), "offset", frameStart));
+                }
+                if (!related.isEmpty()) diagnostic.setRelatedInformation(related);
+                data.put("ruleStack", ruleFrames);
+                data.put("ruleStackOmitted", stack.omitted());
             }
             diagnostic.setData(data);
             diagnostics.add(diagnostic);
@@ -676,10 +695,17 @@ public abstract class SnapshotLanguageServer implements LanguageServer, Language
         List<String> expectedTokens,
         List<String> expectedHints,
         List<String> expectedParsers,
-        String deepestMatchedRule) {
+        String deepestMatchedRule,
+        org.unlaxer.context.RuleStack ruleStack) {
         public ParseResult(boolean succeeded, int consumedLength, int totalLength) {
             this(succeeded, consumedLength, totalLength, consumedLength,
                 List.of(), List.of(), List.of(), "");
+        }
+        public ParseResult(boolean succeeded, int consumedLength, int totalLength, int errorOffset,
+                List<String> expectedTokens, List<String> expectedHints, List<String> expectedParsers,
+                String deepestMatchedRule) {
+            this(succeeded, consumedLength, totalLength, errorOffset, expectedTokens, expectedHints,
+                expectedParsers, deepestMatchedRule, null);
         }
     }
 

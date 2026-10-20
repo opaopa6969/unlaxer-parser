@@ -1,0 +1,43 @@
+{
+  "grammar": "grammar Stack {\n  @package: org.unlaxer.rulestack.generated\n  @whitespace: none\n  @root @mapping(Doc)\n  Doc ::= { Stmt } ;\n  Stmt ::= 'let' Body ;\n  Body ::= Name COMMIT('=', 'expected =') Value ';' ;\n  Name ::= 'x' | 'y' ;\n  Value ::= LABEL(value, '1') ;\n}\n",
+  "cases": [
+    {
+      "id": "commit-at-raise",
+      "text": "letx1;",
+      "kind": "commit",
+      "offset": 4,
+      "stack": [
+        "Doc@0",
+        "Stmt@0",
+        "Body@3"
+      ],
+      "omitted": 0
+    },
+    {
+      "id": "label-at-raise",
+      "text": "letx=2;",
+      "kind": "label",
+      "offset": 5,
+      "stack": [
+        "Doc@0",
+        "Stmt@0",
+        "Body@3",
+        "Value@5"
+      ],
+      "omitted": 0
+    },
+    {
+      "id": "ordinary-after-commits",
+      "text": "lety=1;letz",
+      "kind": "syntax",
+      "offset": 10,
+      "stack": [
+        "Doc@0",
+        "Stmt@7",
+        "Body@10",
+        "Name@10"
+      ],
+      "omitted": 0
+    }
+  ]
+}

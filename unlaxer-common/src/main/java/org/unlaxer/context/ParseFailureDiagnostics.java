@@ -147,6 +147,7 @@ public class ParseFailureDiagnostics {
   private final String deepestMatchedRule;
   private final int deepestConsumedPosition;
   private final RaisedFailure raisedFailure;
+  private final RuleStack ruleStack;
 
   public ParseFailureDiagnostics(
       int farthestOffset,
@@ -198,7 +199,30 @@ public class ParseFailureDiagnostics {
       String deepestMatchedRule,
       int deepestConsumedPosition,
       RaisedFailure raisedFailure) {
+    this(farthestOffset, farthestConsumedOffset, farthestMatchedOffset, line, column,
+        maxReachedStackElements, expectedParsers, expectedHintCandidates, hasFailureCandidate,
+        trialHistory, expectedTokens, deepestMatchedRule, deepestConsumedPosition, raisedFailure, null);
+  }
+
+  /** As above, with the rule stack of the final error (#703), or null without one. */
+  public ParseFailureDiagnostics(
+      int farthestOffset,
+      int farthestConsumedOffset,
+      int farthestMatchedOffset,
+      int line,
+      int column,
+      List<ParseStackElement> maxReachedStackElements,
+      List<String> expectedParsers,
+      List<ExpectedHintCandidate> expectedHintCandidates,
+      boolean hasFailureCandidate,
+      List<TrialRecord> trialHistory,
+      Set<String> expectedTokens,
+      String deepestMatchedRule,
+      int deepestConsumedPosition,
+      RaisedFailure raisedFailure,
+      RuleStack ruleStack) {
     this.raisedFailure = raisedFailure;
+    this.ruleStack = ruleStack;
     this.farthestOffset = farthestOffset;
     this.farthestConsumedOffset = farthestConsumedOffset;
     this.farthestMatchedOffset = farthestMatchedOffset;
@@ -273,5 +297,15 @@ public class ParseFailureDiagnostics {
    */
   public java.util.Optional<RaisedFailure> getRaisedFailure() {
     return java.util.Optional.ofNullable(raisedFailure);
+  }
+
+  /**
+   * The grammar rules active at the final error, outermost first (#703); see
+   * {@link ParseContext#getRuleStack()}. Empty unless diagnostics are DETAILED. Its
+   * {@link RuleStack#offset()} is the failure it explains: the raised failure's offset, or
+   * the farthest failure (which {@link #getFarthestOffset()} reports when a failure was recorded).
+   */
+  public java.util.Optional<RuleStack> getRuleStack() {
+    return java.util.Optional.ofNullable(ruleStack);
   }
 }
