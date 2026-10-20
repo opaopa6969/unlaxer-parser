@@ -69,9 +69,16 @@ public final class PackratMemoTable {
     private long successCharge;
     private final long successPayloadCharge;
     private final Token.MemoSnapshot snapshot;
+    // A failure entry distinguishes an ordinary failure (null) from a committed or labeled one.
+    private RaisedFailure raised;
 
     private Entry(ParseContext.FailureDiagnostic diagnostic) {
+      this(diagnostic, null);
+    }
+
+    private Entry(ParseContext.FailureDiagnostic diagnostic, RaisedFailure raised) {
       this(diagnostic, null, 0, 0, null, Map.of(), null, 0);
+      this.raised = raised;
     }
 
     private Entry(ParseContext.FailureDiagnostic diagnostic, TokenList tokens,
@@ -131,7 +138,13 @@ public final class PackratMemoTable {
    */
   public static Parsed replay(ParseContext context, Parser parser, TokenKind tokenKind,
       boolean invertMatch, Entry entry) {
-    if (entry.tokens == null) return Parsed.FAILED;
+    if (entry.tokens == null) {
+      // Restores the failure kind and label exactly as the original evaluation raised them,
+      // including "ordinary": a stale raised failure must not survive an ordinary memo hit.
+      if (entry.raised != null) context.raise(entry.raised);
+      else context.clearRaisedFailure();
+      return Parsed.FAILED;
+    }
     context.startParse(parser, context, tokenKind, invertMatch);
     if (parser instanceof org.unlaxer.parser.combinator.Occurs occurs
         && occurs.min() == 0 && occurs.max() == 0 && !occurs.isZeroMatchCheck())
@@ -222,7 +235,8 @@ public final class PackratMemoTable {
     if (false == parseContext.isMemoizationSessionSafe() || false == isExactSafeClass(parser)) return;
     ParseContext.sealMemoDiagnostic(diagnostic);
     parseContext.getPackratMemoTable().put(
-        parser, positionKeyOf(parseContext, tokenKind, invertMatch), new Entry(diagnostic));
+        parser, positionKeyOf(parseContext, tokenKind, invertMatch),
+        new Entry(diagnostic, parseContext.raisedFailure()));
   }
 
   /** Starts a local diagnostic frame only for an eligible exact safe rule. */
@@ -449,9 +463,12 @@ public final class PackratMemoTable {
     }
     // The public put surface may receive an already indexed outcome. Share its
     // immutable payload, never its intrusive index links, with another key.
-    if (entry.indexedKey != null)
+    if (entry.indexedKey != null) {
+      RaisedFailure raised = entry.raised;
       entry = new Entry(entry.diagnostic, entry.tokens, entry.endConsumed, entry.endMatched,
           entry.chosenChild, entry.choices, entry.snapshot, entry.successPayloadCharge);
+      entry.raised = raised;
+    }
     if (indexLength > entryChainByPosition.length)
       entryChainByPosition = java.util.Arrays.copyOf(entryChainByPosition, indexLength);
     if (old != null) {

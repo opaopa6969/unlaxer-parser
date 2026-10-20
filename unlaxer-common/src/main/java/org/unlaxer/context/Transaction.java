@@ -83,6 +83,8 @@ public interface Transaction extends TransactionListenerContainer , ParseContext
    */
 	public default Committed commit(Parser parser, TokenKind tokenKind , AdditionalCommitAction... actions) {
         get().requireParseHealthy();
+        // A committed transaction is a success: any raised failure below it has been caught.
+        get().clearRaisedFailure();
 
     Collection<AdditionalCommitAction> persistentActions = getActions();
     boolean hasArgActions = actions.length > 0;

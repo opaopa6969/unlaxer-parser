@@ -241,6 +241,27 @@ pub enum Expr {
         tokens: Vec<&'static str>,
         message: &'static str,
     },
+    /// Cut (#700): the child's ordinary failure becomes a committed error raised at this
+    /// operator's start. Only [`Expr::Recovery`] or the outermost parse catches it.
+    /// CST-transparent; labeled or committed child failures pass through unchanged.
+    Commit {
+        child: Box<Expr>,
+        message: &'static str,
+    },
+    /// Labeled failure (#700): the child's ordinary failure becomes a failure labeled
+    /// `label`, raised at this operator's start. Only [`Expr::CatchLabels`] naming the
+    /// label catches it. CST-transparent; raised child failures pass through unchanged.
+    Label {
+        child: Box<Expr>,
+        label: &'static str,
+    },
+    /// Catch labeled failures (#700), scomb's `|~`: when `child` raises one of `labels`,
+    /// restore the start state and parse `alternative` from the same position.
+    CatchLabels {
+        child: Box<Expr>,
+        alternative: Box<Expr>,
+        labels: Vec<&'static str>,
+    },
     /// Undeclared custom parser: [`Diagnostics::Auto`] conservatively uses `Detailed`.
     Custom(fn(&mut ParseContext<'_>) -> ParseResult),
     /// Custom parser with a caller-supplied contract for automatic diagnostics.
@@ -473,6 +494,36 @@ impl Expr {
             positive: false,
         }
     }
+    /// Cut with the default message, see [`Expr::Commit`].
+    pub fn commit(self) -> Self {
+        self.commit_with(DEFAULT_COMMIT_MESSAGE)
+    }
+    /// Cut with an explicit message, see [`Expr::Commit`].
+    pub fn commit_with(self, message: &'static str) -> Self {
+        Self::Commit {
+            child: Box::new(self),
+            message,
+        }
+    }
+    /// Labeled failure, see [`Expr::Label`].
+    pub fn label(self, label: &'static str) -> Self {
+        Self::Label {
+            child: Box::new(self),
+            label,
+        }
+    }
+    /// Catch labeled failures, see [`Expr::CatchLabels`].
+    pub fn catch_labels(
+        self,
+        alternative: Self,
+        labels: impl IntoIterator<Item = &'static str>,
+    ) -> Self {
+        Self::CatchLabels {
+            child: Box::new(self),
+            alternative: Box::new(alternative),
+            labels: labels.into_iter().collect(),
+        }
+    }
     pub fn separated_by(self, separator: Self) -> Self {
         Self::sequence([self.clone(), separator.then(self).zero_or_more()])
     }
@@ -631,6 +682,48 @@ impl Tree {
     }
     pub fn text(&self, span: Span) -> &str {
         &self.source[self.byte_offsets[span.start]..self.byte_offsets[span.end]]
+    }
+}
+
+/// Default message of a committed error declared without one.
+pub const DEFAULT_COMMIT_MESSAGE: &str = "unexpected input";
+
+/// The two non-ordinary failure kinds (#700).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RaisedKind {
+    /// Committed (cut) error: no choice, optional, repetition or assertion catches it.
+    Commit,
+    /// Labeled failure: only [`Expr::CatchLabels`] naming the label catches it.
+    Label,
+}
+
+/// A committed error or labeled failure raised by [`Expr::Commit`] / [`Expr::Label`].
+/// Position and message are structural; memoization and diagnostics policy never change them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RaisedFailure {
+    pub kind: RaisedKind,
+    /// The label of a labeled failure; `None` for a committed error.
+    pub label: Option<&'static str>,
+    /// Reported message; a labeled failure reports its label.
+    pub message: &'static str,
+    /// Code-point offset of the active cursor where the raising operator started.
+    pub offset: usize,
+}
+
+impl RaisedFailure {
+    /// The final parse error: this failure's offset and message.
+    pub fn error(&self) -> ParseError {
+        ParseError {
+            offset: self.offset,
+            expected: vec![self.message.to_owned()],
+        }
+    }
+    /// Stable [`ParseDiagnostic::kind`] for an uncaught raised failure.
+    pub fn diagnostic_kind(&self) -> &'static str {
+        match self.kind {
+            RaisedKind::Commit => "commit",
+            RaisedKind::Label => "label",
+        }
     }
 }
 
@@ -1042,6 +1135,8 @@ struct FailureDiagnostic {
     // Historical name: any syntax failure (Classic or native) overrides a success watermark.
     classic_failure_seen: bool,
     classic_failure_end: Option<(usize, MatchCursorPolicy)>,
+    // Only failure memo entries set this: an ordinary (None) versus raised failure (#700).
+    raised: Option<Rc<RaisedFailure>>,
 }
 
 impl FailureDiagnostic {
@@ -1582,6 +1677,9 @@ pub struct ParseContext<'a> {
     names_state: names::State,
     token_trace: Option<token_trace::Trace>,
     trace_custom_contracts: Vec<bool>,
+    // Committed or labeled failure (#700) propagating towards its catcher; None on every
+    // ordinary path. Cleared whenever a new expression attempt starts.
+    raised: Option<RaisedFailure>,
 }
 
 /// Ordered choice with rollback and full-input acceptance. Rule nesting is bounded
@@ -1783,6 +1881,15 @@ fn parse_detailed_owned(
             farthest: failure.error(),
         });
     }
+    if let Some(raised) = parser.raised {
+        // Structural position and message: no detailed retry can change them.
+        return Err(ParseDiagnostic {
+            kind: raised.diagnostic_kind(),
+            offset: raised.offset,
+            expected: vec![raised.message.to_owned()],
+            farthest: raised.error(),
+        });
+    }
     if options.diagnostics == Diagnostics::DetailedOnFailure {
         let bindings = parser.bindings.clone();
         let rules = Arc::clone(&parser.rules);
@@ -1926,6 +2033,7 @@ impl<'a> ParseContext<'a> {
             names_state: names::State::default(),
             token_trace: options.token_trace.map(token_trace::Trace::new),
             trace_custom_contracts: Vec::new(),
+            raised: None,
         }
         .with_candidate_exclusion()
     }
@@ -2195,12 +2303,21 @@ impl<'a> ParseContext<'a> {
         self.names_state.failure()
     }
 
+    /// The committed error or labeled failure that ended the last failed parse, if any.
+    /// It takes precedence over the farthest failure in [`Self::failure`].
+    pub fn raised_failure(&self) -> Option<RaisedFailure> {
+        self.raised
+    }
+
     pub fn failure(&self) -> ParseError {
         if let Some(error) = &self.resource_failure {
             return error.clone();
         }
         if let Some(failure) = self.name_failure() {
             return failure.error();
+        }
+        if let Some(raised) = &self.raised {
+            return raised.error();
         }
         ParseError {
             offset: self.code_point(if !self.classic_failure_seen {
@@ -2706,6 +2823,8 @@ impl<'a> ParseContext<'a> {
         {
             self.memoized_failure_hits += 1;
             self.replay_failure(&diagnostic);
+            // The entry distinguishes ordinary from committed / labeled failures (#700).
+            self.raised = diagnostic.raised.as_deref().copied();
             if let Some((matched, policy)) = diagnostic.classic_failure_end {
                 self.matched_position = matched;
                 self.match_cursor_policy = policy;
@@ -2756,6 +2875,7 @@ impl<'a> ParseContext<'a> {
                     );
                 }
             } else {
+                diagnostic.raised = self.raised.map(Rc::new);
                 diagnostic.memo_expression_depth = self.expression_depth;
                 diagnostic.memo_expected_text_bytes =
                     diagnostic
@@ -2964,6 +3084,9 @@ impl<'a> ParseContext<'a> {
             self.resource_error("expression nesting below 1024");
             return None;
         }
+        // A new attempt: every combinator observes a raised failure before it starts
+        // another one, so anything still pending here was caught.
+        self.raised = None;
         self.expression_depth += 1;
         let checkpoint = self.checkpoint();
         let parent_policy = self.match_cursor_policy;
@@ -3001,6 +3124,7 @@ impl<'a> ParseContext<'a> {
                 | Expr::UniqueLongestChoice(_)
                 | Expr::PredictiveChoice { .. }
                 | Expr::Recovery { .. }
+                | Expr::CatchLabels { .. }
         );
         let no_repeat_attempt = matches!(expression,
             Expr::Repeat { min, max: Some(max), .. } | Expr::JavaRepeat { min, max: Some(max), .. }
@@ -3094,6 +3218,9 @@ impl<'a> ParseContext<'a> {
             | Expr::ValueBoundary(_)
             | Expr::CaptureBoundary(_, _)
             | Expr::InputCaptureBoundary(_, _) => self.expression_value_boundary(expression, depth),
+            Expr::Commit { .. } | Expr::Label { .. } | Expr::CatchLabels { .. } => {
+                self.expression_raising(expression, depth)
+            }
             Expr::Character { .. } => self.classic_atom(expression, depth),
             _ if self.token_mode.is_some() => self.classic_atom(expression, depth),
             _ => self.expression_inner(expression, depth),
@@ -3322,7 +3449,7 @@ impl<'a> ParseContext<'a> {
                     break;
                 }
                 self.finish_classic_candidate(checkpoint, false);
-                if self.resource_failure.is_some() {
+                if self.resource_failure.is_some() || self.raised.is_some() {
                     return None;
                 }
             }
@@ -3342,6 +3469,9 @@ impl<'a> ParseContext<'a> {
             | Expr::Character { .. } => unreachable!("Classic expression dispatched by expression"),
             Expr::Custom(_) | Expr::CustomWith { .. } => {
                 unreachable!("recursive expression dispatched by expression")
+            }
+            Expr::Commit { .. } | Expr::Label { .. } | Expr::CatchLabels { .. } => {
+                unreachable!("raising expression dispatched by expression")
             }
             Expr::Lexical(label, expression) => {
                 let end = match &mut self.lexing {
@@ -3705,6 +3835,10 @@ impl<'a> ParseContext<'a> {
                 self.call_depth = self.call_depth.max(depth) + 1;
                 let result = self.transaction(|context| parser(context));
                 self.call_depth = previous_depth;
+                if result.is_ok() {
+                    // The callback succeeded, so it caught any raised failure it observed.
+                    self.raised = None;
+                }
                 if tracing && !self.trace_custom_contracts.pop().unwrap() && result.is_ok() {
                     self.unsupported_trace(
                         "custom parser without explicit terminal trace contract",
@@ -3775,83 +3909,184 @@ impl<'a> ParseContext<'a> {
                     return Some(fragment);
                 }
                 self.finish_classic_candidate(checkpoint, false);
-                if self.token_mode.is_some() {
-                    let token_kind = self.token_mode().kind;
-                    let active = self.mode_cursor();
-                    self.position = active;
-                    let end = self.recovery_end(*mode, tokens);
-                    self.position = start;
-                    let end = end?;
-                    if token_kind.is_match_only() {
-                        self.matched_position = end;
-                        return Some(Fragment::default());
-                    }
-                    let span = Span {
-                        start: self.code_point(active),
-                        end: self.code_point(end),
-                    };
-                    let target = self.position() + span.end - span.start;
-                    self.position = *self.byte_offsets.get(target)?;
-                    self.matched_position = self.position;
-                    let id = self.add_token_node(
-                        RECOVERY_ERROR_RULE,
-                        token_kind,
-                        token::TokenSource::Input(span),
-                    )?;
-                    self.recoveries.push(RecoveryDiagnostic {
-                        span,
-                        message,
-                        node: id.index(),
-                    });
-                    self.mark_classic_node(
-                        id.index(),
-                        &FragmentSource {
-                            span,
-                            kind: token_kind,
-                            classic: true,
-                            generated: false,
-                            text: None,
-                        },
-                    );
-                    self.unsupported_trace("recovery");
-                    return Some(Fragment {
-                        nodes: vec![id.index()],
-                        captures: Vec::new(),
-                        source: Some(Box::new(FragmentSource {
-                            span,
-                            kind: token_kind,
-                            classic: true,
-                            generated: false,
-                            text: None,
-                        })),
-                    });
+                // A recovery boundary catches ordinary failures and committed errors (#700).
+                // A labeled failure is caught only by CatchLabels naming it.
+                let raised = self.raised.take();
+                if raised.is_some_and(|raised| raised.kind == RaisedKind::Label) {
+                    self.raised = raised;
+                    return None;
                 }
-                let end = self.recovery_end(*mode, tokens)?;
-                self.position = end;
-                self.matched_position = end;
-                let span = Span {
-                    start: self.code_point(start),
-                    end: self.code_point(end),
-                };
-                let node = self.nodes.len();
-                self.nodes.push(Node {
-                    rule: RECOVERY_ERROR_RULE,
-                    span,
-                    children: Vec::new(),
-                    captures: Vec::new(),
-                });
-                self.recoveries.push(RecoveryDiagnostic {
-                    span,
-                    message,
-                    node,
-                });
-                Some(Fragment {
-                    nodes: vec![node],
-                    captures: Vec::new(),
-                    source: None,
-                })
+                let recovered = self.recover_after_failure(start, *mode, tokens, message);
+                if recovered.is_none() && self.resource_failure.is_none() {
+                    self.raised = raised;
+                }
+                recovered
             }
             _ => unreachable!("recursive expression dispatched by variant"),
+        }
+    }
+
+    #[inline(never)]
+    fn recover_after_failure(
+        &mut self,
+        start: usize,
+        mode: RecoveryMode,
+        tokens: &[&'static str],
+        message: &'static str,
+    ) -> Option<Fragment> {
+        if self.token_mode.is_some() {
+            let token_kind = self.token_mode().kind;
+            let active = self.mode_cursor();
+            self.position = active;
+            let end = self.recovery_end(mode, tokens);
+            self.position = start;
+            let end = end?;
+            if token_kind.is_match_only() {
+                self.matched_position = end;
+                return Some(Fragment::default());
+            }
+            let span = Span {
+                start: self.code_point(active),
+                end: self.code_point(end),
+            };
+            let target = self.position() + span.end - span.start;
+            self.position = *self.byte_offsets.get(target)?;
+            self.matched_position = self.position;
+            let id = self.add_token_node(
+                RECOVERY_ERROR_RULE,
+                token_kind,
+                token::TokenSource::Input(span),
+            )?;
+            self.recoveries.push(RecoveryDiagnostic {
+                span,
+                message,
+                node: id.index(),
+            });
+            self.mark_classic_node(
+                id.index(),
+                &FragmentSource {
+                    span,
+                    kind: token_kind,
+                    classic: true,
+                    generated: false,
+                    text: None,
+                },
+            );
+            self.unsupported_trace("recovery");
+            return Some(Fragment {
+                nodes: vec![id.index()],
+                captures: Vec::new(),
+                source: Some(Box::new(FragmentSource {
+                    span,
+                    kind: token_kind,
+                    classic: true,
+                    generated: false,
+                    text: None,
+                })),
+            });
+        }
+        let end = self.recovery_end(mode, tokens)?;
+        self.position = end;
+        self.matched_position = end;
+        let span = Span {
+            start: self.code_point(start),
+            end: self.code_point(end),
+        };
+        let node = self.nodes.len();
+        self.nodes.push(Node {
+            rule: RECOVERY_ERROR_RULE,
+            span,
+            children: Vec::new(),
+            captures: Vec::new(),
+        });
+        self.recoveries.push(RecoveryDiagnostic {
+            span,
+            message,
+            node,
+        });
+        Some(Fragment {
+            nodes: vec![node],
+            captures: Vec::new(),
+            source: None,
+        })
+    }
+
+    #[inline(never)]
+    fn expression_raising(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        match expression {
+            Expr::Commit {
+                child,
+                message: text,
+            } => {
+                let offset = self.raising_offset();
+                let result = self.expression(child, depth);
+                self.raise_if_ordinary(&result, RaisedKind::Commit, None, text, offset);
+                result
+            }
+            Expr::Label { child, label } => {
+                let offset = self.raising_offset();
+                let result = self.expression(child, depth);
+                self.raise_if_ordinary(&result, RaisedKind::Label, Some(label), label, offset);
+                result
+            }
+            Expr::CatchLabels {
+                child,
+                alternative,
+                labels,
+            } => {
+                let start = self.position;
+                let count = self.nodes.len();
+                let checkpoint = self
+                    .token_mode
+                    .is_some()
+                    .then(|| Box::new(self.checkpoint()));
+                if let Some(fragment) = self.expression(child, depth) {
+                    self.finish_classic_candidate(checkpoint, true);
+                    return Some(fragment);
+                }
+                self.finish_classic_candidate(checkpoint, false);
+                self.position = start;
+                self.nodes.truncate(count);
+                let caught = self.raised.is_some_and(|raised| {
+                    raised.kind == RaisedKind::Label
+                        && raised.label.is_some_and(|label| labels.contains(&label))
+                });
+                if !caught {
+                    return None;
+                }
+                self.raised = None;
+                if self.token_mode.is_some() && self.match_cursor_policy.reset {
+                    self.matched_position = self.position;
+                }
+                self.expression(alternative, depth)
+            }
+            _ => unreachable!("raising expression dispatched by variant"),
+        }
+    }
+
+    fn raising_offset(&self) -> usize {
+        self.code_point(if self.token_mode.is_some() {
+            self.mode_cursor()
+        } else {
+            self.position
+        })
+    }
+
+    fn raise_if_ordinary(
+        &mut self,
+        result: &Option<Fragment>,
+        kind: RaisedKind,
+        label: Option<&'static str>,
+        message: &'static str,
+        offset: usize,
+    ) {
+        if result.is_none() && self.raised.is_none() && self.resource_failure.is_none() {
+            self.raised = Some(RaisedFailure {
+                kind,
+                label,
+                message,
+                offset,
+            });
         }
     }
 
@@ -3868,6 +4103,8 @@ impl<'a> ParseContext<'a> {
                 };
                 match attempt {
                     Some(fragment) => Some(fragment),
+                    // A committed or labeled failure is not an absent optional (#700).
+                    None if self.raised.is_some() => None,
                     None => {
                         self.position = start;
                         self.nodes.truncate(count);
@@ -3953,6 +4190,8 @@ impl<'a> ParseContext<'a> {
                         break;
                     }
                 }
+                // A committed or labeled failure is not the end of a repetition (#700).
+                None if self.raised.is_some() => return None,
                 None => {
                     self.position = start;
                     self.nodes.truncate(count);
@@ -3992,6 +4231,11 @@ impl<'a> ParseContext<'a> {
                 let matched = self.expression(child, depth).is_some();
                 self.token_mode = previous;
                 self.restore(checkpoint);
+                // A committed or labeled child failure fails either polarity and keeps
+                // its diagnostics (#700).
+                if self.raised.is_some() {
+                    return None;
+                }
                 // Successful assertions discard speculative diagnostics. A failed
                 // negative assertion retains failures explored inside its matching child.
                 if matched == *positive {
@@ -4399,6 +4643,10 @@ impl<'a> ParseContext<'a> {
                         fragment,
                     });
                 }
+            } else if self.raised.is_some() {
+                // A committed or labeled failure aborts the whole choice (#700).
+                self.restore(checkpoint);
+                return None;
             }
             self.restore(checkpoint);
         }
@@ -4463,6 +4711,10 @@ impl<'a> ParseContext<'a> {
             self.finish_classic_candidate(checkpoint, false);
             self.position = start;
             self.nodes.truncate(count);
+            // A committed or labeled failure is not caught by an ordinary choice (#700).
+            if self.raised.is_some() {
+                return None;
+            }
         }
         None
     }
@@ -4508,6 +4760,9 @@ impl<'a> ParseContext<'a> {
             return Some(fragment);
         }
         self.restore(checkpoint);
+        if self.raised.is_some() {
+            return None;
+        }
         self.ordered_choice(alternatives.iter(), depth)
     }
 
@@ -4833,7 +5088,15 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Recovery { child, .. }
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. }
-        | Expr::LexicalContextScope { child, .. } => expression_allows_deferred_diagnostics(child),
+        | Expr::LexicalContextScope { child, .. }
+        | Expr::Commit { child, .. }
+        | Expr::Label { child, .. } => expression_allows_deferred_diagnostics(child),
+        Expr::CatchLabels {
+            child, alternative, ..
+        } => {
+            expression_allows_deferred_diagnostics(child)
+                && expression_allows_deferred_diagnostics(alternative)
+        }
         Expr::Lexical(_, _)
         | Expr::Literal(_)
         | Expr::CaseInsensitive(_)
@@ -4949,8 +5212,15 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::RuleEffects { child, .. }
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. }
-        | Expr::LexicalContextScope { child, .. } => {
+        | Expr::LexicalContextScope { child, .. }
+        | Expr::Commit { child, .. }
+        | Expr::Label { child, .. } => expression_is_memo_safe(child, references, success),
+        // Failure entries record the raised failure, so these stay memo-safe (#700).
+        Expr::CatchLabels {
+            child, alternative, ..
+        } => {
             expression_is_memo_safe(child, references, success)
+                && expression_is_memo_safe(alternative, references, success)
         }
         Expr::Lexical(_, _)
         | Expr::Literal(_)
@@ -6248,7 +6518,17 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
             | Expr::Recovery { child, .. }
             | Expr::TriviaScope { child, .. }
             | Expr::LexicalTriviaScope { child, .. }
-            | Expr::LexicalContextScope { child, .. } => Some(child.as_ref()),
+            | Expr::LexicalContextScope { child, .. }
+            | Expr::Commit { child, .. }
+            | Expr::Label { child, .. } => Some(child.as_ref()),
+            Expr::CatchLabels {
+                child, alternative, ..
+            } => {
+                if requires_classic_mode(alternative, rules) {
+                    return true;
+                }
+                Some(child.as_ref())
+            }
             _ => None,
         };
     }

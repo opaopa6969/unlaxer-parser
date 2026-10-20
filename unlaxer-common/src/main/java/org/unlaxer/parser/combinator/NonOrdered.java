@@ -97,6 +97,8 @@ public class NonOrdered extends ConstructedCombinatorParser {
 						break;
 					}
 					parseContext.rollback(CANDIDATE_BOUNDARY);
+					// A committed or labeled failure is not caught by candidate selection (#700).
+					if (parseContext.hasRaisedFailure()) break;
 				}
 				if (start == remain) {
 					parseContext.rollback(this);

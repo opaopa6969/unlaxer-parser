@@ -61,6 +61,13 @@ public interface LongestChoiceInterface extends ChoiceInterface {
                     }
                 }
                 parseContext.rollback(this);
+                // A committed or labeled failure aborts the whole choice (#700).
+                if (parsed.isFailed() && parseContext.hasRaisedFailure()) {
+                    parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
+                    PackratMemoTable.memoizeFailure(
+                        parseContext, this, tokenKind, invertMatch, memoDiagnostic);
+                    return Parsed.FAILED;
+                }
             }
 
             if (winner != null && requiresUniqueLongestChoice() && (ties > 1 || winnerEnd == start)) {

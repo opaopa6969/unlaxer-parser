@@ -61,6 +61,8 @@ public class ParseContext implements
     if (parserCallDepth == 0) {
       parserCallEntry = getCurrent();
       parserCallResetMatched = parserCallEntry.isResetMatchedWithConsumed();
+      // A new outermost parse starts; a failure raised by an earlier one is history.
+      raisedFailure = null;
     }
     parserCallDepth++;
     if (immediateCallback && activeParseDepth() == 0
@@ -93,6 +95,38 @@ public class ParseContext implements
     throw (Error) failure;
   }
 
+  /*
+   * Committed / labeled failure (#700) propagating from a Commit or Label towards the parser
+   * that catches it. Null on every ordinary path, so grammars without these operators only pay
+   * a field store per transaction begin.
+   */
+  private RaisedFailure raisedFailure;
+
+  /** The committed or labeled failure currently propagating, or null for an ordinary failure. */
+  public RaisedFailure raisedFailure() {
+    return raisedFailure;
+  }
+
+  /** Whether the failure currently propagating is committed or labeled rather than ordinary. */
+  public boolean hasRaisedFailure() {
+    return raisedFailure != null;
+  }
+
+  /** The committed or labeled failure of the last failed parse, if any. */
+  public java.util.Optional<RaisedFailure> getRaisedFailure() {
+    return java.util.Optional.ofNullable(raisedFailure);
+  }
+
+  /** Raise {@code failure}; the caller must return a failed {@link Parsed}. */
+  public void raise(RaisedFailure failure) {
+    raisedFailure = java.util.Objects.requireNonNull(failure, "failure");
+  }
+
+  /** Catch the current raised failure. Custom catching parsers call this before retrying. */
+  public void clearRaisedFailure() {
+    raisedFailure = null;
+  }
+
   private boolean observerBoundaryActive;
   private TransactionElement observerEntry;
   private ParserCursor observerCursor;
@@ -113,6 +147,10 @@ public class ParseContext implements
   /** Internal boundary for public begin/commit/rollback calls outside parse notifications. */
   public void beforeTransactionBegin() {
     requireParseHealthy();
+    // Every combinator that observes a raised failure does so before it begins another
+    // attempt. A new attempt therefore means the failure was caught (or ignored by a parser
+    // unaware of raised failures) and must not leak into an unrelated later failure.
+    raisedFailure = null;
     if (!observerBoundaryActive) beginObserverBoundary(true);
   }
 
@@ -1045,7 +1083,9 @@ public class ParseContext implements
       boolean succeeded;
       try {
         begin(owner);
-        succeeded = child.parse(this, TokenKind.consumed, false).isSucceeded() == positive;
+        Parsed childParsed = child.parse(this, TokenKind.consumed, false);
+        // A committed or labeled child failure fails either polarity and propagates (#700).
+        succeeded = childParsed.isSucceeded() == positive && raisedFailure == null;
         rollback(owner);
         completed = true;
       } catch (RuntimeException | Error failure) {
@@ -1729,6 +1769,9 @@ public class ParseContext implements
   @Override
   public void startParse(Parser parser, ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
     requireParseHealthy();
+    // Every parser attempt starts here, terminals included (they begin no transaction).
+    // A raised failure still pending was ignored by its caller and must not leak (#700).
+    raisedFailure = null;
     int activeDepth = activeParseDepth();
     if (activeDepth == 0 && (!observerBoundaryActive || observerExplicitTransaction)) beginObserverBoundary(false);
     if (activeDepth >= MAX_PARSE_DEPTH) {
@@ -1818,6 +1861,15 @@ public class ParseContext implements
    * recording remains available separately through getTrialHistory().
    */
   public ParseFailureDiagnostics getParseFailureDiagnostics() {
+    if (raisedFailure != null) {
+      // A committed or labeled failure is the final error whatever the diagnostic policy:
+      // its position and message are structural, never the farthest speculative failure.
+      CodePointIndex at = new CodePointIndex(raisedFailure.offset());
+      return new ParseFailureDiagnostics(raisedFailure.offset(), raisedFailure.offset(),
+          raisedFailure.offset(), source.lineNumberFrom(at).value(),
+          source.codePointIndexInLineFrom(at).value(), List.of(), List.of(), List.of(), true,
+          List.of(), Set.of(raisedFailure.message()), "", 0, raisedFailure);
+    }
     if (deferredDiagnostics) {
       CodePointIndex start = new CodePointIndex(0);
       return new ParseFailureDiagnostics(0, 0, 0, source.lineNumberFrom(start).value(),

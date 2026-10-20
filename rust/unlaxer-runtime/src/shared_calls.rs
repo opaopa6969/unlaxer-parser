@@ -114,6 +114,8 @@ impl Registry {
         // The primitive keeps a lexical session for an outermost grammar parse.
         // A shared boundary must isolate it even when the caller has no rules.
         let lexing = context.lexing.take();
+        // The call returns its failure as data; an inner cut or label must not escape (#700).
+        let raised = context.raised.take();
         context.set_state(DEPTH, depth + 1);
         context.set_state(BUDGET, retained + source_length);
         // Local diagnostics must not report a farther failure from an earlier caller alternative.
@@ -129,6 +131,8 @@ impl Registry {
             .ok()
             .and_then(|value| value.root_node())
             .and_then(|node| context.tree(node));
+        // The inner cut stays inside the call, so its message must not reach the local error.
+        context.raised = None;
         let local_error = context.failure();
         let succeeded = parsed.is_ok()
             && end > start
@@ -157,6 +161,7 @@ impl Registry {
         context.tokens = tokens;
         context.names_state = names;
         context.lexing = lexing;
+        context.raised = raised;
         context.position = cursor.0;
         context.matched_position = cursor.1;
         if parsed.is_err() {
