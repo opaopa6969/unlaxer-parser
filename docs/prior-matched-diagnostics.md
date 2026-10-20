@@ -94,8 +94,18 @@ match-only terminal が lexeme を見る。たとえば `Root ::= EMPTY END`（`
 `a` を与えると、Java の `EMPTY`（`MatchOnly(任意の 1 文字)`）は error lexeme の `a` に一致せず、
 matched は CP0 のまま `EOF` が CP0 で失敗する（`spec-corpus/token-stream/corpus.json` の
 `empty-assertions` / `not-eof`）。Rust の `JavaEmpty` は lexing session の中でも matched を 1 文字
-進めるので、補正すると Rust だけ CP1 になる。token stream の中の正の `LOOKAHEAD` の失敗位置を
-両版で比べる共有 corpus はまだ無い。
+進めるので、補正すると Rust だけ CP1 になる。session の中から `parse_grammar` で入れ子に呼んだ
+grammar も、呼び出しが session を外しても同じく補正しない（Rust `prior_matched_diagnostics` の
+`a_grammar_nested_in_a_token_stream_session_keeps_the_consumed_frontier`）。UBNF は token stream の
+文法で `LOOKAHEAD` / `NEGATIVE_LOOKAHEAD` / `UNTIL` などの非 declarative token を
+`E-TOKEN-STREAM-TOKEN` で拒否する（`TokenStreamGrammar`）。token stream の中で matched を進めうる
+UBNF の要素は `EMPTY` だけなので、この例外で #706 の対象から外れる UBNF 文法は `EMPTY` を使うものに限られる。
+
+**shared grammar call**: `shared_calls::Registry::call` は、Java の `SharedGrammarCalls` と同じく、
+子 grammar を呼び出し元の consumed の位置から、両 cursor をそこに揃えて始める。呼び出し元の正の
+`LOOKAHEAD` が進めた matched は、子の失敗位置にも rule frame の開始にもならない（`'a' LOOKAHEAD('x')`
+の後に子 `Root ::= 'b' 'c'` を呼ぶと、`ax` / `axb` とも両版で CP1、`Root@1`）。呼び出し元の matched は
+呼び出しの後に元へ戻る。
 
 **変えないもの**: 受理・拒否、両 cursor、CST、AST、token は変えない。式単位の公開入口
 （`ParseContext::parse`、`parse_with_token_mode`、`parse_token`）は、grammar の中から

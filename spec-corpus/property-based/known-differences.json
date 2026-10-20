@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "id": "number-incomplete-exponent",
+    "issue": "#717",
+    "reason": "Java's NumberParser reads an incomplete exponent (an e or E after a digit, and a sign) and fails after it; Rust's Number token stops before the e, so the next element fails there and the Java offset is one (or, over a sign, two) code points later. Recorded in rust/FULL-SPEC.md (Number token). It was hidden by the broad #706 exclusion until that was removed. Only that shape is excluded: java-rust:diag (both syntax) and java-rust:stack (same omitted count and frames) findings in grammars with NumberParser whose Rust offset is at an e/E after a digit (checked in code, see KnownDifferences.numberIncompleteExponent). regressions.json pins number-incomplete-exponent, so this entry always excludes something; the test fails when it excludes nothing.",
+    "kind": "java-rust:(diag|stack)",
+    "grammar": "org\\.unlaxer\\.parser\\.elementary\\.NumberParser",
+    "condition": "number-incomplete-exponent"
+  }
+]

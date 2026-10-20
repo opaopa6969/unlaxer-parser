@@ -126,6 +126,9 @@ impl Registry {
         // The call selects its own failed rule invocation (#703).
         let rule_call = context.begin_rule_call();
         context.farthest = context.position;
+        // The child starts with both cursors at the caller's consumed position, as Java's
+        // SharedGrammarCalls does; the caller's matched reach is restored with `cursor`.
+        context.matched_position = context.position;
         let parsed = context.parse_shared_grammar(&grammar.grammar, root, grammar.whitespace);
         let end = context.position();
         let retained = *context.state::<usize>(BUDGET).unwrap();

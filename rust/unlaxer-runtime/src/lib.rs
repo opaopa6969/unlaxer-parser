@@ -2506,6 +2506,7 @@ impl<'a> ParseContext<'a> {
         let previous_definition = self.lexical_trivia.take();
         let previous_goal = self.lexical_context.take();
         let outer_entry = self.rules.is_empty();
+        let in_token_stream = self.lexing.is_some();
         let previous_lexing = if outer_entry {
             None
         } else {
@@ -2528,7 +2529,9 @@ impl<'a> ParseContext<'a> {
         let active_session = self.next_grammar_session;
         self.next_grammar_session = self.next_grammar_session.wrapping_add(1);
         self.grammar_session = active_session;
-        let previous_frontier = std::mem::replace(&mut self.grammar_frontier, true);
+        // A grammar called inside a token-stream session, also a nested one whose call
+        // took the session above, keeps the consumed frontier (see frame_start).
+        let previous_frontier = std::mem::replace(&mut self.grammar_frontier, !in_token_stream);
         let result = self.parse_expression(&Expr::Rule(root));
         self.grammar_frontier = previous_frontier;
         self.failure_memo = previous_failure_memo;
@@ -2801,7 +2804,8 @@ impl<'a> ParseContext<'a> {
     /// Where a rule invocation at `position` (bytes) starts: inside a grammar invocation
     /// at max(consumed, matched), Java's `ParseFrame` start, in Classic token mode too.
     /// A token-stream session keeps the consumed position: there the Java match-only
-    /// terminals (`EMPTY`) see lexemes and Rust's matched cursor is not Java's.
+    /// terminals (`EMPTY`) see lexemes and Rust's matched cursor is not Java's. A grammar
+    /// called inside a session clears `grammar_frontier` even after taking the session.
     #[inline]
     pub(crate) fn frame_start(&self, position: usize) -> usize {
         if self.grammar_frontier && self.lexing.is_none() {
