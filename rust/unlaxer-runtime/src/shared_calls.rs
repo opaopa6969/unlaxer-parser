@@ -131,6 +131,8 @@ impl Registry {
             .ok()
             .and_then(|value| value.root_node())
             .and_then(|node| context.tree(node));
+        // The inner cut stays inside the call, so its message must not reach the local error.
+        context.raised = None;
         let local_error = context.failure();
         let succeeded = parsed.is_ok()
             && end > start
