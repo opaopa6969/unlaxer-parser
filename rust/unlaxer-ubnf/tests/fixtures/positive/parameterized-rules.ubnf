@@ -1,0 +1,13 @@
+// Parameterized rules (#701): both frontends expose only the expanded grammar.
+grammar Parameterized {
+  token NAME = IdentifierParser
+  @root
+  @mapping(Root, params=[name])
+  Root ::= Kw('let') NAME @name Sep(Token('😀'), Token(',')) Opt(Kw('end'))? ;
+  Spacing ::= { ' ' } ;
+  // Definitions may appear in any order; calls reuse one instance per argument list.
+  Token(p) ::= p Spacing ;
+  Kw(word) ::= Token(word) ;
+  Sep(item, sep) ::= item { sep item } | ( item sep ) % sep ;
+  Opt(x) ::= [ x ] | x{0,1} | x+ | lib.Value | CAPTURE(v, x) SAME_AS(v) ;
+}

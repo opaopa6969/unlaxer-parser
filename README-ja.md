@@ -153,7 +153,7 @@ MulOp ::= '*' | '/' ;
 
 **Java/Rust共通の[本番品質基準](docs/production-quality.md)を設け、位置・Unicode・再帰上限・IDE lifecycleを検証しています。** 対応範囲内の本番採用は、記載した資源制限と、使う文法・負荷・対象環境での検証を前提に判断してください。全Java文法との互換性や未対応機能を含む無条件のproduction-ready宣言ではありません。crates.io 公開の有無と実装品質は別の軸です。
 
-品質の根拠は [CI](.github/workflows/maven.yml) の Rust 1.85 による Cargo test / fmt / Clippy、Java/Rust 共通 corpus の受理・拒否・AST・ソース位置比較、Java host/native generator の生成一致、実 stdio LSP/DAP 通信、release バイナリ smoke です。通常の `mvn test` では Rust conformance は skip されるため、再検証には `-DrustConformance=true` が必要です。再現手順は [Rust README](rust/README.md) にあります。
+品質の根拠は [CI](.github/workflows/maven.yml) の Rust 1.85 による Cargo test / fmt / Clippy、Java/Rust 共通 corpus の受理・拒否・AST・ソース位置比較、Java host/native generator の生成一致、seed 付きランダム文法・入力による [property-based 差分テスト](docs/property-based-testing.md)（Java と native Rust、memo・診断・cursor 設定間、rollback・span・決定性・原文再構成の不変条件）、実 stdio LSP/DAP 通信、release バイナリ smoke です。通常の `mvn test` では Rust conformance は skip されるため、再検証には `-DrustConformance=true` が必要です。再現手順は [Rust README](rust/README.md) にあります。
 
 開発ブランチでは、3.3.0公開後の追加として [`CI('word')` のUnicode固定比較](docs/case-insensitive-tokens.md)をJava/Rust両方に実装しています。JDKのUnicode版による差とJavaの誤った枝刈りを解消します。この追加は公開済み3.3.0には含まれません。
 

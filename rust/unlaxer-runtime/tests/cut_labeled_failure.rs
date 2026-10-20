@@ -391,3 +391,21 @@ fn a_shared_grammar_call_does_not_leak_an_inner_cut() {
         assert_eq!(context.raised_failure(), None);
     }
 }
+
+/// The failure a shared call returns is its farthest failure, without the inner cut's message.
+#[test]
+fn a_shared_grammar_call_failure_omits_the_inner_cut_message() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for input in ["a", "ax"] {
+            let mut context = ParseContext::with_options(
+                input,
+                ParseOptions::with_memoization(memo).with_diagnostics(Diagnostics::Detailed),
+            );
+            let parser = Expr::choice([Expr::Custom(shared_call), w("az")]);
+            let error = context.parse(&parser).unwrap_err();
+            assert_eq!(context.raised_failure(), None, "{memo:?}/{input}");
+            assert_eq!(error.offset, 1, "{memo:?}/{input}");
+            assert_eq!(error.expected, vec!["b".to_owned()], "{memo:?}/{input}");
+        }
+    }
+}

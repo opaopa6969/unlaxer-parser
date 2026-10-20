@@ -33,6 +33,9 @@ public final class PortabilityCheck {
             return new Result(false, "unavailable", List.of(new Diagnostic(
                 org.unlaxer.dsl.bootstrap.RegexRetirement.CODE, new Span(error.start(), error.end()),
                 org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE)));
+        } catch (org.unlaxer.dsl.bootstrap.ParameterizedRules.ExpansionException error) {
+            return new Result(false, "unavailable", List.of(new Diagnostic(
+                error.code(), new Span(error.start(), error.end()), error.diagnostic())));
         } catch (IllegalArgumentException error) {
             return new Result(false, "unavailable", List.of(new Diagnostic("P-SYNTAX", null, "UBNF syntax")));
         }
@@ -48,6 +51,9 @@ public final class PortabilityCheck {
             return new Result(false, "unavailable", List.of(new Diagnostic(
                 org.unlaxer.dsl.bootstrap.RegexRetirement.CODE, new Span(error.start(), error.end()),
                 org.unlaxer.dsl.bootstrap.RegexRetirement.MESSAGE)));
+        } catch (org.unlaxer.dsl.bootstrap.ParameterizedRules.ExpansionException error) {
+            return new Result(false, "unavailable", List.of(new Diagnostic(
+                error.code(), new Span(error.start(), error.end()), error.diagnostic())));
         } catch (IllegalArgumentException error) {
             return new Result(false, "unavailable", List.of(new Diagnostic("P-SYNTAX", null, "UBNF syntax")));
         }

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "lookahead-diagnostic-offset",
+    "issue": "#706",
+    "note": "Found by seed 131 (generator revision of #705). Java diagnose reports CP2, Rust CP1; excluded by known-differences.json until #706 is fixed.",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= 'a' AHEAD 'é' ; }",
+    "inputs": [
+      "ax",
+      "axé",
+      "aé",
+      "a"
+    ]
+  },
+  {
+    "id": "numeric-field-mapping",
+    "note": "Harness regression from #705 development: a NumberParser field maps to a JSON number on both hosts (the Java oracle once failed to canonicalize Integer values).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(N0, params=[f2,f1]) R0 ::= NUM @f2 | 'b' @f1 ',' @f1 ; }",
+    "inputs": [
+      "42",
+      "b,",
+      "7x"
+    ]
+  },
+  {
+    "id": "memo-replay",
+    "note": "Coverage anchor: under SAFE_FAILURES both hosts replay the pure rule R1 from the success memo (aby) and its failure from the failure memo (ac).",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none @root @mapping(N0) R0 ::= R1 'x' | R1 'y' | 'a' 'c' ; R1 ::= 'a' 'b' ; }",
+    "inputs": [
+      "aby",
+      "abx",
+      "ac",
+      "abz"
+    ]
+  }
+]

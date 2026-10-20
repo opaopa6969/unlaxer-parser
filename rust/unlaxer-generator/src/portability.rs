@@ -86,6 +86,17 @@ pub fn check(source: &str) -> Report {
                 }],
             }
         }
+        Err(error) if parameterized_code(&error.message).is_some() => {
+            return Report {
+                portable: false,
+                structure: "unavailable",
+                diagnostics: vec![Diagnostic {
+                    code: parameterized_code(&error.message).unwrap(),
+                    subject: error.message,
+                    span: Some(error.span),
+                }],
+            }
+        }
         Err(_) => {
             return Report {
                 portable: false,
@@ -99,6 +110,28 @@ pub fn check(source: &str) -> Report {
         }
     };
     check_ast(snapshot.ast())
+}
+
+/// Positioned parameterized-rule rejections (#701) keep their own code and span.
+fn parameterized_code(message: &str) -> Option<&'static str> {
+    [
+        "E-PARAM-ARITY",
+        "E-PARAM-UNDEFINED",
+        "E-PARAM-CYCLE",
+        "E-PARAM-LIMIT",
+        "E-PARAM-ANNOTATION",
+        "E-PARAM-CAPTURE",
+        "E-PARAM-SHADOW",
+        "E-PARAM-DUPLICATE",
+        "E-PARAM-RESERVED",
+        "E-PARAM-NAME-COLLISION",
+    ]
+    .into_iter()
+    .find(|code| {
+        message
+            .strip_prefix(code)
+            .is_some_and(|rest| rest.starts_with(':'))
+    })
 }
 
 pub fn check_file(path: &std::path::Path) -> Report {

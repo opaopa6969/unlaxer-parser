@@ -49,3 +49,17 @@ label-string-name	grammar Bad { Root ::= LABEL('name', 'a'); }
 catch-missing-alternative	grammar Bad { Root ::= CATCH('a'); CATCH ::= 'c'; }
 catch-string-label	grammar Bad { Root ::= CATCH('a', 'b', 'L'); }
 catch-empty-alternative	grammar Bad { Root ::= CATCH('a',, L); }
+param-definition-trivia	grammar Bad { Root ::= F('a'); F (x) ::= x; }
+param-definition-empty	grammar Bad { F() ::= 'a'; }
+param-definition-literal	grammar Bad { F('x') ::= 'a'; }
+param-call-empty	grammar Bad { Root ::= F(); F(x) ::= x; }
+param-call-trailing-comma	grammar Bad { Root ::= F('a',); F(x) ::= x; }
+param-call-unclosed	grammar Bad { Root ::= F('a'; F(x) ::= x; }
+param-value-double-marker	grammar Bad { Root ::= F('a'); F(==x) ::= x; }
+param-value-marker-only	grammar Bad { Root ::= F('a'); F(=) ::= 'a'; }
+param-value-marker-after	grammar Bad { Root ::= F('a'); F(x=) ::= x; }
+param-value-marker-at-call	grammar Bad { Root ::= F(='a'); F(=x) ::= x; }
+param-value-capture-name	grammar Bad { Root ::= CAPTURE(F(=x), 'a'); }
+param-reserved-commit	grammar Bad { Root ::= COMMIT('a'); COMMIT(x) ::= x 'z'; }
+param-reserved-label	grammar Bad { Root ::= LABEL(L, 'a'); LABEL(x) ::= x 'z'; }
+param-reserved-catch	grammar Bad { Root ::= CATCH('a', 'b', L); CATCH(x) ::= x 'z'; }
