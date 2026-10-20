@@ -78,7 +78,8 @@ Java は失敗の到達（`maxReachedOffset`）、parse frame の開始（`Parse
 frame の到達を、どれも max(consumed, matched) で測る。Rust は consumed だけで測っていた。
 
 **揃え方**: Rust を Java に合わせた。Rust では、grammar を呼び出している間
-（全入力の `parse_detailed*` 系と `ParseContext::parse_grammar` / `parse_shared_grammar`）、
+（全入力の `parse_detailed*` 系と `ParseContext::parse_grammar` / `parse_shared_grammar`。
+token stream の lexing session の中を除く）、
 失敗の記録位置と rule frame の開始位置を max(consumed, matched) にする。
 Classic token mode（`CAPTURE` などを含む grammar）の中では、rule frame の開始だけを補正し、
 失敗の記録位置は補正しない。token mode の各失敗箇所は、すでに Java Classic の位置
@@ -86,6 +87,15 @@ Classic token mode（`CAPTURE` などを含む grammar）の中では、rule fra
 `R0 ::= CAPTURE(w0, EOF)` の `a` で context の失敗位置（と rule stack の offset）が Rust だけ CP1 になり、逆に frame の開始を補正しないと
 `R0 ::= AHEAD CAPTURE(w0, R1) ; R1 ::= 'a'` の `x` で Rust だけ `R0@0>R1@0` になる（どちらも
 PBT で確かめた）。
+
+**token stream の中は対象外**: `@tokenStream: enabled` の lexing session（Rust の
+`parse_with_lexing`）の中では、失敗も rule frame も従来の consumed の位置で測る。そこでは Java の
+match-only terminal が lexeme を見る。たとえば `Root ::= EMPTY END`（`@whitespace: javaStyle`）に
+`a` を与えると、Java の `EMPTY`（`MatchOnly(任意の 1 文字)`）は error lexeme の `a` に一致せず、
+matched は CP0 のまま `EOF` が CP0 で失敗する（`spec-corpus/token-stream/corpus.json` の
+`empty-assertions` / `not-eof`）。Rust の `JavaEmpty` は lexing session の中でも matched を 1 文字
+進めるので、補正すると Rust だけ CP1 になる。token stream の中の正の `LOOKAHEAD` の失敗位置を
+両版で比べる共有 corpus はまだ無い。
 
 **変えないもの**: 受理・拒否、両 cursor、CST、AST、token は変えない。式単位の公開入口
 （`ParseContext::parse`、`parse_with_token_mode`、`parse_token`）は、grammar の中から

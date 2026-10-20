@@ -1639,7 +1639,7 @@ pub struct ParseContext<'a> {
     // parse_shared_grammar): failures and rule frames are measured at
     // max(consumed, matched), as Java's parse frames are (#706). The innermost
     // public entry decides; expression entries (parse, parse_with_token_mode,
-    // parse_token) clear it for their duration.
+    // parse_token) clear it for their duration. Not applied in a token-stream session.
     grammar_frontier: bool,
     match_cursor_policy: MatchCursorPolicy,
     bindings: BTreeMap<String, Vec<String>>,
@@ -2800,9 +2800,11 @@ impl<'a> ParseContext<'a> {
 
     /// Where a rule invocation at `position` (bytes) starts: inside a grammar invocation
     /// at max(consumed, matched), Java's `ParseFrame` start, in Classic token mode too.
+    /// A token-stream session keeps the consumed position: there the Java match-only
+    /// terminals (`EMPTY`) see lexemes and Rust's matched cursor is not Java's.
     #[inline]
     pub(crate) fn frame_start(&self, position: usize) -> usize {
-        if self.grammar_frontier {
+        if self.grammar_frontier && self.lexing.is_none() {
             position.max(self.matched_position)
         } else {
             position
