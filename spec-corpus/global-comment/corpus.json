@@ -1,0 +1,857 @@
+[
+  {
+    "name": "comment-only",
+    "grammar": "grammar CommentOnly { @package: org.example.ruletrivia @comment: { line: '//' } @root @mapping(Root, params=[value]) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "compact",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "trailing-comment",
+        "input": "ab//tail",
+        "prefix": [
+          true,
+          8,
+          8
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            8
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "string-block-and-non-bmp-inside-comment",
+        "input": "ab// 'q' \"s\" /* x 😀",
+        "prefix": [
+          true,
+          19,
+          19
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            19
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "empty-comment-at-eof",
+        "input": "ab//",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "non-bmp-comment-at-eof",
+        "input": "ab//😀",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "lf-is-not-trivia",
+        "input": "a//x\nb",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      },
+      {
+        "id": "crlf-is-not-trivia",
+        "input": "a//x\r\nb",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          6
+        ]
+      },
+      {
+        "id": "cr-terminates-comment",
+        "input": "a//x\rb",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      },
+      {
+        "id": "space-is-not-trivia",
+        "input": "a b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          1
+        ]
+      },
+      {
+        "id": "block-comment-is-not-trivia",
+        "input": "a/*x*/b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          1
+        ]
+      },
+      {
+        "id": "single-slash",
+        "input": "a/b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          1
+        ]
+      },
+      {
+        "id": "comment-swallows-literal",
+        "input": "a//b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      },
+      {
+        "id": "leading-comment-only",
+        "input": "//x",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          3
+        ]
+      },
+      {
+        "id": "newline-after-trailing-comment",
+        "input": "ab//t\n",
+        "prefix": [
+          true,
+          5,
+          6
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "name": "comment-lines",
+    "grammar": "grammar CommentLines { @package: org.example.ruletrivia @ubnf: v2 @comment: { line: '//' } token NL ::= ('\\r\\n' | '\\r' | '\\n'); token WORD ::= ('a' | 'b' | '😀')+; @root @mapping(Program, params=[items]) Program ::= WORD @items { NL WORD @items } ; }",
+    "cases": [
+      {
+        "id": "plain-lines",
+        "input": "a\nb",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Program",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "items": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      },
+      {
+        "id": "comment-before-lf-and-eof",
+        "input": "a//x\nb//y",
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Program",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "items": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      },
+      {
+        "id": "comment-before-crlf",
+        "input": "a//x\r\nb",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Program",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "items": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      },
+      {
+        "id": "comment-before-cr",
+        "input": "a//x\rb",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Program",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "items": [
+              "a",
+              "b"
+            ]
+          }
+        }
+      },
+      {
+        "id": "quotes-block-opener-non-bmp-inside-comment",
+        "input": "😀// 'q' \"s\" /* 😀\n😀",
+        "prefix": [
+          true,
+          18,
+          18
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Program",
+          "span": [
+            0,
+            18
+          ],
+          "fields": {
+            "items": [
+              "😀",
+              "😀"
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-comment-at-eof",
+        "input": "a//",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Program",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "items": [
+              "a"
+            ]
+          }
+        }
+      },
+      {
+        "id": "space-before-comment",
+        "input": "a //x\nb",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          1
+        ]
+      },
+      {
+        "id": "comment-only-line-rolls-back",
+        "input": "a\n//x\nb",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          1
+        ]
+      },
+      {
+        "id": "trailing-newline-rolls-back",
+        "input": "a//\n",
+        "prefix": [
+          true,
+          3,
+          4
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          3
+        ]
+      },
+      {
+        "id": "unterminated-block-comment",
+        "input": "a/* x\nb",
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          1
+        ]
+      },
+      {
+        "id": "leading-comment-line",
+        "input": "//x\na",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-with-global-none",
+    "grammar": "grammar CommentNone { @package: org.example.ruletrivia @whitespace: none @comment: { line: '//' } @root @mapping(Root, params=[value]) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "trailing-comment",
+        "input": "ab//c",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "space-is-not-trivia",
+        "input": "a b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          1
+        ]
+      },
+      {
+        "id": "lf-is-not-trivia",
+        "input": "a//c\nb",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "name": "comment-with-global-java-style",
+    "grammar": "grammar CommentJava { @package: org.example.ruletrivia @whitespace: javaStyle @comment: { line: '//' } @root @mapping(Root, params=[value]) Root ::= 'a' @value 'b'; }",
+    "cases": [
+      {
+        "id": "spaces-line-block-crlf-non-bmp",
+        "input": " a //x\r\n /*😀*/ b //t",
+        "prefix": [
+          true,
+          20,
+          20
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            20
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "tab",
+        "input": "a\tb",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "unterminated-block-comment",
+        "input": "a /* open b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-rule-priority",
+    "grammar": "grammar CommentPriority { @package: org.example.ruletrivia @comment: { line: '//' } @root @mapping(Root, params=[value]) Root ::= 'r' @value Inherit Plain Spaced Interleaved ; Inherit ::= 'i' 'j' ; @whitespace(none) Plain ::= 'p' 'q' ; @whitespace Spaced ::= 's' 't' ; @interleave(profile=commentsAndSpaces) Interleaved ::= 'k' 'l' ; }",
+    "cases": [
+      {
+        "id": "compact",
+        "input": "rijpqstkl",
+        "prefix": [
+          true,
+          9,
+          9
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            9
+          ],
+          "fields": {
+            "value": "r"
+          }
+        }
+      },
+      {
+        "id": "root-trailing-comment",
+        "input": "rijpqstkl//end",
+        "prefix": [
+          true,
+          14,
+          14
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            14
+          ],
+          "fields": {
+            "value": "r"
+          }
+        }
+      },
+      {
+        "id": "explicit-java-style-child-owns-its-trivia",
+        "input": "rijpq s /*x*/ //y\r\n t kl",
+        "prefix": [
+          true,
+          24,
+          24
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            24
+          ],
+          "fields": {
+            "value": "r"
+          }
+        }
+      },
+      {
+        "id": "interleave-child",
+        "input": "rijpqstk\n/*😀*/l //x",
+        "prefix": [
+          true,
+          19,
+          19
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            19
+          ],
+          "fields": {
+            "value": "r"
+          }
+        }
+      },
+      {
+        "id": "inherited-root-does-not-skip-space",
+        "input": "r ijpqstkl",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          1
+        ]
+      },
+      {
+        "id": "inherited-child-does-not-skip-space",
+        "input": "ri jpqstkl",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          2
+        ]
+      },
+      {
+        "id": "inherited-child-does-not-skip-block",
+        "input": "ri/**/jpqstkl",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          2
+        ]
+      },
+      {
+        "id": "explicit-none-child",
+        "input": "rijp//x",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "comment-lexical-context",
+    "grammar": "grammar CommentLexical { @package: org.example.ruletrivia @ubnf: v2 @comment: { line: '//' } token A ::= 'a'; token B ::= 'b'; @root @mapping(Root, params=[value]) @lexicalContext(tokens=['A','B']) Root ::= A @value B; }",
+    "cases": [
+      {
+        "id": "compact",
+        "input": "ab",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "trailing-comment",
+        "input": "ab//t😀",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "lf-is-not-trivia",
+        "input": "a//x\nb",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "space-is-not-trivia",
+        "input": "a b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "block-comment-is-not-trivia",
+        "input": "a/*x*/b",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-named-rule-whitespace",
+    "grammar": "grammar CommentNamedRule { @package: org.example.ruletrivia @ubnf: v2 @comment: { line: '//' } token GAP ::= ' '+; @root @mapping(Root, params=[value]) Root ::= 'a' @value Gapped ; @whitespace(GAP) Gapped ::= 'g' 'h' ; }",
+    "cases": [
+      {
+        "id": "compact",
+        "input": "agh",
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "named-child-owns-gaps",
+        "input": "a g h ",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "root-trailing-comment",
+        "input": "agh //c",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "named-child-does-not-skip-comment",
+        "input": "ag//c\nh",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      },
+      {
+        "id": "root-comment-swallows-child",
+        "input": "a//c",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false
+      }
+    ]
+  }
+]
