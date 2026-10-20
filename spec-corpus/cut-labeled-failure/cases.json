@@ -1,0 +1,327 @@
+[
+  {
+    "name": "commit-choice",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= '(' COMMIT('x', 'expected x') ')' | '(y)' ;\n}\n",
+    "cases": [
+      {
+        "input": "(x)",
+        "outcome": "success"
+      },
+      {
+        "input": "(y)",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "expected x"
+      },
+      {
+        "input": "z",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "commit-rule-default-message",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= 'k' COMMIT(Name) ;\n  Name ::= 'n' ;\n}\n",
+    "cases": [
+      {
+        "input": "kn",
+        "outcome": "success"
+      },
+      {
+        "input": "kx",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      }
+    ]
+  },
+  {
+    "name": "commit-optional",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= [ 'a' COMMIT('b', 'expected b') ] 'a' 'c' ;\n}\n",
+    "cases": [
+      {
+        "input": "abac",
+        "outcome": "success"
+      },
+      {
+        "input": "ac",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "expected b"
+      }
+    ]
+  },
+  {
+    "name": "label-repeat",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Item } ;\n  Item ::= 'a' LABEL(semi, ';') ;\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "a;a;",
+        "outcome": "success"
+      },
+      {
+        "input": "a;ab",
+        "outcome": "label",
+        "offset": 3,
+        "message": "semi",
+        "label": "semi"
+      },
+      {
+        "input": "b",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "catch-alternative",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH('(' LABEL(close, ')'), '(' ']', close) ;\n}\n",
+    "cases": [
+      {
+        "input": "()",
+        "outcome": "success"
+      },
+      {
+        "input": "(]",
+        "outcome": "success"
+      },
+      {
+        "input": "(x",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "catch-memoized-rule",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH(Item, Item | 'b', missing) ;\n  Item ::= LABEL(missing, 'a') ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "label",
+        "offset": 0,
+        "message": "missing",
+        "label": "missing"
+      }
+    ]
+  },
+  {
+    "name": "nested-catch",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH(CATCH(LABEL(A, 'a'), LABEL(B, 'b'), A), 'c', B) ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "c",
+        "outcome": "success"
+      },
+      {
+        "input": "d",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "recovery-commit",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= { Statement } ;\n  @recovery(sync=';')\n  Statement ::= 'let' COMMIT('x', 'expected x') ';' ;\n}\n",
+    "cases": [
+      {
+        "input": "letx;",
+        "outcome": "success"
+      },
+      {
+        "input": "lety;letx;",
+        "outcome": "recovery",
+        "offset": 0
+      },
+      {
+        "input": "lety",
+        "outcome": "commit",
+        "offset": 3,
+        "message": "expected x"
+      }
+    ]
+  },
+  {
+    "name": "unicode-label",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= '😀' '\\r\\n' LABEL(L, '界') ;\n}\n",
+    "cases": [
+      {
+        "input": "😀\r\n界",
+        "outcome": "success"
+      },
+      {
+        "input": "😀\r\nx",
+        "outcome": "label",
+        "offset": 3,
+        "message": "L",
+        "label": "L"
+      }
+    ]
+  },
+  {
+    "name": "parameter-inside-commit",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F('a') ;\n  F(x) ::= COMMIT(x, 'm') ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "commit",
+        "offset": 0,
+        "message": "m"
+      }
+    ]
+  },
+  {
+    "name": "commit-as-argument",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F(COMMIT('a')) ;\n  F(x) ::= x 'b' ;\n}\n",
+    "cases": [
+      {
+        "input": "ab",
+        "outcome": "success"
+      },
+      {
+        "input": "x",
+        "outcome": "commit",
+        "offset": 0,
+        "message": "unexpected input"
+      },
+      {
+        "input": "ac",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "value-parameter-inside-commit",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F('a') ;\n  F(=x) ::= COMMIT(x) x ;\n}\n",
+    "cases": [
+      {
+        "input": "aaa",
+        "outcome": "success"
+      },
+      {
+        "input": "aa",
+        "outcome": "syntax"
+      },
+      {
+        "input": "a",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "b",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "label-argument-caught-in-callee",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F(LABEL(L, 'a')) ;\n  F(x) ::= CATCH(x, 'b', L) ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "c",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "parameter-in-label-and-catch",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= F('a') ;\n  F(x) ::= LABEL(L, x) | CATCH(x, 'b', L) ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "label",
+        "offset": 0,
+        "message": "L",
+        "label": "L"
+      }
+    ]
+  },
+  {
+    "name": "call-inside-catch",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH(F('a'), 'b', L) ;\n  F(x) ::= LABEL(L, x) ;\n}\n",
+    "cases": [
+      {
+        "input": "a",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "c",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "label-repetition-inside-catch",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= CATCH({ LABEL(L, 'a') }, 'b', L) ;\n}\n",
+    "cases": [
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "a",
+        "outcome": "syntax"
+      },
+      {
+        "input": "",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "commit-repetition-in-recovery-rule",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @root @mapping(Doc)\n  Root ::= Statement 'x' ;\n  @recovery(sync=';')\n  Statement ::= { COMMIT('a', 'need a') } ';' ;\n}\n",
+    "cases": [
+      {
+        "input": "aa;x",
+        "outcome": "recovery",
+        "offset": 0
+      },
+      {
+        "input": ";x",
+        "outcome": "recovery",
+        "offset": 0
+      },
+      {
+        "input": "x",
+        "outcome": "commit",
+        "offset": 0,
+        "message": "need a"
+      }
+    ]
+  }
+]

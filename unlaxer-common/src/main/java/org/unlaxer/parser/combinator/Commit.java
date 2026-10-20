@@ -19,7 +19,8 @@ import org.unlaxer.parser.Parser;
  * failure from the child passes through unchanged. The operator adds no CST node, transaction
  * or diagnostic frame of its own, so a successful child is observationally unchanged.
  */
-public class Commit extends ConstructedSingleChildParser implements MetaFunctionParser {
+public class Commit extends ConstructedSingleChildParser implements MetaFunctionParser,
+    org.unlaxer.parser.HasChildrenParser {
 
   private static final long serialVersionUID = 1L;
 
@@ -67,5 +68,11 @@ public class Commit extends ConstructedSingleChildParser implements MetaFunction
     } finally {
       parseContext.leaveParserCall();
     }
+  }
+
+  /** Traversable by parser-graph analyses such as DiagnosticsSafety. */
+  @Override
+  public org.unlaxer.parser.HasChildrenParser createWith(org.unlaxer.parser.Parsers children) {
+    return new Commit(children.get(0), message);
   }
 }

@@ -268,6 +268,11 @@ class LSPServerEmitter {
 
     /** parseDocument() および関連ユーティリティメソッドを出力する。 */
     static void emitParseDocument(IndentedWriter w, String parsersClass, boolean hasScopeStore) {
+        emitParseDocument(w, parsersClass, hasScopeStore, false);
+    }
+
+    /** {@code raising}: the grammar uses COMMIT / LABEL / CATCH (#700); otherwise output is unchanged. */
+    static void emitParseDocument(IndentedWriter w, String parsersClass, boolean hasScopeStore, boolean raising) {
         // doParse() — パースコアロジック（副作用なし）
         w.line("private ParseResult doParse(String content) {");
         w.indent();
@@ -302,6 +307,9 @@ class LSPServerEmitter {
         w.line("String deepestMatchedRule = failure.getDeepestMatchedRule();");
         w.line("return new ParseResult(result.isSucceeded(), consumedLength, content.length(),");
         w.line("    errorOffset, expectedTokens, expectedHints, expectedParsers, deepestMatchedRule,");
+        if (raising) {
+            w.line("    failure.getRaisedFailure().map(raised -> raised.isCommit() ? \"commit\" : \"label\").orElse(null),");
+        }
         w.line("    failure.getRuleStack().orElse(null));");
         w.line("}");
         w.dedent();
@@ -415,7 +423,8 @@ class LSPServerEmitter {
         w.line("Map<String, Object> data = new LinkedHashMap<>();");
         w.line("data.put(\"schemaVersion\", 1);");
         w.line("data.put(\"code\", \"ULX-PARSE-001\");");
-        w.line("data.put(\"kind\", \"syntax\");");
+        w.line(raising ? "data.put(\"kind\", result.raisedKind() != null ? result.raisedKind() : \"syntax\");"
+            : "data.put(\"kind\", \"syntax\");");
         w.line("data.put(\"offset\", errorStart);");
         w.line("data.put(\"line\", startPos.getLine());");
         w.line("data.put(\"character\", startPos.getCharacter());");
@@ -465,6 +474,8 @@ class LSPServerEmitter {
         // parseErrorMessage()
         w.line("private String parseErrorMessage(ParseResult result) {");
         w.indent();
+        // A committed or labeled failure reports its declared message as is (#700).
+        if (raising) w.line("if (result.raisedKind() != null) return String.join(\" or \", result.expectedTokens());");
         w.line("List<String> expected = !result.expectedTokens().isEmpty() ? result.expectedTokens()");
         w.line("    : (!result.expectedHints().isEmpty() ? result.expectedHints() : result.expectedParsers());");
         w.line("String message = expected.isEmpty()");
@@ -704,6 +715,10 @@ class LSPServerEmitter {
 
     /** DocumentState/ParseResult レコードを出力する。 */
     static void emitRecords(IndentedWriter w) {
+        emitRecords(w, false);
+    }
+
+    static void emitRecords(IndentedWriter w, boolean raising) {
         w.line("public static class DocumentState {");
         w.indent();
         w.line("private final String uri;");
@@ -736,20 +751,22 @@ class LSPServerEmitter {
         w.line("    List<String> expectedHints,");
         w.line("    List<String> expectedParsers,");
         w.line("    String deepestMatchedRule,");
+        if (raising) w.line("    String raisedKind,");
         w.line("    org.unlaxer.context.RuleStack ruleStack) {");
         w.indent();
         w.line("public ParseResult(boolean succeeded, int consumedLength, int totalLength) {");
         w.indent();
         w.line("this(succeeded, consumedLength, totalLength, consumedLength,");
-        w.line("    List.of(), List.of(), List.of(), \"\");");
+        w.line(raising ? "    List.of(), List.of(), List.of(), \"\", null);" : "    List.of(), List.of(), List.of(), \"\");");
         w.dedent();
         w.line("}");
+        // The canonical signature before #703, without the rule stack.
         w.line("public ParseResult(boolean succeeded, int consumedLength, int totalLength, int errorOffset,");
         w.line("        List<String> expectedTokens, List<String> expectedHints, List<String> expectedParsers,");
-        w.line("        String deepestMatchedRule) {");
+        w.line(raising ? "        String deepestMatchedRule, String raisedKind) {" : "        String deepestMatchedRule) {");
         w.indent();
         w.line("this(succeeded, consumedLength, totalLength, errorOffset, expectedTokens, expectedHints,");
-        w.line("    expectedParsers, deepestMatchedRule, null);");
+        w.line(raising ? "    expectedParsers, deepestMatchedRule, raisedKind, null);" : "    expectedParsers, deepestMatchedRule, null);");
         w.dedent();
         w.line("}");
         w.dedent();

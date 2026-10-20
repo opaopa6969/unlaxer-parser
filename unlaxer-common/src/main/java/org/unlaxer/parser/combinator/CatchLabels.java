@@ -25,7 +25,8 @@ import org.unlaxer.parser.Parsers;
  * failure with another label propagates unchanged without trying the alternative. The operator
  * adds no CST node of its own.
  */
-public class CatchLabels extends ConstructedAbstractParser implements MetaFunctionParser {
+public class CatchLabels extends ConstructedAbstractParser implements MetaFunctionParser,
+    org.unlaxer.parser.HasChildrenParser {
 
   private static final long serialVersionUID = 1L;
 
@@ -66,30 +67,25 @@ public class CatchLabels extends ConstructedAbstractParser implements MetaFuncti
   public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
     parseContext.enterParserCall();
     try {
-      parseContext.startParse(this, parseContext, tokenKind, invertMatch);
+      // No parse notification of its own: like Commit / Label it is transparent to
+      // diagnostics, so its class name never becomes an expected hint.
       parseContext.begin(this);
       Parsed parsed = getChild().parse(parseContext, tokenKind, invertMatch);
       if (parsed.isSucceeded()) {
-        Parsed committed = new Parsed(parseContext.commit(this, tokenKind));
-        parseContext.endParse(this, committed, parseContext, tokenKind, invertMatch);
-        return committed;
+        return new Parsed(parseContext.commit(this, tokenKind));
       }
       parseContext.rollback(this);
       RaisedFailure raised = parseContext.raisedFailure();
       if (raised == null || false == raised.isLabel() || false == labels.contains(raised.label())) {
-        parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
         return Parsed.FAILED;
       }
       parseContext.clearRaisedFailure();
       parseContext.begin(this);
       parsed = getAlternative().parse(parseContext, tokenKind, invertMatch);
       if (parsed.isSucceeded()) {
-        Parsed committed = new Parsed(parseContext.commit(this, tokenKind));
-        parseContext.endParse(this, committed, parseContext, tokenKind, invertMatch);
-        return committed;
+        return new Parsed(parseContext.commit(this, tokenKind));
       }
       parseContext.rollback(this);
-      parseContext.endParse(this, Parsed.FAILED, parseContext, tokenKind, invertMatch);
       return Parsed.FAILED;
     } catch (RuntimeException | Error failure) {
       parseContext.failParserCall(failure);
@@ -97,5 +93,11 @@ public class CatchLabels extends ConstructedAbstractParser implements MetaFuncti
     } finally {
       parseContext.leaveParserCall();
     }
+  }
+
+  /** Traversable by parser-graph analyses such as DiagnosticsSafety. */
+  @Override
+  public org.unlaxer.parser.HasChildrenParser createWith(Parsers children) {
+    return new CatchLabels(children.get(0), children.get(1), List.copyOf(labels));
   }
 }

@@ -174,8 +174,17 @@ fn contains_recovery(expression: &Expression) -> bool {
         | OwnedCapture {
             child: expression, ..
         }
-        | CaptureScope(expression) => contains_recovery(expression),
+        | CaptureScope(expression)
+        | Commit {
+            child: expression, ..
+        }
+        | Label {
+            child: expression, ..
+        } => contains_recovery(expression),
         Separated { child, separator } => contains_recovery(child) || contains_recovery(separator),
+        CatchLabels {
+            child, alternative, ..
+        } => contains_recovery(child) || contains_recovery(alternative),
         Sequence(values) | Choice(values) | LongestChoice(values) | UniqueLongestChoice(values) => {
             values.iter().any(contains_recovery)
         }
@@ -567,6 +576,21 @@ fn expression(expr: &Expression) -> String {
         OwnedCapture { name, child } => format!("Expr::OwnedCapture({}, Box::new({}))", quote(name), expression(child)),
         Replay(name) => format!("Expr::Replay({})", quote(name)),
         CaptureScope(child) => format!("Expr::CaptureScope(Box::new({}))", expression(child)),
+        Commit { child, message } => match message {
+            Some(message) => format!("{}.commit_with({})", expression(child), quote(message)),
+            None => format!("{}.commit()", expression(child)),
+        },
+        Label { label, child } => format!("{}.label({})", expression(child), quote(label)),
+        CatchLabels {
+            child,
+            alternative,
+            labels,
+        } => format!(
+            "{}.catch_labels({}, [{}])",
+            expression(child),
+            expression(alternative),
+            labels.iter().map(|label| quote(label)).collect::<Vec<_>>().join(", ")
+        ),
         Capture {
             name,
             expression: child,
@@ -644,8 +668,13 @@ fn grapheme_capture(ir: &GrammarIr, body: &Expression, name: &str) -> bool {
                 alternatives: children,
                 ..
             } => pending.extend(children.iter().map(|child| (child, captured))),
+            CatchLabels {
+                child, alternative, ..
+            } => pending.extend([(&**child, captured), (&**alternative, captured)]),
             OwnedCapture { child, .. }
             | CaptureScope(child)
+            | Commit { child, .. }
+            | Label { child, .. }
             | OptionalExpr(child)
             | Delimited(child)
             | TextValue(child)

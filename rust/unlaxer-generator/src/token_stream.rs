@@ -157,6 +157,9 @@ fn element(e: &AtomicElement, literals: &mut Vec<String>, references: &mut HashS
         }
         ElementKind::OwnedCapture { body: b, .. }
         | ElementKind::CaptureScope(b)
+        | ElementKind::Commit { body: b, .. }
+        | ElementKind::Label { body: b, .. }
+        | ElementKind::Catch { choice: b, .. }
         | ElementKind::Group(b)
         | ElementKind::Optional(b)
         | ElementKind::Repeat(b) => body(b, literals, references),

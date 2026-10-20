@@ -59,6 +59,7 @@ public final class RustGrammarLowering {
     public static GrammarIR lower(GrammarDecl grammar) {
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         org.unlaxer.dsl.codegen.NestedCaptures.requireValid(grammar);
+        org.unlaxer.dsl.codegen.RaisingOperators.requireValid(grammar);
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);
         org.unlaxer.dsl.codegen.TypeofConstraints.validate(grammar);
@@ -495,6 +496,8 @@ public final class RustGrammarLowering {
                 return expression;
             }
             if (expression instanceof GeneralBody general) return general.withChild(retainTextValues(general.child(), mapping));
+            if (expression instanceof CatchLabels caught) return new CatchLabels(retainTextValues(caught.child(), mapping),
+                retainTextValues(caught.alternative(), mapping), caught.labels());
             if (expression instanceof Capture capture) {
                 Expression child = retainTextValues(capture.expression(), mapping);
                 if (mapping != null && mapping.fields().stream().anyMatch(field ->
@@ -705,6 +708,14 @@ public final class RustGrammarLowering {
         }
         if (element instanceof UBNFAST.ReplayElement replay) return new Replay(scalarText(replay.name()));
         if (element instanceof UBNFAST.CaptureScopeElement scope) return new CaptureScope(singleBody(scope.body(), true));
+        if (element instanceof UBNFAST.CommitElement commit) {
+            return new Commit(singleBody(commit.body(), true), commit.message().map(this::scalarText).orElse(null));
+        }
+        if (element instanceof UBNFAST.LabelElement label) return new Label(scalarText(label.label()), singleBody(label.body(), true));
+        if (element instanceof UBNFAST.CatchElement caught) {
+            return new CatchLabels(singleBody(caught.child().body(), true), singleBody(caught.alternative().body(), true),
+                caught.labels().stream().map(this::scalarText).toList());
+        }
         if (element instanceof GroupElement group) {
             return body(group.body());
         }
@@ -837,6 +848,10 @@ public final class RustGrammarLowering {
         if (expression instanceof UniqueLongestChoice choice) {
             return combinePredictors(choice.alternatives(), visiting, cache);
         }
+        // A raising operator can fail at any code point, so no predictor may skip it (#700).
+        if (expression instanceof Commit || expression instanceof Label || expression instanceof CatchLabels) {
+            return new AnyPredictor();
+        }
         if (expression instanceof GeneralBody general) return firstPredictor(general.child(), visiting, cache);
         if (expression instanceof Capture capture) {
             return firstPredictor(capture.expression(), visiting, cache);
@@ -895,6 +910,7 @@ public final class RustGrammarLowering {
     private boolean nullable(Expression expression) {
         if (expression instanceof Replay) return true;
         if (expression instanceof GeneralBody general) return nullable(general.child());
+        if (expression instanceof CatchLabels caught) return nullable(caught.asChoice());
         if (expression instanceof CaptureBoundary b) { return nullable(b.child()); }
         if (expression instanceof LexicalToken token) return token.expression().nullable();
         if (expression instanceof ErrorExpected ignored) {
@@ -1030,6 +1046,7 @@ public final class RustGrammarLowering {
 
     private void checkRepetition(Expression expression) {
         if (expression instanceof GeneralBody general) { checkRepetition(general.child()); return; }
+        if (expression instanceof CatchLabels caught) { checkRepetition(caught.asChoice()); return; }
         if (expression instanceof CaptureBoundary b) { checkRepetition(b.child()); return; }
         if (expression instanceof Repeat repeat) {
             // Generated repeats use JavaRepeat: one successful zero-progress iteration stops.
@@ -1064,6 +1081,7 @@ public final class RustGrammarLowering {
 
     private Set<Integer> leadingRules(Expression expression) {
         if (expression instanceof GeneralBody general) return leadingRules(general.child());
+        if (expression instanceof CatchLabels caught) return leadingRules(caught.asChoice());
         if (expression instanceof CaptureBoundary b) { return leadingRules(b.child()); }
         if (expression instanceof ErrorExpected ignored) return Set.of();
         if (expression instanceof Reference reference) {
@@ -1121,6 +1139,7 @@ public final class RustGrammarLowering {
                 return skippedProjection(bodies.get(rule), visited);
             }
             if (expression instanceof GeneralBody general) return skippedProjection(general.child(), visited);
+            if (expression instanceof CatchLabels caught) return skippedProjection(caught.asChoice(), visited);
             if (expression instanceof Capture capture) return skippedProjection(capture.expression(), visited);
             if (expression instanceof Delimited delimited) return skippedProjection(delimited.child(), visited);
             if (expression instanceof OptionalExpr optional) return skippedProjection(optional.child(), visited);
@@ -1181,6 +1200,7 @@ public final class RustGrammarLowering {
                 return shape(reference.rule(), visiting, enumNodes);
             }
             if (expression instanceof GeneralBody general) return shape(general.child(), visiting, enumNodes);
+            if (expression instanceof CatchLabels caught) return shape(caught.asChoice(), visiting, enumNodes);
             if (expression instanceof Capture capture) {
                 return shape(capture.expression(), visiting, enumNodes);
             }
@@ -1253,6 +1273,7 @@ public final class RustGrammarLowering {
         enterAnalysis();
         try {
             if (expression instanceof GeneralBody general) return captures(general.child());
+            if (expression instanceof CatchLabels caught) return captures(caught.asChoice());
             if (expression instanceof Capture capture) {
                 Map<String, Shape> result = new LinkedHashMap<>(captures(capture.expression()));
                 result.merge(capture.name(), shape(capture.expression(), new HashSet<>()), (a, b) -> merge(a, b, true));

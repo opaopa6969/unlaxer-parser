@@ -41,10 +41,23 @@ fn collect(expression: &Expression, keywords: &mut Vec<String>) {
             child: expression, ..
         }
         | CaptureScope(expression)
+        | Commit {
+            child: expression, ..
+        }
+        | Label {
+            child: expression, ..
+        }
         | Capture { expression, .. } => collect(expression, keywords),
         Separated { child, separator } => {
             collect(child, keywords);
             collect(separator, keywords);
+        }
+        // Same order as the Java host: the CATCH operands as a choice.
+        CatchLabels {
+            child, alternative, ..
+        } => {
+            collect(child, keywords);
+            collect(alternative, keywords);
         }
         _ => {}
     }

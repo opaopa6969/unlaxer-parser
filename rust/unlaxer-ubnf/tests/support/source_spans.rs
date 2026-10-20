@@ -55,8 +55,21 @@ fn body(rows: &mut Vec<(String, Span)>, p: &str, body: &RuleBody) {
 fn element(rows: &mut Vec<(String, Span)>, p: &str, elem: &AtomicElement) {
     rows.push((p.to_owned(), elem.span));
     match &elem.kind {
+        ElementKind::Catch { choice, operands } => {
+            // Java's synthetic operand groups share their body's span.
+            rows.push((format!("{p}.child"), operands.body_span));
+            body(rows, &format!("{p}.child.body"), &operands.body(choice));
+            rows.push((format!("{p}.alternative"), operands.alternative_span));
+            body(
+                rows,
+                &format!("{p}.alternative.body"),
+                &operands.alternative(choice),
+            );
+        }
         ElementKind::OwnedCapture { body: b, .. }
         | ElementKind::CaptureScope(b)
+        | ElementKind::Commit { body: b, .. }
+        | ElementKind::Label { body: b, .. }
         | ElementKind::Group(b)
         | ElementKind::Optional(b)
         | ElementKind::Repeat(b) => {

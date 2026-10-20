@@ -32,7 +32,8 @@ grammar UBNF {
   token IDENTIFIER ::= LETTER (LETTER | DIGIT)*;
   // Reserve only adjacent general owned calls; trivia keeps identifier + group syntax.
   token NOT_OWNED_CALL ::= NEGATIVE_LOOKAHEAD('CAPTURE(')
-    NEGATIVE_LOOKAHEAD('SAME_AS(') NEGATIVE_LOOKAHEAD('CAPTURE_SCOPE(');
+    NEGATIVE_LOOKAHEAD('SAME_AS(') NEGATIVE_LOOKAHEAD('CAPTURE_SCOPE(')
+    NEGATIVE_LOOKAHEAD('COMMIT(') NEGATIVE_LOOKAHEAD('LABEL(') NEGATIVE_LOOKAHEAD('CATCH(');
   token STRING ::= '\'' { '\\' ANY | NEGATION('\'\\') } '\'';
   token CLASS_NAME ::= IDENTIFIER;
   token UNSIGNED_INTEGER ::= DIGIT+;
@@ -310,6 +311,9 @@ grammar UBNF {
       OwnedCaptureElement
     | ReplayElement
     | CaptureScopeElement
+    | CommitElement
+    | LabelElement
+    | CatchElement
     | GroupElement
     | OptionalElement
     | RepeatElement
@@ -325,6 +329,18 @@ grammar UBNF {
 
   @mapping(CaptureScopeElement, params=[body])
   CaptureScopeElement ::= 'CAPTURE_SCOPE(' RuleBody @body ')' ;
+
+  // Cut and labeled failures (#700): COMMIT(body[, 'message']), LABEL(label, body),
+  // CATCH(body, alternative, label {, label}). The validator rejects a CATCH without labels.
+  @mapping(CommitElement, params=[body, message])
+  CommitElement ::= 'COMMIT(' RuleBody @body [ ',' STRING @message ] ')' ;
+
+  @mapping(LabelElement, params=[label, body])
+  LabelElement ::= 'LABEL(' IDENTIFIER @label ',' RuleBody @body ')' ;
+
+  @mapping(CatchElement, params=[body, alternative, labels])
+  CatchElement ::= 'CATCH(' RuleBody @body ',' RuleBody @alternative
+      { ',' IDENTIFIER @labels } ')' ;
 
   // ( A B | C )  グループ
   @mapping(GroupElement, params=[body])

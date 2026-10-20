@@ -71,6 +71,7 @@ public final class RustBackend {
         else if (expression instanceof CaptureEquality v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Recovery v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof GeneralBody v) collectLspKeywords(v.child(), keywords);
+        else if (expression instanceof CatchLabels v) collectLspKeywords(v.asChoice(), keywords);
         else if (expression instanceof Capture v) collectLspKeywords(v.expression(), keywords);
         else if (expression instanceof OptionalExpr v) collectLspKeywords(v.child(), keywords);
         else if (expression instanceof Repeat v) collectLspKeywords(v.child(), keywords);
@@ -467,6 +468,14 @@ public final class RustBackend {
         }
         if (expression instanceof Replay replay) return "Expr::Replay(" + quote(replay.name()) + ")";
         if (expression instanceof CaptureScope scope) return "Expr::CaptureScope(Box::new(" + expression(scope.child()) + "))";
+        if (expression instanceof Commit commit) {
+            return expression(commit.child()) + (commit.message() == null ? ".commit()" : ".commit_with(" + quote(commit.message()) + ")");
+        }
+        if (expression instanceof Label label) return expression(label.child()) + ".label(" + quote(label.label()) + ")";
+        if (expression instanceof CatchLabels caught) {
+            return expression(caught.child()) + ".catch_labels(" + expression(caught.alternative()) + ", ["
+                + caught.labels().stream().map(RustBackend::quote).collect(java.util.stream.Collectors.joining(", ")) + "])";
+        }
         if (expression instanceof Capture capture) {
             return "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
         }
@@ -829,6 +838,7 @@ public final class RustBackend {
             else if (expression instanceof TriviaScope value) children = List.of(value.child());
             else if (expression instanceof RuleEffects value) children = List.of(value.child());
             else if (expression instanceof GeneralBody value) children = List.of(value.child());
+            else if (expression instanceof CatchLabels value) children = List.of(value.child(), value.alternative());
             else if (expression instanceof CaptureEquality value) children = List.of(value.child());
             else if (expression instanceof NamePredicate value) children = List.of(value.child());
             else if (expression instanceof NameResolutionScope value) children = List.of(value.child());
@@ -843,6 +853,7 @@ public final class RustBackend {
 
     private static boolean containsRecovery(Expression expression) {
         if (expression instanceof GeneralBody value) return containsRecovery(value.child());
+        if (expression instanceof CatchLabels value) return containsRecovery(value.child()) || containsRecovery(value.alternative());
         if (expression instanceof Recovery) return true;
         // A user adapter callback can parse a recovery expression inside its own provider.
         if (expression instanceof CustomToken) return true;

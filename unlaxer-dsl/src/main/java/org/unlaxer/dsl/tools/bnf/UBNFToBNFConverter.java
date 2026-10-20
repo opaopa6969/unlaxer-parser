@@ -358,8 +358,22 @@ public final class UBNFToBNFConverter {
     ) {
         if (element instanceof UBNFAST.ReplayElement replay) {
             builder.append("SAME_AS(").append(replay.name()).append(")");
+        } else if (element instanceof UBNFAST.CatchElement caught) {
+            builder.append("CATCH( ");
+            convertRuleBody(caught.child().body(), builder, context);
+            builder.append(", ");
+            convertRuleBody(caught.alternative().body(), builder, context);
+            builder.append(", ").append(String.join(", ", caught.labels())).append(" )");
+        } else if (element instanceof UBNFAST.CommitElement commit) {
+            builder.append("COMMIT( ");
+            convertRuleBody(commit.body(), builder, context);
+            commit.message().ifPresent(message -> builder.append(", '")
+                .append(message.replace("\\", "\\\\").replace("'", "\\'")).append("'"));
+            builder.append(" )");
         } else if (element instanceof TransparentElement groupElement) {
-            if (element instanceof UBNFAST.OwnedCaptureElement capture) {
+            if (element instanceof UBNFAST.LabelElement label) {
+                builder.append("LABEL(").append(label.label()).append(", ");
+            } else if (element instanceof UBNFAST.OwnedCaptureElement capture) {
                 builder.append("CAPTURE(").append(capture.name()).append(", ");
             } else {
                 builder.append(element instanceof UBNFAST.CaptureScopeElement ? "CAPTURE_SCOPE( " : "( ");

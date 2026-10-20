@@ -305,6 +305,16 @@ public class MapperGenerator implements CodeGenerator {
                             failure.start(), List.of(failure.expected()));
                     }
             """);
+        // Only grammars using COMMIT / LABEL / CATCH (#700) change; others keep their output.
+        if (RaisingOperators.used(grammar)) sb.append("""
+                    var raised = context.getRaisedFailure();
+                    if (raised.isPresent()) {
+                        // Committed / labeled failures (#700) are structural final errors.
+                        var failure = raised.get();
+                        return new ParseDiagnostic(failure.isCommit() ? "commit" : "label", failure.offset(),
+                            List.of(failure.message()), failure.offset(), List.of(failure.message()));
+                    }
+            """);
         sb.append("""
                     var nativeFailure = context.getParseFailureDiagnostics();
                     List<String> hints = nativeFailure.getExpectedTokens().stream().sorted().toList();

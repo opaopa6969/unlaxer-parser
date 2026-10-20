@@ -155,6 +155,15 @@ public final class UBNFModuleLoader {
             return new UBNFAST.OwnedCaptureElement(capture.name(), body(capture.body(), imported, tokens, used, synthetic));
         if (value instanceof UBNFAST.CaptureScopeElement scope)
             return new UBNFAST.CaptureScopeElement(body(scope.body(), imported, tokens, used, synthetic));
+        if (value instanceof UBNFAST.CommitElement commit)
+            return new UBNFAST.CommitElement(body(commit.body(), imported, tokens, used, synthetic), commit.message());
+        if (value instanceof UBNFAST.LabelElement label)
+            return new UBNFAST.LabelElement(label.label(), body(label.body(), imported, tokens, used, synthetic));
+        if (value instanceof UBNFAST.CatchElement caught)
+            return new UBNFAST.CatchElement(
+                new GroupElement(body(caught.child().body(), imported, tokens, used, synthetic)),
+                new GroupElement(body(caught.alternative().body(), imported, tokens, used, synthetic)),
+                caught.labels());
         if (value instanceof GroupElement group)
             return new GroupElement(body(group.body(), imported, tokens, used, synthetic));
         if (value instanceof OptionalElement optional)

@@ -130,7 +130,12 @@ public class UBNFToRailroad {
             RailroadDiagram inner = convertRuleBody(groupElement.body(), grammarName);
             if (!(atomicElement instanceof GroupElement)) {
                 String label = atomicElement instanceof org.unlaxer.dsl.bootstrap.UBNFAST.OwnedCaptureElement capture
-                    ? "CAPTURE(" + capture.name() + ")" : "CAPTURE_SCOPE";
+                    ? "CAPTURE(" + capture.name() + ")"
+                    : atomicElement instanceof org.unlaxer.dsl.bootstrap.UBNFAST.CommitElement ? "COMMIT"
+                    : atomicElement instanceof org.unlaxer.dsl.bootstrap.UBNFAST.LabelElement labeled
+                        ? "LABEL(" + labeled.label() + ")"
+                    : atomicElement instanceof org.unlaxer.dsl.bootstrap.UBNFAST.CatchElement caught
+                        ? "CATCH(" + String.join(", ", caught.labels()) + ")" : "CAPTURE_SCOPE";
                 inner = new RailroadDiagram.Sequence(nextId(groupElement),
                     List.of(new RailroadDiagram.Terminal(nextId(groupElement), label), inner));
             }

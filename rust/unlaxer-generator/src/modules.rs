@@ -276,6 +276,9 @@ fn atom(
         }
         ElementKind::OwnedCapture { body: value, .. }
         | ElementKind::CaptureScope(value)
+        | ElementKind::Commit { body: value, .. }
+        | ElementKind::Label { body: value, .. }
+        | ElementKind::Catch { choice: value, .. }
         | ElementKind::Group(value)
         | ElementKind::Optional(value)
         | ElementKind::Repeat(value) => body(value, imported, tokens, used, synthetic)?,

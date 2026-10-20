@@ -53,7 +53,7 @@ public final class ParameterizedRules {
      * every instance were written at its call site. One fixed recursion budget on both hosts.
      */
     public static final int MAX_EXPANDED_NESTING = 128;
-    static final Set<String> RESERVED = Set.of("CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "ERROR");
+    static final Set<String> RESERVED = Set.of("CAPTURE", "SAME_AS", "CAPTURE_SCOPE", "COMMIT", "LABEL", "CATCH", "ERROR");
     /** NUL never occurs in an identifier, so no user reference can match a placeholder. */
     private static final String CALL_PREFIX = "\0call";
     /** The hidden by-name parameter that carries a value argument into its CAPTURE. */
@@ -723,6 +723,19 @@ public final class ParameterizedRules {
                 RuleBody body = body(scope.body(), env);
                 return body == scope.body() ? scope : copy(origins, new CaptureScopeElement(body), scope);
             }
+            if (element instanceof UBNFAST.CommitElement commit) {
+                RuleBody body = body(commit.body(), env);
+                return body == commit.body() ? commit : copy(origins, new UBNFAST.CommitElement(body, commit.message()), commit);
+            }
+            if (element instanceof UBNFAST.LabelElement label) {
+                RuleBody body = body(label.body(), env);
+                return body == label.body() ? label : copy(origins, new UBNFAST.LabelElement(label.label(), body), label);
+            }
+            if (element instanceof UBNFAST.CatchElement caught) {
+                AtomicElement child = atomic(caught.child(), env), alternative = atomic(caught.alternative(), env);
+                return child == caught.child() && alternative == caught.alternative() ? caught
+                    : copy(origins, new UBNFAST.CatchElement((GroupElement) child, (GroupElement) alternative, caught.labels()), caught);
+            }
             if (element instanceof OptionalElement optional) {
                 RuleBody body = body(optional.body(), env);
                 return body == optional.body() ? optional : copy(origins, new OptionalElement(body), optional);
@@ -941,6 +954,27 @@ public final class ParameterizedRules {
             wrap(out, "z", repeat.body());
         } else if (element instanceof CaptureScopeElement scope) {
             wrap(out, "k", scope.body());
+        } else if (element instanceof UBNFAST.CommitElement commit) {
+            // #700: m(...) / n(message,...) COMMIT, l(label,...) LABEL, h(g(..),g(..),labels) CATCH.
+            if (commit.message().isEmpty()) wrap(out, "m", commit.body());
+            else {
+                out.append("n(");
+                writeCodePoints(out, commit.message().get());
+                out.append(',');
+                writeBody(out, commit.body());
+                out.append(')');
+            }
+        } else if (element instanceof UBNFAST.LabelElement label) {
+            out.append("l(").append(label.label()).append(',');
+            writeBody(out, label.body());
+            out.append(')');
+        } else if (element instanceof UBNFAST.CatchElement caught) {
+            out.append("h(");
+            wrap(out, "g", caught.child().body());
+            out.append(',');
+            wrap(out, "g", caught.alternative().body());
+            for (String name : caught.labels()) out.append(',').append(name);
+            out.append(')');
         } else if (element instanceof OwnedCaptureElement capture) {
             out.append("c(").append(capture.name()).append(',');
             writeBody(out, capture.body());
