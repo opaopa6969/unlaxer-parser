@@ -62,10 +62,10 @@ AST の field 型・コンストラクタ・source span の単位は変更しま
 
 ## 非捕捉 Optional / Repeat delimiter（#679）
 
-基準 Java `6816a2a6` で正常だった `['('] NUMBER @left { '+' @op NUMBER @right }` と `{ '!' } NUMBER @left { '+' @op NUMBER @right }` を、両 Rust host にも対応させます。前者の `(1+2+3` は `left=1, op=["+","+"], right=[2,3]` / CP `[0,6]`、後者の `!!1+2+3` は同じ値 / CP `[0,7]` です。`''` を置いた対照は Java でも常に構文失敗であり、Rust の empty-literal 生成前拒否を維持します。
+基準 Java `6816a2a6` で正常だった `['('] NUMBER @left { '+' @op NUMBER @right }` と `{ '!' } NUMBER @left { '+' @op NUMBER @right }` を、両 Rust host にも対応させます。前者の `(1+2+3` は `left=1, op=["+","+"], right=[2,3]` / CP `[0,6]`、後者の `!!1+2+3` は同じ値 / CP `[0,7]` です。`''` を置いた対照は Java でも常に構文失敗です。#713 以降、両 Rust host も `''` を拒否せず Java `WordParser("")` と同じ常に失敗する非意味 delimiter として生成し、[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) で実行比較します。
 
 検査で除外できる非捕捉要素は、非空固定 literal またはその列を、1段の Optional / zero-or-more Repeat で包んだものです。これは検査用の列だけに適用し、実 parser の試行・rollback・位置・原文は保持します。意味を持つ唯一の `left {op right}` 列は既存 capture 名・順序・型条件で検証します。非捕捉の別 Repeat が先にあっても、shared spine は `op` / `right` capture を持つ Repeat を使うため、delimiter が AST operand や型判定へ混入しません。
 
 直接の入力位置を保つため、delimiter を消した文法で再parseしたり、構文を任意に書き換えたりしません。既存 AST型、コンストラクタ、field順、evaluator引数、nullable synthetic leaf の意味は維持します。任意 helper/choice・匿名再帰形・nested-owner の新合成はこの変更では開放しません。
 
-`spec-corpus/associative-nullable-delimiters` は6文法27入力、memo2×診断3で Java と各 Rust 出力を別compile/map/evalします。Optionalの有無・delimiter反復回数・演算子反復回数、内部delimiter、tokenStream、Unicode/CRLF、shared precedence、preferred/保持snapshot、失敗を手書き期待値と比較します。`(1+` は primary trailing-input CP2 / farthest CP3、`!!1+` は primary CP3 / farthest CP4です。Java direct parserのprefix成功とfull-input消費条件を区別して両位置を観測し、Rust full-input diagnosticと照合します。捕捉値を増やすprefix、意味列が二つあるshape、empty literalは生成前に拒否します。
+`spec-corpus/associative-nullable-delimiters` は6文法27入力、memo2×診断3で Java と各 Rust 出力を別compile/map/evalします。Optionalの有無・delimiter反復回数・演算子反復回数、内部delimiter、tokenStream、Unicode/CRLF、shared precedence、preferred/保持snapshot、失敗を手書き期待値と比較します。`(1+` は primary trailing-input CP2 / farthest CP3、`!!1+` は primary CP3 / farthest CP4です。Java direct parserのprefix成功とfull-input消費条件を区別して両位置を観測し、Rust full-input diagnosticと照合します。捕捉値を増やすprefix、意味列が二つあるshapeは生成前に拒否します。

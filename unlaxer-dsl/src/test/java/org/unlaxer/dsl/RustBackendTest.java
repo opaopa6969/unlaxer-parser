@@ -78,7 +78,9 @@ public class RustBackendTest {
         assertEquals(5, new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", "{ [ 'hello' ] } 'x' @value")).grammars().get(0)).size());
         reject(SIMPLE.replace("'hello' @value", "[ [ 'hello' ] ] @value"), "nested container capture");
         assertEquals(5, new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", "{ Maybe } @value").replace("@root", "Maybe ::= [ 'x' ];\n@root")).grammars().get(0)).size());
-        reject(SIMPLE.replace("'hello' @value", "'' @value"), "empty literal");
+        // #713: Java generates WordParser(""), so both Rust frontends lower '' instead of rejecting it.
+        assertTrue(new RustBackend().generate(UBNFMapper.parse(SIMPLE.replace("'hello' @value", "'hello' @value ''"))
+            .grammars().get(0)).stream().anyMatch(file -> file.content().contains("Expr::JavaEmptyWord")));
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\n@whitespace: python"), "whitespace");
         reject(SIMPLE.replace("grammar Example {", "grammar Example {\ntoken TEXT = StringParser"), "external token");
     }

@@ -617,11 +617,7 @@ public class EnumConformanceTest {
                         source.substring(
                                 source.offsetByCodePoints(0, start),
                                 source.offsetByCodePoints(0, end));
-                if (expected.code().equals("P-EMPTY-LITERAL")) {
-                    assertEquals("''", located);
-                } else {
-                    assertTrue(expected.code() + ": " + located, located.startsWith("@" + expected.subject()));
-                }
+                assertTrue(expected.code() + ": " + located, located.startsWith("@" + expected.subject()));
             }
         }
         assertEquals(source, Files.readString(path));

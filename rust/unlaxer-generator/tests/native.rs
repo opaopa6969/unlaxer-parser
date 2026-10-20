@@ -394,7 +394,6 @@ fn lowerer_rejects_unsupported_or_inconsistent_grammars_without_artifacts() {
             simple.replace("'x' @value", "[ [ 'x' ] ] @value"),
             "nested container capture",
         ),
-        (simple.replace("'x' @value", "'' @value"), "empty literal"),
         (
             simple.replace("@root", "@root @rightAssoc"),
             "occur together",
@@ -612,4 +611,34 @@ fn left_recursion_reports_the_same_rule_on_every_run() {
             "{index}: {diagnostic}"
         );
     }
+}
+
+#[test]
+fn empty_literals_follow_the_java_parser_each_grammar_mode_generates() {
+    let parser = |source: &str| {
+        unlaxer_generator::generate(source)
+            .unwrap()
+            .into_iter()
+            .find(|file| file.relative_path == "parser.rs")
+            .unwrap()
+            .content
+    };
+    // Java WordParser(""): the literal never matches.
+    let word = parser(
+        "grammar W { @root @mapping(Value, params=[value]) Root ::= 'x' @value '' [ '' ]; }",
+    );
+    assert!(word.contains("Expr::JavaEmptyWord, Expr::JavaEmptyWord.optional_java()"));
+    assert!(!word.contains("Expr::Literal(\"\")"));
+    // Java Lexing.LiteralParser(""): zero-width success, also inside lexical contexts.
+    let lexical = parser("grammar L { @ubnf: v2 @tokenStream: enabled token N ::= CHAR_RANGE('a','z')+; @root @mapping(Value, params=[value]) Root ::= N @value ''; }");
+    assert!(lexical.contains("Expr::JavaEmptyLiteral"));
+    assert!(!lexical.contains("Expr::JavaEmptyWord"));
+    let context = parser("grammar C { @ubnf: v2 token N ::= CHAR_RANGE('a','z')+; @root @mapping(Value, params=[value]) @lexicalContext(tokens=['N']) Root ::= N @value ''; }");
+    assert!(context.contains("Expr::JavaEmptyLiteral"));
+    assert!(
+        unlaxer_generator::portability::check(
+            "grammar W { @root @mapping(Value, params=[value]) Root ::= '' @value; }"
+        )
+        .portable
+    );
 }

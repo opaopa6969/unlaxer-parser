@@ -834,6 +834,9 @@ impl ParseContext<'_> {
                 )
             }
             Expr::Empty => ("Empty", start, true),
+            // Classic Literal("") already follows Java WordParser("").
+            Expr::JavaEmptyWord => ("WordParser", start, false),
+            Expr::JavaEmptyLiteral => ("LiteralParser", start, !mode.invert),
             Expr::Error(message) => {
                 self.fail_at(start, message);
                 return None;
@@ -854,12 +857,16 @@ impl ParseContext<'_> {
                     at,
                     match expression {
                         Expr::Literal(word) | Expr::CaseInsensitive(word) => word,
+                        Expr::JavaEmptyWord | Expr::JavaEmptyLiteral => "",
                         Expr::LongCodeBlock => "long code block",
                         _ => "character",
                     },
                 );
             }
-            if mode.kind.is_consumed() && !matches!(expression, Expr::LongCodeBlock) {
+            // Java LiteralParser("") does not call consume(0) after an inverted failure.
+            if mode.kind.is_consumed()
+                && !matches!(expression, Expr::LongCodeBlock | Expr::JavaEmptyLiteral)
+            {
                 self.matched_position = self.position;
             }
             return None;
@@ -868,7 +875,9 @@ impl ParseContext<'_> {
             start: self.code_point(start),
             end: self.code_point(end),
         };
-        if mode.kind.is_consumed() && !(matches!(expression, Expr::Lexical(_, _)) && start == end) {
+        if mode.kind.is_consumed()
+            && !(matches!(expression, Expr::Lexical(_, _) | Expr::JavaEmptyLiteral) && start == end)
+        {
             let target = self.position().checked_add(span.end - span.start)?;
             self.position = *self.byte_offsets.get(target)?;
             self.matched_position = self.position;

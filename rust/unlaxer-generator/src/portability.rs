@@ -416,9 +416,6 @@ impl Inventory {
                 element.span,
             ),
             ElementKind::Replay { .. } | ElementKind::Error(_) => {}
-            ElementKind::Terminal(value) if value.is_empty() => {
-                self.add("P-EMPTY-LITERAL", "empty literal", element.span)
-            }
             ElementKind::Terminal(_)
             | ElementKind::RuleRef {
                 namespace: None, ..
