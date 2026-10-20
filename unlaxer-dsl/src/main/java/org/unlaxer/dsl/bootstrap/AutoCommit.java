@@ -433,10 +433,9 @@ public final class AutoCommit {
         /** The grammar skips javaStyle trivia at sequence boundaries (#728). */
         final boolean trivia;
 
-        private Analysis(GrammarDecl grammar) {
+        private Analysis(GrammarDecl grammar, boolean trivia) {
             this.grammar = grammar;
-            trivia = grammar.settings().stream().anyMatch(setting -> setting.key().equals("whitespace")
-                && setting.value() instanceof StringSettingValue value && javaStyle(value.value()));
+            this.trivia = trivia;
             table = new First[grammar.rules().size()];
             opaque = new boolean[grammar.rules().size()];
             reachable = new boolean[grammar.rules().size()];
@@ -454,7 +453,25 @@ public final class AutoCommit {
                 if (grammar.rules().get(r).annotations().stream().anyMatch(RootAnnotation.class::isInstance)) roots.add(r);
             }
             if (roots.size() != 1) return null;
-            Analysis analysis = new Analysis(grammar);
+            boolean spaced = grammar.settings().stream().anyMatch(setting -> setting.key().equals("whitespace")
+                && setting.value() instanceof StringSettingValue value && javaStyle(value.value()));
+            Analysis analysis = solve(grammar, spaced);
+            // Left recursion is about the parser calling a rule again at the same position, so it
+            // uses the FIRST sets of the input as written: a terminal that is unknown under trivia
+            // (such as '/') still consumes (#728 review).
+            if ((spaced ? solve(grammar, false) : analysis).leftRecursive()) return null;
+            analysis.reach(roots.get(0));
+            for (int index = 0; index < grammar.rules().size(); index++) {
+                if (analysis.reachable[index]) {
+                    analysis.indexBody(grammar.rules().get(index).body(), index, -1, index, new int[] {0}, false);
+                }
+            }
+            return analysis;
+        }
+
+        /** Name tables and the least-fixpoint FIRST table, with or without the trivia rule. */
+        private static Analysis solve(GrammarDecl grammar, boolean trivia) {
+            Analysis analysis = new Analysis(grammar, trivia);
             for (int index = 0; index < grammar.rules().size(); index++) {
                 if (analysis.rules.putIfAbsent(grammar.rules().get(index).name(), index) != null) {
                     analysis.ambiguous.add(grammar.rules().get(index).name());
@@ -482,13 +499,6 @@ public final class AutoCommit {
                 }
             }
             analysis.frozen = true;
-            if (analysis.leftRecursive()) return null;
-            analysis.reach(roots.get(0));
-            for (int index = 0; index < grammar.rules().size(); index++) {
-                if (analysis.reachable[index]) {
-                    analysis.indexBody(grammar.rules().get(index).body(), index, -1, index, new int[] {0}, false);
-                }
-            }
             return analysis;
         }
 

@@ -45,7 +45,7 @@ public class AutoCommitConformanceTest {
 
     @Test public void lintReportsTheCorpusPositions() throws Exception {
         var rows = corpus("lint.json");
-        assertEquals(28, rows.size());
+        assertEquals(33, rows.size());
         int reported = 0;
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
@@ -76,13 +76,13 @@ public class AutoCommitConformanceTest {
                 reported++;
             }
         }
-        assertEquals(29, reported);
+        assertEquals(31, reported);
     }
 
     /** {@code W-AUTO-COMMIT-SKIPPED} for annotations the analysis cannot use, located at the annotation. */
     @Test public void skippedAnnotationsAreWarnedAbout() throws Exception {
         var rows = corpus("warnings.json");
-        assertEquals(7, rows.size());
+        assertEquals(11, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String name = row.get("name").getAsString(), source = row.get("grammar").getAsString();

@@ -206,7 +206,7 @@ public class AutoCommitWhitespaceFuzzTest {
                     }
                 }
                 if (ok) accepted++;
-                if (ok && input.chars().anyMatch(c -> " \t\r\n/".indexOf(c) >= 0)) acceptedWithTrivia++;
+                if (ok && hasTrivia(input)) acceptedWithTrivia++;
                 if (a.startsWith("fail\tcommit\t") && !p.startsWith("fail\tcommit\t")) commitRejections++;
             }
         }
@@ -216,6 +216,11 @@ public class AutoCommitWhitespaceFuzzTest {
                 + " commitRejections=" + commitRejections
                 + " differences=" + differences.size();
         }
+    }
+
+    /** Whether the input has javaStyle trivia: a space character or the start of a comment (a lone {@code /} is not). */
+    static boolean hasTrivia(String input) {
+        return input.chars().anyMatch(c -> " \t\n\u000B\u000C\r".indexOf(c) >= 0) || input.contains("//") || input.contains("/*");
     }
 
     static String quote(String input) {

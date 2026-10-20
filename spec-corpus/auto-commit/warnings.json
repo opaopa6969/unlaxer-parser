@@ -28,6 +28,45 @@
     ]
   },
   {
+    "name": "whitespace-left-recursion-check",
+    "note": "'/', ANY and XID_IDENTIFIER consume for the left-recursion check, so the javaStyle grammar is analysed and S is not a warning (#728 review).",
+    "grammar": "grammar SpacedConsuming {\n  @whitespace: javaStyle\n  token ANYC = ANY\n  token ID ::= XID_IDENTIFIER;\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n  P ::= '/' P | 'x' ;\n  Q ::= ANYC Q | 'y' ;\n  X ::= ID X | 'z' ;\n}\n",
+    "warnings": []
+  },
+  {
+    "name": "whitespace-rule-none",
+    "note": "javaStyle with a rule-level @whitespace(none): outside the analysed subset.",
+    "grammar": "grammar SpacedRuleNone {\n  @whitespace: javaStyle\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @whitespace(none)\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "grammar"
+      }
+    ]
+  },
+  {
+    "name": "whitespace-interleave",
+    "note": "javaStyle with a rule-level @interleave: outside the analysed subset.",
+    "grammar": "grammar SpacedInterleave {\n  @whitespace: javaStyle\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @interleave(profile=commentsAndSpaces)\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "grammar"
+      }
+    ]
+  },
+  {
+    "name": "whitespace-lexical-context",
+    "note": "javaStyle with a rule-level @lexicalContext: outside the analysed subset.",
+    "grammar": "grammar SpacedContext {\n  @whitespace: javaStyle\n  token ID ::= 'b';\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @lexicalContext(tokens=['ID'])\n  B ::= ID ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "grammar"
+      }
+    ]
+  },
+  {
     "name": "two-roots",
     "note": "Two roots: outside the analysed subset; every annotated rule is reported.",
     "grammar": "grammar Roots {\n  @root @autoCommit\n  A ::= 'a' N ;\n  @root\n  @autoCommit\n  B ::= 'b' N ;\n  N ::= 'n' ;\n}\n",

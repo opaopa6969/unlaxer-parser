@@ -31,7 +31,7 @@ fn slice(source: &str, start: usize, end: usize) -> String {
 #[test]
 fn lint_reports_the_corpus_positions() {
     let rows = corpus("lint.json");
-    assert_eq!(rows.len(), 28);
+    assert_eq!(rows.len(), 33);
     let mut reported = 0;
     for row in &rows {
         let name = text(row, "name");
@@ -72,7 +72,7 @@ fn lint_reports_the_corpus_positions() {
             reported += 1;
         }
     }
-    assert_eq!(reported, 29);
+    assert_eq!(reported, 31);
 }
 
 /// The rewrite equals the hand-written grammar, inserts only into annotated rules, removes the
@@ -138,7 +138,7 @@ fn rewritten_elements_keep_their_source_spans() {
 #[test]
 fn skipped_annotations_are_warned_about() {
     let rows = corpus("warnings.json");
-    assert_eq!(rows.len(), 7);
+    assert_eq!(rows.len(), 11);
     for row in &rows {
         let name = text(row, "name");
         let source = text(row, "grammar");

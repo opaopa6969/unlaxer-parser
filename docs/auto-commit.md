@@ -160,7 +160,11 @@ FIRST 集合は runtime の `FirstSet` と同じ表現で持つ。ASCII（0〜12
   大文字小文字を区別せずに比べるので、ここで javaStyle と判定した文法は両 host とも javaStyle で生成する。
 - 規則に `@whitespace` `@interleave` `@lexicalContext`（文脈依存の字句）が付いている。
 - `@root` がちょうど 1 個でない。
-- 左再帰がある（消費せずに自分を呼べる規則がある）。
+- 左再帰がある（消費せずに自分を呼べる規則がある）。この検査は書いたとおりの入力に対する FIRST で行う。
+  javaStyle の文法で unknown にする `'/'`・`ANY`・XID 識別子なども、成功すれば必ず消費するので
+  「消費する」と扱う（下の「空白のある文法」の読み替えは使わない）。左再帰は parser が同じ位置で同じ
+  規則を呼ぶかどうかの性質で、generator の `E-LEFT-RECURSION`（[left-recursion.md](left-recursion.md)）
+  も同じ意味である。
 
 ### 不透明な規則
 
@@ -383,21 +387,25 @@ runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする�
 
 [`spec-corpus/auto-commit`](../spec-corpus/auto-commit) を両 host が読む。期待値は手書きである。
 
-- `lint.json`: 28 文法、29 件の報告。報告する位置（選択肢と `e1` の原文、包む参照）と、
+- `lint.json`: 33 文法、31 件の報告。報告する位置（選択肢と `e1` の原文、包む参照）と、
   報告しない例（重なる FIRST、外側の選択・optional・`+`・separated list での再開、
   `COMMIT` / `LABEL` / `CATCH` / `CAPTURE`、不透明な規則、到達できない規則、`@recovery`、
   模型化しない token、左再帰、root 2 個、非 ASCII の 1 bit）。javaStyle の文法（#728）は
   `whitespace`、`whitespace-case`（綴りの大文字小文字）、`whitespace-trivia-start`（`'/'`・`' '`・
   `ANY` が unknown になる）と、同じ選択肢を空白なしで解析する `whitespace-trivia-start-none`、
-  まだ対象外の `rule-whitespace`、`comment`、`declarative-whitespace`。
+  左再帰の検査で `'/'`・`ANY`・XID 識別子を消費するものとして扱う `whitespace-left-recursion-check`、
+  本当の左再帰がある `whitespace-left-recursion`、まだ対象外の `rule-whitespace`、`comment`、
+  `declarative-whitespace`、javaStyle と規則の `@whitespace(none)` / `@interleave` / `@lexicalContext`
+  の組み合わせ（`whitespace-rule-none`、`whitespace-interleave`、`whitespace-lexical-context`）。
 - `cases.json`: 10 文法 108 入力。自動挿入の文法、同じ位置に手で `COMMIT` を書いた文法、
   それぞれの入力の結果（受理・拒否、確定エラーの位置と message）。`group-after-commit` は
   包んだ参照の後ろに group が続き、Java の group helper の番号が変わらないことを CST で確かめる。
   javaStyle の 4 文法（`whitespace-statements`、`whitespace-expression`、`whitespace-slash`、
   `whitespace-raw-slash`）は、空白・tab・CRLF・行コメント・ブロックコメント・閉じていないコメント・
   単独の `/`・末尾の空白・空白だけの入力を含む。
-- `warnings.json`: 7 文法。`W-AUTO-COMMIT-SKIPPED` の規則・reason・位置（`grammar` 3 例（`@comment`、
-  宣言的 token の空白、root 2 個）、`opaque`、`unreachable`、警告しない例 2 つ（javaStyle を含む））。
+- `warnings.json`: 11 文法。`W-AUTO-COMMIT-SKIPPED` の規則・reason・位置（`grammar` 6 例（`@comment`、
+  宣言的 token の空白、javaStyle と規則の `@whitespace(none)` / `@interleave` / `@lexicalContext`、
+  root 2 個）、`opaque`、`unreachable`、警告しない例 3 つ（javaStyle の 2 つを含む））。
 
 `AutoCommitConformanceTest`（Java）は次を確かめる。
 
@@ -443,7 +451,8 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ub
   （#712 の後に別 issue）、宣言的 token の空白（`@whitespace: 名前`）、規則の `@whitespace` /
   `@interleave` は解析しない。
 - javaStyle の文法では、空白か `/` で始まり得る終端記号・token（`'/'`、`' '`、`ANY`、`NEGATION`、
-  空白を含む `CHAR_RANGE` など）は unknown になる。割り算の `'/'` のような演算子があると、その位置を
+  XID 識別子（`XID_IDENTIFIER`。FIRST を全体で近似しているため）、空白を含む `CHAR_RANGE` など）は
+  unknown になる。割り算の `'/'` のような演算子があると、その位置を
   通る文脈の検査は「不可」になり、挿入されない（corpus の `whitespace-slash`）。`'/='` のように
   2 文字目が `/` でも `*` でもない終端記号はコメントの開始と区別できるが、まだ区別していない。
 - 包むのは規則参照と token 参照だけで、終端記号は包まない（Java の CST が変わるため）。
@@ -457,7 +466,7 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ub
 - 非 ASCII の符号位置は 1 bit にまとめるので、非 ASCII で始まる選択肢どうしは常に重なると扱う。
 - 判定は保守的で、意味を変えない位置でも報告しないことがある（例: corpus の
   `separated-trailing`）。
-- 解析の対象外の文法（空白のある文法など）、不透明な規則、到達できない規則では、frontend は注釈を
+- 解析の対象外の文法（`@comment`・宣言的 token の空白などのある文法）、不透明な規則、到達できない規則では、frontend は注釈を
   警告なしに取り除く。警告 `W-AUTO-COMMIT-SKIPPED` は lint の API（`lintWarnings` /
   `lint_warnings`）から得る。解析できたが候補が無い規則は警告しない。
 - lint（すべての規則を調べる）は、候補ごとに文脈を root までたどるので、大きな文法では規則数の

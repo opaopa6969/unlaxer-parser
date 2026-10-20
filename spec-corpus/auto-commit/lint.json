@@ -286,6 +286,55 @@
     "findings": []
   },
   {
+    "name": "whitespace-left-recursion-check",
+    "note": "Left recursion is checked on the input as written: '/', ANY and XID_IDENTIFIER are unknown under javaStyle but still consume, so P, Q and X are not left-recursive and the grammar is analysed (#728 review).",
+    "grammar": "grammar SpacedConsuming {\n  @whitespace: javaStyle\n  token ANYC = ANY\n  token ID ::= XID_IDENTIFIER;\n  @root\n  Root ::= { S } ;\n  S ::= 'k' N | 'm' N ;\n  N ::= 'n' ;\n  P ::= '/' P | 'x' ;\n  Q ::= ANYC Q | 'y' ;\n  X ::= ID X | 'z' ;\n}\n",
+    "findings": [
+      {
+        "rule": "S",
+        "alternative": "'k' N",
+        "first": "'k'",
+        "commits": [
+          "N"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "S",
+        "alternative": "'m' N",
+        "first": "'m'",
+        "commits": [
+          "N"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "whitespace-left-recursion",
+    "note": "A real left recursion still disables a javaStyle grammar.",
+    "grammar": "grammar SpacedLeft {\n  @whitespace: javaStyle\n  @root\n  Root ::= { S } ;\n  S ::= 'k' N | 'm' N ;\n  N ::= 'n' ;\n  P ::= [ '/' ] P | 'x' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "whitespace-rule-none",
+    "note": "javaStyle with a rule-level @whitespace(none) is not analysed.",
+    "grammar": "grammar SpacedRuleNone {\n  @whitespace: javaStyle\n  @root\n  Root ::= { S } ;\n  S ::= 'k' N | 'm' N ;\n  @whitespace(none)\n  N ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "whitespace-interleave",
+    "note": "javaStyle with a rule-level @interleave is not analysed.",
+    "grammar": "grammar SpacedInterleave {\n  @whitespace: javaStyle\n  @root\n  Root ::= { S } ;\n  S ::= 'k' N | 'm' N ;\n  @interleave(profile=commentsAndSpaces)\n  N ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "whitespace-lexical-context",
+    "note": "javaStyle with a rule-level @lexicalContext is not analysed.",
+    "grammar": "grammar SpacedContext {\n  @whitespace: javaStyle\n  token ID ::= 'n';\n  @root\n  Root ::= { S } ;\n  S ::= 'k' N | 'm' N ;\n  @lexicalContext(tokens=['ID'])\n  N ::= ID ;\n}\n",
+    "findings": []
+  },
+  {
     "name": "raising-and-labels",
     "note": "An alternative followed by a raising operator is not reported, and nothing inside COMMIT, LABEL or CATCH is.",
     "grammar": "grammar Raised {\n  @root\n  Root ::= 'k' Name | LABEL(lbl, 'c' Name) | CATCH('d' Name, 'e', lbl) | COMMIT('f' Name) ;\n  Name ::= 'n' ;\n}\n",

@@ -500,6 +500,35 @@ impl<'a> Analysis<'a> {
         let [root] = roots.as_slice() else {
             return None;
         };
+        let spaced = grammar.settings.iter().any(|setting| {
+            setting.key == "whitespace"
+                && matches!(&setting.value, SettingValue::String(value) if java_style(value))
+        });
+        let mut analysis = Self::solve(grammar, spaced);
+        // Left recursion is about the parser calling a rule again at the same position, so it
+        // uses the FIRST sets of the input as written: a terminal that is unknown under trivia
+        // (such as '/') still consumes (#728 review).
+        let left_recursive = if spaced {
+            Self::solve(grammar, false).left_recursive()
+        } else {
+            analysis.left_recursive()
+        };
+        if left_recursive {
+            return None;
+        }
+        analysis.reach(*root);
+        for index in 0..grammar.rules.len() {
+            if analysis.reachable[index] {
+                let body = &grammar.rules[index].body;
+                let mut ordinal = 0;
+                analysis.index_body(body, BodyParent::Rule(index), index, &mut ordinal, false);
+            }
+        }
+        Some(analysis)
+    }
+
+    /// Name tables and the least-fixpoint FIRST table, with or without the trivia rule.
+    fn solve(grammar: &'a GrammarDecl, trivia: bool) -> Self {
         let mut rules = HashMap::new();
         let mut ambiguous = HashSet::new();
         for (index, rule) in grammar.rules.iter().enumerate() {
@@ -533,10 +562,7 @@ impl<'a> Analysis<'a> {
             sites: HashMap::new(),
             memo: RefCell::new(HashMap::new()),
             frozen: Cell::new(false),
-            trivia: grammar.settings.iter().any(|setting| {
-                setting.key == "whitespace"
-                    && matches!(&setting.value, SettingValue::String(value) if java_style(value))
-            }),
+            trivia,
         };
         for (index, opaque) in analysis.opaque.iter().enumerate() {
             if *opaque {
@@ -560,18 +586,7 @@ impl<'a> Analysis<'a> {
             }
         }
         analysis.frozen.set(true);
-        if analysis.left_recursive() {
-            return None;
-        }
-        analysis.reach(*root);
-        for index in 0..grammar.rules.len() {
-            if analysis.reachable[index] {
-                let body = &grammar.rules[index].body;
-                let mut ordinal = 0;
-                analysis.index_body(body, BodyParent::Rule(index), index, &mut ordinal, false);
-            }
-        }
-        Some(analysis)
+        analysis
     }
 
     fn rule_of(&self, name: &str) -> Option<usize> {
