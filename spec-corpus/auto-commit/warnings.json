@@ -1,0 +1,56 @@
+[
+  {
+    "name": "whitespace",
+    "note": "Automatic whitespace: the grammar is outside the analysed subset.",
+    "grammar": "grammar Spaced {\n  @whitespace: javaStyle\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "grammar"
+      }
+    ]
+  },
+  {
+    "name": "two-roots",
+    "note": "Two roots: outside the analysed subset; every annotated rule is reported.",
+    "grammar": "grammar Roots {\n  @root @autoCommit\n  A ::= 'a' N ;\n  @root\n  @autoCommit\n  B ::= 'b' N ;\n  N ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "A",
+        "reason": "grammar"
+      },
+      {
+        "rule": "B",
+        "reason": "grammar"
+      }
+    ]
+  },
+  {
+    "name": "opaque",
+    "note": "A recovery rule is opaque.",
+    "grammar": "grammar Recover {\n  @root\n  Root ::= { S } ;\n  @autoCommit @recovery(sync=';')\n  S ::= 'k' N ';' ;\n  N ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "opaque"
+      }
+    ]
+  },
+  {
+    "name": "unreachable",
+    "note": "A rule the root never reaches.",
+    "grammar": "grammar Unused {\n  @root\n  Root ::= 'r' N ;\n  @autoCommit\n  Lost ::= 'l' N ;\n  N ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Lost",
+        "reason": "unreachable"
+      }
+    ]
+  },
+  {
+    "name": "analysed-without-candidates",
+    "note": "An analysed rule without a candidate is not a warning (the lint shows why).",
+    "grammar": "grammar Kept {\n  @root\n  Root ::= Item 'x' | 'a' 'y' ;\n  @autoCommit\n  Item ::= 'a' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": []
+  }
+]

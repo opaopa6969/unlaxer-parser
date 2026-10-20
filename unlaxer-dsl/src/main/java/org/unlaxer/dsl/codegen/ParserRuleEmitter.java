@@ -166,6 +166,10 @@ class ParserRuleEmitter {
             // Each operand is an ordinary group with its own helper; the CATCH itself has none.
             analyzeHelpersInElement(ctx, ruleName, caught.child(), specs);
             analyzeHelpersInElement(ctx, ruleName, caught.alternative(), specs);
+        } else if ((element instanceof UBNFAST.CommitElement || element instanceof UBNFAST.LabelElement)
+                && isSingleRuleRef(((TransparentElement) element).body())) {
+            // COMMIT / LABEL around one reference wrap it inline (resolveFlatElement), so a helper
+            // would be unused and would shift the numbers of the following groups (#702).
         } else if (element instanceof TransparentElement g) {
             int n = ctx.nextGroup(ruleName);
             String helperName = ruleName + "Group" + n + "Parser";
@@ -1085,12 +1089,11 @@ class ParserRuleEmitter {
             model = new ElementModel.CatchLabels(resolveElement(ctx, ruleName, caught.child()),
                 resolveElement(ctx, ruleName, caught.alternative()), caught.labels());
         } else if (element instanceof TransparentElement g) {
-            String helperName = ctx.helperName(ruleName, element);
             // A bare reference must reach the owned boundary directly: collecting
             // it through a Chain would discard a virtual generated/projected result.
             ElementModel child = !(element instanceof GroupElement) && isSingleRuleRef(g.body())
                 ? resolveElement(ctx,ruleName,getSingleAtomicElementFrom(g.body()))
-                : new ElementModel.ClassRef(helperName + ".class");
+                : new ElementModel.ClassRef(ctx.helperName(ruleName, element) + ".class");
             model = element instanceof OwnedCaptureElement capture
                 ? new ElementModel.OwnedCapture(capture.name(), child)
                 : element instanceof CaptureScopeElement ? new ElementModel.CaptureScope(child) : raising(element, child);
