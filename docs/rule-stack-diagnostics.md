@@ -67,6 +67,11 @@ let failure = parse_detailed_shared_with_rule_stack(&grammar, root, whitespace, 
   reported only when the winning reach is the farthest failure the context reports (Java
   `getFarthestOffset()` with a failure candidate, Rust `failure().offset`); otherwise, for
   example when the farthest failure happened only inside rules that succeeded, there is none.
+- **Starts after a positive LOOKAHEAD.** A frame starts, and a failure is recorded, at
+  max(consumed, matched), as Java's `ParseFrame` does. A positive `LOOKAHEAD` token advances
+  only the matched cursor, so `R0 ::= 'y' (AHEAD R1) ; R1 ::= 'x' 'a'` on `yx` reports
+  `R0@0>R1@2` in both versions (#706, see
+  [prior-matched-diagnostics.md](prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)).
 - **Limit and spans.** A stack keeps its innermost `RuleStack.LIMIT` / `RULE_STACK_LIMIT` = 32
   frames and reports the dropped outer frames in `omitted`. Starts are code points of the
   original input, never bytes or UTF-16 units, and are not renumbered when frames are dropped.
@@ -177,12 +182,13 @@ superlinearly in Java (+36–43 % at nested-120); the depth array removed that.
 
 ## Verification
 
-- [`conformance/rule-stack/cases.tsv`](../conformance/rule-stack/cases.tsv): 15 inputs over 14
+- [`conformance/rule-stack/cases.tsv`](../conformance/rule-stack/cases.tsv): 17 inputs over 16
   fixtures with handwritten stacks: nesting, a farther alternative, deeper and equal-depth ties,
   a discarded negative lookahead whose stack is only reachable through a rebased memo replay,
   commit and label at the raise, a replayed label, a caught label followed by an ordinary
   failure, 40 nested rules with 8 omitted frames (ordinary and committed), supplementary
-  characters and a rule-free parse. Java `RuleStackTest` and Rust `tests/rule_stack.rs` run them
+  characters, a rule-free parse, and two rules that start after a positive `LOOKAHEAD`
+  advanced the matched cursor (#706). Java `RuleStackTest` and Rust `tests/rule_stack.rs` run them
   under both memo policies and every diagnostics policy, check the offset, the raised kind and
   label, and that the memo cases really replay; Rust also runs the full-input entry under every
   policy and checks its diagnostic equals `parse_detailed_shared_with_options`.
@@ -210,17 +216,6 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ru
 ```
 
 ## Limitations
-
-- After a positive `LOOKAHEAD` token advances Java's matched cursor, Java starts the next parse
-  frame, and measures its reach, at max(consumed, matched), so a rule that begins there starts
-  later in Java than in Rust and can win a different tie: `R0 ::= 'y' (AHEAD R1) ; R1 ::= 'x' 'a'`
-  on `yx` reports `R0@0>R1@2` in Java and `R0@0>R1@1` in Rust; `R0 ::= AHEAD (R1 | 'x' 'a') ;
-  R1 ::= 'a'` on `x` reports `R0@0>R1@1` and `R0@0`. It is the cause of
-  [#706](https://github.com/opaopa6969/unlaxer-parser/issues/706) (the diagnostic offset after a
-  positive LOOKAHEAD) and is fixed with it. Until then `PropertyBasedParityTest` excludes exactly
-  that shape (`positive-lookahead-rule-stack-starts` in `known-differences.json`: same offset and
-  omitted count, Java frames starting later after a common prefix, in grammars with a positive
-  LOOKAHEAD), and `regressions.json` pins both examples so the exclusion stays in use.
 
 - Shared grammar calls carry stacks with the called grammar's rule names; no shared corpus
   covers them yet.

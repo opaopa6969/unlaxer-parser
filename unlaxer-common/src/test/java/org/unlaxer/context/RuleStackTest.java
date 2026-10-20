@@ -18,6 +18,7 @@ import org.unlaxer.parser.combinator.Chain;
 import org.unlaxer.parser.combinator.Choice;
 import org.unlaxer.parser.combinator.Commit;
 import org.unlaxer.parser.combinator.Label;
+import org.unlaxer.parser.combinator.MatchOnly;
 import org.unlaxer.parser.combinator.PegLookahead;
 import org.unlaxer.parser.elementary.WordParser;
 
@@ -83,6 +84,13 @@ public class RuleStackTest {
       }
       case "unicode":
         return new Rule("Root", w("😀"), new Rule("Item", w("界"), w("x")));
+      // Root ::= 'y' (AHEAD Item) ; Item ::= 'x' 'a' ; AHEAD = LOOKAHEAD('x') (#706).
+      case "lookahead-start":
+        return new Rule("Root", w("y"), new Chain(new MatchOnly(w("x")), new Rule("Item", w("x"), w("a"))));
+      // Root ::= AHEAD (Item | 'x' 'a') ; Item ::= 'a' ; (#706).
+      case "lookahead-frame":
+        return new Rule("Root", new MatchOnly(w("x")),
+            new Choice(new Rule("Item", w("a")), new Chain(w("x"), w("a"))));
       case "bare":
         return new Chain(w("a"), w("b"));
       default:
@@ -94,7 +102,7 @@ public class RuleStackTest {
     var rows = Files.readAllLines(Path.of("../conformance/rule-stack/cases.tsv")).stream()
         .filter(row -> !row.startsWith("#")).map(row -> row.split("\t", -1)).collect(Collectors.toList());
     for (String[] row : rows) assertEquals(String.join("|", row), 8, row.length);
-    assertEquals(15, rows.size());
+    assertEquals(17, rows.size());
     return rows;
   }
 

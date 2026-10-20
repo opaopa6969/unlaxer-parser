@@ -267,7 +267,9 @@ impl ParseContext<'_> {
             self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
         }
         self.call_depth += 1;
+        let frontier = std::mem::replace(&mut self.grammar_frontier, false);
         let result = parser.parse_classic(self);
+        self.grammar_frontier = frontier;
         self.call_depth -= 1;
         let result = match &self.resource_failure {
             Some(error) => Err(error.clone()),
@@ -441,7 +443,9 @@ impl ParseContext<'_> {
             return Err(self.error("parser calls below 256"));
         }
         self.call_depth += 1;
+        let frontier = std::mem::replace(&mut self.grammar_frontier, false);
         let result = self.transaction(|context| parser.parse(context, kind, invert));
+        self.grammar_frontier = frontier;
         self.call_depth -= 1;
         result
     }

@@ -61,3 +61,73 @@ matched が CP1 のままでも、raw consuming leaf の matched=CP0 への rese
 登録状態を復元し、observer failure は公開境界を復元後に context を無効化する。
 両版の resource failure は sticky、Rust の panic 後は context を破棄する。
 本件だけで親 #545 全体を close しない。
+
+## grammar 呼び出しの frontier（#706）
+
+[#706](https://github.com/opaopa6969/unlaxer-parser/issues/706) では、UBNF の正の
+`LOOKAHEAD('x')`（Java `MatchOnly(WordParser)`、Rust `Expr::JavaLookahead`）が matched
+cursor を進めた後に続く要素が失敗すると、失敗位置と rule stack が両版で食い違っていた。
+
+| 文法と入力 | Java | 修正前の Rust | 修正後の Rust |
+|---|---|---|---|
+| `R0 ::= 'a' AHEAD 'é'` に `ax` / `axé`（`diagnose`） | syntax CP2 | syntax CP1 | syntax CP2 |
+| `R0 ::= 'y' (AHEAD R1) ; R1 ::= 'x' 'a'` に `yx`（rule stack） | `R0@0>R1@2` | `R0@0>R1@1` | `R0@0>R1@2` |
+| `R0 ::= AHEAD (R1 \| 'x' 'a') ; R1 ::= 'a'` に `x`（rule stack） | `R0@0>R1@1` | `R0@0` | `R0@0>R1@1` |
+
+Java は失敗の到達（`maxReachedOffset`）、parse frame の開始（`ParseFrame.startOffset`）、
+frame の到達を、どれも max(consumed, matched) で測る。Rust は consumed だけで測っていた。
+
+**揃え方**: Rust を Java に合わせた。Rust では、grammar を呼び出している間
+（全入力の `parse_detailed*` 系と `ParseContext::parse_grammar` / `parse_shared_grammar`。
+token stream の lexing session の中を除く）、
+失敗の記録位置と rule frame の開始位置を max(consumed, matched) にする。
+Classic token mode（`CAPTURE` などを含む grammar）の中では、rule frame の開始だけを補正し、
+失敗の記録位置は補正しない。token mode の各失敗箇所は、すでに Java Classic の位置
+（owner の開始や max(consumed, matched)）を明示して記録しているからである。両方を補正すると
+`R0 ::= CAPTURE(w0, EOF)` の `a` で context の失敗位置（と rule stack の offset）が Rust だけ CP1 になり、逆に frame の開始を補正しないと
+`R0 ::= AHEAD CAPTURE(w0, R1) ; R1 ::= 'a'` の `x` で Rust だけ `R0@0>R1@0` になる（どちらも
+PBT で確かめた）。
+
+**token stream の中は対象外**: `@tokenStream: enabled` の lexing session（Rust の
+`parse_with_lexing`）の中では、失敗も rule frame も従来の consumed の位置で測る。そこでは Java の
+match-only terminal が lexeme を見る。たとえば `Root ::= EMPTY END`（`@whitespace: javaStyle`）に
+`a` を与えると、Java の `EMPTY`（`MatchOnly(任意の 1 文字)`）は error lexeme の `a` に一致せず、
+matched は CP0 のまま `EOF` が CP0 で失敗する（`spec-corpus/token-stream/corpus.json` の
+`empty-assertions` / `not-eof`）。Rust の `JavaEmpty` は lexing session の中でも matched を 1 文字
+進めるので、補正すると Rust だけ CP1 になる。session の中から `parse_grammar` で入れ子に呼んだ
+grammar も、呼び出しが session を外しても同じく補正しない（Rust `prior_matched_diagnostics` の
+`a_grammar_nested_in_a_token_stream_session_keeps_the_consumed_frontier`）。UBNF は token stream の
+文法で `LOOKAHEAD` / `NEGATIVE_LOOKAHEAD` / `UNTIL` などの非 declarative token を
+`E-TOKEN-STREAM-TOKEN` で拒否する（`TokenStreamGrammar`）。token stream の中で matched を進めうる
+UBNF の要素は `EMPTY` だけなので、この例外で #706 の対象から外れる UBNF 文法は `EMPTY` を使うものに限られる。
+
+**shared grammar call**: `shared_calls::Registry::call` は、Java の `SharedGrammarCalls` と同じく、
+子 grammar を呼び出し元の consumed の位置から、両 cursor をそこに揃えて始める。呼び出し元の正の
+`LOOKAHEAD` が進めた matched は、子の失敗位置にも rule frame の開始にもならない（`'a' LOOKAHEAD('x')`
+の後に子 `Root ::= 'b' 'c'` を呼ぶと、`ax` / `axb` とも両版で CP1、`Root@1`）。呼び出し元の matched は
+呼び出しの後に元へ戻る。
+
+**変えないもの**: 受理・拒否、両 cursor、CST、AST、token は変えない。式単位の公開入口
+（`ParseContext::parse`、`parse_with_token_mode`、`parse_token`）は、grammar の中から
+呼ばれた場合も含め、その呼び出しの間は従来の frontier を使う。上の表の native PEG の
+source failure（`context.parse(&child.ahead())` の CP0）と `peg-assertion/cases.tsv` の
+`rustOffset` はそのままである。matched cursor が consumed を越えるのは Java 互換の要素
+（正の `LOOKAHEAD`、`EMPTY`、`UNTIL`）か Classic token mode だけなので、それらを使わない
+grammar の診断は変わらない。
+
+**Java を Rust に合わせなかった理由**: Java の max(consumed, matched) は Classic の
+failure frame 全体の前提で、この文書の表の 1 行目、92 行の手書き期待値、Java の LSP が
+これに依存している。Java 側を変えると Classic の既存契約を広く動かすことになる。Rust 側は
+grammar 呼び出しの境界で方針を切り替えるだけで済む。
+
+**費用**: 分岐が 1 つ増えるだけで、割当は増えない。失敗の記録（Detailed のときだけ）と
+rule frame の開始で比較を 1 回、公開入口で `bool` を 1 つ退避・復元する。
+`DetailedOnFailure` の 1 回目の pass は、失敗の記録より前に戻るので何もしない。
+
+**検証**: Rust `prior_matched_diagnostics` の
+`grammar_invocations_measure_failures_at_the_matched_reach` が、全入力と `parse_grammar` の
+両入口、CRLF と補助文字を含む CP4 の例、式入口が従来の frontier を保つことを、memo 2 種 ×
+診断 3 種で確かめる。rule stack は [共有 fixture](../conformance/rule-stack/cases.tsv) の
+`lookahead-later-start` / `lookahead-extra-frame` を Java `RuleStackTest` と Rust
+`tests/rule_stack.rs` が両方とも検証する。`PropertyBasedParityTest` は既知差の除外なしで、
+`regressions.json` の #706 の 5 例を Java / Rust の 12 設定で比べる。

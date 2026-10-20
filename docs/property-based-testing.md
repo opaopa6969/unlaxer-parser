@@ -122,8 +122,13 @@ Rust runtime は文法を `Expr` の表として解釈するので、生成 modu
   拒否することを確かめる。
 - `spec-corpus/property-based/known-differences.json`: 既知差。各 entry は `issue` と `reason` を
   必須とし、`kind`（finding 種別の正規表現）と、任意で `grammar` / `detail` の正規表現、および
-  正規表現で書けない数値条件 `condition` で対象を限定する。現在の `condition` は
-  `java-syntax-offset-after-rust`（両方とも `syntax` 失敗で、Java の offset が Rust より大きい）だけ。
+  正規表現で書けない数値条件 `condition` で対象を限定する。`condition` には
+  `java-syntax-offset-after-rust`（両方とも `syntax` 失敗で、Java の offset が Rust より大きい）と
+  `java-stack-starts-after-rust`（`KnownDifferences.javaStackStartsAfterRust`）、
+  `number-incomplete-exponent`（`KnownDifferences.numberIncompleteExponent`）がある。前の 2 つは
+  #706 のために作ったもので、#706 の修正後はどの entry も使っていない。現在の既知差は
+  [#717](https://github.com/opaopa6969/unlaxer-parser/issues/717) の `number-incomplete-exponent`
+  の 1 件だけで、`regressions.json` の同名の例が毎回これに当たる。
   除外した件数は毎回 `[pbt] ... excludedKnown=` に出る。1 件も除外しなかった entry があると
   テストは失敗する（直った差や、範囲がずれた entry を残さないため）。黙って除外しない。
 
@@ -190,10 +195,22 @@ seed は `java.util.Random` で展開する（JDK 仕様で列が固定）。同
 
 - [#706](https://github.com/opaopa6969/unlaxer-parser/issues/706): 正の `LOOKAHEAD` token が matched
   cursor を進めた後の失敗で、`diagnose` の CP 位置が Java（matched 到達）と Rust（consumed）で
-  異なる。受理・cursor・CST・AST は一致する。縮小例 `R0 ::= 'a' AHEAD 'é'`（入力 `ax`）を
-  `regressions.json` の `lookahead-diagnostic-offset` に固定し、`known-differences.json` で
-  「正の `LOOKAHEAD` を含む文法」「両方 `syntax` 失敗」「Java の offset > Rust の offset」の差だけを
-  除外している。生成文法では今のところこの形は出ておらず、除外が効いているのは固定 corpus だけ。
+  異なっていた。受理・cursor・CST・AST は一致していた。#723 の rule stack（seed 211 / 284）でも
+  同じ原因の差が出た。Rust の grammar 呼び出しで失敗と rule frame の開始を max(consumed, matched)
+  で測るようにして揃え（[契約](prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)）、
+  `known-differences.json` の 2 entry を削除した。縮小例 `lookahead-diagnostic-offset`、
+  CRLF と補助文字を含む `lookahead-diagnostic-unicode-offset`、rule stack の 3 例（Classic token
+  mode の `positive-lookahead-rule-stack-classic-mode` を含む）は `regressions.json` に残り、
+  除外なしで一致する。上表の「#706 の既知差のみ」は修正前の結果で、その除外（文法全体に正の
+  `LOOKAHEAD` があり、Java の offset の方が大きい `syntax` の差）は別の原因の差も隠していた。
+  除外を外すと、seed 27 と seed `1000..1399` で `NumberParser` の不完全な指数の差（`R0 ::= NUM 'a'`
+  に `2e` で Java CP2 / Rust CP1）が見えるようになった。この差は `rust/FULL-SPEC.md` に記録済みで、
+  [#717](https://github.com/opaopa6969/unlaxer-parser/issues/717) で追跡し、`known-differences.json`
+  の `number-incomplete-exponent` でこの形だけを除外している。上表の seed `1000..1399` などの
+  「finding 0」は、この差を #706 の除外に含めて数えた値である。
+- seed 142 の受理の差（[#729](https://github.com/opaopa6969/unlaxer-parser/issues/729)）と seed 59 の
+  生成物の bytes の差（[#730](https://github.com/opaopa6969/unlaxer-parser/issues/730)）は、#706 の作業で
+  seed `1..320` を回したときに見つかった既存の差で、除外していない（CI の seed には出ない）。
 - 数値 field（`NumberParser` の capture）の AST を Java 側の oracle が正規化できなかった。これは
   テスト側の不具合で、修正後に `numeric-field-mapping` として固定した。
 - 両版とも同じ理由で拒否した文法（入れ子 container への field capture、#583 の範囲）は不一致
