@@ -17,12 +17,15 @@
 //! rewritten AST equals that of the grammar with the same `COMMIT` written by hand.
 use crate::ast::*;
 use crate::lexical::{LexicalExpression, Op};
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 /// The rule annotation that opts a rule into the rewrite.
 pub const ANNOTATION: &str = "autoCommit";
 /// The code of every lint finding.
 pub const CODE: &str = "I-AUTO-COMMIT";
+/// The code of the warning for an `@autoCommit` the analysis cannot use.
+pub const SKIPPED: &str = "W-AUTO-COMMIT-SKIPPED";
 /// Walk states explored per candidate; a larger walk leaves the candidate ineligible.
 pub const STATE_BUDGET: usize = 100_000;
 
@@ -59,20 +62,93 @@ impl Finding {
     }
 }
 
+/// An `@autoCommit` annotation that the frontend removes without inserting anything because
+/// the analysis cannot apply to its rule. `span` is the annotation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Warning {
+    pub rule: String,
+    pub span: Span,
+    /// `grammar` (outside the analysed subset), `opaque` or `unreachable`.
+    pub reason: &'static str,
+}
+
+impl Warning {
+    pub fn code(&self) -> &'static str {
+        SKIPPED
+    }
+
+    pub fn severity(&self) -> &'static str {
+        "warning"
+    }
+
+    pub fn message(&self) -> String {
+        let why = match self.reason {
+            "grammar" => "the grammar is outside the analysed subset",
+            "opaque" => "the rule has an annotation the analysis does not model",
+            _ => "the rule is not reachable from the root",
+        };
+        format!(
+            "{SKIPPED}: {}: @autoCommit inserts nothing: {why}",
+            self.rule
+        )
+    }
+}
+
+/// The source as written: parameterized rules expanded, but without the `@autoCommit`
+/// rewrite. [`findings`] and [`warnings`] expect this tree; [`crate::parse`] returns the
+/// rewritten one, where the annotation is gone and inserted commits hide their positions.
+pub fn parse_before_auto_commit(source: &str) -> Result<UbnfFile, crate::Diagnostic> {
+    crate::parser::parse(source, crate::lexer::lex(source)?)
+}
+
 /// Lint every grammar of one source. The findings describe the source as written, before
 /// any `@autoCommit` rewrite; positions are those of this single input.
 pub fn lint(source: &str) -> Result<Vec<Finding>, crate::Diagnostic> {
-    let file = crate::parser::parse(source, crate::lexer::lex(source)?)?;
+    let file = parse_before_auto_commit(source)?;
     Ok(file.grammars.iter().flat_map(findings).collect())
 }
 
-/// Findings of one expanded grammar, in rule order and then source order.
+/// The `W-AUTO-COMMIT-SKIPPED` warnings of every grammar of one source.
+pub fn lint_warnings(source: &str) -> Result<Vec<Warning>, crate::Diagnostic> {
+    let file = parse_before_auto_commit(source)?;
+    Ok(file.grammars.iter().flat_map(warnings).collect())
+}
+
+/// One warning per `@autoCommit` that cannot insert anything, in rule order. Pass the tree of
+/// [`parse_before_auto_commit`]: the rewritten tree no longer has the annotation.
+pub fn warnings(grammar: &GrammarDecl) -> Vec<Warning> {
+    let analysis = Analysis::new(grammar);
+    let mut out = Vec::new();
+    for (index, rule) in grammar.rules.iter().enumerate() {
+        for annotation in &rule.annotations {
+            if !matches!(&annotation.kind, AnnotationKind::Simple { name } if name == ANNOTATION) {
+                continue;
+            }
+            let reason = match &analysis {
+                None => "grammar",
+                Some(analysis) if analysis.opaque[index] => "opaque",
+                Some(analysis) if !analysis.reachable[index] => "unreachable",
+                Some(_) => continue,
+            };
+            out.push(Warning {
+                rule: rule.name.clone(),
+                span: annotation.span,
+                reason,
+            });
+        }
+    }
+    out
+}
+
+/// Findings of one expanded grammar, in rule order and then source order. Pass the tree of
+/// [`parse_before_auto_commit`]: in the rewritten tree the inserted commits are not modelled,
+/// so its alternatives are no longer reported.
 pub fn findings(grammar: &GrammarDecl) -> Vec<Finding> {
     let Some(analysis) = Analysis::new(grammar) else {
         return Vec::new();
     };
     analysis
-        .candidates()
+        .candidates(&|_| true)
         .into_iter()
         .map(|candidate| analysis.finding(&candidate))
         .collect()
@@ -90,11 +166,8 @@ pub fn apply(mut grammar: GrammarDecl) -> GrammarDecl {
         return grammar;
     }
     let plans: Vec<Candidate> = match Analysis::new(&grammar) {
-        Some(analysis) => analysis
-            .candidates()
-            .into_iter()
-            .filter(|candidate| annotated(&grammar.rules[candidate.rule]))
-            .collect(),
+        // Only annotated rules are examined: the walk of each candidate is global.
+        Some(analysis) => analysis.candidates(&|rule| annotated(&grammar.rules[rule])),
         None => Vec::new(),
     };
     for (index, rule) in grammar.rules.iter_mut().enumerate() {
@@ -347,6 +420,9 @@ struct Analysis<'a> {
     /// Body node to its sequence nodes, in alternative order.
     alternatives: HashMap<usize, Vec<usize>>,
     sites: HashMap<&'a str, Vec<usize>>,
+    /// FIRST per element (by address, valid while the grammar is borrowed), once `table` is final.
+    memo: RefCell<HashMap<usize, First>>,
+    frozen: Cell<bool>,
 }
 
 /// Settings that leave the code-point semantics of terminals and references unchanged.
@@ -429,6 +505,8 @@ impl<'a> Analysis<'a> {
             nodes: Vec::new(),
             alternatives: HashMap::new(),
             sites: HashMap::new(),
+            memo: RefCell::new(HashMap::new()),
+            frozen: Cell::new(false),
         };
         for (index, opaque) in analysis.opaque.iter().enumerate() {
             if *opaque {
@@ -451,6 +529,7 @@ impl<'a> Analysis<'a> {
                 break;
             }
         }
+        analysis.frozen.set(true);
         if analysis.left_recursive() {
             return None;
         }
@@ -579,6 +658,19 @@ impl<'a> Analysis<'a> {
     }
 
     fn element(&self, element: &AtomicElement) -> First {
+        if !self.frozen.get() {
+            return self.compute(element);
+        }
+        let key = element as *const AtomicElement as usize;
+        if let Some(first) = self.memo.borrow().get(&key) {
+            return *first;
+        }
+        let first = self.compute(element);
+        self.memo.borrow_mut().insert(key, first);
+        first
+    }
+
+    fn compute(&self, element: &AtomicElement) -> First {
         match &element.kind {
             ElementKind::Terminal(value) => match value.chars().next() {
                 Some(c) => First::consuming(Chars::of(c)),
@@ -781,7 +873,8 @@ impl<'a> Analysis<'a> {
         }
     }
 
-    fn candidates(&self) -> Vec<Candidate> {
+    /// Candidates of the rules `only` selects, in rule order and then source order.
+    fn candidates(&self, only: &dyn Fn(usize) -> bool) -> Vec<Candidate> {
         let mut out = Vec::new();
         for (id, node) in self.nodes.iter().enumerate() {
             let Node::Body {
@@ -794,7 +887,7 @@ impl<'a> Analysis<'a> {
             else {
                 continue;
             };
-            if self.opaque[*rule] {
+            if self.opaque[*rule] || !only(*rule) {
                 continue;
             }
             for (alternative, sequence) in body.alternatives.iter().enumerate() {

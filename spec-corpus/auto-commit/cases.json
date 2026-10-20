@@ -244,5 +244,39 @@
         "outcome": "syntax"
       }
     ]
+  },
+  {
+    "name": "group-after-commit",
+    "note": "A group follows the committed reference: the Java group helpers keep their numbers, so the CST is unchanged (review of #724).",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  @autoCommit\n  Root ::= 'a' R1 ( 'x' | 'y' ) | 'b' ;\n  R1 ::= 'c' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @root @mapping(Doc)\n  Root ::= 'a' COMMIT(R1) ( 'x' | 'y' ) | 'b' ;\n  R1 ::= 'c' ;\n}\n",
+    "cases": [
+      {
+        "input": "acx",
+        "outcome": "success"
+      },
+      {
+        "input": "acy",
+        "outcome": "success"
+      },
+      {
+        "input": "b",
+        "outcome": "success"
+      },
+      {
+        "input": "ax",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "acz",
+        "outcome": "syntax"
+      },
+      {
+        "input": "",
+        "outcome": "syntax"
+      }
+    ]
   }
 ]

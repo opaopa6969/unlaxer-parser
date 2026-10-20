@@ -38,6 +38,12 @@ grammar Stmts {
 - 終端記号・group・optional・repeat などは包まない。Java の CST では `COMMIT('b')` の本体が
   group helper になり、CST に 1 階層増える（Rust の CST は変わらない）。規則参照を包んだ
   `COMMIT(B)` は両 host とも CST を変えない。終端記号の失敗は従来どおり通常の失敗として報告される。
+- Java の ParserGenerator は、参照 1 個だけを包む `COMMIT` / `LABEL` には group helper を作らない
+  （`new Commit(Parser.get(BParser.class))` と inline で生成するので、helper はどこからも使われない）。
+  #700 の時点では使われない helper を作って番号を消費していたため、注釈を付けると後ろの group の
+  helper 名（`R0Group0Parser` → `R0Group1Parser`）がずれ、CST に出る parser class が変わっていた。
+  手で書いた `COMMIT(参照)` / `LABEL(L, 参照)` の生成物もこの helper の分だけ変わる（#700 は未リリース）。
+  Rust の生成物は group helper を持たないので変わらない。
 - message は付けない（既定の `unexpected input`）。引数付き規則の instance は `Tok_dd2f…` の
   ような書けない名前なので、名前から message を作ると利用者に読めない。
 - 挿入の後、注釈 `@autoCommit` は規則から取り除く。したがって書き換えた構文木は、同じ位置に
@@ -45,6 +51,9 @@ grammar Stmts {
   validator、portability、generator、LSP は `@autoCommit` を知らない。
 - 注釈は規則単位だけで、文法全体の設定は設けない。文法全体に効かせたいときは各規則に付ける。
   候補が無い規則、文法が解析の対象外のとき（下記）は、注釈を取り除くだけで何も挿入しない。
+  解析を当てられない注釈は lint の警告 `W-AUTO-COMMIT-SKIPPED` で分かる（下記）。
+- 調べるのは注釈を付けた規則の選択肢だけで、FIRST は節点ごとに memo する。注釈が 1 個なら、
+  規則数に比例する時間で済む（1000 規則の文法で、Rust release の frontend は注釈なし 0.02 s、注釈 1 個で 0.03 s）。
 
 ### 展開の後に挿入する
 
@@ -72,7 +81,13 @@ grammar Stmts {
 | | Java | Rust |
 | --- | --- | --- |
 | 原文を解析 | `AutoCommit.lint(String source)` | `auto_commit::lint(source)` |
+| 書き換え前の構文木 | `AutoCommit.parseBeforeAutoCommit(source)`（= `UBNFMapper.parseWithSourceBeforeAutoCommit`） | `auto_commit::parse_before_auto_commit(source)` |
 | 展開済みの文法 | `AutoCommit.findings(grammar, snapshot)` | `auto_commit::findings(&grammar)` |
+| 警告 | `AutoCommit.lintWarnings(source)` / `warnings(grammar, snapshot)` | `auto_commit::lint_warnings(source)` / `warnings(&grammar)` |
+
+`findings` と `warnings` には**書き換え前の構文木**を渡す。通常の `UBNFMapper.parse` /
+`parseWithSource` / `unlaxer_ubnf::parse` が返すのは書き換え後の構文木で、注釈は取り除かれ、挿入した
+`COMMIT` は unknown なので、その選択肢は報告されない。
 
 結果は `Finding` の列で、規則の順、その中は原文の順に並ぶ。
 
@@ -89,6 +104,20 @@ lint は注釈の有無と関係なく、挿入できる位置をすべて報告
 原文を解析する。lint は既存の portability check や validator の診断には混ぜない。それらは
 severity が error だけで、混ぜると既存の文法の `check` の出力が変わるためである。
 CLI は設けていない（下の制限事項）。
+
+### 警告 `W-AUTO-COMMIT-SKIPPED`
+
+`@autoCommit` を付けたのに解析を当てられないとき、注釈ごとに 1 件の警告（severity `warning`、
+span は注釈 `@autoCommit` の位置）を返す。`reason` は次のどれかで、両 host で同じ値と message を使う。
+
+| reason | 条件 |
+| --- | --- |
+| `grammar` | 文法が解析の対象外（下の「文法全体の前提」：空白、設定、root が 1 個でない、左再帰） |
+| `opaque` | 規則が不透明（下の「不透明な規則」） |
+| `unreachable` | root からたどれない |
+
+解析できたが候補が無い規則は警告しない（なぜ無いかは lint の位置で確かめる）。frontend の構文解析は
+警告を出さずに注釈を取り除くので、警告は lint の API から得る。
 
 ## 条件
 
@@ -257,12 +286,15 @@ runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする�
   報告しない例（重なる FIRST、外側の選択・optional・`+`・separated list での再開、空白、
   `COMMIT` / `LABEL` / `CATCH` / `CAPTURE`、不透明な規則、到達できない規則、`@recovery`、
   模型化しない token、左再帰、root 2 個、非 ASCII の 1 bit）。
-- `cases.json`: 5 文法 43 入力。自動挿入の文法、同じ位置に手で `COMMIT` を書いた文法、
-  それぞれの入力の結果（受理・拒否、確定エラーの位置と message）。
+- `cases.json`: 6 文法 49 入力。自動挿入の文法、同じ位置に手で `COMMIT` を書いた文法、
+  それぞれの入力の結果（受理・拒否、確定エラーの位置と message）。`group-after-commit` は
+  包んだ参照の後ろに group が続き、Java の group helper の番号が変わらないことを CST で確かめる。
+- `warnings.json`: 5 文法。`W-AUTO-COMMIT-SKIPPED` の規則・reason・位置（`grammar` 2 例、`opaque`、
+  `unreachable`、警告しない例）。
 
 `AutoCommitConformanceTest`（Java）は次を確かめる。
 
-- lint の位置が corpus と一致する。
+- lint の位置と警告が corpus と一致する。`findings` は書き換え前の構文木で `lint` と一致する。
 - 書き換えた構文木が手書きの構文木と等しく（`parse` と `parseWithSource`）、Java の Parser /
   AST / Mapper / LSP 生成物と Java host の Rust 生成物が byte 単位で一致する。
   書き換えた文法に `RaisingOperators` の問題が無い。注釈の無い文法は同じ instance のまま。
@@ -274,7 +306,7 @@ runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする�
   一致し、手書きの文法の生成物とも一致する。両 host の生成物を 6 設定で実行し、同じ比較を
   CST（`Tree` の節点列）まで行う。
 
-`rust/unlaxer-ubnf/tests/auto_commit.rs` は同じ `lint.json` と、書き換えた構文木と手書きの構文木の
+`rust/unlaxer-ubnf/tests/auto_commit.rs` は同じ `lint.json` と `warnings.json`、書き換えた構文木と手書きの構文木の
 canonical 比較を native frontend で確かめる。`rust/unlaxer-ubnf/tests/fixtures/positive/auto-commit.ubnf`
 は既存の frontend 比較（`RustUbnfFrontendConformanceTest` の構文木、`RustUbnfSourceConformanceTest`
 の位置）にも入る。
@@ -291,12 +323,20 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ub
   `@interleave`）は解析しない。実用の文法の多くはこれに当たる。
 - 包むのは規則参照と token 参照だけで、終端記号は包まない（Java の CST が変わるため）。
 - 確定エラーの message は既定の `unexpected input` だけである。
-- 同値性は入力全体の解析についてだけ保証する。途中で止まってよい解析と、別の文法からの
-  shared grammar call は対象外。
+- 同値性は root 規則から始める入力全体の解析についてだけ保証する。途中で止まってよい解析、
+  別の文法からの shared grammar call、root 以外の規則（Java の各規則の parser class など）を入口に
+  する解析は対象外。
+- 旧 API の `UBNFMapper.parseWithImports` は、取り込まれる文法も 1 個ずつ `UBNFMapper.parse` で
+  読んでから規則を合わせる。したがって取り込まれる文法の `@autoCommit` は、**その文法自身の `@root`** を入口とした解析で
+  判定・挿入される。取り込む側から見た参照の文脈は考慮しない。
 - 非 ASCII の符号位置は 1 bit にまとめるので、非 ASCII で始まる選択肢どうしは常に重なると扱う。
 - 判定は保守的で、意味を変えない位置でも報告しないことがある（例: corpus の
   `separated-trailing`）。
-- `@autoCommit` を付けた規則に候補が無いとき、警告は出さない（lint で位置を確かめる）。
+- 解析の対象外の文法（空白のある文法など）、不透明な規則、到達できない規則では、frontend は注釈を
+  警告なしに取り除く。警告 `W-AUTO-COMMIT-SKIPPED` は lint の API（`lintWarnings` /
+  `lint_warnings`）から得る。解析できたが候補が無い規則は警告しない。
+- lint（すべての規則を調べる）は、候補ごとに文脈を root までたどるので、大きな文法では規則数の
+  2 乗に近い時間がかかり得る。frontend の書き換えは注釈を付けた規則だけを調べる。
 - lint の CLI は無い。Java / Rust の API から呼ぶ。
 - `COMMIT` を含む文法は #700 のとおり snapshot 全体の incremental cache の対象外なので、
   `@autoCommit` で `COMMIT` が入った文法も対象外になる。

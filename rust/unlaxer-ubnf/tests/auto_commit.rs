@@ -80,7 +80,7 @@ fn lint_reports_the_corpus_positions() {
 #[test]
 fn rewrite_equals_the_hand_written_commits() {
     let rows = corpus("cases.json");
-    assert_eq!(rows.len(), 5);
+    assert_eq!(rows.len(), 6);
     for row in &rows {
         let name = text(row, "name");
         let auto = parse(text(row, "grammar")).unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -132,4 +132,68 @@ fn rewritten_elements_keep_their_source_spans() {
     assert_eq!(wrapper.capture, None);
     assert_eq!(wrapper.capture_span, None);
     assert!(file.grammars[0].rules[1].annotations.is_empty());
+}
+
+/// `W-AUTO-COMMIT-SKIPPED` for annotations the analysis cannot use, located at the annotation.
+#[test]
+fn skipped_annotations_are_warned_about() {
+    let rows = corpus("warnings.json");
+    assert_eq!(rows.len(), 5);
+    for row in &rows {
+        let name = text(row, "name");
+        let source = text(row, "grammar");
+        let warnings = auto_commit::lint_warnings(source).unwrap();
+        let expected = row.get("warnings").unwrap().array();
+        assert_eq!(warnings.len(), expected.len(), "{name}: {warnings:?}");
+        for (warning, expected) in warnings.iter().zip(expected) {
+            assert_eq!(warning.rule, text(expected, "rule"), "{name}");
+            assert_eq!(warning.reason, text(expected, "reason"), "{name}");
+            assert_eq!(warning.code(), "W-AUTO-COMMIT-SKIPPED");
+            assert_eq!(warning.severity(), "warning");
+            let written = slice(
+                source,
+                warning.span.codepoint_start,
+                warning.span.codepoint_end,
+            );
+            assert_eq!(written, "@autoCommit", "{name}");
+            assert!(
+                warning.message().starts_with("W-AUTO-COMMIT-SKIPPED: "),
+                "{name}"
+            );
+        }
+        // The rewritten tree no longer carries the annotation.
+        let rewritten = parse(source).unwrap();
+        assert!(
+            rewritten
+                .grammars
+                .iter()
+                .all(|g| auto_commit::warnings(g).is_empty()),
+            "{name}"
+        );
+    }
+}
+
+/// `findings` describes the tree before the rewrite; the rewritten tree hides inserted commits.
+#[test]
+fn findings_take_the_tree_before_the_rewrite() {
+    let source = &corpus("lint.json")[1];
+    let source = text(source, "grammar");
+    let before = auto_commit::parse_before_auto_commit(source).unwrap();
+    let findings: Vec<_> = before
+        .grammars
+        .iter()
+        .flat_map(auto_commit::findings)
+        .collect();
+    assert_eq!(findings, auto_commit::lint(source).unwrap());
+    assert_eq!(findings.iter().filter(|f| f.inserted).count(), 2);
+    let after = parse(source).unwrap();
+    let rewritten: Vec<_> = after
+        .grammars
+        .iter()
+        .flat_map(auto_commit::findings)
+        .collect();
+    assert_eq!(
+        rewritten.iter().filter(|f| f.rule == "Statement").count(),
+        0
+    );
 }

@@ -128,7 +128,7 @@ public class UBNFMapper {
     }
 
     /** The source as written: expanded, but without the {@code @autoCommit} rewrite (lint, #702). */
-    static UBNFSourceSnapshot parseWithSourceBeforeAutoCommit(String source) {
+    public static UBNFSourceSnapshot parseWithSourceBeforeAutoCommit(String source) {
         return parseWithSource(source, false);
     }
 

@@ -79,6 +79,46 @@ public class AutoCommitConformanceTest {
         assertEquals(21, reported);
     }
 
+    /** {@code W-AUTO-COMMIT-SKIPPED} for annotations the analysis cannot use, located at the annotation. */
+    @Test public void skippedAnnotationsAreWarnedAbout() throws Exception {
+        var rows = corpus("warnings.json");
+        assertEquals(5, rows.size());
+        for (var raw : rows) {
+            var row = raw.getAsJsonObject();
+            String name = row.get("name").getAsString(), source = row.get("grammar").getAsString();
+            var snapshot = AutoCommit.parseBeforeAutoCommit(source);
+            var warnings = AutoCommit.lintWarnings(source);
+            var expected = row.getAsJsonArray("warnings");
+            assertEquals(name + " " + warnings, expected.size(), warnings.size());
+            for (int i = 0; i < warnings.size(); i++) {
+                var warning = warnings.get(i);
+                var want = expected.get(i).getAsJsonObject();
+                assertEquals(name, want.get("rule").getAsString(), warning.rule());
+                assertEquals(name, want.get("reason").getAsString(), warning.reason());
+                assertEquals("W-AUTO-COMMIT-SKIPPED", warning.code());
+                assertEquals("warning", warning.severity());
+                assertEquals(name, "@autoCommit", snapshot.slice(warning.span().orElseThrow()));
+                assertTrue(name, warning.message().startsWith("W-AUTO-COMMIT-SKIPPED: "));
+            }
+            // The rewritten tree no longer carries the annotation.
+            var rewritten = UBNFMapper.parseWithSource(source);
+            for (var grammar : rewritten.ast().grammars()) assertEquals(name, List.of(), AutoCommit.warnings(grammar, rewritten));
+        }
+    }
+
+    /** {@code findings} describes the tree before the rewrite; the rewritten tree hides inserted commits. */
+    @Test public void findingsTakeTheTreeBeforeTheRewrite() throws Exception {
+        String source = corpus("lint.json").get(1).getAsJsonObject().get("grammar").getAsString();
+        var before = AutoCommit.parseBeforeAutoCommit(source);
+        assertSame(before.ast().getClass(), UBNFMapper.parseWithSourceBeforeAutoCommit(source).ast().getClass());
+        var findings = AutoCommit.findings(before.ast().grammars().get(0), before);
+        assertEquals(AutoCommit.lint(source), findings);
+        assertEquals(2, findings.stream().filter(AutoCommit.Finding::inserted).count());
+        var after = UBNFMapper.parseWithSource(source);
+        assertEquals(0, AutoCommit.findings(after.ast().grammars().get(0), after).stream()
+            .filter(f -> f.rule().equals("Statement")).count());
+    }
+
     /** Positions are those of the native frontend for every node the rewrite creates or rebuilds. */
     @Test public void rewrittenElementsKeepTheirSourceSpans() {
         String source = "grammar G {\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' N @n ;\n  N ::= 'n' ;\n}\n";
@@ -109,7 +149,7 @@ public class AutoCommitConformanceTest {
     /** The rewrite equals the hand-written grammar and generates byte-identical code on every path. */
     @Test public void rewriteEqualsTheHandWrittenCommits() throws Exception {
         var rows = corpus("cases.json");
-        assertEquals(5, rows.size());
+        assertEquals(6, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String name = row.get("name").getAsString();
@@ -234,8 +274,8 @@ public class AutoCommitConformanceTest {
                 runJava(row.get("manual").getAsString(), cases), runJava(plain(grammar), cases));
             observations += auto.size();
         }
-        assertEquals(43 * 6, observations);
-        assertEquals(12 * 6, accepted);
+        assertEquals(49 * 6, observations);
+        assertEquals(15 * 6, accepted);
     }
 
     @Test public void bothRustHostsMatchTheOracleAndTheUnannotatedGrammar() throws Exception {
@@ -289,7 +329,7 @@ public class AutoCommitConformanceTest {
             }
             assertEquals(name + " independently executed Rust hosts", outputs.get("auto"), outputs.get("auto-java"));
         }
-        assertEquals(2 * 12 * 6, accepted);
+        assertEquals(2 * 15 * 6, accepted);
     }
 
     private static final String RUST_PROBE = """

@@ -39,6 +39,8 @@ public final class AutoCommit {
     public static final String ANNOTATION = "autoCommit";
     /** The code of every lint finding. */
     public static final String CODE = "I-AUTO-COMMIT";
+    /** The code of the warning for an {@code @autoCommit} the analysis cannot use. */
+    public static final String SKIPPED = "W-AUTO-COMMIT-SKIPPED";
     /** Walk states explored per candidate; a larger walk leaves the candidate ineligible. */
     public static final int STATE_BUDGET = 100_000;
 
@@ -67,22 +69,86 @@ public final class AutoCommit {
     }
 
     /**
+     * An {@code @autoCommit} annotation that the frontend removes without inserting anything
+     * because the analysis cannot apply to its rule. {@code span} is the annotation; {@code reason}
+     * is {@code grammar} (outside the analysed subset), {@code opaque} or {@code unreachable}.
+     */
+    public record Warning(String rule, Optional<Span> span, String reason) {
+        public String code() { return SKIPPED; }
+
+        public String severity() { return "warning"; }
+
+        public String message() {
+            String why = switch (reason) {
+                case "grammar" -> "the grammar is outside the analysed subset";
+                case "opaque" -> "the rule has an annotation the analysis does not model";
+                default -> "the rule is not reachable from the root";
+            };
+            return SKIPPED + ": " + rule + ": @autoCommit inserts nothing: " + why;
+        }
+    }
+
+    /**
+     * The source as written: parameterized rules expanded, but without the {@code @autoCommit}
+     * rewrite. {@link #findings} and {@link #warnings} expect this tree; {@link UBNFMapper#parse}
+     * returns the rewritten one, where the annotation is gone and inserted commits hide their
+     * positions.
+     */
+    public static UBNFSourceSnapshot parseBeforeAutoCommit(String source) {
+        return UBNFMapper.parseWithSourceBeforeAutoCommit(source);
+    }
+
+    /** The {@code W-AUTO-COMMIT-SKIPPED} warnings of every grammar of one source. */
+    public static List<Warning> lintWarnings(String source) {
+        UBNFSourceSnapshot snapshot = parseBeforeAutoCommit(source);
+        List<Warning> out = new ArrayList<>();
+        for (GrammarDecl grammar : snapshot.ast().grammars()) out.addAll(warnings(grammar, snapshot));
+        return out;
+    }
+
+    /**
+     * One warning per {@code @autoCommit} that cannot insert anything, in rule order. Pass the tree
+     * of {@link #parseBeforeAutoCommit}: the rewritten tree no longer has the annotation.
+     */
+    public static List<Warning> warnings(GrammarDecl grammar, UBNFSourceSnapshot snapshot) {
+        Analysis analysis = Analysis.create(grammar);
+        List<Warning> out = new ArrayList<>();
+        for (int index = 0; index < grammar.rules().size(); index++) {
+            RuleDecl rule = grammar.rules().get(index);
+            for (Annotation annotation : rule.annotations()) {
+                if (!(annotation instanceof SimpleAnnotation simple && simple.name().equals(ANNOTATION))) continue;
+                String reason;
+                if (analysis == null) reason = "grammar";
+                else if (analysis.opaque[index]) reason = "opaque";
+                else if (!analysis.reachable[index]) reason = "unreachable";
+                else continue;
+                out.add(new Warning(rule.name(), snapshot == null ? Optional.empty() : snapshot.spanOf(annotation), reason));
+            }
+        }
+        return out;
+    }
+
+    /**
      * Lint every grammar of one source. The findings describe the source as written, before any
      * {@code @autoCommit} rewrite; positions are those of this single input.
      */
     public static List<Finding> lint(String source) {
-        UBNFSourceSnapshot snapshot = UBNFMapper.parseWithSourceBeforeAutoCommit(source);
+        UBNFSourceSnapshot snapshot = parseBeforeAutoCommit(source);
         List<Finding> out = new ArrayList<>();
         for (GrammarDecl grammar : snapshot.ast().grammars()) out.addAll(findings(grammar, snapshot));
         return out;
     }
 
-    /** Findings of one expanded grammar, in rule order and then source order. */
+    /**
+     * Findings of one expanded grammar, in rule order and then source order. Pass the tree of
+     * {@link #parseBeforeAutoCommit}: in the rewritten tree the inserted commits are not modelled,
+     * so its alternatives are no longer reported.
+     */
     public static List<Finding> findings(GrammarDecl grammar, UBNFSourceSnapshot snapshot) {
         Analysis analysis = Analysis.create(grammar);
         if (analysis == null) return List.of();
         List<Finding> out = new ArrayList<>();
-        for (Candidate candidate : analysis.candidates()) {
+        for (Candidate candidate : analysis.candidates(rule -> true)) {
             RuleDecl rule = grammar.rules().get(candidate.rule);
             SequenceBody sequence = candidate.sequence;
             List<AnnotatedElement> elements = sequence.elements();
@@ -117,8 +183,9 @@ public final class AutoCommit {
     static GrammarDecl apply(GrammarDecl grammar, UBNFSourceSnapshot.Builder origins) {
         if (grammar.rules().stream().noneMatch(AutoCommit::annotated)) return grammar;
         Analysis analysis = Analysis.create(grammar);
-        List<Candidate> plans = analysis == null ? List.of() : analysis.candidates().stream()
-            .filter(candidate -> annotated(grammar.rules().get(candidate.rule))).toList();
+        // Only annotated rules are examined: the walk of each candidate is global.
+        List<Candidate> plans = analysis == null ? List.of()
+            : analysis.candidates(rule -> annotated(grammar.rules().get(rule)));
         List<RuleDecl> rules = new ArrayList<>();
         for (int index = 0; index < grammar.rules().size(); index++) {
             RuleDecl rule = grammar.rules().get(index);
@@ -351,6 +418,9 @@ public final class AutoCommit {
         final boolean[] reachable;
         final List<Node> nodes = new ArrayList<>();
         final Map<String, List<Integer>> sites = new HashMap<>();
+        /** FIRST per element node (by identity), once {@code table} is final. */
+        final Map<AtomicElement, First> memo = new java.util.IdentityHashMap<>();
+        boolean frozen;
 
         private Analysis(GrammarDecl grammar) {
             this.grammar = grammar;
@@ -398,6 +468,7 @@ public final class AutoCommit {
                     }
                 }
             }
+            analysis.frozen = true;
             if (analysis.leftRecursive()) return null;
             analysis.reach(roots.get(0));
             for (int index = 0; index < grammar.rules().size(); index++) {
@@ -507,6 +578,16 @@ public final class AutoCommit {
         }
 
         First element(AtomicElement element) {
+            if (!frozen) return compute(element);
+            First first = memo.get(element);
+            if (first == null) {
+                first = compute(element);
+                memo.put(element, first);
+            }
+            return first;
+        }
+
+        First compute(AtomicElement element) {
             if (element instanceof TerminalElement terminal) {
                 return terminal.value().isEmpty() ? First.EPSILON : First.consuming(Chars.of(terminal.value().codePointAt(0)));
             }
@@ -699,11 +780,12 @@ public final class AutoCommit {
             }
         }
 
-        List<Candidate> candidates() {
+        /** Candidates of the rules {@code only} selects, in rule order and then source order. */
+        List<Candidate> candidates(java.util.function.IntPredicate only) {
             List<Candidate> out = new ArrayList<>();
             for (int id = 0; id < nodes.size(); id++) {
                 Node node = nodes.get(id);
-                if (node.kind != BODY || node.blocked || opaque[node.owner]) continue;
+                if (node.kind != BODY || node.blocked || opaque[node.owner] || !only.test(node.owner)) continue;
                 List<SequenceBody> alternatives = alternatives(node.body);
                 for (int alternative = 0; alternative < alternatives.size(); alternative++) {
                     List<AnnotatedElement> elements = alternatives.get(alternative).elements();
