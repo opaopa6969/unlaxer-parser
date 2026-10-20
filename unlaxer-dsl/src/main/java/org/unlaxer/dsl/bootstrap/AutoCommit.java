@@ -31,6 +31,10 @@ import org.unlaxer.dsl.runtime.LexicalExpression;
  * {@code COMMIT(element)} (captures stay inside), which neither the Java nor the Rust CST sees. It
  * runs after parameterized rules are expanded and removes the annotation, so the rewritten AST
  * equals that of the grammar with the same {@code COMMIT} written by hand.
+ *
+ * <p>Under the grammar-wide built-in {@code @whitespace: javaStyle} (#728) the same rules apply with
+ * code points read after the trivia that sequence boundaries skip; terminals and tokens whose FIRST
+ * meets a code point that can start trivia (a space or {@code /}) are not modelled.
  */
 public final class AutoCommit {
     private AutoCommit() {}
@@ -381,6 +385,11 @@ public final class AutoCommit {
 
     private static final int BODY = 0, SEQ = 1, ELEM = 2;
 
+    /** The space characters of javaStyle trivia (Java {@code SpaceParser}, Rust {@code skip}). */
+    private static final String TRIVIA_SPACES = " \t\n\u000B\u000C\r";
+    /** Code points that can start javaStyle trivia: its spaces and {@code /} of both comments. */
+    static final Chars TRIVIA_START = Chars.of(' ').union(Chars.range('\t', '\r')).union(Chars.of('/'));
+
     /** Arena node. Parents are node ids; nothing is looked up by record identity or equality. */
     private static final class Node {
         final int kind;
@@ -421,9 +430,13 @@ public final class AutoCommit {
         /** FIRST per element node (by identity), once {@code table} is final. */
         final Map<AtomicElement, First> memo = new java.util.IdentityHashMap<>();
         boolean frozen;
+        /** The grammar skips javaStyle trivia at sequence boundaries (#728). */
+        final boolean trivia;
 
         private Analysis(GrammarDecl grammar) {
             this.grammar = grammar;
+            trivia = grammar.settings().stream().anyMatch(setting -> setting.key().equals("whitespace")
+                && setting.value() instanceof StringSettingValue value && javaStyle(value.value()));
             table = new First[grammar.rules().size()];
             opaque = new boolean[grammar.rules().size()];
             reachable = new boolean[grammar.rules().size()];
@@ -432,10 +445,10 @@ public final class AutoCommit {
         /** {@code null} when the grammar is outside the modelled subset as a whole. */
         static Analysis create(GrammarDecl grammar) {
             if (!grammar.settings().stream().allMatch(Analysis::plainSetting)) return null;
-            boolean trivia = grammar.rules().stream().flatMap(r -> r.annotations().stream())
+            boolean ruleTrivia = grammar.rules().stream().flatMap(r -> r.annotations().stream())
                 .anyMatch(a -> a instanceof WhitespaceAnnotation || a instanceof InterleaveAnnotation
                     || a instanceof LexicalContextAnnotation);
-            if (trivia) return null;
+            if (ruleTrivia) return null;
             List<Integer> roots = new ArrayList<>();
             for (int r = 0; r < grammar.rules().size(); r++) {
                 if (grammar.rules().get(r).annotations().stream().anyMatch(RootAnnotation.class::isInstance)) roots.add(r);
@@ -479,14 +492,39 @@ public final class AutoCommit {
             return analysis;
         }
 
-        /** Settings that leave the code-point semantics of terminals and references unchanged. */
+        /**
+         * Settings the analysis models: those that leave the code-point semantics of terminals and
+         * references unchanged, and the built-in {@code @whitespace: javaStyle} (#728).
+         */
         static boolean plainSetting(GlobalSetting setting) {
             if (!(setting.value() instanceof StringSettingValue value)) return false;
             return switch (setting.key()) {
                 case "package", "ubnf", "memoSafeToken", "feature" -> true;
-                case "whitespace" -> value.value().trim().equals("none");
+                case "whitespace" -> value.value().trim().equals("none") || javaStyle(value.value());
                 default -> false;
             };
+        }
+
+        /**
+         * The built-in {@code javaStyle} trivia, spelled so that every host reads it the same way:
+         * ASCII case-insensitive after removing ASCII spaces at both ends. Both generators trim
+         * more and compare case-insensitively, so whatever this accepts they read as javaStyle.
+         */
+        static boolean javaStyle(String style) {
+            int start = 0, end = style.length();
+            while (start < end && TRIVIA_SPACES.indexOf(style.charAt(start)) >= 0) start++;
+            while (end > start && TRIVIA_SPACES.indexOf(style.charAt(end - 1)) >= 0) end--;
+            String name = style.substring(start, end);
+            return name.chars().allMatch(c -> c < 128) && name.equalsIgnoreCase("javaStyle");
+        }
+
+        /**
+         * Under automatic whitespace a terminal or token whose FIRST meets the code points that can
+         * start trivia is not modelled: it could consume trivia that the next sequence boundary
+         * would have skipped (docs/auto-commit.md, 空白のある文法).
+         */
+        First atom(First first) {
+            return trivia && !first.unknown() && first.chars().meets(TRIVIA_START) ? First.UNKNOWN : first;
         }
 
         /** Annotations that leave the rule's recognition as written; anything else makes it opaque. */
@@ -505,7 +543,7 @@ public final class AutoCommit {
             Integer rule = rules.get(reference.name());
             if (rule != null) return table[rule];
             TokenDecl token = tokens.get(reference.name());
-            return token == null ? First.UNKNOWN : token(token, new ArrayList<>());
+            return token == null ? First.UNKNOWN : atom(token(token, new ArrayList<>()));
         }
 
         First token(TokenDecl token, List<String> visiting) {
@@ -589,7 +627,8 @@ public final class AutoCommit {
 
         First compute(AtomicElement element) {
             if (element instanceof TerminalElement terminal) {
-                return terminal.value().isEmpty() ? First.EPSILON : First.consuming(Chars.of(terminal.value().codePointAt(0)));
+                return terminal.value().isEmpty() ? First.EPSILON
+                    : atom(First.consuming(Chars.of(terminal.value().codePointAt(0))));
             }
             if (element instanceof RuleRefElement reference) return reference(reference);
             if (element instanceof GroupElement group) return body(group.body());

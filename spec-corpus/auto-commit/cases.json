@@ -278,5 +278,301 @@
         "outcome": "syntax"
       }
     ]
+  },
+  {
+    "name": "whitespace-statements",
+    "note": "javaStyle (#728): spaces, newlines and both comments between elements; a commit is reported where the committed element starts, after the trivia.",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @root @mapping(Doc)\n  Root ::= { Statement } ;\n  @autoCommit\n  Statement ::= 'let' Name '=' Value ';' | 'print' Value ';' ;\n  Name ::= 'n' ;\n  @autoCommit\n  Value ::= 'v' | '(' Value ')' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @root @mapping(Doc)\n  Root ::= { Statement } ;\n  Statement ::= 'let' COMMIT(Name) '=' COMMIT(Value) ';' | 'print' COMMIT(Value) ';' ;\n  Name ::= 'n' ;\n  Value ::= 'v' | '(' COMMIT(Value) ')' ;\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "   ",
+        "outcome": "success"
+      },
+      {
+        "input": "\n\t\r\n",
+        "outcome": "success"
+      },
+      {
+        "input": "// only a comment",
+        "outcome": "success"
+      },
+      {
+        "input": "/* block */",
+        "outcome": "success"
+      },
+      {
+        "input": "let n = v ;",
+        "outcome": "success"
+      },
+      {
+        "input": " let\tn\n=\r\nv;\n",
+        "outcome": "success"
+      },
+      {
+        "input": "let /* c */ n // c\n = v;",
+        "outcome": "success"
+      },
+      {
+        "input": "print ( ( v ) ) ;  ",
+        "outcome": "success"
+      },
+      {
+        "input": "/* a */ let n=v; print(v); // tail",
+        "outcome": "success"
+      },
+      {
+        "input": "let",
+        "outcome": "commit",
+        "offset": 3,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let   ",
+        "outcome": "commit",
+        "offset": 6,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let x",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let /* c */ x",
+        "outcome": "commit",
+        "offset": 12,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let // c\nx",
+        "outcome": "commit",
+        "offset": 9,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let n = x ;",
+        "outcome": "commit",
+        "offset": 8,
+        "message": "unexpected input"
+      },
+      {
+        "input": "print ( x )",
+        "outcome": "commit",
+        "offset": 8,
+        "message": "unexpected input"
+      },
+      {
+        "input": "print /* unterminated",
+        "outcome": "commit",
+        "offset": 6,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let n = v; print\n(\n",
+        "outcome": "commit",
+        "offset": 19,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let n = v",
+        "outcome": "syntax"
+      },
+      {
+        "input": "lex n = v;",
+        "outcome": "syntax"
+      },
+      {
+        "input": "/ let n = v;",
+        "outcome": "syntax"
+      },
+      {
+        "input": "let n = v ; x",
+        "outcome": "syntax"
+      },
+      {
+        "input": "/* unterminated",
+        "outcome": "syntax"
+      },
+      {
+        "input": "let n = v; /",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "whitespace-expression",
+    "note": "javaStyle: an expression grammar whose operators cannot start trivia; the parenthesised alternative is committed.",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @root @mapping(Doc)\n  Root ::= Expr ;\n  Expr ::= Term { ( '*' | '-' ) Term } ;\n  @autoCommit\n  Term ::= 'v' | '(' Expr ')' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @root @mapping(Doc)\n  Root ::= Expr ;\n  Expr ::= Term { ( '*' | '-' ) Term } ;\n  Term ::= 'v' | '(' COMMIT(Expr) ')' ;\n}\n",
+    "cases": [
+      {
+        "input": "v",
+        "outcome": "success"
+      },
+      {
+        "input": " v - v * v ",
+        "outcome": "success"
+      },
+      {
+        "input": "( v - ( v ) )",
+        "outcome": "success"
+      },
+      {
+        "input": "(\n// c\nv)",
+        "outcome": "success"
+      },
+      {
+        "input": "/* a */ ( v )*v",
+        "outcome": "success"
+      },
+      {
+        "input": "(",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "( )",
+        "outcome": "commit",
+        "offset": 2,
+        "message": "unexpected input"
+      },
+      {
+        "input": "(\n// c\n)",
+        "outcome": "commit",
+        "offset": 7,
+        "message": "unexpected input"
+      },
+      {
+        "input": "v - ( /* c */ - v )",
+        "outcome": "commit",
+        "offset": 14,
+        "message": "unexpected input"
+      },
+      {
+        "input": "v * ( ( * v ) )",
+        "outcome": "commit",
+        "offset": 8,
+        "message": "unexpected input"
+      },
+      {
+        "input": "",
+        "outcome": "syntax"
+      },
+      {
+        "input": "( v",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v -",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v - ( v * )",
+        "outcome": "syntax"
+      },
+      {
+        "input": "( v ) v",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v / v",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "whitespace-slash",
+    "note": "javaStyle: '/' can start a comment, so the walk from Term reaches a prefix it does not model and nothing is inserted; 'v // c' stays accepted.",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @root @mapping(Doc)\n  Root ::= Expr ;\n  Expr ::= Term { ( '*' | '/' ) Term } ;\n  @autoCommit\n  Term ::= 'v' | '(' Expr ')' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @root @mapping(Doc)\n  Root ::= Expr ;\n  Expr ::= Term { ( '*' | '/' ) Term } ;\n  Term ::= 'v' | '(' Expr ')' ;\n}\n",
+    "cases": [
+      {
+        "input": "v / v",
+        "outcome": "success"
+      },
+      {
+        "input": "v // c",
+        "outcome": "success"
+      },
+      {
+        "input": "v /* c */ / v",
+        "outcome": "success"
+      },
+      {
+        "input": "( v / ( v ) )",
+        "outcome": "success"
+      },
+      {
+        "input": "v//c\n/v",
+        "outcome": "success"
+      },
+      {
+        "input": "(",
+        "outcome": "syntax"
+      },
+      {
+        "input": "( )",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v /",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v / / v",
+        "outcome": "syntax"
+      },
+      {
+        "input": "( v",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "whitespace-raw-slash",
+    "note": "javaStyle: a bare '/' after a bare DIGIT is tried before any trivia is skipped, so it can take the first code point of a comment. '1/**/kx' is accepted as DIGIT '/' and '* * / k x'; committing N after 'k' would reject it, so nothing is inserted.",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  token DIGIT = CHAR_RANGE('0','9')\n  @root @mapping(Doc)\n  Root ::= { Item } ;\n  @autoCommit\n  Item ::= DIGIT | 'k' N | '/' | '*' '*' '/' 'k' 'x' ;\n  N ::= 'n' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  token DIGIT = CHAR_RANGE('0','9')\n  @root @mapping(Doc)\n  Root ::= { Item } ;\n  Item ::= DIGIT | 'k' N | '/' | '*' '*' '/' 'k' 'x' ;\n  N ::= 'n' ;\n}\n",
+    "cases": [
+      {
+        "input": "1/**/kx",
+        "outcome": "success"
+      },
+      {
+        "input": "kn",
+        "outcome": "success"
+      },
+      {
+        "input": "1 kn /",
+        "outcome": "success"
+      },
+      {
+        "input": "**/kx",
+        "outcome": "success"
+      },
+      {
+        "input": "1// c\nkn",
+        "outcome": "success"
+      },
+      {
+        "input": "1/**/k",
+        "outcome": "syntax"
+      },
+      {
+        "input": "k",
+        "outcome": "syntax"
+      },
+      {
+        "input": "kx",
+        "outcome": "syntax"
+      }
+    ]
   }
 ]

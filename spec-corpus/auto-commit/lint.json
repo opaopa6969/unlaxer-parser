@@ -169,14 +169,120 @@
   },
   {
     "name": "whitespace",
-    "note": "Automatic whitespace makes the analysis inapplicable to the whole grammar.",
+    "note": "Built-in javaStyle whitespace is analysed (#728): FIRST sets are compared at the position after the trivia.",
     "grammar": "grammar Spaced {\n  @whitespace: javaStyle\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
-    "findings": []
+    "findings": [
+      {
+        "rule": "Statement",
+        "alternative": "'let' Name ';'",
+        "first": "'let'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Statement",
+        "alternative": "'print' Name ';'",
+        "first": "'print'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
   },
   {
     "name": "rule-whitespace",
-    "note": "A rule-level whitespace annotation also disables the grammar.",
+    "note": "A rule-level whitespace annotation still disables the grammar.",
     "grammar": "grammar RuleSpaced {\n  @root\n  Root ::= { Statement } ;\n  @whitespace(javaStyle)\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "whitespace-case",
+    "note": "The built-in style is matched case-insensitively, as both generators do.",
+    "grammar": "grammar SpacedCase {\n  @whitespace: JavaStyle\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Statement",
+        "alternative": "'let' Name ';'",
+        "first": "'let'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Statement",
+        "alternative": "'print' Name ';'",
+        "first": "'print'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "whitespace-trivia-start",
+    "note": "Under javaStyle a terminal or token that can start with a space or '/' (here '/', ' ' and ANY) is not modelled; the later alternatives decide which earlier ones are reported.",
+    "grammar": "grammar SpacedStart {\n  @whitespace: javaStyle\n  token ANYC = ANY\n  token DIGIT = CHAR_RANGE('0','9')\n  @root\n  Root ::= { Item } ;\n  Item ::= 'k' Name ';' | '/' Name ';' | 'm' Name | ANYC Name | 'p' Name | ' ' Name | DIGIT Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Item",
+        "alternative": "DIGIT Name",
+        "first": "DIGIT",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "whitespace-trivia-start-none",
+    "note": "The same alternatives without whitespace: '/' and ' ' are ordinary terminals, only ANY overlaps.",
+    "grammar": "grammar UnspacedStart {\n  token ANYC = ANY\n  token DIGIT = CHAR_RANGE('0','9')\n  @root\n  Root ::= { Item } ;\n  Item ::= 'k' Name ';' | '/' Name ';' | 'm' Name | ANYC Name | 'p' Name | ' ' Name | DIGIT Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Item",
+        "alternative": "'p' Name",
+        "first": "'p'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Item",
+        "alternative": "' ' Name",
+        "first": "' '",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Item",
+        "alternative": "DIGIT Name",
+        "first": "DIGIT",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "comment",
+    "note": "@comment is not analysed yet (#712): Java and Rust differ.",
+    "grammar": "grammar Commented {\n  @comment: { line: '//' }\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "declarative-whitespace",
+    "note": "A declarative whitespace token is not a built-in style and is not analysed.",
+    "grammar": "grammar Gapped {\n  @whitespace: GAP\n  token GAP ::= '#'+;\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
     "findings": []
   },
   {

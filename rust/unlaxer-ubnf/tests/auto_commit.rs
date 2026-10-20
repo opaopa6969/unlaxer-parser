@@ -31,7 +31,7 @@ fn slice(source: &str, start: usize, end: usize) -> String {
 #[test]
 fn lint_reports_the_corpus_positions() {
     let rows = corpus("lint.json");
-    assert_eq!(rows.len(), 23);
+    assert_eq!(rows.len(), 28);
     let mut reported = 0;
     for row in &rows {
         let name = text(row, "name");
@@ -72,7 +72,7 @@ fn lint_reports_the_corpus_positions() {
             reported += 1;
         }
     }
-    assert_eq!(reported, 21);
+    assert_eq!(reported, 29);
 }
 
 /// The rewrite equals the hand-written grammar, inserts only into annotated rules, removes the
@@ -80,7 +80,7 @@ fn lint_reports_the_corpus_positions() {
 #[test]
 fn rewrite_equals_the_hand_written_commits() {
     let rows = corpus("cases.json");
-    assert_eq!(rows.len(), 6);
+    assert_eq!(rows.len(), 10);
     for row in &rows {
         let name = text(row, "name");
         let auto = parse(text(row, "grammar")).unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -138,7 +138,7 @@ fn rewritten_elements_keep_their_source_spans() {
 #[test]
 fn skipped_annotations_are_warned_about() {
     let rows = corpus("warnings.json");
-    assert_eq!(rows.len(), 5);
+    assert_eq!(rows.len(), 7);
     for row in &rows {
         let name = text(row, "name");
         let source = text(row, "grammar");
@@ -170,6 +170,17 @@ fn skipped_annotations_are_warned_about() {
                 .all(|g| auto_commit::warnings(g).is_empty()),
             "{name}"
         );
+        // A skipped annotation only disappears: the tree is the unannotated one.
+        if !warnings.is_empty() {
+            let plain = source
+                .replace("@autoCommit ", "")
+                .replace("@autoCommit\n  ", "");
+            assert_eq!(
+                canonical::file(&rewritten),
+                canonical::file(&parse(&plain).unwrap()),
+                "{name}"
+            );
+        }
     }
 }
 

@@ -15,7 +15,7 @@ grammar AutoCommit {
   @autoCommit
   Value ::= 'v' | '(' Value ')' | 'q' [ Name ] Digit ;
 }
-// Not rewritten: the enclosing choice resumes, and whitespace disables the analysis.
+// Not rewritten: the enclosing choice resumes.
 grammar Kept {
   @root
   Root ::= Item 'x' | 'a' 'y' ;
@@ -23,8 +23,20 @@ grammar Kept {
   Item ::= 'a' B ;
   B ::= 'b' ;
 }
+// Built-in javaStyle whitespace is analysed (#728): S is rewritten, T is not ('/' can start a comment).
 grammar Spaced {
   @whitespace: javaStyle
+  @root
+  Root ::= { T | S } ;
+  @autoCommit
+  S ::= 'k' B ;
+  @autoCommit
+  T ::= 'm' B | '/' B ;
+  B ::= 'b' ;
+}
+// Not rewritten: @comment is outside the analysed subset (#712).
+grammar Commented {
+  @comment: { line: '//' }
   @root
   Root ::= { S } ;
   @autoCommit
