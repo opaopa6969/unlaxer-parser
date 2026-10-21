@@ -1646,6 +1646,9 @@ pub struct ParseContext<'a> {
     input: &'a str,
     grapheme_boundaries: Option<grapheme::Boundaries>,
     lexing: Option<lexing::Session<'a>>,
+    // grammar 呼び出しが lexing を退避しても、session 内という状態を引き継ぐ (#734)。
+    // shared call の境界では子のために一時的に解除する。
+    token_stream_scope: bool,
     rules: Arc<[Rule]>,
     whitespace: bool,
     lexical_trivia: Option<lexical::LexicalExpression>,
@@ -2064,6 +2067,7 @@ impl<'a> ParseContext<'a> {
             bindings,
             input,
             lexing: None,
+            token_stream_scope: false,
             rules: Arc::from([]),
             token_mode: None,
             classic_max_reached: None,
@@ -2506,7 +2510,9 @@ impl<'a> ParseContext<'a> {
         let previous_definition = self.lexical_trivia.take();
         let previous_goal = self.lexical_context.take();
         let outer_entry = self.rules.is_empty();
-        let in_token_stream = self.lexing.is_some();
+        let in_token_stream = self.token_stream_scope || self.lexing.is_some();
+        let previous_token_stream_scope =
+            std::mem::replace(&mut self.token_stream_scope, in_token_stream);
         let previous_lexing = if outer_entry {
             None
         } else {
@@ -2529,11 +2535,11 @@ impl<'a> ParseContext<'a> {
         let active_session = self.next_grammar_session;
         self.next_grammar_session = self.next_grammar_session.wrapping_add(1);
         self.grammar_session = active_session;
-        // A grammar called inside a token-stream session, also a nested one whose call
-        // took the session above, keeps the consumed frontier (see frame_start).
+        // session を外した後も、何段入れ子になっても consumed の frontier を保つ。
         let previous_frontier = std::mem::replace(&mut self.grammar_frontier, !in_token_stream);
         let result = self.parse_expression(&Expr::Rule(root));
         self.grammar_frontier = previous_frontier;
+        self.token_stream_scope = previous_token_stream_scope;
         self.failure_memo = previous_failure_memo;
         self.success_memo = previous_success_memo;
         self.rules = previous_rules;

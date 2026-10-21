@@ -95,7 +95,7 @@ match-only terminal が lexeme を見る。たとえば `Root ::= EMPTY END`（`
 matched は CP0 のまま `EOF` が CP0 で失敗する（`spec-corpus/token-stream/corpus.json` の
 `empty-assertions` / `not-eof`）。Rust の `JavaEmpty` は lexing session の中でも matched を 1 文字
 進めるので、補正すると Rust だけ CP1 になる。session の中から `parse_grammar` で入れ子に呼んだ
-grammar も、呼び出しが session を外しても同じく補正しない（Rust `prior_matched_diagnostics` の
+grammar も、呼び出しが session を外しても、何段入れ子になっても補正しない（#734。Rust `prior_matched_diagnostics` の
 `a_grammar_nested_in_a_token_stream_session_keeps_the_consumed_frontier`）。UBNF は token stream の
 文法で `LOOKAHEAD` / `NEGATIVE_LOOKAHEAD` / `UNTIL` などの非 declarative token を
 `E-TOKEN-STREAM-TOKEN` で拒否する（`TokenStreamGrammar`）。token stream の中で matched を進めうる

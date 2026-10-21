@@ -114,6 +114,8 @@ impl Registry {
         // The primitive keeps a lexical session for an outermost grammar parse.
         // A shared boundary must isolate it even when the caller has no rules.
         let lexing = context.lexing.take();
+        // shared call は session の範囲も分離し、子の frontier 補正を有効にする (#734)。
+        let token_stream_scope = std::mem::replace(&mut context.token_stream_scope, false);
         // The call returns its failure as data; an inner cut or label must not escape (#700).
         let raised = context.raised.take();
         let raised_rules = std::mem::take(&mut context.rule_stacks.raised);
@@ -168,6 +170,7 @@ impl Registry {
         context.tokens = tokens;
         context.names_state = names;
         context.lexing = lexing;
+        context.token_stream_scope = token_stream_scope;
         context.raised = raised;
         context.rule_stacks.raised = raised_rules;
         context.position = cursor.0;
