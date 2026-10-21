@@ -710,3 +710,108 @@ fn selected_lookahead_source_survives_rule_success_memo_without_changing_cst() {
         assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end: 1 });
     }
 }
+
+fn ahead_x() -> Expr {
+    Expr::JavaLookahead {
+        pattern: "x",
+        positive: true,
+    }
+}
+
+#[test]
+fn classic_field_capture_uses_committed_source_for_choice_and_rule() {
+    use unlaxer_runtime::{parse_detailed_with_options, Rule};
+
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for (child, rule) in [
+            (Expr::Rule(1), Expr::choice([ahead_x(), w("q")])),
+            (Expr::choice([ahead_x(), w("q")]), Expr::Empty),
+            (Expr::Rule(1), ahead_x()),
+        ] {
+            let rules = [
+                Rule {
+                    name: "R0",
+                    expression: Expr::sequence([child.capture("f"), w("x")]).stop_consume(),
+                },
+                Rule {
+                    name: "R1",
+                    expression: rule,
+                },
+            ];
+            let tree = parse_detailed_with_options(
+                &rules,
+                0,
+                false,
+                "x",
+                ParseOptions::with_memoization(memo),
+            )
+            .unwrap();
+            let captures = &tree.nodes[tree.root].captures;
+            assert_eq!(captures.len(), 1);
+            assert_eq!(captures[0].name, "f");
+            assert_eq!(captures[0].span, Span { start: 0, end: 0 });
+        }
+    }
+}
+
+#[test]
+fn classic_public_span_and_capture_boundary_keep_committed_choice_source() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        let choice = Expr::choice([ahead_x(), w("q")]);
+        let mut context = ParseContext::with_options("x", ParseOptions::with_memoization(memo));
+        let result = context.parse(&choice.clone().stop_consume()).unwrap();
+        assert_eq!(result.span, Span { start: 0, end: 0 });
+        assert_eq!((context.position(), context.matched_position()), (0, 1));
+        let mut context = ParseContext::with_options("x", ParseOptions::with_memoization(memo));
+        context
+            .parse(&choice.capture_value().capture_owned("w"))
+            .unwrap();
+        assert_eq!(context.captured_text("w"), Some(""));
+        let mut context = ParseContext::with_options("x", ParseOptions::with_memoization(memo));
+        let result = context
+            .parse(&Expr::choice([ahead_x(), w("q")]).capture_owned("w"))
+            .unwrap();
+        assert_eq!(result.span, Span { start: 0, end: 0 });
+        assert_eq!(context.captured_text("w"), Some("x"));
+    }
+}
+
+#[test]
+fn nonclassic_collectors_drop_direct_lookahead_result_source() {
+    use unlaxer_runtime::{parse_detailed_with_options, RecoveryMode, Rule};
+
+    // 全入力入口は CAPTURE を含んでも非 Classic。直接の子で各破棄分岐に到達させる。
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for child in [
+            Expr::Optional(Box::new(ahead_x())),
+            ahead_x().optional_java(),
+            ahead_x().recover(RecoveryMode::Sync, [";"], "syntax error"),
+            ahead_x().capture_value(),
+            Expr::InputCaptureBoundary(
+                unlaxer_runtime::capture_tree::Kind::Value,
+                Box::new(ahead_x()),
+            ),
+            ahead_x().value_boundary(),
+            ahead_x().text_value(),
+        ] {
+            let rules = [Rule {
+                name: "R0",
+                expression: Expr::sequence([child.capture_owned("w"), Expr::Replay("w"), w("x")]),
+            }];
+            let tree = parse_detailed_with_options(
+                &rules,
+                0,
+                false,
+                "x",
+                ParseOptions::with_memoization(memo),
+            )
+            .unwrap();
+            assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end: 1 });
+            assert!(tree
+                .nodes
+                .iter()
+                .filter(|n| n.rule != 0)
+                .all(|n| n.span == Span { start: 0, end: 0 }));
+        }
+    }
+}

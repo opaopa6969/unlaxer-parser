@@ -10,7 +10,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
-- Rust の非 Classic 経路の CAPTURE が、Java と同じ子の root token の原文を保存するよう修正 (#729)。直接の LOOKAHEAD の値を保持し、consumed の Chain・EMPTY・UNTIL の先読み部分は値に含めない。SAME_AS は保存した値を consumed cursor から再照合する。入口のモード選択・AST field capture・CST は従来どおり。
+- Rust の非 Classic 経路の CAPTURE が、Java と同じ子の root token の原文を保存するよう修正 (#729)。直接の LOOKAHEAD の値を保持し、consumed の Chain・EMPTY・UNTIL の先読み部分は値に含めない。SAME_AS は保存した値を consumed cursor から再照合する。入口のモード選択・AST field capture・CST は従来どおり。Classic 経路でも Choice／rule 参照が owned capture へ返す Parsed の原文を、CST に commit する原文と分離する。field capture と CaptureBoundary は commit 済み原文を使い、公開 `ParseMatch.span` も従来の値を保つ（先読み Choice の consumed span は `[0,0]`）。Optional／Recovery／CaptureBoundary が直接の先読み原文を集めないことを Java/Rust で検証した。
 
 ### Changed
 

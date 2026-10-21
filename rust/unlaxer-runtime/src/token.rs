@@ -899,6 +899,7 @@ impl ParseContext<'_> {
         Some(Fragment {
             nodes: vec![node.index],
             captures: Vec::new(),
+            parsed_source: None,
             source: Some(Box::new(FragmentSource {
                 span,
                 kind: mode.kind,
@@ -1310,6 +1311,7 @@ impl ParseContext<'_> {
         {
             return fragment;
         }
+        fragment.parsed_source = None;
         let source = self.collected_source(&fragment, kind);
         fragment
             .nodes
@@ -1372,7 +1374,12 @@ impl ParseContext<'_> {
     ) -> Fragment {
         // Java Choice は選択した子の Parsed を返す。CST の収集値で上書きしない。
         let selected_source = matches!(label, "Choice" | "LongestChoice" | "UniqueLongestChoice")
-            .then(|| fragment.source.clone())
+            .then(|| {
+                fragment
+                    .parsed_source
+                    .clone()
+                    .or_else(|| fragment.source.clone())
+            })
             .flatten();
         let mut original = fragment.nodes.clone();
         // Java Choice publishes the selected child's Parsed object, while the
@@ -1412,7 +1419,7 @@ impl ParseContext<'_> {
         info.classic = true;
         fragment.nodes = vec![id.index];
         if selected_source.is_some() {
-            fragment.source = selected_source;
+            fragment.parsed_source = selected_source;
         }
         fragment
     }

@@ -1,5 +1,60 @@
 [
   {
+    "id": "ast-field-direct-lookahead",
+    "issue": "#729",
+    "note": "入力専用 CaptureBoundary が直接の先読み原文を捨て、field を空文字列に保つ。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= AHEAD @f 'x' ; }",
+    "inputs": [
+      "x",
+      "xx",
+      "q"
+    ]
+  },
+  {
+    "id": "ast-field-rule-choice-lookahead",
+    "issue": "#729",
+    "note": "先読みの Parsed 原文と collector が commit する空原文を区別する回帰例。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= R1 @f 'x' ; R1 ::= AHEAD | 'q' ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
+    "id": "ast-field-direct-choice-lookahead",
+    "issue": "#729",
+    "note": "先読みの Parsed 原文と collector が commit する空原文を区別する回帰例。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= (AHEAD | 'q') @f 'x' ;  }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
+    "id": "ast-field-single-rule-lookahead",
+    "issue": "#729",
+    "note": "先読みの Parsed 原文と collector が commit する空原文を区別する回帰例。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= R1 @f 'x' ; R1 ::= AHEAD ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
+    "id": "owned-capture-recovery-choice-lookahead",
+    "issue": "#729",
+    "note": "先読みの Parsed 原文と collector が commit する空原文を区別する回帰例。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CAPTURE(w, R1) SAME_AS(w) ; @recovery(sync=';') R1 ::= AHEAD | 'q' ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
     "id": "owned-capture-optional-lookahead",
     "issue": "#729",
     "note": "Optional の consumed root は空原文。先読み結果を値へ引き継がず x は trailing_input CP0。",

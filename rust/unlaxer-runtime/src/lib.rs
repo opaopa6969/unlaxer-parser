@@ -816,6 +816,8 @@ struct Fragment {
     nodes: Vec<usize>,
     captures: Vec<Capture>,
     source: Option<Box<FragmentSource>>,
+    // Classic の Parsed 原文。source は従来どおり commit した token の原文。
+    parsed_source: Option<Box<FragmentSource>>,
 }
 
 #[derive(Debug, Clone)]
@@ -3214,7 +3216,10 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
         // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
-        self.rule_result_source = fragment.source.clone();
+        self.rule_result_source = fragment
+            .parsed_source
+            .clone()
+            .or_else(|| fragment.source.clone());
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
         let classic = fragment
             .source
@@ -3317,21 +3322,7 @@ impl<'a> ParseContext<'a> {
             | Expr::InvertMatch(_)
             | Expr::StopInvert(_)
             | Expr::StopConsume(_) => self.classic_wrapper(expression, depth),
-            Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
-                nodes: vec![id],
-                captures: Vec::new(),
-                source: self.rule_result_source.take().or_else(|| {
-                    self.tokens.values.get(&id).map(|value| {
-                        Box::new(FragmentSource {
-                            span: self.nodes[id].span,
-                            kind: value.kind,
-                            classic: value.classic,
-                            generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                            text: value.source.owned_shared(),
-                        })
-                    })
-                }),
-            }),
+            Expr::Rule(rule) => self.expression_rule(*rule, depth),
             Expr::LexicalContextScope { child, terminals } => {
                 self.expression_with_lexical_context(child, terminals, depth)
             }
@@ -3396,6 +3387,36 @@ impl<'a> ParseContext<'a> {
             parent_policy,
             java_transaction,
         )
+    }
+
+    // 原文の分離処理で再帰 dispatch の stack frame を増やさない。
+    #[inline(never)]
+    fn expression_rule(&mut self, rule: usize, depth: usize) -> Option<Fragment> {
+        let id = self.rule(rule, depth)?;
+        let result_source = self.rule_result_source.take();
+        let committed_source = self.tokens.values.get(&id).map(|value| {
+            Box::new(FragmentSource {
+                span: self.nodes[id].span,
+                kind: value.kind,
+                classic: value.classic,
+                generated: matches!(value.source, token::TokenSource::Generated { .. }),
+                text: value.source.owned_shared(),
+            })
+        });
+        let classic = committed_source
+            .as_deref()
+            .is_some_and(|source| source.classic);
+        let (source, parsed_source) = if classic {
+            (committed_source, result_source)
+        } else {
+            (result_source.or(committed_source), None)
+        };
+        Some(Fragment {
+            nodes: vec![id],
+            captures: Vec::new(),
+            source,
+            parsed_source,
+        })
     }
 
     // Keep source/trace post-processing out of the recursive dispatch frame.
@@ -4065,6 +4086,7 @@ impl<'a> ParseContext<'a> {
                         nodes: matched.nodes,
                         captures: matched.captures,
                         source,
+                        parsed_source: None,
                     }
                 })
             }
@@ -4170,6 +4192,7 @@ impl<'a> ParseContext<'a> {
             return Some(Fragment {
                 nodes: vec![id.index()],
                 captures: Vec::new(),
+                parsed_source: None,
                 source: Some(Box::new(FragmentSource {
                     span,
                     kind: token_kind,
@@ -4202,6 +4225,7 @@ impl<'a> ParseContext<'a> {
             nodes: vec![node],
             captures: Vec::new(),
             source: None,
+            parsed_source: None,
         })
     }
 
@@ -4481,18 +4505,22 @@ impl<'a> ParseContext<'a> {
         anchor: usize,
         owned: bool,
     ) -> Option<Fragment> {
-        let span = fragment
-            .source
-            .as_deref()
-            .filter(|source| source.classic || owned)
-            .map_or_else(
-                || Span {
-                    start: self.code_point(start),
-                    // Java と同じ子の Parsed の root 原文を保存する。
-                    end: self.code_point(self.position),
-                },
-                |source| source.span,
-            );
+        let source = if owned {
+            fragment
+                .parsed_source
+                .as_deref()
+                .or(fragment.source.as_deref())
+        } else {
+            fragment.source.as_deref()
+        };
+        let span = source.filter(|source| source.classic || owned).map_or_else(
+            || Span {
+                start: self.code_point(start),
+                // Java と同じ子の Parsed の root 原文を保存する。
+                end: self.code_point(self.position),
+            },
+            |source| source.span,
+        );
         if !owned {
             // Keep the existing AST field contract and its input-only metadata.
             if fragment
@@ -4511,7 +4539,7 @@ impl<'a> ParseContext<'a> {
             });
             return Some(fragment);
         }
-        let source = match fragment.source.as_deref().filter(|source| source.classic) {
+        let source = match source.filter(|source| source.classic) {
             Some(source) if source.generated => token::TokenSource::Generated {
                 anchor: source.span.start,
                 text: source.text.as_deref().unwrap_or("").to_owned(),
@@ -4698,6 +4726,7 @@ impl<'a> ParseContext<'a> {
                     nodes: vec![node_id],
                     captures: fragment.captures,
                     source: fragment.source,
+                    parsed_source: None,
                 })
             }
             _ => unreachable!("recursive expression dispatched by variant"),

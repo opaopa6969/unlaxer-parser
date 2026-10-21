@@ -85,8 +85,22 @@ Rust の非 Classic 経路は正の LOOKAHEAD の結果 span を Fragment に保
 透明な capture と選択した Choice を通して伝える（#729）。消費側の Chain・反復は
 この結果 span を集めず、従来の consumed 範囲を使う。rule の結果に必要な span は
 CST の span とは別に保持し、成功 memo の再生でも復元する。
-Classic 経路では従来どおり子の source を使い、投影・生成した値も保持する。
-全入力入口のモード選択、CST node 数、両 cursor、AST field capture は変更しない。
+Classic 経路でも、owned capture には子が返す Parsed の原文を使い、投影・生成した値も
+保持する。Choice と rule 参照では、この原文を commit 済み token の原文と別に渡す。
+AST field capture（`@f` / `capture`）と CaptureBoundary は従来の commit 済み原文を使う。
+たとえば先読み分岐を選ぶ Choice／その rule 参照／単一 LOOKAHEAD rule を `@f` にすると、
+consumed の field span は `[0,0]`、値は空文字列のままである。
+公開 `ParseContext::parse` の `ParseMatch.span` も commit 済み原文を使うため、
+`Choice[LOOKAHEAD('x'), 'q'].stop_consume()` を入力 `x` で解析すると `[0,0]` を返す。
+同じ Choice の owned capture は値 `x` を保存する。
+全入力入口のモード選択、CST node 数、両 cursor は変更しない。
+
+Optional／JavaOptional／Recovery の consumed collector は、直接 LOOKAHEAD を子に取っても
+空原文を返す。非 Classic 経路でも子の結果 source を破棄する必要がある。
+CaptureBoundary（入力専用境界を含む）も同じで、先読みの Parsed 原文を AST の span にしない。
+Java の直接 API と Rust の全入力入口を共通の入力 `x`・空原文・`[0,0]` で検証する。
+UBNF の `[AHEAD]` は内部に Chain があるため、その例だけでは Optional 自身の破棄処理を
+検証できない。直接 API の回帰テストに加え、Choice を子に持つ `@recovery` を共通 corpus に置く。
 通常の `ParseContext::parse` / `parse_grammar` には既存の `requires_classic_mode` による
 自動選択があり、CAPTURE / SAME_AS 以外の Classic ラッパーにも適用される。
 
