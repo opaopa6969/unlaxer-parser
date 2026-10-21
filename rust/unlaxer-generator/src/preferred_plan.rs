@@ -76,6 +76,71 @@ impl<'a> RecursiveShapes<'a> {
             .map_err(Clone::clone)
     }
 }
+// MapperElementUtil.containsMappedValue の RuleRef 分岐と同じ探索。
+// 規則本体は collectRuleRefs と同じ順に走査し、visited は枝を戻っても消さない。
+fn contains_mapped_value(
+    name: &str,
+    g: &GrammarDecl,
+    indices: &HashMap<&str, usize>,
+    visited: &mut HashSet<String>,
+) -> bool {
+    if !visited.insert(name.to_owned()) {
+        return false;
+    }
+    let Some(&id) = indices.get(name) else {
+        return false;
+    };
+    let rule = &g.rules[id];
+    !rule
+        .annotations
+        .iter()
+        .any(|a| matches!(a.kind, AnnotationKind::Skip))
+        && (rule.annotations.iter().any(|a| {
+            matches!(
+                a.kind,
+                AnnotationKind::Mapping { .. } | AnnotationKind::Enum
+            )
+        }) || body_contains_mapped_ref(&rule.body, g, indices, visited))
+}
+fn body_contains_mapped_ref(
+    body: &RuleBody,
+    g: &GrammarDecl,
+    indices: &HashMap<&str, usize>,
+    visited: &mut HashSet<String>,
+) -> bool {
+    body.alternatives.iter().any(|sequence| {
+        sequence
+            .elements
+            .iter()
+            .any(|item| contains_mapped_ref(&item.element, g, indices, visited))
+    })
+}
+fn contains_mapped_ref(
+    a: &AtomicElement,
+    g: &GrammarDecl,
+    indices: &HashMap<&str, usize>,
+    visited: &mut HashSet<String>,
+) -> bool {
+    match &a.kind {
+        ElementKind::RuleRef { name, .. } => contains_mapped_value(name, g, indices, visited),
+        ElementKind::Group(b)
+        | ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b)
+        | ElementKind::Commit { body: b, .. }
+        | ElementKind::Label { body: b, .. }
+        | ElementKind::Catch { choice: b, .. }
+        | ElementKind::Optional(b)
+        | ElementKind::Repeat(b) => body_contains_mapped_ref(b, g, indices, visited),
+        ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
+            contains_mapped_ref(a, g, indices, visited)
+        }
+        ElementKind::Separated { element, separator } => {
+            contains_mapped_ref(element, g, indices, visited)
+                || contains_mapped_ref(separator, g, indices, visited)
+        }
+        _ => false,
+    }
+}
 fn body_shape(
     g: &GrammarDecl,
     b: &RuleBody,
@@ -129,6 +194,9 @@ fn shape(
                 )
             }) {
                 return Ok(Shape(Kind::Node, Count::One));
+            }
+            if !contains_mapped_value(name, g, &recursive.indices, &mut HashSet::new()) {
+                return Ok(text());
             }
             if !seen.insert(name.clone()) {
                 return recursive.rule(id);
@@ -273,16 +341,11 @@ fn fixed_atom(
         | ElementKind::Label { body: b, .. }
         | ElementKind::Catch { choice: b, .. } => fixed_body(b, indices, state, work, depth + 1)?,
         ElementKind::Optional(b) | ElementKind::Repeat(b) => {
-            let child = if a.span.codepoint_start == b.span.codepoint_start {
+            let postfix = one(b).filter(|_| a.span.codepoint_start == b.span.codepoint_start);
+            let child = if let Some(child) = postfix {
                 // Java の postfix ?/* は合成 SequenceBody で、ChoiceBody を挟まない。
                 check_work(work, depth + 1)?;
-                fixed_atom(
-                    one(b).expect("postfix body"),
-                    indices,
-                    state,
-                    work,
-                    depth + 2,
-                )?
+                fixed_atom(child, indices, state, work, depth + 2)?
             } else {
                 fixed_body(b, indices, state, work, depth + 1)?
             };
@@ -668,6 +731,84 @@ pub(crate) fn calls(g: &GrammarDecl) -> Result<Vec<Vec<(usize, usize)>>, String>
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn mapped_value_search_guards_cycles_and_stops_at_skip_and_mapping() {
+        for (rules, expected) in [
+            ("T ::= 'n' U | 'a'; U ::= 'u' T;", false),
+            ("T ::= 'n' U | 'a'; U ::= 'u' T | M;", true),
+            ("T ::= [U]; @skip U ::= M;", false),
+            ("T ::= (U % M); U ::= 'u';", true),
+            ("T ::= U+; @mapping(N) U ::= Missing;", true),
+            ("T ::= Missing;", false),
+        ] {
+            let source = format!("grammar G {{ @root R ::= T; {rules} @mapping(NM) M ::= 'm'; }}");
+            let file = unlaxer_ubnf::parse(&source).unwrap();
+            let g = &file.grammars[0];
+            let shapes = super::RecursiveShapes::new(g);
+            let mut visited = std::collections::HashSet::new();
+            assert_eq!(
+                super::contains_mapped_value("T", g, &shapes.indices, &mut visited),
+                expected,
+                "{source}"
+            );
+            assert!(visited.contains("T"));
+            assert!(!super::contains_mapped_value(
+                "T",
+                g,
+                &shapes.indices,
+                &mut visited
+            ));
+        }
+    }
+
+    #[test]
+    fn text_only_recursion_does_not_initialize_fixed_point() {
+        let source = format!(
+            "grammar G {{ @root R ::= T; T ::= 'n' T | 'a'; H ::= {}'a' M{}; \
+             @mapping(NM) M ::= 'm'; }}",
+            "(".repeat(86),
+            ")+".repeat(86)
+        );
+        let file = unlaxer_ubnf::parse(&source).unwrap();
+        let g = &file.grammars[0];
+        let shapes = super::RecursiveShapes::new(g);
+        let result = super::body_shape(g, &g.rules[0].body, &mut Default::default(), &shapes);
+        assert!(result.is_ok_and(|s| s == super::text()));
+        assert!(shapes.values.get().is_none());
+    }
+
+    #[test]
+    fn postfix_with_compound_body_falls_back_without_panicking() {
+        for (wrapper, count) in [
+            ("['a' M]", super::Count::Optional),
+            ("{'a' M}", super::Count::Many),
+        ] {
+            let source = format!("grammar G {{ @root R ::= {wrapper}; @mapping(N) M ::= 'm'; }}");
+            let mut file = unlaxer_ubnf::parse(&source).unwrap();
+            let g = &mut file.grammars[0];
+            let atom = &mut g.rules[0].body.alternatives[0].elements[0].element;
+            let (super::ElementKind::Optional(body) | super::ElementKind::Repeat(body)) =
+                &atom.kind
+            else {
+                unreachable!();
+            };
+            atom.span = body.span;
+            let shapes = super::RecursiveShapes::new(g);
+            let state = vec![
+                None,
+                Some(super::Shape(super::Kind::Node, super::Count::One)),
+            ];
+            let result = super::fixed_atom(
+                &g.rules[0].body.alternatives[0].elements[0].element,
+                &shapes.indices,
+                &state,
+                &mut 0,
+                0,
+            );
+            assert!(result.is_ok_and(|s| s == Some(super::Shape(super::Kind::Node, count))));
+        }
+    }
+
     #[test]
     fn fixed_point_depth_matches_java_choice_sequence_element_calls() {
         // RustNativeGeneratorTest の RecursiveSemanticShapes.rule と共通の境界。
