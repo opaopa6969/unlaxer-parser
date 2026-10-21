@@ -11,7 +11,10 @@ pub(crate) fn emit(
     parser: &str,
     ast: &str,
 ) -> (String, String) {
+    // Java と同様、解析上限を超えた場合も通常の生成を保持し、preferred projection だけを無効にする。
     let calls = crate::preferred_plan::calls(grammar);
+    let unsupported = calls.is_err();
+    let calls = calls.unwrap_or_else(|_| vec![vec![]; grammar.rules.len()]);
     let mut identity = String::new();
     for (i, rule) in grammar.rules.iter().enumerate() {
         let mapping = rule
@@ -58,7 +61,13 @@ pub(crate) fn emit(
         hash = hash.wrapping_mul(0x100000001b3);
     }
     let marker = format!("#preferred-schema:{hash:x}");
-    let instrumented = unlaxer_codegen::preferred::parser(ir, &calls, &marker);
+    let instrumented = if unsupported {
+        Err(unlaxer_codegen::GenerateError(
+            "unsupported source projection".into(),
+        ))
+    } else {
+        unlaxer_codegen::preferred::parser(ir, &calls, &marker)
+    };
     let mut parser =
         include_str!("../../../unlaxer-dsl/src/main/resources/rust/preferred-parser.rs.txt")
             .replace("$ROOT", &ir.root.to_string())

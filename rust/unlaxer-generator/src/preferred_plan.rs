@@ -2,19 +2,20 @@
 use std::collections::HashSet;
 use unlaxer_ubnf::ast::*;
 type Key = (u8, usize, usize);
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Kind {
+    Empty,
     Text,
     Node,
     Value,
 }
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Count {
     One,
     Optional,
     Many,
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 struct Shape(Kind, Count);
 fn text() -> Shape {
     Shape(Kind::Text, Count::One)
@@ -47,25 +48,40 @@ fn merge(a: Shape, b: Shape, seq: bool) -> Shape {
         },
     )
 }
-fn body_shape(g: &GrammarDecl, b: &RuleBody, seen: &mut HashSet<String>) -> Shape {
+fn body_shape(
+    g: &GrammarDecl,
+    b: &RuleBody,
+    seen: &mut HashSet<String>,
+    recursive: &[Shape],
+) -> Shape {
     b.alternatives
         .iter()
-        .map(|s| seq_shape(g, s, seen))
+        .map(|s| seq_shape(g, s, seen, recursive))
         .reduce(|a, b| merge(a, b, false))
         .unwrap_or_else(text)
 }
-fn seq_shape(g: &GrammarDecl, s: &Sequence, seen: &mut HashSet<String>) -> Shape {
+fn seq_shape(
+    g: &GrammarDecl,
+    s: &Sequence,
+    seen: &mut HashSet<String>,
+    recursive: &[Shape],
+) -> Shape {
     s.elements
         .iter()
-        .map(|a| shape(g, &a.element, seen))
+        .map(|a| shape(g, &a.element, seen, recursive))
         .filter(|s| s.0 != Kind::Text)
         .reduce(|a, b| merge(a, b, true))
         .unwrap_or_else(text)
 }
-fn shape(g: &GrammarDecl, a: &AtomicElement, seen: &mut HashSet<String>) -> Shape {
+fn shape(
+    g: &GrammarDecl,
+    a: &AtomicElement,
+    seen: &mut HashSet<String>,
+    recursive: &[Shape],
+) -> Shape {
     match &a.kind {
         ElementKind::RuleRef { name, .. } => {
-            let Some(r) = g.rules.iter().find(|r| &r.name == name) else {
+            let Some((id, r)) = g.rules.iter().enumerate().find(|(_, r)| &r.name == name) else {
                 return text();
             };
             if r.annotations
@@ -83,9 +99,9 @@ fn shape(g: &GrammarDecl, a: &AtomicElement, seen: &mut HashSet<String>) -> Shap
                 return Shape(Kind::Node, Count::One);
             }
             if !seen.insert(name.clone()) {
-                return text();
+                return recursive[id];
             }
-            let out = body_shape(g, &r.body, seen);
+            let out = body_shape(g, &r.body, seen, recursive);
             seen.remove(name);
             out
         }
@@ -94,15 +110,178 @@ fn shape(g: &GrammarDecl, a: &AtomicElement, seen: &mut HashSet<String>) -> Shap
         | ElementKind::CaptureScope(b)
         | ElementKind::Commit { body: b, .. }
         | ElementKind::Label { body: b, .. }
-        | ElementKind::Catch { choice: b, .. } => body_shape(g, b, seen),
-        ElementKind::Optional(b) => wrap(body_shape(g, b, seen), Count::Optional),
-        ElementKind::Repeat(b) => wrap(body_shape(g, b, seen), Count::Many),
+        | ElementKind::Catch { choice: b, .. } => body_shape(g, b, seen, recursive),
+        ElementKind::Optional(b) => wrap(body_shape(g, b, seen, recursive), Count::Optional),
+        ElementKind::Repeat(b) => wrap(body_shape(g, b, seen, recursive), Count::Many),
         ElementKind::OneOrMore(a)
         | ElementKind::BoundedRepeat { element: a, .. }
-        | ElementKind::Separated { element: a, .. } => wrap(shape(g, a, seen), Count::Many),
+        | ElementKind::Separated { element: a, .. } => {
+            wrap(shape(g, a, seen, recursive), Count::Many)
+        }
         _ => text(),
     }
 }
+// Java の RecursiveSemanticShapes と同じ有限固定点を使う。再帰を Text で打ち切ると、
+// Node の反復を Value と誤認し、存在しない semantic wrapper を深さに加えてしまう (#730)。
+fn recursive_shapes(g: &GrammarDecl) -> Result<Vec<Shape>, String> {
+    let terminal = |r: &RuleDecl| {
+        if r.annotations
+            .iter()
+            .any(|a| matches!(a.kind, AnnotationKind::Skip))
+        {
+            Some(text())
+        } else if r.annotations.iter().any(|a| {
+            matches!(
+                a.kind,
+                AnnotationKind::Enum | AnnotationKind::Mapping { .. }
+            )
+        }) {
+            Some(Shape(Kind::Node, Count::One))
+        } else {
+            None
+        }
+    };
+    let mut current: Vec<_> = g.rules.iter().map(terminal).collect();
+    let mut work = 0;
+    for _ in 0..4 * g.rules.len() + 4 {
+        let mut next = current.clone();
+        for (id, rule) in g.rules.iter().enumerate() {
+            if terminal(rule).is_none() {
+                next[id] = fixed_body(g, &rule.body, &current, &mut work, 0)?;
+            }
+        }
+        if next == current {
+            return Ok(next
+                .into_iter()
+                .map(|s| s.filter(|s| s.0 != Kind::Empty).unwrap_or_else(text))
+                .collect());
+        }
+        current = next;
+    }
+    Err("E-RECURSIVE-SHAPE: transparent shape analysis did not converge".into())
+}
+// None は有限導出が未確定の枝、Empty は省略可能な枝。文字列の選択肢と混同しない。
+fn empty() -> Shape {
+    Shape(Kind::Empty, Count::Optional)
+}
+fn fixed_wrap(s: Option<Shape>, count: Count, nullable: bool) -> Option<Shape> {
+    match s {
+        None if nullable => Some(empty()),
+        Some(s) if s.0 == Kind::Empty => Some(s),
+        other => other.map(|s| wrap(s, count)),
+    }
+}
+fn fixed_join(a: Shape, b: Shape, sequence: bool) -> Shape {
+    if a.0 == Kind::Empty {
+        if sequence {
+            b
+        } else {
+            wrap(b, Count::Optional)
+        }
+    } else if b.0 == Kind::Empty {
+        if sequence {
+            a
+        } else {
+            wrap(a, Count::Optional)
+        }
+    } else {
+        merge(a, b, sequence)
+    }
+}
+fn fixed_body(
+    g: &GrammarDecl,
+    b: &RuleBody,
+    state: &[Option<Shape>],
+    work: &mut usize,
+    depth: usize,
+) -> Result<Option<Shape>, String> {
+    check_work(work, depth)?;
+    let mut result = None;
+    for sequence in &b.alternatives {
+        let mut value = Some(empty());
+        let mut has_text = false;
+        for item in &sequence.elements {
+            match fixed_atom(g, &item.element, state, work, depth + 1)? {
+                None => {
+                    value = None;
+                    break;
+                }
+                Some(s) if s.0 == Kind::Text => has_text = true,
+                Some(s) => value = value.map(|v| fixed_join(v, s, true)),
+            }
+        }
+        if has_text && value == Some(empty()) {
+            value = Some(text());
+        }
+        if let Some(candidate) = value {
+            result = Some(result.map_or(candidate, |r| fixed_join(r, candidate, false)));
+        }
+    }
+    Ok(result)
+}
+fn fixed_atom(
+    g: &GrammarDecl,
+    a: &AtomicElement,
+    state: &[Option<Shape>],
+    work: &mut usize,
+    depth: usize,
+) -> Result<Option<Shape>, String> {
+    check_work(work, depth)?;
+    Ok(match &a.kind {
+        ElementKind::RuleRef { name, .. } => g
+            .rules
+            .iter()
+            .position(|r| &r.name == name)
+            .map_or(Some(text()), |id| state[id]),
+        ElementKind::Group(b)
+        | ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b)
+        | ElementKind::Commit { body: b, .. }
+        | ElementKind::Label { body: b, .. }
+        | ElementKind::Catch { choice: b, .. } => fixed_body(g, b, state, work, depth + 1)?,
+        ElementKind::Optional(b) => fixed_wrap(
+            fixed_body(g, b, state, work, depth + 1)?,
+            Count::Optional,
+            true,
+        ),
+        ElementKind::Repeat(b) => {
+            fixed_wrap(fixed_body(g, b, state, work, depth + 1)?, Count::Many, true)
+        }
+        ElementKind::OneOrMore(a) => fixed_wrap(
+            fixed_atom(g, a, state, work, depth + 1)?,
+            Count::Many,
+            false,
+        ),
+        ElementKind::BoundedRepeat { element, min, .. } => fixed_wrap(
+            fixed_atom(g, element, state, work, depth + 1)?,
+            Count::Many,
+            *min == 0,
+        ),
+        ElementKind::Separated { element, separator } => {
+            if matches!(fixed_atom(g, separator, state, work, depth + 1)?, Some(s) if s.0 != Kind::Text && s.0 != Kind::Empty)
+            {
+                return Err("Mapped semantic separator is unsupported".into());
+            }
+            fixed_wrap(
+                fixed_atom(g, element, state, work, depth + 1)?,
+                Count::Many,
+                false,
+            )
+        }
+        _ => Some(text()),
+    })
+}
+fn check_work(work: &mut usize, depth: usize) -> Result<(), String> {
+    *work += 1;
+    if *work > 1_000_000 {
+        return Err("E-RECURSIVE-SHAPE: analysis work exceeds 1000000".into());
+    }
+    if depth > 256 {
+        return Err("E-RECURSIVE-SHAPE: expression depth exceeds 256".into());
+    }
+    Ok(())
+}
+
 fn one(b: &RuleBody) -> Option<&AtomicElement> {
     let [s] = b.alternatives.as_slice() else {
         return None;
@@ -112,16 +291,19 @@ fn one(b: &RuleBody) -> Option<&AtomicElement> {
     };
     Some(&a.element)
 }
-fn site_body(g: &GrammarDecl, b: &RuleBody) -> Shape {
-    one(b).map_or_else(|| body_shape(g, b, &mut HashSet::new()), |a| site(g, a))
+fn site_body(g: &GrammarDecl, b: &RuleBody, recursive: &[Shape]) -> Shape {
+    one(b).map_or_else(
+        || body_shape(g, b, &mut HashSet::new(), recursive),
+        |a| site(g, a, recursive),
+    )
 }
-fn site(g: &GrammarDecl, a: &AtomicElement) -> Shape {
+fn site(g: &GrammarDecl, a: &AtomicElement, recursive: &[Shape]) -> Shape {
     match &a.kind {
-        ElementKind::Optional(b) | ElementKind::Repeat(b) => site_body(g, b),
+        ElementKind::Optional(b) | ElementKind::Repeat(b) => site_body(g, b, recursive),
         ElementKind::OneOrMore(a)
         | ElementKind::BoundedRepeat { element: a, .. }
-        | ElementKind::Separated { element: a, .. } => site(g, a),
-        _ => shape(g, a, &mut HashSet::new()),
+        | ElementKind::Separated { element: a, .. } => site(g, a, recursive),
+        _ => shape(g, a, &mut HashSet::new(), recursive),
     }
 }
 fn key(tag: u8, s: Span) -> Key {
@@ -130,6 +312,7 @@ fn key(tag: u8, s: Span) -> Key {
 struct Plan<'a> {
     g: &'a GrammarDecl,
     nested: bool,
+    recursive: &'a [Shape],
     bindings: HashSet<Key>,
     sites: Vec<&'a AtomicElement>,
 }
@@ -195,9 +378,9 @@ impl<'a> Plan<'a> {
         }
     }
     fn semantic_body(&mut self, b: &'a RuleBody) {
-        let mixed = body_shape(self.g, b, &mut HashSet::new()).0 == Kind::Value;
+        let mixed = body_shape(self.g, b, &mut HashSet::new(), self.recursive).0 == Kind::Value;
         for s in &b.alternatives {
-            if mixed && seq_shape(self.g, s, &mut HashSet::new()).0 == Kind::Text {
+            if mixed && seq_shape(self.g, s, &mut HashSet::new(), self.recursive).0 == Kind::Text {
                 if s.elements.len() == 1 {
                     self.bindings.insert(key(2, s.elements[0].element.span));
                 } else {
@@ -210,14 +393,14 @@ impl<'a> Plan<'a> {
         }
     }
     fn semantic_item_body(&mut self, b: &'a RuleBody) {
-        let s = body_shape(self.g, b, &mut HashSet::new());
+        let s = body_shape(self.g, b, &mut HashSet::new(), self.recursive);
         if s.0 == Kind::Value && s.1 != Count::Many {
             self.unit_body(b)
         }
         self.semantic_body(b)
     }
     fn semantic_item_atom(&mut self, a: &'a AtomicElement) {
-        let s = shape(self.g, a, &mut HashSet::new());
+        let s = shape(self.g, a, &mut HashSet::new(), self.recursive);
         if s.0 == Kind::Value && s.1 != Count::Many {
             self.bindings.insert(key(2, a.span));
         }
@@ -358,13 +541,15 @@ impl<'a> Plan<'a> {
         }
     }
 }
-pub(crate) fn calls(g: &GrammarDecl) -> Vec<Vec<(usize, usize)>> {
+pub(crate) fn calls(g: &GrammarDecl) -> Result<Vec<Vec<(usize, usize)>>, String> {
+    let recursive = recursive_shapes(g)?;
     let mut plans: Vec<_> = g
         .rules
         .iter()
         .map(|r| {
             let mut p = Plan {
                 g,
+                recursive: &recursive,
                 nested: crate::nested_captures::enabled(r),
                 bindings: HashSet::new(),
                 sites: vec![],
@@ -380,11 +565,11 @@ pub(crate) fn calls(g: &GrammarDecl) -> Vec<Vec<(usize, usize)>> {
                 AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc
             )
         }) && p.sites.iter().any(|a| {
-            let s = site(g, a);
+            let s = site(g, a, &recursive);
             s.0 != Kind::Text && s.1 != Count::One
         })
     });
-    plans
+    Ok(plans
         .iter_mut()
         .zip(&g.rules)
         .map(|(p, r)| {
@@ -409,5 +594,27 @@ pub(crate) fn calls(g: &GrammarDecl) -> Vec<Vec<(usize, usize)>> {
             }
             out
         })
-        .collect()
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn recursive_collection_call_depths_match_java_token_wrappers() {
+        // #730: semantic 値が MANY に収束する規則参照には、単一 Value 用の境界は無い。
+        for repeated in ["R1+", "{R1}", "R1{1,2}", "R1 % ','"] {
+            for base in ["", " | 'a'"] {
+                let source = format!(
+                    "grammar Pbt {{ @root @mapping(N0, params=[f2]) R0 ::= (R1 R1) @f2; \
+                     R1 ::= 'n' R0 | 'y' ({repeated}){base}; }}"
+                );
+                let file = unlaxer_ubnf::parse(&source).unwrap();
+                assert_eq!(
+                    super::calls(&file.grammars[0]).unwrap(),
+                    vec![vec![(1, 3), (1, 3)], vec![(0, 2), (1, 4)]],
+                    "{source}"
+                );
+            }
+        }
+    }
 }
