@@ -4537,6 +4537,15 @@ impl<'a> ParseContext<'a> {
                 span,
                 nodes: fragment.nodes.clone(),
             });
+            // @f は consumed の収集境界。外側の owned capture へ Parsed 原文を渡さない。
+            fragment.parsed_source = None;
+            if fragment
+                .source
+                .as_deref()
+                .is_some_and(|source| !source.classic)
+            {
+                fragment.source = None;
+            }
             return Some(fragment);
         }
         let source = match source.filter(|source| source.classic) {

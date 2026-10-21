@@ -82,7 +82,11 @@ Choice を経由した結果と、親へ commit する consumed CST の原文は
 token 別名や call-by-value の脱糖も、最終的に返る子の root token に従う。
 
 Rust の非 Classic 経路は正の LOOKAHEAD の結果 span を Fragment に保持し、
-透明な capture と選択した Choice を通して伝える（#729）。消費側の Chain・反復は
+owned capture と選択した Choice を通して伝える（#729）。AST field capture（`@f`）は
+Java の consumed collector と同じく結果 span を捨て、外側の owned capture へ伝えない。
+Classic 経路でも `@f` は `parsed_source` を破棄し、commit 済み原文だけを返す。
+この境界は rule の成功 memo 再生でも変わらない。
+消費側の Chain・反復は
 この結果 span を集めず、従来の consumed 範囲を使う。rule の結果に必要な span は
 CST の span とは別に保持し、成功 memo の再生でも復元する。
 Classic 経路でも、owned capture には子が返す Parsed の原文を使い、投影・生成した値も
@@ -90,6 +94,8 @@ Classic 経路でも、owned capture には子が返す Parsed の原文を使�
 AST field capture（`@f` / `capture`）と CaptureBoundary は従来の commit 済み原文を使う。
 たとえば先読み分岐を選ぶ Choice／その rule 参照／単一 LOOKAHEAD rule を `@f` にすると、
 consumed の field span は `[0,0]`、値は空文字列のままである。
+`CAPTURE(w, R1 @f) SAME_AS(w)`（`R1 ::= AHEAD | 'q'`）では、入力 `x` の `w` は空文字列、
+context の consumed cursor は CP0、全入力解析は `trailing_input` CP0 になる。
 公開 `ParseContext::parse` の `ParseMatch.span` も commit 済み原文を使うため、
 `Choice[LOOKAHEAD('x'), 'q'].stop_consume()` を入力 `x` で解析すると `[0,0]` を返す。
 同じ Choice の owned capture は値 `x` を保存する。

@@ -815,3 +815,76 @@ fn nonclassic_collectors_drop_direct_lookahead_result_source() {
         }
     }
 }
+
+#[test]
+fn field_capture_blocks_parsed_source_before_owned_capture_and_success_memo() {
+    use unlaxer_runtime::{parse_detailed_with_options, Rule};
+
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for (classic, retry) in [(false, false), (false, true), (true, false), (true, true)] {
+            for (variant, field) in [
+                Expr::Rule(1).capture("f"),
+                Expr::choice([ahead_x(), w("q")]).capture("f"),
+                Expr::Rule(2),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                // 最初の分岐の失敗後に rule の成功 memo を再生する。
+                let success = Expr::sequence([field.clone().capture_owned("w"), Expr::Replay("w")]);
+                let body = if retry {
+                    Expr::choice([
+                        Expr::sequence([field.capture_owned("discard"), w("z")]),
+                        success,
+                    ])
+                } else {
+                    success
+                };
+                for consume_tail in [false, true] {
+                    let body = if consume_tail {
+                        Expr::sequence([body.clone(), w("x")])
+                    } else {
+                        body.clone()
+                    };
+                    let rules = [
+                        Rule {
+                            name: "R0",
+                            expression: if classic { body.stop_consume() } else { body },
+                        },
+                        Rule {
+                            name: "R1",
+                            expression: Expr::choice([ahead_x(), w("q")]),
+                        },
+                        Rule {
+                            name: "R2",
+                            expression: Expr::Rule(1).capture("f"),
+                        },
+                    ];
+                    let options = ParseOptions::with_memoization(memo);
+                    let result = parse_detailed_with_options(&rules, 0, false, "x", options);
+                    if consume_tail {
+                        let tree = result.unwrap();
+                        let fields: Vec<_> = tree.nodes.iter().flat_map(|n| &n.captures).collect();
+                        assert_eq!(fields.len(), 1);
+                        assert_eq!(fields[0].span, Span { start: 0, end: 0 });
+                    } else {
+                        let error = result.unwrap_err();
+                        assert_eq!(error.kind, "trailing_input");
+                        assert_eq!(error.offset, 0);
+                    }
+                    // context 入口でも w=""、consumed CP0 を確認する。
+                    let mut context = ParseContext::with_options("x", options);
+                    context.parse_grammar(rules.to_vec(), 0, false).unwrap();
+                    assert_eq!(context.captured_text("w"), Some(""));
+                    assert_eq!(context.position(), usize::from(consume_tail));
+                    if retry && memo == Memoization::SafeFailures && variant != 1 {
+                        assert!(
+                            context.memoized_success_hits() > 0,
+                            "classic={classic}, variant={variant}, tail={consume_tail}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

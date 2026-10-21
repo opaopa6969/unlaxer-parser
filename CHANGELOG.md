@@ -10,9 +10,11 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
-- Rust の非 Classic 経路の CAPTURE が、Java と同じ子の root token の原文を保存するよう修正 (#729)。直接の LOOKAHEAD の値を保持し、consumed の Chain・EMPTY・UNTIL の先読み部分は値に含めない。SAME_AS は保存した値を consumed cursor から再照合する。入口のモード選択・AST field capture・CST は従来どおり。Classic 経路でも Choice／rule 参照が owned capture へ返す Parsed の原文を、CST に commit する原文と分離する。field capture と CaptureBoundary は commit 済み原文を使い、公開 `ParseMatch.span` も従来の値を保つ（先読み Choice の consumed span は `[0,0]`）。Optional／Recovery／CaptureBoundary が直接の先読み原文を集めないことを Java/Rust で検証した。
+- Rust の非 Classic 経路の CAPTURE が、Java と同じ子の root token の原文を保存するよう修正 (#729)。直接の LOOKAHEAD の値を保持し、consumed の Chain・EMPTY・UNTIL の先読み部分は値に含めない。SAME_AS は保存した値を consumed cursor から再照合する。入口のモード選択・AST field capture・CST は従来どおり。Classic 経路でも Choice／rule 参照が owned capture へ返す Parsed の原文を、CST に commit する原文と分離する。field capture と CaptureBoundary は commit 済み原文を使い、公開 `ParseMatch.span` も従来の値を保つ（先読み Choice の consumed span は `[0,0]`）。Optional／Recovery／CaptureBoundary が直接の先読み原文を集めないことを Java/Rust で検証した。field capture（`@f`）自身も子の Parsed 原文を破棄し、外側の owned capture へ伝えない。Classic・非 Classic・成功 memo 再生を共通 corpus と直接 API で固定した。
 
 ### Changed
+
+- #729 の原文分離により、Rust の `Fragment` は x86_64 で 56 → 64 B になる（`parsed_source` はすでに Box 化済み）。深さ255の `R0 ::= '(' CAPTURE(w, R0) ')' | 'a'` の非 Classic 全入力解析で、最小要求スタックは master `a67d8d19` 比で debug 1,758,144 → 1,856,256 B（+5.58%）、release 735,616 → 772,352 B（+4.99%）。Rust 1.85.0、同一プログラムで16 B刻みに探索し、各境界を3回確認した。再帰上限は変えず、この増加を残す。
 
 - 生成した Rust parser の失敗位置と rule stack を Java に揃えた (#706)。UBNF の正の `LOOKAHEAD`・`EMPTY`・`UNTIL` が matched cursor だけを進めた後の失敗は、Java と同じく matched の到達位置（たとえば `R0 ::= 'a' AHEAD 'é'` に `ax` で CP1 → CP2）で報告され、その後に始まる rule の開始位置も同じく後ろへ進む。受理・cursor・CST・AST は変わらない。式単位の入口（`ParseContext::parse` など）と token stream の中は従来どおり。[契約](docs/prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)。
 
