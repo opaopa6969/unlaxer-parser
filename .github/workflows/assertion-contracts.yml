@@ -6,6 +6,8 @@ on:
 jobs:
   assertion-contracts:
     runs-on: [unlaxer-parser-ci, Linux, X64]
+    env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -14,16 +16,14 @@ jobs:
           distribution: temurin
           java-version: '21.0.9'
           overwrite-settings: false
-      - uses: dtolnay/rust-toolchain@1.85.0
-        with:
-          components: rustfmt
+      - name: Rust toolchain を既定を変更せずに準備
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
       - run: rustfmt --edition 2021 --check docs/fixtures/assertion-contracts/probe.rs
       - run: >
           mvn -B -pl unlaxer-common,unlaxer-dsl -am test
           -Dtest=AssertionContractConformanceTest,MatchOnlyTest,NotTest,TransactionalStateTest,MemoDiagnosticFrameTest,DetailedOnFailureTest,PackratMemoizationTest,ScopeStoreTransactionTest,JavaDetailedOnFailureRuntimeTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,CaptureEqualityConformanceTest,TokenAdapterConformanceTest,RustUbnfFrontendConformanceTest,SharedLanguageCallConformanceTest
           -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
         env:
-          RUSTUP_TOOLCHAIN: '1.85.0'
           CARGO_INCREMENTAL: '0'
       - run: cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-runtime --lib --test scopes --test diagnostics_policy --test capture_equality
       - run: |

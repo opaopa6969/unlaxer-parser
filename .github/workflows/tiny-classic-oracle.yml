@@ -15,11 +15,12 @@ permissions:
 
 env:
   CARGO_INCREMENTAL: '0'
-  RUSTUP_TOOLCHAIN: '1.85.0'
 
 jobs:
   semantic-oracle:
     runs-on: [unlaxer-parser-ci, Linux, X64]
+    env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +40,7 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-          rustup toolchain install 1.85.0 --profile minimal
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
       - name: Verify harness failure detection
         working-directory: parser
         run: python3 -m unittest discover -s scripts/tests -p 'test_tiny_classic_*.py'

@@ -22,6 +22,19 @@ full-specの進捗は[対応表と受け入れ条件](FULL-SPEC.md)で追跡す�
 
 生成済みのexampleにはJVMも外部crateも不要。repoルートで実行する。Rust 1.85以上、Cargoを使用する。
 
+並行作業がある共有マシンでは、`RUSTUP_TOOLCHAIN=1.85.0` を Cargo と Maven の実行に付ける。
+CI もジョブ単位でこの版に固定している。Maven から起動する `cargo` / `rustc` も環境変数を継承するため、
+ビルド済み crate と probe のコンパイラ版がずれて `E0514` になることを防げる。
+`rustup default` による共有の既定値の切り替えは避け、必要な版は既定を変えずに準備する。
+
+```sh
+rustup toolchain install 1.85.0 --profile minimal --component rustfmt,clippy --no-self-update
+RUSTUP_TOOLCHAIN=1.85.0 cargo test --locked --manifest-path rust/Cargo.toml
+RUSTUP_TOOLCHAIN=1.85.0 mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
+  -Dtest=EmbeddedGrammarConformanceTest,PropertyBasedParityTest \
+  -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+```
+
 ```sh
 cargo test --locked --manifest-path rust/Cargo.toml
 printf '%s\n' 'if(0,neg(2*3),4+5)' | cargo run --quiet \
