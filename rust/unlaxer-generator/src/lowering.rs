@@ -1648,6 +1648,7 @@ impl Lowering<'_> {
     // Solve rule references as a finite graph. None is an as-yet unknown finite
     // derivation, not a text alternative: using Text as a cycle seed widens
     // otherwise pure node/enum aliases incorrectly.
+    // AST 版は preferred_plan.rs の recursive_shapes / fixed_body / fixed_atom を参照。
     fn recursive_shapes(&self, enum_nodes: bool) -> Result<Vec<Shape>> {
         let terminal = |rule: usize| -> Option<Shape> {
             if self.skips[rule] {

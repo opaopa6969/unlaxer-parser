@@ -8,6 +8,10 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Fixed
+
+- Rust host の Rust 生成器で、再帰する未 mapping 規則の値の種類・個数を固定点から求め、反復・separated 内の preferred AST 用の深さと schema hash を Java host に揃えた (#730)。PBT seed 59 の生成物不一致を解消し、縮小した2文法を共有回帰 corpus に追加した。
+
 ### Changed
 
 - 生成した Rust parser の失敗位置と rule stack を Java に揃えた (#706)。UBNF の正の `LOOKAHEAD`・`EMPTY`・`UNTIL` が matched cursor だけを進めた後の失敗は、Java と同じく matched の到達位置（たとえば `R0 ::= 'a' AHEAD 'é'` に `ax` で CP1 → CP2）で報告され、その後に始まる rule の開始位置も同じく後ろへ進む。受理・cursor・CST・AST は変わらない。式単位の入口（`ParseContext::parse` など）と token stream の中は従来どおり。[契約](docs/prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)。
