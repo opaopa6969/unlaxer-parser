@@ -13,6 +13,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
+import org.unlaxer.dsl.codegen.RecursiveSemanticShapes;
 import org.unlaxer.dsl.codegen.rust.RustBackend;
 
 /** Java is an oracle only: every generation below uses the JVM-free native executable. */
@@ -106,6 +107,123 @@ public class RustNativeGeneratorTest {
             report.add(index++ + "\taccepted\t5");
         }
         Files.write(Path.of("target/rust-native-generator.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    @Test public void preferredShapeLimitsMatchJavaWithoutEagerFixedPoint() throws Exception {
+        assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        assertEquals(0, command(List.of("cargo", "build", "--locked", "--manifest-path",
+            repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
+        Path binary = repo.resolve("rust/target/debug/unlaxer");
+        var report = new ArrayList<>(List.of("case\tfiles_identical\tpreferred_projection"));
+        // 非再帰では固定点の上限に関係なく preferred projection を保持する (#737)。
+        for (int depth = 84; depth <= 90; depth++) {
+            assertGeneratedBytes(binary, "acyclic-plus-" + depth, nestedHelper(depth, "(", ")+"), report);
+        }
+        // mapped 値のない再帰では、他の規則が固定点の depth 上限を超えても解析を開始しない。
+        for (int depth : List.of(60, 86)) {
+            assertGeneratedBytes(binary, "text-recursive-plus-" + depth,
+                recursiveNestedHelper(depth, "(", ")+", false), report);
+        }
+        // 固定点そのものの Java 側境界も確認。Rust の対応テストは preferred_plan.rs。
+        for (String[] wrapper : List.of(new String[] {"(", ")", "84"},
+                new String[] {"(", ")+", "63"}, new String[] {"(", ")?", "50"},
+                new String[] {"(", ")*", "50"}, new String[] {"[", "]", "84"},
+                new String[] {"{", "}", "84"})) {
+            int limit = Integer.parseInt(wrapper[2]);
+            for (int depth = limit; depth <= limit + 1; depth++) {
+                String source = nestedHelper(depth, wrapper[0], wrapper[1]);
+                var grammar = UBNFMapper.parse(source).grammars().get(0);
+                var shapes = new RecursiveSemanticShapes(grammar, true);
+                if (depth == limit) {
+                    assertEquals("#node", shapes.rule("H").kind());
+                } else {
+                    var error = assertThrows(IllegalArgumentException.class, () -> shapes.rule("H"));
+                    assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256", error.getMessage());
+                }
+                assertGeneratedBytes(binary, "boundary-" + report.size(), source, report);
+            }
+        }
+        for (boolean textRecursive : List.of(false, true)) {
+            String source = workHelper(textRecursive);
+            var workGrammar = UBNFMapper.parse(source).grammars().get(0);
+            var workError = assertThrows(IllegalArgumentException.class,
+                () -> new RecursiveSemanticShapes(workGrammar, true).rule("C0"));
+            assertEquals("E-RECURSIVE-SHAPE: analysis work exceeds 1000000", workError.getMessage());
+            assertGeneratedBytes(binary, (textRecursive ? "text-recursive" : "acyclic") + "-work-80-700",
+                source, report);
+        }
+        Files.write(Path.of("target/rust-preferred-shape-limits.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    @Test public void preferredShapeLimitsMatchJavaWithMappedRecursion() throws Exception {
+        assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        assertEquals(0, command(List.of("cargo", "build", "--locked", "--manifest-path",
+            repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
+        Path binary = repo.resolve("rust/target/debug/unlaxer");
+        var report = new ArrayList<>(List.of("case\tfiles_identical\tpreferred_projection"));
+        // T が mapped 値を含む再帰なので、両 host の生成経路で固定点の上限を検証する。
+        for (String[] wrapper : List.of(new String[] {"(", ")", "84", "paren"},
+                new String[] {"(", ")+", "63", "plus"}, new String[] {"(", ")?", "50", "optional"},
+                new String[] {"(", ")*", "50", "star"}, new String[] {"[", "]", "84", "bracket"},
+                new String[] {"{", "}", "84", "brace"})) {
+            int limit = Integer.parseInt(wrapper[2]);
+            for (int depth = limit; depth <= limit + 1; depth++) {
+                assertGeneratedBytes(binary, "mapped-recursive-" + wrapper[3] + "-" + depth,
+                    recursiveNestedHelper(depth, wrapper[0], wrapper[1], true), depth == limit, report);
+            }
+        }
+        Files.write(Path.of("target/rust-preferred-recursive-shape-limits.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    private static String workHelper(boolean textRecursive) {
+        var source = new StringBuilder("grammar Pbt { @package: pbt.corpus @root @mapping(N0, params=[x"
+            + (textRecursive ? ", g]) R0 ::= (NM2 NM2) @g T 'x' C0 @x" : "]) R0 ::= 'x' C0 @x"));
+        for (int i = 0; i < 700; i++) source.append(" | 'z' F").append(i);
+        source.append("; ");
+        for (int i = 0; i < 80; i++) source.append("C").append(i).append(" ::= ")
+            .append(textRecursive ? "'a' C" + (i + 1) : i == 79 ? "M" : "C" + (i + 1)).append("; ");
+        source.append(textRecursive ? "C80 ::= 'm'; " : "@mapping(NM) M ::= 'm'; ");
+        for (int i = 0; i < 700; i++) {
+            source.append("F").append(i).append(" ::= ");
+            for (char c = 'a'; c <= 't'; c++) source.append("'").append(c).append("' ");
+            source.append("; ");
+        }
+        if (textRecursive) source.append("T ::= 'n' T | 'a'; @mapping(NN) NM2 ::= 'k'; ");
+        return source.append("}").toString();
+    }
+
+    private static String nestedHelper(int depth, String open, String close) {
+        return "grammar Pbt { @package: pbt.corpus @root @mapping(N0, params=[x]) "
+            + "R0 ::= 'x' H @x; H ::= " + open.repeat(depth) + "'a' M" + close.repeat(depth)
+            + "; @mapping(NM) M ::= 'm'; }";
+    }
+
+    private static String recursiveNestedHelper(int depth, String open, String close, boolean mapped) {
+        return nestedHelper(depth, open, close).replace("R0 ::= 'x' H @x;",
+            "R0 ::= (M M) @x T H; T ::= 'n' T" + (mapped ? " M" : "") + " | 'a';");
+    }
+
+    private void assertGeneratedBytes(Path binary, String name, String source, List<String> report) throws Exception {
+        assertGeneratedBytes(binary, name, source, true, report);
+    }
+
+    private void assertGeneratedBytes(Path binary, String name, String source, boolean preferred, List<String> report) throws Exception {
+        Path grammar = temporary.newFile(name + ".ubnf").toPath();
+        Files.writeString(grammar, source);
+        Path output = temporary.getRoot().toPath().resolve(name);
+        var generated = command(List.of(binary.toString(), "generate", "--grammar", grammar.toString(),
+            "--output", output.toString()), true);
+        assertEquals(name + "\n" + generated.output(), 0, generated.code());
+        var expected = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
+        assertEquals(name, 5, expected.size());
+        for (var file : expected) assertArrayEquals(name + " / " + file.relativePath(),
+            file.content().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(output.resolve(file.relativePath())));
+        var parser = expected.stream().filter(file -> file.relativePath().equals("parser.rs")).findFirst().orElseThrow();
+        assertEquals(name + ": preferred projection", preferred, parser.content().contains("#preferred-depth:"));
+        assertEquals(name + ": mapping_grammar Some", preferred, parser.content().contains("Some(__preferred_cst::grammar())"));
+        assertEquals(name + ": mapping_grammar None", !preferred,
+            parser.content().contains("pub fn mapping_grammar() -> Option<&'static SharedGrammar> { None }"));
+        report.add(name + "\t5\t" + (preferred ? "Some" : "None"));
     }
 
     private record Result(int code, String output) {}

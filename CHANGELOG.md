@@ -11,6 +11,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 ### Fixed
 
 - Rust の非 Classic 経路の CAPTURE が、Java と同じ子の root token の原文を保存するよう修正 (#729)。直接の LOOKAHEAD の値を保持し、consumed の Chain・EMPTY・UNTIL の先読み部分は値に含めない。SAME_AS は保存した値を consumed cursor から再照合する。入口のモード選択・AST field capture・CST は従来どおり。Classic 経路でも Choice／rule 参照が owned capture へ返す Parsed の原文を、CST に commit する原文と分離する。field capture と CaptureBoundary は commit 済み原文を使い、公開 `ParseMatch.span` も従来の値を保つ（先読み Choice の consumed span は `[0,0]`）。Optional／Recovery／CaptureBoundary が直接の先読み原文を集めないことを Java/Rust で検証した。field capture（`@f`）自身も子の Parsed 原文を破棄し、外側の owned capture へ伝えない。Classic・非 Classic・成功 memo 再生を共通 corpus と直接 API で固定した。
+- Rust host の Rust 生成器で、再帰する未 mapping 規則の値の種類・個数を固定点から求め、反復・separated 内の preferred AST 用の深さと schema hash を Java host に揃えた (#730)。PBT seed 59 の生成物不一致を解消し、縮小した2文法を共有回帰 corpus に追加した。
 
 ### Changed
 

@@ -391,5 +391,32 @@
       "Z",
       ""
     ]
+  },
+  {
+    "id": "recursive-repeat-preferred-depth",
+    "issue": "#730",
+    "note": "seed 59 を2規則まで縮小。再帰の値の種類と個数を固定点で求め、反復内の規則参照の preferred-depth と schema hash を両 host で一致させる。有限の受理入力が無くても生成物の byte 比較を行う。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @root @mapping(N0, params=[f2]) R0 ::= (R1 R1) @f2 ; R1 ::= 'n' R0 | 'y' R1+ ; }",
+    "inputs": [
+      "",
+      "y",
+      "nya"
+    ]
+  },
+  {
+    "id": "recursive-separated-preferred-depth",
+    "issue": "#730",
+    "note": "元の seed 59 と同じ separated 構文を保持した縮小例。終端の選択肢を加え、生成物の byte 一致に加えて成功・失敗の CST/AST と各設定の一致を検査する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @root @mapping(N0, params=[f2]) R0 ::= (R1 R1) @f2 ; R1 ::= 'n' R0 | 'y' (R1 % ',') | 'a' ; }",
+    "inputs": [
+      "aa",
+      "yaa",
+      "aya",
+      "naaaa",
+      "ya,aa",
+      "a",
+      "ya,",
+      ""
+    ]
   }
 ]
