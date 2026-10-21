@@ -1,5 +1,6 @@
 //! Independently mirror the Java generated token wrappers, not just rule nesting.
-use std::collections::HashSet;
+use std::cell::OnceCell;
+use std::collections::{HashMap, HashSet};
 use unlaxer_ubnf::ast::*;
 type Key = (u8, usize, usize);
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -48,47 +49,78 @@ fn merge(a: Shape, b: Shape, seq: bool) -> Shape {
         },
     )
 }
+struct RecursiveShapes<'a> {
+    g: &'a GrammarDecl,
+    indices: HashMap<&'a str, usize>,
+    values: OnceCell<Result<Vec<Shape>, String>>,
+}
+impl<'a> RecursiveShapes<'a> {
+    fn new(g: &'a GrammarDecl) -> Self {
+        Self {
+            g,
+            indices: g
+                .rules
+                .iter()
+                .enumerate()
+                .map(|(id, r)| (r.name.as_str(), id))
+                .collect(),
+            values: OnceCell::new(),
+        }
+    }
+    fn rule(&self, id: usize) -> Result<Shape, String> {
+        // SemanticCardinality.shape → RecursiveSemanticShapes.rule と同じく、再帰時だけ解く。
+        self.values
+            .get_or_init(|| recursive_shapes(self.g, &self.indices))
+            .as_ref()
+            .map(|values| values[id])
+            .map_err(Clone::clone)
+    }
+}
 fn body_shape(
     g: &GrammarDecl,
     b: &RuleBody,
     seen: &mut HashSet<String>,
-    recursive: &[Shape],
-) -> Shape {
-    b.alternatives
-        .iter()
-        .map(|s| seq_shape(g, s, seen, recursive))
-        .reduce(|a, b| merge(a, b, false))
-        .unwrap_or_else(text)
+    recursive: &RecursiveShapes<'_>,
+) -> Result<Shape, String> {
+    let mut result = None;
+    for sequence in &b.alternatives {
+        let candidate = seq_shape(g, sequence, seen, recursive)?;
+        result = Some(result.map_or(candidate, |r| merge(r, candidate, false)));
+    }
+    Ok(result.unwrap_or_else(text))
 }
 fn seq_shape(
     g: &GrammarDecl,
     s: &Sequence,
     seen: &mut HashSet<String>,
-    recursive: &[Shape],
-) -> Shape {
-    s.elements
-        .iter()
-        .map(|a| shape(g, &a.element, seen, recursive))
-        .filter(|s| s.0 != Kind::Text)
-        .reduce(|a, b| merge(a, b, true))
-        .unwrap_or_else(text)
+    recursive: &RecursiveShapes<'_>,
+) -> Result<Shape, String> {
+    let mut result = None;
+    for item in &s.elements {
+        let candidate = shape(g, &item.element, seen, recursive)?;
+        if candidate.0 != Kind::Text {
+            result = Some(result.map_or(candidate, |r| merge(r, candidate, true)));
+        }
+    }
+    Ok(result.unwrap_or_else(text))
 }
 fn shape(
     g: &GrammarDecl,
     a: &AtomicElement,
     seen: &mut HashSet<String>,
-    recursive: &[Shape],
-) -> Shape {
-    match &a.kind {
+    recursive: &RecursiveShapes<'_>,
+) -> Result<Shape, String> {
+    Ok(match &a.kind {
         ElementKind::RuleRef { name, .. } => {
-            let Some((id, r)) = g.rules.iter().enumerate().find(|(_, r)| &r.name == name) else {
-                return text();
+            let Some(&id) = recursive.indices.get(name.as_str()) else {
+                return Ok(text());
             };
+            let r = &g.rules[id];
             if r.annotations
                 .iter()
                 .any(|a| matches!(a.kind, AnnotationKind::Skip))
             {
-                return text();
+                return Ok(text());
             }
             if r.annotations.iter().any(|a| {
                 matches!(
@@ -96,12 +128,12 @@ fn shape(
                     AnnotationKind::Enum | AnnotationKind::Mapping { .. }
                 )
             }) {
-                return Shape(Kind::Node, Count::One);
+                return Ok(Shape(Kind::Node, Count::One));
             }
             if !seen.insert(name.clone()) {
-                return recursive[id];
+                return recursive.rule(id);
             }
-            let out = body_shape(g, &r.body, seen, recursive);
+            let out = body_shape(g, &r.body, seen, recursive)?;
             seen.remove(name);
             out
         }
@@ -110,20 +142,21 @@ fn shape(
         | ElementKind::CaptureScope(b)
         | ElementKind::Commit { body: b, .. }
         | ElementKind::Label { body: b, .. }
-        | ElementKind::Catch { choice: b, .. } => body_shape(g, b, seen, recursive),
-        ElementKind::Optional(b) => wrap(body_shape(g, b, seen, recursive), Count::Optional),
-        ElementKind::Repeat(b) => wrap(body_shape(g, b, seen, recursive), Count::Many),
+        | ElementKind::Catch { choice: b, .. } => body_shape(g, b, seen, recursive)?,
+        ElementKind::Optional(b) => wrap(body_shape(g, b, seen, recursive)?, Count::Optional),
+        ElementKind::Repeat(b) => wrap(body_shape(g, b, seen, recursive)?, Count::Many),
         ElementKind::OneOrMore(a)
         | ElementKind::BoundedRepeat { element: a, .. }
         | ElementKind::Separated { element: a, .. } => {
-            wrap(shape(g, a, seen, recursive), Count::Many)
+            wrap(shape(g, a, seen, recursive)?, Count::Many)
         }
         _ => text(),
-    }
+    })
 }
 // Java の RecursiveSemanticShapes と同じ有限固定点を使う。再帰を Text で打ち切ると、
 // Node の反復を Value と誤認し、存在しない semantic wrapper を深さに加えてしまう (#730)。
-fn recursive_shapes(g: &GrammarDecl) -> Result<Vec<Shape>, String> {
+// IR 版は lowering.rs の Lowering::recursive_shapes / fixed_shape を参照。
+fn recursive_shapes(g: &GrammarDecl, indices: &HashMap<&str, usize>) -> Result<Vec<Shape>, String> {
     let terminal = |r: &RuleDecl| {
         if r.annotations
             .iter()
@@ -147,7 +180,7 @@ fn recursive_shapes(g: &GrammarDecl) -> Result<Vec<Shape>, String> {
         let mut next = current.clone();
         for (id, rule) in g.rules.iter().enumerate() {
             if terminal(rule).is_none() {
-                next[id] = fixed_body(g, &rule.body, &current, &mut work, 0)?;
+                next[id] = fixed_body(&rule.body, indices, &current, &mut work, 0)?;
             }
         }
         if next == current {
@@ -189,8 +222,8 @@ fn fixed_join(a: Shape, b: Shape, sequence: bool) -> Shape {
     }
 }
 fn fixed_body(
-    g: &GrammarDecl,
     b: &RuleBody,
+    indices: &HashMap<&str, usize>,
     state: &[Option<Shape>],
     work: &mut usize,
     depth: usize,
@@ -198,10 +231,12 @@ fn fixed_body(
     check_work(work, depth)?;
     let mut result = None;
     for sequence in &b.alternatives {
+        // Java body(ChoiceBody) → body(SequenceBody) → element の各呼出しを数える。
+        check_work(work, depth + 1)?;
         let mut value = Some(empty());
         let mut has_text = false;
         for item in &sequence.elements {
-            match fixed_atom(g, &item.element, state, work, depth + 1)? {
+            match fixed_atom(&item.element, indices, state, work, depth + 2)? {
                 None => {
                     value = None;
                     break;
@@ -220,50 +255,64 @@ fn fixed_body(
     Ok(result)
 }
 fn fixed_atom(
-    g: &GrammarDecl,
     a: &AtomicElement,
+    indices: &HashMap<&str, usize>,
     state: &[Option<Shape>],
     work: &mut usize,
     depth: usize,
 ) -> Result<Option<Shape>, String> {
     check_work(work, depth)?;
     Ok(match &a.kind {
-        ElementKind::RuleRef { name, .. } => g
-            .rules
-            .iter()
-            .position(|r| &r.name == name)
-            .map_or(Some(text()), |id| state[id]),
+        ElementKind::RuleRef { name, .. } => indices
+            .get(name.as_str())
+            .map_or(Some(text()), |&id| state[id]),
         ElementKind::Group(b)
         | ElementKind::OwnedCapture { body: b, .. }
         | ElementKind::CaptureScope(b)
         | ElementKind::Commit { body: b, .. }
         | ElementKind::Label { body: b, .. }
-        | ElementKind::Catch { choice: b, .. } => fixed_body(g, b, state, work, depth + 1)?,
-        ElementKind::Optional(b) => fixed_wrap(
-            fixed_body(g, b, state, work, depth + 1)?,
-            Count::Optional,
-            true,
-        ),
-        ElementKind::Repeat(b) => {
-            fixed_wrap(fixed_body(g, b, state, work, depth + 1)?, Count::Many, true)
+        | ElementKind::Catch { choice: b, .. } => fixed_body(b, indices, state, work, depth + 1)?,
+        ElementKind::Optional(b) | ElementKind::Repeat(b) => {
+            let child = if a.span.codepoint_start == b.span.codepoint_start {
+                // Java の postfix ?/* は合成 SequenceBody で、ChoiceBody を挟まない。
+                check_work(work, depth + 1)?;
+                fixed_atom(
+                    one(b).expect("postfix body"),
+                    indices,
+                    state,
+                    work,
+                    depth + 2,
+                )?
+            } else {
+                fixed_body(b, indices, state, work, depth + 1)?
+            };
+            fixed_wrap(
+                child,
+                if matches!(a.kind, ElementKind::Optional(_)) {
+                    Count::Optional
+                } else {
+                    Count::Many
+                },
+                true,
+            )
         }
         ElementKind::OneOrMore(a) => fixed_wrap(
-            fixed_atom(g, a, state, work, depth + 1)?,
+            fixed_atom(a, indices, state, work, depth + 1)?,
             Count::Many,
             false,
         ),
         ElementKind::BoundedRepeat { element, min, .. } => fixed_wrap(
-            fixed_atom(g, element, state, work, depth + 1)?,
+            fixed_atom(element, indices, state, work, depth + 1)?,
             Count::Many,
             *min == 0,
         ),
         ElementKind::Separated { element, separator } => {
-            if matches!(fixed_atom(g, separator, state, work, depth + 1)?, Some(s) if s.0 != Kind::Text && s.0 != Kind::Empty)
+            if matches!(fixed_atom(separator, indices, state, work, depth + 1)?, Some(s) if s.0 != Kind::Text && s.0 != Kind::Empty)
             {
                 return Err("Mapped semantic separator is unsupported".into());
             }
             fixed_wrap(
-                fixed_atom(g, element, state, work, depth + 1)?,
+                fixed_atom(element, indices, state, work, depth + 1)?,
                 Count::Many,
                 false,
             )
@@ -291,13 +340,21 @@ fn one(b: &RuleBody) -> Option<&AtomicElement> {
     };
     Some(&a.element)
 }
-fn site_body(g: &GrammarDecl, b: &RuleBody, recursive: &[Shape]) -> Shape {
+fn site_body(
+    g: &GrammarDecl,
+    b: &RuleBody,
+    recursive: &RecursiveShapes<'_>,
+) -> Result<Shape, String> {
     one(b).map_or_else(
         || body_shape(g, b, &mut HashSet::new(), recursive),
         |a| site(g, a, recursive),
     )
 }
-fn site(g: &GrammarDecl, a: &AtomicElement, recursive: &[Shape]) -> Shape {
+fn site(
+    g: &GrammarDecl,
+    a: &AtomicElement,
+    recursive: &RecursiveShapes<'_>,
+) -> Result<Shape, String> {
     match &a.kind {
         ElementKind::Optional(b) | ElementKind::Repeat(b) => site_body(g, b, recursive),
         ElementKind::OneOrMore(a)
@@ -312,7 +369,7 @@ fn key(tag: u8, s: Span) -> Key {
 struct Plan<'a> {
     g: &'a GrammarDecl,
     nested: bool,
-    recursive: &'a [Shape],
+    recursive: &'a RecursiveShapes<'a>,
     bindings: HashSet<Key>,
     sites: Vec<&'a AtomicElement>,
 }
@@ -377,10 +434,10 @@ impl<'a> Plan<'a> {
             self.bindings.insert(key(0, b.span));
         }
     }
-    fn semantic_body(&mut self, b: &'a RuleBody) {
-        let mixed = body_shape(self.g, b, &mut HashSet::new(), self.recursive).0 == Kind::Value;
+    fn semantic_body(&mut self, b: &'a RuleBody) -> Result<(), String> {
+        let mixed = body_shape(self.g, b, &mut HashSet::new(), self.recursive)?.0 == Kind::Value;
         for s in &b.alternatives {
-            if mixed && seq_shape(self.g, s, &mut HashSet::new(), self.recursive).0 == Kind::Text {
+            if mixed && seq_shape(self.g, s, &mut HashSet::new(), self.recursive)?.0 == Kind::Text {
                 if s.elements.len() == 1 {
                     self.bindings.insert(key(2, s.elements[0].element.span));
                 } else {
@@ -388,42 +445,44 @@ impl<'a> Plan<'a> {
                 }
             }
             for a in &s.elements {
-                self.semantic_atom(&a.element);
+                self.semantic_atom(&a.element)?;
             }
         }
+        Ok(())
     }
-    fn semantic_item_body(&mut self, b: &'a RuleBody) {
-        let s = body_shape(self.g, b, &mut HashSet::new(), self.recursive);
+    fn semantic_item_body(&mut self, b: &'a RuleBody) -> Result<(), String> {
+        let s = body_shape(self.g, b, &mut HashSet::new(), self.recursive)?;
         if s.0 == Kind::Value && s.1 != Count::Many {
             self.unit_body(b)
         }
         self.semantic_body(b)
     }
-    fn semantic_item_atom(&mut self, a: &'a AtomicElement) {
-        let s = shape(self.g, a, &mut HashSet::new(), self.recursive);
+    fn semantic_item_atom(&mut self, a: &'a AtomicElement) -> Result<(), String> {
+        let s = shape(self.g, a, &mut HashSet::new(), self.recursive)?;
         if s.0 == Kind::Value && s.1 != Count::Many {
             self.bindings.insert(key(2, a.span));
         }
         self.semantic_atom(a)
     }
-    fn semantic_atom(&mut self, a: &'a AtomicElement) {
+    fn semantic_atom(&mut self, a: &'a AtomicElement) -> Result<(), String> {
         match &a.kind {
             ElementKind::Group(b)
             | ElementKind::OwnedCapture { body: b, .. }
             | ElementKind::CaptureScope(b)
             | ElementKind::Commit { body: b, .. }
             | ElementKind::Label { body: b, .. }
-            | ElementKind::Catch { choice: b, .. } => self.semantic_body(b),
-            ElementKind::Optional(b) | ElementKind::Repeat(b) => self.semantic_item_body(b),
+            | ElementKind::Catch { choice: b, .. } => self.semantic_body(b)?,
+            ElementKind::Optional(b) | ElementKind::Repeat(b) => self.semantic_item_body(b)?,
             ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
-                self.semantic_item_atom(a)
+                self.semantic_item_atom(a)?
             }
             ElementKind::Separated { element, separator } => {
-                self.semantic_item_atom(element);
-                self.semantic_atom(separator);
+                self.semantic_item_atom(element)?;
+                self.semantic_atom(separator)?;
             }
             _ => {}
         }
+        Ok(())
     }
     fn body(&self, b: &RuleBody, depth: usize, out: &mut Vec<(usize, usize)>) {
         for s in &b.alternatives {
@@ -445,7 +504,7 @@ impl<'a> Plan<'a> {
         let depth = depth + usize::from(self.bindings.contains(&key(2, a.span)));
         match &a.kind {
             ElementKind::RuleRef { name, .. } => {
-                if let Some(id) = self.g.rules.iter().position(|r| &r.name == name) {
+                if let Some(&id) = self.recursive.indices.get(name.as_str()) {
                     out.push((id, depth));
                 }
             }
@@ -526,7 +585,7 @@ impl<'a> Plan<'a> {
                 self.atom(separator, depth + 5, out);
             }
             ElementKind::RuleRef { name, .. } => {
-                if let Some(id) = self.g.rules.iter().position(|r| &r.name == name) {
+                if let Some(&id) = self.recursive.indices.get(name.as_str()) {
                     out.push((id, depth + 1));
                 }
             }
@@ -542,7 +601,7 @@ impl<'a> Plan<'a> {
     }
 }
 pub(crate) fn calls(g: &GrammarDecl) -> Result<Vec<Vec<(usize, usize)>>, String> {
-    let recursive = recursive_shapes(g)?;
+    let recursive = RecursiveShapes::new(g);
     let mut plans: Vec<_> = g
         .rules
         .iter()
@@ -558,23 +617,33 @@ pub(crate) fn calls(g: &GrammarDecl) -> Result<Vec<Vec<(usize, usize)>>, String>
             p
         })
         .collect();
-    let semantic = plans.iter().zip(&g.rules).any(|(p, r)| {
-        !r.annotations.iter().any(|a| {
+    let mut semantic = false;
+    for (p, r) in plans.iter().zip(&g.rules) {
+        if r.annotations.iter().any(|a| {
             matches!(
                 a.kind,
                 AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc
             )
-        }) && p.sites.iter().any(|a| {
-            let s = site(g, a, &recursive);
-            s.0 != Kind::Text && s.1 != Count::One
-        })
-    });
-    Ok(plans
+        }) {
+            continue;
+        }
+        for a in &p.sites {
+            let s = site(g, a, &recursive)?;
+            if s.0 != Kind::Text && s.1 != Count::One {
+                semantic = true;
+                break;
+            }
+        }
+        if semantic {
+            break;
+        }
+    }
+    plans
         .iter_mut()
         .zip(&g.rules)
         .map(|(p, r)| {
             if semantic && !p.nested {
-                p.semantic_body(&r.body)
+                p.semantic_body(&r.body)?
             }
             let mut out = vec![];
             if r.annotations
@@ -592,13 +661,68 @@ pub(crate) fn calls(g: &GrammarDecl) -> Result<Vec<Vec<(usize, usize)>>, String>
             } else {
                 p.body(&r.body, 0, &mut out);
             }
-            out
+            Ok(out)
         })
-        .collect())
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn fixed_point_depth_matches_java_choice_sequence_element_calls() {
+        // RustNativeGeneratorTest の RecursiveSemanticShapes.rule と共通の境界。
+        for (open, close, limit) in [
+            ("(", ")", 84),
+            ("(", ")+", 63),
+            ("(", ")?", 50),
+            ("(", ")*", 50),
+            ("[", "]", 84),
+            ("{", "}", 84),
+        ] {
+            for depth in [limit, limit + 1] {
+                let source = format!(
+                    "grammar Pbt {{ @root @mapping(N0, params=[x]) R0 ::= 'x' H @x; \
+                    H ::= {}'a' M{}; @mapping(NM) M ::= 'm'; }}",
+                    open.repeat(depth),
+                    close.repeat(depth)
+                );
+                let file = unlaxer_ubnf::parse(&source).unwrap();
+                let shapes = super::RecursiveShapes::new(&file.grammars[0]);
+                let result = shapes.rule(1);
+                if depth == limit {
+                    assert!(result.is_ok(), "{source}: {:?}", result.err());
+                } else {
+                    assert_eq!(
+                        result.err().as_deref(),
+                        Some("E-RECURSIVE-SHAPE: expression depth exceeds 256"),
+                        "{source}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fixed_point_counts_choice_sequence_and_each_element_as_work() {
+        let file =
+            unlaxer_ubnf::parse("grammar G { @root R ::= 'a' M; @mapping(N) M ::= 'm'; }").unwrap();
+        let g = &file.grammars[0];
+        let shapes = super::RecursiveShapes::new(g);
+        let state = vec![
+            None,
+            Some(super::Shape(super::Kind::Node, super::Count::One)),
+        ];
+        let mut work = 999_996;
+        assert!(super::fixed_body(&g.rules[0].body, &shapes.indices, &state, &mut work, 0).is_ok());
+        assert_eq!(work, 1_000_000);
+        assert_eq!(
+            super::fixed_body(&g.rules[0].body, &shapes.indices, &state, &mut work, 0)
+                .err()
+                .as_deref(),
+            Some("E-RECURSIVE-SHAPE: analysis work exceeds 1000000")
+        );
+    }
+
     #[test]
     fn recursive_collection_call_depths_match_java_token_wrappers() {
         // #730: semantic 値が MANY に収束する規則参照には、単一 Value 用の境界は無い。

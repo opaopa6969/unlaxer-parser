@@ -13,6 +13,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
+import org.unlaxer.dsl.codegen.RecursiveSemanticShapes;
 import org.unlaxer.dsl.codegen.rust.RustBackend;
 
 /** Java is an oracle only: every generation below uses the JVM-free native executable. */
@@ -106,6 +107,78 @@ public class RustNativeGeneratorTest {
             report.add(index++ + "\taccepted\t5");
         }
         Files.write(Path.of("target/rust-native-generator.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    @Test public void preferredShapeLimitsMatchJavaWithoutEagerFixedPoint() throws Exception {
+        assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        assertEquals(0, command(List.of("cargo", "build", "--locked", "--manifest-path",
+            repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
+        Path binary = repo.resolve("rust/target/debug/unlaxer");
+        var report = new ArrayList<>(List.of("case\tfiles_identical"));
+        // 非再帰では固定点の上限に関係なく preferred projection を保持する (#737)。
+        for (int depth = 84; depth <= 90; depth++) {
+            assertGeneratedBytes(binary, "acyclic-plus-" + depth, nestedHelper(depth, "(", ")+"), report);
+        }
+        // 固定点そのものの Java 側境界も確認。Rust の対応テストは preferred_plan.rs。
+        for (String[] wrapper : List.of(new String[] {"(", ")", "84"},
+                new String[] {"(", ")+", "63"}, new String[] {"(", ")?", "50"},
+                new String[] {"(", ")*", "50"}, new String[] {"[", "]", "84"},
+                new String[] {"{", "}", "84"})) {
+            int limit = Integer.parseInt(wrapper[2]);
+            for (int depth = limit; depth <= limit + 1; depth++) {
+                String source = nestedHelper(depth, wrapper[0], wrapper[1]);
+                var grammar = UBNFMapper.parse(source).grammars().get(0);
+                var shapes = new RecursiveSemanticShapes(grammar, true);
+                if (depth == limit) {
+                    assertEquals("#node", shapes.rule("H").kind());
+                } else {
+                    var error = assertThrows(IllegalArgumentException.class, () -> shapes.rule("H"));
+                    assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256", error.getMessage());
+                }
+                assertGeneratedBytes(binary, "boundary-" + report.size(), source, report);
+            }
+        }
+        var source = new StringBuilder("grammar Pbt { @package: pbt.corpus "
+            + "@root @mapping(N0, params=[x]) R0 ::= 'x' C0 @x");
+        for (int i = 0; i < 700; i++) source.append(" | 'z' F").append(i);
+        source.append("; ");
+        for (int i = 0; i < 80; i++) source.append("C").append(i).append(" ::= ")
+            .append(i == 79 ? "M" : "C" + (i + 1)).append("; ");
+        source.append("@mapping(NM) M ::= 'm'; ");
+        for (int i = 0; i < 700; i++) {
+            source.append("F").append(i).append(" ::= ");
+            for (char c = 'a'; c <= 't'; c++) source.append("'").append(c).append("' ");
+            source.append("; ");
+        }
+        source.append("}");
+        var workGrammar = UBNFMapper.parse(source.toString()).grammars().get(0);
+        var workError = assertThrows(IllegalArgumentException.class,
+            () -> new RecursiveSemanticShapes(workGrammar, true).rule("C0"));
+        assertEquals("E-RECURSIVE-SHAPE: analysis work exceeds 1000000", workError.getMessage());
+        assertGeneratedBytes(binary, "acyclic-work-80-700", source.toString(), report);
+        Files.write(Path.of("target/rust-preferred-shape-limits.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    private static String nestedHelper(int depth, String open, String close) {
+        return "grammar Pbt { @package: pbt.corpus @root @mapping(N0, params=[x]) "
+            + "R0 ::= 'x' H @x; H ::= " + open.repeat(depth) + "'a' M" + close.repeat(depth)
+            + "; @mapping(NM) M ::= 'm'; }";
+    }
+
+    private void assertGeneratedBytes(Path binary, String name, String source, List<String> report) throws Exception {
+        Path grammar = temporary.newFile(name + ".ubnf").toPath();
+        Files.writeString(grammar, source);
+        Path output = temporary.getRoot().toPath().resolve(name);
+        var generated = command(List.of(binary.toString(), "generate", "--grammar", grammar.toString(),
+            "--output", output.toString()), true);
+        assertEquals(name + "\n" + generated.output(), 0, generated.code());
+        var expected = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
+        assertEquals(name, 5, expected.size());
+        for (var file : expected) assertArrayEquals(name + " / " + file.relativePath(),
+            file.content().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(output.resolve(file.relativePath())));
+        var parser = expected.stream().filter(file -> file.relativePath().equals("parser.rs")).findFirst().orElseThrow();
+        assertTrue(name + ": preferred projection", parser.content().contains("#preferred-depth:"));
+        report.add(name + "\t5");
     }
 
     private record Result(int code, String output) {}
