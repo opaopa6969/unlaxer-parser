@@ -220,6 +220,249 @@ fn a_grammar_nested_in_a_token_stream_session_keeps_the_consumed_frontier() {
     }
 }
 
+fn nested_frontier_leaf(context: &mut ParseContext<'_>) -> ParseResult {
+    let grammar = unlaxer_runtime::share_grammar(vec![unlaxer_runtime::Rule {
+        name: "Leaf",
+        expression: Expr::literal("é"),
+    }]);
+    context.parse_shared_grammar(&grammar, 0, false)
+}
+
+fn nested_frontier_bridge(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse_grammar(
+        vec![unlaxer_runtime::Rule {
+            name: "Inner",
+            expression: Expr::Custom(nested_frontier_leaf),
+        }],
+        0,
+        false,
+    )
+}
+
+fn nested_frontier_rules<const DEPTH: usize>() -> Vec<unlaxer_runtime::Rule> {
+    let tail = match DEPTH {
+        1 => Expr::literal("é"),
+        2 => Expr::Custom(nested_frontier_leaf),
+        3 => Expr::Custom(nested_frontier_bridge),
+        _ => panic!("未対応の入れ子の深さ: {DEPTH}"),
+    };
+    vec![unlaxer_runtime::Rule {
+        name: "Middle",
+        expression: Expr::sequence([
+            Expr::literal("a"),
+            Expr::JavaLookahead {
+                pattern: "x",
+                positive: true,
+            },
+            tail,
+        ]),
+    }]
+}
+
+fn nested_frontier<const DEPTH: usize>(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse_grammar(nested_frontier_rules::<DEPTH>(), 0, false)
+}
+
+const NESTED_FRONTIER_ENTRIES: [fn(&mut ParseContext<'_>) -> ParseResult; 3] = [
+    nested_frontier::<1>,
+    nested_frontier::<2>,
+    nested_frontier::<3>,
+];
+
+#[test]
+fn one_to_three_nested_grammars_keep_the_token_stream_consumed_frontier() {
+    for (depth, entry) in NESTED_FRONTIER_ENTRIES.into_iter().enumerate() {
+        let grammar = unlaxer_runtime::share_grammar(vec![unlaxer_runtime::Rule {
+            name: "Outer",
+            expression: Expr::Custom(entry),
+        }]);
+        for mode in [
+            unlaxer_runtime::lexing::Mode::Direct,
+            unlaxer_runtime::lexing::Mode::TriviaCache,
+            unlaxer_runtime::lexing::Mode::TokensLazy,
+            unlaxer_runtime::lexing::Mode::TokensEager,
+        ] {
+            for input in ["ax", "axé"] {
+                let label = format!("深さ{}/{mode:?}/{input}", depth + 1);
+                let outcome = unlaxer_runtime::lexing::parse(
+                    &grammar,
+                    0,
+                    false,
+                    input,
+                    unlaxer_runtime::lexing::Options {
+                        mode,
+                        preserve_trivia: true,
+                    },
+                    std::sync::Arc::from([]),
+                )
+                .unwrap();
+                assert!(!outcome.succeeded, "{label}");
+                assert_eq!(outcome.farthest, 1, "{label}");
+                assert_eq!(outcome.expected, ["é"], "{label}");
+                assert_eq!((outcome.consumed, outcome.matched), (0, 0), "{label}");
+            }
+        }
+    }
+}
+
+#[test]
+fn nested_grammars_outside_a_token_stream_keep_the_matched_frontier() {
+    for (depth, entry) in NESTED_FRONTIER_ENTRIES.into_iter().enumerate() {
+        for memo in [Memoization::Off, Memoization::SafeFailures] {
+            for diagnostics in [
+                Diagnostics::Auto,
+                Diagnostics::Detailed,
+                Diagnostics::DetailedOnFailure,
+            ] {
+                let label = format!("深さ{}/{memo:?}/{diagnostics:?}", depth + 1);
+                let mut context = ParseContext::with_options("ax", options(memo, diagnostics));
+                let result = context.parse_grammar(
+                    vec![unlaxer_runtime::Rule {
+                        name: "Outer",
+                        expression: Expr::Custom(entry),
+                    }],
+                    0,
+                    false,
+                );
+                assert!(result.is_err(), "{label}");
+                let offset = if diagnostics == Diagnostics::DetailedOnFailure {
+                    0
+                } else {
+                    2
+                };
+                assert_eq!(context.failure().offset, offset, "{label}");
+                assert_eq!((context.position(), context.matched_position()), (0, 0));
+                if diagnostics != Diagnostics::DetailedOnFailure {
+                    let stack = context.rule_stack().unwrap();
+                    assert_eq!(stack.offset, 2, "{label}");
+                    assert_eq!(stack.frames.len(), depth + 2, "{label}");
+                    for frame in &stack.frames[2..] {
+                        assert_eq!(frame.start, 2, "{label}/{frame:?}");
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn shared_nested_frontier(context: &mut ParseContext<'_>) -> ParseResult {
+    let grammar = unlaxer_runtime::embedded::CstGrammar {
+        name: "Child".into(),
+        grammar: unlaxer_runtime::share_grammar(nested_frontier_rules::<3>()),
+        entries: [("Root".to_owned(), 0)].into_iter().collect(),
+        bindings: Vec::new(),
+        whitespace: false,
+    };
+    let registry = unlaxer_runtime::shared_calls::Registry::new(
+        [(child_language(), grammar)].into_iter().collect(),
+    )
+    .unwrap();
+    registry
+        .call(context, &child_language())
+        .map_err(|failure| failure.error)
+}
+
+fn nested_shared_frontier(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse_grammar(
+        vec![unlaxer_runtime::Rule {
+            name: "SessionChild",
+            expression: Expr::Custom(shared_nested_frontier),
+        }],
+        0,
+        false,
+    )
+}
+
+#[test]
+fn shared_calls_from_token_streams_keep_the_child_matched_frontier() {
+    // session を直接外す経路と、入れ子がすでに外した経路の両方を検証する。
+    for entry in [shared_nested_frontier, nested_shared_frontier] {
+        let grammar = unlaxer_runtime::share_grammar(vec![unlaxer_runtime::Rule {
+            name: "Outer",
+            expression: Expr::Custom(entry),
+        }]);
+        for mode in [
+            unlaxer_runtime::lexing::Mode::Direct,
+            unlaxer_runtime::lexing::Mode::TriviaCache,
+            unlaxer_runtime::lexing::Mode::TokensLazy,
+            unlaxer_runtime::lexing::Mode::TokensEager,
+        ] {
+            let outcome = unlaxer_runtime::lexing::parse(
+                &grammar,
+                0,
+                false,
+                "ax",
+                unlaxer_runtime::lexing::Options {
+                    mode,
+                    preserve_trivia: true,
+                },
+                std::sync::Arc::from([]),
+            )
+            .unwrap();
+            assert!(!outcome.succeeded, "{mode:?}");
+            assert_eq!(outcome.farthest, 2, "{mode:?}");
+            assert_eq!(outcome.expected, ["é"], "{mode:?}");
+            assert_eq!((outcome.consumed, outcome.matched), (0, 0), "{mode:?}");
+        }
+    }
+}
+
+fn shared_call_then_frontier(context: &mut ParseContext<'_>) -> ParseResult {
+    // 子 'b' 'c' の成功・失敗にかかわらず、その後も session 内の解析を続ける。
+    let _ = call_child(context);
+    context.parse_grammar(nested_frontier_rules::<3>(), 0, false)
+}
+
+fn nested_shared_call_then_frontier(context: &mut ParseContext<'_>) -> ParseResult {
+    context.parse_grammar(
+        vec![unlaxer_runtime::Rule {
+            name: "SessionChild",
+            expression: Expr::Custom(shared_call_then_frontier),
+        }],
+        0,
+        false,
+    )
+}
+
+#[test]
+fn shared_calls_restore_the_session_frontier_after_success_and_failure() {
+    let grammar = unlaxer_runtime::share_grammar(vec![unlaxer_runtime::Rule {
+        name: "Outer",
+        expression: Expr::Custom(nested_shared_call_then_frontier),
+    }]);
+    for mode in [
+        unlaxer_runtime::lexing::Mode::Direct,
+        unlaxer_runtime::lexing::Mode::TriviaCache,
+        unlaxer_runtime::lexing::Mode::TokensLazy,
+        unlaxer_runtime::lexing::Mode::TokensEager,
+    ] {
+        for (input, offset, shared_succeeded) in [("ax", 1, false), ("bcax", 3, true)] {
+            let label = format!("{mode:?}/{input}");
+            let outcome = unlaxer_runtime::lexing::parse(
+                &grammar,
+                0,
+                false,
+                input,
+                unlaxer_runtime::lexing::Options {
+                    mode,
+                    preserve_trivia: true,
+                },
+                std::sync::Arc::from([]),
+            )
+            .unwrap();
+            assert!(!outcome.succeeded, "{label}");
+            assert_eq!(outcome.farthest, offset, "{label}");
+            assert_eq!(outcome.expected, ["é"], "{label}");
+            assert_eq!(
+                BC_FAILURE.with(|cell| cell.borrow_mut().take()).is_none(),
+                shared_succeeded,
+                "{label}"
+            );
+            assert_eq!((outcome.consumed, outcome.matched), (0, 0), "{label}");
+        }
+    }
+}
+
 fn kind(value: &str) -> TokenKind {
     match value {
         "consumed" => TokenKind::Consumed,

@@ -16,6 +16,10 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 - 生成した Rust parser の失敗位置と rule stack を Java に揃えた (#706)。UBNF の正の `LOOKAHEAD`・`EMPTY`・`UNTIL` が matched cursor だけを進めた後の失敗は、Java と同じく matched の到達位置（たとえば `R0 ::= 'a' AHEAD 'é'` に `ax` で CP1 → CP2）で報告され、その後に始まる rule の開始位置も同じく後ろへ進む。受理・cursor・CST・AST は変わらない。式単位の入口（`ParseContext::parse` など）と token stream の中は従来どおり。[契約](docs/prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)。
 
+### Fixed
+
+- Rust の lexing session 内で grammar を 2 段以上入れ子に呼ぶと、正の `LOOKAHEAD` 後の frontier 補正が復活する問題を修正 (#734)。session の範囲を入れ子へ引き継ぎ、何段でも consumed の失敗位置と rule frame 開始位置を保つ。session 外と shared call の子では従来どおり補正する。[契約](docs/rule-stack-diagnostics.md)。
+
 ## [3.3.0] - 2026-10-16
 
 ### Added
