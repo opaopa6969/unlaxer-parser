@@ -22,6 +22,8 @@ jobs:
   rust:
     name: Rust backend and Java conformance
     runs-on: [unlaxer-parser-ci, Linux, X64]
+    env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
     timeout-minutes: 60
     steps:
     - uses: actions/checkout@v4
@@ -34,9 +36,8 @@ jobs:
       run: |
         export PATH="$HOME/.cargo/bin:$PATH"
         echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-        rustup toolchain install 1.85.0 --profile minimal --component rustfmt --component clippy
-        rustup target add --toolchain 1.85.0 wasm32-unknown-unknown
-        echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
+        rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update --component rustfmt --component clippy
+        rustup target add --toolchain "$RUSTUP_TOOLCHAIN" wasm32-unknown-unknown
     - name: Rust standalone checks
       run: |
         cargo fmt --all --manifest-path rust/Cargo.toml --check
@@ -401,6 +402,8 @@ jobs:
 
   build:
     runs-on: [unlaxer-parser-ci, Linux, X64]
+    env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
     timeout-minutes: 60
 
     steps:
@@ -416,8 +419,7 @@ jobs:
     # Maven's native emitter comparison intentionally runs Cargo offline.
     - name: Prepare locked Rust dependencies for offline generator tests
       run: |
-        rustup toolchain install 1.85.0 --profile minimal
-        echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
+        rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
         cargo +1.85.0 fetch --locked --manifest-path rust/Cargo.toml
 
     - name: Validate Central release guard
@@ -451,6 +453,8 @@ jobs:
   build-jdk17:
     name: "*-jdk17 artifacts on JDK 17"
     runs-on: [unlaxer-parser-ci, Linux, X64]
+    env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
     timeout-minutes: 60
 
     steps:
@@ -466,8 +470,7 @@ jobs:
     # Maven's native emitter comparison intentionally runs Cargo offline.
     - name: Prepare locked Rust dependencies for offline generator tests
       run: |
-        rustup toolchain install 1.85.0 --profile minimal
-        echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
+        rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
         cargo +1.85.0 fetch --locked --manifest-path rust/Cargo.toml
 
     - name: Build and test the -jdk17 modules on JDK 17
@@ -503,6 +506,8 @@ jobs:
   vsix:
     name: UBNF VSIX (ubnf-vscode)
     runs-on: [unlaxer-parser-ci, Linux, X64]
+    env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
     timeout-minutes: 60
 
     steps:
@@ -534,11 +539,9 @@ jobs:
 
     - name: Activate the packaged VSIX with isolated VS Code profiles
       working-directory: unlaxer-dsl/ubnf-vscode
-      env:
-        RUSTUP_TOOLCHAIN: 1.85.0
       run: |
         export PATH="$HOME/.cargo/bin:$PATH"
-        rustup toolchain install 1.85.0 --profile minimal --target wasm32-unknown-unknown
+        rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update --target wasm32-unknown-unknown
         xvfb-run -a npm run test:vsix
 
     - name: Upload VSIX artifact
@@ -554,6 +557,8 @@ jobs:
   downstream:
     name: Downstream smoke (tinyexpression)
     runs-on: [unlaxer-parser-ci, Linux, X64]
+    env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
     timeout-minutes: 60
 
     steps:
@@ -653,8 +658,7 @@ jobs:
 
     - name: Set up Rust for actual tinyexpression token conformance
       run: |
-        rustup toolchain install 1.85.0 --profile minimal
-        echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
+        rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
 
     - name: Compare real tinyexpression external tokens with both Rust generators
       working-directory: unlaxer-parser
@@ -739,7 +743,7 @@ jobs:
     runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 30
     env:
-      RUSTUP_TOOLCHAIN: 1.85.0
+      RUSTUP_TOOLCHAIN: '1.85.0'
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
@@ -753,7 +757,7 @@ jobs:
     - name: Prepare Rust 1.85
       run: |
         export PATH="$HOME/.cargo/bin:$PATH"
-        rustup toolchain install 1.85.0 --profile minimal --component rustfmt,clippy
+        rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update --component rustfmt,clippy
         echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
     - name: Build Java server from current generators
       run: mvn -B -pl unlaxer-common,unlaxer-dsl,unlaxer-dsl/tinycalc-vscode -am package -DskipTests -Dgpg.skip=true

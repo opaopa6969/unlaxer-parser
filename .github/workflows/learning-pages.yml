@@ -28,6 +28,7 @@ jobs:
     runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 30
     env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
       CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@v4
@@ -36,8 +37,7 @@ jobs:
           node-version: '20'
       - name: Prepare Rust and WASM
         run: |
-          rustup toolchain install 1.85.0 --profile minimal --target wasm32-unknown-unknown
-          echo "RUSTUP_TOOLCHAIN=1.85.0" >> "$GITHUB_ENV"
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update --target wasm32-unknown-unknown
       - name: Build the static learning site
         run: node scripts/build-learning.mjs
       - name: Verify all lessons in a browser

@@ -6,6 +6,8 @@ on:
 jobs:
   external-language-providers:
     runs-on: [unlaxer-parser-ci, Linux, X64]
+    env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -16,7 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20.20.0'
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Rust toolchain を既定を変更せずに準備
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
       - name: Prepare locked dependencies for the offline LSP diagnostic probe
         run: cargo fetch --locked --manifest-path rust/Cargo.toml
       - name: Install the locked TypeScript 5.9.3 compiler without package scripts

@@ -6,6 +6,8 @@ on:
 jobs:
   analysis-pipeline:
     runs-on: [unlaxer-parser-ci, Linux, X64]
+    env:
+      RUSTUP_TOOLCHAIN: '1.85.0'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -13,7 +15,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           overwrite-settings: false
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Rust toolchain を既定を変更せずに準備
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
       - run: mvn -B -pl unlaxer-common -am test -Dtest=AnalysisPipelineTest -Dsurefire.failIfNoSpecifiedTests=false
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test pipeline
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=PreprocessingConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
