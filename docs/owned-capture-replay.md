@@ -67,23 +67,31 @@ states the runtime contract only.
 
 ## match-only の結果を capture する場合
 
-`token AHEAD = LOOKAHEAD('x')` に対する `CAPTURE(name, AHEAD)` は、Java の
-`NamedCapture` と同じく子の結果の原文を保存する。Java の
-`ParseContext.parseCaptureBoundary` は `result.getRootToken().source` を値として取り、
-結果 token がなければ現在位置の空の source を使う。正の先読みは原文 token を返すので、
-consumed cursor の移動幅が 0 でも束縛値は空とは限らない。
+Java の `ParseContext.parseCaptureBoundary` は子が返した
+`result.getRootToken().source` を保存する。結果 token がなければ現在位置の空の source を使う。
+`Transaction.commit` の収集では `tokenKind.passFilter` により親と同じ kind の token だけを
+原文へ連結する。そのため consumed の Chain 内にある LOOKAHEAD や、EMPTY・UNTIL の
+先読み部分は値に入らない。`max(consumed, matched)` は保存範囲の契約ではない。
 
-Rust の非 Classic 経路では `OwnedCapture` の入力 span を capture 開始位置から
-`max(consumed, matched)` までとして、その範囲の原文を保存する（#729）。
-Classic 経路では従来どおり子の source を使い、投影・生成した値もそのまま保持する。
-全入力入口のモード選択は変更しない。通常の `ParseContext::parse` / `parse_grammar`
-には既存の `requires_classic_mode` による自動選択があり、これは CAPTURE / SAME_AS 以外の
-Classic ラッパーにも適用される。子の CST・両 cursor・AST field capture は変更しない。
+`CAPTURE(w, AHEAD)`（`token AHEAD = LOOKAHEAD('x')`）では、子の root 自体が
+match-only token なので、consumed cursor が動かなくても値は `x` になる。
+一方 `CAPTURE(w, 'a' AHEAD)` の値は consumed の `a` だけである。
+Choice は選択した子の Parsed を返すため、先読み分岐ならその原文を保持する。
+Choice を経由した結果と、親へ commit する consumed CST の原文は区別する。
+単一要素の rule や明示 group が Chain を作る場合は、その consumed の原文を使う。
+token 別名や call-by-value の脱糖も、最終的に返る子の root token に従う。
 
-たとえば `LOOKAHEAD('x')` を consumed/matched とも CP1 で照合すると、capture 後は
-consumed CP1 / matched CP2、束縛値は `x`（入力 span CP1..2）になる。
-続く consumed の `SAME_AS(name)` は Java の `ReplayParser` と同じく CP1 から `x` を
-照合・消費し、両 cursor を CP2 にする。空の束縛も定義済みの値であり、再照合は幅0で成功する。
-Classic の match-only の再照合は matched cursor から照合し、その cursor だけを進める。
+Rust の非 Classic 経路は正の LOOKAHEAD の結果 span を Fragment に保持し、
+透明な capture と選択した Choice を通して伝える（#729）。消費側の Chain・反復は
+この結果 span を集めず、従来の consumed 範囲を使う。rule の結果に必要な span は
+CST の span とは別に保持し、成功 memo の再生でも復元する。
+Classic 経路では従来どおり子の source を使い、投影・生成した値も保持する。
+全入力入口のモード選択、CST node 数、両 cursor、AST field capture は変更しない。
+通常の `ParseContext::parse` / `parse_grammar` には既存の `requires_classic_mode` による
+自動選択があり、CAPTURE / SAME_AS 以外の Classic ラッパーにも適用される。
+
+続く consumed の `SAME_AS(w)` は保存した値を consumed cursor から照合・消費する。
+空の束縛も定義済みの値であり、再照合は幅0で成功する。
+Classic の match-only の再照合は matched cursor だけを進める。
 補助文字を含む値の幅と公開する span/cursor は CP 単位である。
 純 PEG assertion は token も cursor の前進も公開しないため、その空の結果とは区別する。

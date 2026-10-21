@@ -10,7 +10,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
-- Rust の非 Classic 経路の CAPTURE が、正の LOOKAHEAD の matched 範囲の原文を保存するよう修正 (#729)。SAME_AS はその値を consumed cursor から再照合する。入口のモード選択・AST field capture・CST は従来どおり。
+- Rust の非 Classic 経路の CAPTURE が、Java と同じ子の root token の原文を保存するよう修正 (#729)。直接の LOOKAHEAD の値を保持し、consumed の Chain・EMPTY・UNTIL の先読み部分は値に含めない。SAME_AS は保存した値を consumed cursor から再照合する。入口のモード選択・AST field capture・CST は従来どおり。
 
 ### Changed
 

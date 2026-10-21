@@ -671,3 +671,42 @@ fn lookahead_capture_replays_matched_text_at_every_full_input_entry() {
         }
     }
 }
+
+#[test]
+fn selected_lookahead_source_survives_rule_success_memo_without_changing_cst() {
+    use unlaxer_runtime::{parse_detailed_with_options, Rule};
+
+    let rules = [
+        Rule {
+            name: "R0",
+            expression: Expr::choice([
+                Expr::sequence([Expr::Rule(1).capture_owned("discard"), Expr::literal("z")]),
+                Expr::sequence([Expr::Rule(1).capture_owned("w"), Expr::Replay("w")]),
+            ]),
+        },
+        Rule {
+            name: "R1",
+            expression: Expr::choice([
+                Expr::JavaLookahead {
+                    pattern: "x",
+                    positive: true,
+                },
+                Expr::literal("q"),
+            ]),
+        },
+    ];
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        let options = ParseOptions::with_memoization(memo);
+        let mut context = ParseContext::with_options("x", options);
+        context.parse_grammar(rules.to_vec(), 0, false).unwrap();
+        assert_eq!(context.captured_text("w"), Some("x"));
+        assert_eq!(context.position(), 1);
+        if memo == Memoization::SafeFailures {
+            assert!(context.memoized_success_hits() > 0);
+        }
+        let tree = parse_detailed_with_options(&rules, 0, false, "x", options).unwrap();
+        assert_eq!(tree.nodes.len(), 2);
+        assert_eq!(tree.nodes[0].span, Span { start: 0, end: 0 });
+        assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end: 1 });
+    }
+}

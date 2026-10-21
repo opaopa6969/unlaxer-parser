@@ -818,7 +818,7 @@ struct Fragment {
     source: Option<Box<FragmentSource>>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct FragmentSource {
     span: Span,
     kind: token::TokenKind,
@@ -1352,6 +1352,7 @@ impl MemoValue for FailureDiagnostic {
 /// No arena IDs or caller-owned metadata escape into the memo. Node edges are
 /// relative to this snapshot; spans remain absolute original-source CP offsets.
 struct SuccessMemo {
+    result_source: Option<Box<FragmentSource>>,
     nodes: Vec<Node>,
     tokens: token::MemoTokens,
     root: usize,
@@ -1684,6 +1685,8 @@ pub struct ParseContext<'a> {
     // with DetailedOnFailure, where a failed candidate records no diagnostics.
     first_sets: Option<Arc<[first::FirstSet]>>,
     exclusion_audit: bool,
+    // rule() の直近の成功結果。呼出元が直ちに取り出し、CST/transaction 状態には含めない。
+    rule_result_source: Option<Box<FragmentSource>>,
     tokens: Rc<token::Store>,
     next_token_generation: u64,
     unique_choice_failure_seen: bool,
@@ -2104,6 +2107,7 @@ impl<'a> ParseContext<'a> {
             checkpoint_metrics_scope_journal_base: 0,
             first_sets: None,
             exclusion_audit: false,
+            rule_result_source: None,
             tokens: Rc::new(token::Store::new()),
             next_token_generation: 1,
             unique_choice_failure_seen: false,
@@ -3090,6 +3094,11 @@ impl<'a> ParseContext<'a> {
             .saturating_add(std::mem::size_of_val(journal))
             .saturating_add(journal.len().saturating_mul(std::mem::size_of::<Span>()))
             .saturating_add(diagnostic.retained_bytes());
+        if let Some(source) = &self.rule_result_source {
+            bytes = bytes
+                .saturating_add(std::mem::size_of::<FragmentSource>())
+                .saturating_add(source.text.as_ref().map_or(0, |text| text.len()));
+        }
         if bytes > limit {
             self.success_memo.budget_misses = self.success_memo.budget_misses.saturating_add(1);
             return;
@@ -3155,6 +3164,7 @@ impl<'a> ParseContext<'a> {
             position / FAILURE_MEMO_BUCKET_SIZE,
             key,
             Rc::new(SuccessMemo {
+                result_source: self.rule_result_source.clone(),
                 nodes,
                 tokens: token::MemoTokens::capture(&self.tokens, start, self.nodes.len()),
                 root: root - start,
@@ -3191,11 +3201,14 @@ impl<'a> ParseContext<'a> {
         self.matched_position = entry.matched;
         self.match_cursor_policy = entry.policy;
         self.replay_failure(&entry.diagnostic);
+        self.rule_result_source = entry.result_source.clone();
         start + entry.root
     }
 
     #[inline(never)]
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
+        // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
+        self.rule_result_source = fragment.source.clone();
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
         let classic = fragment
             .source
@@ -3301,13 +3314,15 @@ impl<'a> ParseContext<'a> {
             Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
                 nodes: vec![id],
                 captures: Vec::new(),
-                source: self.tokens.values.get(&id).map(|value| {
-                    Box::new(FragmentSource {
-                        span: self.nodes[id].span,
-                        kind: value.kind,
-                        classic: true,
-                        generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                        text: value.source.owned_shared(),
+                source: self.rule_result_source.take().or_else(|| {
+                    self.tokens.values.get(&id).map(|value| {
+                        Box::new(FragmentSource {
+                            span: self.nodes[id].span,
+                            kind: value.kind,
+                            classic: value.classic,
+                            generated: matches!(value.source, token::TokenSource::Generated { .. }),
+                            text: value.source.owned_shared(),
+                        })
                     })
                 }),
             }),
@@ -3413,6 +3428,19 @@ impl<'a> ParseContext<'a> {
                             text: None,
                         }));
                     }
+                }
+                if self.token_mode.is_none()
+                    && matches!(
+                        expression,
+                        Expr::Optional(_) | Expr::JavaOptional(_) | Expr::Recovery { .. }
+                    )
+                    && fragment
+                        .source
+                        .as_deref()
+                        .is_some_and(|source| !source.classic)
+                {
+                    // consumed の collector は先読みの Parsed 原文を引き継がない。
+                    fragment.source = None;
                 }
                 fragment
             })
@@ -3674,10 +3702,27 @@ impl<'a> ParseContext<'a> {
                 let matched =
                     !pattern.is_empty() && self.input[self.matched_position..].starts_with(pattern);
                 if matched == *positive {
+                    let start = self.matched_position;
                     if *positive {
                         self.matched_position += pattern.len();
                     }
-                    Some(Fragment::default())
+                    // 正の先読みだけが match-only の root token を返す。
+                    // EMPTY / UNTIL と消費側 collector の原文には含めない。
+                    Some(Fragment {
+                        source: positive.then(|| {
+                            Box::new(FragmentSource {
+                                span: Span {
+                                    start: self.code_point(start),
+                                    end: self.code_point(self.matched_position),
+                                },
+                                kind: token::TokenKind::MatchOnly,
+                                classic: false,
+                                generated: false,
+                                text: None,
+                            })
+                        }),
+                        ..Fragment::default()
+                    })
                 } else {
                     self.fail_at(
                         self.matched_position,
@@ -4433,18 +4478,12 @@ impl<'a> ParseContext<'a> {
         let span = fragment
             .source
             .as_deref()
-            .filter(|source| source.classic)
+            .filter(|source| source.classic || owned)
             .map_or_else(
                 || Span {
                     start: self.code_point(start),
-                    // Java NamedCapture は子の結果 token の原文を保存する。
-                    // 非 Classic 経路でも match-only の到達範囲を値に含めるが、
-                    // AST field capture の consumed 範囲と子の CST は変えない。
-                    end: self.code_point(if owned {
-                        self.position.max(self.matched_position)
-                    } else {
-                        self.position
-                    }),
+                    // Java と同じ子の Parsed の root 原文を保存する。
+                    end: self.code_point(self.position),
                 },
                 |source| source.span,
             );
@@ -4597,7 +4636,15 @@ impl<'a> ParseContext<'a> {
             | Expr::CaptureBoundary(_, child)
             | Expr::InputCaptureBoundary(_, child) => {
                 let start = self.position;
-                let fragment = self.expression(child, depth)?;
+                let mut fragment = self.expression(child, depth)?;
+                // AST 境界の node/span は従来の consumed 契約を保つ。
+                if fragment
+                    .source
+                    .as_deref()
+                    .is_some_and(|source| !source.classic)
+                {
+                    fragment.source = None;
+                }
                 if matches!(expression, Expr::InputCaptureBoundary(_, _))
                     && fragment
                         .source

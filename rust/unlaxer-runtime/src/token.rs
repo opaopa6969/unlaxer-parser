@@ -1268,7 +1268,13 @@ impl ParseContext<'_> {
         fallback: Span,
         owner_start: usize,
     ) {
-        if self.token_mode.is_none() && result.source.is_none() && child.source.is_none() {
+        if self.token_mode.is_none()
+            && !result
+                .source
+                .as_deref()
+                .is_some_and(|source| source.classic)
+            && !child.source.as_deref().is_some_and(|source| source.classic)
+        {
             result.nodes.append(&mut child.nodes);
             result.captures.append(&mut child.captures);
             return;
@@ -1364,6 +1370,10 @@ impl ParseContext<'_> {
         kind: TokenKind,
         label: &'static str,
     ) -> Fragment {
+        // Java Choice は選択した子の Parsed を返す。CST の収集値で上書きしない。
+        let selected_source = matches!(label, "Choice" | "LongestChoice" | "UniqueLongestChoice")
+            .then(|| fragment.source.clone())
+            .flatten();
         let mut original = fragment.nodes.clone();
         // Java Choice publishes the selected child's Parsed object, while the
         // committed CST still contains the Choice collector.
@@ -1401,6 +1411,9 @@ impl ParseContext<'_> {
         info.original = Some(original);
         info.classic = true;
         fragment.nodes = vec![id.index];
+        if selected_source.is_some() {
+            fragment.source = selected_source;
+        }
         fragment
     }
     pub(crate) fn mark_classic_node(&mut self, index: usize, source: &FragmentSource) {
