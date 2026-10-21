@@ -1899,11 +1899,6 @@ fn parse_detailed_stacked(
     parser.rules = rules;
     parser.whitespace = whitespace;
     parser.grammar_frontier = true;
-    // 診断の再解析でも、CAPTURE/SAME_AS と Classic ラッパーの token 原文と
-    // cursor の規則を ParseContext::parse_grammar と揃える。
-    if requires_classic_mode(&Expr::Rule(root), &parser.rules) {
-        parser.token_mode = Some(token::ParseMode::default());
-    }
     if parser.first_sets.is_some() {
         parser.first_sets = Some(first::table(&parser.rules));
     }
@@ -4439,7 +4434,20 @@ impl<'a> ParseContext<'a> {
             .source
             .as_deref()
             .filter(|source| source.classic)
-            .map_or_else(|| self.span(start), |source| source.span);
+            .map_or_else(
+                || Span {
+                    start: self.code_point(start),
+                    // Java NamedCapture は子の結果 token の原文を保存する。
+                    // 非 Classic 経路でも match-only の到達範囲を値に含めるが、
+                    // AST field capture の consumed 範囲と子の CST は変えない。
+                    end: self.code_point(if owned {
+                        self.position.max(self.matched_position)
+                    } else {
+                        self.position
+                    }),
+                },
+                |source| source.span,
+            );
         if !owned {
             // Keep the existing AST field contract and its input-only metadata.
             if fragment

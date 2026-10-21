@@ -659,6 +659,8 @@ fn lookahead_capture_replays_matched_text_at_every_full_input_entry() {
                     let tree =
                         parse_detailed_with_options(&rules, 0, false, input, options).unwrap();
                     assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end });
+                    // 全入力入口では Classic の meta node を増やさない。
+                    assert_eq!(tree.nodes.len(), 1);
                     let shared = std::sync::Arc::from(rules);
                     assert!(parse_detailed_shared_with_rule_stack(
                         &shared, 0, false, input, options

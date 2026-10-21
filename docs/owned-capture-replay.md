@@ -67,15 +67,23 @@ states the runtime contract only.
 
 ## match-only の結果を capture する場合
 
-`token AHEAD = LOOKAHEAD('x')` に対する `CAPTURE(name, AHEAD)` は、子が返した
-match-only token の原文を保持する。
-consumed cursor の移動幅が 0 でも、束縛値は空とは限らない。たとえば `LOOKAHEAD('x')`
-を consumed/matched とも CP1 で照合すると、capture 後は consumed CP1 / matched CP2、
-束縛値は `x`（入力 span CP1..2）になる。続く consumed の `SAME_AS(name)` は CP1 から
-`x` を消費し、両 cursor が CP2 になる。capture は子の CST や cursor を変えない。
+`token AHEAD = LOOKAHEAD('x')` に対する `CAPTURE(name, AHEAD)` は、Java の
+`NamedCapture` と同じく子の結果の原文を保存する。Java の
+`ParseContext.parseCaptureBoundary` は `result.getRootToken().source` を値として取り、
+結果 token がなければ現在位置の空の source を使う。正の先読みは原文 token を返すので、
+consumed cursor の移動幅が 0 でも束縛値は空とは限らない。
 
-これは Java の `NamedCapture` が子の結果 token の source を保存する Classic 互換の意味であり、
-Rust もこれに揃える（#729）。Rust の context 解析と全入力解析（診断の再解析を含む）は、
-どちらも `CAPTURE` / `SAME_AS` に必要な Classic モードを選ぶ。補助文字を含む入力でも
-値の幅と公開する span/cursor は CP 単位である。純 PEG assertion は token も cursor の前進も
-公開しないため、それを capture した空の結果とは区別する。
+Rust の非 Classic 経路では `OwnedCapture` の入力 span を capture 開始位置から
+`max(consumed, matched)` までとして、その範囲の原文を保存する（#729）。
+Classic 経路では従来どおり子の source を使い、投影・生成した値もそのまま保持する。
+全入力入口のモード選択は変更しない。通常の `ParseContext::parse` / `parse_grammar`
+には既存の `requires_classic_mode` による自動選択があり、これは CAPTURE / SAME_AS 以外の
+Classic ラッパーにも適用される。子の CST・両 cursor・AST field capture は変更しない。
+
+たとえば `LOOKAHEAD('x')` を consumed/matched とも CP1 で照合すると、capture 後は
+consumed CP1 / matched CP2、束縛値は `x`（入力 span CP1..2）になる。
+続く consumed の `SAME_AS(name)` は Java の `ReplayParser` と同じく CP1 から `x` を
+照合・消費し、両 cursor を CP2 にする。空の束縛も定義済みの値であり、再照合は幅0で成功する。
+Classic の match-only の再照合は matched cursor から照合し、その cursor だけを進める。
+補助文字を含む値の幅と公開する span/cursor は CP 単位である。
+純 PEG assertion は token も cursor の前進も公開しないため、その空の結果とは区別する。

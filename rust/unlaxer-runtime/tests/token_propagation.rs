@@ -717,7 +717,8 @@ fn classic_unique_choice_limit_retains_the_structured_diagnostic_kind() {
         ] {
             let grammar = vec![unlaxer_runtime::Rule {
                 name: "root",
-                expression: Expr::unique_longest_choice([w("a").match_only()]),
+                // 全入力入口の自動選択に依存せず、ラッパーで Classic 経路に入る。
+                expression: Expr::unique_longest_choice([w("a").match_only()]).stop_consume(),
             }];
             let error = unlaxer_runtime::parse_detailed_with_options(
                 &grammar,

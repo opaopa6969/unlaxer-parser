@@ -1,5 +1,12 @@
 [
   {
+    "id": "owned-capture-negative-lookahead-empty-ast-field",
+    "issue": "#729",
+    "note": "PR #736 の旧実装が全入力入口を Classic に切り替えたことで生じた AST 退行。入力 a の N0.f2 は Java/Rust とも空文字列であり null ではない。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NOTAHEAD = NEGATIVE_LOOKAHEAD('y') @root @mapping(N0, params=[f2]) R0 ::= CAPTURE(w0, 'y') | NOTAHEAD @f2 'a' ; }",
+    "inputs": ["a", "y", "", "aa", "ya"]
+  },
+  {
     "id": "positive-lookahead-capture-replay",
     "issue": "#729",
     "note": "seed 142 の縮小例。CAPTURE は LOOKAHEAD の matched token の原文を保持し、SAME_AS はその値を consumed cursor から再照合する。",

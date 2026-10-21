@@ -209,9 +209,12 @@ seed は `java.util.Random` で展開する（JDK 仕様で列が固定）。同
   の `number-incomplete-exponent` でこの形だけを除外している。上表の seed `1000..1399` などの
   「finding 0」は、この差を #706 の除外に含めて数えた値である。
 - seed 142 の受理の差（[#729](https://github.com/opaopa6969/unlaxer-parser/issues/729)）は、Rust の
-  全入力解析でも CAPTURE / SAME_AS に必要な Classic モードを選ぶよう修正し、
+  非 Classic 経路の CAPTURE でも matched 範囲の原文を保存するよう修正し、
   `positive-lookahead-capture-replay` として固定した。match-only の原文を保存する
   [capture の契約](owned-capture-replay.md)に両入口を揃え、除外は追加していない。
+  全入力入口を Classic に切り替えた PR #736 の旧実装の AST 退行（seed 29 / 35 / 85 /
+  135 / 209 / 281）は、入口を従来のままにする新実装で解消し、
+  `owned-capture-negative-lookahead-empty-ast-field` に縮小例を固定した。
 - seed 59 の生成物の bytes の差（[#730](https://github.com/opaopa6969/unlaxer-parser/issues/730)）は、
   #706 の作業で seed `1..320` を回したときに見つかった既存の差で、除外していない
   （CI の seed には出ない）。
