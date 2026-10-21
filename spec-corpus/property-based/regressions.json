@@ -1,5 +1,12 @@
 [
   {
+    "id": "positive-lookahead-capture-replay",
+    "issue": "#729",
+    "note": "seed 142 の縮小例。CAPTURE は LOOKAHEAD の matched token の原文を保持し、SAME_AS はその値を consumed cursor から再照合する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') token NEG = NEGATION('ab') @root @mapping(N0) R0 ::= NEG (CAPTURE(w2, AHEAD) SAME_AS(w2)) ; }",
+    "inputs": ["😀x", "😀xx", "😀", "😀y", "ax", "x", ""]
+  },
+  {
     "id": "lookahead-diagnostic-offset",
     "issue": "#706",
     "note": "Found by seed 131 (generator revision of #705). Java diagnose reported CP2, Rust CP1; since #706 both report CP2 (the matched reach of the positive LOOKAHEAD), without an exclusion.",

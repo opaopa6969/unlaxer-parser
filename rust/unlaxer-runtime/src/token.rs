@@ -979,6 +979,7 @@ impl ParseContext<'_> {
         unique: bool,
     ) -> Option<Fragment> {
         if unique && !(2..=64).contains(&alternatives.len()) {
+            self.unique_choice_failure_seen = true;
             self.fail("2 to 64 unique longest alternatives");
             return None;
         }

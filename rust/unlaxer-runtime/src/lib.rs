@@ -1899,6 +1899,11 @@ fn parse_detailed_stacked(
     parser.rules = rules;
     parser.whitespace = whitespace;
     parser.grammar_frontier = true;
+    // 診断の再解析でも、CAPTURE/SAME_AS と Classic ラッパーの token 原文と
+    // cursor の規則を ParseContext::parse_grammar と揃える。
+    if requires_classic_mode(&Expr::Rule(root), &parser.rules) {
+        parser.token_mode = Some(token::ParseMode::default());
+    }
     if parser.first_sets.is_some() {
         parser.first_sets = Some(first::table(&parser.rules));
     }

@@ -604,3 +604,68 @@ fn failed_replay_has_the_shared_name_and_code_point_diagnostic() {
         }
     }
 }
+
+#[test]
+fn lookahead_capture_replays_matched_text_at_every_full_input_entry() {
+    use unlaxer_runtime::{
+        parse_detailed_shared_with_rule_stack, parse_detailed_with_options, Rule,
+    };
+
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            for reset in [false, true] {
+                for (input, prefix, pattern) in [
+                    ("😀x", "😀", "x"),
+                    ("a😀", "a", "😀"),
+                    ("a\r\n😀", "a", "\r\n😀"),
+                ] {
+                    let options =
+                        ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+                    let capture = Expr::JavaLookahead {
+                        pattern,
+                        positive: true,
+                    }
+                    .capture_owned("value");
+                    let mut context = ParseContext::with_options(input, options);
+                    context.set_reset_matched_with_consumed(reset);
+                    context.parse(&Expr::literal(prefix)).unwrap();
+                    context.parse(&capture).unwrap();
+                    let start = prefix.chars().count();
+                    let end = input.chars().count();
+                    assert_eq!(
+                        (context.position(), context.matched_position()),
+                        (start, end)
+                    );
+                    assert_eq!(context.captured_text("value"), Some(pattern));
+                    assert_eq!(
+                        context.captured_source("value"),
+                        Some(&TokenSource::Input(Span { start, end }))
+                    );
+                    context.parse(&Expr::Replay("value")).unwrap();
+                    assert_eq!((context.position(), context.matched_position()), (end, end));
+
+                    let rules = [Rule {
+                        name: "R0",
+                        expression: Expr::sequence([
+                            Expr::literal(prefix),
+                            capture,
+                            Expr::Replay("value"),
+                        ]),
+                    }];
+                    let tree =
+                        parse_detailed_with_options(&rules, 0, false, input, options).unwrap();
+                    assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end });
+                    let shared = std::sync::Arc::from(rules);
+                    assert!(parse_detailed_shared_with_rule_stack(
+                        &shared, 0, false, input, options
+                    )
+                    .is_ok());
+                }
+            }
+        }
+    }
+}

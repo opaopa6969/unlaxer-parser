@@ -52,6 +52,8 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- Rust の全入力解析でも CAPTURE / SAME_AS の Classic モードを選び、正の LOOKAHEAD の原文を空として保存して Java と受理・診断が食い違う問題を修正 (#729)。match-only の capture は子の結果 token の原文を保持する。
+
 - Java `REGEX` が UTF-16 の一致幅を CP 数として消費し、補助文字の後ろまで誤消費する問題を修正 (#505)。指定 TokenKind の現在位置を使うため match-only の位置も正しくなる。反転不一致は存在しない matcher group を読まず次の1 scalar を消費し、EOF/ゼロ幅一致では非空 token を作らない。Rust の汎用 REGEX 対応を追加したものではない。[共通 Unicode 契約](spec-corpus/unicode-tokens/README.md)。
 - Java/Rust snapshot の逆位置変換を候補ごとの再走査から単一走査へ変更し、二乗時間を解消 (#509)。CP/UTF-16/UTF-8/LSP の結果、EOF、CRLF、符号化途中位置の拒否を維持する。
 - DAP の `configurationDone` 再送による step 巻戻りと終了後の stopped event を防止し、launch ごとに一度だけ受理する (#504)。breakpoint の source path を正規化した program と照合し、別 source の要求で既存 breakpoint を上書きしない (#507)。[lifecycle/source 契約](docs/classic-rust-dap.md)。

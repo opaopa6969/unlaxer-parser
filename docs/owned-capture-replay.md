@@ -64,3 +64,18 @@ The runtime unit #590 is connected to general rule expressions by #591:
 [syntax and generated-consumer contract](general-owned-capture-syntax.md).
 Acceptance of the broader #572 / #545 work is recorded in those issues; this document
 states the runtime contract only.
+
+## match-only の結果を capture する場合
+
+`token AHEAD = LOOKAHEAD('x')` に対する `CAPTURE(name, AHEAD)` は、子が返した
+match-only token の原文を保持する。
+consumed cursor の移動幅が 0 でも、束縛値は空とは限らない。たとえば `LOOKAHEAD('x')`
+を consumed/matched とも CP1 で照合すると、capture 後は consumed CP1 / matched CP2、
+束縛値は `x`（入力 span CP1..2）になる。続く consumed の `SAME_AS(name)` は CP1 から
+`x` を消費し、両 cursor が CP2 になる。capture は子の CST や cursor を変えない。
+
+これは Java の `NamedCapture` が子の結果 token の source を保存する Classic 互換の意味であり、
+Rust もこれに揃える（#729）。Rust の context 解析と全入力解析（診断の再解析を含む）は、
+どちらも `CAPTURE` / `SAME_AS` に必要な Classic モードを選ぶ。補助文字を含む入力でも
+値の幅と公開する span/cursor は CP 単位である。純 PEG assertion は token も cursor の前進も
+公開しないため、それを capture した空の結果とは区別する。
