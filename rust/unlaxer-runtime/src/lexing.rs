@@ -522,3 +522,75 @@ pub(crate) fn match_goal(
     let (index, end) = select_goal(source, position, terminals)?;
     (terminals[index].name == name && terminals[index].literal == literal).then_some(end)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Diagnostics, Expr, ParseContext, ParseOptions, ParseResult, Rule};
+
+    fn leaf(context: &mut ParseContext<'_>) -> ParseResult {
+        context.parse_grammar(
+            vec![Rule {
+                name: "Leaf",
+                expression: Expr::literal("é"),
+            }],
+            0,
+            false,
+        )
+    }
+
+    fn middle(context: &mut ParseContext<'_>) -> ParseResult {
+        context.parse_grammar(
+            vec![Rule {
+                name: "Middle",
+                expression: Expr::sequence([
+                    Expr::literal("a"),
+                    Expr::JavaLookahead {
+                        pattern: "x",
+                        positive: true,
+                    },
+                    Expr::Custom(leaf),
+                ]),
+            }],
+            0,
+            false,
+        )
+    }
+
+    #[test]
+    fn nested_grammars_keep_consumed_rule_frames_and_restore_the_session_scope() {
+        for mode in [Mode::Direct, Mode::TokensEager] {
+            let grammar = crate::share_grammar(vec![Rule {
+                name: "Outer",
+                expression: Expr::Custom(middle),
+            }]);
+            let mut context = ParseContext::with_options(
+                "ax",
+                ParseOptions::default().with_diagnostics(Diagnostics::Detailed),
+            );
+            context.lexing = Some(
+                Session::new(
+                    "ax",
+                    Options {
+                        mode,
+                        preserve_trivia: true,
+                    },
+                    Arc::from(vec![]),
+                    false,
+                )
+                .unwrap(),
+            );
+
+            assert!(context.parse_shared_grammar(&grammar, 0, false).is_err());
+            assert_eq!(context.failure().offset, 1, "{mode:?}");
+            let stack = context.rule_stack().expect("rule stack");
+            let frames: Vec<_> = stack
+                .frames
+                .iter()
+                .map(|frame| format!("{}@{}", frame.rule, frame.start))
+                .collect();
+            assert_eq!(frames, ["Outer@0", "Middle@0", "Leaf@1"], "{mode:?}");
+            assert!(!context.token_stream_scope, "{mode:?}");
+        }
+    }
+}
