@@ -72,6 +72,14 @@ let failure = parse_detailed_shared_with_rule_stack(&grammar, root, whitespace, 
   only the matched cursor, so `R0 ::= 'y' (AHEAD R1) ; R1 ::= 'x' 'a'` on `yx` reports
   `R0@0>R1@2` in both versions (#706, see
   [prior-matched-diagnostics.md](prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)).
+  Inside a Rust lexing session the consumed position is used instead, at any nesting depth,
+  even though `parse_grammar` / `parse_shared_grammar` set the session aside while a nested
+  grammar runs (#734). For example `Outer ::= Custom(middle)`,
+  `Middle ::= 'a' AHEAD Custom(inner)`, `Inner ::= 'é'` on `ax` fails at CP1 with
+  `Outer@0>Middle@0>Leaf@1`; outside a session the same grammar fails at CP2.
+  `shared_calls::Registry::call` is the boundary that separates a child from the session, so
+  the child grammar and its nested grammars are adjusted as usual. After either call, success
+  or failure, the caller's scope is restored.
 - **Limit and spans.** A stack keeps its innermost `RuleStack.LIMIT` / `RULE_STACK_LIMIT` = 32
   frames and reports the dropped outer frames in `omitted`. Starts are code points of the
   original input, never bytes or UTF-16 units, and are not renumbered when frames are dropped.
