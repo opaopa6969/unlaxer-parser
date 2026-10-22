@@ -1931,7 +1931,7 @@ fn parse_detailed_stacked(
         options
     };
     let mut parser = ParseContext::with_bindings(input, bindings, options);
-    parser.track_owned_source = grammar_needs_owned_source(&rules);
+    parser.track_owned_source = shared_grammar_needs_owned_source(&rules);
     parser.rules = rules;
     parser.whitespace = whitespace;
     parser.grammar_frontier = true;
@@ -2554,8 +2554,8 @@ impl<'a> ParseContext<'a> {
             self.lexing.take()
         };
         let previous_owned_source = self.track_owned_source;
-        self.track_owned_source |= grammar_needs_owned_source(grammar);
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
+        self.track_owned_source |= shared_grammar_needs_owned_source(&self.rules);
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
             memo_safe_rules(grammar)
@@ -5446,6 +5446,34 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
     }
 }
 
+// FIRST 解析と同じく Weak で allocation を識別する。ルールを延命せず、
+// allocation の再利用による別文法への誤適用を防ぐ。保持数も64に制限する。
+fn shared_grammar_needs_owned_source(grammar: &SharedGrammar) -> bool {
+    use std::sync::{Mutex, OnceLock, Weak};
+    type Entry = (Weak<[Rule]>, bool);
+    static CACHE: OnceLock<Mutex<Vec<Entry>>> = OnceLock::new();
+    if Arc::strong_count(grammar) <= 1 {
+        return grammar_needs_owned_source(grammar);
+    }
+    let mut entries = CACHE
+        .get_or_init(|| Mutex::new(Vec::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some((_, required)) = entries
+        .iter()
+        .find(|(weak, _)| std::ptr::eq(weak.as_ptr(), Arc::as_ptr(grammar)))
+    {
+        return *required;
+    }
+    entries.retain(|(weak, _)| weak.strong_count() > 0);
+    let required = grammar_needs_owned_source(grammar);
+    if entries.len() == 64 {
+        entries.remove(0);
+    }
+    entries.push((Arc::downgrade(grammar), required));
+    required
+}
+
 // Rule references are not followed: every installed rule is visited once. This also
 // covers call-by-value after lowering and terminates for recursive grammars.
 fn grammar_needs_owned_source(rules: &[Rule]) -> bool {
@@ -5732,6 +5760,30 @@ mod tests {
                 },
             ]);
             assert!(grammar_needs_owned_source(&grammar));
+        }
+    }
+
+    #[test]
+    fn owned_source_cache_keeps_grammars_separate_without_retaining_rules() {
+        for required in [false, true, false, true] {
+            let grammar = share_grammar(vec![Rule {
+                name: "R0",
+                expression: if required {
+                    Expr::literal("q").capture_owned("w")
+                } else {
+                    Expr::literal("q")
+                },
+            }]);
+            // Unique one-shot grammars keep Arc::get_mut available.
+            assert_eq!(shared_grammar_needs_owned_source(&grammar), required);
+            assert_eq!(Arc::weak_count(&grammar), 0);
+            let shared = Arc::clone(&grammar);
+            assert_eq!(shared_grammar_needs_owned_source(&shared), required);
+            assert_eq!(shared_grammar_needs_owned_source(&shared), required);
+            let weak = Arc::downgrade(&grammar);
+            drop(shared);
+            drop(grammar);
+            assert!(weak.upgrade().is_none());
         }
     }
 
