@@ -5469,32 +5469,35 @@ fn shared_grammar_needs_owned_source(grammar: &SharedGrammar) -> bool {
     if Arc::strong_count(grammar) <= 1 {
         return grammar_needs_owned_source(grammar);
     }
-    CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if let Some((_, required)) = cache
-            .entries
-            .iter()
-            .flatten()
-            .find(|(weak, _)| std::ptr::eq(weak.as_ptr(), Arc::as_ptr(grammar)))
-        {
-            return *required;
-        }
-        let required = grammar_needs_owned_source(grammar);
-        let slot = match cache.entries.iter().position(|entry| {
-            entry
-                .as_ref()
-                .is_none_or(|(weak, _)| weak.strong_count() == 0)
-        }) {
-            Some(slot) => slot,
-            None => {
-                let slot = cache.next;
-                cache.next = (slot + 1) % CAPACITY;
-                slot
+    // TLS の破棄中（スレッド終了時の parse）はキャッシュせずに毎回走査する。
+    CACHE
+        .try_with(|cache| {
+            let mut cache = cache.borrow_mut();
+            if let Some((_, required)) = cache
+                .entries
+                .iter()
+                .flatten()
+                .find(|(weak, _)| std::ptr::eq(weak.as_ptr(), Arc::as_ptr(grammar)))
+            {
+                return *required;
             }
-        };
-        cache.entries[slot] = Some((Arc::downgrade(grammar), required));
-        required
-    })
+            let required = grammar_needs_owned_source(grammar);
+            let slot = match cache.entries.iter().position(|entry| {
+                entry
+                    .as_ref()
+                    .is_none_or(|(weak, _)| weak.strong_count() == 0)
+            }) {
+                Some(slot) => slot,
+                None => {
+                    let slot = cache.next;
+                    cache.next = (slot + 1) % CAPACITY;
+                    slot
+                }
+            };
+            cache.entries[slot] = Some((Arc::downgrade(grammar), required));
+            required
+        })
+        .unwrap_or_else(|_| grammar_needs_owned_source(grammar))
 }
 
 // Rule references are not followed: every installed rule is visited once. This also
