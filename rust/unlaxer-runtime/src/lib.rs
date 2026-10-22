@@ -816,18 +816,39 @@ struct Fragment {
     nodes: Vec<usize>,
     captures: Vec<Capture>,
     source: Option<Box<FragmentSource>>,
-    // Classic の Parsed 原文。source は従来どおり commit した token の原文。
-    parsed_source: Option<Box<FragmentSource>>,
 }
 
 #[derive(Debug, Clone)]
 struct FragmentSource {
+    // owned capture のときだけ保持する、commit 済み原文と異なる Parsed 原文。
+    parsed_source: Option<Box<FragmentSource>>,
     span: Span,
     kind: token::TokenKind,
     classic: bool,
     generated: bool,
-    text: Option<Arc<str>>,
+    // 投影原文のときだけ間接化し、通常 source の allocation も master と同じ40 Bに保つ。
+    text: Option<Box<Arc<str>>>,
 }
+
+impl Fragment {
+    fn parsed_source(&self) -> Option<&FragmentSource> {
+        self.source
+            .as_ref()
+            .map(|source| source.parsed_source.as_deref().unwrap_or(source))
+    }
+
+    fn clear_parsed_source(&mut self) {
+        if let Some(source) = self.source.as_mut() {
+            source.parsed_source = None;
+        }
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(std::mem::size_of::<Fragment>() == 56);
+    assert!(std::mem::size_of::<FragmentSource>() == 40);
+};
 
 /// Shared entry point for handwritten and generated parsers. Use context.parse(parser)
 /// when calling a custom implementation so failed calls roll back transactional state.
@@ -1263,6 +1284,10 @@ impl FailureMemoKey {
         }
         self
     }
+    fn with_owned_source(mut self, enabled: bool) -> Self {
+        self.depth_and_modes |= usize::from(enabled) << 15;
+        self
+    }
     fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
         self.depth_and_modes = (self.depth_and_modes & !6)
             | (usize::from(policy.reset) << 2)
@@ -1692,6 +1717,8 @@ pub struct ParseContext<'a> {
     exclusion_audit: bool,
     // rule() の直近の成功結果。呼出元が直ちに取り出し、CST/transaction 状態には含めない。
     rule_result_source: Option<Box<FragmentSource>>,
+    // 文法/式の入口でだけ決定し、入れ子の owned capture へ引き継ぐ。
+    track_owned_source: bool,
     tokens: Rc<token::Store>,
     next_token_generation: u64,
     unique_choice_failure_seen: bool,
@@ -1904,6 +1931,7 @@ fn parse_detailed_stacked(
         options
     };
     let mut parser = ParseContext::with_bindings(input, bindings, options);
+    parser.track_owned_source = grammar_needs_owned_source(&rules);
     parser.rules = rules;
     parser.whitespace = whitespace;
     parser.grammar_frontier = true;
@@ -2114,6 +2142,7 @@ impl<'a> ParseContext<'a> {
             first_sets: None,
             exclusion_audit: false,
             rule_result_source: None,
+            track_owned_source: false,
             tokens: Rc::new(token::Store::new()),
             next_token_generation: 1,
             unique_choice_failure_seen: false,
@@ -2524,6 +2553,8 @@ impl<'a> ParseContext<'a> {
         } else {
             self.lexing.take()
         };
+        let previous_owned_source = self.track_owned_source;
+        self.track_owned_source |= grammar_needs_owned_source(grammar);
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
@@ -2549,6 +2580,7 @@ impl<'a> ParseContext<'a> {
         self.failure_memo = previous_failure_memo;
         self.success_memo = previous_success_memo;
         self.rules = previous_rules;
+        self.track_owned_source = previous_owned_source;
         self.lexical_context = previous_goal;
         if !outer_entry {
             self.lexing = previous_lexing;
@@ -2580,6 +2612,8 @@ impl<'a> ParseContext<'a> {
     }
 
     fn parse_expression(&mut self, expression: &Expr) -> ParseResult {
+        let previous_owned_source = self.track_owned_source;
+        self.track_owned_source |= expression_needs_owned_source(expression);
         let previous = self.token_mode;
         if previous.is_none() && requires_classic_mode(expression, &self.rules) {
             self.token_mode = Some(token::ParseMode::default());
@@ -2604,6 +2638,7 @@ impl<'a> ParseContext<'a> {
             None => Err(self.failure()),
         };
         self.token_mode = previous;
+        self.track_owned_source = previous_owned_source;
         result
     }
 
@@ -2928,6 +2963,7 @@ impl<'a> ParseContext<'a> {
         )
         .with_match_policy(self.match_cursor_policy)
         .with_token_mode(self.token_mode)
+        .with_owned_source(self.track_owned_source)
         .with_state_version(self.scopes.memo_version().expect("memo version checked"));
         let position = self.code_point(self.position);
         if let Some(result) = self.probe_rule_memo(position, &key) {
@@ -3105,7 +3141,9 @@ impl<'a> ParseContext<'a> {
         if let Some(source) = &self.rule_result_source {
             bytes = bytes
                 .saturating_add(std::mem::size_of::<FragmentSource>())
-                .saturating_add(source.text.as_ref().map_or(0, |text| text.len()));
+                .saturating_add(source.text.as_ref().map_or(0, |text| {
+                    text.len().saturating_add(std::mem::size_of::<Arc<str>>())
+                }));
         }
         if bytes > limit {
             self.success_memo.budget_misses = self.success_memo.budget_misses.saturating_add(1);
@@ -3216,10 +3254,14 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
         // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
-        self.rule_result_source = fragment
-            .parsed_source
-            .clone()
-            .or_else(|| fragment.source.clone());
+        self.rule_result_source = self
+            .track_owned_source
+            .then(|| {
+                fragment
+                    .parsed_source()
+                    .map(|source| Box::new(source.clone()))
+            })
+            .flatten();
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
         let classic = fragment
             .source
@@ -3322,7 +3364,21 @@ impl<'a> ParseContext<'a> {
             | Expr::InvertMatch(_)
             | Expr::StopInvert(_)
             | Expr::StopConsume(_) => self.classic_wrapper(expression, depth),
-            Expr::Rule(rule) => self.expression_rule(*rule, depth),
+            Expr::Rule(rule) if self.track_owned_source => self.expression_rule(*rule, depth),
+            Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
+                nodes: vec![id],
+                captures: Vec::new(),
+                source: self.tokens.values.get(&id).map(|value| {
+                    Box::new(FragmentSource {
+                        parsed_source: None,
+                        span: self.nodes[id].span,
+                        kind: value.kind,
+                        classic: value.classic,
+                        generated: matches!(value.source, token::TokenSource::Generated { .. }),
+                        text: value.source.owned_shared().map(Box::new),
+                    })
+                }),
+            }),
             Expr::LexicalContextScope { child, terminals } => {
                 self.expression_with_lexical_context(child, terminals, depth)
             }
@@ -3396,26 +3452,30 @@ impl<'a> ParseContext<'a> {
         let result_source = self.rule_result_source.take();
         let committed_source = self.tokens.values.get(&id).map(|value| {
             Box::new(FragmentSource {
+                parsed_source: None,
                 span: self.nodes[id].span,
                 kind: value.kind,
                 classic: value.classic,
                 generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                text: value.source.owned_shared(),
+                text: value.source.owned_shared().map(Box::new),
             })
         });
         let classic = committed_source
             .as_deref()
             .is_some_and(|source| source.classic);
-        let (source, parsed_source) = if classic {
-            (committed_source, result_source)
+        let source = if classic {
+            let mut source = committed_source;
+            if let Some(source) = source.as_mut() {
+                source.parsed_source = result_source;
+            }
+            source
         } else {
-            (result_source.or(committed_source), None)
+            result_source.or(committed_source)
         };
         Some(Fragment {
             nodes: vec![id],
             captures: Vec::new(),
             source,
-            parsed_source,
         })
     }
 
@@ -3445,6 +3505,7 @@ impl<'a> ParseContext<'a> {
                             0
                         };
                         fragment.source = Some(Box::new(FragmentSource {
+                            parsed_source: None,
                             span: Span {
                                 start: anchor,
                                 end: anchor,
@@ -3736,8 +3797,9 @@ impl<'a> ParseContext<'a> {
                     // 正の先読みだけが match-only の root token を返す。
                     // EMPTY / UNTIL と消費側 collector の原文には含めない。
                     Some(Fragment {
-                        source: positive.then(|| {
+                        source: (*positive && self.track_owned_source).then(|| {
                             Box::new(FragmentSource {
+                                parsed_source: None,
                                 span: Span {
                                     start: self.code_point(start),
                                     end: self.code_point(self.matched_position),
@@ -4073,20 +4135,22 @@ impl<'a> ParseContext<'a> {
                         });
                     let source = classic.then(|| {
                         Box::new(FragmentSource {
+                            parsed_source: None,
                             span: matched.span,
                             kind: info.map_or(self.token_mode().kind, |info| info.kind),
                             classic: true,
                             generated: info.is_some_and(|info| {
                                 matches!(info.source, token::TokenSource::Generated { .. })
                             }),
-                            text: info.and_then(|info| info.source.owned_shared()),
+                            text: info
+                                .and_then(|info| info.source.owned_shared())
+                                .map(Box::new),
                         })
                     });
                     Fragment {
                         nodes: matched.nodes,
                         captures: matched.captures,
                         source,
-                        parsed_source: None,
                     }
                 })
             }
@@ -4181,6 +4245,7 @@ impl<'a> ParseContext<'a> {
             self.mark_classic_node(
                 id.index(),
                 &FragmentSource {
+                    parsed_source: None,
                     span,
                     kind: token_kind,
                     classic: true,
@@ -4192,8 +4257,9 @@ impl<'a> ParseContext<'a> {
             return Some(Fragment {
                 nodes: vec![id.index()],
                 captures: Vec::new(),
-                parsed_source: None,
+
                 source: Some(Box::new(FragmentSource {
+                    parsed_source: None,
                     span,
                     kind: token_kind,
                     classic: true,
@@ -4225,7 +4291,6 @@ impl<'a> ParseContext<'a> {
             nodes: vec![node],
             captures: Vec::new(),
             source: None,
-            parsed_source: None,
         })
     }
 
@@ -4506,10 +4571,7 @@ impl<'a> ParseContext<'a> {
         owned: bool,
     ) -> Option<Fragment> {
         let source = if owned {
-            fragment
-                .parsed_source
-                .as_deref()
-                .or(fragment.source.as_deref())
+            fragment.parsed_source()
         } else {
             fragment.source.as_deref()
         };
@@ -4538,7 +4600,9 @@ impl<'a> ParseContext<'a> {
                 nodes: fragment.nodes.clone(),
             });
             // @f は consumed の収集境界。外側の owned capture へ Parsed 原文を渡さない。
-            fragment.parsed_source = None;
+            if self.track_owned_source {
+                fragment.clear_parsed_source();
+            }
             if fragment
                 .source
                 .as_deref()
@@ -4551,7 +4615,11 @@ impl<'a> ParseContext<'a> {
         let source = match source.filter(|source| source.classic) {
             Some(source) if source.generated => token::TokenSource::Generated {
                 anchor: source.span.start,
-                text: source.text.as_deref().unwrap_or("").to_owned(),
+                text: source
+                    .text
+                    .as_deref()
+                    .map_or("", |text| text.as_ref())
+                    .to_owned(),
             },
             Some(source) if source.text.is_some() => token::TokenSource::Projected {
                 span,
@@ -4680,6 +4748,9 @@ impl<'a> ParseContext<'a> {
             | Expr::InputCaptureBoundary(_, child) => {
                 let start = self.position;
                 let mut fragment = self.expression(child, depth)?;
+                if self.track_owned_source {
+                    fragment.clear_parsed_source();
+                }
                 // AST 境界の node/span は従来の consumed 契約を保つ。
                 if fragment
                     .source
@@ -4735,7 +4806,6 @@ impl<'a> ParseContext<'a> {
                     nodes: vec![node_id],
                     captures: fragment.captures,
                     source: fragment.source,
-                    parsed_source: None,
                 })
             }
             _ => unreachable!("recursive expression dispatched by variant"),
@@ -5376,6 +5446,84 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
     }
 }
 
+// Rule references are not followed: every installed rule is visited once. This also
+// covers call-by-value after lowering and terminates for recursive grammars.
+fn grammar_needs_owned_source(rules: &[Rule]) -> bool {
+    rules
+        .iter()
+        .any(|rule| expression_needs_owned_source(&rule.expression))
+}
+
+fn expression_needs_owned_source(expression: &Expr) -> bool {
+    let mut pending = vec![expression];
+    while let Some(expression) = pending.pop() {
+        match expression {
+            Expr::OwnedCapture(_, _) | Expr::Replay(_) | Expr::CaptureScope(_) => return true,
+            Expr::Custom(_) | Expr::Character { .. } | Expr::CustomWith { .. } => {}
+            Expr::Sequence(children)
+            | Expr::NonOrdered(children)
+            | Expr::Choice(children)
+            | Expr::LongestChoice(children)
+            | Expr::UniqueLongestChoice(children) => pending.extend(children),
+            Expr::PredictiveChoice { alternatives, .. } => pending.extend(alternatives),
+            Expr::MatchOnly(child)
+            | Expr::InvertMatch(child)
+            | Expr::StopInvert(child)
+            | Expr::StopConsume(child)
+            | Expr::Capture(_, child)
+            | Expr::TextValue(child)
+            | Expr::CaptureBoundary(_, child)
+            | Expr::InputCaptureBoundary(_, child)
+            | Expr::ValueBoundary(child)
+            | Expr::Optional(child)
+            | Expr::JavaOptional(child)
+            | Expr::ZeroMatch(child)
+            | Expr::Repeat { child, .. }
+            | Expr::JavaRepeat { child, .. }
+            | Expr::Lookahead { child, .. }
+            | Expr::RuleEffects { child, .. }
+            | Expr::CaptureEquality { child, .. }
+            | Expr::NamePredicate { child, .. }
+            | Expr::NameResolutionScope { child, .. }
+            | Expr::Recovery { child, .. }
+            | Expr::TriviaScope { child, .. }
+            | Expr::LexicalTriviaScope { child, .. }
+            | Expr::LexicalContextScope { child, .. }
+            | Expr::Commit { child, .. }
+            | Expr::Label { child, .. } => pending.push(child),
+            Expr::CatchLabels {
+                child, alternative, ..
+            } => {
+                pending.push(child);
+                pending.push(alternative);
+            }
+            Expr::Lexical(_, _)
+            | Expr::Literal(_)
+            | Expr::CaseInsensitive(_)
+            | Expr::Number
+            | Expr::Identifier
+            | Expr::Grapheme
+            | Expr::CodeStart
+            | Expr::CodeEnd
+            | Expr::LongCodeBlock
+            | Expr::Quoted(_)
+            | Expr::Rule(_)
+            | Expr::Any
+            | Expr::Eof
+            | Expr::Empty
+            | Expr::CharRange(_, _)
+            | Expr::Except(_)
+            | Expr::Until(_)
+            | Expr::JavaLookahead { .. }
+            | Expr::JavaEmpty
+            | Expr::JavaUntil(_)
+            | Expr::Error(_)
+            | Expr::Backreference(_) => {}
+        }
+    }
+    false
+}
+
 fn memo_safe_rules(rules: &[Rule]) -> Vec<bool> {
     memo_safe_rules_for(rules, false)
 }
@@ -5519,6 +5667,91 @@ pub fn json_string(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn owned_source_tracking_is_scoped_and_absent_from_plain_success_memo() {
+        let grammar = share_grammar(vec![Rule {
+            name: "R0",
+            expression: Expr::choice([
+                Expr::JavaLookahead {
+                    pattern: "x",
+                    positive: true,
+                },
+                Expr::literal("q"),
+            ])
+            .stop_consume(),
+        }]);
+        for memo in [Memoization::Off, Memoization::SafeFailures] {
+            let mut context = ParseContext::with_options("x", ParseOptions::with_memoization(memo));
+            context.rules = Arc::clone(&grammar);
+            context.memo_safe_rules = memo_safe_rules(&grammar);
+            let checkpoint = context.checkpoint();
+            let plain = context.expression(&Expr::Rule(0), 0).unwrap();
+            assert!(plain.source.as_ref().unwrap().parsed_source.is_none());
+            assert!(context.rule_result_source.is_none());
+            assert!(context
+                .success_memo
+                .first
+                .values()
+                .all(|entry| entry.result_source.is_none()));
+            context.restore(checkpoint);
+            // Same rule/cursor in the same grammar: a plain memo cannot supply an
+            // owned result. Its key must distinguish this later expression entry.
+            context.parse(&Expr::Rule(0).capture_owned("w")).unwrap();
+            assert_eq!(context.captured_text("w"), Some("x"));
+            assert!(!context.track_owned_source);
+            if memo == Memoization::SafeFailures {
+                assert!(context
+                    .success_memo
+                    .first
+                    .values()
+                    .any(|entry| entry.result_source.is_some()));
+            }
+        }
+    }
+
+    #[test]
+    fn owned_source_scan_includes_lowered_wrappers_and_unreachable_rules() {
+        assert!(!grammar_needs_owned_source(&[Rule {
+            name: "recursive",
+            expression: Expr::Rule(0).capture("f").optional(),
+        }]));
+        for expression in [
+            Expr::literal("q").capture_owned("w"),
+            Expr::Replay("w"),
+            Expr::literal("q").capture_scope(),
+        ] {
+            let grammar = share_grammar(vec![
+                Rule {
+                    name: "R0",
+                    expression: Expr::Rule(0),
+                },
+                Rule {
+                    name: "unreachable",
+                    expression: expression.optional().stop_consume(),
+                },
+            ]);
+            assert!(grammar_needs_owned_source(&grammar));
+        }
+    }
+
+    #[test]
+    fn nested_grammar_preserves_outer_owned_source_tracking_and_restores_it() {
+        let grammar = share_grammar(vec![Rule {
+            name: "R0",
+            expression: Expr::literal("q"),
+        }]);
+        let mut context = ParseContext::new("qq");
+        for enabled in [false, true] {
+            context.track_owned_source = enabled;
+            context.parse_shared_grammar(&grammar, 0, false).unwrap();
+            assert_eq!(context.track_owned_source, enabled);
+        }
+        context
+            .parse_shared_grammar(&grammar, 0, false)
+            .unwrap_err();
+        assert!(context.track_owned_source);
+    }
 
     static PREDICTIVE_SKIPPED_CALLS: std::sync::atomic::AtomicUsize =
         std::sync::atomic::AtomicUsize::new(0);

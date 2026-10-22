@@ -15,7 +15,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Changed
 
-- #729 の原文分離により、Rust の `Fragment` は x86_64 で 56 → 64 B になる（`parsed_source` はすでに Box 化済み）。深さ255の `R0 ::= '(' CAPTURE(w, R0) ')' | 'a'` の非 Classic 全入力解析で、最小要求スタックは master `a67d8d19` 比で debug 1,758,144 → 1,856,256 B（+5.58%）、release 735,616 → 772,352 B（+4.99%）。Rust 1.85.0、同一プログラムで16 B刻みに探索し、各境界を3回確認した。再帰上限は変えず、この増加を残す。
+- #729 の Parsed 原文の追跡を、owned capture（CAPTURE / SAME_AS / CaptureScope、call-by-value の脱糖後を含む）がある文法・式だけに限定した。未使用時は Parsed 原文を生成・伝搬せず、成功 memo にも保存しない。入れ子の呼び出しでは外側の追跡を引き継ぎ、終了時に復元する。原文の追加情報は既存の boxed source に移し、Rust の `Fragment` を x86_64 で 64 → 56 B（master と同サイズ）へ戻した。深さ255の非 Classic CAPTURE 再帰について、Rust 1.85.0・release（opt-level=3、debuginfo=1）で最小要求スタックを16 B刻み・各境界3回確認すると、A' `ae11e746` 747,904 B、修正前 `def95dc8` 784,640 B、修正後 768,256 B。A' 比の増加は約4.9%から約2.7%へ縮小したが、残差はある。再帰上限は変更していない。
 
 - 生成した Rust parser の失敗位置と rule stack を Java に揃えた (#706)。UBNF の正の `LOOKAHEAD`・`EMPTY`・`UNTIL` が matched cursor だけを進めた後の失敗は、Java と同じく matched の到達位置（たとえば `R0 ::= 'a' AHEAD 'é'` に `ax` で CP1 → CP2）で報告され、その後に始まる rule の開始位置も同じく後ろへ進む。受理・cursor・CST・AST は変わらない。式単位の入口（`ParseContext::parse` など）と token stream の中は従来どおり。[契約](docs/prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)。
 
