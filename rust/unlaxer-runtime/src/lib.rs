@@ -5448,30 +5448,53 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
 
 // FIRST 解析と同じく Weak で allocation を識別する。ルールを延命せず、
 // allocation の再利用による別文法への誤適用を防ぐ。保持数も64に制限する。
+// 共有文法の並列解析で Mutex を取り合わないよう、キャッシュはスレッドごとに持つ。
+// 固定長の表にして、初回の登録でも heap を確保しない（unlaxer-alloc-audit）。
 fn shared_grammar_needs_owned_source(grammar: &SharedGrammar) -> bool {
-    use std::sync::{Mutex, OnceLock, Weak};
-    type Entry = (Weak<[Rule]>, bool);
-    static CACHE: OnceLock<Mutex<Vec<Entry>>> = OnceLock::new();
+    use std::cell::RefCell;
+    use std::sync::Weak;
+    const CAPACITY: usize = 64;
+    struct Cache {
+        entries: [Option<(Weak<[Rule]>, bool)>; CAPACITY],
+        next: usize,
+    }
+    thread_local! {
+        static CACHE: RefCell<Cache> = const {
+            RefCell::new(Cache {
+                entries: [const { None }; CAPACITY],
+                next: 0,
+            })
+        };
+    }
     if Arc::strong_count(grammar) <= 1 {
         return grammar_needs_owned_source(grammar);
     }
-    let mut entries = CACHE
-        .get_or_init(|| Mutex::new(Vec::new()))
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if let Some((_, required)) = entries
-        .iter()
-        .find(|(weak, _)| std::ptr::eq(weak.as_ptr(), Arc::as_ptr(grammar)))
-    {
-        return *required;
-    }
-    entries.retain(|(weak, _)| weak.strong_count() > 0);
-    let required = grammar_needs_owned_source(grammar);
-    if entries.len() == 64 {
-        entries.remove(0);
-    }
-    entries.push((Arc::downgrade(grammar), required));
-    required
+    CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some((_, required)) = cache
+            .entries
+            .iter()
+            .flatten()
+            .find(|(weak, _)| std::ptr::eq(weak.as_ptr(), Arc::as_ptr(grammar)))
+        {
+            return *required;
+        }
+        let required = grammar_needs_owned_source(grammar);
+        let slot = match cache.entries.iter().position(|entry| {
+            entry
+                .as_ref()
+                .is_none_or(|(weak, _)| weak.strong_count() == 0)
+        }) {
+            Some(slot) => slot,
+            None => {
+                let slot = cache.next;
+                cache.next = (slot + 1) % CAPACITY;
+                slot
+            }
+        };
+        cache.entries[slot] = Some((Arc::downgrade(grammar), required));
+        required
+    })
 }
 
 // Rule references are not followed: every installed rule is visited once. This also
@@ -5482,18 +5505,24 @@ fn grammar_needs_owned_source(rules: &[Rule]) -> bool {
         .any(|rule| expression_needs_owned_source(&rule.expression))
 }
 
+// ParseContext::parse calls this once per parse, so the scan keeps its stack inline
+// like requires_classic_mode instead of allocating (unlaxer-alloc-audit).
 fn expression_needs_owned_source(expression: &Expr) -> bool {
-    let mut pending = vec![expression];
-    while let Some(expression) = pending.pop() {
-        match expression {
+    let mut scan = ClassicModeScan::new();
+    let mut current = Some(expression);
+    while let Some(expression) = current.take().or_else(|| scan.next()) {
+        current = match expression {
             Expr::OwnedCapture(_, _) | Expr::Replay(_) | Expr::CaptureScope(_) => return true,
-            Expr::Custom(_) | Expr::Character { .. } | Expr::CustomWith { .. } => {}
+            Expr::Custom(_) | Expr::Character { .. } | Expr::CustomWith { .. } => None,
             Expr::Sequence(children)
             | Expr::NonOrdered(children)
             | Expr::Choice(children)
             | Expr::LongestChoice(children)
-            | Expr::UniqueLongestChoice(children) => pending.extend(children),
-            Expr::PredictiveChoice { alternatives, .. } => pending.extend(alternatives),
+            | Expr::UniqueLongestChoice(children)
+            | Expr::PredictiveChoice {
+                alternatives: children,
+                ..
+            } => scan.children(children),
             Expr::MatchOnly(child)
             | Expr::InvertMatch(child)
             | Expr::StopInvert(child)
@@ -5518,12 +5547,12 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             | Expr::LexicalTriviaScope { child, .. }
             | Expr::LexicalContextScope { child, .. }
             | Expr::Commit { child, .. }
-            | Expr::Label { child, .. } => pending.push(child),
+            | Expr::Label { child, .. } => Some(child.as_ref()),
             Expr::CatchLabels {
                 child, alternative, ..
             } => {
-                pending.push(child);
-                pending.push(alternative);
+                scan.defer(std::slice::from_ref(alternative.as_ref()));
+                Some(child.as_ref())
             }
             Expr::Lexical(_, _)
             | Expr::Literal(_)
@@ -5546,8 +5575,8 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             | Expr::JavaEmpty
             | Expr::JavaUntil(_)
             | Expr::Error(_)
-            | Expr::Backreference(_) => {}
-        }
+            | Expr::Backreference(_) => None,
+        };
     }
     false
 }
