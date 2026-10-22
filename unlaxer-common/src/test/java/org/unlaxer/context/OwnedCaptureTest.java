@@ -78,6 +78,33 @@ public class OwnedCaptureTest {
         return replay().parse(c, kind, invert);
     }
 
+    @Test public void lookaheadCollectorsKeepEmptyCommittedSource() {
+        for (Memoization memo : Memoization.values()) {
+            for (int variant = 0; variant < 4; variant++) {
+                Parser ahead = new MatchOnly(w("x"));
+                Parser collector = switch (variant) {
+                    case 0 -> new Optional(ahead);
+                    case 1 -> new SyncPointRecoveryParser(ahead, ";");
+                    case 2 -> CaptureBoundaryParser.value(ahead);
+                    default -> CaptureBoundaryParser.input(CaptureBoundaryParser.Kind.VALUE,
+                            new Choice(ahead, w("q")));
+                };
+                try (ParseContext context = ParseContext.withOptions(StringSource.createRootSource("x"),
+                        ParseOptions.withMemoization(memo))) {
+                    Parsed result = cap(collector).parse(context);
+                    assertTrue(result.isSucceeded());
+                    assertEquals("", result.getRootToken().source.sourceAsString());
+                    var value = context.captured("value").orElseThrow();
+                    assertEquals("", value.text());
+                    assertEquals(0, value.start());
+                    assertEquals(0, value.end());
+                    assertEquals(0, context.getConsumedPosition().value());
+                    assertEquals(1, context.getMatchedPosition().value());
+                }
+            }
+        }
+    }
+
     @Test public void sharedIndependentOracle() throws Exception {
         var rows = Files.readAllLines(Path.of("../conformance/owned-capture/cases.tsv"));
         var failures = new ArrayList<String>();

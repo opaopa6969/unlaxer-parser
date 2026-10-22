@@ -604,3 +604,287 @@ fn failed_replay_has_the_shared_name_and_code_point_diagnostic() {
         }
     }
 }
+
+#[test]
+fn lookahead_capture_replays_matched_text_at_every_full_input_entry() {
+    use unlaxer_runtime::{
+        parse_detailed_shared_with_rule_stack, parse_detailed_with_options, Rule,
+    };
+
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            for reset in [false, true] {
+                for (input, prefix, pattern) in [
+                    ("😀x", "😀", "x"),
+                    ("a😀", "a", "😀"),
+                    ("a\r\n😀", "a", "\r\n😀"),
+                ] {
+                    let options =
+                        ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+                    let capture = Expr::JavaLookahead {
+                        pattern,
+                        positive: true,
+                    }
+                    .capture_owned("value");
+                    let mut context = ParseContext::with_options(input, options);
+                    context.set_reset_matched_with_consumed(reset);
+                    context.parse(&Expr::literal(prefix)).unwrap();
+                    context.parse(&capture).unwrap();
+                    let start = prefix.chars().count();
+                    let end = input.chars().count();
+                    assert_eq!(
+                        (context.position(), context.matched_position()),
+                        (start, end)
+                    );
+                    assert_eq!(context.captured_text("value"), Some(pattern));
+                    assert_eq!(
+                        context.captured_source("value"),
+                        Some(&TokenSource::Input(Span { start, end }))
+                    );
+                    context.parse(&Expr::Replay("value")).unwrap();
+                    assert_eq!((context.position(), context.matched_position()), (end, end));
+
+                    let rules = [Rule {
+                        name: "R0",
+                        expression: Expr::sequence([
+                            Expr::literal(prefix),
+                            capture,
+                            Expr::Replay("value"),
+                        ]),
+                    }];
+                    let tree =
+                        parse_detailed_with_options(&rules, 0, false, input, options).unwrap();
+                    assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end });
+                    // 全入力入口では Classic の meta node を増やさない。
+                    assert_eq!(tree.nodes.len(), 1);
+                    let shared = std::sync::Arc::from(rules);
+                    assert!(parse_detailed_shared_with_rule_stack(
+                        &shared, 0, false, input, options
+                    )
+                    .is_ok());
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn selected_lookahead_source_survives_rule_success_memo_without_changing_cst() {
+    use unlaxer_runtime::{parse_detailed_with_options, Rule};
+
+    let rules = [
+        Rule {
+            name: "R0",
+            expression: Expr::choice([
+                Expr::sequence([Expr::Rule(1).capture_owned("discard"), Expr::literal("z")]),
+                Expr::sequence([Expr::Rule(1).capture_owned("w"), Expr::Replay("w")]),
+            ]),
+        },
+        Rule {
+            name: "R1",
+            expression: Expr::choice([
+                Expr::JavaLookahead {
+                    pattern: "x",
+                    positive: true,
+                },
+                Expr::literal("q"),
+            ]),
+        },
+    ];
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        let options = ParseOptions::with_memoization(memo);
+        let mut context = ParseContext::with_options("x", options);
+        context.parse_grammar(rules.to_vec(), 0, false).unwrap();
+        assert_eq!(context.captured_text("w"), Some("x"));
+        assert_eq!(context.position(), 1);
+        if memo == Memoization::SafeFailures {
+            assert!(context.memoized_success_hits() > 0);
+        }
+        let tree = parse_detailed_with_options(&rules, 0, false, "x", options).unwrap();
+        assert_eq!(tree.nodes.len(), 2);
+        assert_eq!(tree.nodes[0].span, Span { start: 0, end: 0 });
+        assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end: 1 });
+    }
+}
+
+fn ahead_x() -> Expr {
+    Expr::JavaLookahead {
+        pattern: "x",
+        positive: true,
+    }
+}
+
+#[test]
+fn classic_field_capture_uses_committed_source_for_choice_and_rule() {
+    use unlaxer_runtime::{parse_detailed_with_options, Rule};
+
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for (child, rule) in [
+            (Expr::Rule(1), Expr::choice([ahead_x(), w("q")])),
+            (Expr::choice([ahead_x(), w("q")]), Expr::Empty),
+            (Expr::Rule(1), ahead_x()),
+        ] {
+            let rules = [
+                Rule {
+                    name: "R0",
+                    expression: Expr::sequence([child.capture("f"), w("x")]).stop_consume(),
+                },
+                Rule {
+                    name: "R1",
+                    expression: rule,
+                },
+            ];
+            let tree = parse_detailed_with_options(
+                &rules,
+                0,
+                false,
+                "x",
+                ParseOptions::with_memoization(memo),
+            )
+            .unwrap();
+            let captures = &tree.nodes[tree.root].captures;
+            assert_eq!(captures.len(), 1);
+            assert_eq!(captures[0].name, "f");
+            assert_eq!(captures[0].span, Span { start: 0, end: 0 });
+        }
+    }
+}
+
+#[test]
+fn classic_public_span_and_capture_boundary_keep_committed_choice_source() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        let choice = Expr::choice([ahead_x(), w("q")]);
+        let mut context = ParseContext::with_options("x", ParseOptions::with_memoization(memo));
+        let result = context.parse(&choice.clone().stop_consume()).unwrap();
+        assert_eq!(result.span, Span { start: 0, end: 0 });
+        assert_eq!((context.position(), context.matched_position()), (0, 1));
+        let mut context = ParseContext::with_options("x", ParseOptions::with_memoization(memo));
+        context
+            .parse(&choice.capture_value().capture_owned("w"))
+            .unwrap();
+        assert_eq!(context.captured_text("w"), Some(""));
+        let mut context = ParseContext::with_options("x", ParseOptions::with_memoization(memo));
+        let result = context
+            .parse(&Expr::choice([ahead_x(), w("q")]).capture_owned("w"))
+            .unwrap();
+        assert_eq!(result.span, Span { start: 0, end: 0 });
+        assert_eq!(context.captured_text("w"), Some("x"));
+    }
+}
+
+#[test]
+fn nonclassic_collectors_drop_direct_lookahead_result_source() {
+    use unlaxer_runtime::{parse_detailed_with_options, RecoveryMode, Rule};
+
+    // 全入力入口は CAPTURE を含んでも非 Classic。直接の子で各破棄分岐に到達させる。
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for child in [
+            Expr::Optional(Box::new(ahead_x())),
+            ahead_x().optional_java(),
+            ahead_x().recover(RecoveryMode::Sync, [";"], "syntax error"),
+            ahead_x().capture_value(),
+            Expr::InputCaptureBoundary(
+                unlaxer_runtime::capture_tree::Kind::Value,
+                Box::new(ahead_x()),
+            ),
+            ahead_x().value_boundary(),
+            ahead_x().text_value(),
+        ] {
+            let rules = [Rule {
+                name: "R0",
+                expression: Expr::sequence([child.capture_owned("w"), Expr::Replay("w"), w("x")]),
+            }];
+            let tree = parse_detailed_with_options(
+                &rules,
+                0,
+                false,
+                "x",
+                ParseOptions::with_memoization(memo),
+            )
+            .unwrap();
+            assert_eq!(tree.nodes[tree.root].span, Span { start: 0, end: 1 });
+            assert!(tree
+                .nodes
+                .iter()
+                .filter(|n| n.rule != 0)
+                .all(|n| n.span == Span { start: 0, end: 0 }));
+        }
+    }
+}
+
+#[test]
+fn field_capture_blocks_parsed_source_before_owned_capture_and_success_memo() {
+    use unlaxer_runtime::{parse_detailed_with_options, Rule};
+
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for (classic, retry) in [(false, false), (false, true), (true, false), (true, true)] {
+            for (variant, field) in [
+                Expr::Rule(1).capture("f"),
+                Expr::choice([ahead_x(), w("q")]).capture("f"),
+                Expr::Rule(2),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                // 最初の分岐の失敗後に rule の成功 memo を再生する。
+                let success = Expr::sequence([field.clone().capture_owned("w"), Expr::Replay("w")]);
+                let body = if retry {
+                    Expr::choice([
+                        Expr::sequence([field.capture_owned("discard"), w("z")]),
+                        success,
+                    ])
+                } else {
+                    success
+                };
+                for consume_tail in [false, true] {
+                    let body = if consume_tail {
+                        Expr::sequence([body.clone(), w("x")])
+                    } else {
+                        body.clone()
+                    };
+                    let rules = [
+                        Rule {
+                            name: "R0",
+                            expression: if classic { body.stop_consume() } else { body },
+                        },
+                        Rule {
+                            name: "R1",
+                            expression: Expr::choice([ahead_x(), w("q")]),
+                        },
+                        Rule {
+                            name: "R2",
+                            expression: Expr::Rule(1).capture("f"),
+                        },
+                    ];
+                    let options = ParseOptions::with_memoization(memo);
+                    let result = parse_detailed_with_options(&rules, 0, false, "x", options);
+                    if consume_tail {
+                        let tree = result.unwrap();
+                        let fields: Vec<_> = tree.nodes.iter().flat_map(|n| &n.captures).collect();
+                        assert_eq!(fields.len(), 1);
+                        assert_eq!(fields[0].span, Span { start: 0, end: 0 });
+                    } else {
+                        let error = result.unwrap_err();
+                        assert_eq!(error.kind, "trailing_input");
+                        assert_eq!(error.offset, 0);
+                    }
+                    // context 入口でも w=""、consumed CP0 を確認する。
+                    let mut context = ParseContext::with_options("x", options);
+                    context.parse_grammar(rules.to_vec(), 0, false).unwrap();
+                    assert_eq!(context.captured_text("w"), Some(""));
+                    assert_eq!(context.position(), usize::from(consume_tail));
+                    if retry && memo == Memoization::SafeFailures && variant != 1 {
+                        assert!(
+                            context.memoized_success_hits() > 0,
+                            "classic={classic}, variant={variant}, tail={consume_tail}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

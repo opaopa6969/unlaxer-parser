@@ -772,6 +772,7 @@ fn success_budget_replacement_eviction_entry_and_index_capacity_are_accounted() 
         (2, bytes * 2, 1)
     );
     let oversized = Rc::new(SuccessMemo {
+        result_source: None,
         nodes: vec![],
         tokens: token::MemoTokens::capture(&token::Store::new(), 0, 0),
         root: 0,

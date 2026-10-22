@@ -900,6 +900,7 @@ impl ParseContext<'_> {
             nodes: vec![node.index],
             captures: Vec::new(),
             source: Some(Box::new(FragmentSource {
+                parsed_source: None,
                 span,
                 kind: mode.kind,
                 classic: true,
@@ -979,6 +980,7 @@ impl ParseContext<'_> {
         unique: bool,
     ) -> Option<Fragment> {
         if unique && !(2..=64).contains(&alternatives.len()) {
+            self.unique_choice_failure_seen = true;
             self.fail("2 to 64 unique longest alternatives");
             return None;
         }
@@ -1249,6 +1251,7 @@ impl ParseContext<'_> {
             }
         }
         first.map(|start| FragmentSource {
+            parsed_source: None,
             span: Span {
                 start,
                 end: if generated { start } else { start + length },
@@ -1257,7 +1260,8 @@ impl ParseContext<'_> {
             classic: true,
             generated: generated && length > 0,
             text: projected
-                .then(|| single_projection.unwrap_or_else(|| std::sync::Arc::from(parts.concat()))),
+                .then(|| single_projection.unwrap_or_else(|| std::sync::Arc::from(parts.concat())))
+                .map(Box::new),
         })
     }
     pub(crate) fn append_classic_fragment(
@@ -1267,7 +1271,13 @@ impl ParseContext<'_> {
         fallback: Span,
         owner_start: usize,
     ) {
-        if self.token_mode.is_none() && result.source.is_none() && child.source.is_none() {
+        if self.token_mode.is_none()
+            && !result
+                .source
+                .as_deref()
+                .is_some_and(|source| source.classic)
+            && !child.source.as_deref().is_some_and(|source| source.classic)
+        {
             result.nodes.append(&mut child.nodes);
             result.captures.append(&mut child.captures);
             return;
@@ -1277,6 +1287,7 @@ impl ParseContext<'_> {
         if result.source.is_none() {
             let kind = self.token_mode().kind;
             result.source = Some(Box::new(FragmentSource {
+                parsed_source: None,
                 span: Span {
                     start: owner_start,
                     end: fallback.start,
@@ -1326,6 +1337,7 @@ impl ParseContext<'_> {
             0
         };
         fragment.source = Some(Box::new(source.unwrap_or(FragmentSource {
+            parsed_source: None,
             span: Span {
                 start: anchor,
                 end: anchor,
@@ -1341,7 +1353,11 @@ impl ParseContext<'_> {
         if source.generated {
             TokenSource::Generated {
                 anchor: source.span.start,
-                text: source.text.as_deref().unwrap_or("").to_owned(),
+                text: source
+                    .text
+                    .as_deref()
+                    .map_or("", |text| text.as_ref())
+                    .to_owned(),
             }
         } else if let Some(text) = &source.text {
             TokenSource::Projected {
@@ -1363,6 +1379,15 @@ impl ParseContext<'_> {
         kind: TokenKind,
         label: &'static str,
     ) -> Fragment {
+        // Java Choice は選択した子の Parsed を返す。CST の収集値で上書きしない。
+        let selected_source = (self.track_owned_source
+            && matches!(label, "Choice" | "LongestChoice" | "UniqueLongestChoice"))
+        .then(|| {
+            fragment
+                .parsed_source()
+                .map(|source| Box::new(source.clone()))
+        })
+        .flatten();
         let mut original = fragment.nodes.clone();
         // Java Choice publishes the selected child's Parsed object, while the
         // committed CST still contains the Choice collector.
@@ -1400,6 +1425,13 @@ impl ParseContext<'_> {
         info.original = Some(original);
         info.classic = true;
         fragment.nodes = vec![id.index];
+        if selected_source.is_some() {
+            fragment
+                .source
+                .as_mut()
+                .expect("Classic collection has source")
+                .parsed_source = selected_source;
+        }
         fragment
     }
     pub(crate) fn mark_classic_node(&mut self, index: usize, source: &FragmentSource) {

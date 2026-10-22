@@ -1,5 +1,224 @@
 [
   {
+    "id": "owned-capture-field-rule-choice-lookahead",
+    "issue": "#729",
+    "note": "@f の consumed collector は先読みの Parsed 原文を外側の CAPTURE へ渡さない。入力 x で w は空文字列、context の consumed は CP0、全入力解析は trailing_input CP0。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= CAPTURE(w, R1 @f) SAME_AS(w) ; R1 ::= AHEAD | 'q' ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
+    "id": "owned-capture-field-direct-choice-lookahead",
+    "issue": "#729",
+    "note": "@f の consumed collector は先読みの Parsed 原文を外側の CAPTURE へ渡さない。入力 x で w は空文字列、context の consumed は CP0、全入力解析は trailing_input CP0。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= CAPTURE(w, (AHEAD | 'q') @f) SAME_AS(w) ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
+    "id": "ast-field-direct-lookahead",
+    "issue": "#729",
+    "note": "入力専用 CaptureBoundary が直接の先読み原文を捨て、field を空文字列に保つ。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= AHEAD @f 'x' ; }",
+    "inputs": [
+      "x",
+      "xx",
+      "q"
+    ]
+  },
+  {
+    "id": "ast-field-rule-choice-lookahead",
+    "issue": "#729",
+    "note": "先読みの Parsed 原文と collector が commit する空原文を区別する回帰例。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= R1 @f 'x' ; R1 ::= AHEAD | 'q' ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
+    "id": "ast-field-direct-choice-lookahead",
+    "issue": "#729",
+    "note": "先読みの Parsed 原文と collector が commit する空原文を区別する回帰例。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= (AHEAD | 'q') @f 'x' ;  }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
+    "id": "ast-field-single-rule-lookahead",
+    "issue": "#729",
+    "note": "先読みの Parsed 原文と collector が commit する空原文を区別する回帰例。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= R1 @f 'x' ; R1 ::= AHEAD ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
+    "id": "owned-capture-recovery-choice-lookahead",
+    "issue": "#729",
+    "note": "先読みの Parsed 原文と collector が commit する空原文を区別する回帰例。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CAPTURE(w, R1) SAME_AS(w) ; @recovery(sync=';') R1 ::= AHEAD | 'q' ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
+  },
+  {
+    "id": "owned-capture-optional-lookahead",
+    "issue": "#729",
+    "note": "Optional の consumed root は空原文。先読み結果を値へ引き継がず x は trailing_input CP0。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CAPTURE(w, [AHEAD]) SAME_AS(w) ; }",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "id": "owned-capture-empty-consumed-root",
+    "issue": "#729",
+    "note": "EMPTY の root は consumed の空原文。ab は trailing_input CP1、w は空文字列。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token E = EMPTY @root @mapping(N0) R0 ::= 'a' CAPTURE(w, E) SAME_AS(w) ;  }",
+    "inputs": [
+      "ab"
+    ]
+  },
+  {
+    "id": "owned-capture-until-consumed-root",
+    "issue": "#729",
+    "note": "UNTIL は終端の先読みを値に含めず、z を受理する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token U = UNTIL('z') @root @mapping(N0) R0 ::= CAPTURE(w, U) SAME_AS(w) 'z' ;  }",
+    "inputs": [
+      "z"
+    ]
+  },
+  {
+    "id": "owned-capture-chain-excludes-lookahead",
+    "issue": "#729",
+    "note": "Chain は consumed の x だけを保存し、trailing_input CP2。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('xy') @root @mapping(N0) R0 ::= CAPTURE_SCOPE(CAPTURE(w, 'x' AHEAD) SAME_AS(w)) ;  }",
+    "inputs": [
+      "xxy"
+    ]
+  },
+  {
+    "id": "owned-capture-nested-lookahead-root",
+    "issue": "#729",
+    "note": "内側 i は x、外側 o は a。trailing_input CP3。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CAPTURE(o, 'a' CAPTURE(i, AHEAD)) SAME_AS(i) SAME_AS(o) ;  }",
+    "inputs": [
+      "axax"
+    ]
+  },
+  {
+    "id": "owned-capture-value-argument-lookahead",
+    "issue": "#729",
+    "note": "値引数の脱糖後も直接の先読み結果を保持し ax を受理する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= 'a' B(AHEAD) ; B(=t) ::= t ; }",
+    "inputs": [
+      "ax"
+    ]
+  },
+  {
+    "id": "owned-capture-repeated-lookahead",
+    "issue": "#729",
+    "note": "反復ごとの直接先読み値を再照合し axax を受理する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= ('a' CAPTURE(w, AHEAD) SAME_AS(w))+ ;  }",
+    "inputs": [
+      "axax"
+    ]
+  },
+  {
+    "id": "owned-capture-prior-lookahead-excluded",
+    "issue": "#729",
+    "note": "capture 前の matched 到達位置を値へ混入せず、w は x。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AH2 = LOOKAHEAD('xx') @root @mapping(N0) R0 ::= AH2 CAPTURE(w, 'x') SAME_AS(w) ;  }",
+    "inputs": [
+      "xx"
+    ]
+  },
+  {
+    "id": "owned-capture-leading-lookahead-excluded",
+    "issue": "#729",
+    "note": "先読みから始まる Chain も consumed の x を保存する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CAPTURE(w, AHEAD 'x') SAME_AS(w) ;  }",
+    "inputs": [
+      "xx"
+    ]
+  },
+  {
+    "id": "owned-capture-value-argument-chain",
+    "issue": "#729",
+    "note": "値引数の Chain は先読みの x を値に含めず Java の診断と一致する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= B('a' AHEAD) ; B(=t) ::= t ; }",
+    "inputs": [
+      "ax"
+    ]
+  },
+  {
+    "id": "owned-capture-choice-selected-lookahead",
+    "issue": "#729",
+    "note": "Choice は選択した子の Parsed を返す。先読み分岐なら値は x、消費分岐なら q。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CAPTURE(w, AHEAD | 'q') SAME_AS(w) ;  }",
+    "inputs": [
+      "x",
+      "qq"
+    ]
+  },
+  {
+    "id": "owned-capture-rule-choice-lookahead",
+    "issue": "#729",
+    "note": "Choice rule 参照でも選択した Parsed の原文を使い、committed CST の consumed span と区別する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CAPTURE(w, R1) SAME_AS(w) ; R1 ::= AHEAD | 'q' ; }",
+    "inputs": [
+      "x",
+      "qq"
+    ]
+  },
+  {
+    "id": "owned-capture-rule-chain-lookahead",
+    "issue": "#729",
+    "note": "単一要素の rule は Chain を構築するため先読みを値に含めない。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CAPTURE(w, R1) SAME_AS(w) ; R1 ::= AHEAD ; }",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "id": "owned-capture-group-lookahead",
+    "issue": "#729",
+    "note": "明示 group は単一要素でも Chain を構築し、先読みを値に含めない。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0) R0 ::= CAPTURE(w, (AHEAD)) SAME_AS(w) ;  }",
+    "inputs": [
+      "x"
+    ]
+  },
+  {
+    "id": "owned-capture-negative-lookahead-empty-ast-field",
+    "issue": "#729",
+    "note": "PR #736 の旧実装が全入力入口を Classic に切り替えたことで生じた AST 退行。入力 a の N0.f2 は Java/Rust とも空文字列であり null ではない。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NOTAHEAD = NEGATIVE_LOOKAHEAD('y') @root @mapping(N0, params=[f2]) R0 ::= CAPTURE(w0, 'y') | NOTAHEAD @f2 'a' ; }",
+    "inputs": ["a", "y", "", "aa", "ya"]
+  },
+  {
+    "id": "positive-lookahead-capture-replay",
+    "issue": "#729",
+    "note": "seed 142 の縮小例。CAPTURE は LOOKAHEAD の matched token の原文を保持し、SAME_AS はその値を consumed cursor から再照合する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') token NEG = NEGATION('ab') @root @mapping(N0) R0 ::= NEG (CAPTURE(w2, AHEAD) SAME_AS(w2)) ; }",
+    "inputs": ["😀x", "😀xx", "😀", "😀y", "ax", "x", ""]
+  },
+  {
     "id": "lookahead-diagnostic-offset",
     "issue": "#706",
     "note": "Found by seed 131 (generator revision of #705). Java diagnose reported CP2, Rust CP1; since #706 both report CP2 (the matched reach of the positive LOOKAHEAD), without an exclusion.",
