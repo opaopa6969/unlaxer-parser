@@ -4,8 +4,10 @@ description: >-
   and tests, to a fresh local repository owned by this run attempt and job (#718),
   and remove it when the job ends. Development installs then never enter the
   shared ~/.m2/repository of the self-hosted runners, where they would sit next
-  to signed Central artifacts of the same version. Use after actions/setup-java
-  (the check runs Maven).
+  to signed Central artifacts of the same version. The runner's repositories are
+  chained behind it as a read-only tail without org/unlaxer, so the job does not
+  download everything from Central again. Use after actions/setup-java (the check
+  runs Maven).
 outputs:
   path:
     description: Absolute path of the job-local repository.
