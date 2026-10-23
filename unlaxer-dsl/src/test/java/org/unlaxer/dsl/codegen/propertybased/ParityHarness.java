@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 
+import org.unlaxer.Name;
 import org.unlaxer.StringSource;
 import org.unlaxer.Token;
 import org.unlaxer.context.Memoization;
@@ -21,6 +22,8 @@ import org.unlaxer.dsl.codegen.GrammarValidator;
 import org.unlaxer.dsl.codegen.MapperGenerator;
 import org.unlaxer.dsl.codegen.ParserGenerator;
 import org.unlaxer.dsl.codegen.rust.RustBackend;
+import org.unlaxer.listener.OutputLevel;
+import org.unlaxer.listener.TransactionListener;
 import org.unlaxer.parser.Parser;
 
 import java.net.URI;
@@ -56,6 +59,16 @@ import javax.tools.SimpleJavaFileObject;
  */
 final class ParityHarness {
     static final int RESERVE_GROUPS = 2;
+    /**
+     * Deterministic work bound per input (#739): parser transactions begun by one Java parse with
+     * {@link ParseOptions#DEFAULT} (no memo, detailed diagnostics). Without memoization a PEG grammar
+     * may backtrack exponentially, and rules with {@code CAPTURE} / {@code SAME_AS} are not memoized
+     * even under {@code SAFE_FAILURES}; seed 81 had a 54 code-point reserve derivation that did not
+     * finish in minutes on either host. An input above the bound is observed on neither host; it is
+     * counted in {@link Stats#overBudget} and recorded in the evidence. The bound is a test budget,
+     * not a parser limit: the parsers themselves are unchanged.
+     */
+    static final long STEP_BUDGET = Long.getLong("pbt.stepBudget", 100_000L);
     static final List<String> MEMO = List.of("OFF", "SAFE_FAILURES");
     static final List<String> DIAGNOSTICS = List.of("AUTO", "DETAILED", "DETAILED_ON_FAILURE");
     static final List<Boolean> RESET = List.of(false, true);
@@ -72,9 +85,16 @@ final class ParityHarness {
      * @param reserve extra derivation groups ({derivation, its mutations...}); the harness adds up to
      *     {@link #RESERVE_GROUPS} groups whose derivation the Java parser accepts, so every seed has a
      *     good chance to reach accepted parses although derivations ignore lookahead constraints.
+     * @param overBudget for corpus entries, exactly the inputs expected above {@link #STEP_BUDGET};
+     *     null for generated cases, whose over-budget inputs are only counted
      */
     record Case(String id, String grammar, List<String> inputs, Map<String, Integer> features, String expectedRejection,
-            List<List<String>> reserve) {
+            List<List<String>> reserve, List<String> overBudget) {
+        Case(String id, String grammar, List<String> inputs, Map<String, Integer> features, String expectedRejection,
+                List<List<String>> reserve) {
+            this(id, grammar, inputs, features, expectedRejection, reserve, null);
+        }
+
         Case(String id, String grammar, List<String> inputs, Map<String, Integer> features, String expectedRejection) {
             this(id, grammar, inputs, features, expectedRejection, List.of());
         }
@@ -138,6 +158,11 @@ final class ParityHarness {
         /** Generated (non-corpus) cases with at least one accepted input. */
         int generatedAcceptingCases;
         int grammars, rejected, rejectedAsExpected, inputs, observations, javaSuccessHits, javaFailureHits, rustSuccessHits, rustFailureHits, accepted;
+        /** Inputs (including reserve derivations and their mutations) above {@link #STEP_BUDGET}, not observed. */
+        int overBudget;
+        /** Largest step count of an input within the budget, and that input. */
+        long maxSteps;
+        String maxStepsInput;
         final Map<String, Integer> features = new java.util.TreeMap<>();
         /** Frontend rejection reasons of grammars both frontends rejected, by error code. */
         final Map<String, Integer> rejections = new java.util.TreeMap<>();
@@ -152,6 +177,7 @@ final class ParityHarness {
                     + " memoHits(rust success/failure)=" + rustSuccessHits + "/" + rustFailureHits
                     + " millis(javac/rustc/rust-run/java-run)=" + javaCompileMillis + "/" + rustCompileMillis + "/" + rustRunMillis + "/" + javaRunMillis
                     + " slowestRustInput=" + slowestMillis + "ms:" + slowest
+                    + " overBudget=" + overBudget + " maxJavaSteps=" + maxSteps + ":" + maxStepsInput
                     + " features=" + features + " rejections=" + rejections;
         }
     }
@@ -283,14 +309,46 @@ final class ParityHarness {
             for (Prepared p : prepared) {
                 var api = new JavaApi(classes, p.pkg(), p.name(), p.source());
                 apis.put(p, api);
-                var inputs = new java.util.LinkedHashSet<>(p.source().inputs());
+                // #739: every observed input, including reserve mutations, must fit STEP_BUDGET.
+                var over = new java.util.LinkedHashSet<String>();
+                var inputs = new java.util.LinkedHashSet<String>();
+                for (String input : p.source().inputs()) {
+                    if (api.withinBudget(input, stats)) inputs.add(input);
+                    else over.add(input);
+                }
                 int added = 0;
                 for (List<String> group : p.source().reserve()) {
                     if (added == RESERVE_GROUPS) break;
-                    if (inputs.contains(group.get(0)) || !api.accepts(group.get(0))) continue;
+                    String derivation = group.get(0);
+                    if (inputs.contains(derivation)) continue;
+                    if (!api.withinBudget(derivation, stats)) {
+                        over.add(derivation);
+                        continue;
+                    }
+                    if (!api.accepts(derivation)) continue;
+                    // A mutation above the budget skips the whole group, as a rejected derivation does.
+                    String tooExpensive = group.subList(1, group.size()).stream()
+                            .filter(input -> !inputs.contains(input) && !api.withinBudget(input, stats)).findFirst().orElse(null);
+                    if (tooExpensive != null) {
+                        over.add(tooExpensive);
+                        continue;
+                    }
                     inputs.addAll(group);
                     added++;
                 }
+                if (stats != null)
+                    for (String input : over) {
+                        stats.overBudget++;
+                        var row = new JsonObject();
+                        row.addProperty("case", p.source().id());
+                        row.addProperty("overBudget", input);
+                        row.addProperty("stepBudget", STEP_BUDGET);
+                        stats.evidence.add(row.toString());
+                    }
+                List<String> declared = p.source().overBudget();
+                if (declared != null && !new java.util.HashSet<>(declared).equals(over))
+                    findings.add(new Finding(p.source().id(), "step-budget", null, null,
+                            "expected over " + STEP_BUDGET + " steps=" + declared + " actual=" + over));
                 effective.put(p, List.copyOf(inputs));
             }
             var stdin = new StringBuilder();
@@ -307,12 +365,15 @@ final class ParityHarness {
             // Generous for a loaded shared machine; a hang is attributed through progress lines.
             clock = System.currentTimeMillis();
             Result rust = execute(List.of(binary.toString()), stdin.toString(), 120 + 10 * prepared.size());
+            // Rust time of all configurations of one input, by "position<TAB>hex", for the evidence.
+            var rustMillis = new java.util.HashMap<String, Long>();
             if (stats != null) {
                 stats.rustRunMillis += System.currentTimeMillis() - clock;
                 var batchCases = List.copyOf(prepared);
                 rust.output().lines().filter(l -> l.startsWith("#time\t")).forEach(l -> {
                     String[] cells = l.split("\t");
                     long millis = Long.parseLong(cells[2]);
+                    rustMillis.put(cells[1] + "\t" + (cells.length > 3 ? cells[3] : ""), millis);
                     if (millis > stats.slowestMillis) {
                         stats.slowestMillis = millis;
                         stats.slowest = batchCases.get(Integer.parseInt(cells[1])).source().id() + " input="
@@ -365,6 +426,9 @@ final class ParityHarness {
                         var row = new JsonObject();
                         row.addProperty("case", p.source().id());
                         row.addProperty("input", input);
+                        row.addProperty("javaSteps", api.steps.get(input));
+                        row.addProperty("rustMillis", rustMillis.get(position + "\t"
+                                + HexFormat.of().formatHex(input.getBytes(StandardCharsets.UTF_8))));
                         row.add("java", java.get("OFF/AUTO/false"));
                         row.add("rust", native_.get("OFF/AUTO/false"));
                         stats.evidence.add(row.toString());
@@ -445,6 +509,9 @@ final class ParityHarness {
         final Class<?> mapper;
         final Set<String> rules = new TreeSet<>();
         final List<String> owned;
+        final String caseId;
+        /** Step count of every input checked by {@link #withinBudget}, for the evidence. */
+        final Map<String, Long> steps = new java.util.HashMap<>();
         /** Message of the last mapping failure; reported, not compared (wording is host-specific). */
         String mapError;
 
@@ -453,6 +520,46 @@ final class ParityHarness {
             mapper = loader.loadClass(pkg + "." + name + "Mapper");
             rules.addAll(source.ruleNames());
             owned = source.ownedNames();
+            caseId = source.id();
+        }
+
+        /** Thrown by the step counter; carries no stack trace (#739). */
+        private static final class StepBudgetExceeded extends RuntimeException {
+            private static final long serialVersionUID = 1L;
+
+            StepBudgetExceeded() {
+                super("step budget " + STEP_BUDGET + " exceeded", null, false, false);
+            }
+        }
+
+        /**
+         * Whether one parse with {@link ParseOptions#DEFAULT} begins at most {@link #STEP_BUDGET}
+         * parser transactions. The counter is an observer: its exception aborts the parse and
+         * propagates unchanged (docs/parser-observer-failures.md); the context is then discarded.
+         * The observed configurations are expected to stay within a small multiple of this count:
+         * memo hits only skip work, and the DETAILED_ON_FAILURE retry repeats this detailed parse once.
+         */
+        boolean withinBudget(String input, Stats stats) {
+            long[] steps = {0};
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(input), ParseOptions.DEFAULT)) {
+                context.addMemoizationTransparentTransactionListener(Name.of("pbt-step-budget"), new TransactionListener() {
+                    @Override public void setLevel(OutputLevel level) {}
+                    @Override public void onOpen(ParseContext c) {}
+                    @Override public void onBegin(ParseContext c, Parser parser) {
+                        if (++steps[0] > STEP_BUDGET) throw new StepBudgetExceeded();
+                    }
+                    @Override public void onClose(ParseContext c) {}
+                });
+                root.parse(context);
+            } catch (StepBudgetExceeded exceeded) {
+                return false;
+            }
+            this.steps.put(input, steps[0]);
+            if (stats != null && steps[0] > stats.maxSteps) {
+                stats.maxSteps = steps[0];
+                stats.maxStepsInput = caseId + " input=" + input;
+            }
+            return true;
         }
 
         /** Full-input acceptance with default options (used only to pick reserve inputs). */
