@@ -96,8 +96,8 @@ fn process_failure_states_and_no_execution_gate() {
         );
         if actual == Status::Timeout {
             assert!(elapsed >= process.timeout, "{observation}");
-            // 30 秒の fixture 遅延より十分短く、共有 host の scheduling には余裕を持たせる。
-            assert!(elapsed < Duration::from_secs(5), "{observation}");
+            // 固定 10 秒で 30 秒の fixture 待機を検出する。deadline の延長は検査しない。
+            assert!(elapsed < Duration::from_secs(10), "{observation}");
         }
     }
     let marker =

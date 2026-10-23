@@ -130,28 +130,47 @@ No production dependency is added to the Rust runtime. Process invocation is a n
 host capability; a browser/WASM editor requires an explicit native bridge and cannot
 claim that the compiler is installed merely because these modules are bundled.
 
-## Transport の deadline 回帰 (#721)
+## Transport deadline regression (#721)
 
-Java の `ProviderProtocolTest` と Rust の `provider_protocol` は、同じ
-`protocol/transport.tsv` の case、mode、期待 status、deadline (ms)、入力前の遅延
-(ms)、入力後の応答遅延 (ms) を使う。通常の非 zero 終了と 4 MiB を超える stdout /
-stderr は 5000ms 以内に厳密に `FAILED`、起動できない command は `UNAVAILABLE` を
-要求する。入力前 / 応答前に 500ms 遅延させる行も `FAILED` を要求するため、旧来の
-全行 200ms に戻すと失敗する。共有 host の自然発生した負荷を完全に再現するものでは
-なく、拒否前の遅延が予算を使い切る経路を制御して再現する fixture である。
+Java's `ProviderProtocolTest` and Rust's `provider_protocol` read the same 13 rows
+in `protocol/transport.tsv`: case, mode, expected status, deadline (ms), delay before
+reading input (ms), and delay before responding (ms). The rows cover `OK` and three
+failure statuses: `UNAVAILABLE`, `FAILED`, and `TIMEOUT`. The separate user-code
+execution gate still requires `UNSUPPORTED`.
 
-意図した timeout は入力前 / 応答前 / 無応答の各経路で 30 秒待機する子プロセスを
-200ms の deadline で呼び、厳密に `TIMEOUT` を要求する。呼出し全体の観測時間も
-200ms 以上、5000ms 未満で検査し、case・期待値・実測値・deadline・経過時間を出力する。
-5000ms は共有 host の scheduling を許容するテスト上の上限であり、製品の deadline
-ではない。製品コード、既定値、既存の計測範囲は変更していない。両 host の deadline
-は command の起動に成功した後に始まり、入力書込み、stdout / stderr の読取り、
-子プロセスの終了待ちを含む。frame の encode と OS の spawn 自体は対象外であり、
-fixture の「入力前の遅延」は spawn 後の Python の準備遅延を模擬する。応答の decode と
-cleanup に個別の deadline はなく、呼出し全体の観測時間にはそれらも含まれる。
+Ordinary rejection rows use a 5000ms deadline and strictly require `FAILED` for
+nonzero exit or oversized stdout/stderr, and `UNAVAILABLE` for spawn failure.
+Four rows delay input reading or the response by 500ms before nonzero exit or
+oversized stdout, so reverting every row to 200ms fails. This controls one path
+where delay exhausts the budget; it does not reproduce every source of shared-host
+load. Ordinary rejection latency is logged but has no elapsed-time assertion:
+these tests check rejection status, not whether rejection is slow.
 
-既存の不正 frame 拒否と user code 実行 gate も引き続き検証する。cleanup は従来どおり
-Java が子孫を強制終了し、Rust が直接の子を終了して wait する契約である。
+Exactly 4 MiB of stdout containing a valid `OK` response, and exactly 4 MiB of
+stderr alongside a valid `OK` stdout response, must both be accepted. The
+oversized-stderr row also sends valid stdout and exits successfully; its extra
+stderr byte must produce `FAILED`. Removing the transport limit therefore yields
+`OK` for this row even if malformed-response decoding errors are mapped to
+`FAILED`. This distinguishes the transport limit from protocol rejection.
+
+The three intentional timeout rows sleep for 30 seconds before reading input,
+before responding, or without responding. They retain a 200ms deadline and
+strictly require `TIMEOUT`. Total invocation time must be at least 200ms and below
+a fixed 10 seconds. The upper bound is chosen relative to the fixture's 30-second
+sleep, not as a multiple of the deadline: it gives shared-host scheduling ample
+headroom while detecting a host that ignores the deadline and waits for the
+fixture. It does **not** detect an implementation that extends the deadline but
+still returns within 10 seconds, and arbitrary scheduler stalls can still exceed
+this test bound. Case, expected/actual status, deadline and elapsed time are logged.
+
+Production code, defaults and deadline scope are unchanged. Both hosts start the
+deadline after successfully spawning the command; it covers input writes, stdout /
+stderr reads and waiting for the child to exit. Frame encoding and OS spawn are
+outside it. The fixture's startup delay models Python readiness after spawn.
+Response decoding and cleanup have no separate deadline, and are included in the
+observed total invocation time. Existing malformed-frame rejection and the
+user-code execution gate remain covered. Cleanup retains the Java descendant
+termination and Rust direct-child kill-and-wait contracts.
 
 ## Consumer integration and limits
 

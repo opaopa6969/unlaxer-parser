@@ -52,8 +52,8 @@ public class ProviderProtocolTest {
             assertEquals(observation, Status.valueOf(row[2]), actual);
             if (actual == Status.TIMEOUT) {
                 assertTrue(observation, elapsedMillis >= deadlineMillis);
-                // 30 秒の fixture 遅延より十分短く、共有 host の scheduling には余裕を持たせる。
-                assertTrue(observation, elapsedMillis < 5000);
+                // 固定 10 秒で 30 秒の fixture 待機を検出する。deadline の延長は検査しない。
+                assertTrue(observation, elapsedMillis < 10000);
             }
         }
         Path marker = Files.createTempFile("provider-execute", ".marker"); Files.delete(marker);

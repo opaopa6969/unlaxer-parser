@@ -1,6 +1,8 @@
 # case	mode	expected_status	deadline_ms	startup_delay_ms	response_delay_ms
 missing	missing	UNAVAILABLE	5000	0	0
 nonzero	nonzero	FAILED	5000	0	0
+limit-stdout	limit-stdout	OK	5000	0	0
+limit-stderr	limit-stderr	OK	5000	0	0
 oversized	oversized	FAILED	5000	0	0
 oversized-stderr	oversized-stderr	FAILED	5000	0	0
 startup-oversized	oversized	FAILED	5000	500	0
