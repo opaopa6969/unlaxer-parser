@@ -146,19 +146,46 @@ public class Token implements Serializable{
      * concurrently.
      */
     public static MemoSnapshot prepareMemoSnapshot(TokenList roots, long limit) {
+        return prepareMemoSnapshot(roots, null, limit);
+    }
+
+    /**
+     * Also retains the tokens of a Parsed that a parser returns instead of its committed token
+     * (#744): a Choice returns its selected child's Parsed, whose root may be filtered out of the
+     * committed CST. A returned token that is in {@code roots} shares that copy; any other is
+     * copied as a hidden sub-tree, which {@link MemoSnapshot#replay()} returns but does not add
+     * to {@code roots}. A hidden sub-tree that overlaps a copied token fails closed (null).
+     */
+    public static MemoSnapshot prepareMemoSnapshot(TokenList roots, List<Token> returned, long limit) {
+        int returnedCount = returned == null ? 0 : returned.size();
         if (roots == null
                 || roots.getClass() != TokenList.class
                 || limit < 64
                 || limit > 64L * 1024 * 1024
                 || roots.size() > (limit - 64) / 16) return null;
+        // Returned ids are uncharged, so success memo capacity stays as before; a hidden
+        // sub-tree is charged per copied node like the CST.
         long bytes = 64 + 16L * roots.size();
         var nodes = new ArrayList<MemoNode>();
         var ids = new java.util.IdentityHashMap<Token, Integer>();
         var sources = new java.util.IdentityHashMap<Source, Boolean>();
         var frames = new ArrayDeque<MemoFrame>();
         int[] rootIds = new int[roots.size()];
+        int[] returnedIds = returnedCount == 0 ? NO_MEMO_IDS : new int[returnedCount];
+        int nextReturned = 0;
         frames.push(new MemoFrame(roots, -1));
-        while (!frames.isEmpty()) {
+        while (true) {
+            if (frames.isEmpty()) {
+                // Hidden sub-trees follow the CST, so a returned CST token reuses its copy.
+                while (nextReturned < returnedCount && ids.containsKey(returned.get(nextReturned))) {
+                    returnedIds[nextReturned] = ids.get(returned.get(nextReturned));
+                    nextReturned++;
+                }
+                if (nextReturned == returnedCount) break;
+                TokenList hidden = new TokenList(1);
+                hidden.add(returned.get(nextReturned));
+                frames.push(new MemoFrame(hidden, HIDDEN_MEMO_ROOT, nextReturned++));
+            }
             MemoFrame frame = frames.peek();
             if (frame.next == frame.children.size()) {
                 frames.pop();
@@ -196,7 +223,8 @@ public class Token implements Serializable{
             nodes.add(
                     new MemoNode(
                             token, frame.parent, children, filtered, extraValues, relatedValues));
-            if (frame.parent < 0) rootIds[slot] = index;
+            if (frame.parent == HIDDEN_MEMO_ROOT) returnedIds[frame.returnedSlot] = index;
+            else if (frame.parent < 0) rootIds[slot] = index;
             else nodes.get(frame.parent).children[slot] = index;
             if (children != 0) frames.push(new MemoFrame(token.originalChildren, index));
         }
@@ -211,8 +239,11 @@ public class Token implements Serializable{
                 node.filtered[j] = child;
             }
         }
-        return new MemoSnapshot(nodes, rootIds, bytes);
+        return new MemoSnapshot(nodes, rootIds, returnedIds, bytes);
     }
+
+    private static final int HIDDEN_MEMO_ROOT = -2;
+    private static final int[] NO_MEMO_IDS = new int[0];
 
     private static boolean memoSourceSafe(
             Source source, java.util.IdentityHashMap<Source, Boolean> seen, int maximum) {
@@ -254,11 +285,17 @@ public class Token implements Serializable{
     private static final class MemoFrame {
         final TokenList children;
         final int parent;
+        final int returnedSlot;
         int next;
 
         MemoFrame(TokenList children, int parent) {
+            this(children, parent, -1);
+        }
+
+        MemoFrame(TokenList children, int parent, int returnedSlot) {
             this.children = children;
             this.parent = parent;
+            this.returnedSlot = returnedSlot;
         }
     }
 
@@ -293,11 +330,13 @@ public class Token implements Serializable{
     public static final class MemoSnapshot {
         private final List<MemoNode> nodes;
         private final int[] roots;
+        private final int[] returned;
         private final long bytes;
 
-        private MemoSnapshot(List<MemoNode> nodes, int[] roots, long bytes) {
+        private MemoSnapshot(List<MemoNode> nodes, int[] roots, int[] returned, long bytes) {
             this.nodes = nodes;
             this.roots = roots;
+            this.returned = returned;
             this.bytes = bytes;
         }
 
@@ -317,6 +356,17 @@ public class Token implements Serializable{
             Token[] copies = copies();
             return rootList(copies);
         }
+
+        /** One replay copy: the roots and, in preparation order, the returned tokens' copies. */
+        public Replay replay() {
+            Token[] copies = copies();
+            TokenList returnedCopies = new TokenList(returned.length);
+            for (int id : returned) returnedCopies.add(copies[id]);
+            return new Replay(rootList(copies), returnedCopies);
+        }
+
+        /** Copies made by one {@link MemoSnapshot#replay()}. */
+        public record Replay(TokenList roots, TokenList returned) {}
 
         private TokenList rootList(Token[] copies) {
             TokenList result = new TokenList(roots.length);

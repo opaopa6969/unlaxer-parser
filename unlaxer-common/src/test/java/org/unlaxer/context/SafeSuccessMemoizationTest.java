@@ -339,4 +339,66 @@ public class SafeSuccessMemoizationTest {
             assertEquals(1, on.getPackratMemoTable().successHits());
         }
     }
+
+    private static void sameReturned(Parsed expected, Parsed actual) {
+        assertEquals(expected.status, actual.status);
+        assertEquals(expected.isCollected(), actual.isCollected());
+        assertEquals(expected.getTokenOptional().isPresent(), actual.getTokenOptional().isPresent());
+        assertEquals(expected.getOriginalTokens().size(), actual.getOriginalTokens().size());
+        Token expectedRoot = expected.getRootToken(), actualRoot = actual.getRootToken();
+        assertSame(expectedRoot.parser, actualRoot.parser);
+        assertEquals(expectedRoot.tokenKind, actualRoot.tokenKind);
+        assertEquals(expectedRoot.source.sourceAsString(), actualRoot.source.sourceAsString());
+        assertEquals(expectedRoot.source.offsetFromRoot(), actualRoot.source.offsetFromRoot());
+        assertEquals(expectedRoot.source.codePointLength(), actualRoot.source.codePointLength());
+    }
+
+    // A Choice returns its selected child's Parsed on a miss; a hit must return the same (#744).
+    @Test public void choiceHitReturnsTheSelectedChildParsedLikeAMiss() {
+        for (String input : List.of("x", "a")) {
+            for (java.util.function.Supplier<Parser> factory : List.<java.util.function.Supplier<Parser>>of(
+                    // The selected root is filtered out of the committed CST.
+                    () -> new SafeChoice(new MatchOnly(new WordParser("x")), new WordParser("a")),
+                    // A nested Choice drops it from the outer snapshot's CST as well.
+                    () -> new SafeChoice(new SafeChoice(new MatchOnly(new WordParser("x"))), new WordParser("a")),
+                    () -> new SafeLongest(new MatchOnly(new WordParser("x")), new WordParser("a")),
+                    () -> new SafePredictive(new WordParser("z"), new WordParser("a")))) {
+                try (ParseContext off = context(input, Memoization.OFF);
+                     ParseContext on = context(input, Memoization.SAFE_FAILURES)) {
+                    Parser parser = factory.get();
+                    Parsed expected = parser.parse(off);
+                    if (expected.isFailed()) continue;
+                    on.begin(parser);
+                    sameReturned(expected, parser.parse(on));
+                    on.rollback(parser);
+                    Parsed actual = parser.parse(on);
+                    assertEquals(1, on.getPackratMemoTable().successHits());
+                    sameReturned(expected, actual);
+                    sameTree(off.getCurrent().getTokens().get(0), on.getCurrent().getTokens().get(0));
+                    // A returned token that is in the CST is the replayed CST copy, as on a miss.
+                    Token committed = on.getCurrent().getTokens().get(0);
+                    boolean inCst = committed.getOriginalChildren().stream().anyMatch(t -> t == actual.getRootToken());
+                    boolean expectedInCst = off.getCurrent().getTokens().get(0).getOriginalChildren().stream()
+                        .anyMatch(t -> t == expected.getRootToken());
+                    assertEquals(expectedInCst, inCst);
+                }
+            }
+        }
+    }
+
+    @Test public void captureOfAReplayedChoiceKeepsTheSelectedLookaheadText() {
+        for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES)) {
+            SafeChoice choice = new SafeChoice(new MatchOnly(new WordParser("x")), new WordParser("q"));
+            // R0 ::= R1 'z' | CAPTURE(w, R1) SAME_AS(w) ; R1 ::= LOOKAHEAD('x') | 'q'
+            // The first use is as deep as the capture, so the memo entry has the budget to hit.
+            Parser root = new Choice(new Chain(new Chain(choice), new WordParser("z")),
+                new Chain(new NamedCapture("w", choice), new org.unlaxer.parser.elementary.ReplayParser("w")));
+            try (ParseContext context = context("x", memo)) {
+                assertTrue(root.parse(context).isSucceeded());
+                assertEquals("x", context.captured("w").orElseThrow().text());
+                assertEquals(1, context.getConsumedPosition().value());
+                if (memo != Memoization.OFF) assertEquals(1, context.getPackratMemoTable().successHits());
+            }
+        }
+    }
 }

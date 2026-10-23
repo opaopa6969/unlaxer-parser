@@ -69,6 +69,8 @@ public final class PackratMemoTable {
     private long successCharge;
     private final long successPayloadCharge;
     private final Token.MemoSnapshot snapshot;
+    // How replay rebuilds the Parsed the original evaluation returned (#744).
+    private final byte returnedShape;
     // A failure entry distinguishes an ordinary failure (null) from a committed or labeled one.
     private RaisedFailure raised;
 
@@ -77,12 +79,13 @@ public final class PackratMemoTable {
     }
 
     private Entry(ParseContext.FailureDiagnostic diagnostic, RaisedFailure raised) {
-      this(diagnostic, null, 0, 0, null, Map.of(), null, 0);
+      this(diagnostic, null, 0, 0, null, Map.of(), null, 0, RETURNED_COMMITTED);
       this.raised = raised;
     }
 
     private Entry(ParseContext.FailureDiagnostic diagnostic, TokenList tokens,
-        int endConsumed, int endMatched, Parser chosenChild, Map<ChoiceInterface, Parser> choices, Token.MemoSnapshot snapshot, long payloadCharge) {
+        int endConsumed, int endMatched, Parser chosenChild, Map<ChoiceInterface, Parser> choices, Token.MemoSnapshot snapshot, long payloadCharge,
+        byte returnedShape) {
       this.diagnostic = diagnostic;
       this.tokens = tokens;
       this.endConsumed = endConsumed;
@@ -91,8 +94,15 @@ public final class PackratMemoTable {
       this.choices = choices;
       this.snapshot = snapshot;
       this.successPayloadCharge = payloadCharge;
+      this.returnedShape = returnedShape;
     }
   }
+
+  // The returned Parsed is the committed token, a selected child's collected token, or a
+  // selected child's uncollected token list.
+  private static final byte RETURNED_COMMITTED = 0;
+  private static final byte RETURNED_COLLECTED = 1;
+  private static final byte RETURNED_UNCOLLECTED = 2;
 
   /**
    * The memoized outcome for {@code parser} at the current position, or null to proceed with a
@@ -151,8 +161,11 @@ public final class PackratMemoTable {
         && occurs.min() == 0 && occurs.max() == 0 && !occurs.isZeroMatchCheck())
       context.beginPreservingMatched(parser);
     else context.begin(parser);
-    TokenList copies = java.util.Objects.requireNonNull(entry.snapshot.copy(), "immutable memo snapshot");
-    context.getCurrent().getTokens().addAll(copies);
+    Token.MemoSnapshot.Replay copies = entry.returnedShape == RETURNED_COMMITTED ? null
+        : java.util.Objects.requireNonNull(entry.snapshot.replay(), "immutable memo snapshot");
+    context.getCurrent().getTokens().addAll(copies == null
+        ? java.util.Objects.requireNonNull(entry.snapshot.copy(), "immutable memo snapshot")
+        : copies.roots());
     int consumeDelta = entry.endConsumed - context.getConsumedPosition().value();
     // Even a zero-width consumed token can reset a previously advanced matched cursor.
     if (consumeDelta > 0 || context.getMatchedPosition().value() > entry.endMatched) {
@@ -161,7 +174,14 @@ public final class PackratMemoTable {
     int matchDelta = entry.endMatched - context.getMatchedPosition().value();
     if (matchDelta > 0) context.matchOnly(new CodePointLength(matchDelta));
     entry.choices.forEach(context::choose);
-    Parsed parsed = new Parsed(context.commit(parser, tokenKind, choiceActions(entry.chosenChild)));
+    var committed = context.commit(parser, tokenKind, choiceActions(entry.chosenChild));
+    // A Choice returns its selected child's Parsed on a miss; a hit returns the same shape, so a
+    // CAPTURE of the replayed Choice keeps the child's root source (#744).
+    Parsed parsed = copies == null ? new Parsed(committed)
+        : entry.returnedShape == RETURNED_COLLECTED
+            ? new Parsed(copies.returned().get(0),
+                TokenList.of(copies.returned().subList(1, copies.returned().size())), Parsed.Status.succeeded)
+            : new Parsed(copies.returned(), Parsed.Status.succeeded);
     context.endParse(parser, parsed, context, tokenKind, invertMatch);
     return parsed;
   }
@@ -177,7 +197,8 @@ public final class PackratMemoTable {
    * Commit an ordinary success and retain its completed diagnostic frame. Capture a bounded
    * topology/value plan before collection reparents the tokens, then copy the CST only after
    * the final diagnostic fits the budget. Replay copies isolate later returned-tree mutations.
-   * Choices keep their historical child Parsed on a miss.
+   * Choices keep their historical child Parsed on a miss, and a hit rebuilds that Parsed from
+   * the same snapshot (#744).
    */
   public static Parsed commitSuccess(ParseContext context, Parser parser, TokenKind tokenKind,
       boolean invertMatch, PositionKey startKey, ParseContext.FailureDiagnostic diagnostic,
@@ -193,7 +214,8 @@ public final class PackratMemoTable {
       int count = context.getCurrent().memoChoiceCount();
       long choiceCharge = count == 0 ? 0 : 64L + 64L * count;
       long diagnosticCharge = ParseContext.failureMemoCharge(diagnostic, room);
-      plan = Token.prepareMemoSnapshot(context.getCurrent().getTokens(), room - diagnosticCharge - choiceCharge);
+      plan = Token.prepareMemoSnapshot(context.getCurrent().getTokens(), returnedTokens(originalParsed),
+          room - diagnosticCharge - choiceCharge);
       if (plan == null) table.successBudgetMiss();
       else {
         payloadCharge = plan.retainedBytes() + choiceCharge;
@@ -214,10 +236,28 @@ public final class PackratMemoTable {
       else {
         TokenList tokens = plan.freeze();
         table.put(parser, startKey, new Entry(diagnostic, tokens, endConsumed, endMatched,
-            chosenChild, choices, plan, payloadCharge));
+            chosenChild, choices, plan, payloadCharge, returnedShape(originalParsed)));
       }
     }
     return parsed;
+  }
+
+  // The root first, then the original tokens: the order replay uses to rebuild the Parsed.
+  private static java.util.List<Token> returnedTokens(Parsed originalParsed) {
+    byte shape = returnedShape(originalParsed);
+    if (shape == RETURNED_COMMITTED) return null;
+    if (shape == RETURNED_UNCOLLECTED) return originalParsed.getOriginalTokens();
+    var tokens = new java.util.ArrayList<Token>(1 + originalParsed.getOriginalTokens().size());
+    tokens.add(originalParsed.getTokenOptional().get());
+    tokens.addAll(originalParsed.getOriginalTokens());
+    return tokens;
+  }
+
+  private static byte returnedShape(Parsed originalParsed) {
+    if (originalParsed == null) return RETURNED_COMMITTED;
+    if (false == originalParsed.isCollected()) return RETURNED_UNCOLLECTED;
+    // A malformed collected Parsed without its token keeps the historical committed Parsed.
+    return originalParsed.getTokenOptional().isPresent() ? RETURNED_COLLECTED : RETURNED_COMMITTED;
   }
 
   private static final AdditionalCommitAction[] NO_ACTIONS = new AdditionalCommitAction[0];
@@ -472,7 +512,7 @@ public final class PackratMemoTable {
     if (entry.indexedKey != null) {
       RaisedFailure raised = entry.raised;
       entry = new Entry(entry.diagnostic, entry.tokens, entry.endConsumed, entry.endMatched,
-          entry.chosenChild, entry.choices, entry.snapshot, entry.successPayloadCharge);
+          entry.chosenChild, entry.choices, entry.snapshot, entry.successPayloadCharge, entry.returnedShape);
       entry.raised = raised;
     }
     if (indexLength > entryChainByPosition.length)
