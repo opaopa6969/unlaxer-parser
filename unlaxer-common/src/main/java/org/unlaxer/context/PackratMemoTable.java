@@ -213,6 +213,7 @@ public final class PackratMemoTable {
     Token.MemoSnapshot plan = null;
     Map<ChoiceInterface, Parser> choices = Map.of();
     long payloadCharge = 0;
+    String returnedMessage = "";
     int endConsumed = context.getConsumedPosition().value();
     int endMatched = context.getMatchedPosition().value();
     if (startKey != null && context.isMemoizationSessionSafe()) {
@@ -221,11 +222,16 @@ public final class PackratMemoTable {
       int count = context.getCurrent().memoChoiceCount();
       long choiceCharge = count == 0 ? 0 : 64L + 64L * count;
       long diagnosticCharge = ParseContext.failureMemoCharge(diagnostic, room);
-      plan = Token.prepareMemoSnapshot(context.getCurrent().getTokens(), returnedTokens(originalParsed),
-          room - diagnosticCharge - choiceCharge);
+      // The returned Parsed's message is retained by the entry, so it is charged up front too.
+      String message = returnedMessage(originalParsed);
+      long messageCharge = message.isEmpty() ? 0 : 64L + 2L * message.length();
+      long planLimit = room - diagnosticCharge - choiceCharge - messageCharge;
+      plan = planLimit < 0 ? null
+          : Token.prepareMemoSnapshot(context.getCurrent().getTokens(), returnedTokens(originalParsed), planLimit);
       if (plan == null) table.successBudgetMiss();
       else {
-        payloadCharge = plan.retainedBytes() + choiceCharge;
+        payloadCharge = plan.retainedBytes() + choiceCharge + messageCharge;
+        returnedMessage = message;
         choices = context.getCurrent().snapshotChosenParsers(context.getChosenParserByChoice());
       }
     }
@@ -244,29 +250,32 @@ public final class PackratMemoTable {
         TokenList tokens = plan.freeze();
         table.put(parser, startKey, new Entry(diagnostic, tokens, endConsumed, endMatched,
             chosenChild, choices, plan, payloadCharge, returnedShape(originalParsed),
-            originalParsed == null ? Parsed.Status.succeeded : originalParsed.status, returnedMessage(originalParsed)));
+            originalParsed == null ? Parsed.Status.succeeded : originalParsed.status, returnedMessage));
       }
     }
     return parsed;
   }
 
-  // The root first, then the original tokens: the order replay uses to rebuild the Parsed.
+  // The root first, then the original tokens: the order replay uses to rebuild the Parsed. A
+  // view, not a copy, so prepareMemoSnapshot checks the count against the budget before it
+  // allocates anything proportional to it.
   private static java.util.List<Token> returnedTokens(Parsed originalParsed) {
     byte shape = returnedShape(originalParsed);
     if (shape == RETURNED_COMMITTED) return null;
-    if (shape == RETURNED_UNCOLLECTED) return originalParsed.getOriginalTokens();
-    var tokens = new java.util.ArrayList<Token>(1 + originalParsed.getOriginalTokens().size());
-    tokens.add(originalParsed.getTokenOptional().get());
-    tokens.addAll(originalParsed.getOriginalTokens());
-    return tokens;
+    TokenList originals = originalParsed.getOriginalTokens();
+    if (shape == RETURNED_UNCOLLECTED) return originals;
+    Token root = originalParsed.getTokenOptional().get();
+    return new java.util.AbstractList<Token>() {
+      @Override public Token get(int index) { return index == 0 ? root : originals.get(index - 1); }
+      @Override public int size() { return 1 + originals.size(); }
+    };
   }
 
-  // getMessage() is "<status>:<message>", with null and "" printed alike; keep the message part.
+  // The same immutable String the Parsed holds; getMessage() prints null and "" alike.
   private static String returnedMessage(Parsed originalParsed) {
-    if (originalParsed == null || originalParsed.status == null) return "";
-    String message = originalParsed.getMessage();
-    String prefix = originalParsed.status.name() + ":";
-    return message.startsWith(prefix) ? message.substring(prefix.length()) : "";
+    if (originalParsed == null) return "";
+    String message = originalParsed.getRawMessage();
+    return message == null ? "" : message;
   }
 
   private static byte returnedShape(Parsed originalParsed) {

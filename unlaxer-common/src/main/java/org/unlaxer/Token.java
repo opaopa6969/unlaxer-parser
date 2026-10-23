@@ -158,7 +158,8 @@ public class Token implements Serializable{
      */
     public static MemoSnapshot prepareMemoSnapshot(TokenList roots, List<Token> returned, long limit) {
         int returnedCount = returned == null ? 0 : returned.size();
-        if (roots == null
+        if (returnedCount < 0
+                || roots == null
                 || roots.getClass() != TokenList.class
                 || limit < 64
                 || limit > 64L * 1024 * 1024

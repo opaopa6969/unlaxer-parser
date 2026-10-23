@@ -450,4 +450,66 @@ public class SafeSuccessMemoizationTest {
         assertNotNull(Token.prepareMemoSnapshot(new TokenList(token),
             java.util.Collections.nCopies((int) ((1024 - plain - 16) / 4), token), 1024));
     }
+
+    // A child that returns its Parsed with a message and an arbitrary original-token list.
+    static final class ReturningWord extends WordParser {
+        final String message;
+        final int originals;
+        Parsed prepared;
+        ReturningWord(String message, int originals) { super("x"); this.message = message; this.originals = originals; }
+        @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+            Parsed parsed = super.parse(context, kind, invert);
+            if (parsed.isFailed() || originals == 0) return message.isEmpty() ? parsed : parsed.setMessage(message);
+            // Built once (Committed copies the list), so a measured parse allocates no list itself.
+            if (prepared == null) prepared = new Parsed(parsed.getRootToken(),
+                new TokenList(java.util.Collections.nCopies(originals, parsed.getRootToken())), Parsed.Status.succeeded);
+            return prepared;
+        }
+    }
+
+    private static long[] storeAndHit(ReturningWord child, long entryBytes, boolean measure) {
+        SafeChoice parser = new SafeChoice(child, new WordParser("a"));
+        try (ParseContext on = context("x", Memoization.SAFE_FAILURES)) {
+            PackratMemoTable table = on.getPackratMemoTable();
+            if (entryBytes > 0) table.setSuccessBudget(16, 1 << 24, entryBytes);
+            var threads = (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+            child.parse(context("x", Memoization.OFF));  // builds the shared original-token list
+            long before = measure ? threads.getCurrentThreadAllocatedBytes() : 0;
+            on.begin(parser);
+            assertTrue(parser.parse(on).isSucceeded());
+            long allocated = measure ? threads.getCurrentThreadAllocatedBytes() - before : 0;
+            on.rollback(parser);
+            Parsed hit = parser.parse(on);
+            assertTrue(hit.isSucceeded());
+            if (table.successHits() == 1) assertEquals("succeeded:" + child.message, hit.getMessage());
+            return new long[] {table.successHits(), table.successRetainedBytes(), table.successBudgetMisses(), allocated};
+        }
+    }
+
+    // The returned message is charged before the entry is stored (#744).
+    @Test public void returnedMessageIsChargedBeforeTheSuccessEntryIsStored() {
+        long plain = storeAndHit(new ReturningWord("", 0), 0, false)[1];
+        String large = "m".repeat(10_000);
+        long[] stored = storeAndHit(new ReturningWord(large, 0), 0, false);
+        assertEquals(1, stored[0]);
+        assertEquals(plain + 64 + 2L * large.length(), stored[1]);
+        long[] exact = storeAndHit(new ReturningWord(large, 0), stored[1], false);
+        assertEquals(1, exact[0]);
+        long[] over = storeAndHit(new ReturningWord(large, 0), stored[1] - 1, false);
+        assertEquals(0, over[0]);
+        assertEquals(0, over[1]);
+        assertTrue(over[2] > 0);
+    }
+
+    // A long original-token list is refused before anything proportional to it is copied (#744).
+    @Test public void longReturnedOriginalTokensAreRefusedBeforeCopying() {
+        long[] small = storeAndHit(new ReturningWord("", 3), 0, false);
+        assertEquals(1, small[0]);
+        long[] refused = storeAndHit(new ReturningWord("", 4_000_000), 4096, true);
+        assertEquals(0, refused[0]);
+        assertEquals(0, refused[1]);
+        assertTrue(refused[2] > 0);
+        // A copy of the four million references would allocate at least 16 MB.
+        assertTrue("allocated " + refused[3], refused[3] < 4L * 1024 * 1024);
+    }
 }
