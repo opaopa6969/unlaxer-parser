@@ -741,13 +741,29 @@ pub struct ParseError {
     pub expected: Vec<String>,
 }
 
+/// Human-readable expected candidates (#750): the empty literal `''` (Java's `WordParser("")`)
+/// is shown as `''`, as Java displays it; the stored value stays `""`. Other candidates as is.
+pub fn display_expected(expected: &[String], separator: &str) -> String {
+    expected
+        .iter()
+        .map(|candidate| {
+            if candidate.is_empty() {
+                "''"
+            } else {
+                candidate.as_str()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(separator)
+}
+
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "at code point {}: expected {}",
             self.offset,
-            self.expected.join(", ")
+            display_expected(&self.expected, ", ")
         )
     }
 }
@@ -789,7 +805,7 @@ impl std::fmt::Display for ParseDiagnostic {
             "{} at code point {}: expected {}",
             self.kind,
             self.offset,
-            self.expected.join(", ")
+            display_expected(&self.expected, ", ")
         )
     }
 }

@@ -70,3 +70,27 @@ fn nesting_resource_failure_keeps_its_primary_offset_and_hints() {
     assert_eq!(diagnostic.span.start, error.offset);
     assert_eq!(diagnostic.data["expectedTokens"], json!(error.expected));
 }
+
+#[test]
+fn empty_expected_candidate_is_readable_in_the_message() {
+    // spec-corpus/empty-literal Labeled: CATCH('a' LABEL(L, ''), 'a' 'b', L) | 'c' LABEL(M, '').
+    let mut backend = backend(
+        Expr::literal("a")
+            .then(Expr::JavaEmptyWord.label("L"))
+            .catch_labels(Expr::literal("a").then(Expr::literal("b")), ["L"])
+            .or(Expr::literal("c").then(Expr::JavaEmptyWord.label("M"))),
+    );
+    let snapshot = Snapshot::new("file:///fixture", 1, "a😀").unwrap();
+    let diagnostics = backend.validate(&snapshot);
+    assert_eq!(diagnostics.len(), 1);
+    // The range, kind and expectedTokens keep the contract value "" (#750 changes only the text).
+    assert_eq!(diagnostics[0].span, Span { start: 1, end: 2 });
+    assert_eq!(diagnostics[0].data["code"], "ULX-PARSE-001");
+    assert_eq!(diagnostics[0].data["kind"], "syntax");
+    assert_eq!(diagnostics[0].data["offset"], 1);
+    assert_eq!(diagnostics[0].data["expectedTokens"], json!(["", "b"]));
+    assert_eq!(diagnostics[0].message, "Expected '' or b");
+    // A raised label keeps its declared message as is.
+    let raised = backend.validate(&Snapshot::new("file:///fixture", 1, "c").unwrap());
+    assert_eq!(raised[0].message, "M");
+}

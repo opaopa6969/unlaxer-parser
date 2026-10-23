@@ -91,8 +91,29 @@ native generator は空 `PATH` で起動する。
 ### Java 側の既存表示差
 
 `diagnostic` は Rust 側の期待値であり、Java の既存表示が異なる入力だけ `javaDiagnostic` を記録する（受理・kind・primary offset は全入力で共通）。
-空 literal の期待候補は Rust では `""`、Java では `''` と表示する（Rust の LSP message と `ParseError` の表示で空の候補が読めない点は [#750](https://github.com/opaopa6969/unlaxer-parser/issues/750)）。ほかの差は非空 literal に置き換えた対照文法でも同じく現れる既存差で、
+空 literal の期待候補は Rust では `""`、Java では `''` と表示する。ほかの差は非空 literal に置き換えた対照文法でも同じく現れる既存差で、
 空 literal 固有ではない。
+
+### 人が読む表示（#750）
+
+`diagnostic`・canonical JSON・LSP の `data.expectedTokens` に入る値は契約の一部なので、Rust では `""` のまま変えない。
+変えたのは人が読む文字列だけで、Rust の LSP の message（`Expected … or …`）と `ParseError` / `ParseDiagnostic` の `Display`
+（`expected …, …`）は、空の候補を `''` と表示する（`unlaxer_runtime::display_expected`）。以前は `Expected  or b` のように空白が並ぶだけで、
+何が期待されたか読めなかった。空でない候補・区切り・LSP の range・code・kind、commit / label の宣言した message はそのまま。
+
+| 表示 | Labeled の `a😀`（CP 1 で `''` と `b` を期待） |
+|---|---|
+| 生成 Java LSP の message | `Expected '' or 'b' (in WordParser)`（`expectedTokens` は `["''","'b'"]`） |
+| 生成 Rust LSP の message | `Expected '' or b`（`expectedTokens` は `["","b"]`、range は UTF-16 の 1..3） |
+| Rust `ParseDiagnostic` の `Display` | `syntax at code point 1: expected '', b` |
+| Rust `ParseError` の `Display` | `at code point 1: expected '', b` |
+
+`''` を選んだのは、Java の生成 LSP と同じ綴りで、両方の editor で同じ見た目になるためである。Java は literal をすべて引用符付きで表示し、
+Rust は非空の literal を引用符なしで表示するので、空の候補だけを Java と同じ `''` にした。`<empty>` のような独自の表記は Java と食い違い、
+Rust の非空 literal を引用符付きに変えるのは既存の表示を全部変えてしまう。ただし Rust では、2文字の literal `''`（引用符2個）の候補と
+表示が同じになる。値（`expectedTokens`）では区別できる。
+`EmptyLiteralConformanceTest#generatedLanguageServersShowTheEmptyExpectedCandidate` は、両 host が生成した Rust LSP server と Java の生成
+LSP server を stdio で起動し、この入力の message・range・code・`data` を確かめる（Rust は `-DrustConformance=true`）。
 
 - Java は literal を引用符付きで表示し、`javaStyle` trivia の補助候補、同じ chain の後続要素、`RootParser` などの class 名、
   幅0で成功した token 名を候補に加え、trailing input の farthest 候補が異なる。Cut / Labeled / Stack / AutoCommit の `''` を `'z'` に
