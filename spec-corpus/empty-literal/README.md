@@ -3,7 +3,7 @@
 契約は [docs/empty-literal.md](../../docs/empty-literal.md)。通常 grammar の `''` は Java `WordParser("")` として
 常に失敗し、`@tokenStream` / `@lexicalContext` grammar の `''` は Java `Lexing.LiteralParser("")` として幅0で成功する。
 
-`corpus.json` は 17 文法 72 入力の独立期待値である。各入力の `prefix`（直接 parse の受理と consumed / matched cursor）、
+`corpus.json` は 19 文法 80 入力の独立期待値である。各入力の `prefix`（直接 parse の受理と consumed / matched cursor）、
 `classic`（consumed / matchOnly × 非反転 / 反転）、`diagnostic`（全入力診断）、`ruleStack`（失敗時と入力が残ったときの rule stack）、`ast`（全 field と code point span）、
 `cst`（rule 単位 CST）を Java 生成 parser と、Java host・native host が生成した Rust をそれぞれ compile した binary で比較する。
 memo OFF / SAFE_FAILURES と Auto / Detailed / DetailedOnFailure の組み合わせで値が変わらないことも各 host で確認する。

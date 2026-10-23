@@ -32,7 +32,10 @@ Java の生成器は grammar の字句方式によって `''` を別の parser �
   Classic では反転を含め常に失敗し、失敗した直接 consuming leaf として Java と同じ matched cursor の巻き戻しを受ける。
   FIRST 集合は空（必ず失敗）、memo・deferred diagnostics は他の終端と同じく安全。
 - `JavaEmptyLiteral` は native では幅0で成功する（`Literal("")` と同じ）。Classic では非反転なら幅0の token を追加して成功し、
-  反転なら失敗する。どちらの場合も cursor を動かさず、失敗後の matched cursor の巻き戻しもしない。FIRST 集合は nullable。
+  反転なら失敗する。どちらの場合も cursor を動かさず、失敗後の matched cursor の巻き戻しもしない（巻き戻す leaf は
+  runtime の `leaf_reset` の列挙で決まり、`JavaEmptyLiteral` はそこに含めない）。FIRST 集合は nullable。DetailedOnFailure の
+  最初の pass は FIRST で候補を除外するので、ここを EMPTY にすると `'' '='` のような枝が誤って落ちる
+  （corpus の LexicalContextChoice / TokenStreamChoice が検出する）。
 - 新しい runtime 式を二つにしたのは、native / Classic のどちらかで既存の `Literal("")` や `Error` と意味が異なり、
   既存式を流用すると手書き API の契約か Java 互換のどちらかを壊すためである。`Error("")` は期待候補を記録しない点で
   `WordParser("")` と異なる。
@@ -53,7 +56,7 @@ Java の生成器は grammar の字句方式によって `''` を別の parser �
   Java の `EMPTY`（matched-only の1文字先読み、Rust `JavaEmpty`）は `''` とは別の要素であり、本変更はその扱いを変えない。
 - cut とラベル付き失敗（[#700](cut-and-labeled-failures.md)）: `COMMIT('')`・`COMMIT('', 'message')`・`LABEL(L, '')` は本体が必ず失敗するので、到達すれば必ず raise する。
   `CATCH` は通常どおり label を捕まえて代替へ進む。`E-RAISING-REPETITION` の nullable 判定は空 literal を nullable とみなす過大近似（両 host 共通）なので、
-  `{ COMMIT('') }` は拒否されず、実行時に最初の反復で raise する（`'z'` に置き換えた対照は拒否される）。
+  `{ COMMIT('') }` は拒否されず、実行時に最初の反復で raise する（`'z'` に置き換えた対照は拒否される）。通常の文法で拒否するかは [#749](https://github.com/opaopa6969/unlaxer-parser/issues/749)。
 - rule stack（[#703](rule-stack-diagnostics.md)）: `''` の失敗も他の終端と同じく失敗した rule の frame を持つ。失敗した parse の stack と、成功して入力が残った parse の stack を両方比較する。
 - `@autoCommit`（[#702](auto-commit.md)、#728）: FIRST 解析は `''` を nullable（`EPSILON`）として扱う。`WordParser("")` は成功しないので実際の FIRST より広い過大近似であり、
   挿入される `COMMIT` を減らす方向にしか働かない。挿入位置は両 frontend で同じ（生成物の byte 一致で確認）。
@@ -63,11 +66,12 @@ Java の生成器は grammar の字句方式によって `''` を別の parser �
 
 ## 共通 oracle と検証
 
-[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 17 文法 72 入力。root / sequence / choice の rollback /
+[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 19 文法 80 入力。root / sequence / choice の rollback /
 field capture の rollback / optional・repeat（capture 付き）/ `''+`・`''{0,3}`・`'' % ','`・`{ [ '' ] }` の進捗停止 /
 `javaStyle` trivia / 先読み後の matched cursor / 宣言的 token の `''`・`LOOKAHEAD('')`・`NEGATIVE_LOOKAHEAD('')` /
 tokenStream / lexicalContext / 左結合の prefix・tail delimiter / `COMMIT('')`・`COMMIT('', 'never')` の反復 /
-`CATCH` で捕まえる `LABEL(L, '')` と捕まえない `LABEL(M, '')` / 入れ子 rule の rule stack / `@autoCommit` の後の `''` を含み、
+`CATCH` で捕まえる `LABEL(L, '')` と捕まえない `LABEL(M, '')` / 入れ子 rule の rule stack / `@autoCommit` の後の `''` /
+規則単位の `@lexicalContext` がある文法と tokenStream の choice の先頭の `''`（FIRST の nullable 分類）を含み、
 非 BMP 文字・EOF・空入力の code point 位置を確認する。
 
 各入力について次を記録する。
@@ -87,7 +91,7 @@ native generator は空 `PATH` で起動する。
 ### Java 側の既存表示差
 
 `diagnostic` は Rust 側の期待値であり、Java の既存表示が異なる入力だけ `javaDiagnostic` を記録する（受理・kind・primary offset は全入力で共通）。
-空 literal の期待候補は Rust では `""`、Java では `''` と表示する。ほかの差は非空 literal に置き換えた対照文法でも同じく現れる既存差で、
+空 literal の期待候補は Rust では `""`、Java では `''` と表示する（Rust の LSP message と `ParseError` の表示で空の候補が読めない点は [#750](https://github.com/opaopa6969/unlaxer-parser/issues/750)）。ほかの差は非空 literal に置き換えた対照文法でも同じく現れる既存差で、
 空 literal 固有ではない。
 
 - Java は literal を引用符付きで表示し、`javaStyle` trivia の補助候補、同じ chain の後続要素、`RootParser` などの class 名、

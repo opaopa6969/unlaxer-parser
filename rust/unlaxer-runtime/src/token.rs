@@ -863,10 +863,9 @@ impl ParseContext<'_> {
                     },
                 );
             }
-            // Java LiteralParser("") does not call consume(0) after an inverted failure.
-            if mode.kind.is_consumed()
-                && !matches!(expression, Expr::LongCodeBlock | Expr::JavaEmptyLiteral)
-            {
+            // `expression` restores its checkpoint after this failure and then decides the
+            // matched cursor from its leaf-reset list (which leaves out JavaEmptyLiteral).
+            if mode.kind.is_consumed() && !matches!(expression, Expr::LongCodeBlock) {
                 self.matched_position = self.position;
             }
             return None;

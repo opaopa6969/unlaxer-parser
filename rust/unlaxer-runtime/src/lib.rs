@@ -3540,6 +3540,8 @@ impl<'a> ParseContext<'a> {
             })
         };
         if result.is_none() {
+            // A failed consuming Java leaf calls consume(0), which resets the matched cursor.
+            // Java LiteralParser("") (JavaEmptyLiteral) never does, so it is not listed.
             let leaf_reset = self.token_mode.is_some_and(|mode| mode.kind.is_consumed())
                 && matches!(
                     expression,

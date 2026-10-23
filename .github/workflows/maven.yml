@@ -127,8 +127,10 @@ jobs:
       run: test -s unlaxer-dsl/target/classic-lsp-diagnostics.tsv
     - name: Require Java and both Rust hosts empty-literal evidence
       run: |
-        awk 'END {exit NR != 73}' unlaxer-dsl/target/empty-literal-java.tsv
-        awk 'END {exit NR != 73}' unlaxer-dsl/target/rust-empty-literal.tsv
+        rows=$(python3 -c "import json; print(1 + sum(len(g['cases']) for g in json.load(open('spec-corpus/empty-literal/corpus.json', encoding='utf-8'))))")
+        test "$rows" -gt 1
+        awk -v rows="$rows" 'END {exit NR != rows}' unlaxer-dsl/target/empty-literal-java.tsv
+        awk -v rows="$rows" 'END {exit NR != rows}' unlaxer-dsl/target/rust-empty-literal.tsv
     - name: Require real Java and Rust rule-stack diagnostic evidence
       run: grep -qxP 'Rust\t14\tPASS' unlaxer-dsl/target/rule-stack-lsp.tsv
     - name: Require Java and native Rust literal enum evidence

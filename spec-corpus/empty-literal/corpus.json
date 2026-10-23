@@ -172,5 +172,25 @@
       {"id":"accepted","input":"bn","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"n"}},"cst":"Root[0,2){Name[1,2)}","javaCst":"Name[1,2)"},
       {"id":"committed-at-eof","input":"b","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"commit","offset":1,"expected":["unexpected input"],"farthestOffset":1,"farthestExpected":["unexpected input"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null}
     ]
+  },
+  {
+    "name":"LexicalContextChoice",
+    "grammar":"grammar LexicalContextChoice { @package: org.example.emptyliteral @ubnf: v2 token ID ::= CHAR_RANGE('a','z')+; @root @mapping(Root, params=[name, tail]) Root ::= Name @name Rest @tail; @lexicalContext(tokens=['ID']) Name ::= ID; Rest ::= '' '=' | '=' 'x'; }",
+    "cases":[
+      {"id":"zero-width-alternative-wins","input":"a=x","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":2,"expected":["end of input"],"farthestOffset":2,"farthestExpected":["end of input"]},"javaDiagnostic":{"kind":"trailing_input","offset":2,"expected":["end of input"],"farthestOffset":2,"farthestExpected":[]},"ruleStack":[null,null],"ast":null,"cst":null},
+      {"id":"zero-width-alternative","input":"a=","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"name":"a","tail":"="}},"cst":"Root[0,2){Name[0,1),Rest[1,2)}"},
+      {"id":"trailing-after-zero-width","input":"a=y","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":2,"expected":["end of input"],"farthestOffset":2,"farthestExpected":["end of input"]},"javaDiagnostic":{"kind":"trailing_input","offset":2,"expected":["end of input"],"farthestOffset":2,"farthestExpected":[]},"ruleStack":[null,null],"ast":null,"cst":null},
+      {"id":"missing-rest","input":"a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["="],"farthestOffset":1,"farthestExpected":["="]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["=","__CaptureSite","x"],"farthestOffset":1,"farthestExpected":["=","__CaptureSite","x"]},"ruleStack":["1:Root@0>Rest@1|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"TokenStreamChoice",
+    "grammar":"grammar TokenStreamChoice { @package: org.example.emptyliteral @ubnf: v2 @tokenStream: enabled @whitespace: javaStyle token NAME ::= CHAR_RANGE('a','z')+; token SEMI ::= ';'; @root @mapping(Root, params=[value]) Root ::= Item @value; Item ::= '' SEMI | COMMIT(NAME) SEMI; }",
+    "cases":[
+      {"id":"zero-width-alternative","input":";","prefix":[true,1,1],"classic":[[true,1,1],[true,1,1],[true,0,1],[true,0,1]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,1],"fields":{"value":";"}},"cst":"Root[0,1){Item[0,1)}"},
+      {"id":"committed-alternative","input":"a;","prefix":[true,2,2],"classic":[[true,2,2],[true,2,2],[true,0,2],[true,0,2]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a;"}},"cst":"Root[0,2){Item[0,2)}"},
+      {"id":"committed-name-missing","input":"?","prefix":[false,0,0],"classic":[[false,0,0],[true,1,1],[false,0,0],[true,0,1]],"diagnostic":{"kind":"commit","offset":0,"expected":["unexpected input"],"farthestOffset":0,"farthestExpected":["unexpected input"]},"ruleStack":["0:Root@0>Item@0|0",null],"ast":null,"cst":null},
+      {"id":"empty-input","input":"","prefix":[false,0,0],"classic":[[false,0,0],[true,0,0],[false,0,0],[true,0,0]],"diagnostic":{"kind":"commit","offset":0,"expected":["unexpected input"],"farthestOffset":0,"farthestExpected":["unexpected input"]},"ruleStack":["0:Root@0>Item@0|0",null],"ast":null,"cst":null}
+    ]
   }
 ]
