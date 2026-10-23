@@ -1,4 +1,4 @@
-# Java NumberParser oracle (#717): Chain(NumberParser, WordParser("a")) and NumberParser alone from CP0, the same for every memo/diagnostics/reset. failureCP is the farthest failure under AUTO/DETAILED (0 under DETAILED_ON_FAILURE).
+# Java NumberParser oracle (#717): Chain(NumberParser, WordParser("a")) and NumberParser alone from CP0, the same for every memo/diagnostics/reset. failureCP is the farthest failure under AUTO/DETAILED (0 under DETAILED_ON_FAILURE). Regenerate with NumberTokenOracleTest and -Dnumber.oracle.write=true.
 # id	inputHex	kind	invert	success	consumedCP	matchedCP	failureCP	numberSuccess	numberConsumedCP	numberMatchedCP
 e-consumed-false	3265	consumed	false	false	0	0	2	true	1	1
 e-consumed-true	3265	consumed	true	false	0	0	2	true	2	2
@@ -120,3 +120,27 @@ space-a-consumed-false	322061	consumed	false	false	0	0	1	true	1	1
 space-a-consumed-true	322061	consumed	true	false	0	0	3	true	3	3
 space-a-matchOnly-false	322061	matchOnly	false	false	0	0	1	true	0	1
 space-a-matchOnly-true	322061	matchOnly	true	false	0	0	3	true	0	3
+exponent-e-consumed-false	31653165	consumed	false	false	0	0	3	true	3	3
+exponent-e-consumed-true	31653165	consumed	true	false	0	0	4	true	4	4
+exponent-e-matchOnly-false	31653165	matchOnly	false	false	0	0	3	true	0	3
+exponent-e-matchOnly-true	31653165	matchOnly	true	false	0	0	4	true	0	4
+e-plus-x-consumed-false	31652b78	consumed	false	false	0	0	3	true	1	1
+e-plus-x-consumed-true	31652b78	consumed	true	false	0	0	4	true	4	4
+e-plus-x-matchOnly-false	31652b78	matchOnly	false	false	0	0	3	true	0	1
+e-plus-x-matchOnly-true	31652b78	matchOnly	true	false	0	0	4	true	0	4
+fullwidth-digit-a-consumed-false	efbc9261	consumed	false	false	0	0	0	false	0	0
+fullwidth-digit-a-consumed-true	efbc9261	consumed	true	false	0	0	2	true	2	2
+fullwidth-digit-a-matchOnly-false	efbc9261	matchOnly	false	false	0	0	0	false	0	0
+fullwidth-digit-a-matchOnly-true	efbc9261	matchOnly	true	false	0	0	2	true	0	2
+e-fullwidth-digit-consumed-false	3265efbc92	consumed	false	false	0	0	2	true	1	1
+e-fullwidth-digit-consumed-true	3265efbc92	consumed	true	false	0	0	3	true	3	3
+e-fullwidth-digit-matchOnly-false	3265efbc92	matchOnly	false	false	0	0	2	true	0	1
+e-fullwidth-digit-matchOnly-true	3265efbc92	matchOnly	true	false	0	0	3	true	0	3
+digit-combining-a-consumed-false	32cc8161	consumed	false	false	0	0	1	true	1	1
+digit-combining-a-consumed-true	32cc8161	consumed	true	false	0	0	3	true	3	3
+digit-combining-a-matchOnly-false	32cc8161	matchOnly	false	false	0	0	1	true	0	1
+digit-combining-a-matchOnly-true	32cc8161	matchOnly	true	false	0	0	3	true	0	3
+e-combining-consumed-false	3265cc81	consumed	false	false	0	0	2	true	1	1
+e-combining-consumed-true	3265cc81	consumed	true	false	0	0	3	true	3	3
+e-combining-matchOnly-false	3265cc81	matchOnly	false	false	0	0	2	true	0	1
+e-combining-matchOnly-true	3265cc81	matchOnly	true	false	0	0	3	true	0	3

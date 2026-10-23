@@ -84,10 +84,11 @@ fn configurations() -> Vec<(ParseOptions, bool, String)> {
 }
 
 /// Classic token mode (every kind and inversion row) follows Java's graph of the token.
+// The Classic path already agreed with Java; the native test below detects the #717 mutation.
 #[test]
 fn classic_token_mode_matches_the_shared_oracle() {
     let cases = cases();
-    assert_eq!(cases.len(), 120);
+    assert_eq!(cases.len(), 144);
     for (options, reset, config) in configurations() {
         let detailed = options.diagnostics != Diagnostics::DetailedOnFailure;
         for case in &cases {
@@ -135,7 +136,7 @@ fn native_number_and_grammar_entry_match_the_shared_oracle() {
         .into_iter()
         .filter(|c| c.kind == TokenKind::Consumed && !c.invert)
         .collect();
-    assert_eq!(cases.len(), 30);
+    assert_eq!(cases.len(), 36);
     for (options, _, config) in configurations() {
         let detailed = options.diagnostics != Diagnostics::DetailedOnFailure;
         for case in &cases {
