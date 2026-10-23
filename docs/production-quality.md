@@ -15,6 +15,52 @@ Maven Central の 3.2.0 に以下の修正が含まれるという意味では�
 対象opt-in試験のskipなし実行、CI成功、各PRのmergeが必要である。
 ローカルの部分的な成功、待機中のCI、openのPRを全体完了の根拠にしない。
 
+### 必須 opt-in の実行証跡（#719）
+
+CI の check が緑、または `-Dtest` にクラスがあるだけでは実行済みとしない。
+[job 別の契約](../.github/optin-test-contracts.json)に必須クラス・メソッド・有効化 property を記録し、
+[verifier](../scripts/verify-optin-tests.py) が実 Surefire XML を照合する。
+対象 XML / メソッドの欠落、ゼロ実行、skip / failure / error、失敗後の再試行、
+カウンターと testcase の不一致、必須 property の無効化は失敗にする。
+クラス単位の契約でも testcase が 1 件以上あり、その全件が成功する必要がある。
+
+| job / 契約 | 必須条件・証跡 |
+|---|---|
+| `maven.yml:rust` / `cross-language` | Java21 / Rust1.85、`rustConformance=true`、`tokenStreamBench=true`、固定 Tiny 文法。共通適合性、frontend、意味 oracle、位置、LSP/DAP の全対象を検査 |
+| 同 job / `tiny-catalog` | `RustCatalogConformanceTest.realTinyGrammarAdvancesPastCatalogToTheSameGenerationFrontier` を含む全件。下流と同じ Tiny `7d7bd1cbfab1bd9548ba53c73cc50502f0437c67` の実 grammar を指定し、XML・frontier・revision を `tiny-catalog-conformance` artifact に保存 |
+| `maven.yml:downstream` | `downstream-p4-smoke`（意味 oracle）、`downstream-node-alias`（原文保存）、`downstream-tokens`（実 Tiny クラスと両 Rust generator の意味・位置）、`downstream-portability`（実 grammar）、`downstream-ide-smoke`（LSP）の各実行を直後に検査 |
+| `maven.yml:build-jdk17` / `jdk17-parity` | 明示的な Unicode / frontend の 3 クラスだけを検査。通常 package の opt-in skip は対象外 |
+| `assertion-contracts`, `shared-language-calls`, `embedded-grammars`, `language-profiles`, `language-queries`, `external-language-providers`, `analysis-pipeline` | 各 workflow の必須クラスと `rustConformance=true` を検査 |
+| `source-maps`, `source-edits` | Java 側の位置・編集契約を検査。Rust 側は既存の Cargo 共通 fixture で検証 |
+
+実 Tiny Catalog は共通 job で grammar を渡して実行する。下流 Portability の成功を Catalog の代用にしない。
+Catalog の frontier 比較は、それ以降の未対応機能や Tiny 全体の実行成功を保証するものではない。
+`tokenStreamBench` は既存の測定テストの実行確認であり、性能改善・新しい性能合否基準は追加しない。
+
+各 Maven 実行の前に `--prepare` でその契約の古い XML だけを消す。
+実行後は `if: always()` で検査し、対象 XML と `result.json` を
+`target/optin-evidence/<契約名>/` に保存して artifact 化する。
+別の Maven 実行が XML を上書きする前に検査・保存する。
+対象の追加・削除・改名時には契約も更新する。workflow の長い `-Dtest` 一覧とは別ファイルなので、
+他の機能 PR による一覧の追加と競合しにくい。
+
+Surefire を使わない `tiny-classic-oracle.yml:semantic-oracle` は既存の
+12 semantic configurations / 216 samples と Java・両 Rust の独立期待値検査を維持する。
+packaged IDE / VSIX、本番 bridge の JSON/TSV 検査も引き続き別の必須証跡であり、
+この XML verifier の成功で代替しない。
+素の `mvn test` や公開済み 3.3.0 の JDK17 履歴には全 skip 禁止を適用しない。
+
+ローカルで同じ対象を実行する場合は、repository ルートで次のように検査する。
+Maven は必要なキャッシュを用意した上で `-o` を使用できる。
+
+```sh
+python3 scripts/tests/test_verify_optin_tests.py
+python3 scripts/verify-optin-tests.py cross-language --prepare
+# CI と同じ -Dtest と、rustConformance / tokenStreamBench / tinyexpression.grammar を指定して実行
+python3 scripts/verify-optin-tests.py cross-language
+python3 scripts/verify-optin-tests.py tiny-catalog
+```
+
 2026-10-19の統合記録: 積み上げた#570〜#691のPRを下から順にmergeし、masterは`4e8bd971`（#682のmerge）になった。
 そのtreeは`fe648700`と同一で、同revisionのCI 18 checkがすべて成功した（Rust backend and Java conformance、Downstream smoke (tinyexpression)、JDK17 artifacts、VSIX、packaged IDE、各contract系）。
 途中のPRは同じ内容を先端に含むため、先端のCIで代表させた。

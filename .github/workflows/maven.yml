@@ -59,11 +59,50 @@ jobs:
         python3 scripts/generate-case-tables.py --check
         (cd spec-corpus/case-insensitive/unicode-17.0.0 && sha256sum --check SHA256SUMS)
         (cd spec-corpus/grapheme/unicode-17.0.0 && sha256sum --check SHA256SUMS)
+    # Same fixed grammar as downstream; both real Tiny opt-ins must execute here.
+    - name: Checkout the pinned Tiny Catalog grammar
+      uses: actions/checkout@v4
+      with:
+        repository: opaopa6969/tinyexpression
+        ref: 7d7bd1cbfab1bd9548ba53c73cc50502f0437c67
+        path: tiny-catalog
+    - name: Record the Tiny Catalog source revision
+      run: |
+        mkdir -p unlaxer-dsl/target
+        git -C tiny-catalog rev-parse HEAD > unlaxer-dsl/target/rust-catalog-tiny-revision.txt
+    - name: Prepare required tests (cross-language)
+      run: python3 scripts/verify-optin-tests.py cross-language --prepare
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
         -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,JavaTokenBindingConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,ClassicSemanticTokensConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest,NonOrderedParityTest,NonOrderedStateTest,ClassicLspLifecycleConformanceTest,ClassicLspDiagnosticsConformanceTest,EnumConformanceTest,PegLookaheadTest,PegLookaheadStateTest,ClassicLspKeywordConformanceTest,DapLauncherLifecycleConformanceTest,MixedEnumConformanceTest,IncrementalCacheConformanceTest,CommonFieldConformanceTest,NumericCaptureConformanceTest,GeneralTokenPropagationTest,GeneralLexicalPropagationTest,GeneralTokenPropagationStateTest,EvaluationConformanceTest,ApiImpactOverloadTest,TypeofConformanceTest,ObserverFailureTest,ObserverScopeStateTest,RecursiveHelperConformanceTest,PreferredAstConformanceTest,FamilyProjectionConformanceTest,LeftRecursionConformanceTest,OwnedCaptureTest,AssociativeProjectionConformanceTest,AssociativeDelimiterConformanceTest,AssociativeNullableDelimiterConformanceTest,AtomicTriviaConformanceTest,ZeroRepeatBoundaryTest,ZeroRepeatGenerationTest,RegexRetirementConformanceTest,CaptureBoundaryTest,NullableRepeatStateTest,NullableRepeatConformanceTest,NullableSeparationStateTest,NullableSeparationConformanceTest,MemoResetPolicyTest,MemoEvictionTest,MemoResourceDepthTest,TypedNestedSchemaTest,TypedNestedCaptureConformanceTest,PureSuccessRollbackTest,PureSuccessMemoizationConformanceTest,VersionedFailureMemoizationConformanceTest,SafeSuccessMemoizationTest,ResourcePublicationTest,NestedMappedCaptureConformanceTest,ClassicMemoizationConformanceTest,OwnedCaptureConformanceTest,OwnedCaptureSyntaxTest,NestedSharedFieldConformanceTest,MappingGuardTest,PublicMapperCstConformanceTest,OrdinaryParserExceptionTest,OrdinaryExceptionOracleTest,PriorMatchedDiagnosticsTest,OrdinaryParserExceptionConformanceTest,NestedSeparatedBoundaryTest,NestedSeparatedCaptureConformanceTest,NestedMixedValueConformanceTest,NestedSeparatedMappedCaptureConformanceTest,FailureMemoBudgetTest,FailureMemoBudgetConformanceTest,SuccessMemoBudgetTest,SuccessMemoBudgetConformanceTest,ParserScalingSmokeTest,MemoScalingConformanceTest,OwnedNestedCaptureConformanceTest,NestedTypeofConformanceTest,NestedAutoEvalConformanceTest,NestedAliasCaptureConformanceTest,FailureMemoConfigurationTest,ParameterizedRuleConformanceTest,CallByValueConformanceTest,PropertyBasedParityTest,CutLabeledFailureTest,RuleStackTest,RuleStackLspConformanceTest,RaisingOperatorConformanceTest,AutoCommitConformanceTest,AutoCommitWhitespaceFuzzTest,EmptyLiteralConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
+        -Dtinyexpression.grammar=${{ github.workspace }}/tiny-catalog/tools/tinyexpression-p4-lsp-vscode/grammar/tinyexpression-p4.ubnf
+    - name: Verify required tests (cross-language)
+      if: always()
+      run: python3 scripts/verify-optin-tests.py cross-language
+    - name: Verify required tests (tiny-catalog)
+      if: always()
+      run: |
+        python3 scripts/verify-optin-tests.py tiny-catalog
+        test -s unlaxer-dsl/target/rust-catalog-tiny-frontier.txt
+        test -s unlaxer-dsl/target/rust-catalog-tiny-revision.txt
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: optin-cross-language
+        path: |
+          target/optin-evidence/cross-language/
+        if-no-files-found: error
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: tiny-catalog-conformance
+        path: |
+          target/optin-evidence/tiny-catalog/
+          unlaxer-dsl/target/rust-catalog-tiny-frontier.txt
+          unlaxer-dsl/target/rust-catalog-tiny-revision.txt
+        if-no-files-found: error
     # PropertyBasedParityTest (#705): fixed seeds 1..24 plus spec-corpus/property-based/regressions.json.
     # Uploaded even when the test fails: -raw.json holds findings before shrinking.
     - name: Upload property-based parity results
@@ -447,6 +486,9 @@ jobs:
         node --check .github/actions/maven-job-repository/main.js
         node --check .github/actions/maven-job-repository/post.js
 
+    - name: Test required Surefire execution verifier (#719)
+      run: python3 scripts/tests/test_verify_optin_tests.py
+
     - name: Build with Maven
       run: mvn -B clean test
 
@@ -496,6 +538,8 @@ jobs:
     - name: Build and test the -jdk17 modules on JDK 17
       run: mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am clean package -Dgpg.skip=true
 
+    - name: Prepare required tests (jdk17-parity)
+      run: python3 scripts/verify-optin-tests.py jdk17-parity --prepare
     - name: Require Unicode-pinned CI parity on the Java 17 JVM
       run: |
         mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am test \
@@ -503,6 +547,16 @@ jobs:
           -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
         test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
         test -s unlaxer-dsl/target/case-insensitive-java.tsv
+    - name: Verify required tests (jdk17-parity)
+      if: always()
+      run: python3 scripts/verify-optin-tests.py jdk17-parity
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: optin-jdk17-parity
+        path: |
+          target/optin-evidence/jdk17-parity/
+        if-no-files-found: error
     - uses: actions/upload-artifact@v4
       with:
         name: case-insensitive-jdk17-conformance
@@ -661,6 +715,9 @@ jobs:
         ref: 420757a8ab94ae1bed6dbd7cea2743efb8840bbd
         path: tinyexpression-consumer
 
+    - name: Prepare required tests (downstream-p4-smoke)
+      working-directory: tinyexpression-consumer
+      run: python3 ../unlaxer-parser/scripts/verify-optin-tests.py downstream-p4-smoke --prepare
     - name: tinyexpression p4-smoke
       working-directory: tinyexpression-consumer
       run: |
@@ -677,6 +734,21 @@ jobs:
         PYTHON
         mvn -B -P p4-smoke test -Dgpg.skip=true
 
+    - name: Verify required tests (downstream-p4-smoke)
+      if: always()
+      working-directory: tinyexpression-consumer
+      run: python3 ../unlaxer-parser/scripts/verify-optin-tests.py downstream-p4-smoke
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: optin-downstream-p4-smoke
+        path: |
+          tinyexpression-consumer/target/optin-evidence/downstream-p4-smoke/
+        if-no-files-found: error
+
+    - name: Prepare required tests (downstream-node-alias)
+      working-directory: tinyexpression
+      run: python3 ../unlaxer-parser/scripts/verify-optin-tests.py downstream-node-alias --prepare
     - name: tinyexpression generated Node alias contract
       working-directory: tinyexpression
       run: >
@@ -684,6 +756,18 @@ jobs:
         -Dtinyexpression.expected.mapper.snapshot=true
         -Dtinyexpression.expected.mapper.nodeAlias=true
         -Dtest=P4SourceMappingTest,P4OwnedSliceSourceTest
+
+    - name: Verify required tests (downstream-node-alias)
+      if: always()
+      working-directory: tinyexpression
+      run: python3 ../unlaxer-parser/scripts/verify-optin-tests.py downstream-node-alias
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: optin-downstream-node-alias
+        path: |
+          tinyexpression/target/optin-evidence/downstream-node-alias/
+        if-no-files-found: error
 
     - name: Install tinyexpression (for LSP smoke)
       working-directory: tinyexpression
@@ -693,6 +777,9 @@ jobs:
       run: |
         rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
 
+    - name: Prepare required tests (downstream-tokens)
+      working-directory: unlaxer-parser
+      run: python3 scripts/verify-optin-tests.py downstream-tokens --prepare
     - name: Compare real tinyexpression external tokens with both Rust generators
       working-directory: unlaxer-parser
       run: |
@@ -704,6 +791,18 @@ jobs:
         test -s unlaxer-dsl/target/rust-tiny-code-fence-adapters.tsv
         test -s unlaxer-dsl/target/tiny-classic-java.tsv
         test -s unlaxer-dsl/target/tiny-classic-mode/rust.tsv
+
+    - name: Verify required tests (downstream-tokens)
+      if: always()
+      working-directory: unlaxer-parser
+      run: python3 scripts/verify-optin-tests.py downstream-tokens
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: optin-downstream-tokens
+        path: |
+          unlaxer-parser/target/optin-evidence/downstream-tokens/
+        if-no-files-found: error
 
     - uses: actions/upload-artifact@v4
       with:
@@ -727,12 +826,27 @@ jobs:
         path: unlaxer-parser/unlaxer-dsl/target/rust-tiny-code-fence.tsv
         if-no-files-found: error
 
+    - name: Prepare required tests (downstream-portability)
+      working-directory: unlaxer-parser
+      run: python3 scripts/verify-optin-tests.py downstream-portability --prepare
     - name: Check actual tinyexpression portability and injected diagnostics in both hosts
       working-directory: unlaxer-parser
       run: |
         mvn -B -pl unlaxer-dsl test -Dtest=RustPortabilityConformanceTest -DrustConformance=true \
           -Dtinyexpression.grammar="$GITHUB_WORKSPACE/tinyexpression/tools/tinyexpression-p4-lsp-vscode/grammar/tinyexpression-p4.ubnf"
         test -s unlaxer-dsl/target/rust-portability-tiny.tsv
+
+    - name: Verify required tests (downstream-portability)
+      if: always()
+      working-directory: unlaxer-parser
+      run: python3 scripts/verify-optin-tests.py downstream-portability
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: optin-downstream-portability
+        path: |
+          unlaxer-parser/target/optin-evidence/downstream-portability/
+        if-no-files-found: error
 
     - uses: actions/upload-artifact@v4
       with:
@@ -741,6 +855,9 @@ jobs:
         if-no-files-found: error
 
     # 3.0.3 リグレッションを実際に検出したのはこの LSP smoke
+    - name: Prepare required tests (downstream-ide-smoke)
+      working-directory: tinyexpression/tools/tinyexpression-p4-lsp-vscode
+      run: python3 ../../../unlaxer-parser/scripts/verify-optin-tests.py downstream-ide-smoke --prepare
     - name: tinyexpression LSP smoke
       working-directory: tinyexpression/tools/tinyexpression-p4-lsp-vscode
       env:
@@ -761,6 +878,18 @@ jobs:
         print('Current downstream IDE unlaxer dependencies:', resolved)
         PYTHON
         mvn -B -P p4-smoke test -Dgpg.skip=true
+
+    - name: Verify required tests (downstream-ide-smoke)
+      if: always()
+      working-directory: tinyexpression/tools/tinyexpression-p4-lsp-vscode
+      run: python3 ../../../unlaxer-parser/scripts/verify-optin-tests.py downstream-ide-smoke
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: optin-downstream-ide-smoke
+        path: |
+          tinyexpression/tools/tinyexpression-p4-lsp-vscode/target/optin-evidence/downstream-ide-smoke/
+        if-no-files-found: error
 
     - name: Upload downstream dependency versions
       uses: actions/upload-artifact@v4

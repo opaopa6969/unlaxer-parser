@@ -20,22 +20,28 @@ jobs:
       - name: Rust toolchain を既定を変更せずに準備
         run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
       - run: rustfmt --edition 2021 --check docs/fixtures/assertion-contracts/probe.rs
+      - name: Prepare required tests (assertion-contracts)
+        run: python3 scripts/verify-optin-tests.py assertion-contracts --prepare
       - run: >
           mvn -B -pl unlaxer-common,unlaxer-dsl -am test
           -Dtest=AssertionContractConformanceTest,MatchOnlyTest,NotTest,TransactionalStateTest,MemoDiagnosticFrameTest,DetailedOnFailureTest,PackratMemoizationTest,ScopeStoreTransactionTest,JavaDetailedOnFailureRuntimeTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,CaptureEqualityConformanceTest,TokenAdapterConformanceTest,RustUbnfFrontendConformanceTest,SharedLanguageCallConformanceTest
           -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
         env:
           CARGO_INCREMENTAL: '0'
+      - name: Verify required tests (assertion-contracts)
+        if: always()
+        run: python3 scripts/verify-optin-tests.py assertion-contracts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: optin-assertion-contracts
+          path: |
+            target/optin-evidence/assertion-contracts/
+          if-no-files-found: error
       - run: cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-runtime --lib --test scopes --test diagnostics_policy --test capture_equality
       - run: |
           test -s unlaxer-dsl/target/assertion-contracts.tsv
           test -s unlaxer-dsl/target/assertion-retries.tsv
-          python3 - <<'PY'
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-          suites = [ET.parse(p).getroot() for p in Path('unlaxer-dsl/target/surefire-reports').glob('TEST-*.xml')]
-          assert suites and all(int(s.attrib.get('skipped', 0)) == 0 for s in suites), 'conformance tests must execute without skips'
-          PY
       - uses: actions/upload-artifact@v4
         with:
           name: assertion-contracts
