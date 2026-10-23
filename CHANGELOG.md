@@ -8,6 +8,48 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Changed
+
+公開済み 3.3.0 以降の開発版では互換性に注意し、生成物と利用側を更新する順序は [移行・再生成の手順](docs/migration-after-3.3.0.md) を参照してください (#769)。
+
+- UBNF の `REGEX(...)` と旧 adapter binding を `E-REGEX-RETIRED` で拒否し、Java の `RegexTokenParser` 実行 API を削除した (PR #617、issue #612)。宣言的な `token NAME ::= expression;` へ置き換えて再生成する。[移行例と PEG の意味](docs/regex-retirement.md)。
+- enum の AST field を scalar / optional / list とも宣言 enum 型へ揃え、enum-only root に wrapper を生成する。非 ASCII 定数名を共通の scalar escape に変更（例: `日本` → `U65E5__U672C_`）したため、再生成時に型・定数参照・root の利用箇所を更新する (PR #557)。混在 enum/Text/Node は Java `EnumValue` と Rust `AstValue` の enum variant を使い、網羅的な分岐も更新する (PR #563)。[enum の移行](docs/enum-values.md#migration-and-staged-scope)、[混在値](docs/enum-values.md#mixed-values)。
+- Rust の直接の `NumberParser` / `DigitParser` capture を `String` から `i32` へ変更し、optional / list・`Semantics` 引数・canonical JSON も整数へ揃えた (PR #575、issue #566)。Java の field 型は従来どおり。再生成後の文字列変換を外し、低水準 IR の `Kind::Integer` を分岐に加える。[型・失敗条件・移行](docs/numeric-captures.md#compatibility-and-verification)。
+- Java の `@commonField` accessor を実際の member の型・cardinality に揃えた (PR #570)。従来の `String` 前提の利用箇所を更新する。[型の契約](docs/common-fields.md)、[利用側の移行](docs/migration-after-3.3.0.md)。
+- Java の自動 `@eval` literal / passthrough は unchecked cast に代わり `convertValue(Object)` の実装を要求する (PR #577)。再生成する evaluator に明示的な変換を実装する。Rust の自動評価も必要な変換・条件判定 hook を利用側が実装する。[値と移行](docs/evaluation-strategies.md#values-and-migration)。
+- Rust の公開 IR `Rule` に `type_constraints` を追加した (PR #584)。直接構築する既存 consumer は `type_constraints: vec![]` を指定する。Java の旧 convenience constructor は保持する。[IR の移行](docs/typeof-constraints.md#generated-ir-and-verification)。
+- Rust の引数なし AST family / alias は空の親 variant に代わり具体的な子 AST を返す (PR #597)。旧親 variant / `eval_family` の参照を再生成した具体子へ移す。[互換性と移行](docs/family-projection.md)。結合演算子の共有 literal spine は `NullableNode` を追加し、該当 operand / evaluator 引数を nullable Node 型へ変える (PR #605)。[型と移行](docs/associative-projection.md)。
+- 生成 `CI('word')` の比較を Java/Rust 共通の Unicode 17.0.0 simple upper→lower に固定した (PR #534)。JDK に依存した受理ペアの期待値は再生成後に確認する。手書き Java `IgnoreCaseWordParser` は維持する。[生成 CI の契約](spec-corpus/case-insensitive/README-generated.md)、[移行手順](docs/migration-after-3.3.0.md)。
+- Java も未変換の左再帰を警告だけで生成せず `E-LEFT-RECURSION` で拒否する (PR #600)。消費する基底と反復へ書き換える。[移行例](docs/left-recursion.md)。利用可能な final Java token class の継承も、生成前に `E-JAVA-TOKEN-FINAL` で拒否する (PR #645)。[置換する binding の条件](docs/java-token-bindings.md)。
+- 一般規則の隣接した `CAPTURE(` / `SAME_AS(` / `CAPTURE_SCOPE(` と `COMMIT(` / `LABEL(` / `CATCH(` を組込み呼出しとして扱う (PR #641、#710)。既存の規則参照＋group の意味を保つ場合は名前と `(` の間に空白を入れる。[owned capture 構文](docs/general-owned-capture-syntax.md)、[cut 構文](docs/cut-and-labeled-failures.md)、[移行一覧](docs/migration-after-3.3.0.md)。
+- 通常の `{0}` / `Repeat(0,0)` は子・terminator を実行しない (PR #611)。Classic の nullable repeat と separated list は、Rust 生成でも Java と同じく進捗しない成功を一度数えて停止する (PR #622、#623)。従来のゼロ回での副作用や no-progress 拒否を前提にした利用箇所を見直す。[ゼロ回と明示的な否定検査](docs/zero-repetition.md)、[反復](docs/nullable-repetition.md)、[区切り付き](docs/nullable-separation.md)、[移行](docs/migration-after-3.3.0.md)。
+- Java memo の `PositionKey` に matched cursor の reset policy を追加した (PR #625)。旧5引数 constructor は reset=true として維持し、固定した record pattern / reflection は更新する。[移行](docs/memo-reset-policy.md)。Java/Rust の成功・失敗 memo に件数・payload の有限予算を適用し、失敗合計の既定は32 MiB、成功合計は16 MiBとした (PR #656、#661、#675)。memo 自体は既定 OFF、満杯では通常解析へ戻る。[失敗の設定・統計変更](docs/failure-memo-budget.md)、[成功の設定](docs/success-memo-budget.md)。
+- Java/Rust の公開 CST mapping は不正な graph / span を `E-MAPPING-CST`、投影の資源上限を `E-MAPPING-LIMIT` で拒否する (PR #650、#682)。mapper を再生成し、手書き CST と失敗処理を確認する。[構造・上限](docs/public-mapper-cst.md)、[移行](docs/migration-after-3.3.0.md)。
+- Java observer の失敗後は公開状態を復元して context の再利用を拒否する (PR #589)。close 後に新しい context で再試行する。通常 callback 例外の同 context 再試行と、資源失敗の fatal な扱いを区別する (PR #651、#636)。[observer](docs/parser-observer-failures.md)、[通常例外](docs/ordinary-parser-exceptions.md)、[資源失敗](docs/resource-abort-publication.md)。
+- Rust Classic の atomic token 内部の trivia、Sequence の原文・CP 範囲、先行 matched cursor の診断を Java の契約へ揃えた (PR #607、#610、#658)。原文・位置を固定する利用側の期待値を見直す。[atomic](docs/classic-atomic-trivia.md)、[Sequence](docs/classic-sequence-trivia.md)、[診断](docs/prior-matched-diagnostics.md)、[移行](docs/migration-after-3.3.0.md)。下記 Fixed の先読み capture・失敗位置修正も同じ移行一覧に含む (#706、#717、#729、#734)。
+- Java/Rust LSP は初期化前の通常 request と重複 `initialize` を拒否する (PR #553)。再設定は明示的な `unlaxer/configure` へ移す。[移行例](docs/classic-lsp-lifecycle.md#migration-from-repeated-initialize)。TinyCalc / 新規 scaffold 拡張の最低 VS Code 版を1.97.2へ変更した (PR #689)。[editor の更新・起動手順](docs/rust-vscode-launch.md)。
+- Java API impact は合法な overload を保持し、同名 method 群の `subject` に引数型列を含める (PR #579)。レポートの利用側は名前だけで一意と仮定しない。[差分の規則](docs/api-impact-report.md#差分の規則)、[移行](docs/migration-after-3.3.0.md)。
+- 学習用 `unlaxer-learning` は未対応の `@enum` / `@typeof` を compile 時に明示拒否する (PR #581、#584)。対応済みの Java/Rust 生成 CLI・生成 Playground を使う。[利用境界](docs/enum-values.md#browser-lesson-boundary)、[移行](docs/migration-after-3.3.0.md)。
+
+- 空 literal `''` を含む文法は、`unlaxer check --target rust` の結果が blocked から passed に変わる (issue #713 / PR #747)。下記 Fixed にある生成対応の利用者向けの変更であり、通常文法と token stream の空 literal の意味を確認して再生成する。[契約](docs/empty-literal.md)、[再生成手順](docs/migration-after-3.3.0.md)。
+
+### Added
+
+- cut とラベル付き失敗を Java/Rust runtime および UBNF の `COMMIT` / `LABEL` / `CATCH` に追加 (PR #707、#710、issue #700)。確定エラーは recovery 境界へ、ラベル付き失敗は指定した CATCH へ伝わる。[契約](docs/cut-and-labeled-failures.md)。
+- 一階の引数付き規則を両 frontend で生成前に単相化し、`F(=x, y)` の値渡し引数を `CAPTURE_SCOPE` / `CAPTURE` / `SAME_AS` へ展開する (PR #708、#711、issue #701、#704)。[引数付き規則](docs/parameterized-rules.md)、[値渡し](docs/call-by-value-arguments.md)。
+- FIRST 集合と外側の文脈による cut 位置の lint、規則単位で opt-in する `@autoCommit` を追加。文法全体の `@whitespace: javaStyle` にも対応する (PR #724、#731、issue #702、#728)。対象外の警告は lint API から取得する。[条件と制限](docs/auto-commit.md)。
+- DETAILED 診断の最終エラーに、外側からの規則名・開始 CP を保持する rule stack を追加 (PR #723、issue #703)。Java/Rust runtime API と両 LSP の `relatedInformation` / `data.ruleStack` で取得できる。[契約](docs/rule-stack-diagnostics.md)。
+- seed 付き文法・入力生成、差分比較、失敗例の縮小と corpus 化による property-based テストを追加 (PR #709、issue #705)。Java/Rust の受理・cursor・CST・AST・診断と設定間の不変条件、両 host の Rust 生成物を検証する。[seed の再現手順](docs/property-based-testing.md)。
+- Rust の `CI`、transactional `NonOrdered`、Java の明示 PEG assertion `PegLookahead` を追加 (PR #534、#551、#560)。[CI](spec-corpus/case-insensitive/README.md)、[NonOrdered](docs/nonordered-runtime.md)、[PEG assertion](docs/peg-assertions.md)。
+- Rust の一般 parser / custom parser に4種の Classic token kind・invert・stopper を伝播し、Tiny の CodeStart / CodeEnd / LongCodeBlock へ接続した (PR #576、#608)。[token mode](docs/classic-token-propagation.md)、[Tiny](docs/tiny-classic-modes.md)。
+- Java/Rust に原文を所有する capture / replay / scope と、一般 UBNF の `CAPTURE` / `SAME_AS` / `CAPTURE_SCOPE` を追加 (PR #603、#641)。明示的な Value / Optional / List 境界の immutable snapshot も取得できる (PR #620)。[owned capture](docs/owned-capture-replay.md)、[UBNF](docs/general-owned-capture-syntax.md)、[境界 snapshot](docs/nested-capture-boundaries.md)。
+- 規則単位の `@nestedCaptures` による再帰型 Optional / List の生成を追加。text / i32 / mapped node / enum、共有 mapping と family accessor、owned capture との合成、separated list を扱う (PR #627、#638、#643、#648、#654)。[型と対応範囲](docs/typed-nested-captures.md)、[mapped 葉](docs/nested-mapped-leaves.md)、[共有 field](docs/nested-shared-fields.md)、[separated](docs/nested-separated-captures.md)。
+- nested capture 内の混在 text / i32 / node / enum、浅い `@typeof` 比較、非再帰の透過 alias 経由の container を追加 (PR #659、#666、#699)。循環 helper や nested 所有規則自身の `@eval` 等は引き続き拒否する (PR #698)。[混在値](docs/nested-mixed-values.md)、[型比較](docs/nested-typeof.md)、[対応範囲表](docs/typed-nested-captures.md#nested-の対応範囲と拡張先)。
+- Rust の typed enum / 混在 enum、`@commonField` family view、`@eval` 自動評価、mapping 時の `@typeof` を Java と共通の契約へ揃えた (PR #557、#563、#570、#575、#577、#584)。[enum](docs/enum-values.md)、[共通 field](docs/common-fields.md)、[評価](docs/evaluation-strategies.md)、[型制約](docs/typeof-constraints.md)。
+- 再帰する透過 helper の値投影、Rust の preferred AST snapshot、具体 AST family と結合演算子の投影を追加 (PR #594、#595、#597、#605)。左結合の固定 literal および1段の Optional / Repeat delimiter にも対応する (PR #678、#681)。[再帰 helper](docs/recursive-helpers.md)、[preferred](docs/preferred-ast-snapshots.md)、[family](docs/family-projection.md)、[結合演算子](docs/associative-projection.md)。
+- Java/Rust の上限付き snapshot cache、Rust の pure success / Classic token mode の memo 再生、rollback に対応する state version 付き failure memo を追加 (PR #565、#633、#640、#647)。Rust の pure success memo 再生は既定 OFF で、`ParseOptions::with_memoization(Memoization::SafeFailures)` を指定した opt-in。外部 callback を含む文法は既定で snapshot cache の対象外 (issue #613)。編集は全再解析し、unsafe callback や stateful success の暗黙再利用は行わない。[snapshot cache](docs/incremental-cache.md)、[pure success](docs/pure-success-memo.md)、[Classic](docs/classic-memo.md)、[state version](docs/stateful-failure-memo.md)。
+- Java/Rust LSP の full semantic-token provider と、TinyCalc / `unlaxer init` 拡張での Java/Rust stdio backend 選択を追加 (PR #550、#556)。[semantic tokens](docs/classic-rust-lsp.md)、[起動・再設定](docs/rust-vscode-launch.md)。
+
 ### Fixed
 
 - 生成した Rust parser の Number token が、不完全な指数（`2e`・`2e+`）で Java の `NumberParser` と同じく指数記号・符号の後を失敗位置として記録するよう修正 (#717)。`R0 ::= NUM 'a'` に `2e` の診断は CP1 → CP2（`2e+` は CP3）。受理と消費は従来どおり仮数部まで。共通 oracle `conformance/number-token/cases.tsv` を追加し、PBT の既知差 `number-incomplete-exponent` を削除。
@@ -15,17 +57,18 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Rust host の Rust 生成器で、再帰する未 mapping 規則の値の種類・個数を固定点から求め、反復・separated 内の preferred AST 用の深さと schema hash を Java host に揃えた (#730)。PBT seed 59 の生成物不一致を解消し、縮小した2文法を共有回帰 corpus に追加した。
 - Java host の Rust 生成で、再帰する規則の値の形を native と同じく lowered IR 上の固定点で求め、構造解析の深さ 256 を共有するよう修正 (#740)。再帰する helper を括弧で包んだ文法（`H ::= 'n' R0 | 'y' (…H…)+ | 'a'`、separator 側の再帰も同じ）を 85〜122 段（separator 側は 84 段から）で `E-RECURSIVE-SHAPE` により拒否していたのをやめ、native と同一の生成物を出す。123 段からは両 host とも `structural analysis depth exceeds 256`。固定点は呼び出し元の深さを引き継がず 0 から数える（両 host）。このため native も、Java host が以前から受理していた文法（再帰する helper を `[ ]`・`{ }`・`CAPTURE`・`CAPTURE_SCOPE` で 62 段包んだもの、82 個の規則参照の列の先の再帰など）を受理するようになった。既存の生成物は変わらない。整数 field の判定で Java の型推論が深さの上限に達した場合だけ、native の `numeric_fields.rs` と同じ capture の規則を使う（作業量の上限と非収束は従来どおり失敗）。Java の Java 生成の上限は変えていない。UBNF frontend の入れ子の上限が Java（parser frame 1024、形により 126〜168 段）と Rust（本体 128 段）で異なることを契約として [docs/java-parser-limits.md](docs/java-parser-limits.md) に記載し、両方の境界をテストで固定した (#741)。
 
-### Changed
-
 - UBNF の空 literal `''` を Rust 生成器でも Java と同じ意味で生成する (#713)。`unlaxer check --target rust` は `''` を含む文法を `P-EMPTY-LITERAL` で blocked とせず passed とし、通常の文法では Java の `WordParser("")`（常に失敗し、期待候補 `''` を記録する）、`@tokenStream` / `@lexicalContext` の文法では `Lexing.LiteralParser("")`（幅0で成功）として、Java host・native host の両方から生成する。runtime に `Expr::JavaEmptyWord` / `Expr::JavaEmptyLiteral` を追加し、手書きの `Expr::literal("")` の PEG 成功は変えない。cut・ラベル付き失敗・rule stack・`@autoCommit`・#706 の frontier 補正との組み合わせを含む19文法80入力を、Java 生成 parser と両 host の Rust を別々に compile・実行して比較する。[契約](docs/empty-literal.md)。
 - #729 の Parsed 原文の追跡を、owned capture（CAPTURE / SAME_AS / CaptureScope、call-by-value の脱糖後を含む）がある文法・式だけに限定した。未使用時は Parsed 原文を生成・伝搬せず、成功 memo にも保存しない。共有文法ごとの判定結果は Weak 参照で最大64件キャッシュし、小入力でも毎 parse の全 rule 走査を避ける。入れ子の呼び出しでは外側の追跡を引き継ぎ、終了時に復元する。原文の追加情報は既存の boxed source に移し、Rust の `Fragment` を x86_64 で 64 → 56 B（master と同サイズ）へ戻した。深さ255の非 Classic CAPTURE 再帰について、Rust 1.85.0・release（opt-level=3、debuginfo=1）で最小要求スタックを16 B刻み・各境界3回確認すると、A' `ae11e746` 747,904 B、修正前 `def95dc8` 784,640 B、修正後 768,256 B。A' 比の増加は約4.9%から約2.7%へ縮小したが、残差はある。再帰上限は変更していない。
 
 - 生成した Rust parser の失敗位置と rule stack を Java に揃えた (#706)。UBNF の正の `LOOKAHEAD`・`EMPTY`・`UNTIL` が matched cursor だけを進めた後の失敗は、Java と同じく matched の到達位置（たとえば `R0 ::= 'a' AHEAD 'é'` に `ax` で CP1 → CP2）で報告され、その後に始まる rule の開始位置も同じく後ろへ進む。受理・cursor・CST・AST は変わらない。式単位の入口（`ParseContext::parse` など）と token stream の中は従来どおり。[契約](docs/prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)。
 
-### Fixed
-
 - 共有 self-hosted runner の Rust 使用ジョブを `RUSTUP_TOOLCHAIN=1.85.0` に固定し、toolchain のインストール時に全体の既定値を変更しないよう修正 (#738)。Cargo と Java テストの子プロセスの `rustc` が並行ジョブの影響で異なる版になり、`E0514` で失敗する競合を防ぐ。
 - Rust の lexing session 内で grammar を 2 段以上入れ子に呼ぶと、正の `LOOKAHEAD` 後の frontier 補正が復活する問題を修正 (#734)。session の範囲を入れ子へ引き継ぎ、何段でも consumed の失敗位置と rule frame 開始位置を保つ。session 外と shared call の子では従来どおり補正する。[契約](docs/rule-stack-diagnostics.md)。
+
+- Java frontend の annotation 名の prefix 誤認、`@eval` の名前付き引数と `@commonField` の comma 後 trivia の解析を修正 (PR #540)。左再帰の診断順と `@eval` パラメータの表示順も決定的にした (PR #726)。
+- Java の token stream / lexical context 内の literal capture と、左結合の同じ parser class を使う literal の取得箇所を修正 (PR #672、#677)。[token stream](docs/token-stream.md)、[結合演算子](docs/associative-projection.md)。
+- LSP の最遠構文失敗位置、Java 生成補完 literal の escaping、DAP 切断後の終了と transport 失敗通知、初期化未完了の LSP 起動失敗後の cleanup を修正 (PR #554、#561、#562、#691)。[LSP 診断](docs/classic-lsp-diagnostics.md)、[起動と終了](docs/rust-vscode-launch.md)。
+- memo 再試行で資源の深さ制限を飛び越えないようにした (PR #639)。`E-RAISING-REPETITION` の検査を実際に捕まえる失敗種別へ揃え、Rust CATCH の循環検査での stack overflow を修正 (PR #727、#733)。[cut / label の契約](docs/cut-and-labeled-failures.md)。
 
 ## [3.3.0] - 2026-10-16
 
