@@ -51,7 +51,7 @@ fn shared_corpus_inventory_and_readiness_are_deterministic() {
 fn inventory_reports_later_nested_and_equal_valued_occurrences() {
     let source = include_str!("fixtures/portability/multi-gap.ubnf");
     let report = check(source);
-    assert_eq!(12, report.diagnostics.len());
+    assert_eq!(11, report.diagnostics.len());
     let docs: Vec<_> = report
         .diagnostics
         .iter()
@@ -71,7 +71,7 @@ fn inventory_reports_later_nested_and_equal_valued_occurrences() {
         ("P-SCOPE-MODE", 1),
         ("P-TYPEOF", 0),
         ("P-QUALIFIED-REFERENCE", 2),
-        ("P-EMPTY-LITERAL", 1),
+        ("P-EMPTY-LITERAL", 0),
     ] {
         assert_eq!(
             expected,

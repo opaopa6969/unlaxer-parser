@@ -233,6 +233,12 @@ pub enum Expr {
     },
     /// Java EMPTY optionally matches one scalar without consuming it.
     JavaEmpty,
+    /// Java `WordParser("")`: never matches, even inverted, and expects the empty word.
+    /// Generated for UBNF `''`; unlike PEG `Literal("")`, which always succeeds.
+    JavaEmptyWord,
+    /// Java lexical `LiteralParser("")`, generated for `''` in token-stream or lexical-context
+    /// grammars: zero-width success. Classic adds an empty token; inverted use fails.
+    JavaEmptyLiteral,
     /// Java UNTIL succeeds at EOF even if its non-consuming terminator is absent.
     JavaUntil(&'static str),
     Error(&'static str),
@@ -3534,10 +3540,13 @@ impl<'a> ParseContext<'a> {
             })
         };
         if result.is_none() {
+            // A failed consuming Java leaf calls consume(0), which resets the matched cursor.
+            // Java LiteralParser("") (JavaEmptyLiteral) never does, so it is not listed.
             let leaf_reset = self.token_mode.is_some_and(|mode| mode.kind.is_consumed())
                 && matches!(
                     expression,
                     Expr::Literal(_)
+                        | Expr::JavaEmptyWord
                         | Expr::CaseInsensitive(_)
                         | Expr::Replay(_)
                         | Expr::Any
@@ -3779,6 +3788,11 @@ impl<'a> ParseContext<'a> {
                 }
             }
             Expr::Empty => Some(Fragment::default()),
+            Expr::JavaEmptyWord => {
+                self.fail("");
+                None
+            }
+            Expr::JavaEmptyLiteral => Some(Fragment::default()),
             Expr::JavaEmpty => {
                 if let Some(next) = self.input[self.matched_position..].chars().next() {
                     self.matched_position += next.len_utf8();
@@ -5276,6 +5290,7 @@ impl<'a> ParseContext<'a> {
         if matches!(
             child,
             Expr::Literal(_)
+                | Expr::JavaEmptyWord
                 | Expr::CaseInsensitive(_)
                 | Expr::Replay(_)
                 | Expr::Any
@@ -5443,6 +5458,8 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::Until(_)
         | Expr::JavaLookahead { .. }
         | Expr::JavaEmpty
+        | Expr::JavaEmptyWord
+        | Expr::JavaEmptyLiteral
         | Expr::JavaUntil(_)
         | Expr::Error(_)
         | Expr::Replay(_)
@@ -5580,6 +5597,8 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             | Expr::Until(_)
             | Expr::JavaLookahead { .. }
             | Expr::JavaEmpty
+            | Expr::JavaEmptyWord
+            | Expr::JavaEmptyLiteral
             | Expr::JavaUntil(_)
             | Expr::Error(_)
             | Expr::Backreference(_) => None,
@@ -5705,6 +5724,8 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::Until(_)
         | Expr::JavaLookahead { .. }
         | Expr::JavaEmpty
+        | Expr::JavaEmptyWord
+        | Expr::JavaEmptyLiteral
         | Expr::JavaUntil(_)
         | Expr::Error(_) => true,
     }

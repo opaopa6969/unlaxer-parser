@@ -179,7 +179,11 @@ pub enum Expression {
         tokens: Vec<String>,
         message: String,
     },
+    /// A word. `Literal("")` is Java's lexical `LiteralParser("")`, used only in
+    /// token-stream or lexical-context grammars: zero-width success.
     Literal(String),
+    /// UBNF `''` as Java `WordParser("")`: never matches; expects the empty word.
+    EmptyWordToken,
     /// Always fails without consuming input; the message is an expected hint.
     ErrorExpected(String),
     NumberToken,

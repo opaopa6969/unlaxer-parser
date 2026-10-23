@@ -585,7 +585,7 @@ public final class RustGrammarLowering {
     }
 
     private static boolean assocDelimiter(Expression expression) {
-        if (expression instanceof Literal literal) return !literal.text().isEmpty();
+        if (expression instanceof Literal || expression instanceof EmptyWordToken) return true;
         if (expression instanceof OptionalExpr optional) return literalDelimiterBody(optional.child());
         if (expression instanceof Repeat repeat)
             return repeat.min() == 0 && repeat.max() == null && literalDelimiterBody(repeat.child());
@@ -594,10 +594,10 @@ public final class RustGrammarLowering {
 
     // Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
     private static boolean literalDelimiterBody(Expression expression) {
-        if (expression instanceof Literal literal) return !literal.text().isEmpty();
+        if (expression instanceof Literal || expression instanceof EmptyWordToken) return true;
         return expression instanceof Sequence sequence && !sequence.elements().isEmpty()
             && sequence.elements().stream().allMatch(element ->
-                element instanceof Literal literal && !literal.text().isEmpty());
+                element instanceof Literal || element instanceof EmptyWordToken);
     }
 
     private void checkLeftAssoc(int rule, Mapping mapping) {
@@ -691,7 +691,10 @@ public final class RustGrammarLowering {
 
     private Expression atomic(AtomicElement element) {
         if (element instanceof TerminalElement terminal) {
-            if (terminal.value().isEmpty()) throw unsupported("empty literal");
+            // Java emits WordParser(""), which never matches, unless lexical
+            // literals are enabled; then its literal parser accepts zero width.
+            if (terminal.value().isEmpty() && !org.unlaxer.dsl.codegen.TokenStreamGrammar.enabled(grammar)
+                && !org.unlaxer.dsl.codegen.LexicalContexts.enabled(grammar)) return new EmptyWordToken();
             return new Literal(scalarText(terminal.value()));
         }
         if (element instanceof ErrorElement error) {
@@ -750,7 +753,7 @@ public final class RustGrammarLowering {
                 ? choice.alternatives().get(0) : body;
             if (sourceBody instanceof SequenceBody source && source.elements().size() == 1
                 && source.elements().get(0).element() instanceof RuleRefElement) return child;
-            if (!onlyReference && bare instanceof Literal) return child;
+            if (!onlyReference && (bare instanceof Literal || bare instanceof EmptyWordToken)) return child;
         }
         return lowered;
     }
@@ -758,7 +761,7 @@ public final class RustGrammarLowering {
     private Expression repeatedAtom(AtomicElement atom) {
         Expression child = atomic(atom);
         // Java wraps repeated choices/literals in a DelimitedChain outside their capture site.
-        if (child instanceof Choice || child instanceof Literal) return new Delimited(child);
+        if (child instanceof Choice || child instanceof Literal || child instanceof EmptyWordToken) return new Delimited(child);
         return atom instanceof RuleRefElement || child instanceof Sequence
             ? child : new Sequence(List.of(child));
     }
@@ -914,6 +917,7 @@ public final class RustGrammarLowering {
         if (expression instanceof CatchLabels caught) return nullable(caught.asChoice());
         if (expression instanceof CaptureBoundary b) { return nullable(b.child()); }
         if (expression instanceof LexicalToken token) return token.expression().nullable();
+        if (expression instanceof Literal literal) return literal.text().isEmpty();
         if (expression instanceof ErrorExpected ignored) {
             return false;
         }

@@ -212,8 +212,6 @@ public final class PortabilityCheck {
     private static void scanAtomic(AtomicElement atomic, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
         if (atomic instanceof RuleRefElement ref && ref.namespace().isPresent()) {
             add(out, "P-QUALIFIED-REFERENCE", snapshot, atomic, ref.namespace().get() + "." + ref.name());
-        } else if (atomic instanceof TerminalElement terminal && terminal.value().isEmpty()) {
-            add(out, "P-EMPTY-LITERAL", snapshot, atomic, "empty literal");
         } else if (atomic instanceof TransparentElement group) {
             scanBody(group.body(), snapshot, out);
         } else if (atomic instanceof OptionalElement optional) {

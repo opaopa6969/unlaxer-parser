@@ -502,7 +502,9 @@ fn expression(expr: &Expression) -> String {
                 expression(child)
             )
         }
+        Literal(s) if s.is_empty() => "Expr::JavaEmptyLiteral".into(),
         Literal(s) => format!("Expr::Literal({})", quote(s)),
+        EmptyWordToken => "Expr::JavaEmptyWord".into(),
         ErrorExpected(message) => format!("Expr::Error({})", quote(message)),
         NumberToken => "Expr::Number".into(),
         GraphemeToken => "Expr::Grapheme".into(),

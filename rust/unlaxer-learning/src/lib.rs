@@ -46,7 +46,9 @@ fn lexical(
 fn expression(e: &Expression) -> Result<Expr> {
     use Expression::*;
     Ok(match e {
+        Literal(text) if text.is_empty() => Expr::JavaEmptyLiteral,
         Literal(text) => Expr::Literal(intern(text)),
+        EmptyWordToken => Expr::JavaEmptyWord,
         LexicalToken { name, expression: e } => Expr::Lexical(intern(name), lexical(e)?),
         Reference(id) => Expr::Rule(*id),
         Sequence(items) => Expr::Sequence(items.iter().map(expression).collect::<Result<_>>()?),

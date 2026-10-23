@@ -23,7 +23,7 @@ let leaves = tree.token_trace().expect("explicitly enabled")?;
 | ordered / longest / unique-longest / predictive choice | 敗者の leaf・上限エラーを rollback。選択した勝者の metadata を保持 |
 | PEG lookahead / UBNF lookahead | 投機的 leaf を外側 consumed trace へ残さない。明示 TokenExpr の match-only token とは区別 |
 | Java-compatible optional/repeat | 実際に空で成功した Optional / ZeroOrMore の leaf を保持 |
-| CHAR_RANGE / NEGATION / declarative lexical | 原子的認識の span/text を保持。Rust の表示labelは `SingleCharacterParser` / `LexicalTokenParser`。Java の生成 subclass 名との表示差を残す |
+| CHAR_RANGE / NEGATION / declarative lexical / token stream・lexical context の `''` | 原子的認識の span/text を保持（`''` は Java `LiteralParser("")` と同じ幅0 leaf、[#713](empty-literal.md)）。Rust の表示labelは `SingleCharacterParser` / `LexicalTokenParser`。Java の生成 subclass 名との表示差を残す |
 | code fence / UNTIL / EMPTY / backreference / recovery | この trace では `Unsupported`。通常parseとAST利用は従来どおり |
 
 Number の `12.3` は `Optional[0,0]`, `Digit[0,1]`, `Digit[1,2]`, `Point[2,3]`, `Digit[3,4]`, `Optional[4,4]`。これは既存 number の分岐内で記録する。`1e+` の失敗した exponent は消え、`Optional[1,1]` を保持する。元の number の受理や診断を変更しない。
