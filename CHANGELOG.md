@@ -8,9 +8,10 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
-### Changed（互換性あり注意）
+### Changed
 
-- 以下は公開済み 3.3.0 以降の開発版の変更。生成物と利用側を更新する順序は [移行・再生成の手順](docs/migration-after-3.3.0.md) を参照 (#769)。
+公開済み 3.3.0 以降の開発版では互換性に注意し、生成物と利用側を更新する順序は [移行・再生成の手順](docs/migration-after-3.3.0.md) を参照してください (#769)。
+
 - UBNF の `REGEX(...)` と旧 adapter binding を `E-REGEX-RETIRED` で拒否し、Java の `RegexTokenParser` 実行 API を削除した (PR #617、issue #612)。宣言的な `token NAME ::= expression;` へ置き換えて再生成する。[移行例と PEG の意味](docs/regex-retirement.md)。
 - enum の AST field を scalar / optional / list とも宣言 enum 型へ揃え、enum-only root に wrapper を生成する。非 ASCII 定数名を共通の scalar escape に変更（例: `日本` → `U65E5__U672C_`）したため、再生成時に型・定数参照・root の利用箇所を更新する (PR #557)。混在 enum/Text/Node は Java `EnumValue` と Rust `AstValue` の enum variant を使い、網羅的な分岐も更新する (PR #563)。[enum の移行](docs/enum-values.md#migration-and-staged-scope)、[混在値](docs/enum-values.md#mixed-values)。
 - Rust の直接の `NumberParser` / `DigitParser` capture を `String` から `i32` へ変更し、optional / list・`Semantics` 引数・canonical JSON も整数へ揃えた (PR #575、issue #566)。Java の field 型は従来どおり。再生成後の文字列変換を外し、低水準 IR の `Kind::Integer` を分岐に加える。[型・失敗条件・移行](docs/numeric-captures.md#compatibility-and-verification)。
@@ -30,6 +31,8 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Java API impact は合法な overload を保持し、同名 method 群の `subject` に引数型列を含める (PR #579)。レポートの利用側は名前だけで一意と仮定しない。[差分の規則](docs/api-impact-report.md#差分の規則)、[移行](docs/migration-after-3.3.0.md)。
 - 学習用 `unlaxer-learning` は未対応の `@enum` / `@typeof` を compile 時に明示拒否する (PR #581、#584)。対応済みの Java/Rust 生成 CLI・生成 Playground を使う。[利用境界](docs/enum-values.md#browser-lesson-boundary)、[移行](docs/migration-after-3.3.0.md)。
 
+- 空 literal `''` を含む文法は、`unlaxer check --target rust` の結果が blocked から passed に変わる (issue #713 / PR #747)。下記 Fixed にある生成対応の利用者向けの変更であり、通常文法と token stream の空 literal の意味を確認して再生成する。[契約](docs/empty-literal.md)、[再生成手順](docs/migration-after-3.3.0.md)。
+
 ### Added
 
 - cut とラベル付き失敗を Java/Rust runtime および UBNF の `COMMIT` / `LABEL` / `CATCH` に追加 (PR #707、#710、issue #700)。確定エラーは recovery 境界へ、ラベル付き失敗は指定した CATCH へ伝わる。[契約](docs/cut-and-labeled-failures.md)。
@@ -44,7 +47,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - nested capture 内の混在 text / i32 / node / enum、浅い `@typeof` 比較、非再帰の透過 alias 経由の container を追加 (PR #659、#666、#699)。循環 helper や nested 所有規則自身の `@eval` 等は引き続き拒否する (PR #698)。[混在値](docs/nested-mixed-values.md)、[型比較](docs/nested-typeof.md)、[対応範囲表](docs/typed-nested-captures.md#nested-の対応範囲と拡張先)。
 - Rust の typed enum / 混在 enum、`@commonField` family view、`@eval` 自動評価、mapping 時の `@typeof` を Java と共通の契約へ揃えた (PR #557、#563、#570、#575、#577、#584)。[enum](docs/enum-values.md)、[共通 field](docs/common-fields.md)、[評価](docs/evaluation-strategies.md)、[型制約](docs/typeof-constraints.md)。
 - 再帰する透過 helper の値投影、Rust の preferred AST snapshot、具体 AST family と結合演算子の投影を追加 (PR #594、#595、#597、#605)。左結合の固定 literal および1段の Optional / Repeat delimiter にも対応する (PR #678、#681)。[再帰 helper](docs/recursive-helpers.md)、[preferred](docs/preferred-ast-snapshots.md)、[family](docs/family-projection.md)、[結合演算子](docs/associative-projection.md)。
-- Java/Rust の上限付き snapshot cache、Rust の pure success / Classic token mode の memo 再生、rollback に対応する state version 付き failure memo を追加 (PR #565、#633、#640、#647)。編集は全再解析し、unsafe callback や stateful success の暗黙再利用は行わない。[snapshot cache](docs/incremental-cache.md)、[pure success](docs/pure-success-memo.md)、[Classic](docs/classic-memo.md)、[state version](docs/stateful-failure-memo.md)。
+- Java/Rust の上限付き snapshot cache、Rust の pure success / Classic token mode の memo 再生、rollback に対応する state version 付き failure memo を追加 (PR #565、#633、#640、#647)。Rust の pure success memo 再生は既定 OFF で、`ParseOptions::with_memoization(Memoization::SafeFailures)` を指定した opt-in。外部 callback を含む文法は既定で snapshot cache の対象外 (issue #613)。編集は全再解析し、unsafe callback や stateful success の暗黙再利用は行わない。[snapshot cache](docs/incremental-cache.md)、[pure success](docs/pure-success-memo.md)、[Classic](docs/classic-memo.md)、[state version](docs/stateful-failure-memo.md)。
 - Java/Rust LSP の full semantic-token provider と、TinyCalc / `unlaxer init` 拡張での Java/Rust stdio backend 選択を追加 (PR #550、#556)。[semantic tokens](docs/classic-rust-lsp.md)、[起動・再設定](docs/rust-vscode-launch.md)。
 
 ### Fixed

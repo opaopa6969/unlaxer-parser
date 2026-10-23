@@ -2,23 +2,86 @@
 
 これは [Unreleased](../CHANGELOG.md#unreleased) の移行案内です（#769）。公開済みの
 `v3.3.0` と Maven Central の 3.3.0 の仕様を変更するものではありません。
-各項目の PR 番号は `opaopa6969/unlaxer-parser` の PR を指します。
+各項目の PR 番号は `opaopa6969/unlaxer-parser` の PR を指し、CHANGELOG の Fixed で `PR` の明記がない括弧内の番号（例: `(#717)`、`(#713)`）は issue 番号です。
 
 ## 再生成の手順
 
 1. 利用する開発版 revision を固定し、その revision の生成器と runtime を揃えます。
    Java 21 / Rust 1.85.0 が開発版の検証基準です（PR #692）。公開版の依存物と混在させず、
-   ソースからの Maven build は専用の local repository を指定します。
+   ソースからの Maven build は専用の local repository を指定します。repository のルートで、
+   [品質検証文書の隔離 build](production-quality.md#開発版の再現手順java21)と
+   [Rust 生成器の build](../rust/README.md#rustだけで生成する)を実行する例です。
+
+   ```sh
+   parity_m2=$(mktemp -d)
+   mvn -B -Dmaven.repo.local="$parity_m2" -pl unlaxer-common,unlaxer-dsl -am install -DskipTests -Dgpg.skip=true
+   cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
+   ```
+
+   以降の Maven 例も同じ shell の `parity_m2` を使います。転記元のコマンドに
+   `-Dmaven.repo.local="$parity_m2"` を付け、install と利用側の依存解決を同じ場所に揃えています。
+
 2. 下表の該当する文法・手書き API 利用箇所を直し、従来の生成設定で parser・AST・mapper・
    evaluator を一緒に再生成します。利用している LSP / DAP / Playground も同じ生成器で更新します。
-   Java API の呼出例は [生成手順](../unlaxer-dsl/README.ja.md)、Rust は
-   [生成 CLI](../rust/README.md) を参照してください。
+   Java は [README の Maven 設定](../README-ja.md#3-コードジェネレータプラグインを追加)
+   （`AST,Parser,Mapper,Evaluator` と生成先 source root の登録）を適用した利用側 project の
+   ルートで、同 README の [生成コマンド](../README-ja.md#4-コードを生成)を実行します。
+   この例は生成とコンパイルを一緒に行います。直接 CLI を使う設定は
+   [CodegenMain の説明](../unlaxer-dsl/README.ja.md#codegenmain--cli-ツール)を参照してください。
+
+   ```sh
+   mvn -Dmaven.repo.local="$parity_m2" compile
+   ```
+
+   Rust は repository のルートで [再生成の例](../rust/README.md#rustだけで生成する)を使います。
+   同文書の説明どおり、生成物の一致確認用の `--check` を外した生成コマンドです。
+
+   ```sh
+   rust/target/release/unlaxer generate --target rust \
+     --grammar unlaxer-dsl/src/test/resources/evolution/3/Evolution.ubnf \
+     --output rust/examples/evolution/src/generated
+   ```
+
+   これは同梱 Evolution 文法の例です。利用側では文法・出力先を自分のものへ置き換えます。
+
 3. 手書きの evaluator / `Semantics`、enum・IR の網羅的な `switch` / `match`、
    AST field と root wrapper を使うコードを新しい型に合わせ、生成物と一緒にコンパイルします。
-   公開型を確認するときは [API schema / impact](api-impact-report.md) の対象範囲も参照します。
+   Java は手順2の `mvn ... compile` を再実行します。Rust の同梱 consumer の build は
+   [ネイティブ実行ファイルの例](../rust/README.md#ネイティブ実行ファイル)を使います。
+
+   ```sh
+   cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-evolution-example
+   ```
+
+   文法変更による公開型の差は [API impact の再現例](api-impact-report.md#再現手順と-artifact)
+   でも確認できます。次は同梱の before / after 文法を比較するコマンドで、generator の旧・新 revision
+   自体を比較するものではありません。利用側の文法差を調べるときは2つのパスを置き換えます。
+
+   ```sh
+   rust/target/release/unlaxer impact --target rust \
+     --before spec-corpus/api-impact/node-add/before.ubnf \
+     --after spec-corpus/api-impact/node-add/after.ubnf --format json
+   ```
+
 4. 利用側の同じ入力で、受理・拒否、AST 値、原文と CP 位置、失敗段階を確認します。
    Java と Rust の双方を提供する場合はそれぞれ実行します。診断位置の修正と
    AST 型の変更は別々に期待値へ反映します。
+   repository のルートから両言語の生成 consumer を検証する例は
+   [API impact の共通テスト](api-impact-report.md#再現手順と-artifact)にあります。
+   `-DrustConformance=true` を付け、対象テストが skip されていないことも確認します。
+
+   ```sh
+   mvn -B -Dmaven.repo.local="$parity_m2" -pl unlaxer-common,unlaxer-dsl -am test \
+     -Dtest=JavaApiSchemaTest,ApiImpactOverloadTest,ApiImpactCommandTest,ApiImpactConformanceTest,EvaluationConformanceTest \
+     -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+   ```
+
+   同梱 Rust consumer の実行例は [README](../rust/README.md#ネイティブ実行ファイル)からの転記です。
+   返る JSON の評価値は `9` です。このサンプルの成功に加え、利用側自身の文法と入力でも検証します。
+
+   ```sh
+   printf '%s\n' 'if(0,neg(2*3),4+5)' | rust/target/release/unlaxer-evolution-example
+   ```
 
 ## 文法と生成 API
 
