@@ -727,6 +727,8 @@ fn classic_field_capture_uses_committed_source_for_choice_and_rule() {
             (Expr::Rule(1), Expr::choice([ahead_x(), w("q")])),
             (Expr::choice([ahead_x(), w("q")]), Expr::Empty),
             (Expr::Rule(1), ahead_x()),
+            // Java の `@f` は直接の先読みも consumed の collector で包む（#742）。
+            (ahead_x(), Expr::Empty),
         ] {
             let rules = [
                 Rule {
@@ -886,5 +888,25 @@ fn field_capture_blocks_parsed_source_before_owned_capture_and_success_memo() {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn classic_field_capture_collects_direct_lookahead_before_owned_capture() {
+    use unlaxer_runtime::{parse_detailed_with_options, Rule};
+
+    // Java の `@f` は LazyChain の collector。consumed では match-only の先読みを集めない（#742）。
+    let rules = [Rule {
+        name: "R0",
+        expression: Expr::sequence([ahead_x().capture("f").capture_owned("w"), Expr::Replay("w")]),
+    }];
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        let options = ParseOptions::with_memoization(memo);
+        let mut context = ParseContext::with_options("x", options);
+        context.parse_grammar(rules.to_vec(), 0, false).unwrap();
+        assert_eq!(context.captured_text("w"), Some(""));
+        assert_eq!((context.position(), context.matched_position()), (0, 0));
+        let error = parse_detailed_with_options(&rules, 0, false, "x", options).unwrap_err();
+        assert_eq!((error.kind, error.offset), ("trailing_input", 0));
     }
 }

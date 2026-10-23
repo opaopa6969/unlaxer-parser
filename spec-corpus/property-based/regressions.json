@@ -547,5 +547,16 @@
     "overBudget": [
       "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     ]
+  },
+  {
+    "id": "capture-field-direct-token-lookahead",
+    "issue": "#742",
+    "note": "@f は Java の LazyChain の collector。直接の先読み token を @f にしても consumed の子がないため、外側の CAPTURE の w は空文字列。入力 x で context の consumed / matched は CP0、全入力解析は trailing_input CP0。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= CAPTURE(w, AHEAD @f) SAME_AS(w) ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
+    ]
   }
 ]
