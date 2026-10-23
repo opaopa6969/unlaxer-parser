@@ -307,6 +307,48 @@ fn nesting_limit_is_a_diagnostic_not_a_stack_overflow() {
     );
 }
 
+/// #741: the native frontend counts rule body levels, whatever the nested construct is, and
+/// declarative token groups separately. The Java frontend has no body counter (its parser frame
+/// limit depends on the construct); docs/java-parser-limits.md is the contract, and
+/// `RustUbnfFrontendConformanceTest` pins both sides.
+#[test]
+fn nesting_limits_are_body_and_token_levels() {
+    assert_eq!(MAX_NESTING, 128);
+    let groups = |depth: usize| {
+        format!(
+            "grammar G {{ R ::= 'x' {}'a'{}; }}",
+            "(".repeat(depth),
+            ")".repeat(depth)
+        )
+    };
+    let alternatives = |depth: usize| {
+        format!(
+            "grammar G {{ R ::= 'x' {}'a'{}; }}",
+            "('b' | ".repeat(depth),
+            ")".repeat(depth)
+        )
+    };
+    for grammar in [&groups as &dyn Fn(usize) -> String, &alternatives] {
+        // The rule body is the first level.
+        assert!(parse(&grammar(MAX_NESTING - 1)).is_ok());
+        let error = parse(&grammar(MAX_NESTING)).unwrap_err();
+        assert_eq!(error.kind, DiagnosticKind::NestingLimit);
+        assert_eq!(error.message, "UBNF nesting limit exceeded");
+    }
+    let token = |depth: usize| {
+        format!(
+            "grammar G {{ @ubnf: v2\n token T ::= {}'a'{} ;\n R ::= T; }}",
+            "(".repeat(depth),
+            ")".repeat(depth)
+        )
+    };
+    assert!(parse(&token(MAX_NESTING - 1)).is_ok());
+    assert_eq!(
+        parse(&token(MAX_NESTING)).unwrap_err().message,
+        "lexical nesting exceeds 128"
+    );
+}
+
 #[test]
 fn typeof_is_not_accidentally_the_previous_elements_capture() {
     for source in [

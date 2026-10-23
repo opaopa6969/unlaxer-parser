@@ -460,6 +460,27 @@ public class RustBackendTest {
         assertTrue(Files.readString(output.resolve("parser.rs")).contains("0, false, source"));
     }
 
+    /**
+     * #740: recursive shapes are solved on the lowered IR under the shared structural depth, as in
+     * the native host, so the Java host no longer rejects 85..121 groups with E-RECURSIVE-SHAPE.
+     */
+    @Test public void recursiveShapesShareTheStructuralAnalysisDepth() {
+        for (var grammar : List.<java.util.function.IntFunction<String>>of(NestingLimitGrammars::recursivePlus,
+                NestingLimitGrammars::recursiveSeparator, NestingLimitGrammars::recursivePlusWithNumber)) {
+            for (int depth : List.of(84, 85, NestingLimitGrammars.LOWERED)) {
+                var files = new RustBackend().generate(UBNFMapper.parse(grammar.apply(depth)).grammars().get(0));
+                assertEquals(5, files.size());
+                if (grammar.apply(depth).contains("NUM @n")) {
+                    // Integer refinement still applies beside the recursion (numeric_fields.rs).
+                    assertTrue(files.get(1).content().contains("r#x: Vec<AstValue>, r#n: i32"));
+                }
+            }
+            var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(
+                UBNFMapper.parse(grammar.apply(NestingLimitGrammars.LOWERED + 1)).grammars().get(0)));
+            assertEquals("Rust subset: structural analysis depth exceeds 256", error.getMessage());
+        }
+    }
+
     private int run(String... args) {
         var bytes = new ByteArrayOutputStream();
         try (var stream = new PrintStream(bytes, true, StandardCharsets.UTF_8)) {

@@ -175,6 +175,57 @@ public class RustNativeGeneratorTest {
         Files.write(Path.of("target/rust-preferred-recursive-shape-limits.tsv"), report, StandardCharsets.UTF_8);
     }
 
+    /**
+     * #740: the 84..130 sweep of recursive helpers in groups. Both hosts accept up to 121 groups
+     * with identical files and reject 122 with the same structural depth diagnostic. From the
+     * native frontend's 128 body levels on, native rejects before lowering, while the Java
+     * frontend (no body counter, #741) still reaches the lowering depth diagnostic.
+     */
+    @Test public void recursiveNestingLimitsMatchJavaHost() throws Exception {
+        assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        assertEquals(0, command(List.of("cargo", "build", "--locked", "--manifest-path",
+            repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
+        Path binary = repo.resolve("rust/target/debug/unlaxer");
+        var report = new ArrayList<>(List.of("case\tjava\tnative"));
+        // The separated operand of T is one body level deeper than the groups of H.
+        record Shape(String name, java.util.function.IntFunction<String> grammar, int frontendLimit) {}
+        for (var shape : List.of(new Shape("plus", NestingLimitGrammars::recursivePlus, NestingLimitGrammars.NATIVE_BODY_LEVELS),
+                new Shape("separator", NestingLimitGrammars::recursiveSeparator, NestingLimitGrammars.NATIVE_BODY_LEVELS - 1),
+                new Shape("number", NestingLimitGrammars::recursivePlusWithNumber, NestingLimitGrammars.NATIVE_BODY_LEVELS))) {
+            for (int depth = 84; depth <= 130; depth++) {
+                String name = shape.name() + "-" + depth, source = shape.grammar().apply(depth);
+                Path grammar = temporary.newFile(name + ".ubnf").toPath();
+                Files.writeString(grammar, source);
+                Path output = temporary.getRoot().toPath().resolve(name);
+                var nativeRun = command(List.of(binary.toString(), "generate", "--grammar", grammar.toString(),
+                    "--output", output.toString()), true);
+                String javaError = null;
+                List<RustBackend.GeneratedFile> expected = List.of();
+                try {
+                    expected = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
+                } catch (IllegalArgumentException error) {
+                    javaError = error.getMessage();
+                }
+                if (depth <= NestingLimitGrammars.LOWERED) {
+                    assertNull(name, javaError);
+                    assertEquals(name + "\n" + nativeRun.output(), 0, nativeRun.code());
+                    assertEquals(name, 5, expected.size());
+                    for (var file : expected) assertArrayEquals(name + " / " + file.relativePath(),
+                        file.content().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(output.resolve(file.relativePath())));
+                    report.add(name + "\taccepted\taccepted");
+                    continue;
+                }
+                assertEquals(name, "Rust subset: structural analysis depth exceeds 256", javaError);
+                assertNotEquals(name, 0, nativeRun.code());
+                String expectedNative = depth < shape.frontendLimit() ? "structural analysis depth exceeds 256"
+                    : "UBNF nesting limit exceeded";
+                assertTrue(name + ": " + nativeRun.output(), nativeRun.output().strip().endsWith(expectedNative));
+                report.add(name + "\t" + javaError + "\t" + nativeRun.output().strip());
+            }
+        }
+        Files.write(Path.of("target/rust-recursive-nesting-limits.tsv"), report, StandardCharsets.UTF_8);
+    }
+
     private static String workHelper(boolean textRecursive) {
         var source = new StringBuilder("grammar Pbt { @package: pbt.corpus @root @mapping(N0, params=[x"
             + (textRecursive ? ", g]) R0 ::= (NM2 NM2) @g T 'x' C0 @x" : "]) R0 ::= 'x' C0 @x"));
