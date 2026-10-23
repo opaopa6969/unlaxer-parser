@@ -3,10 +3,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 
-const result = spawnSync('bash', [path.join(__dirname, 'select.sh')], {
-  stdio: 'inherit',
-  env: { ...process.env, REPOSITORY_SUFFIX: process.env.INPUT_NAME || '' },
-});
+const result = spawnSync('bash', [path.join(__dirname, 'select.sh')], { stdio: 'inherit' });
 if (result.error) {
   console.log(`::error::cannot run select.sh: ${result.error.message}`);
   process.exit(1);

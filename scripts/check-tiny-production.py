@@ -57,23 +57,25 @@ def verify_compatibility(label, module, tests, expected_count):
     (out/(label+'-compatibility.json')).write_text(json.dumps(counts,indent=2)+'\n')
     print(label+' current-version compatibility: '+str(counts),flush=True)
 
-def require_isolated_repository(maven_repo, skip_build):
+def require_isolated_repository(maven_repo):
     # #718: the development build has the release's version; installing it into the shared
     # ~/.m2 would sit next to the signed Central copy and be resolved as the release.
-    if skip_build: return
-    selected=maven_repo or next((a.split('=',1)[1] for a in os.environ.get('MAVEN_ARGS','').split() if a.startswith('-Dmaven.repo.local=')),None)
+    # --skip-build still resolves trees and classpaths, which must come from the earlier build's
+    # repository, so it needs one too. The mvn launcher puts MAVEN_ARGS before the command line,
+    # and the last -Dmaven.repo.local wins: --maven-repo, else the last one in MAVEN_ARGS.
+    selected=maven_repo or ([a.split('=',1)[1] for a in os.environ.get('MAVEN_ARGS','').split() if a.startswith('-Dmaven.repo.local=')] or [None])[-1]
     if not selected:
-        raise SystemExit('refusing to install into the shared Maven repository: pass --maven-repo <dedicated empty directory>')
+        raise SystemExit('refusing to use the shared Maven repository: pass --maven-repo <dedicated directory>')
     shared=pathlib.Path.home()/'.m2'
     if pathlib.Path(selected).resolve().is_relative_to(shared.resolve()):
-        raise SystemExit('refusing to install into the shared Maven repository: '+selected)
+        raise SystemExit('refusing to use the shared Maven repository: '+selected)
 
 def main():
     global mvn, COMPATIBILITY, out
     p=argparse.ArgumentParser();p.add_argument('tiny',type=pathlib.Path);p.add_argument('--skip-build',action='store_true');p.add_argument('--maven-repo');args=p.parse_args()
     tiny=args.tiny.resolve();out=root/'target/tiny-production';out.mkdir(parents=True,exist_ok=True)
     mvn=['mvn','-B']+(['-Dmaven.repo.local='+args.maven_repo] if args.maven_repo else [])
-    require_isolated_repository(args.maven_repo, args.skip_build)
+    require_isolated_repository(args.maven_repo)
     COMPATIBILITY = [
         ('tiny', tiny, 'FormulaInfoSourceDocumentTest,FormulaInfoParserTest,P4EngineModeMatrixTest,P4ParserEngineTest,P4SourceMappingTest,P4OwnedSliceSourceTest,P4JavaCodeEmitterSourceTextTest', 125),
         ('ide', tiny/'tools/tinyexpression-p4-lsp-vscode', 'TinyExpressionP4LanguageServerExtTest,TinyExpressionP4DebugAdapterExtTest', 39),

@@ -25,7 +25,7 @@ for argument in "${words[@]}"; do
   esac
 done
 MAVEN_ARGS="${kept[*]}"
-repository="$RUNNER_TEMP/maven-repository/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB${REPOSITORY_SUFFIX:+-$REPOSITORY_SUFFIX}"
+repository="$RUNNER_TEMP/maven-repository/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB"
 # The mvn launcher word-splits MAVEN_ARGS.
 if [[ "$repository" =~ [[:space:]] ]]; then
   echo "::error::Maven repository path contains whitespace: $repository" >&2
@@ -38,9 +38,14 @@ mkdir "$repository"
 echo "repository=$repository" >> "$GITHUB_STATE"
 maven_args="${MAVEN_ARGS:+$MAVEN_ARGS }-Dmaven.repo.local=$repository"
 # Evaluate what Maven itself resolves, not only the variable we set.
-resolved="$(MAVEN_ARGS="$maven_args" mvn -B -q -N \
-  org.apache.maven.plugins:maven-help-plugin:3.5.1:evaluate \
-  -Dexpression=settings.localRepository -DforceStdout)"
+# -q prints Maven's [ERROR] lines on stdout, so show them when the evaluation fails.
+if ! resolved="$(MAVEN_ARGS="$maven_args" mvn -B -q -N \
+    org.apache.maven.plugins:maven-help-plugin:3.5.1:evaluate \
+    -Dexpression=settings.localRepository -DforceStdout)"; then
+  printf '%s\n' "$resolved" >&2
+  echo "::error::Maven could not resolve maven-help-plugin into the empty job repository $repository; Central (repo.maven.apache.org) must be reachable, and offline mode (-o) cannot work from an empty repository" >&2
+  exit 1
+fi
 if [ "$resolved" != "$repository" ]; then
   echo "::error::Maven resolves local repository '$resolved', expected '$repository'" >&2
   exit 1

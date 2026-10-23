@@ -6,11 +6,6 @@ description: >-
   shared ~/.m2/repository of the self-hosted runners, where they would sit next
   to signed Central artifacts of the same version. Use after actions/setup-java
   (the check runs Maven).
-inputs:
-  name:
-    description: Suffix for a second repository in one job (for example a matrix leg).
-    required: false
-    default: ''
 outputs:
   path:
     description: Absolute path of the job-local repository.

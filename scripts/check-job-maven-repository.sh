@@ -9,8 +9,13 @@ repository=${UNLAXER_MAVEN_REPOSITORY:?run .github/actions/maven-job-repository 
 case "$repository/" in
   "$HOME/.m2/"*) echo "job repository must not be the shared ~/.m2: $repository" >&2; exit 1;;
 esac
-resolved="$(cd "$root" && mvn -B -q -N org.apache.maven.plugins:maven-help-plugin:3.5.1:evaluate \
-  -Dexpression=settings.localRepository -DforceStdout)"
+# -q prints Maven's [ERROR] lines on stdout, so show them when the evaluation fails.
+if ! resolved="$(cd "$root" && mvn -B -q -N org.apache.maven.plugins:maven-help-plugin:3.5.1:evaluate \
+    -Dexpression=settings.localRepository -DforceStdout)"; then
+  printf '%s\n' "$resolved" >&2
+  echo "Maven could not evaluate the local repository of $root; Central (repo.maven.apache.org) must be reachable" >&2
+  exit 1
+fi
 if [ "$resolved" != "$repository" ]; then
   echo "Maven resolves '$resolved', expected the job repository '$repository'" >&2
   exit 1

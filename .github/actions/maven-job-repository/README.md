@@ -11,8 +11,10 @@ later build on the machine as if it were the release. Central itself was never c
 - Every job that starts Maven, directly or through a script, uses this action after
   `actions/setup-java` and before its first Maven process.
   `scripts/tests/test_maven_job_repository.py` checks this for all workflows.
-- The repository is `$RUNNER_TEMP/maven-repository/<run id>-<run attempt>-<job id>[-<name>]`.
-  `select.sh` fails if it already exists, so each job starts with an empty repository.
+- The repository is `$RUNNER_TEMP/maven-repository/<run id>-<run attempt>-<job id>`; a job selects
+  exactly one. `select.sh` fails if it already exists, so each job starts with an empty repository.
+  If Maven cannot fetch `maven-help-plugin` into it (Central unreachable, or `-o`), the action
+  prints Maven's output and fails with that reason.
 - It appends `-Dmaven.repo.local=<path>` to `MAVEN_ARGS` (read by the `mvn` launcher since
   Maven 3.9) and writes `MAVEN_ARGS` and `UNLAXER_MAVEN_REPOSITORY` to `GITHUB_ENV`.
   Later steps, Python/shell scripts and nested `mvn` processes inherit it.
@@ -33,7 +35,8 @@ later build on the machine as if it were the release. Central itself was never c
   `scripts/check-published-consumer.sh` (downstream smoke) uses that for a consumer of the
   published release: it resolves `unlaxer-common` / `unlaxer-dsl` of the same version into its
   own empty repository from Central only (`-C`, strict checksums), requires Central's `.sha1`,
-  and reports whether the development jar of the job repository differs. Never reuse the job
+  and reports whether the development jar of the job repository differs. It skips only when
+  `repo.maven.apache.org` answers 404 for that version; any other status fails. Never reuse the job
   repository for such a check, since it contains the development build under the release version.
 - Expressions such as `${{ github.job }}` are not used. The action reads the runner's
   environment variables, which every step has.
@@ -77,8 +80,10 @@ without `-o`.
 ## Scripts
 
 `run-tiny-classic-benchmark.py --maven-repo` and `check-tiny-production.py --maven-repo` receive
-the same path in CI. `check-tiny-production.py` refuses to install unless `--maven-repo` or
-`MAVEN_ARGS` selects a repository outside `~/.m2` (`--skip-build` installs nothing).
+the same path in CI. `check-tiny-production.py` refuses to run unless `--maven-repo` or the last
+`-Dmaven.repo.local` of `MAVEN_ARGS` selects a repository outside `~/.m2`. This holds for
+`--skip-build` too: it still resolves dependency trees and classpaths, which must come from the
+repository of the earlier build.
 Local reproduction keeps using its own `mktemp -d` repository (`docs/production-quality.md`).
 The local `scripts/release-central.sh` is not a CI job and is unchanged: its `deploy` installs the
 bytes it publishes.

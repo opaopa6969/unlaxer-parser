@@ -14,7 +14,9 @@ function main() {
   const temp = process.env.RUNNER_TEMP || '';
   const parent = path.join(temp, 'maven-repository');
   const prefix = `${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}-`;
-  if (!temp || !path.isAbsolute(repository) || path.dirname(repository) !== parent
+  // Directly below $RUNNER_TEMP/maven-repository (a relative or nested path has another dirname),
+  // and named after this run attempt.
+  if (!path.isAbsolute(temp) || path.dirname(repository) !== parent
       || !path.basename(repository).startsWith(prefix)) {
     console.log(`::warning::not removing '${repository}': it is not this run attempt's repository under ${parent}`);
     return 0;

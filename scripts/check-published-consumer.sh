@@ -7,12 +7,20 @@ set -euo pipefail
 root=${1:?parser root}
 version=${2:?version}
 job_repository=${UNLAXER_MAVEN_REPOSITORY:?run .github/actions/maven-job-repository first}
-central=https://repo1.maven.org/maven2
-if ! curl --fail --silent --show-error --head --retry 3 --max-time 30 \
-    "$central/org/unlaxer/unlaxer-common/$version/unlaxer-common-$version.pom" >/dev/null; then
-  echo "org.unlaxer:unlaxer-common:$version is not on Central; no published release to keep apart."
-  exit 0
-fi
+# The host Maven itself uses for Central.
+central=https://repo.maven.apache.org/maven2
+# Only a 404 means "not published"; a network failure or any other status must not pass as one.
+status=$(curl --silent --show-error --head --retry 3 --max-time 30 -o /dev/null -w '%{http_code}' \
+  "$central/org/unlaxer/unlaxer-common/$version/unlaxer-common-$version.pom") || status="curl exit $?"
+case "$status" in
+  200) ;;
+  404)
+    echo "org.unlaxer:unlaxer-common:$version is not on Central; no published release to keep apart."
+    exit 0;;
+  *)
+    echo "cannot tell whether org.unlaxer:unlaxer-common:$version is on Central ($central): HTTP $status" >&2
+    exit 1;;
+esac
 consumer=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/published-consumer.XXXXXX")
 trap 'rm -rf "$consumer"' EXIT
 mkdir "$consumer/repository" "$consumer/project"
