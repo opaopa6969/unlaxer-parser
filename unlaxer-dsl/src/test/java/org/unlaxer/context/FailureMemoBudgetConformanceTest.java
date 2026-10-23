@@ -213,9 +213,13 @@ public class FailureMemoBudgetConformanceTest {
                             repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(),
                             "-o",
                             binary.toString()));
+            run(List.of(binary.toString(), "failure_budget_"));
+            // The evidence log runs the oracle alone: with other tests in parallel, libtest
+            // writes "test X ... ok" in pieces, which can split a BUDGET line (CI counts the
+            // lines starting with it), and with one test thread the name precedes the output.
             Files.writeString(
                     Path.of("target/failure-memo-budget-rust.log"),
-                    run(List.of(binary.toString(), "failure_budget_", "--nocapture")));
+                    run(List.of(binary.toString(), "--exact", "memo_retention_tests::failure_budget_shared_oracle_bounds_epochs_and_preserves_real_hits", "--nocapture")));
         } finally {
             try (var paths = Files.walk(dir)) {
                 for (var p : paths.sorted(java.util.Comparator.reverseOrder()).toList())
