@@ -93,17 +93,6 @@ public class PropertyBasedParityTest {
         assertFalse("Java-only frame not later", KnownDifferences.javaStackStartsAfterRust("java=\"1|0|R0@1>R1@1\" rust=\"1|0|R0@1\"" + tail));
         assertFalse("stack on one side only", KnownDifferences.javaStackStartsAfterRust("java=\"-\" rust=\"1|0|R0@0\"" + tail));
         assertFalse("different omitted", KnownDifferences.javaStackStartsAfterRust("java=\"2|1|R0@0>R1@2\" rust=\"2|0|R0@0>R1@1\"" + tail));
-        // #717: an incomplete Number exponent, Java fails after the e (and a sign).
-        String syntax = "java={\"kind\":\"syntax\",\"offset\":%d} rust={\"kind\":\"syntax\",\"offset\":%d}";
-        assertTrue(KnownDifferences.numberIncompleteExponent(String.format(syntax, 2, 1), "2e"));
-        assertTrue(KnownDifferences.numberIncompleteExponent(String.format(syntax, 3, 1), "2e+"));
-        assertTrue(KnownDifferences.numberIncompleteExponent(String.format(syntax, 4, 3), "2.5E"));
-        assertTrue(KnownDifferences.numberIncompleteExponent("java=\"2|0|R0@0\" rust=\"1|0|R0@0\"" + tail, "2e"));
-        assertFalse("no exponent", KnownDifferences.numberIncompleteExponent(String.format(syntax, 2, 1), "2x"));
-        assertFalse("no digit before", KnownDifferences.numberIncompleteExponent(String.format(syntax, 2, 1), "xe"));
-        assertFalse("too far", KnownDifferences.numberIncompleteExponent(String.format(syntax, 3, 1), "2ex"));
-        assertFalse("Rust after Java", KnownDifferences.numberIncompleteExponent(String.format(syntax, 1, 2), "22e"));
-        assertFalse("different frames", KnownDifferences.numberIncompleteExponent("java=\"2|0|R0@0>R1@0\" rust=\"1|0|R0@0\"" + tail, "2e"));
     }
 
     @Test

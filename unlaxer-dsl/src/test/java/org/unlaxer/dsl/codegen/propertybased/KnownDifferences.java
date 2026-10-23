@@ -21,15 +21,14 @@ final class KnownDifferences {
      * {@code condition} is a named, numeric check on the finding that a regular expression cannot
      * express. Supported: {@code java-syntax-offset-after-rust} — both {@code diag} values are
      * {@code syntax} failures and the Java offset is greater than the Rust offset (#706);
-     * {@code java-stack-starts-after-rust} — see {@link #javaStackStartsAfterRust(String)} (#706);
-     * {@code number-incomplete-exponent} — see {@link #numberIncompleteExponent(String, String)} (#717).
+     * {@code java-stack-starts-after-rust} — see {@link #javaStackStartsAfterRust(String)} (#706).
      */
     private record Entry(String id, Pattern kind, Pattern grammar, Pattern detail, String condition) {}
 
     private static final Pattern DIAG = Pattern.compile("^java=(\\{[^}]*\\}) rust=(\\{[^}]*\\})$");
     private static final Pattern STACK = Pattern.compile("^java=\"([^\"]*)\" rust=\"([^\"]*)\"(?: |$)");
     private static final java.util.Set<String> CONDITIONS =
-            java.util.Set.of("java-syntax-offset-after-rust", "java-stack-starts-after-rust", "number-incomplete-exponent");
+            java.util.Set.of("java-syntax-offset-after-rust", "java-stack-starts-after-rust");
 
     private final List<Entry> entries;
     private final Map<String, Integer> used = new LinkedHashMap<>();
@@ -64,48 +63,16 @@ final class KnownDifferences {
             if (e.kind().matcher(finding.kind()).matches()
                     && (e.grammar() == null || e.grammar().matcher(c.grammar()).find())
                     && (e.detail() == null || e.detail().matcher(String.valueOf(finding.detail())).find())
-                    && (e.condition() == null || condition(e.condition(), finding.detail(), finding.input()))) {
+                    && (e.condition() == null || condition(e.condition(), finding.detail()))) {
                 used.merge(e.id(), 1, Integer::sum);
                 return e.id();
             }
         return null;
     }
 
-    private static boolean condition(String name, String detail, String input) {
-        if (name.equals("number-incomplete-exponent")) return numberIncompleteExponent(detail, input);
+    private static boolean condition(String name, String detail) {
         return name.equals("java-stack-starts-after-rust")
                 ? javaStackStartsAfterRust(detail) : javaSyntaxOffsetAfterRust(detail);
-    }
-
-    /**
-     * The #717 shape: Rust's Number token stops before an incomplete exponent and the next element
-     * fails there, while Java's NumberParser reads the exponent marker (and a sign) and fails after
-     * it. Matches a {@code diag} finding with both sides {@code syntax}, or a {@code stack} finding
-     * with the same omitted count and frames, whose Rust offset {@code r} is at an {@code e}/{@code E}
-     * right after a digit and whose Java offset is {@code r + 1}, or {@code r + 2} over a sign.
-     */
-    static boolean numberIncompleteExponent(String detail, String input) {
-        int java, rust;
-        var diag = DIAG.matcher(String.valueOf(detail));
-        var stack = STACK.matcher(String.valueOf(detail));
-        if (diag.matches()) {
-            if (!javaSyntaxOffsetAfterRust(detail)) return false;
-            java = JsonParser.parseString(diag.group(1)).getAsJsonObject().get("offset").getAsInt();
-            rust = JsonParser.parseString(diag.group(2)).getAsJsonObject().get("offset").getAsInt();
-        } else if (stack.find()) {
-            String[] j = stack.group(1).split("\\|", -1), r = stack.group(2).split("\\|", -1);
-            if (j.length != 3 || r.length != 3 || !j[1].equals(r[1]) || !j[2].equals(r[2])) return false;
-            java = Integer.parseInt(j[0]);
-            rust = Integer.parseInt(r[0]);
-        } else {
-            return false;
-        }
-        if (input == null) return false;
-        int[] cp = input.codePoints().toArray();
-        if (rust < 1 || rust >= cp.length || (cp[rust] != 'e' && cp[rust] != 'E')) return false;
-        if (cp[rust - 1] < '0' || cp[rust - 1] > '9') return false;
-        if (java == rust + 1) return true;
-        return java == rust + 2 && rust + 1 < cp.length && (cp[rust + 1] == '+' || cp[rust + 1] == '-');
     }
 
     /**

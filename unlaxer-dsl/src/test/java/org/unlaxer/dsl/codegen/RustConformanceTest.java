@@ -721,7 +721,7 @@ public class RustConformanceTest {
         return ast;
     }
 
-    @Test public void diagnosticEdgeCasesIncludeAnExplicitBackendDifference() throws Exception {
+    @Test public void diagnosticEdgeCasesAgreeAcrossBackends() throws Exception {
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path library = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
         success(run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_runtime",

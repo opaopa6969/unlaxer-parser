@@ -5316,6 +5316,10 @@ impl<'a> ParseContext<'a> {
             self.trace_atom("EParser", exponent);
             self.sign();
             if !self.digits() {
+                // Java's ExponentParser fails here, after the marker and an optional sign,
+                // and that failure is the reach the diagnostic reports (#717). The token
+                // still accepts only the mantissa.
+                self.fail("number");
                 self.position = exponent;
                 trace.restore(self.token_trace.as_mut());
                 self.trace_atom("Optional", exponent);
