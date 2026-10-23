@@ -401,4 +401,53 @@ public class SafeSuccessMemoizationTest {
             }
         }
     }
+
+    static final class StoppingWord extends WordParser {
+        StoppingWord(String word) { super(word); }
+        @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+            Parsed parsed = super.parse(context, kind, invert);
+            if (parsed.isSucceeded()) {
+                parsed.status = Parsed.Status.stopped;
+                parsed.setMessage("stop here");
+            }
+            return parsed;
+        }
+    }
+
+    // The returned Parsed keeps the selected child's stopped status and message on a hit (#744).
+    @Test public void choiceHitKeepsTheSelectedChildStatusAndMessage() {
+        for (String message : List.of("stop here", "")) {
+            try (ParseContext off = context("x", Memoization.OFF);
+                 ParseContext on = context("x", Memoization.SAFE_FAILURES)) {
+                Parser stopping = message.isEmpty() ? new WordParser("x") : new StoppingWord("x");
+                SafeChoice parser = new SafeChoice(stopping, new WordParser("a"));
+                Parsed expected = parser.parse(off);
+                on.begin(parser);
+                parser.parse(on);
+                on.rollback(parser);
+                Parsed actual = parser.parse(on);
+                assertEquals(1, on.getPackratMemoTable().successHits());
+                assertEquals(message.isEmpty() ? Parsed.Status.succeeded : Parsed.Status.stopped, actual.status);
+                assertEquals(expected.status, actual.status);
+                assertEquals(expected.getMessage(), actual.getMessage());
+                sameReturned(expected, actual);
+            }
+        }
+    }
+
+    // The returned id array is charged before allocation and bounded by the entry budget (#744).
+    @Test public void returnedTokensAreChargedAndBoundedByTheSnapshotBudget() {
+        Token token = new Token(TokenKind.consumed, StringSource.createRootSource("x"), new WordParser("x"));
+        long plain = Token.prepareMemoSnapshot(new TokenList(token), 1024).retainedBytes();
+        Token.MemoSnapshot two = Token.prepareMemoSnapshot(new TokenList(token), List.of(token, token), 1024);
+        assertEquals(plain + 16 + 4 * 2, two.retainedBytes());
+        assertEquals(2, two.replay().returned().size());
+        assertSame(two.replay().roots().get(0).parser, two.replay().returned().get(0).parser);
+        // A list far beyond the budget is refused before its id array is allocated.
+        assertNull(Token.prepareMemoSnapshot(new TokenList(token), java.util.Collections.nCopies(1_000_000, token), 1024));
+        assertNull(Token.prepareMemoSnapshot(new TokenList(token),
+            java.util.Collections.nCopies((int) ((1024 - plain - 16) / 4) + 1, token), 1024));
+        assertNotNull(Token.prepareMemoSnapshot(new TokenList(token),
+            java.util.Collections.nCopies((int) ((1024 - plain - 16) / 4), token), 1024));
+    }
 }

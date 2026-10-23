@@ -25,7 +25,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 - 共有 self-hosted runner の Rust 使用ジョブを `RUSTUP_TOOLCHAIN=1.85.0` に固定し、toolchain のインストール時に全体の既定値を変更しないよう修正 (#738)。Cargo と Java テストの子プロセスの `rustc` が並行ジョブの影響で異なる版になり、`E0514` で失敗する競合を防ぐ。
 - Rust の lexing session 内で grammar を 2 段以上入れ子に呼ぶと、正の `LOOKAHEAD` 後の frontier 補正が復活する問題を修正 (#734)。session の範囲を入れ子へ引き継ぎ、何段でも consumed の失敗位置と rule frame 開始位置を保つ。session 外と shared call の子では従来どおり補正する。[契約](docs/rule-stack-diagnostics.md)。
-- Java の `SAFE_FAILURES` で Choice の成功 memo を再生すると、CAPTURE の値と解析位置が memo OFF と変わる問題を修正 (#744)。Choice は miss のとき選んだ子の `Parsed` を返すが、hit では commit した Choice token を root にした `Parsed` を返していたため、子が match-only の先読みだと `w` が `x` から空文字列になった。成功 entry に返した `Parsed` の token を同じ snapshot で保持し、hit でも同じ形の `Parsed` を返す。memo key・hit 率・成功 memo の予算計数は変えない。[契約](docs/pure-success-memo.md)。
+- Java の `SAFE_FAILURES` で Choice の成功 memo を再生すると、CAPTURE の値と解析位置が memo OFF と変わる問題を修正 (#744)。Choice は miss のとき選んだ子の `Parsed` を返すが、hit では commit した Choice token を root にした `succeeded` の `Parsed` を返していたため、子が match-only の先読みだと `w` が `x` から空文字列になり、`stopped` を返す子は `succeeded` に変わって message も失われた。成功 entry に返した `Parsed` の token・status・message を同じ snapshot で保持し、hit でも同じ `Parsed` を返す。memo key は変えない。返す token の ID 配列（16 B + 4 B/件）と、CST から外れた token の部分木を成功 memo の予算に計上するため、予算が飽和する入力では成功 entry・hit がわずかに減る（PR の計測文法で hit 9925 → 9864、2797 → 2792）。予算に収まらない entry は保存しない。[契約](docs/pure-success-memo.md)。
 
 ## [3.3.0] - 2026-10-16
 

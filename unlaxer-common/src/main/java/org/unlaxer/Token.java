@@ -163,9 +163,13 @@ public class Token implements Serializable{
                 || limit < 64
                 || limit > 64L * 1024 * 1024
                 || roots.size() > (limit - 64) / 16) return null;
-        // Returned ids are uncharged, so success memo capacity stays as before; a hidden
-        // sub-tree is charged per copied node like the CST.
         long bytes = 64 + 16L * roots.size();
+        // The returned id array is charged before it is allocated (an int[]: 16 B header and
+        // 4 B per id); a hidden sub-tree is charged per copied node like the CST.
+        if (returnedCount != 0) {
+            if (returnedCount > (limit - bytes - 16) / 4) return null;
+            bytes += 16 + 4L * returnedCount;
+        }
         var nodes = new ArrayList<MemoNode>();
         var ids = new java.util.IdentityHashMap<Token, Integer>();
         var sources = new java.util.IdentityHashMap<Source, Boolean>();

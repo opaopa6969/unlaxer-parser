@@ -71,6 +71,9 @@ public final class PackratMemoTable {
     private final Token.MemoSnapshot snapshot;
     // How replay rebuilds the Parsed the original evaluation returned (#744).
     private final byte returnedShape;
+    // The returned Parsed's status and message: a selected child may return stopped (#744).
+    private final Parsed.Status returnedStatus;
+    private final String returnedMessage;
     // A failure entry distinguishes an ordinary failure (null) from a committed or labeled one.
     private RaisedFailure raised;
 
@@ -79,13 +82,13 @@ public final class PackratMemoTable {
     }
 
     private Entry(ParseContext.FailureDiagnostic diagnostic, RaisedFailure raised) {
-      this(diagnostic, null, 0, 0, null, Map.of(), null, 0, RETURNED_COMMITTED);
+      this(diagnostic, null, 0, 0, null, Map.of(), null, 0, RETURNED_COMMITTED, Parsed.Status.succeeded, "");
       this.raised = raised;
     }
 
     private Entry(ParseContext.FailureDiagnostic diagnostic, TokenList tokens,
         int endConsumed, int endMatched, Parser chosenChild, Map<ChoiceInterface, Parser> choices, Token.MemoSnapshot snapshot, long payloadCharge,
-        byte returnedShape) {
+        byte returnedShape, Parsed.Status returnedStatus, String returnedMessage) {
       this.diagnostic = diagnostic;
       this.tokens = tokens;
       this.endConsumed = endConsumed;
@@ -95,6 +98,8 @@ public final class PackratMemoTable {
       this.snapshot = snapshot;
       this.successPayloadCharge = payloadCharge;
       this.returnedShape = returnedShape;
+      this.returnedStatus = returnedStatus;
+      this.returnedMessage = returnedMessage;
     }
   }
 
@@ -175,13 +180,15 @@ public final class PackratMemoTable {
     if (matchDelta > 0) context.matchOnly(new CodePointLength(matchDelta));
     entry.choices.forEach(context::choose);
     var committed = context.commit(parser, tokenKind, choiceActions(entry.chosenChild));
-    // A Choice returns its selected child's Parsed on a miss; a hit returns the same shape, so a
-    // CAPTURE of the replayed Choice keeps the child's root source (#744).
+    // A Choice returns its selected child's Parsed on a miss; a hit returns the same shape,
+    // status and message, so a CAPTURE of the replayed Choice keeps the child's root source and
+    // a stopped child stays stopped (#744).
     Parsed parsed = copies == null ? new Parsed(committed)
         : entry.returnedShape == RETURNED_COLLECTED
             ? new Parsed(copies.returned().get(0),
-                TokenList.of(copies.returned().subList(1, copies.returned().size())), Parsed.Status.succeeded)
-            : new Parsed(copies.returned(), Parsed.Status.succeeded);
+                TokenList.of(copies.returned().subList(1, copies.returned().size())), entry.returnedStatus)
+            : new Parsed(copies.returned(), entry.returnedStatus);
+    if (copies != null && false == entry.returnedMessage.isEmpty()) parsed.setMessage(entry.returnedMessage);
     context.endParse(parser, parsed, context, tokenKind, invertMatch);
     return parsed;
   }
@@ -236,7 +243,8 @@ public final class PackratMemoTable {
       else {
         TokenList tokens = plan.freeze();
         table.put(parser, startKey, new Entry(diagnostic, tokens, endConsumed, endMatched,
-            chosenChild, choices, plan, payloadCharge, returnedShape(originalParsed)));
+            chosenChild, choices, plan, payloadCharge, returnedShape(originalParsed),
+            originalParsed == null ? Parsed.Status.succeeded : originalParsed.status, returnedMessage(originalParsed)));
       }
     }
     return parsed;
@@ -251,6 +259,14 @@ public final class PackratMemoTable {
     tokens.add(originalParsed.getTokenOptional().get());
     tokens.addAll(originalParsed.getOriginalTokens());
     return tokens;
+  }
+
+  // getMessage() is "<status>:<message>", with null and "" printed alike; keep the message part.
+  private static String returnedMessage(Parsed originalParsed) {
+    if (originalParsed == null || originalParsed.status == null) return "";
+    String message = originalParsed.getMessage();
+    String prefix = originalParsed.status.name() + ":";
+    return message.startsWith(prefix) ? message.substring(prefix.length()) : "";
   }
 
   private static byte returnedShape(Parsed originalParsed) {
@@ -512,7 +528,8 @@ public final class PackratMemoTable {
     if (entry.indexedKey != null) {
       RaisedFailure raised = entry.raised;
       entry = new Entry(entry.diagnostic, entry.tokens, entry.endConsumed, entry.endMatched,
-          entry.chosenChild, entry.choices, entry.snapshot, entry.successPayloadCharge, entry.returnedShape);
+          entry.chosenChild, entry.choices, entry.snapshot, entry.successPayloadCharge, entry.returnedShape,
+          entry.returnedStatus, entry.returnedMessage);
       entry.raised = raised;
     }
     if (indexLength > entryChainByPosition.length)
