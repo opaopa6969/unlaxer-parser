@@ -408,6 +408,15 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
     // Preflight every artifact. Unsupported input and handwritten files cause no writes.
     for file in files {
         let destination = output.join(&file.relative_path);
+        reject_symlink_ancestors(&destination)?;
+        for parent in destination.ancestors().skip(1) {
+            if parent.exists() && !parent.is_dir() {
+                return Err(invalid(format!(
+                    "refusing non-directory {}",
+                    parent.display()
+                )));
+            }
+        }
         match fs::symlink_metadata(&destination) {
             Ok(metadata) => {
                 if metadata.file_type().is_symlink() || !metadata.is_file() {
@@ -442,6 +451,8 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
     // Per-file replacement avoids truncation on a failed write and does not follow a
     // destination symlink introduced after preflight. This is not a directory transaction.
     for (i, file) in files.iter().enumerate() {
+        let destination = output.join(&file.relative_path);
+        fs::create_dir_all(destination.parent().unwrap())?;
         let temporary = output.join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
         let mut handle = OpenOptions::new()
             .write(true)

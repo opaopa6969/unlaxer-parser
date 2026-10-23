@@ -75,33 +75,36 @@ public final class PortabilityCheck {
     public static Result check(UBNFSourceSnapshot snapshot, org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file) {
         List<Diagnostic> diagnostics = new ArrayList<>();
         List<GrammarDecl> grammars = file.grammars();
-        if (grammars.size() != 1) add(diagnostics, "P-GRAMMAR-COUNT", snapshot, snapshot.ast(), "expected one grammar");
+        if (grammars.isEmpty()) add(diagnostics, "P-GRAMMAR-COUNT", snapshot, snapshot.ast(), "expected one grammar");
+        for (var collision : org.unlaxer.dsl.codegen.GrammarFileLayout.collisions(file))
+            add(diagnostics, "P-OUTPUT-COLLISION", snapshot, collision.grammar(), collision.module());
         for (GrammarDecl grammar : grammars) scanGrammar(grammar, snapshot, diagnostics);
         if (!diagnostics.isEmpty()) return result(false, "blocked", diagnostics);
 
-        GrammarDecl grammar = grammars.get(0);
-        try {
-            // Lowering is a pure IR conversion. The common validator's token
-            // suggestion path is excluded to avoid probing Java classes.
-            RustGrammarLowering.lower(grammar);
-            boolean invalid = GrammarValidator.validateWithoutClassLoading(grammar).stream()
-                .anyMatch(issue -> "ERROR".equals(issue.severity()));
-            invalid |= grammar.rules().stream().anyMatch(rule ->
-                rule.annotations().stream().anyMatch(annotation -> annotation instanceof LeftAssocAnnotation
-                    || annotation instanceof RightAssocAnnotation)
-                    && rule.annotations().stream().noneMatch(annotation -> annotation instanceof PrecedenceAnnotation));
-            if (invalid) add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
-        } catch (RuntimeException error) {
-            var nestedIssues = error.getMessage() != null && error.getMessage().contains("E-NESTED-SHAPE")
-                ? org.unlaxer.dsl.codegen.NestedCaptures.problems(grammar) : List.<GrammarValidator.ValidationIssue>of();
-            var commonRule=org.unlaxer.dsl.codegen.CommonFieldSchema.errorRule(error);
-            if(!nestedIssues.isEmpty()) {
-                var origin=grammar.rules().stream().filter(r->r.name().equals(nestedIssues.get(0).rule())).findFirst().orElseThrow();
-                add(diagnostics,"P-NESTED-SHAPE",snapshot,origin,"nested capture schema");
-            } else if(commonRule.isPresent()) {
-                var origin=grammar.rules().stream().filter(r->r.name().equals(commonRule.get())).findFirst().orElseThrow();
-                add(diagnostics,"P-COMMONFIELD",snapshot,origin,"commonField schema");
-            } else add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
+        for (GrammarDecl grammar : grammars) {
+            try {
+                // Lowering is a pure IR conversion. The common validator's token
+                // suggestion path is excluded to avoid probing Java classes.
+                RustGrammarLowering.lower(grammar);
+                boolean invalid = GrammarValidator.validateWithoutClassLoading(grammar).stream()
+                    .anyMatch(issue -> "ERROR".equals(issue.severity()));
+                invalid |= grammar.rules().stream().anyMatch(rule ->
+                    rule.annotations().stream().anyMatch(annotation -> annotation instanceof LeftAssocAnnotation
+                        || annotation instanceof RightAssocAnnotation)
+                        && rule.annotations().stream().noneMatch(annotation -> annotation instanceof PrecedenceAnnotation));
+                if (invalid) add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
+            } catch (RuntimeException error) {
+                var nestedIssues = error.getMessage() != null && error.getMessage().contains("E-NESTED-SHAPE")
+                    ? org.unlaxer.dsl.codegen.NestedCaptures.problems(grammar) : List.<GrammarValidator.ValidationIssue>of();
+                var commonRule=org.unlaxer.dsl.codegen.CommonFieldSchema.errorRule(error);
+                if(!nestedIssues.isEmpty()) {
+                    var origin=grammar.rules().stream().filter(r->r.name().equals(nestedIssues.get(0).rule())).findFirst().orElseThrow();
+                    add(diagnostics,"P-NESTED-SHAPE",snapshot,origin,"nested capture schema");
+                } else if(commonRule.isPresent()) {
+                    var origin=grammar.rules().stream().filter(r->r.name().equals(commonRule.get())).findFirst().orElseThrow();
+                    add(diagnostics,"P-COMMONFIELD",snapshot,origin,"commonField schema");
+                } else add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
+            }
         }
         return diagnostics.isEmpty() ? result(true, "passed", diagnostics) : result(false, "failed", diagnostics);
     }

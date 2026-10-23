@@ -55,28 +55,32 @@ final class RustGenerateCommand {
             return CodegenMain.EXIT_CLI_ERROR;
         }
         try {
-            var file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.load(Path.of(options.get("--grammar")));
-            if (file.grammars().size() != 1) throw new IllegalArgumentException("Rust subset requires exactly one grammar");
+            Path grammarPath = Path.of(options.get("--grammar"));
+            var snapshot = UBNFMapper.parseWithSource(Files.readString(grammarPath));
+            var file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(snapshot.ast(), grammarPath, Files::readString);
+            org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, snapshot);
             // Java class-resolution warnings do not define Rust token support: lowering
             // enforces an explicit Rust allowlist. Common grammar errors remain fatal.
-            var grammar = file.grammars().get(0);
-            // Explicit "none" is part of the Rust backend contract, whereas Java's
-            // common validator only accepts named trivia implementations. Validate it
-            // as absent here; lowering still checks the original settings/duplicates.
-            var validationGrammar = new org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl(
-                grammar.name(), grammar.imports(), grammar.settings().stream().filter(setting ->
-                    !(setting.key().equals("whitespace")
-                        && setting.value() instanceof org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue value
-                        && value.value().equals("none"))).toList(), grammar.tokens(), grammar.rules());
-            var errors = GrammarValidator.validateWithoutClassLoading(validationGrammar).stream()
-                .filter(issue -> "ERROR".equals(issue.severity())).map(GrammarValidator.ValidationIssue::format).toList();
-            if (!errors.isEmpty()) throw new IllegalArgumentException("Grammar validation failed:\n - " + String.join("\n - ", errors));
-            var generated = new RustBackend().generateWithProtocols(grammar, lsp, dap);
+            for (var grammar : file.grammars()) {
+                // Explicit "none" is part of the Rust backend contract, whereas Java's
+                // common validator only accepts named trivia implementations. Validate it
+                // as absent here; lowering still checks the original settings/duplicates.
+                var validationGrammar = new org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl(
+                    grammar.name(), grammar.imports(), grammar.settings().stream().filter(setting ->
+                        !(setting.key().equals("whitespace")
+                            && setting.value() instanceof org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue value
+                            && value.value().equals("none"))).toList(), grammar.tokens(), grammar.rules());
+                var errors = GrammarValidator.validateWithoutClassLoading(validationGrammar).stream()
+                    .filter(issue -> "ERROR".equals(issue.severity())).map(GrammarValidator.ValidationIssue::format).toList();
+                if (!errors.isEmpty()) throw new IllegalArgumentException("Grammar validation failed:\n - " + String.join("\n - ", errors));
+            }
+            var generated = new RustBackend().generateFile(file, lsp, dap);
             Path output = Path.of(options.get("--output"));
-            if (Files.isSymbolicLink(output)) throw new IOException("output directory must not be a symbolic link");
+            validateParentDirectories(output.resolve("mod.rs"));
             // Preflight every file before writing: never replace handwritten code or follow file symlinks.
             for (var artifact : generated) {
                 Path destination = output.resolve(artifact.relativePath());
+                validateParentDirectories(destination);
                 if (Files.isSymbolicLink(destination)) throw new IOException("refusing symbolic link " + destination);
                 if (check) {
                     if (!Files.isRegularFile(destination) || !Files.readString(destination).equals(artifact.content())) {
@@ -89,7 +93,11 @@ final class RustGenerateCommand {
             }
             if (!check) {
                 Files.createDirectories(output);
-                for (var artifact : generated) Files.writeString(output.resolve(artifact.relativePath()), artifact.content());
+                for (var artifact : generated) {
+                    Path destination = output.resolve(artifact.relativePath());
+                    Files.createDirectories(destination.getParent());
+                    Files.writeString(destination, artifact.content());
+                }
             }
             out.println((check ? "Verified " : "Generated ") + generated.size() + " Rust module files in " + output);
             return CodegenMain.EXIT_OK;
@@ -99,6 +107,13 @@ final class RustGenerateCommand {
         } catch (IOException error) {
             err.println(error.getMessage());
             return CodegenMain.EXIT_GENERATION_ERROR;
+        }
+    }
+    private static void validateParentDirectories(Path destination) throws IOException {
+        for (Path parent = destination.toAbsolutePath().getParent(); parent != null; parent = parent.getParent()) {
+            if (Files.isSymbolicLink(parent)) throw new IOException("refusing symbolic link " + parent);
+            if (Files.exists(parent) && !Files.isDirectory(parent))
+                throw new IOException("refusing non-directory " + parent);
         }
     }
 }

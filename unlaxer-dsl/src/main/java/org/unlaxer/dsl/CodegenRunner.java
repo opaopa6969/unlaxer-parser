@@ -64,8 +64,15 @@ final class CodegenRunner {
         FileSystemPort fs
     ) throws IOException {
         String source = fs.readString(Path.of(config.grammarFile()));
+        var snapshot = UBNFMapper.parseWithSource(source);
         UBNFFile file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(
-            UBNFMapper.parse(source), Path.of(config.grammarFile()), fs::readString);
+            snapshot.ast(), Path.of(config.grammarFile()), fs::readString);
+        try {
+            org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, snapshot);
+        } catch (IllegalArgumentException error) {
+            err.println(error.getMessage());
+            return CodegenMain.EXIT_VALIDATION_ERROR;
+        }
 
         Map<String, CodeGenerator> generatorMap = generatorMap(config.javaRelease());
 
@@ -237,6 +244,8 @@ final class CodegenRunner {
         int conflictCount = 0;
         int dryRunCount = 0;
 
+        // Complete every generator before touching output, including a later grammar's failure.
+        List<CodeGenerator.GeneratedSource> plannedSources = new ArrayList<>();
         for (GrammarDecl grammar : file.grammars()) {
             for (String name : config.generators()) {
                 String key = name.trim();
@@ -254,63 +263,65 @@ final class CodegenRunner {
                     return CodegenMain.EXIT_CLI_ERROR;
                 }
 
-                CodeGenerator.GeneratedSource src = gen.generate(grammar);
-                Path pkgDir = outPath.resolve(src.packageName().replace('.', '/'));
-                Path javaFile = pkgDir.resolve(src.className() + ".java");
-
-                if (config.cleanOutput() && !config.dryRun()) {
-                    if (fs.deleteIfExists(javaFile)) {
-                        fileEvents.add(new FileEvent("cleaned", javaFile.toString()));
-                        if ("ndjson".equals(config.reportFormat())) {
-                            out.println(ndjsonFileEvent("cleaned", javaFile.toString()));
-                        }
-                    }
-                }
-
-                WriteAction action = writeGeneratedSource(config, fs, pkgDir, javaFile, src.source());
-                if (action == WriteAction.CONFLICT) {
-                    conflictCount++;
-                    fileEvents.add(new FileEvent("conflict", javaFile.toString()));
-                    if (!"ndjson".equals(config.reportFormat())) {
-                        err.println("Conflict (not overwritten): " + javaFile);
-                    }
-                    if ("ndjson".equals(config.reportFormat())) {
-                        out.println(ndjsonFileEvent("conflict", javaFile.toString()));
-                    }
-                    continue;
-                }
-                if (action == WriteAction.SKIPPED) {
-                    skippedCount++;
-                    fileEvents.add(new FileEvent("skipped", javaFile.toString()));
-                    if (!"ndjson".equals(config.reportFormat())) {
-                        out.println("Skipped (unchanged): " + javaFile);
-                    }
-                    if ("ndjson".equals(config.reportFormat())) {
-                        out.println(ndjsonFileEvent("skipped", javaFile.toString()));
-                    }
-                    continue;
-                }
-                if (action == WriteAction.DRY_RUN) {
-                    dryRunCount++;
-                    fileEvents.add(new FileEvent("dry-run", javaFile.toString()));
-                    if (!"ndjson".equals(config.reportFormat())) {
-                        out.println("Dry-run: would generate " + javaFile);
-                    }
-                    if ("ndjson".equals(config.reportFormat())) {
-                        out.println(ndjsonFileEvent("dry-run", javaFile.toString()));
-                    }
-                } else {
-                    writtenCount++;
-                    fileEvents.add(new FileEvent("written", javaFile.toString()));
-                    if (!"ndjson".equals(config.reportFormat())) {
-                        out.println("Generated: " + javaFile);
-                    }
-                    if ("ndjson".equals(config.reportFormat())) {
-                        out.println(ndjsonFileEvent("written", javaFile.toString()));
-                    }
-                }
-                generatedFiles.add(javaFile.toString());
+                plannedSources.add(gen.generate(grammar));
             }
+        }
+        for (CodeGenerator.GeneratedSource src : plannedSources) {
+            Path pkgDir = outPath.resolve(src.packageName().replace('.', '/'));
+            Path javaFile = pkgDir.resolve(src.className() + ".java");
+
+            if (config.cleanOutput() && !config.dryRun()) {
+                if (fs.deleteIfExists(javaFile)) {
+                    fileEvents.add(new FileEvent("cleaned", javaFile.toString()));
+                    if ("ndjson".equals(config.reportFormat())) {
+                        out.println(ndjsonFileEvent("cleaned", javaFile.toString()));
+                    }
+                }
+            }
+
+            WriteAction action = writeGeneratedSource(config, fs, pkgDir, javaFile, src.source());
+            if (action == WriteAction.CONFLICT) {
+                conflictCount++;
+                fileEvents.add(new FileEvent("conflict", javaFile.toString()));
+                if (!"ndjson".equals(config.reportFormat())) {
+                    err.println("Conflict (not overwritten): " + javaFile);
+                }
+                if ("ndjson".equals(config.reportFormat())) {
+                    out.println(ndjsonFileEvent("conflict", javaFile.toString()));
+                }
+                continue;
+            }
+            if (action == WriteAction.SKIPPED) {
+                skippedCount++;
+                fileEvents.add(new FileEvent("skipped", javaFile.toString()));
+                if (!"ndjson".equals(config.reportFormat())) {
+                    out.println("Skipped (unchanged): " + javaFile);
+                }
+                if ("ndjson".equals(config.reportFormat())) {
+                    out.println(ndjsonFileEvent("skipped", javaFile.toString()));
+                }
+                continue;
+            }
+            if (action == WriteAction.DRY_RUN) {
+                dryRunCount++;
+                fileEvents.add(new FileEvent("dry-run", javaFile.toString()));
+                if (!"ndjson".equals(config.reportFormat())) {
+                    out.println("Dry-run: would generate " + javaFile);
+                }
+                if ("ndjson".equals(config.reportFormat())) {
+                    out.println(ndjsonFileEvent("dry-run", javaFile.toString()));
+                }
+            } else {
+                writtenCount++;
+                fileEvents.add(new FileEvent("written", javaFile.toString()));
+                if (!"ndjson".equals(config.reportFormat())) {
+                    out.println("Generated: " + javaFile);
+                }
+                if ("ndjson".equals(config.reportFormat())) {
+                    out.println(ndjsonFileEvent("written", javaFile.toString()));
+                }
+            }
+            generatedFiles.add(javaFile.toString());
         }
 
         String generationFailReason = generationPolicyFailReason(config, fileEvents, skippedCount, conflictCount);

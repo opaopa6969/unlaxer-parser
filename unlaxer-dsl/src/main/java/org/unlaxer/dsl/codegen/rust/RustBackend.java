@@ -34,6 +34,23 @@ public final class RustBackend {
             new GeneratedFile("evaluator.rs", RustEvalEmitter.apply(grammar, ir, evaluator(ir))));
     }
 
+    /** Whole-file API: validate and emit in memory before the caller writes any artifacts. */
+    public List<GeneratedFile> generateFile(org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file,
+                                           boolean lsp, boolean dap) {
+        org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, null);
+        if (file.grammars().size() == 1) return generateWithProtocols(file.grammars().get(0), lsp, dap);
+        var files = new ArrayList<GeneratedFile>();
+        var index = new StringBuilder(HEADER);
+        for (var grammar : file.grammars()) {
+            String module = org.unlaxer.dsl.codegen.GrammarFileLayout.moduleName(grammar);
+            index.append("pub mod ").append(module).append(";\n");
+            for (var artifact : generateWithProtocols(grammar, lsp, dap))
+                files.add(new GeneratedFile(module + "/" + artifact.relativePath(), artifact.content()));
+        }
+        files.add(0, new GeneratedFile("mod.rs", index.toString()));
+        return List.copyOf(files);
+    }
+
     /** Opt-in stdio LSP module, leaving ordinary generation unchanged. */
     public List<GeneratedFile> generateWithLsp(GrammarDecl grammar) {
         var ir = RustGrammarLowering.lower(grammar);

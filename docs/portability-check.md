@@ -97,7 +97,8 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | `failed` | 機能 inventory は通過したが、構造検証で拒否された |
 | `unavailable` | UBNF の構文 AST を取得できない |
 
-**構造検証は依然 fail-first**。`P-STRUCTURE` は grammar 全体の範囲であり、すべての
+[複数 grammar](multiple-grammars.md) は独立に構造検証し、後続 grammar の失敗も収集する。
+**各 grammar 内の構造検証は依然 fail-first**。`P-STRUCTURE` は grammar 全体の範囲であり、すべての
 構造エラーやその最小位置を列挙するものではない。例外文言の正規表現解析で code や位置を
 推測しない。UBNF 構文失敗 `P-SYNTAX` は Java frontend の精密な位置 API がないため
 両 host とも `span: null`。部分 AST からの recovery は行わない。
@@ -106,7 +107,8 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 
 | code | 対象 / subject |
 |---|---|
-| `P-GRAMMAR-COUNT` | 単一 grammar 以外 / `expected one grammar`（ファイル全体） |
+| `P-GRAMMAR-COUNT` | grammar が0件の AST / `expected one grammar`（ファイル全体）。複数 grammar は #714 で対応 |
+| `P-OUTPUT-COLLISION` | ASCII 大小文字を無視した grammar 名の衝突 / `grammar_` + 小文字名（後出 grammar 全体） |
 | `P-IMPORT` | import / path |
 | `P-SETTING` | 未対応 key または block setting / key |
 | `P-WHITESPACE` | `none` / `javaStyle` 以外 / style |
