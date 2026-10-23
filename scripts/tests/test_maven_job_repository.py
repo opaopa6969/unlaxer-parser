@@ -83,8 +83,8 @@ class ActionScriptTest(unittest.TestCase):
                         GITHUB_RUN_ID='42', GITHUB_RUN_ATTEMPT='3', GITHUB_JOB='downstream',
                         GITHUB_ENV=str(self.temp / 'env'), GITHUB_OUTPUT=str(self.temp / 'output'),
                         GITHUB_STATE=str(self.temp / 'state'), REPOSITORY_SUFFIX='')
-        self.env.pop('MAVEN_ARGS', None)
-        self.env.pop('STUB_RESOLVES', None)
+        for variable in ['MAVEN_ARGS', 'STUB_RESOLVES', 'UNLAXER_MAVEN_REPOSITORY']:
+            self.env.pop(variable, None)
 
     def run_action(self, **overrides):
         env = dict(self.env, **overrides)
@@ -107,10 +107,17 @@ class ActionScriptTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((Path(self.env['RUNNER_TEMP']) / 'maven-repository/42-3-downstream-consumer').is_dir())
 
-    def test_rejects_reuse_and_competing_selection(self):
+    def test_rejects_reuse_and_a_second_selection(self):
         self.assertEqual(self.run_action().returncode, 0)
         self.assertNotEqual(self.run_action().returncode, 0)
-        self.assertIn('already selects', self.run_action(MAVEN_ARGS='-Dmaven.repo.local=/elsewhere').stderr)
+        self.assertIn('already selected', self.run_action(UNLAXER_MAVEN_REPOSITORY='/elsewhere').stderr)
+
+    def test_replaces_a_persistent_repository_of_the_runner_service(self):
+        result = self.run_action(MAVEN_ARGS='-e -Dmaven.repo.local=/home/runner-3/m2/repository -U')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('replacing the runner', result.stdout)
+        repository = Path(self.env['RUNNER_TEMP']) / 'maven-repository/42-3-downstream'
+        self.assertEqual((self.temp / 'env').read_text().splitlines()[0], f'MAVEN_ARGS=-e -U -Dmaven.repo.local={repository}')
 
     def test_rejects_a_repository_maven_does_not_use(self):
         result = self.run_action(STUB_RESOLVES=str(Path.home() / '.m2/repository'))
@@ -176,7 +183,9 @@ class MavenResolutionTest(unittest.TestCase):
         self.env = dict(os.environ, RUNNER_TEMP=str(self.temp / 'runner-temp'), GITHUB_RUN_ID='42', GITHUB_RUN_ATTEMPT='1',
                         GITHUB_JOB='build', GITHUB_ENV=str(self.temp / 'env'), GITHUB_OUTPUT=str(self.temp / 'output'),
                         GITHUB_STATE=str(self.temp / 'state'))
-        self.env.pop('MAVEN_ARGS', None)
+        self.env.pop('UNLAXER_MAVEN_REPOSITORY', None)
+        # As on runners 2 and 3, whose service selects a persistent repository.
+        self.env['MAVEN_ARGS'] = f'-Dmaven.repo.local={self.temp / "runner-service-repository"}'
         selected = subprocess.run(['bash', str(ACTION / 'select.sh')], cwd=self.temp, env=self.env, text=True, capture_output=True)
         self.assertEqual(selected.returncode, 0, selected.stdout + selected.stderr)
         exported = dict(line.split('=', 1) for line in (self.temp / 'env').read_text().splitlines())

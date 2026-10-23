@@ -17,6 +17,12 @@ later build on the machine as if it were the release. Central itself was never c
   Maven 3.9) and writes `MAVEN_ARGS` and `UNLAXER_MAVEN_REPOSITORY` to `GITHUB_ENV`.
   Later steps, Python/shell scripts and nested `mvn` processes inherit it.
   A step-level `MAVEN_OPTS` (for example the tinyexpression LSP smoke) does not replace it.
+- Runners 2 and 3 start from a systemd unit that sets
+  `MAVEN_ARGS=-Dmaven.repo.local=<runner>/m2/repository`, a per-runner repository that outlives
+  the job and also holds development `org.unlaxer:*:3.3.0` installs. The action removes that
+  selection from `MAVEN_ARGS` (with a notice) and puts the job repository in its place; the
+  runner's directory is left as it is. Selecting a second repository in the same job
+  (`UNLAXER_MAVEN_REPOSITORY` already set) fails.
 - The action asks Maven for `settings.localRepository` (`maven-help-plugin:3.5.1:evaluate`)
   and fails unless Maven reports the new path.
 - In one job, the parser install, tinyexpression and its IDE module all resolve from the same

@@ -9,11 +9,22 @@ for variable in RUNNER_TEMP GITHUB_RUN_ID GITHUB_RUN_ATTEMPT GITHUB_JOB GITHUB_E
     exit 1
   fi
 done
-case " ${MAVEN_ARGS:-} " in
-  *" -Dmaven.repo.local="*)
-    echo "::error::MAVEN_ARGS already selects a Maven repository: $MAVEN_ARGS" >&2
-    exit 1;;
-esac
+if [ -n "${UNLAXER_MAVEN_REPOSITORY:-}" ]; then
+  echo "::error::this job already selected a Maven repository: $UNLAXER_MAVEN_REPOSITORY" >&2
+  exit 1
+fi
+# A runner service may select its own persistent repository (runners 2 and 3 set
+# MAVEN_ARGS=-Dmaven.repo.local=<runner>/m2/repository). That one outlives the job, so
+# replace it. The mvn launcher word-splits MAVEN_ARGS, so splitting here loses nothing.
+kept=()
+read -ra words <<< "${MAVEN_ARGS:-}"
+for argument in "${words[@]}"; do
+  case "$argument" in
+    -Dmaven.repo.local=*) echo "::notice::replacing the runner's Maven repository ${argument#-Dmaven.repo.local=} for this job";;
+    *) kept+=("$argument");;
+  esac
+done
+MAVEN_ARGS="${kept[*]}"
 repository="$RUNNER_TEMP/maven-repository/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB${REPOSITORY_SUFFIX:+-$REPOSITORY_SUFFIX}"
 # The mvn launcher word-splits MAVEN_ARGS.
 if [[ "$repository" =~ [[:space:]] ]]; then
