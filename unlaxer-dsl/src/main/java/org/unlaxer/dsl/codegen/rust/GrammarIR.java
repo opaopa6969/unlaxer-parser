@@ -88,7 +88,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
             }
         }
     }
-    public sealed interface Expression permits Literal, NumberToken, Reference, Sequence, Choice, LongestChoice, UniqueLongestChoice, PredictiveChoice, Capture,
+    public sealed interface Expression permits Literal, EmptyWordToken, NumberToken, Reference, Sequence, Choice, LongestChoice, UniqueLongestChoice, PredictiveChoice, Capture,
         CaptureBoundary, OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CaseInsensitiveToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, GraphemeToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
@@ -133,7 +133,10 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     /** A null maximum denotes unbounded repetition. */
     public record Repeat(Expression child, int min, Integer max) implements Expression {}
     public record Separated(Expression child, Expression separator) implements Expression {}
+    /** A word. An empty word is Java's lexical {@code LiteralParser("")}, used only in token-stream or lexical-context grammars: zero-width success. */
     public record Literal(String text) implements Expression {}
+    /** UBNF {@code ''} as Java {@code WordParser("")}: never matches; expects the empty word. */
+    public record EmptyWordToken() implements Expression {}
     public record NumberToken() implements Expression {}
     public record Reference(int rule) implements Expression {}
     public record Sequence(List<Expression> elements) implements Expression {

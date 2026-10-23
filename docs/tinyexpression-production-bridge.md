@@ -131,7 +131,8 @@ for the selected classes count; any missing, skipped, failing, or unexpected tes
 fails the gate. It then independently
 compiles the Rust production library and runtime with `rustc` (no Cargo dependency added),
 and runs both bridges against committed sources and `expected.tsv`. `--maven-repo` chooses
-an isolated Maven cache; `--skip-build` is only for repeating bridge probes after those
+an isolated Maven cache and is required (or `-Dmaven.repo.local` in `MAVEN_ARGS`), also with
+`--skip-build`, which must reuse the cache of the earlier build (#718); `--skip-build` is only for repeating bridge probes after those
 builds/tests have passed. That bridge-only mode explicitly reports zero newly executed
 compatibility tests; it is not evidence that the 164 current-version tests passed.
 `target/tiny-production/{tiny,ide}-dependencies.txt` records the resolved versions,

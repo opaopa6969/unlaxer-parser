@@ -2966,8 +2966,8 @@ ubnfc Java 版へ差し替える API 互換層、#293）を推奨する。
 | `Number` / `Identifier` / `CharRange` / `Except` / `Any` | 実装と同じ ASCII 集合（`Number` は `+-.0-9`、`Except` は非 ASCII を常に「あり得る」） |
 | `Capture` / `TextValue` / `ValueBoundary` / `RuleEffects` / `TriviaScope` | 子の FIRST（`TriviaScope` は trivia 印を確定させる） |
 | `Lookahead` | nullable（消費しない）。**子が unknown なら unknown**（子はこの位置で走るため） |
-| `Eof` / `Empty` / `JavaEmpty` / `JavaLookahead` | nullable |
-| `Error` | 空集合（必ず失敗） |
+| `Eof` / `Empty` / `JavaEmpty` / `JavaEmptyLiteral` / `JavaLookahead` | nullable |
+| `Error` / `JavaEmptyWord` | 空集合（必ず失敗） |
 | `Custom` / `CustomWith` / `Backreference` / `Until` / `JavaUntil` | **unknown**（決して除外しない） |
 
 **trivia の扱いが Java と違う唯一の点。** Java では trivia が chain の先頭子（`SpaceDelimitor`）として存在し、

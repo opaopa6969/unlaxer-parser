@@ -126,7 +126,7 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | `P-TYPEOF` | `@typeof` / capture 名（prefix 自体の範囲） |
 | `P-QUALIFIED-REFERENCE` | 名前空間付き参照 / `namespace.name` |
 | `P-ERROR-ELEMENT` | 旧版の`ERROR(...)`未対応診断。#329以降は生成対応により発行しない（別用途へ転用しない） |
-| `P-EMPTY-LITERAL` | 空 literal / `empty literal` |
+| `P-EMPTY-LITERAL` | 旧版の空 literal 未対応診断。#713 以降は [Java 互換生成](empty-literal.md)により発行しない（別用途へ転用しない） |
 | `P-STRUCTURE` | 構造検証失敗 / `Rust structural constraints` |
 | `P-SYNTAX` | 構文失敗 / `UBNF syntax` |
 

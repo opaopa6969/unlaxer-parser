@@ -53,13 +53,14 @@ public class PortabilityCheckTest {
         var result = PortabilityCheck.check(source);
         assertFalse(result.portable());
         assertEquals("blocked", result.structure());
-        assertEquals(5, result.diagnostics().size());
+        assertEquals(4, result.diagnostics().size());
         assertEquals("P-EXTERNAL-TOKEN", result.diagnostics().get(0).code());
         assertEquals("example.UnsafeParser", result.diagnostics().get(0).subject());
         assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-ANNOTATION") && d.subject().equals("custom")));
-        assertTrue(result.diagnostics().stream().anyMatch(d -> d.code().equals("P-EMPTY-LITERAL")));
+        // #713: '' is generated with Java WordParser("") semantics, not reported as unsupported.
+        assertTrue(result.diagnostics().stream().noneMatch(d -> d.code().equals("P-EMPTY-LITERAL")));
         assertEquals(2, result.diagnostics().stream().filter(d -> d.code().equals("P-QUALIFIED-REFERENCE")).count());
-        Span last = result.diagnostics().get(4).span();
+        Span last = result.diagnostics().get(3).span();
         assertEquals(source.indexOf("remote.Item", source.indexOf("Other ::=")), last.start());
     }
 

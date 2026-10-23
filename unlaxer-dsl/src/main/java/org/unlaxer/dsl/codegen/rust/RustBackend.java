@@ -62,7 +62,7 @@ public final class RustBackend {
     }
 
     private static void collectLspKeywords(Expression expression, java.util.Set<String> keywords) {
-        if (expression instanceof Literal v) keywords.add(v.text());
+        if (expression instanceof Literal v) { if (!v.text().isEmpty()) keywords.add(v.text()); }
         else if (expression instanceof Sequence v) v.elements().forEach(e -> collectLspKeywords(e, keywords));
         else if (expression instanceof Choice v) v.alternatives().forEach(e -> collectLspKeywords(e, keywords));
         else if (expression instanceof LongestChoice v) v.alternatives().forEach(e -> collectLspKeywords(e, keywords));
@@ -381,7 +381,11 @@ public final class RustBackend {
             return expression(scope.child()) + ".rule_effects(" + effects(scope.effects()) + ")";
         }
         if (expression instanceof Literal literal) {
+            if (literal.text().isEmpty()) return "Expr::JavaEmptyLiteral";
             return "Expr::Literal(" + quote(literal.text()) + ")";
+        }
+        if (expression instanceof EmptyWordToken ignored) {
+            return "Expr::JavaEmptyWord";
         }
         if (expression instanceof NumberToken ignored) {
             return "Expr::Number";

@@ -21,6 +21,7 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         overwrite-settings: false
+    - uses: ./.github/actions/maven-job-repository
 
     - name: Set up Node.js (for vsce)
       uses: actions/setup-node@v4

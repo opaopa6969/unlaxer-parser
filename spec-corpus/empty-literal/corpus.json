@@ -1,0 +1,196 @@
+[
+  {
+    "name":"Root",
+    "grammar":"grammar Root { @package: org.example.emptyliteral @root @mapping(Result) Root ::= ''; }",
+    "cases":[
+      {"id":"empty-input","input":"","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":[""],"farthestOffset":0,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''"],"farthestOffset":0,"farthestExpected":["''"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"ascii","input":"x","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":[""],"farthestOffset":0,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''"],"farthestOffset":0,"farthestExpected":["''"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"supplementary","input":"😀","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":[""],"farthestOffset":0,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''"],"farthestOffset":0,"farthestExpected":["''"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"Sequence",
+    "grammar":"grammar Sequence { @package: org.example.emptyliteral @root @mapping(Root, params=[value]) Root ::= '😀' @value '' 'b'; }",
+    "cases":[
+      {"id":"fails-after-supplementary","input":"😀b","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":[""],"farthestOffset":1,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["''"],"farthestOffset":1,"farthestExpected":["''"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"empty-input","input":"","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["😀"],"farthestOffset":0,"farthestExpected":["😀"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''","'b'","'😀'"],"farthestOffset":0,"farthestExpected":["''","'b'","'😀'"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"eof-after-supplementary","input":"😀","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":[""],"farthestOffset":1,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["''"],"farthestOffset":1,"farthestExpected":["''"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"missing-head","input":"b","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["😀"],"farthestOffset":0,"farthestExpected":["😀"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''","'b'","'😀'"],"farthestOffset":0,"farthestExpected":["''","'b'","'😀'"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"Choice",
+    "grammar":"grammar Choice { @package: org.example.emptyliteral @root @mapping(Root, params=[value]) Root ::= Item @value; Item ::= '' | 'a' | '😀' '' | '😀'; }",
+    "cases":[
+      {"id":"second-alternative","input":"a","prefix":[true,1,1],"classic":[[true,1,1],[true,1,1],[true,0,1],[true,0,1]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,1],"fields":{"value":"a"}},"cst":"Root[0,1){Item[0,1)}"},
+      {"id":"rollback-after-supplementary","input":"😀","prefix":[true,1,1],"classic":[[true,1,1],[true,1,1],[true,0,1],[true,0,1]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,1],"fields":{"value":"😀"}},"cst":"Root[0,1){Item[0,1)}"},
+      {"id":"empty-input","input":"","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["","a","😀"],"farthestOffset":0,"farthestExpected":["","a","😀"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''","'a'","'😀'","RootParser"],"farthestOffset":0,"farthestExpected":["''","'a'","'😀'","RootParser"]},"ruleStack":["0:Root@0>Item@0|0",null],"ast":null,"cst":null},
+      {"id":"no-alternative","input":"z","prefix":[false,0,0],"classic":[[false,0,0],[true,1,1],[false,0,0],[true,0,1]],"diagnostic":{"kind":"syntax","offset":0,"expected":["","a","😀"],"farthestOffset":0,"farthestExpected":["","a","😀"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''","'a'","'😀'","RootParser"],"farthestOffset":0,"farthestExpected":["''","'a'","'😀'","RootParser"]},"ruleStack":["0:Root@0>Item@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"CaptureRollback",
+    "grammar":"grammar CaptureRollback { @package: org.example.emptyliteral @root @mapping(Root, params=[value, other]) Root ::= 'a' @value '' | 'a' @other; }",
+    "cases":[
+      {"id":"failed-capture-rolled-back","input":"a","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,1],"fields":{"value":null,"other":"a"}},"cst":"Root[0,1)","javaCst":""},
+      {"id":"no-alternative","input":"b","prefix":[false,0,0],"classic":[[false,0,0],[true,1,1],[false,0,0],[true,0,1]],"diagnostic":{"kind":"syntax","offset":0,"expected":["a"],"farthestOffset":0,"farthestExpected":["a"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''","'a'"],"farthestOffset":0,"farthestExpected":["''","'a'"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"trailing-after-rollback","input":"aa","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":1,"farthestExpected":["","end of input"]},"javaDiagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":1,"farthestExpected":["''"]},"ruleStack":[null,null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"OptionalRepeat",
+    "grammar":"grammar OptionalRepeat { @package: org.example.emptyliteral @root @mapping(Root, params=[value, maybe, many, more]) Root ::= 'a' @value [ '' @maybe ] { '' @many } [ 'x' '' ] { 'y' '' } ( '' | 'b' ) @more; }",
+    "cases":[
+      {"id":"zero-optional-repeat","input":"ab","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a","maybe":null,"many":[],"more":"b"}},"cst":"Root[0,2)"},
+      {"id":"missing-tail","input":"a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["","b","x","y"],"farthestOffset":1,"farthestExpected":["","b","x","y"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["''","'b'","'x'","'y'"],"farthestOffset":1,"farthestExpected":["''","'b'","'x'","'y'"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"optional-rollback","input":"axb","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":2,"expected":[""],"farthestOffset":2,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":2,"expected":["''"],"farthestOffset":2,"farthestExpected":["''"]},"ruleStack":["2:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"repeat-rollback","input":"ayb","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":2,"expected":[""],"farthestOffset":2,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":2,"expected":["''"],"farthestOffset":2,"farthestExpected":["''"]},"ruleStack":["2:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"missing-head","input":"b","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["a"],"farthestOffset":0,"farthestExpected":["a"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'"],"farthestOffset":0,"farthestExpected":["'a'"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"Progress",
+    "grammar":"grammar Progress { @package: org.example.emptyliteral @root @mapping(Root, params=[value]) Root ::= 'a' @value Tail; Tail ::= ''+ | ''{0,3} 'c' | '' % ',' | { [ '' ] } 'e' | 'd'; }",
+    "cases":[
+      {"id":"bounded-zero","input":"ac","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}},"cst":"Root[0,2){Tail[1,2)}"},
+      {"id":"fallback-literal","input":"ad","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}},"cst":"Root[0,2){Tail[1,2)}"},
+      {"id":"nullable-repeat-stops","input":"ae","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}},"cst":"Root[0,2){Tail[1,2)}"},
+      {"id":"no-tail","input":"a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["","c","d","e"],"farthestOffset":1,"farthestExpected":["","c","d","e"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["''","'c'","'d'","'e'"],"farthestOffset":1,"farthestExpected":["''","'c'","'d'","'e'"]},"ruleStack":["1:Root@0>Tail@1|0",null],"ast":null,"cst":null},
+      {"id":"separator-head-fails","input":"a,","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["","c","d","e"],"farthestOffset":1,"farthestExpected":["","c","d","e"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["''","'c'","'d'","'e'"],"farthestOffset":1,"farthestExpected":["''","'c'","'d'","'e'"]},"ruleStack":["1:Root@0>Tail@1|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"Trivia",
+    "grammar":"grammar Trivia { @package: org.example.emptyliteral @whitespace: javaStyle @root @mapping(Root, params=[value, tail]) Root ::= 'a' @value [ '' ] ( '' 'z' | 'b' @tail ); }",
+    "cases":[
+      {"id":"adjacent","input":"ab","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a","tail":"b"}},"cst":"Root[0,2)"},
+      {"id":"space","input":"a b","prefix":[true,3,3],"classic":[[true,3,3],[false,0,0],[true,0,3],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,3],"fields":{"value":"a","tail":"b"}},"cst":"Root[0,3)"},
+      {"id":"leading-trailing","input":" a  b ","prefix":[true,6,6],"classic":[[true,6,6],[false,0,0],[true,0,6],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,6],"fields":{"value":"a","tail":"b"}},"cst":"Root[0,6)"},
+      {"id":"trailing-trivia-eof","input":"a  ","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":3,"expected":["","b"],"farthestOffset":3,"farthestExpected":["","b"]},"javaDiagnostic":{"kind":"syntax","offset":3,"expected":["' '","''","'*/'","'/*'","'//'","'b'","'z'"],"farthestOffset":3,"farthestExpected":["' '","''","'*/'","'/*'","'//'","'b'","'z'"]},"ruleStack":["3:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"leading-trivia-eof","input":" a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":2,"expected":["","b"],"farthestOffset":2,"farthestExpected":["","b"]},"javaDiagnostic":{"kind":"syntax","offset":2,"expected":["' '","''","'*/'","'/*'","'//'","'b'","'z'"],"farthestOffset":2,"farthestExpected":["' '","''","'*/'","'/*'","'//'","'b'","'z'"]},"ruleStack":["2:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"block-comment","input":"a /*c*/ b","prefix":[true,9,9],"classic":[[true,9,9],[false,0,0],[true,0,9],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,9],"fields":{"value":"a","tail":"b"}},"cst":"Root[0,9)"},
+      {"id":"newline-supplementary","input":"a\n😀","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":2,"expected":["","b"],"farthestOffset":2,"farthestExpected":["","b"]},"javaDiagnostic":{"kind":"syntax","offset":2,"expected":["' '","''","'*/'","'/*'","'//'","'b'","'z'"],"farthestOffset":2,"farthestExpected":["' '","''","'*/'","'/*'","'//'","'b'","'z'"]},"ruleStack":["2:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"MatchedCursor",
+    "grammar":"grammar MatchedCursor { @package: org.example.emptyliteral token LB = LOOKAHEAD('b') @root @mapping(Root, params=[value]) Root ::= 'a' @value LB '' | 'a' @value LB [ '' ]; }",
+    "cases":[
+      {"id":"optional-resets-match-cursor","input":"ab","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":2,"farthestExpected":[""]},"javaDiagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":2,"farthestExpected":["''"]},"ruleStack":[null,null],"ast":null,"cst":null},
+      {"id":"lookahead-fails","input":"a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["b"],"farthestOffset":1,"farthestExpected":["b"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["'b'"],"farthestOffset":1,"farthestExpected":["'b'"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"lookahead-mismatch","input":"ac","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["b"],"farthestOffset":1,"farthestExpected":["b"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["'b'"],"farthestOffset":1,"farthestExpected":["'b'"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"DeclarativeToken",
+    "grammar":"grammar DeclarativeToken { @package: org.example.emptyliteral @ubnf: v2 token EMPTY ::= ''; token NE ::= NEGATIVE_LOOKAHEAD('') 'q'; token LA ::= LOOKAHEAD('') 'p'; token OPT ::= 'r' [ '' ]; @root @mapping(Root, params=[value, rest]) Root ::= EMPTY 'a' @value ( NE | LA | OPT | '' ) @rest; }",
+    "cases":[
+      {"id":"negative-lookahead-never","input":"aq","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["","LA","NE","OPT"],"farthestOffset":1,"farthestExpected":["","LA","NE","OPT"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["''","LA","NE","OPT"],"farthestOffset":1,"farthestExpected":["''","LA","NE","OPT"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"positive-lookahead","input":"ap","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a","rest":"p"}},"cst":"Root[0,2)"},
+      {"id":"optional-token","input":"ar","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a","rest":"r"}},"cst":"Root[0,2)"},
+      {"id":"rule-literal-fails","input":"a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["","LA","NE","OPT"],"farthestOffset":1,"farthestExpected":["","LA","NE","OPT"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["''","LA","NE","OPT"],"farthestOffset":1,"farthestExpected":["''","LA","NE","OPT"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"empty-token-before-head","input":"q","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["a"],"farthestOffset":0,"farthestExpected":["a"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'","EMPTY"],"farthestOffset":0,"farthestExpected":["'a'","EMPTY"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"TokenStream",
+    "grammar":"grammar TokenStream { @package: org.example.emptyliteral @ubnf: v2 @tokenStream: enabled @whitespace: javaStyle token NAME ::= CHAR_RANGE('a','z')+; token SEMI ::= ';'; @root @mapping(Root, params=[value, tail]) Root ::= NAME @value [ '' ] ( '' SEMI @tail | '' ); }",
+    "cases":[
+      {"id":"zero-width","input":"ab","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"ab","tail":null}},"cst":"Root[0,2)"},
+      {"id":"zero-width-then-token","input":"ab;","prefix":[true,3,3],"classic":[[true,3,3],[false,0,0],[true,0,3],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,3],"fields":{"value":"ab","tail":";"}},"cst":"Root[0,3)"},
+      {"id":"trivia-before-token","input":"ab ;","prefix":[true,4,4],"classic":[[true,4,4],[false,0,0],[true,0,4],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,4],"fields":{"value":"ab","tail":";"}},"cst":"Root[0,4)"},
+      {"id":"trailing-input","input":"ab;;","prefix":[true,3,3],"classic":[[true,3,3],[false,0,0],[true,0,3],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":3,"expected":["end of input"],"farthestOffset":3,"farthestExpected":["end of input"]},"javaDiagnostic":{"kind":"trailing_input","offset":3,"expected":["end of input"],"farthestOffset":3,"farthestExpected":["' '","'*/'","'/*'","'//'"]},"ruleStack":[null,null],"ast":null,"cst":null},
+      {"id":"missing-name","input":";","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["NAME"],"farthestOffset":0,"farthestExpected":["NAME"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["' '","'*/'","'/*'","'//'","NAME"],"farthestOffset":0,"farthestExpected":["' '","'*/'","'/*'","'//'","NAME"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"empty-input","input":"","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["NAME"],"farthestOffset":0,"farthestExpected":["NAME"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["' '","'*/'","'/*'","'//'","NAME"],"farthestOffset":0,"farthestExpected":["' '","'*/'","'/*'","'//'","NAME"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"LexicalContext",
+    "grammar":"grammar LexicalContext { @package: org.example.emptyliteral @ubnf: v2 token ID ::= CHAR_RANGE('a','z')+; @root @mapping(Root, params=[name, tail]) @lexicalContext(tokens=['ID'], literals=['=']) Root ::= ID @name '' [ '' ] ( '' '=' | '=' ) ID @tail; }",
+    "cases":[
+      {"id":"zero-width-in-context","input":"a=b","prefix":[true,3,3],"classic":[[true,3,3],[false,0,0],[true,0,3],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,3],"fields":{"name":"a","tail":"b"}},"cst":"Root[0,3)"},
+      {"id":"missing-id","input":"a=","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":2,"expected":["ID"],"farthestOffset":2,"farthestExpected":["ID"]},"ruleStack":["2:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"missing-name","input":"=b","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["ID"],"farthestOffset":0,"farthestExpected":["ID"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["=","ID"],"farthestOffset":0,"farthestExpected":["=","ID"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"empty-input","input":"","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["ID"],"farthestOffset":0,"farthestExpected":["ID"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["=","ID"],"farthestOffset":0,"farthestExpected":["=","ID"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"AssociativePrefix",
+    "grammar":"grammar AssociativePrefix { @package: org.example.emptyliteral @whitespace: none @root @mapping(Binary, params=[left, op, right]) @leftAssoc @precedence(level=10) Root ::= '' 'a' @left { '+' @op 'a' @right }; }",
+    "cases":[
+      {"id":"prefix-fails","input":"a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":[""],"farthestOffset":0,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''","'a'"],"farthestOffset":0,"farthestExpected":["''","'a'"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"prefix-fails-before-operator","input":"a+a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":[""],"farthestOffset":0,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''","'a'"],"farthestOffset":0,"farthestExpected":["''","'a'"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"AssociativeTail",
+    "grammar":"grammar AssociativeTail { @package: org.example.emptyliteral @whitespace: none @root @mapping(Binary, params=[left, op, right]) @leftAssoc @precedence(level=10) Root ::= 'a' @left { '+' @op '' 'a' @right }; }",
+    "cases":[
+      {"id":"no-operator","input":"a","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Binary","span":[0,1],"fields":{"left":"a","op":[],"right":[]}},"cst":"Root[0,1)"},
+      {"id":"operator-tail-fails","input":"a+a","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":2,"farthestExpected":[""]},"javaDiagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":2,"farthestExpected":["''"]},"ruleStack":[null,null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"Cut",
+    "grammar":"grammar Cut { @package: org.example.emptyliteral @root @mapping(Root, params=[value]) Root ::= 'a' @value COMMIT('') | 'b' @value { COMMIT('', 'never') } | 'a' @value 'c'; }",
+    "cases":[
+      {"id":"commit-raises","input":"ac","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"commit","offset":1,"expected":["unexpected input"],"farthestOffset":1,"farthestExpected":["unexpected input"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"commit-at-eof","input":"a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"commit","offset":1,"expected":["unexpected input"],"farthestOffset":1,"farthestExpected":["unexpected input"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"repeat-commit-raises","input":"b","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"commit","offset":1,"expected":["never"],"farthestOffset":1,"farthestExpected":["never"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"repeat-commit-supplementary","input":"b😀","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"commit","offset":1,"expected":["never"],"farthestOffset":1,"farthestExpected":["never"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"no-alternative","input":"x","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["a","b"],"farthestOffset":0,"farthestExpected":["a","b"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'","'b'","'c'"],"farthestOffset":0,"farthestExpected":["'a'","'b'","'c'"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"Labeled",
+    "grammar":"grammar Labeled { @package: org.example.emptyliteral @root @mapping(Root, params=[value]) Root ::= CATCH('a' @value LABEL(L, ''), 'a' @value 'b', L) | 'c' @value LABEL(M, ''); }",
+    "cases":[
+      {"id":"caught-then-alternative","input":"ab","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}},"cst":"Root[0,2)","javaCst":""},
+      {"id":"caught-alternative-fails","input":"a😀","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["","b"],"farthestOffset":1,"farthestExpected":["","b"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["''","'b'"],"farthestOffset":1,"farthestExpected":["''","'b'"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"uncaught-label","input":"c","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"label","offset":1,"expected":["M"],"farthestOffset":1,"farthestExpected":["M"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"body-fails-ordinarily","input":"x","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["a","c"],"farthestOffset":0,"farthestExpected":["a","c"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'","'c'","RootParser"],"farthestOffset":0,"farthestExpected":["'a'","'c'","RootParser"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"empty-input","input":"","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["a","c"],"farthestOffset":0,"farthestExpected":["a","c"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'","'c'","RootParser"],"farthestOffset":0,"farthestExpected":["'a'","'c'","RootParser"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"Stack",
+    "grammar":"grammar Stack { @package: org.example.emptyliteral @root @mapping(Root, params=[value]) Root ::= 'a' @value [ Item ]; Item ::= 'b' '' | Inner; Inner ::= '😀' ''; }",
+    "cases":[
+      {"id":"unconsumed-inside-item","input":"ab","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":2,"farthestExpected":[""]},"javaDiagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":2,"farthestExpected":["''"]},"ruleStack":[null,"2:Root@0>Item@1|0"],"ast":null,"cst":null},
+      {"id":"unconsumed-inside-inner","input":"a😀","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":2,"farthestExpected":[""]},"javaDiagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":2,"farthestExpected":["''"]},"ruleStack":[null,"2:Root@0>Item@1>Inner@1|0"],"ast":null,"cst":null},
+      {"id":"unconsumed-at-item-start","input":"ac","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":1,"farthestExpected":["b","end of input","😀"]},"javaDiagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":1,"farthestExpected":["''","'b'","'😀'"]},"ruleStack":[null,"1:Root@0>Item@1>Inner@1|0"],"ast":null,"cst":null},
+      {"id":"accepted-without-item","input":"a","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,1],"fields":{"value":"a"}},"cst":"Root[0,1)"},
+      {"id":"root-start","input":"x","prefix":[false,0,0],"classic":[[false,0,0],[true,1,1],[false,0,0],[true,0,1]],"diagnostic":{"kind":"syntax","offset":0,"expected":["a"],"farthestOffset":0,"farthestExpected":["a"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'"],"farthestOffset":0,"farthestExpected":["'a'"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"AutoCommit",
+    "grammar":"grammar AutoCommit { @package: org.example.emptyliteral @root @mapping(Root, params=[value]) @autoCommit Root ::= 'a' Name @value '' | 'b' Name @value; Name ::= 'n'; }",
+    "cases":[
+      {"id":"empty-after-commit","input":"an","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":2,"expected":[""],"farthestOffset":2,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":2,"expected":["''"],"farthestOffset":2,"farthestExpected":["''"]},"ruleStack":["2:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"committed-name","input":"ax","prefix":[false,0,0],"classic":[[false,0,0],[true,2,2],[false,0,0],[true,0,2]],"diagnostic":{"kind":"commit","offset":1,"expected":["unexpected input"],"farthestOffset":1,"farthestExpected":["unexpected input"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
+      {"id":"accepted","input":"bn","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"n"}},"cst":"Root[0,2){Name[1,2)}","javaCst":"Name[1,2)"},
+      {"id":"committed-at-eof","input":"b","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"commit","offset":1,"expected":["unexpected input"],"farthestOffset":1,"farthestExpected":["unexpected input"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"LexicalContextChoice",
+    "grammar":"grammar LexicalContextChoice { @package: org.example.emptyliteral @ubnf: v2 token ID ::= CHAR_RANGE('a','z')+; @root @mapping(Root, params=[name, tail]) Root ::= Name @name Rest @tail; @lexicalContext(tokens=['ID']) Name ::= ID; Rest ::= '' '=' | '=' 'x'; }",
+    "cases":[
+      {"id":"zero-width-alternative-wins","input":"a=x","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":2,"expected":["end of input"],"farthestOffset":2,"farthestExpected":["end of input"]},"javaDiagnostic":{"kind":"trailing_input","offset":2,"expected":["end of input"],"farthestOffset":2,"farthestExpected":[]},"ruleStack":[null,null],"ast":null,"cst":null},
+      {"id":"zero-width-alternative","input":"a=","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"name":"a","tail":"="}},"cst":"Root[0,2){Name[0,1),Rest[1,2)}"},
+      {"id":"trailing-after-zero-width","input":"a=y","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":2,"expected":["end of input"],"farthestOffset":2,"farthestExpected":["end of input"]},"javaDiagnostic":{"kind":"trailing_input","offset":2,"expected":["end of input"],"farthestOffset":2,"farthestExpected":[]},"ruleStack":[null,null],"ast":null,"cst":null},
+      {"id":"missing-rest","input":"a","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["="],"farthestOffset":1,"farthestExpected":["="]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["=","__CaptureSite","x"],"farthestOffset":1,"farthestExpected":["=","__CaptureSite","x"]},"ruleStack":["1:Root@0>Rest@1|0",null],"ast":null,"cst":null}
+    ]
+  },
+  {
+    "name":"TokenStreamChoice",
+    "grammar":"grammar TokenStreamChoice { @package: org.example.emptyliteral @ubnf: v2 @tokenStream: enabled @whitespace: javaStyle token NAME ::= CHAR_RANGE('a','z')+; token SEMI ::= ';'; @root @mapping(Root, params=[value]) Root ::= Item @value; Item ::= '' SEMI | COMMIT(NAME) SEMI; }",
+    "cases":[
+      {"id":"zero-width-alternative","input":";","prefix":[true,1,1],"classic":[[true,1,1],[true,1,1],[true,0,1],[true,0,1]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,1],"fields":{"value":";"}},"cst":"Root[0,1){Item[0,1)}"},
+      {"id":"committed-alternative","input":"a;","prefix":[true,2,2],"classic":[[true,2,2],[true,2,2],[true,0,2],[true,0,2]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a;"}},"cst":"Root[0,2){Item[0,2)}"},
+      {"id":"committed-name-missing","input":"?","prefix":[false,0,0],"classic":[[false,0,0],[true,1,1],[false,0,0],[true,0,1]],"diagnostic":{"kind":"commit","offset":0,"expected":["unexpected input"],"farthestOffset":0,"farthestExpected":["unexpected input"]},"ruleStack":["0:Root@0>Item@0|0",null],"ast":null,"cst":null},
+      {"id":"empty-input","input":"","prefix":[false,0,0],"classic":[[false,0,0],[true,0,0],[false,0,0],[true,0,0]],"diagnostic":{"kind":"commit","offset":0,"expected":["unexpected input"],"farthestOffset":0,"farthestExpected":["unexpected input"]},"ruleStack":["0:Root@0>Item@0|0",null],"ast":null,"cst":null}
+    ]
+  }
+]

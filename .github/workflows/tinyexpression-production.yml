@@ -25,12 +25,17 @@ jobs:
           distribution: temurin
           java-version: '21.0.9'
           overwrite-settings: false
+      - uses: ./.github/actions/maven-job-repository
       - name: Rust toolchain を既定を変更せずに準備
         run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
       - name: Check dependency restoration and compatibility report guards
         run: python3 -m unittest discover -s scripts/tests -p test_tiny_production_dependencies.py
       - name: Run real production parsers, source mapping and existing editor compatibility
-        run: python3 scripts/check-tiny-production.py target/tiny-source
+        run: python3 scripts/check-tiny-production.py target/tiny-source --maven-repo "$UNLAXER_MAVEN_REPOSITORY"
+      - name: Require this checkout's jars in the job Maven repository
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("target/tiny-production/current-dependencies.json"))["revision"])')
+          bash scripts/check-job-maven-repository.sh . "$version"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

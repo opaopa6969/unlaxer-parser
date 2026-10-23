@@ -6,5 +6,5 @@
   {"input":"if(1,2,)", "kind":"syntax", "javaOffset":7, "rustOffset":7},
   {"input":"neg(-)", "kind":"syntax", "javaOffset":5, "rustOffset":5},
   {"input":"neg(.)", "kind":"syntax", "javaOffset":5, "rustOffset":5},
-  {"input":"neg(1e+)", "kind":"syntax", "javaOffset":7, "rustOffset":5}
+  {"input":"neg(1e+)", "kind":"syntax", "javaOffset":7, "rustOffset":7}
 ]

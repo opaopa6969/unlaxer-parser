@@ -1354,12 +1354,16 @@ impl Lowering<'_> {
 
     fn atomic(&self, atom: &ast::AtomicElement) -> Result<Expression> {
         Ok(match &atom.kind {
-            ElementKind::Terminal(text) => {
-                if text.is_empty() {
-                    return Err("empty literal".into());
-                }
-                Expression::Literal(text.clone())
+            // Java emits WordParser(""), which never matches, unless lexical
+            // literals are enabled; then its literal parser accepts zero width.
+            ElementKind::Terminal(text)
+                if text.is_empty()
+                    && !crate::token_stream::enabled(self.grammar)
+                    && !crate::lexical_contexts::enabled(self.grammar) =>
+            {
+                Expression::EmptyWordToken
             }
+            ElementKind::Terminal(text) => Expression::Literal(text.clone()),
             ElementKind::RuleRef { namespace, name } => {
                 if namespace.is_some() {
                     return Err("unsupported qualified rule reference".into());
@@ -1443,7 +1447,8 @@ impl Lowering<'_> {
                 if matches!(
                     body.alternatives[0].elements[0].element.kind,
                     ElementKind::RuleRef { .. }
-                ) || (!only_reference && matches!(bare, Expression::Literal(_)))
+                ) || (!only_reference
+                    && matches!(bare, Expression::Literal(_) | Expression::EmptyWordToken))
                 {
                     return Ok(child.clone());
                 }
@@ -1455,7 +1460,10 @@ impl Lowering<'_> {
     fn repeated_atom(&self, atom: &ast::AtomicElement) -> Result<Expression> {
         let child = self.atomic(atom)?;
         Ok(
-            if matches!(child, Expression::Choice(_) | Expression::Literal(_)) {
+            if matches!(
+                child,
+                Expression::Choice(_) | Expression::Literal(_) | Expression::EmptyWordToken
+            ) {
                 Expression::Delimited(Box::new(child))
             } else if matches!(atom.kind, ElementKind::RuleRef { .. })
                 || matches!(child, Expression::Sequence(_))
@@ -1471,6 +1479,7 @@ impl Lowering<'_> {
         match expression {
             Expression::CatchLabels { .. } => self.is_nullable(&catch_choice(expression)),
             Expression::LexicalToken { expression, .. } => expression.nullable(),
+            Expression::Literal(text) => text.is_empty(),
             Expression::Replay(_)
             | Expression::EmptyToken
             | Expression::EofToken
@@ -2421,7 +2430,7 @@ fn assoc_skeleton(expression: &Expression) -> Vec<&Expression> {
 
 fn assoc_delimiter(expression: &Expression) -> bool {
     match expression {
-        Expression::Literal(text) => !text.is_empty(),
+        Expression::Literal(_) | Expression::EmptyWordToken => true,
         Expression::OptionalExpr(child)
         | Expression::Repeat {
             child,
@@ -2435,12 +2444,12 @@ fn assoc_delimiter(expression: &Expression) -> bool {
 // Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
 fn literal_delimiter_body(expression: &Expression) -> bool {
     match expression {
-        Expression::Literal(text) => !text.is_empty(),
+        Expression::Literal(_) | Expression::EmptyWordToken => true,
         Expression::Sequence(elements) => {
             !elements.is_empty()
-                && elements
-                    .iter()
-                    .all(|element| matches!(element, Expression::Literal(text) if !text.is_empty()))
+                && elements.iter().all(|element| {
+                    matches!(element, Expression::Literal(_) | Expression::EmptyWordToken)
+                })
         }
         _ => false,
     }

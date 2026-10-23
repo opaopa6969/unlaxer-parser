@@ -426,7 +426,7 @@ Rust生成parserの`parse_tree_detailed(&str)`は`Result<Tree, ParseDiagnostic>`
 
 既存37入力×4段階のうち失敗は66件（`syntax`41件、`trailing_input`25件）。全66件でkindと主要offsetが一致し、末尾未消費25件ではexpectedも一致する。syntaxのexpectedは41件すべて異なる。これらの両側の生診断を`target/rust-diagnostics.tsv`へ保存する。
 
-さらに[`diagnostics.json`](../unlaxer-dsl/src/test/resources/evolution/diagnostics.json)の8境界例をstage 3で検査し、`target/rust-diagnostics-edge.tsv`へ保存する。7件は位置一致、`neg(1e+)`はJavaが位置7、Rustが位置5を返すことを明示的な差として固定する。Javaは失敗した指数部の内部位置を記録し、Rustは指数部をrollbackした後の終端不一致を記録するためである。比較のためにどちらかの位置を捏造・置換しない。
+さらに[`diagnostics.json`](../unlaxer-dsl/src/test/resources/evolution/diagnostics.json)の8境界例をstage 3で検査し、`target/rust-diagnostics-edge.tsv`へ保存する。8件とも位置が一致する。`neg(1e+)`は以前Javaが位置7、Rustが位置5を返す明示的な差だったが、RustのNumber tokenもJavaと同じく失敗した指数部の内部位置（指数記号・符号の後）を記録するようにして両方7に揃えた（[#717](https://github.com/opaopa6969/unlaxer-parser/issues/717)）。fixtureはJavaとRustの位置を別々に持ち、比較のためにどちらかの位置を捏造・置換しない。
 
 TSVは`unlaxer-dsl/target/`配下で、CI artifact `rust-conformance`にも添付する。66件・8件はJUnit内のケース数で、独立したテストメソッド数ではない。Unicode位置、rollback、source-map非干渉、Java診断listの防御的コピー/不変性、Rust旧APIの情報維持もテストする。有限corpusの一致は全UBNF・全入力の等価性証明でも、性能・生産性の比較でもない。
 

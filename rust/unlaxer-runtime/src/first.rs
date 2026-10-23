@@ -260,10 +260,12 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             }
             set
         }
-        Expr::Eof | Expr::Empty | Expr::JavaEmpty | Expr::JavaLookahead { .. } => {
-            FirstSet::NULLABLE
-        }
-        Expr::Error(_) => FirstSet::EMPTY,
+        Expr::Eof
+        | Expr::Empty
+        | Expr::JavaEmpty
+        | Expr::JavaEmptyLiteral
+        | Expr::JavaLookahead { .. } => FirstSet::NULLABLE,
+        Expr::Error(_) | Expr::JavaEmptyWord => FirstSet::EMPTY,
         Expr::Character { .. }
         | Expr::MatchOnly(_)
         | Expr::InvertMatch(_)

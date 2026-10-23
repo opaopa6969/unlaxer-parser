@@ -109,6 +109,26 @@ fn error_expected_raw_ir_emits_runtime_error_without_new_ast_shape() {
 }
 
 #[test]
+fn empty_literal_raw_ir_emits_the_java_parser_for_its_grammar_mode() {
+    let mut grammar = support::fixture("evolution");
+    grammar.rules[0].body = Expression::Choice(vec![
+        grammar.rules[0].body.clone(),
+        Expression::EmptyWordToken,
+        Expression::Literal(String::new()),
+    ]);
+    validate_ir(&grammar).unwrap();
+    let parser = generate(&grammar)
+        .unwrap()
+        .into_iter()
+        .find(|file| file.relative_path == "parser.rs")
+        .unwrap()
+        .content;
+    // WordParser("") never matches; Lexing.LiteralParser("") is zero-width success.
+    assert!(parser.contains("Expr::JavaEmptyWord, Expr::JavaEmptyLiteral"));
+    assert!(!parser.contains("Expr::Literal(\"\")"));
+}
+
+#[test]
 fn recovery_raw_ir_emits_runtime_wrapper_and_mapping_guard() {
     let mut grammar = support::fixture("evolution");
     grammar.rules[0].body = Expression::Recovery {
@@ -502,9 +522,6 @@ fn invalid_ir_is_rejected_before_emission() {
     cases.push(g);
     let mut g = base.clone();
     g.rules[3].body = Expression::QuotedToken('x');
-    cases.push(g);
-    let mut g = base.clone();
-    g.rules[3].body = Expression::Literal(String::new());
     cases.push(g);
     let mut g = base.clone();
     g.rules[3].body = Expression::TextValue(Box::new(Expression::Reference(999)));

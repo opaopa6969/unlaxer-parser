@@ -36,6 +36,7 @@ jobs:
           java-version: '21'
           distribution: temurin
           overwrite-settings: false
+      - uses: ./parser/.github/actions/maven-job-repository
       - name: Set up Rust 1.85
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
@@ -47,7 +48,7 @@ jobs:
       - name: Compile current Classic consumers and verify shared semantics
         working-directory: parser
         run: |
-          benchmark_m2="$RUNNER_TEMP/tiny-classic-m2-${{ github.run_id }}-${{ github.run_attempt }}"
+          benchmark_m2="$UNLAXER_MAVEN_REPOSITORY"
           python3 scripts/run-tiny-classic-benchmark.py \
             --tiny "$GITHUB_WORKSPACE/tiny" --maven-repo "$benchmark_m2" --mode prepare
           python3 scripts/run-tiny-classic-benchmark.py \

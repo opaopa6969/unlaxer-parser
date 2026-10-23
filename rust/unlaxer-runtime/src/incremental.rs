@@ -270,6 +270,8 @@ pub fn grammar_is_snapshot_cacheable(rules: &[crate::Rule]) -> bool {
             | Expr::Until(_)
             | Expr::JavaLookahead { .. }
             | Expr::JavaEmpty
+            | Expr::JavaEmptyWord
+            | Expr::JavaEmptyLiteral
             | Expr::JavaUntil(_)
             | Expr::Error(_)
             | Expr::Backreference(_) => {}

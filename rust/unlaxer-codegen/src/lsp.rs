@@ -12,7 +12,7 @@ fn collect(expression: &Expression, keywords: &mut Vec<String>) {
     use Expression::*;
     match expression {
         Literal(text) => {
-            if !keywords.contains(text) {
+            if !text.is_empty() && !keywords.contains(text) {
                 keywords.push(text.clone());
             }
         }
