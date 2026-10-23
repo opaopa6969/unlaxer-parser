@@ -301,7 +301,8 @@ global whitespace が無い（または `none`）場合、継承 rule は `//` �
 読み飛ばします。改行・空白・block comment は有意なままなので、改行を明示的に書く行指向の文法に
 向きます。rule の `@whitespace(...)` と `@interleave` はそれぞれの設定を使います。その他の形、
 重複、名前付き global whitespace との併記は `E-COMMENT-SETTING` / `E-COMMENT-WHITESPACE` で
-拒否します。Java・Java-host Rust・native Rust の生成物は同じ動作です。詳細は
+拒否します。ただし `@whitespace: javaStyle` と併記した場合は、3.3.0 が javaStyle 単独と同じに
+生成していたため拒否せず、同じ生成物のまま警告 `W-COMMENT-IGNORED` を出します。Java・Java-host Rust・native Rust の生成物は同じ動作です。詳細は
 [trivia 契約](rule-trivia.md#global-comment712)。
 
 ### `@enum`

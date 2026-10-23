@@ -13,22 +13,22 @@ import org.unlaxer.dsl.bootstrap.WhitespaceDefinitions;
 /**
  * Global {@code @comment: { line: '//' }} (#712). The only form is the one whose meaning every
  * generator honours: a Java {@code CPPComment} ({@code //} up to, not including, CR / LF / EOF).
- * Forms whose written value used to be ignored are rejected instead of being silently replaced.
+ * Forms whose written value used to be ignored are rejected instead of being silently replaced,
+ * except next to a global {@code @whitespace: javaStyle}: there every such form generated the
+ * same code as javaStyle alone in 3.3.0, so it is kept and reported as {@code W-COMMENT-IGNORED}.
  */
 public final class GlobalComment {
     private GlobalComment() {}
 
     public record Problem(String code, String subject, Object node) {}
 
+    public static final String IGNORED = "W-COMMENT-IGNORED";
+
     public static List<Problem> problems(GrammarDecl grammar) {
         // tokenStream owns @comment there (E-TOKEN-STREAM-TRIVIA); report it once.
-        if (TokenStreamGrammar.enabled(grammar)) return List.of();
+        if (TokenStreamGrammar.enabled(grammar) || javaStyle(grammar)) return List.of();
         List<GlobalSetting> settings = settings(grammar);
-        var issues = new ArrayList<Problem>();
-        for (int i = 0; i < settings.size(); i++) {
-            if (i > 0 || !supported(settings.get(i).value()))
-                issues.add(new Problem("E-COMMENT-SETTING", "comment", settings.get(i)));
-        }
+        var issues = unsupported(settings, "E-COMMENT-SETTING");
         if (issues.isEmpty() && !settings.isEmpty()) {
             String style = globalWhitespace(grammar);
             boolean named;
@@ -37,6 +37,16 @@ public final class GlobalComment {
             if (named) issues.add(new Problem("E-COMMENT-WHITESPACE", style.trim(), settings.get(0)));
         }
         return List.copyOf(issues);
+    }
+
+    /**
+     * {@code W-COMMENT-IGNORED} for every {@code @comment} that {@code E-COMMENT-SETTING} would
+     * reject, when the grammar default is {@code javaStyle}: javaStyle already skips {@code //},
+     * and 3.3.0 generated these grammars as javaStyle alone. Generation is unchanged.
+     */
+    public static List<Problem> warnings(GrammarDecl grammar) {
+        if (TokenStreamGrammar.enabled(grammar) || !javaStyle(grammar)) return List.of();
+        return List.copyOf(unsupported(settings(grammar), IGNORED));
     }
 
     public static void requireValid(GrammarDecl grammar) {
@@ -48,9 +58,22 @@ public final class GlobalComment {
     /** True when rules that inherit the grammar default skip only line comments. */
     public static boolean lineComments(GrammarDecl grammar) {
         if (settings(grammar).isEmpty() || !problems(grammar).isEmpty()) return false;
-        String style = globalWhitespace(grammar);
         // javaStyle already includes line comments; named global whitespace is rejected above.
-        return style == null || !WhitespaceDefinitions.normalize(style).equals("javaStyle");
+        return !javaStyle(grammar);
+    }
+
+    private static List<Problem> unsupported(List<GlobalSetting> settings, String code) {
+        var issues = new ArrayList<Problem>();
+        for (int i = 0; i < settings.size(); i++) {
+            if (i > 0 || !supported(settings.get(i).value()))
+                issues.add(new Problem(code, "comment", settings.get(i)));
+        }
+        return issues;
+    }
+
+    private static boolean javaStyle(GrammarDecl grammar) {
+        String style = globalWhitespace(grammar);
+        return style != null && WhitespaceDefinitions.normalize(style).equals("javaStyle");
     }
 
     private static List<GlobalSetting> settings(GrammarDecl grammar) {

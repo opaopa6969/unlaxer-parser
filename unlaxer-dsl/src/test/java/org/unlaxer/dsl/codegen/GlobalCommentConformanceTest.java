@@ -96,9 +96,84 @@ public class GlobalCommentConformanceTest extends AtomicTriviaConformanceTest {
         Files.write(Path.of("target/rust-global-comment-invalid.tsv"), report, StandardCharsets.UTF_8);
     }
 
+    /**
+     * Next to a global javaStyle, every form rejected above generated javaStyle alone in 3.3.0:
+     * it stays accepted, generates the same code and is reported as W-COMMENT-IGNORED with the
+     * code-point span that the native {@code global_comment::warnings} reports (same corpus).
+     */
+    @Test public void javaStyleKeepsIgnoredSettingsAsWarnings() throws Exception {
+        JsonArray rows = corpus("ignored.json");
+        assertEquals(8, rows.size());
+        for (JsonElement element : rows) {
+            JsonObject row = element.getAsJsonObject();
+            String name = row.get("name").getAsString();
+            var snapshot = UBNFMapper.parseWithSource(row.get("grammar").getAsString());
+            var grammar = snapshot.ast().grammars().get(0);
+            var baseline = UBNFMapper.parse(row.get("baseline").getAsString()).grammars().get(0);
+            var warnings = new JsonArray();
+            for (var warning : GlobalComment.warnings(grammar)) {
+                var value = new JsonObject();
+                value.addProperty("code", warning.code());
+                value.addProperty("subject", warning.subject());
+                var span = snapshot.spanOf(warning.node()).orElseThrow();
+                value.add("span", spanArray(span.start(), span.end()));
+                warnings.add(value);
+            }
+            assertEquals(name + " warnings", row.get("warnings"), warnings);
+            var issues = GrammarValidator.validate(grammar);
+            assertEquals(name + " validator errors", List.of(), issues.stream()
+                .filter(issue -> issue.severity().equals("ERROR")).toList());
+            assertEquals(name + " validator warnings", warnings.size(), issues.stream()
+                .filter(issue -> issue.code().equals(GlobalComment.IGNORED)
+                    && issue.severity().equals("WARNING")).count());
+            assertEquals(name + " Java parser", new ParserGenerator().generate(baseline),
+                new ParserGenerator().generate(grammar));
+            assertEquals(name + " Java mapper", new MapperGenerator().generate(baseline),
+                new MapperGenerator().generate(grammar));
+            assertEquals(name + " Java-host Rust", new RustBackend().generate(baseline),
+                new RustBackend().generate(grammar));
+            var portability = PortabilityCheck.check(row.get("grammar").getAsString());
+            assertTrue(name + " portable: " + portability, portability.portable()
+                && portability.diagnostics().isEmpty());
+        }
+    }
+
+    @Test public void nativeGeneratorGeneratesIgnoredSettingsAsJavaStyle() throws Exception {
+        assumeTrue("enable with -DrustConformance=true (requires rustc/cargo)",
+            Boolean.getBoolean("rustConformance"));
+        assertEquals(0, process(List.of("cargo", "build", "--locked", "--manifest-path",
+            REPO.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
+        Path generator = REPO.resolve("rust/target/debug/unlaxer");
+        Path work = Files.createTempDirectory("global-comment-ignored");
+        for (JsonElement element : corpus("ignored.json")) {
+            JsonObject row = element.getAsJsonObject();
+            String name = row.get("name").getAsString();
+            var trees = new ArrayList<java.util.Map<String, String>>();
+            for (String key : List.of("grammar", "baseline")) {
+                Path ubnf = work.resolve(name + "-" + key + ".ubnf"), output = work.resolve(name + "-" + key);
+                Files.writeString(ubnf, row.get(key).getAsString());
+                var generate = process(List.of(generator.toString(), "generate", "--grammar",
+                    ubnf.toString(), "--output", output.toString()), true);
+                assertEquals(name + " " + key + " native generate: " + generate.output(), 0, generate.code());
+                var files = new java.util.TreeMap<String, String>();
+                try (var paths = Files.walk(output)) {
+                    for (Path path : paths.filter(Files::isRegularFile).toList())
+                        files.put(output.relativize(path).toString(), Files.readString(path));
+                }
+                trees.add(files);
+            }
+            assertFalse(name + " native output", trees.get(0).isEmpty());
+            assertEquals(name + " native output like javaStyle alone", trees.get(1), trees.get(0));
+        }
+    }
+
     private static JsonArray invalid() throws Exception {
+        return corpus("invalid.json");
+    }
+
+    private static JsonArray corpus(String file) throws Exception {
         return JsonParser.parseString(Files.readString(
-            REPO.resolve("spec-corpus/global-comment/invalid.json"))).getAsJsonArray();
+            REPO.resolve("spec-corpus/global-comment/" + file))).getAsJsonArray();
     }
 
     private static List<PortabilityCheck.Diagnostic> selected(JsonObject row) {

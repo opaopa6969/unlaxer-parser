@@ -138,6 +138,16 @@ lexical context の rule でも同じ既定が使える。
 Rust 生成器・native 生成器が同じ code を返し、Java / native の portability check は
 setting 全体の code point span を同じ値で報告する。
 
+ただし全体の `@whitespace: javaStyle` と併記した場合は、これらの形も拒否しない。javaStyle は
+`//` を既に読み飛ばすので、3.3.0 の Java 生成器はこれらを javaStyle 単独と同じに生成していた
+（ubnfc の oracle corpus などが実際に使っている）。3.3.0 との互換を最小の変更で保つため、
+生成物は javaStyle 単独と同じにしたまま、該当する setting ごとに `W-COMMENT-IGNORED`
+（subject `comment`、setting 全体の code point span）を出す。Java は `GrammarValidator`
+（severity WARNING。CLI は `Validation warnings:` に表示）と `GlobalComment.warnings`、
+Rust は `unlaxer_generator::global_comment::warnings` が同じ code と span を返す。
+portability check では portable のままで、diagnostic にも出さない（native CLI には warning を
+出す経路がまだ無い）。
+
 ### Java の変更と移行
 
 変更前の Java は (1) `line` key があれば値に関わらず `//` を読み飛ばし、`line` が無い block や
@@ -151,17 +161,33 @@ setting 全体の code point span を同じ値で報告する。
 生成していたため、位置付きで拒否する。`@whitespace: javaStyle` と `line: '//'` を併記する
 既存の文法（tinyexpression P4 等）の Java 生成物は変わらない。空白も読み飛ばしたかった
 場合は `@whitespace: javaStyle` を明示し、名前付き空白でコメントも扱いたい場合は
-その token の定義へコメントを含める。
+その token の定義へコメントを含める。javaStyle と併記した (1) の形は、拒否せずに
+`W-COMMENT-IGNORED` を出す（上記）。
+
+3.3.0 の生成物を手書きコードから参照している場合は、次の変化に注意する。
+
+- javaStyle も規則ごとの `@whitespace` / `@interleave` も無い、`@comment` だけの文法では、
+  `<Grammar>LazyChain` と `<Grammar>SpaceDelimitor` が生成されなくなり、
+  `<Grammar>LineCommentLazyChain` と `<Grammar>LineCommentDelimitor` に置き換わる。これらの
+  class を参照する手書きコードは compile できなくなる。CST に現れる parser class も変わる。
+- `@comment` に規則ごとの `@whitespace` / `@interleave` を併記した文法では、継承規則が
+  空白・block comment を読み飛ばさなくなるので、受理が変わることがある。たとえば
+  `@whitespace R0 ::= 'a' R1 'd'; R1 ::= 'b' 'c';` に `a b c d` を与えると、3.3.0 は受理し、
+  #712 では位置 2 の syntax error になる。受理が変わらない入力でも、子規則の node span が
+  変わることがある（例: `R1[2,6]` → `R1[1,6]`）。AST の source span も同じく変わる。
 
 ### 検証
 
 `GlobalCommentConformanceTest` は [共通 corpus](../spec-corpus/global-comment/README.md)
-（7 文法・49 入力）を Java と Java-host / native の Rust 生成物それぞれで compile・実行し、
+（8 文法・54 入力）を Java と Java-host / native の Rust 生成物それぞれで compile・実行し、
 受理、prefix の consumed / matched cursor（memo 有無）、診断種別と位置、AST の全 field と
 node span を独立期待値と照合する。明示 Classic 入口（Java の原文・AST/source map、Rust の
 token mode の cursor と CST 原文）も比較する。両 Rust 生成物は byte 一致も確認するが、実行を
 省略しない。
 無効設定 11 件は Java 検証器・両生成器・両 portability check で code / subject / span を比較する。
+javaStyle と併記した 8 件（`ignored.json`）は、`W-COMMENT-IGNORED` の code / subject / span を
+Java と native で比較し、Java・Java-host Rust・native の生成物が javaStyle 単独と一致すること、
+portability check が portable のままであることを確認する。
 
 ```sh
 mvn -B -pl unlaxer-common,unlaxer-dsl -am test \

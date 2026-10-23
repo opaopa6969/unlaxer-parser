@@ -300,7 +300,9 @@ Without global whitespace (or with `none`) inheriting rules skip only `//` up to
 including, CR / LF / EOF: line terminators, spaces and block comments stay significant, which
 suits line-oriented grammars that match newlines explicitly. Rule-level `@whitespace(...)` and
 `@interleave` keep their own policy. Other forms, duplicates and the combination with a named
-global whitespace token are rejected with `E-COMMENT-SETTING` / `E-COMMENT-WHITESPACE`.
+global whitespace token are rejected with `E-COMMENT-SETTING` / `E-COMMENT-WHITESPACE`,
+except next to `@whitespace: javaStyle`: there 3.3.0 generated them as javaStyle alone, so they
+are still accepted, generate the same code and are reported as the warning `W-COMMENT-IGNORED`.
 Java, Java-hosted Rust and native Rust generation behave the same; see
 [the trivia contract](rule-trivia.md#global-comment712).
 

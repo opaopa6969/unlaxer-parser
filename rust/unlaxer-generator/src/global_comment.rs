@@ -2,26 +2,21 @@
 //!
 //! The only form is the one whose meaning every generator honours: Java's `CPPComment`
 //! (`//` up to, not including, CR / LF / EOF). Forms whose written value Java used to ignore
-//! are rejected instead of being silently replaced.
+//! are rejected instead of being silently replaced, except next to a global
+//! `@whitespace: javaStyle`: there every such form generated the same code as javaStyle alone
+//! in 3.3.0, so it is kept and reported as `W-COMMENT-IGNORED`.
 use crate::adapters::AdapterDiagnostic;
 use unlaxer_ubnf::*;
 
+pub const IGNORED: &str = "W-COMMENT-IGNORED";
+
 pub fn problems(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
     // tokenStream owns @comment there (E-TOKEN-STREAM-TRIVIA); report it once.
-    if crate::token_stream::enabled(grammar) {
+    if crate::token_stream::enabled(grammar) || java_style(grammar) {
         return vec![];
     }
     let settings: Vec<_> = settings(grammar).collect();
-    let mut issues: Vec<_> = settings
-        .iter()
-        .enumerate()
-        .filter(|(i, setting)| *i > 0 || !supported(&setting.value))
-        .map(|(_, setting)| AdapterDiagnostic {
-            code: "E-COMMENT-SETTING",
-            subject: "comment".into(),
-            span: setting.span,
-        })
-        .collect();
+    let mut issues = unsupported(&settings, "E-COMMENT-SETTING");
     if issues.is_empty() && !settings.is_empty() {
         if let Some(style) = global_whitespace(grammar) {
             let builtin = ["javaStyle", "none"]
@@ -45,13 +40,41 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
     issues
 }
 
+/// `W-COMMENT-IGNORED` for every `@comment` that `E-COMMENT-SETTING` would reject, when the
+/// grammar default is javaStyle: javaStyle already skips `//`, and 3.3.0 generated these
+/// grammars as javaStyle alone. Generation is unchanged. Same codes and spans as Java's
+/// `GlobalComment.warnings`.
+pub fn warnings(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
+    if crate::token_stream::enabled(grammar) || !java_style(grammar) {
+        return vec![];
+    }
+    unsupported(&settings(grammar).collect::<Vec<_>>(), IGNORED)
+}
+
 /// True when rules that inherit the grammar default skip only line comments.
 pub fn line_comments(grammar: &GrammarDecl) -> bool {
     if settings(grammar).next().is_none() || !problems(grammar).is_empty() {
         return false;
     }
     // javaStyle already includes line comments; named global whitespace is rejected above.
-    global_whitespace(grammar).is_none_or(|style| !style.trim().eq_ignore_ascii_case("javaStyle"))
+    !java_style(grammar)
+}
+
+fn unsupported(settings: &[&GlobalSetting], code: &'static str) -> Vec<AdapterDiagnostic> {
+    settings
+        .iter()
+        .enumerate()
+        .filter(|(i, setting)| *i > 0 || !supported(&setting.value))
+        .map(|(_, setting)| AdapterDiagnostic {
+            code,
+            subject: "comment".into(),
+            span: setting.span,
+        })
+        .collect()
+}
+
+fn java_style(grammar: &GrammarDecl) -> bool {
+    global_whitespace(grammar).is_some_and(|style| style.trim().eq_ignore_ascii_case("javaStyle"))
 }
 
 fn settings(grammar: &GrammarDecl) -> impl Iterator<Item = &GlobalSetting> {

@@ -148,6 +148,10 @@ public final class GrammarValidator {
                 ? "Use a single @comment: { line: '//' } setting."
                 : "Put line comments into the named whitespace token, or use @whitespace: javaStyle."));
         }
+        for (var issue : GlobalComment.warnings(grammar)) {
+            errors.add(new ValidationIssue(issue.code(), issue.subject(),
+                "@whitespace: javaStyle already skips // comments; remove this @comment setting."));
+        }
         try { LexicalContexts.requireValid(grammar); }
         catch (IllegalArgumentException error) {
             String code = error.getMessage().startsWith("E-LEXICAL-CONTEXT-") ? error.getMessage().split(":",2)[0] : "E-LEXICAL-CONTEXT";

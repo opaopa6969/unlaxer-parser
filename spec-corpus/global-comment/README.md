@@ -1,6 +1,8 @@
 # global `@comment` の共通 corpus（#712）
 
-`corpus.json` は文法・入力・独立期待値、`invalid.json` は拒否する設定の code・subject・code point span。
+`corpus.json` は文法・入力・独立期待値、`invalid.json` は拒否する設定の code・subject・code point span、
+`ignored.json` は全体の `@whitespace: javaStyle` と併記したために拒否せず `W-COMMENT-IGNORED` を出す
+設定の code・subject・code point span と、生成物が一致すべき javaStyle 単独の文法（`baseline`）。
 契約は [trivia 契約の global `@comment`](../../docs/rule-trivia.md#global-comment712)。
 
 `GlobalCommentConformanceTest`（`RuleTriviaConformanceTest` の共通 harness）が Java と
@@ -18,6 +20,12 @@ cursor（memo 有無）、診断種別と位置、AST の全 field と node span
   1 文法に混在させ、別 rule の設定が継承 rule に漏れないこと（変更前の Java は漏れていた）。
 - `comment-lexical-context` / `comment-named-rule-whitespace`: lexical context の rule と、
   rule の名前付き空白との合成。
+- `comment-candidate-exclusion`: trivia の無い rule から、行コメントの前で継承 rule を候補に
+  した選択（規則参照と、継承 rule の本体の選択肢の列）。受理・cursor・診断位置を Java と
+  照合する。FIRST 集合による候補除外（DetailedOnFailure）がこれらの候補を誤って落とさないことは、
+  `rust/unlaxer-runtime/tests/candidate_exclusion.rs` が audit mode と、再試行の無い
+  `ParseContext` の入口で確かめる（全入力の解析関数は deferred pass の失敗後に Detailed で
+  解析し直すので、この corpus の結果には誤った除外が現れない）。
 
 期待値は契約から独立に作った。変更前の Java と照合した差は、上記の漏れ 3 件と、行末記号の
 先読みで matched cursor が進む 2 件（Java が正しく、期待値側を Java の仕様に合わせた）だった。

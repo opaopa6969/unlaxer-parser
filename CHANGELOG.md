@@ -15,6 +15,12 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Changed
 
+- global `@comment: { line: '//' }` を Java 生成器・Java-host Rust 生成器・native Rust 生成器で同じ意味にした (#712)。`@whitespace: javaStyle` と併記した場合は何も足さず、それ以外では全体の既定を継承する rule が Java の CPPComment（`//` から CR / LF / EOF の手前まで）だけを読み飛ばす。3.3.0 の利用者から見える変化は次のとおり。[契約](docs/rule-trivia.md#global-comment712)。
+  - `@comment: { line: '//' }` 以外の形（`line` が `'//'` 以外、`line` が無い、余分な key や重複した key、スカラー値）、`@comment` の重複、名前付きの全体 `@whitespace` との併記は、`E-COMMENT-SETTING` / `E-COMMENT-WHITESPACE` で位置付きで拒否する。3.3.0 の Java はこれらを黙って生成していたので、生成できていた文法が通らなくなる。ただし全体の `@whitespace: javaStyle` と併記した場合は、3.3.0 が javaStyle 単独と同じに生成していたため拒否せず、生成物も変えずに警告 `W-COMMENT-IGNORED`（Java と Rust で同じ code と span）を出す。
+  - `@comment` に規則ごとの `@whitespace` / `@interleave` を併記した文法では、3.3.0 の Java が継承 rule にも空白・block comment を読み飛ばさせていたのをやめたので、受理が変わる。例: `@whitespace R0 ::= 'a' R1 'd'; R1 ::= 'b' 'c';` に `a b c d` を与えると、3.3.0 は受理し、この版は位置 2 の syntax error になる。受理が変わらない入力でも、子 rule の node span と AST の source span が変わることがある（例: `R1[2,6]` → `R1[1,6]`）。
+  - javaStyle も規則ごとの trivia も無い `@comment` だけの文法では、生成される public class の `<Grammar>LazyChain` と `<Grammar>SpaceDelimitor` が無くなり、`<Grammar>LineCommentLazyChain` と `<Grammar>LineCommentDelimitor` に置き換わる。これらを参照する手書きコードは compile できなくなり、CST に現れる parser class も変わる。javaStyle と `line: '//'` を併記する文法（tinyexpression P4 等）の Java 生成物は変わらない。
+  - `@autoCommit` は `@comment` のある文法を引き続き解析しない（`W-AUTO-COMMIT-SKIPPED`、reason=grammar。#745）。
+
 - #729 の Parsed 原文の追跡を、owned capture（CAPTURE / SAME_AS / CaptureScope、call-by-value の脱糖後を含む）がある文法・式だけに限定した。未使用時は Parsed 原文を生成・伝搬せず、成功 memo にも保存しない。共有文法ごとの判定結果は Weak 参照で最大64件キャッシュし、小入力でも毎 parse の全 rule 走査を避ける。入れ子の呼び出しでは外側の追跡を引き継ぎ、終了時に復元する。原文の追加情報は既存の boxed source に移し、Rust の `Fragment` を x86_64 で 64 → 56 B（master と同サイズ）へ戻した。深さ255の非 Classic CAPTURE 再帰について、Rust 1.85.0・release（opt-level=3、debuginfo=1）で最小要求スタックを16 B刻み・各境界3回確認すると、A' `ae11e746` 747,904 B、修正前 `def95dc8` 784,640 B、修正後 768,256 B。A' 比の増加は約4.9%から約2.7%へ縮小したが、残差はある。再帰上限は変更していない。
 
 - 生成した Rust parser の失敗位置と rule stack を Java に揃えた (#706)。UBNF の正の `LOOKAHEAD`・`EMPTY`・`UNTIL` が matched cursor だけを進めた後の失敗は、Java と同じく matched の到達位置（たとえば `R0 ::= 'a' AHEAD 'é'` に `ax` で CP1 → CP2）で報告され、その後に始まる rule の開始位置も同じく後ろへ進む。受理・cursor・CST・AST は変わらない。式単位の入口（`ParseContext::parse` など）と token stream の中は従来どおり。[契約](docs/prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)。
