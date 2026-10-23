@@ -50,7 +50,7 @@ import org.unlaxer.parser.Parser;
  */
 public class EmptyLiteralConformanceTest {
     private static final String PACKAGE = "org.example.emptyliteral";
-    private static final List<String> KEYS = List.of("prefix", "classic", "diagnostic", "ast", "cst");
+    private static final List<String> KEYS = List.of("prefix", "classic", "diagnostic", "ruleStack", "ast", "cst");
 
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
@@ -205,6 +205,19 @@ public class EmptyLiteralConformanceTest {
         }
         result.add("prefix", prefix);
         result.add("classic", classic);
+        // Rule stacks (#703) exist only under DETAILED: the failed and the unconsumed-input stack.
+        JsonArray ruleStack = null;
+        for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES)) {
+            ParseOptions options = ParseOptions.withMemoization(memo).withDiagnostics(ParseOptions.Diagnostics.DETAILED);
+            var stacks = new JsonArray();
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(input), options)) {
+                parser.parse(context);
+                stacks.add(ruleStack(context.getRuleStack()));
+                stacks.add(ruleStack(context.getUnconsumedInputRuleStack()));
+            }
+            if (ruleStack == null) ruleStack = stacks;
+            else if (false == ruleStack.equals(stacks)) variance.add("memo " + memo + " rule stacks " + stacks);
+        }
         JsonElement diagnostic = null;
         for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES)) {
             for (ParseOptions.Diagnostics policy : ParseOptions.Diagnostics.values()) {
@@ -217,6 +230,7 @@ public class EmptyLiteralConformanceTest {
             }
         }
         result.add("diagnostic", diagnostic);
+        result.add("ruleStack", ruleStack);
         JsonElement ast = JsonNull.INSTANCE;
         JsonElement cst = JsonNull.INSTANCE;
         if (diagnostic.isJsonNull()) {
@@ -231,6 +245,14 @@ public class EmptyLiteralConformanceTest {
         result.add("cst", cst);
         if (false == variance.isEmpty()) result.addProperty("variance", String.join("; ", variance));
         return result;
+    }
+
+    /** {@code offset:Root@0>Item@1|omitted}, or JSON null without a stack. */
+    private static JsonElement ruleStack(Optional<org.unlaxer.context.RuleStack> stack) {
+        if (stack.isEmpty()) return JsonNull.INSTANCE;
+        return new JsonPrimitive(stack.get().offset() + ":" + stack.get().frames().stream()
+            .map(frame -> frame.rule() + "@" + frame.start()).collect(Collectors.joining(">"))
+            + "|" + stack.get().omitted());
     }
 
     private static JsonArray cursors(boolean succeeded, ParseContext context) {
@@ -316,6 +338,14 @@ public class EmptyLiteralConformanceTest {
             use std::io::{self, BufRead};
             use unlaxer_runtime::token::TokenKind;
             use unlaxer_runtime::{json_string, Diagnostics, Memoization, ParseContext, ParseOptions, Tree};
+            fn stack(stack: Option<unlaxer_runtime::RuleStack>) -> String {
+                match stack {
+                    None => "null".to_owned(),
+                    Some(stack) => json_string(&format!("{}:{}|{}", stack.offset,
+                        stack.frames.iter().map(|frame| format!("{}@{}", frame.rule, frame.start))
+                            .collect::<Vec<_>>().join(">"), stack.omitted)),
+                }
+            }
             fn cursors(ok: bool, context: &ParseContext<'_>) -> String {
                 format!("[{},{},{}]", ok, context.position(), context.matched_position())
             }
@@ -362,6 +392,19 @@ public class EmptyLiteralConformanceTest {
                             Some(_) => {}
                         }
                     }
+                    let mut rule_stack: Option<String> = None;
+                    for memo in memos {
+                        let options = ParseOptions::with_memoization(memo).with_diagnostics(Diagnostics::Detailed);
+                        let mut context = ParseContext::with_options(&input, options);
+                        let _ = generated::parser::parse_context(&mut context);
+                        let value = format!("[{},{}]", stack(context.rule_stack()),
+                            stack(context.unconsumed_input_rule_stack()));
+                        match &rule_stack {
+                            None => rule_stack = Some(value),
+                            Some(first) if *first != value => variance.push(format!("memo {:?} rule stacks {}", memo, value)),
+                            Some(_) => {}
+                        }
+                    }
                     let mut diagnostic: Option<String> = None;
                     for memo in memos {
                         for policy in [Diagnostics::Auto, Diagnostics::Detailed, Diagnostics::DetailedOnFailure] {
@@ -389,8 +432,8 @@ public class EmptyLiteralConformanceTest {
                     let (prefix, classic) = cursor_results.unwrap();
                     let variance = if variance.is_empty() { String::new() }
                         else { format!(",\\"variance\\":{}", json_string(&variance.join("; "))) };
-                    println!("{{\\"prefix\\":{},\\"classic\\":[{}],\\"diagnostic\\":{},\\"ast\\":{},\\"cst\\":{}{}}}",
-                        prefix, classic, diagnostic.unwrap(), ast, cst_text, variance);
+                    println!("{{\\"prefix\\":{},\\"classic\\":[{}],\\"diagnostic\\":{},\\"ruleStack\\":{},\\"ast\\":{},\\"cst\\":{}{}}}",
+                        prefix, classic, diagnostic.unwrap(), rule_stack.unwrap(), ast, cst_text, variance);
                 }
             }
             """;

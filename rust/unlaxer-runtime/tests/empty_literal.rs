@@ -1,6 +1,7 @@
 //! Empty literals (#713): handwritten PEG `Literal("")` versus the two Java parsers
 //! generated for UBNF `''`. The generated grammars are compared in the shared corpus.
-use unlaxer_runtime::token::TokenKind;
+use unlaxer_runtime::token::{TokenKind, TokenSource};
+use unlaxer_runtime::token_trace::Limits;
 use unlaxer_runtime::{
     parse_detailed_with_options, Diagnostics, Expr, Memoization, ParseContext, ParseOptions, Rule,
 };
@@ -137,4 +138,36 @@ fn only_the_java_word_resets_the_match_cursor_inside_occurs() {
             );
         }
     }
+}
+
+#[test]
+fn token_trace_keeps_the_zero_width_java_literal_leaf() {
+    // Java's LiteralParser("") is a LexicalTokenParser: on success it adds a zero-width token.
+    let expression = Expr::literal("😀")
+        .then(Expr::JavaEmptyLiteral)
+        .then(Expr::literal("b"));
+    let options = ParseOptions::default().with_token_trace(Limits::default());
+    let mut context = ParseContext::with_options("😀b", options);
+    assert!(context.parse(&expression).is_ok());
+    let leaves = context.token_trace().unwrap().unwrap();
+    let observed = leaves
+        .iter()
+        .map(|leaf| match &leaf.source {
+            TokenSource::Input(span) => (leaf.label, span.start, span.end, leaf.consumed),
+            other => panic!("{other:?}"),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        observed,
+        vec![
+            ("WordParser", 0, 1, 1),
+            ("LexicalTokenParser", 1, 1, 1),
+            ("WordParser", 1, 2, 2),
+        ]
+    );
+    // A failed WordParser("") leaves no leaf behind its rolled-back sequence.
+    let failed = Expr::literal("😀").then(Expr::JavaEmptyWord).optional();
+    let mut context = ParseContext::with_options("😀b", options);
+    assert!(context.parse(&failed).is_ok());
+    assert_eq!(context.token_trace().unwrap().unwrap(), vec![]);
 }

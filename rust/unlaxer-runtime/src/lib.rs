@@ -5591,6 +5591,8 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             | Expr::Until(_)
             | Expr::JavaLookahead { .. }
             | Expr::JavaEmpty
+            | Expr::JavaEmptyWord
+            | Expr::JavaEmptyLiteral
             | Expr::JavaUntil(_)
             | Expr::Error(_)
             | Expr::Backreference(_) => None,

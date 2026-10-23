@@ -41,22 +41,41 @@ Java の生成器は grammar の字句方式によって `''` を別の parser �
 - nullable 判定は `EmptyWordToken` を非 nullable（成功しない）、`Literal("")` を nullable とする。両 host で同じ規則であり、
   生成物の byte 一致に影響する。予測子（`@predictiveChoice`）は既定どおり `Any` で、期待候補 `''` が失われない。
 - opt-in の Rust LSP keyword には空文字列を入れない。
+- opt-in の token trace（[#463](token-trace.md)）では、`JavaEmptyLiteral` の成功を幅0の `LexicalTokenParser` leaf として記録する。
+  Java の `Lexing.LiteralParser("")` は `LexicalTokenParser` で、成功時に幅0の token を追加するためである（Rust の宣言的 token と同じ label）。
+  `JavaEmptyWord` は成功しないので leaf を残さない。
+
+### 後から入った機能との関係
+
+- 失敗の frontier（[#706](prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)、#734）: `JavaEmptyWord` の失敗は他の literal の失敗と同じ記録経路を通るので、
+  grammar 呼び出しの中では max(consumed, matched) に記録される。正の `LOOKAHEAD` の後の `''` の失敗（MatchedCursor）は、Rust でも Java と同じ CP2 になった。
+  `JavaEmptyLiteral` は token stream / lexical context の grammar だけで生成され、失敗しない（Classic の反転を除く）ので、session 内の consumed frontier の例外とは交わらない。
+  Java の `EMPTY`（matched-only の1文字先読み、Rust `JavaEmpty`）は `''` とは別の要素であり、本変更はその扱いを変えない。
+- cut とラベル付き失敗（[#700](cut-and-labeled-failures.md)）: `COMMIT('')`・`COMMIT('', 'message')`・`LABEL(L, '')` は本体が必ず失敗するので、到達すれば必ず raise する。
+  `CATCH` は通常どおり label を捕まえて代替へ進む。`E-RAISING-REPETITION` の nullable 判定は空 literal を nullable とみなす過大近似（両 host 共通）なので、
+  `{ COMMIT('') }` は拒否されず、実行時に最初の反復で raise する（`'z'` に置き換えた対照は拒否される）。
+- rule stack（[#703](rule-stack-diagnostics.md)）: `''` の失敗も他の終端と同じく失敗した rule の frame を持つ。失敗した parse の stack と、成功して入力が残った parse の stack を両方比較する。
+- `@autoCommit`（[#702](auto-commit.md)、#728）: FIRST 解析は `''` を nullable（`EPSILON`）として扱う。`WordParser("")` は成功しないので実際の FIRST より広い過大近似であり、
+  挿入される `COMMIT` を減らす方向にしか働かない。挿入位置は両 frontend で同じ（生成物の byte 一致で確認）。
 
 `P-EMPTY-LITERAL` はもう発行しない。code 名は別の意味に転用しない（[移植可能性チェック](portability-check.md)）。
 `@enum` の `''` は従来どおり両 host で `E-ENUM`（定数名にできない）として拒否する。
 
 ## 共通 oracle と検証
 
-[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 13 文法 53 入力。root / sequence / choice の rollback /
+[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 17 文法 72 入力。root / sequence / choice の rollback /
 field capture の rollback / optional・repeat（capture 付き）/ `''+`・`''{0,3}`・`'' % ','`・`{ [ '' ] }` の進捗停止 /
 `javaStyle` trivia / 先読み後の matched cursor / 宣言的 token の `''`・`LOOKAHEAD('')`・`NEGATIVE_LOOKAHEAD('')` /
-tokenStream / lexicalContext / 左結合の prefix・tail delimiter を含み、非 BMP 文字・EOF・空入力の code point 位置を確認する。
+tokenStream / lexicalContext / 左結合の prefix・tail delimiter / `COMMIT('')`・`COMMIT('', 'never')` の反復 /
+`CATCH` で捕まえる `LABEL(L, '')` と捕まえない `LABEL(M, '')` / 入れ子 rule の rule stack / `@autoCommit` の後の `''` を含み、
+非 BMP 文字・EOF・空入力の code point 位置を確認する。
 
 各入力について次を記録する。
 
 - `prefix`: 生成 parser の直接 parse の受理と consumed / matched cursor（memo OFF / SAFE_FAILURES で同一）
 - `classic`: Classic token mode の consumed / matchOnly × 非反転 / 反転の 4 通り（memo 2 通りで同一）
 - `diagnostic`: 全入力診断（memo 2 × Auto / Detailed / DetailedOnFailure の 6 通りで同一）
+- `ruleStack`: Detailed の直接 parse の `[失敗時の rule stack, 入力が残ったときの rule stack]`（`offset:Rule@start>…|omitted`、memo 2 通りで同一）
 - `ast`: 受理時の AST 全 field と code point span
 - `cst`: 受理時の rule 単位 CST（rule 名と code point 範囲。helper・終端は透過）
 
@@ -72,9 +91,10 @@ native generator は空 `PATH` で起動する。
 空 literal 固有ではない。
 
 - Java は literal を引用符付きで表示し、`javaStyle` trivia の補助候補、同じ chain の後続要素、`RootParser` などの class 名、
-  幅0で成功した token 名を候補に加え、trailing input の farthest 候補が異なる。
-- 先読み（`LOOKAHEAD`）で matched cursor が進んだ後の失敗を、Java は matched 位置、Rust は consumed 位置で farthest に記録する
-  （MatchedCursor。非空 `'z'` でも同じ差）。
+  幅0で成功した token 名を候補に加え、trailing input の farthest 候補が異なる。Cut / Labeled / Stack / AutoCommit の `''` を `'z'` に
+  置き換えた対照文法でも、後続要素（`'c'`・`'z'`）・`RootParser`・choice root の token 欠落が同じく現れる。
+- 以前は MatchedCursor（先読みで matched cursor が進んだ後の失敗）の farthest も Java は matched 位置、Rust は consumed 位置で異なっていたが、
+  #706 で Rust が Java に揃ったので、現在の差は引用符の表示だけである。
 - choice を root とする rule で選ばれた枝が capture helper の場合、Java の token 木に root rule の token が残らない
   （CaptureRollback の `javaCst`。非空 literal でも同じ差）。
 
