@@ -96,6 +96,9 @@ AST field capture（`@f` / `capture`）と CaptureBoundary は従来の commit �
 consumed の field span は `[0,0]`、値は空文字列のままである。
 `CAPTURE(w, R1 @f) SAME_AS(w)`（`R1 ::= AHEAD | 'q'`）では、入力 `x` の `w` は空文字列、
 context の consumed cursor は CP0、全入力解析は `trailing_input` CP0 になる。
+Java の `@f` は LazyChain の collector なので、Classic 経路の Rust も `@f` の子を現在の
+TokenKind で集め直す（#742）。直接の先読み token を `@f` にした
+`CAPTURE(w, AHEAD @f) SAME_AS(w)` も、入力 `x` で `w` は空文字列、context の両 cursor は CP0。
 公開 `ParseContext::parse` の `ParseMatch.span` も commit 済み原文を使うため、
 `Choice[LOOKAHEAD('x'), 'q'].stop_consume()` を入力 `x` で解析すると `[0,0]` を返す。
 同じ Choice の owned capture は値 `x` を保存する。
