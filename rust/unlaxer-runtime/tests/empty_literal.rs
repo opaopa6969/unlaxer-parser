@@ -227,3 +227,15 @@ fn display_shows_the_empty_expected_candidate_as_java_quotes() {
         "at code point 2: expected a, end of input"
     );
 }
+
+/// Known limit (#750): the empty candidate and a two-quote literal `''` display alike; the
+/// structured value keeps them apart.
+#[test]
+fn empty_and_two_quote_candidates_display_alike_but_keep_distinct_values() {
+    let expected = vec![String::new(), "''".to_owned()];
+    assert_eq!(
+        unlaxer_runtime::display_expected(&expected, " or "),
+        "'' or ''"
+    );
+    assert_ne!(expected[0], expected[1]);
+}

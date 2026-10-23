@@ -94,3 +94,14 @@ fn empty_expected_candidate_is_readable_in_the_message() {
     let raised = backend.validate(&Snapshot::new("file:///fixture", 1, "c").unwrap());
     assert_eq!(raised[0].message, "M");
 }
+
+#[test]
+fn empty_and_two_quote_candidates_share_the_message_but_not_expected_tokens() {
+    // Known limit (#750): '' (WordParser("")) and the two-character literal "''" read the same.
+    let mut backend = backend(Expr::JavaEmptyWord.or(Expr::literal("''")));
+    let diagnostics = backend.validate(&Snapshot::new("file:///fixture", 1, "x").unwrap());
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].message, "Expected '' or ''");
+    // The structured value distinguishes them.
+    assert_eq!(diagnostics[0].data["expectedTokens"], json!(["", "''"]));
+}

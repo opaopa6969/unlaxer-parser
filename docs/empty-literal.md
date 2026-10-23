@@ -111,9 +111,11 @@ native generator は空 `PATH` で起動する。
 `''` を選んだのは、Java の生成 LSP と同じ綴りで、両方の editor で同じ見た目になるためである。Java は literal をすべて引用符付きで表示し、
 Rust は非空の literal を引用符なしで表示するので、空の候補だけを Java と同じ `''` にした。`<empty>` のような独自の表記は Java と食い違い、
 Rust の非空 literal を引用符付きに変えるのは既存の表示を全部変えてしまう。ただし Rust では、2文字の literal `''`（引用符2個）の候補と
-表示が同じになる。値（`expectedTokens`）では区別できる。
-`EmptyLiteralConformanceTest#generatedLanguageServersShowTheEmptyExpectedCandidate` は、両 host が生成した Rust LSP server と Java の生成
-LSP server を stdio で起動し、この入力の message・range・code・`data` を確かめる（Rust は `-DrustConformance=true`）。
+表示が同じになる（候補が `["", "''"]` なら `Expected '' or ''`）。値（`expectedTokens`）では区別できる。この制限は
+`unlaxer-runtime` と `unlaxer-lsp` のテストで固定している。
+`EmptyLiteralConformanceTest#generatedLanguageServersShowTheEmptyExpectedCandidate` は、Java の生成 LSP server を stdio で起動する。
+`-DrustConformance=true` では、Java host と native host が生成した Rust の LSP ファイルが byte 一致することを確かめたうえで、
+代表として Java host の生成物から Rust LSP server を 1 つ build し、stdio で起動する。どちらもこの入力の message・range・code・`data` を確かめる。
 
 - Java は literal を引用符付きで表示し、`javaStyle` trivia の補助候補、同じ chain の後続要素、`RootParser` などの class 名、
   幅0で成功した token 名を候補に加え、trailing input の farthest 候補が異なる。Cut / Labeled / Stack / AutoCommit の `''` を `'z'` に
