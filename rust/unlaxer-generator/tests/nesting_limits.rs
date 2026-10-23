@@ -24,13 +24,69 @@ fn outcome(source: &str) -> Result<(), String> {
 #[test]
 fn recursive_shape_analysis_shares_the_structural_depth() {
     for grammar in [recursive_plus, recursive_separator] {
-        // Java rejected 85..121 with E-RECURSIVE-SHAPE before #740; both hosts accept them now.
-        for depth in [84, 85, 86, 121] {
+        // Java rejected 85..122 with E-RECURSIVE-SHAPE before #740; both hosts accept them now.
+        for depth in [84, 85, 86, 122] {
             assert_eq!(outcome(&grammar(depth)), Ok(()), "depth {depth}");
         }
-        let error = outcome(&grammar(122)).unwrap_err();
+        let error = outcome(&grammar(123)).unwrap_err();
         assert_eq!(error, "structural analysis depth exceeds 256");
     }
+}
+
+fn recursive_wrapped(depth: usize, open: &str, close: &str) -> String {
+    format!(
+        "grammar G {{ @root @mapping(N,params=[x]) R0 ::= (H H) @x; H ::= 'n' R0 | 'y' {}H{} | 'a'; }}\n",
+        open.repeat(depth),
+        close.repeat(depth)
+    )
+}
+
+fn reference_chain(length: usize) -> String {
+    let mut source = String::from("grammar G { @root @mapping(R, params=[x]) R0 ::= H0 @x;\n");
+    for i in 0..length {
+        source.push_str(&format!("H{i} ::= 'z' H{};\n", i + 1));
+    }
+    source + &format!("H{length} ::= 'n' R0 | 'y' H{length} | 'a'; }}\n")
+}
+
+fn chain_beside_nested_recursion(length: usize, depth: usize) -> String {
+    let mut source =
+        String::from("grammar G {\n@root @mapping(N, params=[x]) R0 ::= (H0 H0) @x ;\n");
+    for i in 0..length {
+        source.push_str(&format!("H{i} ::= 'z' H{} ;\n", i + 1));
+    }
+    source
+        + &format!(
+            "H{length} ::= 'n' H0 | 'a' ;\nD ::= 'n' R0 | 'y' {}D{}+ | 'a' ;\n}}\n",
+            "(".repeat(depth),
+            ")".repeat(depth)
+        )
+}
+
+/// #740 review: the fixed point starts from a fresh structural depth rather than the
+/// caller's, so these (accepted by the Java host before #740) are accepted on both hosts.
+#[test]
+fn recursive_shape_fixed_point_starts_from_a_fresh_depth() {
+    for (open, close) in [
+        ("[", "]"),
+        ("{", "}"),
+        ("CAPTURE(v, ", ")"),
+        ("CAPTURE_SCOPE(", ")"),
+    ] {
+        assert_eq!(
+            outcome(&recursive_wrapped(62, open, close)),
+            Ok(()),
+            "{open}"
+        );
+    }
+    assert_eq!(outcome(&reference_chain(82)), Ok(()));
+    // The deepest analysis (256 levels before the first revisit, then 256 in the fixed point)
+    // also fits the default 2 MiB test thread stack in a debug build.
+    assert_eq!(outcome(&chain_beside_nested_recursion(82, 122)), Ok(()));
+    assert_eq!(
+        outcome(&chain_beside_nested_recursion(83, 122)).unwrap_err(),
+        "structural analysis depth exceeds 256"
+    );
 }
 
 #[test]

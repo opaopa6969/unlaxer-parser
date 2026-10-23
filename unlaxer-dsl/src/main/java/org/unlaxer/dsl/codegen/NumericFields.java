@@ -7,15 +7,18 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 public final class NumericFields {
     private NumericFields() {}
 
+    private static final String DEPTH_LIMIT = "E-RECURSIVE-SHAPE: expression depth exceeds 256";
+
     public static boolean isInteger(GrammarDecl grammar, RuleDecl rule, String name) {
         String type;
         try {
             type = new ASTGenerator().inferType(grammar, rule, name);
         } catch (IllegalArgumentException error) {
-            // The Java AST type inference bounds its recursive shape fixed point more tightly than
-            // the lowered IR does. The Rust host refines integers from the captures alone
-            // (numeric_fields.rs), so use that rule instead of rejecting the grammar (#740).
-            if (!String.valueOf(error.getMessage()).startsWith("E-RECURSIVE-SHAPE:")) throw error;
+            // The Java AST type inference bounds the depth of its recursive shape fixed point more
+            // tightly than the lowered IR does. The Rust host refines integers from the captures
+            // alone (numeric_fields.rs), so use that rule instead of rejecting the grammar (#740).
+            // The work and convergence limits keep failing as before.
+            if (!DEPTH_LIMIT.equals(error.getMessage())) throw error;
             return numericCaptures(grammar, rule, name);
         }
         return type.equals("int")

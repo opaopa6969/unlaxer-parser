@@ -46,7 +46,7 @@ lowering の上限は両 host で同じだが、frontend の上限は意図し�
 
 | 段階 | Java host | Rust host（native） |
 |---|---|---|
-| frontend：規則本体の入れ子 | 専用の計数はない。UBNF parser の frame が上記の 1024 を超えると `ParseLimitException`（`ULX-PARSE-DEPTH-LIMIT`）。届く段数は入れ子の形で変わる（下表） | `MAX_NESTING` = 128。規則本体を 1 段目として本体の入れ子を数え、128 段目を開くと `UBNF nesting limit exceeded`（`DiagnosticKind::NestingLimit`）。形によらない |
+| frontend：規則本体の入れ子 | 専用の計数はない。UBNF parser の frame が上記の 1024 を超えると `ParseLimitException`（`ULX-PARSE-DEPTH-LIMIT`）。届く段数は入れ子の形で変わる（下表） | `MAX_NESTING` = 128。規則本体を 1 段目として本体の入れ子を数え、128 段まで（括弧なら 127 段まで）受理し、129 段目の本体（括弧 128 段目）を開くと `UBNF nesting limit exceeded`（`DiagnosticKind::NestingLimit`）。形によらない |
 | frontend：宣言的 token の括弧 | 128 段で構文失敗 `UBNF パース失敗`（内部の `LexicalSyntax` が 128 段で止める。文言は例外に含まれない） | 128 段で `lexical nesting exceeds 128` |
 | Rust 生成の lowering | lowered IR の構造解析の深さ 256。超えると `Rust subset: structural analysis depth exceeds 256` | 同じ深さ 256 で `structural analysis depth exceeds 256` |
 
@@ -70,19 +70,23 @@ frontend の上限をそろえない理由:
 このため frontend の差は契約とする。片方の frontend だけが受理する文法を書かない場合は、
 規則本体の入れ子を 127 段まで（選択肢の形では 126 段まで）に収める。
 
-Rust 生成の lowering では、再帰する規則の値の形を求める固定点も構造解析の深さ 256 を共有する（#740）。
-Java host も native と同じく lowered IR の上で固定点を解くので、両 host は同じ文法を受理し、
-同じ深さで同じ診断を返す。たとえば再帰する helper を括弧で包んだ
-`H ::= 'n' R0 | 'y' (…H…)+ | 'a'` は、両 host とも 121 段まで同じ生成物を出し、122 段で
-`structural analysis depth exceeds 256` で拒否する。native は 128 段目の本体を開く時点で
-frontend の `UBNF nesting limit exceeded` を先に返すため、その段数からは、両 host とも拒否するが
-診断の文言は frontend の差に従う。
+Rust 生成の lowering では、再帰する規則の値の形を求める固定点も、構造解析の深さの上限 256 で
+数える（#740）。固定点は最初の再帰参照に出会ったときに全規則についてまとめて解くもので、呼び出し元の
+解析の一部ではないため、呼び出し元の深さを引き継がず 0 から数える。Java host も native と同じく
+lowered IR の上で同じ数え方で固定点を解くので、両 host は同じ文法を受理し、同じ深さで同じ診断を返す。
+たとえば再帰する helper を括弧で包んだ `H ::= 'n' R0 | 'y' (…H…)+ | 'a'` は、両 host とも 122 段まで
+同じ生成物を出し、123 段で `structural analysis depth exceeds 256` で拒否する。native は括弧 128 段目
+（本体 129 段目）を開く時点で frontend の `UBNF nesting limit exceeded` を先に返すため、その段数からは、
+両 host とも拒否するが診断の文言は frontend の差に従う。解析の再帰は、固定点の前の 256 段と固定点の
+256 段を合わせた深さまでになる。この最も深い場合も、Java は `-Xss1m -Xint`、Rust は debug build の
+既定 2 MiB の test thread で通ることを確かめている。
 
 Java の Java 生成（`ParserGenerator` など）は、AST 上の固定点（`RecursiveSemanticShapes`、深さ 256）を
 使い続ける。この固定点は preferred projection の上限として Rust の `preferred_plan.rs` と同じ数え方をしており（#737）、
 Java 生成では上限を超えると `E-RECURSIVE-SHAPE: expression depth exceeds 256` で拒否する。
-Rust 生成の整数 field の判定だけは、この拒否の代わりに `numeric_fields.rs` と同じ「capture がすべて数値 token」
-の規則を使う。
+Rust 生成の整数 field の判定だけは、この深さの拒否の代わりに `numeric_fields.rs` と同じ「capture がすべて
+数値 token」の規則を使う。作業量の上限（`analysis work exceeds 1000000`）と非収束は、従来どおり Java host の
+Rust 生成でも失敗になる（native は整数の判定にこの解析を使わないので受理する。既知の差で #758）。
 
 回帰テスト: `RustBackendTest`、`NumericFieldsTest`、`RustNativeGeneratorTest`
 （`recursiveNestingLimitsMatchJavaHost`、84〜130 段の掃引）、`RustUbnfFrontendConformanceTest`

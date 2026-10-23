@@ -47,4 +47,15 @@ public class NumericFieldsTest {
         assertTrue(NumericFields.isInteger(grammar, root, "n"));
         assertFalse(NumericFields.isInteger(grammar, root, "x"));
     }
+
+    /** Only the depth limit falls back: exceeding the analysis work still fails, as before #740. */
+    @Test public void analysisWorkLimitStillFails() {
+        GrammarDecl grammar = UBNFMapper.parse(NestingLimitGrammars.numericBesideAnalysisWork(560)).grammars().get(0);
+        RuleDecl root = grammar.rules().get(0);
+        var error = assertThrows(IllegalArgumentException.class, () -> NumericFields.isInteger(grammar, root, "n"));
+        assertEquals("E-RECURSIVE-SHAPE: analysis work exceeds 1000000", error.getMessage());
+        var generation = assertThrows(IllegalArgumentException.class,
+            () -> new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar));
+        assertEquals("E-RECURSIVE-SHAPE: analysis work exceeds 1000000", generation.getMessage());
+    }
 }

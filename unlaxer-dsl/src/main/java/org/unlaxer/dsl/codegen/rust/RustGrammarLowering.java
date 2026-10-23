@@ -1177,7 +1177,17 @@ public final class RustGrammarLowering {
             if (terminal != null) return terminal;
             if (!visiting.add(rule)) {
                 int index = enumNodes ? 1 : 0;
-                if (recursiveShapes[index] == null) recursiveShapes[index] = recursiveShapes(enumNodes);
+                if (recursiveShapes[index] == null) {
+                    // Solved once for every rule, not as a nested part of the caller's
+                    // analysis: start from a fresh structural depth, as lowering.rs does (#740).
+                    int outer = analysisDepth;
+                    analysisDepth = 0;
+                    try {
+                        recursiveShapes[index] = recursiveShapes(enumNodes);
+                    } finally {
+                        analysisDepth = outer;
+                    }
+                }
                 return recursiveShapes[index][rule];
             }
             if (visiting.size() > MAX_ANALYSIS_DEPTH) throw unsupported("rule shape depth exceeds 256");

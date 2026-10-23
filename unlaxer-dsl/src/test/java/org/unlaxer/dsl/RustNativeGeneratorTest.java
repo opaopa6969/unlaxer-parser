@@ -176,8 +176,8 @@ public class RustNativeGeneratorTest {
     }
 
     /**
-     * #740: the 84..130 sweep of recursive helpers in groups. Both hosts accept up to 121 groups
-     * with identical files and reject 122 with the same structural depth diagnostic. From the
+     * #740: the 84..130 sweep of recursive helpers in groups. Both hosts accept up to 122 groups
+     * with identical files and reject 123 with the same structural depth diagnostic. From the
      * native frontend's 128 body levels on, native rejects before lowering, while the Java
      * frontend (no body counter, #741) still reaches the lowering depth diagnostic.
      */
@@ -222,6 +222,23 @@ public class RustNativeGeneratorTest {
                 assertTrue(name + ": " + nativeRun.output(), nativeRun.output().strip().endsWith(expectedNative));
                 report.add(name + "\t" + javaError + "\t" + nativeRun.output().strip());
             }
+        }
+        // #740 review: the Java host accepted these before #740; native now accepts them too.
+        var accepted = new java.util.LinkedHashMap<>(NestingLimitGrammars.acceptedBefore740());
+        accepted.put("deepest-analysis", NestingLimitGrammars.chainBesideNestedRecursion(82, NestingLimitGrammars.LOWERED));
+        for (var entry : accepted.entrySet()) {
+            String name = "accepted-" + entry.getKey();
+            Path grammar = temporary.newFile(name + ".ubnf").toPath();
+            Files.writeString(grammar, entry.getValue());
+            Path output = temporary.getRoot().toPath().resolve(name);
+            var nativeRun = command(List.of(binary.toString(), "generate", "--grammar", grammar.toString(),
+                "--output", output.toString()), true);
+            assertEquals(name + "\n" + nativeRun.output(), 0, nativeRun.code());
+            var expected = new RustBackend().generate(UBNFMapper.parse(entry.getValue()).grammars().get(0));
+            assertEquals(name, 5, expected.size());
+            for (var file : expected) assertArrayEquals(name + " / " + file.relativePath(),
+                file.content().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(output.resolve(file.relativePath())));
+            report.add(name + "\taccepted\taccepted");
         }
         Files.write(Path.of("target/rust-recursive-nesting-limits.tsv"), report, StandardCharsets.UTF_8);
     }
