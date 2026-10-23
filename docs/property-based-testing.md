@@ -124,11 +124,9 @@ Rust runtime は文法を `Expr` の表として解釈するので、生成 modu
   必須とし、`kind`（finding 種別の正規表現）と、任意で `grammar` / `detail` の正規表現、および
   正規表現で書けない数値条件 `condition` で対象を限定する。`condition` には
   `java-syntax-offset-after-rust`（両方とも `syntax` 失敗で、Java の offset が Rust より大きい）と
-  `java-stack-starts-after-rust`（`KnownDifferences.javaStackStartsAfterRust`）、
-  `number-incomplete-exponent`（`KnownDifferences.numberIncompleteExponent`）がある。前の 2 つは
-  #706 のために作ったもので、#706 の修正後はどの entry も使っていない。現在の既知差は
-  [#717](https://github.com/opaopa6969/unlaxer-parser/issues/717) の `number-incomplete-exponent`
-  の 1 件だけで、`regressions.json` の同名の例が毎回これに当たる。
+  `java-stack-starts-after-rust`（`KnownDifferences.javaStackStartsAfterRust`）がある。どちらも
+  #706 のために作ったもので、#706 の修正後はどの entry も使っていない。現在の既知差は 0 件
+  （file は `[]`）。
   除外した件数は毎回 `[pbt] ... excludedKnown=` に出る。1 件も除外しなかった entry があると
   テストは失敗する（直った差や、範囲がずれた entry を残さないため）。黙って除外しない。
 
@@ -191,6 +189,13 @@ seed は `java.util.Random` で展開する（JDK 仕様で列が固定）。同
 | seed `1000..1149`（予備入力の導入後） | 203（左再帰変種 50 を含む） | 2,113 | 25,356 | 0（#706 の既知差のみ） |
 | seed `1000..1399`（予備入力の導入前） | 536（左再帰変種 133 を含む） | 4,099 | 49,188 | 0（#706 の既知差のみ） |
 
+#717 の修正後（2026-10-23、`known-differences.json` は空）に回した結果:
+
+| 範囲 | 文法 | 入力 | 観測（host あたり） | finding |
+|---|---|---|---|---|
+| CI seed `1..24` + corpus | 75（左再帰変種 8 を含む） | 561 | 6,732 | 0（除外なし） |
+| seed `1000..1399` + corpus | 576（左再帰変種 133 を含む） | 5,712 | 68,544 | 0（除外なし） |
+
 生成器の旧 revision での seed `100..399` の run で、次を見つけた。
 
 - [#706](https://github.com/opaopa6969/unlaxer-parser/issues/706): 正の `LOOKAHEAD` token が matched
@@ -204,10 +209,15 @@ seed は `java.util.Random` で展開する（JDK 仕様で列が固定）。同
   除外なしで一致する。上表の「#706 の既知差のみ」は修正前の結果で、その除外（文法全体に正の
   `LOOKAHEAD` があり、Java の offset の方が大きい `syntax` の差）は別の原因の差も隠していた。
   除外を外すと、seed 27 と seed `1000..1399` で `NumberParser` の不完全な指数の差（`R0 ::= NUM 'a'`
-  に `2e` で Java CP2 / Rust CP1）が見えるようになった。この差は `rust/FULL-SPEC.md` に記録済みで、
-  [#717](https://github.com/opaopa6969/unlaxer-parser/issues/717) で追跡し、`known-differences.json`
-  の `number-incomplete-exponent` でこの形だけを除外している。上表の seed `1000..1399` などの
+  に `2e` で Java CP2 / Rust CP1）が見えるようになった。上表の seed `1000..1399` などの
   「finding 0」は、この差を #706 の除外に含めて数えた値である。
+- [#717](https://github.com/opaopa6969/unlaxer-parser/issues/717): 上の `NumberParser` の差は、
+  Rust の Number token が不完全な指数（`e` / `E` と符号）を読んだ位置で失敗を記録するようにして
+  Java に揃えた（受理と消費は仮数部までのまま）。`known-differences.json` の
+  `number-incomplete-exponent` と判定 `KnownDifferences.numberIncompleteExponent` は削除した。
+  `regressions.json` の `number-incomplete-exponent` と、trivia・Classic token mode・数値 field の
+  変種 3 例は除外なしで一致する。低水準の共通 oracle は `conformance/number-token/cases.tsv`
+  （Java `NumberTokenOracleTest`、Rust `tests/number_token.rs`）。
 - seed 142 の受理の差（[#729](https://github.com/opaopa6969/unlaxer-parser/issues/729)）は、Rust の
   非 Classic 経路の CAPTURE でも Java と同じ子の root token の原文を保存するよう修正し、
   `positive-lookahead-capture-replay` として固定した。match-only の原文を保存する
