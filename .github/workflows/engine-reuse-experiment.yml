@@ -16,6 +16,7 @@ jobs:
           distribution: temurin
           java-version: '21.0.9'
           overwrite-settings: false
+      - uses: ./.github/actions/maven-job-repository
       - name: Rust toolchain を既定を変更せずに準備
         run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
       - name: Classic Java and Rust, shared proof/capability fixtures, bounded Rust driver

@@ -1,0 +1,16 @@
+name: Job-local Maven repository
+description: >-
+  Route every later Maven process of this job, including ones started by scripts
+  and tests, to a fresh local repository owned by this run attempt and job (#718),
+  and remove it when the job ends. Development installs then never enter the
+  shared ~/.m2/repository of the self-hosted runners, where they would sit next
+  to signed Central artifacts of the same version. Use after actions/setup-java
+  (the check runs Maven).
+outputs:
+  path:
+    description: Absolute path of the job-local repository.
+runs:
+  using: node24
+  main: main.js
+  post: post.js
+  post-if: always()
