@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # #718: a consumer of the published release resolves it from Central alone, into its own
 # empty repository, while this job's repository holds the development build of the same
-# version. Neither the job repository nor the shared ~/.m2 is read or written here.
+# version. The job repository is not read, and nothing outside the consumer's repository is
+# written. The read-only tail of MAVEN_ARGS stays in effect, so the plugin comes from the
+# runner's repositories; the tail view has no org/unlaxer, so org.unlaxer:* comes from Central
+# (the checks below fail if it came from anywhere else).
 # Usage: check-published-consumer.sh <parser-root> <version>
 set -euo pipefail
 root=${1:?parser root}
