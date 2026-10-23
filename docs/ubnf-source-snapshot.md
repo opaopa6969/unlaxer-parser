@@ -92,7 +92,8 @@ import 先も必要ならファイルごとに snapshot を作り、呼び出し
 複数ファイルを統合した provenance は未実装として扱う。
 
 失敗時は従来どおり Java の例外 / Rust の `Diagnostic` を返し、
-部分的な成功 snapshot は返さない。Rust の既存 nesting limit や、
+部分的な成功 snapshot は返さない。Rust の既存 nesting limit（両 frontend の上限の差は
+[入れ子の上限](java-parser-limits.md#ubnf-の入れ子の上限740--741)を参照）や、
 既知の Java frontend の構文・mapper 差をこの機能が解消するわけではない。
 
 ## 検証
