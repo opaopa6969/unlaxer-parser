@@ -117,7 +117,7 @@ it without skips. `cases.json` supplies 22 independent source/position/result ca
 a generated annotation-processor sentinel adds the 23rd. Both hosts invoke the same
 three actual adapters, compare full observations and write the report to
 `unlaxer-dsl/target/external-provider-conformance.tsv`. Protocol fixtures contain 31
-accepted/rejected frames; transport fixtures exercise four distinct failure states.
+accepted/rejected frames.
 
 Commands are argument arrays, with no shell:
 
@@ -129,6 +129,29 @@ The TypeScript installation is already locked by `unlaxer-dsl/ubnf-vscode/packag
 No production dependency is added to the Rust runtime. Process invocation is a native
 host capability; a browser/WASM editor requires an explicit native bridge and cannot
 claim that the compiler is installed merely because these modules are bundled.
+
+## Transport の deadline 回帰 (#721)
+
+Java の `ProviderProtocolTest` と Rust の `provider_protocol` は、同じ
+`protocol/transport.tsv` の case、mode、期待 status、deadline (ms)、入力前の遅延
+(ms)、入力後の応答遅延 (ms) を使う。通常の非 zero 終了と 4 MiB を超える stdout /
+stderr は 5000ms 以内に厳密に `FAILED`、起動できない command は `UNAVAILABLE` を
+要求する。入力前 / 応答前に 500ms 遅延させる行も `FAILED` を要求するため、旧来の
+全行 200ms に戻すと失敗する。共有 host の自然発生した負荷を完全に再現するものでは
+なく、拒否前の遅延が予算を使い切る経路を制御して再現する fixture である。
+
+意図した timeout は入力前 / 応答前 / 無応答の各経路で 30 秒待機する子プロセスを
+200ms の deadline で呼び、厳密に `TIMEOUT` を要求する。呼出し全体の観測時間も
+200ms 以上、5000ms 未満で検査し、case・期待値・実測値・deadline・経過時間を出力する。
+5000ms は共有 host の scheduling を許容するテスト上の上限であり、製品の deadline
+ではない。製品コード、既定値、既存の計測範囲は変更していない。両 host の deadline
+は command の起動に成功した後に始まり、入力書込み、stdout / stderr の読取り、
+子プロセスの終了待ちを含む。frame の encode と OS の spawn 自体は対象外であり、
+fixture の「入力前の遅延」は spawn 後の Python の準備遅延を模擬する。応答の decode と
+cleanup に個別の deadline はなく、呼出し全体の観測時間にはそれらも含まれる。
+
+既存の不正 frame 拒否と user code 実行 gate も引き続き検証する。cleanup は従来どおり
+Java が子孫を強制終了し、Rust が直接の子を終了して wait する契約である。
 
 ## Consumer integration and limits
 

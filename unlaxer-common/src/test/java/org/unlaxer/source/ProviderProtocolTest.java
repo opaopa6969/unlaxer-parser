@@ -36,10 +36,25 @@ public class ProviderProtocolTest {
     @Test public void processFailureStatesAndNoExecutionGate() throws Exception {
         Request request = ProviderProtocol.readRequest(Files.readString(fixtures.resolve("request.wire")));
         for (String line : Files.readAllLines(fixtures.resolve("transport.tsv"))) {
+            if (line.startsWith("#")) continue;
             String[] row = line.split("\t");
-            List<String> command = row[0].equals("missing") ? List.of("/unlaxer-provider-missing") : List.of("python3", fixtures.resolve("transport.py").toString(), row[0]);
-            var process = new ProviderProcess(command, request.provider(), Set.of(Operation.HOVER), Duration.ofMillis(200));
-            assertEquals(row[0], Status.valueOf(row[1]), process.invoke(request).status());
+            assertEquals(line, 6, row.length);
+            List<String> command = row[1].equals("missing") ? List.of("/unlaxer-provider-missing")
+                : List.of("python3", fixtures.resolve("transport.py").toString(), row[1], row[4], row[5]);
+            long deadlineMillis = Long.parseLong(row[3]);
+            var process = new ProviderProcess(command, request.provider(), Set.of(Operation.HOVER), Duration.ofMillis(deadlineMillis));
+            long started = System.nanoTime();
+            Status actual = process.invoke(request).status();
+            long elapsedMillis = Duration.ofNanos(System.nanoTime() - started).toMillis();
+            String observation = row[0] + " expected=" + row[2] + " actual=" + actual
+                + " deadline_ms=" + deadlineMillis + " elapsed_ms=" + elapsedMillis;
+            System.out.println("[provider-transport] " + observation);
+            assertEquals(observation, Status.valueOf(row[2]), actual);
+            if (actual == Status.TIMEOUT) {
+                assertTrue(observation, elapsedMillis >= deadlineMillis);
+                // 30 秒の fixture 遅延より十分短く、共有 host の scheduling には余裕を持たせる。
+                assertTrue(observation, elapsedMillis < 5000);
+            }
         }
         Path marker = Files.createTempFile("provider-execute", ".marker"); Files.delete(marker);
         var process = new ProviderProcess(List.of("python3", fixtures.resolve("transport.py").toString(), "marker", marker.toString()), request.provider(), Set.of(Operation.HOVER), Duration.ofSeconds(1));
