@@ -853,5 +853,99 @@
         "accepted": false
       }
     ]
+  },
+  {
+    "name": "comment-candidate-exclusion",
+    "grammar": "grammar CommentCandidates { @package: org.example.ruletrivia @comment: { line: '//' } @root @mapping(Root, params=[value]) @whitespace(none) Root ::= 'a' @value ( Lines | Alt ) ; Lines ::= '\\n' 'x' ; Alt ::= '\\r\\n' 'y' | 'w' ; }",
+    "cases": [
+      {
+        "id": "comment-before-rule-candidate",
+        "input": "a//c\nx",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "comment-before-sequence-candidate",
+        "input": "a//c\r\ny",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "no-comment",
+        "input": "aw",
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": "a"
+          }
+        }
+      },
+      {
+        "id": "comment-then-unexpected",
+        "input": "a//c\nw",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      },
+      {
+        "id": "comment-at-eof",
+        "input": "a//c",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
   }
 ]
