@@ -125,8 +125,14 @@ Java の `ParseOptions.DEFAULT` で 1 回解析し、始まった parser transac
   予備の組は、導出か破壊入力のどれかが上限を超えると、受理されない導出と同じく組ごと使わない。
 - corpus の entry では、上限を超える入力を `overBudget` に過不足なく書く（無ければ空）。実際と
   違えば `step-budget` の finding になる。`step-budget-capture-mutual-recursion` はその回帰例で、
-  `PropertyBasedParityTest.overBudgetCorpusFinishesInBoundedTime` が時間の上限（300 秒）付きで
-  単独に確かめる（手元で約 10 秒。上限を外すと Rust probe の 130 秒の timeout で落ちる）。
+  `PropertyBasedParityTest.overBudgetInputsFinishInBoundedTime` が時間の上限（300 秒）付きで
+  単独に確かめる（手元で約 8 秒）。同じ文法で予備の組も作り（上限を超える導出、受理される導出と
+  上限を超える破壊入力、上限内の組）、seed 81 で止まった予備の選別の経路も通す。導出の判定を外すと
+  受理判定が返らず 300 秒で、破壊入力か corpus の入力の判定を外すと Rust probe の 130 秒の timeout で落ちる。
+- 子プロセス（Rust probe、`unlaxer generate`、`rustc`）には標準入力をファイルから渡し、timeout を
+  起動時点から数える。子が入力を読まなくなっても、送り残しで待たずに期限で戻る。timeout のときも
+  それまでの出力を残すので、最後の進捗行（`#<TAB><index><TAB><hex>`）から、止まった入力を
+  `rust-probe-failed` の finding に出す（`executeTimeoutCoversAChildThatStopsReading`）。
 - 既定の上限で seed `1..320`（batch 40）を回すと、除外は seed 81 の 17 入力、seed 62 の 2 入力と
   corpus の回帰例 1 件で、finding は 0（手元で約 3 分）。観測した 4,704 入力の最大は 61,566 手で、
   Rust の最も遅い入力は約 4 秒だった。上限を 1,000,000 にすると除外は seed 81 の 13 入力だけになるが、

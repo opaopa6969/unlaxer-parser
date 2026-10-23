@@ -810,17 +810,37 @@ final class ParityHarness {
     }
 
     private Result execute(List<String> command, String input, int seconds) throws Exception {
+        return execute(work, command, input, seconds);
+    }
+
+    /**
+     * Runs {@code command} with {@code input} as its standard input, for at most {@code seconds}
+     * from the start. The input is redirected from a file, so a child that stops reading cannot
+     * block this call before the deadline (#739 review). On timeout the result keeps the output so
+     * far, whose last progress line names the input that was running, followed by the reason.
+     */
+    static Result execute(Path work, List<String> command, String input, int seconds) throws Exception {
         Path log = Files.createTempFile(work, "command", ".log");
-        var process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        Path stdin = Files.createTempFile(work, "command", ".stdin");
         try {
-            try (var stdin = process.getOutputStream()) {
-                stdin.write(input.getBytes(StandardCharsets.UTF_8));
+            Files.writeString(stdin, input, StandardCharsets.UTF_8);
+            var process = new ProcessBuilder(command).redirectErrorStream(true)
+                    .redirectInput(stdin.toFile()).redirectOutput(log.toFile()).start();
+            try {
+                if (!process.waitFor(seconds, TimeUnit.SECONDS)) {
+                    process.destroyForcibly().waitFor(10, TimeUnit.SECONDS);
+                    // A killed child may leave a partial character; decode leniently.
+                    String output = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
+                    return new Result(-1, output + (output.isEmpty() || output.endsWith("\n") ? "" : "\n")
+                            + "timeout after " + seconds + "s: " + command);
+                }
+                return new Result(process.exitValue(), Files.readString(log, StandardCharsets.UTF_8));
+            } finally {
+                if (process.isAlive()) process.destroyForcibly();
             }
-            if (!process.waitFor(seconds, TimeUnit.SECONDS)) return new Result(-1, "timeout after " + seconds + "s: " + command);
-            return new Result(process.exitValue(), Files.readString(log));
         } finally {
-            if (process.isAlive()) process.destroyForcibly();
             Files.deleteIfExists(log);
+            Files.deleteIfExists(stdin);
         }
     }
 
