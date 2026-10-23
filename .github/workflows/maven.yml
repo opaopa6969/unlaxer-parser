@@ -436,6 +436,10 @@ jobs:
       run: |
         python3 scripts/tests/test_maven_job_repository.py
         bash -n scripts/check-job-maven-repository.sh
+        bash -n scripts/check-published-consumer.sh
+        bash -n .github/actions/maven-job-repository/select.sh
+        node --check .github/actions/maven-job-repository/main.js
+        node --check .github/actions/maven-job-repository/post.js
 
     - name: Build with Maven
       run: mvn -B clean test
@@ -608,6 +612,12 @@ jobs:
     - name: Require this checkout's jars in the job Maven repository
       working-directory: unlaxer-parser
       run: bash scripts/check-job-maven-repository.sh . '${{ steps.unlaxer.outputs.version }}'
+
+    # A consumer of the published release resolves it from Central alone, into its own empty
+    # repository, next to the development build of the same version in the job repository.
+    - name: Resolve the published release from Central in a separate empty repository
+      working-directory: unlaxer-parser
+      run: bash scripts/check-published-consumer.sh . '${{ steps.unlaxer.outputs.version }}'
 
     - name: Checkout tinyexpression
       uses: actions/checkout@v4
