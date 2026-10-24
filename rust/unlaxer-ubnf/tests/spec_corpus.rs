@@ -11,6 +11,7 @@
 //!
 //! - `scope: validate` の 18 件は診断コードを見るケースで、`unlaxer-ubnf` は構文解析だけを行い
 //!   独立した validator を持たない（Java 側は `GrammarValidator` で駆動する）。
+//!   `quantifier/huge-bound` は `unlaxer-generator/tests/bounded_overflow.rs` でも同じ fixture を駆動する。
 //! - `scope: runtime` の 3 件は生成パーサの実行時挙動で、UBNF を読む処理系の入出力からは
 //!   観測できない。Java 側も同じく駆動しない。
 
@@ -274,7 +275,8 @@ fn rust_frontend_agrees_with_every_spec_derived_expectation() {
         }
         if case.scope == "validate" {
             // unlaxer-ubnf は構文解析だけを行い、独立した validator を持たない。
-            // 同じケースを Java 側の UbnfSpecCorpusTest が GrammarValidator で駆動する。
+            // Java の UbnfSpecCorpusTest が GrammarValidator で駆動する。
+            // overflow は generator の bounded_overflow テストでも構文受理・診断を検証する。
             skipped_validate += 1;
             continue;
         }

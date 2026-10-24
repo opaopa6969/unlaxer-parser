@@ -1149,7 +1149,11 @@ public final class GrammarValidator {
     private static void validateBoundedRepeatElements(GrammarDecl grammar, List<ValidationIssue> errors) {
         for (RuleDecl rule : grammar.rules()) {
             collectBoundedElements(rule.body()).forEach(bounded -> {
-                if (bounded.min() < 0 || bounded.max() < bounded.min()) {
+                if (org.unlaxer.dsl.bootstrap.BoundedQuantifiers.overflow(bounded)) {
+                    addRuleError(errors, rule.name(),
+                        org.unlaxer.dsl.bootstrap.BoundedQuantifiers.message(bounded),
+                        "Use bounds between 0 and 2147483647.", "E-BOUNDED-OVERFLOW");
+                } else if (bounded.min() < 0 || bounded.max() < bounded.min()) {
                     addRuleError(errors, rule.name(),
                         "rule " + rule.name() + " has BoundedRepeatElement with min=" + bounded.min()
                             + ", max=" + bounded.max(),

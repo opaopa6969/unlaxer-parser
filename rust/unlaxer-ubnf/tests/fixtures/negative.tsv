@@ -13,7 +13,6 @@ unknown-token-constructor	grammar G { token T=UNKNOWN('x') R ::= T; }
 empty-params	grammar G { @mapping(X,params=[]) R ::= 'x'; }
 recovery-mode	grammar G { @recovery(magic) R ::= 'x'; }
 precedence-overflow	grammar G { @precedence(level=2147483648) R ::= 'x'; }
-bound-overflow	grammar G { R ::= 'x'{2147483648}; }
 double-quantifier	grammar G { R ::= 'x'+?; }
 empty-range	grammar G { token T=CHAR_RANGE('','a') R ::= T; }
 long-range	grammar G { token T=CHAR_RANGE('ab','z') R ::= T; }

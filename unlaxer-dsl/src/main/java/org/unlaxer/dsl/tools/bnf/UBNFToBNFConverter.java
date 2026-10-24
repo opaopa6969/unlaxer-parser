@@ -61,6 +61,8 @@ public final class UBNFToBNFConverter {
         for (int i = 0; i < grammars.size(); i++) {
             GrammarDecl grammar = grammars.get(i);
             org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
+            // Never print the internal overflow value as a repetition count (#783).
+            org.unlaxer.dsl.bootstrap.BoundedQuantifiers.requireNoOverflow(grammar);
             convertGrammarDecl(grammar, builder, context);
 
             if (false == (i == grammars.size() - 1)) {

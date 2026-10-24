@@ -46,16 +46,8 @@ public class UbnfSpecCorpusTest {
      * 一致しなくなったら（= 実装が直った / 別の壊れ方をした）このテストは落ちる。直ったら
      * このエントリを消すこと。差分を放置しないための番人であって、skip の別名ではない。
      */
-    private static final Map<String, Deviation> DOCUMENTED_DEVIATIONS = Map.of(
-        "quantifier/huge-bound", new Deviation(
-            "診断 E-BOUNDED-OVERFLOW を期待したが構文解析で落ちた: "
-                + "NumberFormatException: For input string: \"2147483648\"",
-            "仕様（validation.md の BOUNDED エラー）は INTEGER が Java の 32bit 符号付き整数を"
-                + " 超えたとき E-BOUNDED-OVERFLOW を出すと定める。Java bootstrap は"
-                + " UBNFMapper が量指定子を Integer へ変換する時点で NumberFormatException を投げ、"
-                + " GrammarValidator まで到達しない。入力が拒否されること自体は満たしているが、"
-                + " 診断コードとしては観測できない。層の違いであり、受理してしまう違反ではない。"
-                + " Rust frontend は scope=validate を駆動しないのでこの差分は Java 側だけに出る。"));
+    // quantifier/huge-bound は #783 で解消した。Rust の driver と同じく空の番人を残す。
+    private static final Map<String, Deviation> DOCUMENTED_DEVIATIONS = Map.of();
 
     /** 記録済みの差分。{@code observation} は実測の文言、{@code reason} はなぜそうなるか。 */
     private record Deviation(String observation, String reason) {}
