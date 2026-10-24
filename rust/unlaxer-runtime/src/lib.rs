@@ -5284,7 +5284,7 @@ impl<'a> ParseContext<'a> {
                     break;
                 }
                 self.position = end;
-                self.matched_position = end;
+                self.matched_position = self.matched_position.max(end);
             }
             return;
         }
@@ -5325,7 +5325,8 @@ impl<'a> ParseContext<'a> {
             if self.position == start {
                 break;
             }
-            self.matched_position = self.position;
+            // Trivia must retain the enclosing Java parse frame's prior LOOKAHEAD reach.
+            self.matched_position = self.matched_position.max(self.position);
         }
     }
 
@@ -5336,12 +5337,13 @@ impl<'a> ParseContext<'a> {
             let body = &self.input[self.position + 2..];
             self.position += 2 + body.find(['\r', '\n']).unwrap_or(body.len());
             let rest = &self.input[self.position..];
-            self.matched_position = self.position
+            let matched = self.position
                 + if rest.starts_with("\r\n") {
                     2
                 } else {
                     usize::from(rest.starts_with(['\r', '\n']))
                 };
+            self.matched_position = self.matched_position.max(matched);
         }
     }
 

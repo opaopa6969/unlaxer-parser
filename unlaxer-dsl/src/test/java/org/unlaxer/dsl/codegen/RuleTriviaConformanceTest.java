@@ -30,6 +30,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.context.Memoization;
+import org.unlaxer.context.ParseOptions;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.codegen.CodeGenerator.GeneratedSource;
@@ -146,6 +148,11 @@ public class RuleTriviaConformanceTest {
                     boolean accepted = row.get("accepted").getAsBoolean();
                     Optional<?> diagnostic =
                         (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
+                    for (var memo : Memoization.values()) for (var policy : ParseOptions.Diagnostics.values()) {
+                        Optional<?> configured = (Optional<?>) mapper.getMethod("diagnose", String.class, ParseOptions.class)
+                            .invoke(null, input, ParseOptions.withMemoization(memo).withDiagnostics(policy));
+                        assertEquals(context + " Java diagnostic " + memo + "/" + policy, diagnostic, configured);
+                    }
                     assertEquals(context + " Java full-input acceptance", accepted, diagnostic.isEmpty());
                     assertEquals(context + " Rust full-input acceptance", accepted,
                         !rust.get("ast").isJsonNull());
@@ -232,16 +239,16 @@ public class RuleTriviaConformanceTest {
 
     private JsonArray prefix(Parser parser, String input) throws Exception {
         JsonArray expected = null;
-        for (boolean memo : new boolean[]{false, true}) {
+        for (var memo : Memoization.values()) for (var policy : ParseOptions.Diagnostics.values()) {
             var result = new JsonArray();
-            try (var context = new ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
-                if (memo) context.enableMemoize();
+            try (var context = ParseContext.withOptions(org.unlaxer.StringSource.createRootSource(input),
+                    ParseOptions.withMemoization(memo).withDiagnostics(policy))) {
                 result.add(parser.parse(context).isSucceeded());
                 result.add(context.getConsumedPosition().value());
                 result.add(context.getMatchedPosition().value());
             }
             if (expected == null) expected = result;
-            else assertEquals("Java memo OFF/ON prefix parity: " + input, expected, result);
+            else assertEquals("Java prefix " + memo + "/" + policy + ": " + input, expected, result);
         }
         return expected;
     }
@@ -292,6 +299,19 @@ public class RuleTriviaConformanceTest {
                     let memo_ok = generated::parser::parse_context(&mut memo_context).is_ok();
                     assert_eq!((prefix_ok, context.position(), context.matched_position()),
                         (memo_ok, memo_context.position(), memo_context.matched_position()));
+                    for memo in [unlaxer_runtime::Memoization::Off, unlaxer_runtime::Memoization::SafeFailures] {
+                        for policy in [unlaxer_runtime::Diagnostics::Detailed,
+                            unlaxer_runtime::Diagnostics::DetailedOnFailure, unlaxer_runtime::Diagnostics::Auto] {
+                            let configured = unlaxer_runtime::ParseOptions::with_memoization(memo).with_diagnostics(policy);
+                            let mut probe = unlaxer_runtime::ParseContext::with_options(&input, configured);
+                            let ok = generated::parser::parse_context(&mut probe).is_ok();
+                            assert_eq!((prefix_ok, context.position(), context.matched_position()),
+                                (ok, probe.position(), probe.matched_position()), "prefix: {memo:?}/{policy:?}: {input}");
+                            assert_eq!(generated::parser::parse_tree_detailed(&input).err(),
+                                generated::parser::parse_tree_detailed_with_options(&input, configured).err(),
+                                "diagnostic: {memo:?}/{policy:?}: {input}");
+                        }
+                    }
                     print!(r#"{{\"prefix\":[{},{},{}],\"ast\":"#,
                         prefix_ok, context.position(), context.matched_position());
                     match generated::parser::parse_tree_detailed(&input) {

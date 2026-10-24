@@ -29,3 +29,27 @@ cursor（memo 有無）、診断種別と位置、AST の全 field と node span
 
 期待値は契約から独立に作った。変更前の Java と照合した差は、上記の漏れ 3 件と、行末記号の
 先読みで matched cursor が進む 2 件（Java が正しく、期待値側を Java の仕様に合わせた）だった。
+
+## LOOKAHEAD の到達位置を保つ trivia（#753）
+
+`*Lookahead` の9文法18入力は、trivia の後で失敗する正の `LOOKAHEAD` の回帰ケース。
+期待値は Java の parse frame の規則 `max(consumed, matched)` から手で求めた。
+`CommentLookahead` の `a//c\nxy` では `a` の消費後 CP1、先読みの到達 CP7、
+コメントの消費 CP4、行末の先読み CP5 なので、後続の `z` の失敗位置は CP7。
+CRLF と補助文字も code point で数え、UTF-8 の byte 数や UTF-16 の unit 数は使わない。
+
+javaStyle の空白・block comment・line comment の連続、規則の `@whitespace`、
+全体と規則の名前付き whitespace（1文字の GAP を繰り返し読む）、入れ子と選択による
+複数回の trivia 試行も同じ最大到達の規則を使う。根の失敗は transaction の rollback
+により prefix が `[false, 0, 0]`。`CommentPrefixLookahead` は任意の `z` が無くても
+成功し、根の消費はコメント末尾 CP4 までなので prefix は `[true, 4, 4]`、
+全入力診断は `trailing_input` CP4（先読み CP7 ではない）になる。
+
+`RuleTriviaConformanceTest` の共通 harness は prefix と全入力診断を memo OFF/ON ×
+Detailed / DetailedOnFailure / Auto の6設定で照合する。Java-host と native Rust は
+別々に生成・compile・実行し、既存の明示 Classic 入口との比較も行う。
+
+修正は Rust の非 Classic・session 外の読み飛ばしで現在の matched と trivia の到達位置の
+最大値を保つだけで、Java の実装、Classic の専用 trivia parser、token-stream session の
+消費位置、#706 / #734 の frontier 選択は変更しない。修正前の runtime で診断の16入力が
+失敗し、prefix 成功の2入力は前後とも一致することを mutation 確認した。
