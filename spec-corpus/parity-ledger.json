@@ -286,6 +286,10 @@
     "784": {
       "state": "OPEN",
       "title": "test(parity): spec corpus の validate/runtime 条件付き除外を両言語の実行先へ結ぶ"
+    },
+    "793": {
+      "state": "OPEN",
+      "title": "parity: 正の LOOKAHEAD の後の group・選択が失敗したとき、frame の開始が Rust の失敗位置に入らない（#753 後続）"
     }
   },
   "entries": [
@@ -581,14 +585,27 @@
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         712,
-        777,
-        753
+        777
       ],
-      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。残りは、javaStyle併記時のW-COMMENT-IGNOREDをnative CLIへ出す経路（#777）と、triviaの読み飛ばしでLOOKAHEADのmatched cursorが小さく上書きされる差（#753）。",
+      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。残りは、javaStyle併記時のW-COMMENT-IGNOREDをnative CLIへ出す経路（#777）。triviaの後で失敗するruleの診断位置（#753）は、失敗したruleのframeの開始をRustも失敗位置に記録して解消した（PR #791）。trivia後のmatched cursorはJavaのtransaction cursorのまま。",
       "evidence": [
         "docs/rule-trivia.md",
         "spec-corpus/global-comment/README.md",
+        "docs/prior-matched-diagnostics.md",
         "rust/unlaxer-runtime/src/lib.rs"
+      ]
+    },
+    {
+      "id": "lookahead-group-frame",
+      "category": "unresolved",
+      "title": "正の LOOKAHEAD の後の group・選択の失敗位置",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        793
+      ],
+      "observation": "失敗したruleのframeの開始は#753でRustも失敗位置に記録するが、ruleでないgroup・選択のframeは記録しない。`R0 ::= 'a' LOOKAHEAD('xyz') ( 'x' 'q' )`に`axyz`でJava CP4、Rust CP2（6設定とも）。明示Classic入口は両版CP4で一致、任意・反復は一致。",
+      "evidence": [
+        "docs/prior-matched-diagnostics.md"
       ]
     },
     {
