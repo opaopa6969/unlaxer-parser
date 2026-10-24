@@ -20,7 +20,9 @@ mod preferred;
 mod preferred_plan;
 mod raising;
 pub mod semantic_rules;
+pub mod simple_annotations;
 mod token_stream;
+pub mod warnings;
 
 /// Parse and validate the complete grammar before producing any artifacts.
 pub fn generate(source: &str) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {

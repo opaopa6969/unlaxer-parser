@@ -59,9 +59,11 @@ fn shared_greedy_order_nullable_spans_and_diagnostics() {
                     name: "root",
                     expression: parser,
                 }];
+                // Java の共通 oracle は子を @f で包まない。Capture は LazyChain として
+                // reset を変えるため、観測用の wrapper を足さず rule の span を読む。
                 rules.extend(children.into_iter().map(|child| Rule {
                     name: "item",
-                    expression: child.capture("item"),
+                    expression: child,
                 }));
                 let mut context = ParseContext::with_options(
                     &input,
@@ -91,8 +93,7 @@ fn shared_greedy_order_nullable_spans_and_diagnostics() {
                         .iter()
                         .map(|&id| {
                             let node = context.node(id).unwrap();
-                            assert_eq!(node.captures.len(), 1);
-                            assert_eq!(node.captures[0].span, node.span);
+                            assert!(node.captures.is_empty());
                             assert_eq!(
                                 context.text(node.span),
                                 Some(
@@ -113,7 +114,7 @@ fn shared_greedy_order_nullable_spans_and_diagnostics() {
                         "{}",
                         f[0]
                     );
-                    assert_eq!(context.capture_spans("item").len(), root.children.len());
+                    assert!(context.capture_spans("item").is_empty());
                 } else {
                     assert!(context.node(0).is_none());
                     assert!(context.captured("item").is_none());

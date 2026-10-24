@@ -344,6 +344,14 @@ Expression ::= Term @left { AddOp @op Term @right } ;
 
 See Section 8 for all `@eval` kinds.
 
+#### Other `@name` (Simple annotation)
+
+Any other `@name` before a rule is kept as metadata and is not used by the generators, except
+`@nestedCaptures` and `@autoCommit` (but `@autoCommit` leaves a rule carrying one out of its analysis). Each one is reported as the warning `W-ANNOTATION-IGNORED`
+(with `did you mean @...?` for a near known name); `--strict` / `--fail-on warning` fail on it.
+`@ leftAssoc` (space after `@`) and `@mapping` (no arguments) are Simple annotations too, so write
+annotations exactly as documented. See `docs/simple-annotations.md`.
+
 ---
 
 ## 4. Complete TinyCalc Example
