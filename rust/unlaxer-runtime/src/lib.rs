@@ -3361,6 +3361,7 @@ impl<'a> ParseContext<'a> {
                 | Expr::Quoted(_)
                 | Expr::CodeStart
                 | Expr::CodeEnd
+                | Expr::Capture(_, _)
                 | Expr::CaptureBoundary(_, _)
                 | Expr::InputCaptureBoundary(_, _)
         ) {
@@ -3631,6 +3632,7 @@ impl<'a> ParseContext<'a> {
                             | Expr::Quoted(_)
                             | Expr::CodeStart
                             | Expr::CodeEnd
+                            | Expr::Capture(_, _)
                             | Expr::CaptureBoundary(_, _)
                             | Expr::InputCaptureBoundary(_, _)
                     )
