@@ -59,6 +59,8 @@ jobs:
         python3 scripts/generate-case-tables.py --check
         (cd spec-corpus/case-insensitive/unicode-17.0.0 && sha256sum --check SHA256SUMS)
         (cd spec-corpus/grapheme/unicode-17.0.0 && sha256sum --check SHA256SUMS)
+    - name: Check memo budget evidence gate (#789)
+      run: python3 scripts/tests/test_memo_budget_evidence.py
     - name: Cross-language fixtures, compile failures, and generated-file drift
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
@@ -90,16 +92,32 @@ jobs:
         awk 'END {exit NR != 613}' unlaxer-dsl/target/nested-typeof-conformance.tsv
     - name: Require bounded failure memo conformance evidence
       run: |
-        test -s unlaxer-dsl/target/failure-memo-budget-java.tsv
-        test -s unlaxer-dsl/target/failure-memo-budget-rust.log
-        awk 'END {exit NR != 601}' unlaxer-dsl/target/failure-memo-budget-java.tsv
-        awk '/^BUDGET/ {n++} END {exit n != 600}' unlaxer-dsl/target/failure-memo-budget-rust.log
+        python3 scripts/check-memo-budget-evidence.py \
+          --cases conformance/failure-memo-budget/cases.tsv --rows 600 \
+          unlaxer-dsl/target/failure-memo-budget-java.tsv \
+          unlaxer-dsl/target/failure-memo-budget-rust.tsv
     - name: Require bounded success memo conformance evidence
       run: |
-        test -s unlaxer-dsl/target/success-memo-budget-java.tsv
-        test -s unlaxer-dsl/target/success-memo-budget-rust.log
-        awk 'END {exit NR != 601}' unlaxer-dsl/target/success-memo-budget-java.tsv
-        awk '/^SUCCESS_BUDGET/ {n++} END {exit n != 600}' unlaxer-dsl/target/success-memo-budget-rust.log
+        python3 scripts/check-memo-budget-evidence.py \
+          --cases conformance/success-memo-budget/cases.tsv --rows 600 \
+          unlaxer-dsl/target/success-memo-budget-java.tsv \
+          unlaxer-dsl/target/success-memo-budget-rust.tsv
+    # #789: the Rust oracle writes its rows to *-rust.tsv itself; the *-rust.log is libtest
+    # stdout, kept only for diagnosis (progress lines interleave with test output there).
+    # Uploaded even when a test or a gate fails.
+    - name: Upload memo budget evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: memo-budget-evidence
+        path: |
+          unlaxer-dsl/target/failure-memo-budget-java.tsv
+          unlaxer-dsl/target/failure-memo-budget-rust.tsv
+          unlaxer-dsl/target/failure-memo-budget-rust.log
+          unlaxer-dsl/target/success-memo-budget-java.tsv
+          unlaxer-dsl/target/success-memo-budget-rust.tsv
+          unlaxer-dsl/target/success-memo-budget-rust.log
+        if-no-files-found: ignore
     - name: Require nested leaf evaluator evidence
       run: |
         test -s unlaxer-dsl/target/nested-auto-eval-java.tsv
@@ -294,8 +312,10 @@ jobs:
           unlaxer-dsl/target/call-by-value-java.tsv
           unlaxer-dsl/target/call-by-value-rust.tsv
           unlaxer-dsl/target/failure-memo-budget-java.tsv
+          unlaxer-dsl/target/failure-memo-budget-rust.tsv
           unlaxer-dsl/target/failure-memo-budget-rust.log
           unlaxer-dsl/target/success-memo-budget-java.tsv
+          unlaxer-dsl/target/success-memo-budget-rust.tsv
           unlaxer-dsl/target/success-memo-budget-rust.log
           unlaxer-dsl/target/memo-scaling-java.tsv
           unlaxer-dsl/target/memo-scaling-rust.tsv
