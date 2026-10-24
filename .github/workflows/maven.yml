@@ -130,7 +130,7 @@ jobs:
       run: test -s unlaxer-dsl/target/classic-lsp-diagnostics.tsv
     - name: Require Java and both Rust hosts empty-literal evidence
       run: |
-        rows=$(python3 -c "import json; print(1 + sum(len(g['cases']) for g in json.load(open('spec-corpus/empty-literal/corpus.json', encoding='utf-8'))))")
+        rows=$(python3 -c "import json; print(1 + sum(len(g['cases']) for p in ('spec-corpus/empty-literal/corpus.json', 'spec-corpus/root-choice-cst/corpus.json') for g in json.load(open(p, encoding='utf-8'))))")
         test "$rows" -gt 1
         awk -v rows="$rows" 'END {exit NR != rows}' unlaxer-dsl/target/empty-literal-java.tsv
         awk -v rows="$rows" 'END {exit NR != rows}' unlaxer-dsl/target/rust-empty-literal.tsv
