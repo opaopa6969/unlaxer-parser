@@ -164,6 +164,14 @@ fn scenario(
                 false,
             );
         }
+        "field-repeat-reset" | "field-repeat-preserve" => {
+            c.set_reset_matched_with_consumed(name == "field-repeat-reset");
+            return c.parse_with_token_mode(
+                &cap(w("x").match_only().repeat_java(0, Some(2)).capture("f")),
+                k,
+                inv,
+            );
+        }
         "match-only" => {
             parse(c, roots, cap(w("a")));
             return c.parse_with_token_mode(&cap(w("b")).match_only(), k, inv);
