@@ -1710,6 +1710,9 @@ pub struct ParseContext<'a> {
     grammar_frontier: bool,
     // Java Number's empty-display terminals inherit the enclosing negative PEG assertion's hint.
     number_negative_hint: bool,
+    // Expected-name ids of NumberName, interned on first use (u32::MAX = not yet), so a
+    // detailed Number records its internal failures without hashing their names (#752).
+    number_names: [u32; NUMBER_NAMES.len()],
     match_cursor_policy: MatchCursorPolicy,
     bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
@@ -2149,6 +2152,7 @@ impl<'a> ParseContext<'a> {
             classic_failure_seen: false,
             grammar_frontier: false,
             number_negative_hint: false,
+            number_names: [u32::MAX; NUMBER_NAMES.len()],
             match_cursor_policy: MatchCursorPolicy::default(),
             whitespace: false,
             line_comments: false,
@@ -2857,6 +2861,31 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
+        if let Some(position) = self.failure_frontier(position) {
+            let expected = self.expected_names.intern(expected);
+            self.record_failure(position, expected);
+        }
+    }
+
+    /// [`Self::fail_at`] for a Java Number internal parser, without hashing its name.
+    fn fail_number_at(&mut self, position: usize, name: NumberName) {
+        if let Some(position) = self.failure_frontier(position) {
+            let expected = match self.number_names[name as usize] {
+                u32::MAX => {
+                    let id = self.expected_names.intern(NUMBER_NAMES[name as usize]);
+                    self.number_names[name as usize] = id;
+                    id
+                }
+                id => id,
+            };
+            self.record_failure(position, expected);
+        }
+    }
+
+    /// The position a failure at `position` is recorded at, or `None` when it cannot
+    /// contribute a name.
+    #[inline]
+    fn failure_frontier(&mut self, position: usize) -> Option<usize> {
         // The successful Classic watermark is only a fallback when neither entry
         // has failed. Native PEG failures must also select the real failure frontier.
         if self.options.diagnostics == Diagnostics::Detailed {
@@ -2866,7 +2895,7 @@ impl<'a> ParseContext<'a> {
             }
         }
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
-            return;
+            return None;
         }
         let position = self.frontier(position);
         // Failures behind both farthest positions cannot contribute a name.
@@ -2876,9 +2905,12 @@ impl<'a> ParseContext<'a> {
                 .last()
                 .is_none_or(|frame| frame.farthest.is_some_and(|farthest| position < farthest))
         {
-            return;
+            return None;
         }
-        let expected = self.expected_names.intern(expected);
+        Some(position)
+    }
+
+    fn record_failure(&mut self, position: usize, expected: u32) {
         self.note_failure_reach(position);
         if let Some(diagnostic) = self.diagnostic_frames.last_mut() {
             diagnostic.record(position, expected);
@@ -5425,13 +5457,13 @@ impl<'a> ParseContext<'a> {
             self.trace_atom("PointParser", point);
             after = self.digits::<RECORD>();
         } else if RECORD {
-            self.fail(".");
+            self.fail_number_at(self.position, NumberName::Point);
         }
         if !before && !after {
             if RECORD {
                 // Failed Choice/Number frames start before the point/digit probes.
-                self.fail_at(mantissa, "Chain");
-                self.fail_at(start, "NumberParser");
+                self.fail_number_at(mantissa, NumberName::Chain);
+                self.fail_number_at(start, NumberName::Number);
             }
             self.position = start;
             return false;
@@ -5455,8 +5487,8 @@ impl<'a> ParseContext<'a> {
             }
         } else {
             if RECORD {
-                self.number_failure("EParser");
-                self.number_failure("ExponentParser");
+                self.number_failure(NumberName::E);
+                self.number_failure(NumberName::Exponent);
             }
             self.trace_atom("Optional", exponent);
         }
@@ -5466,10 +5498,10 @@ impl<'a> ParseContext<'a> {
     // These parsers have no Java display hint. Their failed frames contribute their
     // class name, followed by the nearest enclosing terminal hint (PegLookahead).
     // As in Java, successful memo replay keeps the hint recorded by the first call.
-    fn number_failure(&mut self, expected: &str) {
-        self.fail(expected);
+    fn number_failure(&mut self, name: NumberName) {
+        self.fail_number_at(self.position, name);
         if self.number_negative_hint {
-            self.fail("negative lookahead");
+            self.fail_number_at(self.position, NumberName::NegativeLookahead);
         }
     }
 
@@ -5485,7 +5517,7 @@ impl<'a> ParseContext<'a> {
             self.trace_atom("SignParser", start);
         } else {
             if RECORD {
-                self.number_failure("SignParser");
+                self.number_failure(NumberName::Sign);
             }
             self.trace_atom("Optional", start);
         }
@@ -5506,14 +5538,41 @@ impl<'a> ParseContext<'a> {
         // DetailedOnFailure (including the successful Auto full-input pass) must not
         // intern names or allocate diagnostic records. Java skips these same failures.
         if RECORD {
-            self.number_failure("DigitParser");
+            self.number_failure(NumberName::Digit);
             if self.position == start {
-                self.number_failure("OneOrMore");
+                self.number_failure(NumberName::OneOrMore);
             }
         }
         self.position > start
     }
 }
+
+/// The failures a detailed Java `NumberParser` records, as `ParseContext::number_names` slots.
+#[derive(Clone, Copy)]
+enum NumberName {
+    Sign,
+    Digit,
+    OneOrMore,
+    Point,
+    E,
+    Exponent,
+    Chain,
+    Number,
+    NegativeLookahead,
+}
+
+/// Java display text (or class name) per [`NumberName`]; Rust stores literals unquoted.
+const NUMBER_NAMES: [&str; 9] = [
+    "SignParser",
+    "DigitParser",
+    "OneOrMore",
+    ".",
+    "EParser",
+    "ExponentParser",
+    "Chain",
+    "NumberParser",
+    "negative lookahead",
+];
 
 /// Whether every custom parser in the grammar permits deferred diagnostics.
 ///

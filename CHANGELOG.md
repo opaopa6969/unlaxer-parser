@@ -10,8 +10,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
-- Rust native Number の仮数部・小数点・指数の内部失敗を Java と同じ位置・候補・記録順で保持し、負の先読みと成功 parse の hint を修正 (#752)。遅延診断の成功パスでは記録・候補の割当を行わない。
-
+- Rust native Number の仮数部・小数点・指数の内部失敗を、Java の `NumberParser` と同じ位置・候補・記録順で記録する (#752)。`Number.not_ahead()` に `2a` の診断は CP0 → CP1、`1e1e` は CP0 → CP3。Number 全体の失敗と不完全な指数の期待候補は、従来の `number` から Java と同じ名前（`SignParser`・`DigitParser`・`OneOrMore`・`.`・`Chain`・`NumberParser` など）に変わる。公開 `ParseError.expected` の並び（整列・重複除去）は変えない。記録は Detailed のときだけで、遅延診断（full-input API の Auto / DetailedOnFailure）の成功パスは変わらない。Detailed の成功パスは Number ごとに数件の記録が増える（[測定](conformance/number-token/README.md#性能)、#795）。SAFE_FAILURES の failure memo 再生に残る差は #794。
 - Rust の LSP の message と `ParseError` / `ParseDiagnostic` の `Display` で、空の期待候補（通常の文法の `''`）を Java の生成 LSP と同じ `''` と表示する (#750)。以前は `Expected  or b` のように候補が見えなかった。canonical JSON・`data.expectedTokens` の値 `""`、空でない候補の表示、LSP の range・code は変えない。表示用に `unlaxer_runtime::display_expected` を追加した。[表示の対応](docs/empty-literal.md#人が読む表示750)。
 - 生成した Rust parser の Number token が、不完全な指数（`2e`・`2e+`）で Java の `NumberParser` と同じく指数記号・符号の後を失敗位置として記録するよう修正 (#717)。`R0 ::= NUM 'a'` に `2e` の診断は CP1 → CP2（`2e+` は CP3）。受理と消費は従来どおり仮数部まで。共通 oracle `conformance/number-token/cases.tsv` を追加し、PBT の既知差 `number-incomplete-exponent` を削除。
 - provider transport の通常拒否と意図した timeout の予算を Java/Rust 共通 fixture で分離し、正常応答付き stderr の上限超過と stdout/stderr のちょうど 4MiB の受理を検証する (#721)。製品の timeout 既定値は変更しない。

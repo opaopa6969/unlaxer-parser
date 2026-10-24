@@ -29,6 +29,34 @@ mvn -B -o -pl unlaxer-common -am test -Dtest=NumberTokenOracleTest \
   full-input API の Auto / DetailedOnFailure は失敗時に Detailed で再解析する。
   Number の入口で記録の有無を一度だけ決める。その成功パスでは新しい診断名の割当や記録を行わず、内部テストで確認する。
 
+## 比較の範囲と既知の差
+
+- Num の rule 自体が失敗する形（`Root ::= Num` に `a` など）は、`bare` 以外の oracle に入れない。
+  部分木に表示 hint が無い rule が失敗すると、Java はその rule の class 名（生成 parser の class 名）を
+  候補に加えるが、Rust は加えない。失敗した Chain が子の hint（`negative lookahead` や literal）を展開して
+  候補に加えること、失敗を1件も記録しない成功 parse の最遠位置（Java は消費位置、Rust は 0）も、Number に限らない host 間の差である。
+  PBT も host 間では期待候補を比べない（[docs/property-based-testing.md](../../docs/property-based-testing.md)）。
+  #752 のレビューでは、Number を使う16形・36入力と、7文字種の長さ4までの全入力（7形）を両 host で比べた。
+  この3種類の一般差を除くと、Rust に余分な候補は無く、共通する候補の順序も一致した。
+- SAFE_FAILURES で、負の先読みの中で失敗した Num を後で同じ位置から呼ぶ形（`(!Num 'x') | Num` に `-`）では、
+  Java が failure memo を再生して `negative lookahead` を含める。Rust の failure memo の key は rule の深さを含むので、
+  memo は hit せず再評価になり、`negative lookahead` を含めない（#794）。
+
+## 性能
+
+記録は Detailed のときだけ行い、遅延診断（full-input API の Auto / DetailedOnFailure）の成功パスは変えない。
+Detailed では Number ごとに4〜6件の失敗記録が増える。名前は context ごとに1回だけ intern する（`ParseContext::number_names`）。
+`Root ::= Item*`、`Item ::= Num ';'` に1種類の項を128回並べた入力で、release・1 core 固定、master と同じプロセスで交互に測った
+（11回の中央値、負荷平均17〜19。DetailedOnFailure でも ±10% 揺れる）。
+
+| 項 | memo OFF + Detailed | SAFE_FAILURES + Detailed |
+|---|---|---|
+| `12;` | +8.9% | +41.6% |
+| `+12.5e-3;` | +7.8% | +4.4% |
+| `7;-0.5;3e2;` | +14.8% | +30.0% |
+
+SAFE_FAILURES の増分は、Java と同じく成功 memo が hint を保存・再生するための memo frame の記録である。#197 の凍結中なので #795 で追跡する。
+
 `NumberTokenOracleTest` と Rust の `number_token` / 内部記録順テストがこのファイルを読む。
 `NumberTokenConformanceTest` は生成 Java parser を比較し、Java-host と native-host の Rust を個別に compile・実行する。
 UBNF では Number の負の PEG 先読みを直接記述できないため、生成した Num の式を手書きの assertion で包んで検証する。
