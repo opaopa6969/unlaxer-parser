@@ -298,13 +298,15 @@ fn fixed_body(
 ) -> Result<Option<Shape>, String> {
     check_work(work, depth)?;
     let mut result = None;
+    // Java RecursiveSemanticShapes: a singleton ChoiceBody is AST bookkeeping (#754).
+    // Count it as work, but only a real choice adds expression depth.
+    let sequence_depth = depth + usize::from(b.alternatives.len() != 1);
     for sequence in &b.alternatives {
-        // Java body(ChoiceBody) → body(SequenceBody) → element の各呼出しを数える。
-        check_work(work, depth + 1)?;
+        check_work(work, sequence_depth)?;
         let mut value = Some(empty());
         let mut has_text = false;
         for item in &sequence.elements {
-            match fixed_atom(&item.element, indices, state, work, depth + 2)? {
+            match fixed_atom(&item.element, indices, state, work, sequence_depth + 1)? {
                 None => {
                     value = None;
                     break;
@@ -810,20 +812,21 @@ mod tests {
     }
 
     #[test]
-    fn fixed_point_depth_matches_java_choice_sequence_element_calls() {
+    fn fixed_point_depth_ignores_singleton_choices_but_keeps_the_limit() {
         // RustNativeGeneratorTest の RecursiveSemanticShapes.rule と共通の境界。
         for (open, close, limit) in [
-            ("(", ")", 84),
-            ("(", ")+", 63),
-            ("(", ")?", 50),
-            ("(", ")*", 50),
-            ("[", "]", 84),
-            ("{", "}", 84),
+            ("(", ")", 126),
+            ("(", ")+", 84),
+            ("(", ")?", 63),
+            ("(", ")*", 63),
+            ("[", "]", 126),
+            ("{", "}", 126),
+            ("('b' | ", ")", 84),
         ] {
             for depth in [limit, limit + 1] {
                 let source = format!(
                     "grammar Pbt {{ @root @mapping(N0, params=[x]) R0 ::= 'x' H @x; \
-                    H ::= {}'a' M{}; @mapping(NM) M ::= 'm'; }}",
+                    H ::= {}'a' M | 'b'{} | 'c'; @mapping(NM) M ::= 'm'; }}",
                     open.repeat(depth),
                     close.repeat(depth)
                 );
