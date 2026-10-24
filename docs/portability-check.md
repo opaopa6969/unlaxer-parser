@@ -45,7 +45,7 @@ java -cp "unlaxer-dsl/target/classes:$(tr -d '\n' < unlaxer-dsl/target/rust-clas
   Java は class 探索を除いた共通 validator を使う。native CLI は空の `PATH` でも動く。
 - module 解決エラーは `P-MODULE`（終了 3）。複数ファイルを解決した後の診断は `span: null` とする。
   schemaVersion 1 の単一ファイル offset を別ファイルの位置として返さない。ファイルごとの
-  元の構文位置が必要な場合は文字列 API を使う。複数ソース provenance の JSON 拡張は別段階。
+  元の構文位置が必要な場合は文字列 API を使う。独立 grammar の診断まで null 化・dedup される制限と複数ソース provenance は [#776](https://github.com/opaopa6969/unlaxer-parser/issues/776) で追跡する。
 
 | 終了コード | stdout | stderr |
 |---|---|---|
@@ -97,7 +97,8 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | `failed` | 機能 inventory は通過したが、構造検証で拒否された |
 | `unavailable` | UBNF の構文 AST を取得できない |
 
-**構造検証は依然 fail-first**。`P-STRUCTURE` は grammar 全体の範囲であり、すべての
+[複数 grammar](multiple-grammars.md) は独立に構造検証し、後続 grammar の失敗も収集する。
+**各 grammar 内の構造検証は依然 fail-first**。`P-STRUCTURE` は grammar 全体の範囲であり、すべての
 構造エラーやその最小位置を列挙するものではない。例外文言の正規表現解析で code や位置を
 推測しない。UBNF 構文失敗 `P-SYNTAX` は Java frontend の精密な位置 API がないため
 両 host とも `span: null`。部分 AST からの recovery は行わない。
@@ -106,7 +107,9 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 
 | code | 対象 / subject |
 |---|---|
-| `P-GRAMMAR-COUNT` | 単一 grammar 以外 / `expected one grammar`（ファイル全体） |
+| `P-GRAMMAR-COUNT` | grammar が0件の AST / `expected one grammar`（ファイル全体）。複数 grammar は #714 で対応 |
+| `P-GRAMMAR-NAME` | programmatic AST の不正な grammar 名 / 名前（通常のソース入力は frontend が構文検証） |
+| `P-OUTPUT-COLLISION` | ASCII 大小文字を無視した grammar 名の衝突 / `grammar_` + 小文字名（後出 grammar 全体） |
 | `P-IMPORT` | import / path |
 | `P-SETTING` | 未対応 key または block setting / key（`@comment` は下の 2 code で検査） |
 | `E-COMMENT-SETTING` | `@comment: { line: '//' }` 以外の形・重複 / `comment`（setting 全体の範囲）。全体の `@whitespace: javaStyle` と併記した場合は報告せず portable のまま（3.3.0 互換。警告 `W-COMMENT-IGNORED` は validator と `global_comment::warnings` が出す） |

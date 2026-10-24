@@ -32,6 +32,7 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 
 | 機能群 | 現状 | 検証根拠・残る条件 |
 |---|---|---|
+| 同一ファイルの複数 grammar | Java 向けと両 Rust host の独立生成、両 host の Rust check・module 配置・衝突拒否に対応（#714） | [配置契約](../docs/multiple-grammars.md)。共有 corpus の実 compile/parse/map/eval・CP span・byte 一致。grammar 間の rule 合成は行わず、impact は単一 grammar のまま |
 | Classic LSP構文診断 | Java/Rustで未消費末尾と最遠構文失敗を比較して表示位置を選択（#552） | [表示契約](../docs/classic-lsp-diagnostics.md)。TinyCalc共通20ケースを両生成サーバーの実stdioで検証。UTF-16範囲・offset・必要literalを比較し、public parser primary/farthestと資源失敗は保持。候補全体の表示文言はbackend固有 |
 | 最終エラーのrule stack | Detailed時だけ、最終エラーに有効だった規則（外側から、名前と開始CP）を付ける（#703）。確定エラー・ラベル付き失敗は送出時点、通常の失敗は最遠位置に届いた失敗規則呼出し（深い方、同点は先） | [契約・選択規則・コスト](../docs/rule-stack-diagnostics.md)。14 fixture・15入力の手書き期待値をmemo on/off・全診断policyで両runtimeに適用し、memo再生のrebaseを確認。上限32段・省略数・原文CPを保持。失敗したパースだけが対象（成功時は未消費入力用の別API）。TinyCalc 9文書・UBNF `COMMIT`/`LABEL`文法3文書・CRLF分割2文書を両生成LSPの実stdioで`relatedInformation`/`data.ruleStack`まで比較し、property-based testでも両版のstackを照合 |
 | Java UBNF frontend → Rust generator | 対応範囲の生成に対応。識別子境界 #131、annotation境界・eval既定値・commonField trivia #538を修正 | 共通positive/negative frontend fixture、両host生成一致、実consumerで検証。構文の受理とtargetの実装対応を区別 |
