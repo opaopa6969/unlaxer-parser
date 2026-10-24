@@ -1401,6 +1401,7 @@ class ParserRuleEmitter {
 
     static String getChainClassName(ParserGenerator.GenContext ctx, String ruleName) {
         if (ctx.namedWhitespaceByRule.containsKey(ruleName)) return ctx.grammarName + ctx.namedWhitespaceByRule.get(ruleName) + "LazyChain";
+        if (ctx.lineCommentRules.contains(ruleName)) return ctx.grammarName + "LineCommentLazyChain";
         boolean useDelimited = ctx.useDelimitedChainByRule.getOrDefault(ruleName, false);
         if (useDelimited && ctx.hasDelimitedChain) {
             return ctx.grammarName + "LazyChain";

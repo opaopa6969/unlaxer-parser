@@ -171,3 +171,71 @@ fn token_trace_keeps_the_zero_width_java_literal_leaf() {
     assert!(context.parse(&failed).is_ok());
     assert_eq!(context.token_trace().unwrap().unwrap(), vec![]);
 }
+
+/// `spec-corpus/empty-literal` Labeled: `CATCH('a' LABEL(L, ''), 'a' 'b', L) | 'c' LABEL(M, '')`.
+fn labeled() -> Expr {
+    Expr::literal("a")
+        .then(Expr::JavaEmptyWord.label("L"))
+        .catch_labels(Expr::literal("a").then(Expr::literal("b")), ["L"])
+        .or(Expr::literal("c").then(Expr::JavaEmptyWord.label("M")))
+}
+
+#[test]
+fn display_shows_the_empty_expected_candidate_as_java_quotes() {
+    let failure = parse_detailed_with_options(
+        &[Rule {
+            name: "Root",
+            expression: labeled(),
+        }],
+        0,
+        false,
+        "a😀",
+        ParseOptions::default(),
+    )
+    .unwrap_err();
+    // The contract value stays the empty string; only the human-readable text changes (#750).
+    assert_eq!((failure.kind, failure.offset), ("syntax", 1));
+    assert_eq!(failure.expected, vec![String::new(), "b".to_owned()]);
+    assert_eq!(
+        failure.farthest.expected,
+        vec![String::new(), "b".to_owned()]
+    );
+    assert_eq!(
+        failure.canonical_json(),
+        r#"{"kind":"syntax","offset":1,"expected":["","b"],"farthestOffset":1,"farthestExpected":["","b"]}"#
+    );
+    assert_eq!(
+        failure.to_string(),
+        "syntax at code point 1: expected '', b"
+    );
+    assert_eq!(
+        failure.farthest.to_string(),
+        "at code point 1: expected '', b"
+    );
+    // Only the empty candidate is quoted; the others and the separator are unchanged.
+    let only_empty = unlaxer_runtime::ParseError {
+        offset: 0,
+        expected: vec![String::new()],
+    };
+    assert_eq!(only_empty.to_string(), "at code point 0: expected ''");
+    let plain = unlaxer_runtime::ParseError {
+        offset: 2,
+        expected: vec!["a".to_owned(), "end of input".to_owned()],
+    };
+    assert_eq!(
+        plain.to_string(),
+        "at code point 2: expected a, end of input"
+    );
+}
+
+/// Known limit (#750): the empty candidate and a two-quote literal `''` display alike; the
+/// structured value keeps them apart.
+#[test]
+fn empty_and_two_quote_candidates_display_alike_but_keep_distinct_values() {
+    let expected = vec![String::new(), "''".to_owned()];
+    assert_eq!(
+        unlaxer_runtime::display_expected(&expected, " or "),
+        "'' or ''"
+    );
+    assert_ne!(expected[0], expected[1]);
+}

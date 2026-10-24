@@ -163,7 +163,10 @@ impl Backend for GrammarBackend {
                             snapshot.utf16(start).unwrap_or(0)
                         )
                     } else {
-                        format!("Expected {}", expected.join(" or "))
+                        format!(
+                            "Expected {}",
+                            unlaxer_runtime::display_expected(expected, " or ")
+                        )
                     },
                     data: rule_stack_data(
                         json!({"schemaVersion":1,"code":"ULX-PARSE-001","kind":if raised { error.kind } else { "syntax" },"offset":snapshot.utf16(start).unwrap_or(0),"totalLength":snapshot.utf16(snapshot.len()).unwrap_or(0),"expectedTokens":expected}),

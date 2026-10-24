@@ -198,8 +198,8 @@ public class RuleTriviaConformanceTest {
 
         Path target = Path.of("target");
         Files.createDirectories(target);
-        Files.write(target.resolve("rust-rule-trivia.tsv"), report, StandardCharsets.UTF_8);
-        Files.write(target.resolve("rust-rule-trivia-native.tsv"), nativeReport, StandardCharsets.UTF_8);
+        Files.write(target.resolve(reportName() + ".tsv"), report, StandardCharsets.UTF_8);
+        Files.write(target.resolve(reportName() + "-native.tsv"), nativeReport, StandardCharsets.UTF_8);
     }
 
     private URLClassLoader compileJava(GrammarDecl grammar) throws Exception {
@@ -315,6 +315,9 @@ public class RuleTriviaConformanceTest {
     }
 
     protected boolean explicitClassicMapping() { return false; }
+
+    /** Base name of the required CI artifacts written under {@code target/}. */
+    protected String reportName() { return "rust-rule-trivia"; }
 
     protected Path fixtureCorpus() {
         return repo.resolve("unlaxer-dsl/src/test/resources/rule-trivia/corpus.json");
