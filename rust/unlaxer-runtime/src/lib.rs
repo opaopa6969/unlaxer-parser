@@ -4642,10 +4642,11 @@ impl<'a> ParseContext<'a> {
         let result = self.expression(child, depth);
         self.expression_depth -= 1;
         let mut fragment = result?;
+        let nodes = self.metadata_capture_nodes(&fragment);
         fragment.captures.push(Capture {
             name,
             span: self.span(start),
-            nodes: fragment.nodes.clone(),
+            nodes,
         });
         Some(fragment)
     }

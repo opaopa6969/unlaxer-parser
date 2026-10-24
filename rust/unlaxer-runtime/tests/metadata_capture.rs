@@ -138,6 +138,37 @@ fn metadata_keeps_cst_edges_without_publishing_bindings() {
 }
 
 #[test]
+fn classic_rule_collection_keeps_the_metadata_edge() {
+    use unlaxer_runtime::Rule;
+    // A Classic rule keeps only nodes of its own kind. A body that returns only
+    // match-only nodes must still carry the schema marker, as the former Capture did.
+    let parse = |marker: Option<&'static str>| {
+        let rules = vec![Rule {
+            name: "Root",
+            expression: annotate(Expr::literal("x").match_only(), marker),
+        }];
+        let mut context = ParseContext::new("x");
+        let root = context.parse_grammar(rules, 0, false).unwrap().nodes[0];
+        let node = context.node(root).unwrap().clone();
+        (node, context.position(), context.matched_position())
+    };
+    let (ordinary, position, matched) = parse(None);
+    let (annotated, annotated_position, annotated_matched) = parse(Some("#preferred-schema:0"));
+    assert_eq!(
+        (
+            annotated.children.clone(),
+            annotated_position,
+            annotated_matched
+        ),
+        (ordinary.children.clone(), position, matched)
+    );
+    assert!(ordinary.captures.is_empty());
+    assert_eq!(annotated.captures.len(), 1);
+    assert_eq!(annotated.captures[0].name, "#preferred-schema:0");
+    assert!(annotated.captures[0].nodes.is_empty());
+}
+
+#[test]
 fn failed_metadata_does_not_roll_back_the_childs_field_reset() {
     let mut context = ParseContext::new("x");
     context.set_reset_matched_with_consumed(true);

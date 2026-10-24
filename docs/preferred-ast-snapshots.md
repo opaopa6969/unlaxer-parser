@@ -37,7 +37,7 @@ let original_text = snapshot.source_text(selected.span());
 
 通常の `parse_tree` と `map` は従来の CST / AST 契約を保ちます。snapshot は別入口 `parse_tree_for_mapping`、`parse_tree_for_mapping_with_options`、`parse_tree_for_mapping_with_name_snapshots` が作る CST を使ってください。`map_parsed_tree` は grammar root、`map_subtree_tree` は明示した rule entry を扱います。代替 entry を runtime で解析する場合は `parser::mapping_grammar()` が返す共有 grammar を使用できます。
 
-合成 capture（`#preferred-schema:` / `#preferred-depth:` / `#preferred-extra:`）は、両ホストの生成時に `Expr::MetadataCapture` へ変換します。CST の capture edge だけを記録し、ユーザーの `@f` の入力原文検査・Classic の収集・Parsed 原文の破棄・matched cursor の reset は行いません。replay 用 binding も公開しません。失敗した子の reset 方針を保持するため、独自の transaction を開始しません（#788）。ユーザーの `@f` は引き続き `Expr::Capture` として Java の `__CaptureSite` / LazyChain の契約に従います（#762）。 旧生成物に残る合成 `Expr::Capture` を置き換えるには、parser を再生成してください。
+合成 capture（`#preferred-schema:` / `#preferred-depth:` / `#preferred-extra:`）は、両ホストの生成時に `Expr::MetadataCapture` へ変換します。CST の capture edge だけを記録し、ユーザーの `@f` の入力原文検査・Classic の収集・Parsed 原文の破棄・matched cursor の reset は行いません。replay 用 binding も公開しません。失敗した子の reset 方針を保持するため、独自の transaction を開始しません（#788）。ユーザーの `@f` は引き続き `Expr::Capture` として Java の `__CaptureSite` / LazyChain の契約に従います（#762）。旧生成物に残る合成 `Expr::Capture` を置き換えるには、parser を再生成してください。
 
 認識規則は共通ですが、metadata capture が追加されるため、資源上限に達する入力深さは通常入口と異なる場合があります。
 
