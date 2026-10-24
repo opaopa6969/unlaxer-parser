@@ -462,6 +462,10 @@ jobs:
         python3 scripts/check_class_major.py 65 "unlaxer-common/target/unlaxer-common-${artifact_version}.jar" "unlaxer-dsl/target/unlaxer-dsl-${artifact_version}.jar"
         python3 scripts/check_class_major.py 61 "unlaxer-common-jdk17/target/unlaxer-common-jdk17-${artifact_version}.jar" "unlaxer-dsl-jdk17/target/unlaxer-dsl-jdk17-${artifact_version}.jar"
 
+    # Concurrency, self-hosted runners and the bounded network retries of every workflow.
+    - name: Check CI workflow rules
+      run: python3 scripts/tests/test_ci_workflows.py
+
     # 静的解析 (issue #37): Error Prone (compile 時) + SpotBugs。
     # 生成コードは除外 (config/spotbugs-exclude.xml / -XepExcludedPaths)。
     - name: Static analysis (Error Prone + SpotBugs)
