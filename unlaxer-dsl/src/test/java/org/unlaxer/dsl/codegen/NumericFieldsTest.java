@@ -63,4 +63,46 @@ public class NumericFieldsTest {
             .findFirst().orElseThrow().content();
         assertTrue(ast, ast.contains("r#n: i32"));
     }
+
+    /** #758: {@code @typeof} captures use the same capture rule instead of the Java AST inference. */
+    @Test public void typeofConstraintsDoNotRejectRustGenerationAtTheAnalysisWorkLimit() {
+        GrammarDecl grammar = UBNFMapper.parse(NestingLimitGrammars.typeofBesideAnalysisWork(560)).grammars().get(0);
+        RuleDecl root = grammar.rules().get(0);
+        var error = assertThrows(IllegalArgumentException.class, () -> TypeofConstraints.valueType(grammar, root, "m"));
+        assertEquals("E-RECURSIVE-SHAPE: analysis work exceeds 1000000", error.getMessage());
+        assertTrue(NumericFields.isConstraintInteger(grammar, root, "m"));
+        assertTrue(NumericFields.isConstraintInteger(grammar, root, "k"));
+        assertFalse(NumericFields.isConstraintInteger(grammar, root, "x"));
+        var generated = new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar);
+        assertEquals(5, generated.size());
+        String ast = generated.stream().filter(file -> file.relativePath().equals("ast.rs"))
+            .findFirst().orElseThrow().content();
+        assertTrue(ast, ast.contains("r#m: i32"));
+    }
+
+    /** Below the limit, the capture rule for {@code @typeof} agrees with the Java type inference it replaces. */
+    @Test public void typeofCaptureRuleAgreesWithJavaTypeInference() throws Exception {
+        List<String> sources = new ArrayList<>();
+        sources.add(NestingLimitGrammars.typeofBesideAnalysisWork(0));
+        for (String corpus : List.of("../spec-corpus/typeof/generated-cases.json", "../spec-corpus/nested-typeof/generated-cases.json")) {
+            for (var row : JsonParser.parseString(Files.readString(Path.of(corpus))).getAsJsonArray()) {
+                sources.add(row.getAsJsonObject().get("grammar").getAsString());
+            }
+        }
+        int constraints = 0, integers = 0;
+        for (String source : sources) {
+            GrammarDecl grammar = UBNFMapper.parse(source).grammars().get(0);
+            for (RuleDecl rule : grammar.rules()) {
+                if (NestedCaptures.enabled(rule)) continue;
+                for (String capture : TypeofConstraints.captures(rule)) {
+                    String type = TypeofConstraints.valueType(grammar, rule, capture);
+                    boolean integer = List.of("int", "Optional<Integer>", "List<Integer>").contains(type);
+                    assertEquals(rule.name() + "." + capture + "\n" + source, integer, NumericFields.isConstraintInteger(grammar, rule, capture));
+                    constraints++;
+                    if (integer) integers++;
+                }
+            }
+        }
+        assertTrue(constraints + " constraints / " + integers + " integers", integers >= 3 && constraints > integers);
+    }
 }

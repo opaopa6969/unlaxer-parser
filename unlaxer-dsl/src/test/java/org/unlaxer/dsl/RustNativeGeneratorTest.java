@@ -282,9 +282,17 @@ public class RustNativeGeneratorTest {
             repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
         Path binary = repo.resolve("rust/target/debug/unlaxer");
         var report = new ArrayList<>(List.of("case\toutcome\tfiles_identical"));
+        assertAnalysisWorkMatchesNative(binary, "numeric-work-", NestingLimitGrammars::numericBesideAnalysisWork, report);
+        // @typeof refines its captures with the same rule, so it must not run the AST fixed point either.
+        assertAnalysisWorkMatchesNative(binary, "typeof-work-", NestingLimitGrammars::typeofBesideAnalysisWork, report);
+        Files.write(Path.of("target/rust-numeric-analysis-work.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    private void assertAnalysisWorkMatchesNative(Path binary, String prefix,
+            java.util.function.IntFunction<String> grammars, List<String> report) throws Exception {
         for (int fillers : List.of(0, 500, 550, 560, 575, 580, 600, 700)) {
-            String name = "numeric-work-" + fillers;
-            String source = NestingLimitGrammars.numericBesideAnalysisWork(fillers);
+            String name = prefix + fillers;
+            String source = grammars.apply(fillers);
             Path grammar = temporary.newFile(name + ".ubnf").toPath();
             Files.writeString(grammar, source);
             Path output = temporary.getRoot().toPath().resolve(name);
@@ -309,7 +317,6 @@ public class RustNativeGeneratorTest {
             assertTrue(name + "\n" + ast, ast.contains("r#n: i32"));
             report.add(name + "\taccepted\t5");
         }
-        Files.write(Path.of("target/rust-numeric-analysis-work.tsv"), report, StandardCharsets.UTF_8);
     }
 
     private void assertGeneratedBytes(Path binary, String name, String source, boolean preferred, List<String> report) throws Exception {

@@ -644,7 +644,7 @@
         758,
         740
       ],
-      "observation": "Rust両hostの数値判定はcaptureから直接行う。numericBesideAnalysisWork(560)等でJava-hostだけがAST型推論の作業量上限に達する差を修正し、0/500/550/560/575 fillerで生成物5ファイルのbyte一致、580/600/700で同じ作業量診断を検証する。Java targetのAST型推論とその作業量上限、両hostのlowered IR・preferred projectionの上限は維持する。#758はPR merge前のためOPEN。",
+      "observation": "Rust両hostの数値判定はcaptureから直接行う。numericBesideAnalysisWork(560)等でJava-hostだけがAST型推論の作業量上限に達する差を修正し、0/500/550/560/575 fillerで生成物5ファイルのbyte一致、580/600/700で同じ作業量診断を検証する。@typeof制約のcaptureも同じ規則で判定し、typeofBesideAnalysisWorkで同じ掃引を行う。Java targetのAST型推論とその作業量上限、両hostのlowered IR・preferred projectionの上限は維持する。#758はPR merge前のためOPEN。",
       "evidence": [
         "docs/java-parser-limits.md",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NumericFieldsTest.java",

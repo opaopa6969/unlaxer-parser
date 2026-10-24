@@ -14,6 +14,19 @@ public final class NumericFields {
         return numericCaptures(grammar, rule, name);
     }
 
+    /**
+     * Port of numeric_fields.rs refine for a {@code @typeof} capture: a published capture follows the
+     * mapping, and an unpublished one only the captures of its own rule.
+     */
+    public static boolean isConstraintInteger(GrammarDecl grammar, RuleDecl rule, String name) {
+        boolean published = rule.annotations().stream().filter(MappingAnnotation.class::isInstance)
+                .anyMatch(annotation -> ((MappingAnnotation) annotation).paramNames().contains(name));
+        if (published) return numericCaptures(grammar, rule, name);
+        var captures = new java.util.ArrayList<Boolean>();
+        collect(grammar, rule.body(), name, captures);
+        return !captures.isEmpty() && !captures.contains(false);
+    }
+
     /** Port of numeric_fields.rs refine: every contributor of the mapping captures only numbers. */
     static boolean numericCaptures(GrammarDecl grammar, RuleDecl rule, String name) {
         String mapping = mapping(rule);
