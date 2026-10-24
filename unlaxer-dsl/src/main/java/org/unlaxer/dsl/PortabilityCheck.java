@@ -138,10 +138,13 @@ public final class PortabilityCheck {
             add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (var problem : org.unlaxer.dsl.codegen.RaisingOperators.problems(grammar))
             add(out, problem.code(), snapshot, problem.element(), problem.subject());
+        for (var issue : org.unlaxer.dsl.codegen.GlobalComment.problems(grammar))
+            add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (ImportDecl decl : grammar.imports()) add(out, "P-IMPORT", snapshot, decl, decl.path());
         for (GlobalSetting setting : grammar.settings()) {
-            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream", "embedded", "embedding").contains(setting.key())
-                || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract", "embedded").contains(setting.key()))) {
+            // @comment has its own E-COMMENT-* diagnostics, including the block form check.
+            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream", "embedded", "embedding", "comment").contains(setting.key())
+                || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract", "embedded", "comment").contains(setting.key()))) {
                 add(out, "P-SETTING", snapshot, setting, setting.key());
             }
             if (setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value

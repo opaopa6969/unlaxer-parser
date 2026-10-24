@@ -1168,12 +1168,15 @@ impl ParseContext<'_> {
         owner_start: usize,
         depth: usize,
     ) -> Option<()> {
-        if self.token_mode.is_none() || !self.whitespace && self.lexical_trivia.is_none() {
+        if self.token_mode.is_none()
+            || !self.whitespace && self.lexical_trivia.is_none() && !self.line_comments
+        {
             self.skip();
             return Some(());
         }
         let start = self.position;
         let definition = self.lexical_trivia.clone();
+        let line_comments = self.line_comments;
         // Java generated delimiters own their lexical program. They do not run
         // through the surrounding contextual lexer or recursively delimit themselves.
         let previous_context = self.lexical_context.take();
@@ -1184,6 +1187,8 @@ impl ParseContext<'_> {
                     &Expr::Lexical("Whitespace", definition).repeat_java(0, None),
                     depth,
                 )
+            } else if line_comments {
+                context.expression(classic_line_comments(), depth)
             } else {
                 context.expression(classic_whitespace(), depth)
             }
@@ -1528,6 +1533,13 @@ fn classic_whitespace() -> &'static Expr {
             ]),
         ])
         .repeat_java(0, None)
+    })
+}
+/// Java `ZeroOrMore(CPPComment)` of a global `@comment` (#712).
+fn classic_line_comments() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::sequence([Expr::literal("//"), Expr::Custom(classic_line_body)]).repeat_java(0, None)
     })
 }
 fn classic_line_body(context: &mut ParseContext<'_>) -> ParseResult {

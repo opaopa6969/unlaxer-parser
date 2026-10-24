@@ -111,7 +111,9 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | `P-GRAMMAR-NAME` | programmatic AST の不正な grammar 名 / 名前（通常のソース入力は frontend が構文検証） |
 | `P-OUTPUT-COLLISION` | ASCII 大小文字を無視した grammar 名の衝突 / `grammar_` + 小文字名（後出 grammar 全体） |
 | `P-IMPORT` | import / path |
-| `P-SETTING` | 未対応 key または block setting / key |
+| `P-SETTING` | 未対応 key または block setting / key（`@comment` は下の 2 code で検査） |
+| `E-COMMENT-SETTING` | `@comment: { line: '//' }` 以外の形・重複 / `comment`（setting 全体の範囲）。全体の `@whitespace: javaStyle` と併記した場合は報告せず portable のまま（3.3.0 互換。警告 `W-COMMENT-IGNORED` は validator と `global_comment::warnings` が出す） |
+| `E-COMMENT-WHITESPACE` | 名前付き global `@whitespace` と `@comment` の併記 / whitespace 名（`@comment` の範囲） |
 | `P-WHITESPACE` | `none` / `javaStyle` 以外 / style |
 | `P-EXTERNAL-TOKEN` | 実際の lowerer の組み込み対応表にない Simple token / class 名 |
 | `E-REGEX-RETIRED` | 廃止された `REGEX(...)` / `RegexTokenParser`。宣言的字句式へ移行（公開済み3.3.0は変更なし） |

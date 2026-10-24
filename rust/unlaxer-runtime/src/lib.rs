@@ -192,6 +192,8 @@ pub enum Expr {
     TriviaScope {
         child: Box<Expr>,
         whitespace: bool,
+        /// Java `CPPComment` only (`//` up to CR / LF / EOF), a global `@comment` (#712).
+        line_comments: bool,
     },
     Optional(Box<Expr>),
     /// Java Occurs retains a failed direct consuming atom's match-cursor reset.
@@ -449,6 +451,15 @@ impl Expr {
         Self::TriviaScope {
             child: Box::new(self),
             whitespace,
+            line_comments: false,
+        }
+    }
+    /// Sequence boundaries skip only Java `CPPComment`s; line terminators stay significant.
+    pub fn line_comment_scope(self) -> Self {
+        Self::TriviaScope {
+            child: Box::new(self),
+            whitespace: false,
+            line_comments: true,
         }
     }
     pub fn rule_effects(self, effects: RuleEffects) -> Self {
@@ -741,13 +752,29 @@ pub struct ParseError {
     pub expected: Vec<String>,
 }
 
+/// Human-readable expected candidates (#750): the empty literal `''` (Java's `WordParser("")`)
+/// is shown as `''`, as Java displays it; the stored value stays `""`. Other candidates as is.
+pub fn display_expected(expected: &[String], separator: &str) -> String {
+    expected
+        .iter()
+        .map(|candidate| {
+            if candidate.is_empty() {
+                "''"
+            } else {
+                candidate.as_str()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(separator)
+}
+
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "at code point {}: expected {}",
             self.offset,
-            self.expected.join(", ")
+            display_expected(&self.expected, ", ")
         )
     }
 }
@@ -789,7 +816,7 @@ impl std::fmt::Display for ParseDiagnostic {
             "{} at code point {}: expected {}",
             self.kind,
             self.offset,
-            self.expected.join(", ")
+            display_expected(&self.expected, ", ")
         )
     }
 }
@@ -1294,6 +1321,12 @@ impl FailureMemoKey {
         self.depth_and_modes |= usize::from(enabled) << 15;
         self
     }
+    /// The comment-only trivia of a global `@comment` (#712) is a policy of its own: a rule's
+    /// result under it is not its result with whitespace on or off, for failures and successes.
+    fn with_line_comments(mut self, enabled: bool) -> Self {
+        self.depth_and_modes |= usize::from(enabled) << 16;
+        self
+    }
     fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
         self.depth_and_modes = (self.depth_and_modes & !6)
             | (usize::from(policy.reset) << 2)
@@ -1685,6 +1718,7 @@ pub struct ParseContext<'a> {
     token_stream_scope: bool,
     rules: Arc<[Rule]>,
     whitespace: bool,
+    line_comments: bool,
     lexical_trivia: Option<lexical::LexicalExpression>,
     lexical_context: Option<Arc<[lexing::Terminal]>>,
     position: usize,
@@ -2114,6 +2148,7 @@ impl<'a> ParseContext<'a> {
             grammar_frontier: false,
             match_cursor_policy: MatchCursorPolicy::default(),
             whitespace: false,
+            line_comments: false,
             lexical_trivia: None,
             lexical_context: None,
             position: 0,
@@ -2563,6 +2598,7 @@ impl<'a> ParseContext<'a> {
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         self.track_owned_source |= shared_grammar_needs_owned_source(&self.rules);
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
+        let previous_line_comments = std::mem::take(&mut self.line_comments);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
             memo_safe_rules(grammar)
         } else {
@@ -2592,6 +2628,7 @@ impl<'a> ParseContext<'a> {
             self.lexing = previous_lexing;
         }
         self.whitespace = previous_whitespace;
+        self.line_comments = previous_line_comments;
         self.lexical_trivia = previous_definition;
         self.memo_safe_rules = previous_safe_rules;
         self.success_memo_safe_rules = previous_success_safe_rules;
@@ -2609,10 +2646,21 @@ impl<'a> ParseContext<'a> {
         whitespace: bool,
         operation: impl FnOnce(&mut Self) -> T,
     ) -> T {
+        self.with_trivia_policy(whitespace, false, operation)
+    }
+
+    fn with_trivia_policy<T>(
+        &mut self,
+        whitespace: bool,
+        line_comments: bool,
+        operation: impl FnOnce(&mut Self) -> T,
+    ) -> T {
         let previous_definition = self.lexical_trivia.take();
         let previous = std::mem::replace(&mut self.whitespace, whitespace);
+        let previous_line_comments = std::mem::replace(&mut self.line_comments, line_comments);
         let result = operation(self);
         self.whitespace = previous;
+        self.line_comments = previous_line_comments;
         self.lexical_trivia = previous_definition;
         result
     }
@@ -2970,6 +3018,7 @@ impl<'a> ParseContext<'a> {
         .with_match_policy(self.match_cursor_policy)
         .with_token_mode(self.token_mode)
         .with_owned_source(self.track_owned_source)
+        .with_line_comments(self.line_comments)
         .with_state_version(self.scopes.memo_version().expect("memo version checked"));
         let position = self.code_point(self.position);
         if let Some(result) = self.probe_rule_memo(position, &key) {
@@ -3391,9 +3440,13 @@ impl<'a> ParseContext<'a> {
             Expr::LexicalTriviaScope { child, definition } => {
                 self.expression_with_lexical_trivia(child, definition, depth)
             }
-            Expr::TriviaScope { child, whitespace } => {
-                self.with_trivia(*whitespace, |context| context.expression(child, depth))
-            }
+            Expr::TriviaScope {
+                child,
+                whitespace,
+                line_comments,
+            } => self.with_trivia_policy(*whitespace, *line_comments, |context| {
+                context.expression(child, depth)
+            }),
             Expr::Sequence(elements) => self.sequence(elements, depth),
             Expr::NonOrdered(children) => self.non_ordered(children, depth),
             Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
@@ -3660,8 +3713,10 @@ impl<'a> ParseContext<'a> {
     ) -> Option<Fragment> {
         let previous = self.lexical_trivia.replace(definition.clone());
         let previous_whitespace = std::mem::replace(&mut self.whitespace, false);
+        let previous_line_comments = std::mem::take(&mut self.line_comments);
         let result = self.expression(child, depth);
         self.whitespace = previous_whitespace;
+        self.line_comments = previous_line_comments;
         self.lexical_trivia = previous;
         result
     }
@@ -5123,7 +5178,7 @@ impl<'a> ParseContext<'a> {
         let Some(table) = &self.first_sets else {
             return false;
         };
-        if self.token_mode.is_some() || self.lexical_trivia.is_some() {
+        if self.token_mode.is_some() || self.lexical_trivia.is_some() || self.line_comments {
             return false;
         }
         if first::of(candidate, table).may_start(&self.input[self.position..], self.whitespace) {
@@ -5154,6 +5209,13 @@ impl<'a> ParseContext<'a> {
                 position = end;
             }
             return &raw[position..];
+        }
+        if self.line_comments {
+            let mut rest = raw;
+            while let Some(comment) = rest.strip_prefix("//") {
+                rest = &comment[comment.find(['\r', '\n']).unwrap_or(comment.len())..];
+            }
+            return rest;
         }
         if !self.whitespace {
             return raw;
@@ -5226,6 +5288,10 @@ impl<'a> ParseContext<'a> {
             }
             return;
         }
+        if self.line_comments {
+            self.skip_line_comments();
+            return;
+        }
         if !self.whitespace {
             return;
         }
@@ -5260,6 +5326,22 @@ impl<'a> ParseContext<'a> {
                 break;
             }
             self.matched_position = self.position;
+        }
+    }
+
+    /// Java `ZeroOrMore(CPPComment)`: `//` and the rest of the line are consumed, while the
+    /// `MatchOnly` line terminator (CRLF, CR, LF or EOF) still advances the matched cursor.
+    fn skip_line_comments(&mut self) {
+        while self.input[self.position..].starts_with("//") {
+            let body = &self.input[self.position + 2..];
+            self.position += 2 + body.find(['\r', '\n']).unwrap_or(body.len());
+            let rest = &self.input[self.position..];
+            self.matched_position = self.position
+                + if rest.starts_with("\r\n") {
+                    2
+                } else {
+                    usize::from(rest.starts_with(['\r', '\n']))
+                };
         }
     }
 

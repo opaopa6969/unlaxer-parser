@@ -5,6 +5,7 @@ mod common_fields;
 mod embedded;
 mod evaluation;
 mod grammar_files;
+pub mod global_comment;
 pub mod impact;
 mod lexical;
 mod lexical_contexts;

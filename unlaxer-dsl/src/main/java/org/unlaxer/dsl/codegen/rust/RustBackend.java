@@ -522,6 +522,7 @@ public final class RustBackend {
             .collect(java.util.stream.Collectors.joining(", ")) + "])";
         if (expression instanceof LexicalTriviaScope scope) return expression(scope.child()) + ".lexical_trivia_scope(" + lexicalExpression(scope.definition()) + ")";
         if (expression instanceof TriviaScope scope) {
+            if (scope.lineComments()) return expression(scope.child()) + ".line_comment_scope()";
             return expression(scope.child()) + ".trivia_scope(" + scope.javaWhitespace() + ")";
         }
         if (expression instanceof OptionalExpr optional) {
