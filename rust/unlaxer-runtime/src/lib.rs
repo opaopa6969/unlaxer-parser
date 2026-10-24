@@ -192,6 +192,8 @@ pub enum Expr {
     TriviaScope {
         child: Box<Expr>,
         whitespace: bool,
+        /// Java `CPPComment` only (`//` up to CR / LF / EOF), a global `@comment` (#712).
+        line_comments: bool,
     },
     Optional(Box<Expr>),
     /// Java Occurs retains a failed direct consuming atom's match-cursor reset.
@@ -449,6 +451,15 @@ impl Expr {
         Self::TriviaScope {
             child: Box::new(self),
             whitespace,
+            line_comments: false,
+        }
+    }
+    /// Sequence boundaries skip only Java `CPPComment`s; line terminators stay significant.
+    pub fn line_comment_scope(self) -> Self {
+        Self::TriviaScope {
+            child: Box::new(self),
+            whitespace: false,
+            line_comments: true,
         }
     }
     pub fn rule_effects(self, effects: RuleEffects) -> Self {
@@ -842,7 +853,7 @@ struct Fragment {
 
 #[derive(Debug, Clone)]
 struct FragmentSource {
-    // owned capture のときだけ保持する、commit 済み原文と異なる Parsed 原文。
+    // owned capture の値と @f の入力由来検査に使う、commit 済み原文と異なる Parsed 原文。
     parsed_source: Option<Box<FragmentSource>>,
     span: Span,
     kind: token::TokenKind,
@@ -1310,6 +1321,12 @@ impl FailureMemoKey {
         self.depth_and_modes |= usize::from(enabled) << 15;
         self
     }
+    /// The comment-only trivia of a global `@comment` (#712) is a policy of its own: a rule's
+    /// result under it is not its result with whitespace on or off, for failures and successes.
+    fn with_line_comments(mut self, enabled: bool) -> Self {
+        self.depth_and_modes |= usize::from(enabled) << 16;
+        self
+    }
     fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
         self.depth_and_modes = (self.depth_and_modes & !6)
             | (usize::from(policy.reset) << 2)
@@ -1701,6 +1718,7 @@ pub struct ParseContext<'a> {
     token_stream_scope: bool,
     rules: Arc<[Rule]>,
     whitespace: bool,
+    line_comments: bool,
     lexical_trivia: Option<lexical::LexicalExpression>,
     lexical_context: Option<Arc<[lexing::Terminal]>>,
     position: usize,
@@ -2130,6 +2148,7 @@ impl<'a> ParseContext<'a> {
             grammar_frontier: false,
             match_cursor_policy: MatchCursorPolicy::default(),
             whitespace: false,
+            line_comments: false,
             lexical_trivia: None,
             lexical_context: None,
             position: 0,
@@ -2579,6 +2598,7 @@ impl<'a> ParseContext<'a> {
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         self.track_owned_source |= shared_grammar_needs_owned_source(&self.rules);
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
+        let previous_line_comments = std::mem::take(&mut self.line_comments);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
             memo_safe_rules(grammar)
         } else {
@@ -2608,6 +2628,7 @@ impl<'a> ParseContext<'a> {
             self.lexing = previous_lexing;
         }
         self.whitespace = previous_whitespace;
+        self.line_comments = previous_line_comments;
         self.lexical_trivia = previous_definition;
         self.memo_safe_rules = previous_safe_rules;
         self.success_memo_safe_rules = previous_success_safe_rules;
@@ -2625,10 +2646,21 @@ impl<'a> ParseContext<'a> {
         whitespace: bool,
         operation: impl FnOnce(&mut Self) -> T,
     ) -> T {
+        self.with_trivia_policy(whitespace, false, operation)
+    }
+
+    fn with_trivia_policy<T>(
+        &mut self,
+        whitespace: bool,
+        line_comments: bool,
+        operation: impl FnOnce(&mut Self) -> T,
+    ) -> T {
         let previous_definition = self.lexical_trivia.take();
         let previous = std::mem::replace(&mut self.whitespace, whitespace);
+        let previous_line_comments = std::mem::replace(&mut self.line_comments, line_comments);
         let result = operation(self);
         self.whitespace = previous;
+        self.line_comments = previous_line_comments;
         self.lexical_trivia = previous_definition;
         result
     }
@@ -2986,6 +3018,7 @@ impl<'a> ParseContext<'a> {
         .with_match_policy(self.match_cursor_policy)
         .with_token_mode(self.token_mode)
         .with_owned_source(self.track_owned_source)
+        .with_line_comments(self.line_comments)
         .with_state_version(self.scopes.memo_version().expect("memo version checked"));
         let position = self.code_point(self.position);
         if let Some(result) = self.probe_rule_memo(position, &key) {
@@ -3276,14 +3309,10 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
         // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
-        self.rule_result_source = self
-            .track_owned_source
-            .then(|| {
-                fragment
-                    .parsed_source()
-                    .map(|source| Box::new(source.clone()))
-            })
-            .flatten();
+        self.rule_result_source = fragment
+            .parsed_source()
+            .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
+            .map(|source| Box::new(source.clone()));
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
         let classic = fragment
             .source
@@ -3391,16 +3420,21 @@ impl<'a> ParseContext<'a> {
             Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
                 nodes: vec![id],
                 captures: Vec::new(),
-                source: self.tokens.values.get(&id).map(|value| {
-                    Box::new(FragmentSource {
-                        parsed_source: None,
-                        span: self.nodes[id].span,
-                        kind: value.kind,
-                        classic: value.classic,
-                        generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                        text: value.source.owned_shared().map(Box::new),
+                source: self
+                    .tokens
+                    .values
+                    .get(&id)
+                    .map(|value| {
+                        Box::new(FragmentSource {
+                            parsed_source: self.rule_result_source.take(),
+                            span: self.nodes[id].span,
+                            kind: value.kind,
+                            classic: value.classic,
+                            generated: matches!(value.source, token::TokenSource::Generated { .. }),
+                            text: value.source.owned_shared().map(Box::new),
+                        })
                     })
-                }),
+                    .or_else(|| self.rule_result_source.take()),
             }),
             Expr::LexicalContextScope { child, terminals } => {
                 self.expression_with_lexical_context(child, terminals, depth)
@@ -3408,9 +3442,13 @@ impl<'a> ParseContext<'a> {
             Expr::LexicalTriviaScope { child, definition } => {
                 self.expression_with_lexical_trivia(child, definition, depth)
             }
-            Expr::TriviaScope { child, whitespace } => {
-                self.with_trivia(*whitespace, |context| context.expression(child, depth))
-            }
+            Expr::TriviaScope {
+                child,
+                whitespace,
+                line_comments,
+            } => self.with_trivia_policy(*whitespace, *line_comments, |context| {
+                context.expression(child, depth)
+            }),
             Expr::Sequence(elements) => self.sequence(elements, depth),
             Expr::NonOrdered(children) => self.non_ordered(children, depth),
             Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
@@ -3678,8 +3716,10 @@ impl<'a> ParseContext<'a> {
     ) -> Option<Fragment> {
         let previous = self.lexical_trivia.replace(definition.clone());
         let previous_whitespace = std::mem::replace(&mut self.whitespace, false);
+        let previous_line_comments = std::mem::take(&mut self.line_comments);
         let result = self.expression(child, depth);
         self.whitespace = previous_whitespace;
+        self.line_comments = previous_line_comments;
         self.lexical_trivia = previous;
         result
     }
@@ -4165,12 +4205,15 @@ impl<'a> ParseContext<'a> {
                                 .get(index)
                                 .is_some_and(|info| info.classic)
                         });
-                    let source = classic.then(|| {
+                    // 原文の由来は Classic の収集モードとは独立して保持する。
+                    let non_input = info
+                        .is_some_and(|info| !matches!(info.source, token::TokenSource::Input(_)));
+                    let source = (classic || non_input).then(|| {
                         Box::new(FragmentSource {
                             parsed_source: None,
                             span: matched.span,
                             kind: info.map_or(self.token_mode().kind, |info| info.kind),
-                            classic: true,
+                            classic,
                             generated: info.is_some_and(|info| {
                                 matches!(info.source, token::TokenSource::Generated { .. })
                             }),
@@ -4602,10 +4645,18 @@ impl<'a> ParseContext<'a> {
         anchor: usize,
         owned: bool,
     ) -> Option<Fragment> {
+        // Java は Choice/rule が返した Parsed を、@f の収集より先に検査する。
+        if !owned
+            && fragment
+                .parsed_source()
+                .is_some_and(|source| source.text.is_some() || source.generated)
+        {
+            self.fail("AST field capture requires original input source; use capture_owned for general replay");
+            return None;
+        }
         if !owned && self.token_mode.is_some() {
             // Java の @f は LazyChain なので、現在の kind の子だけを収集する。
             // 直接の LOOKAHEAD（match-only）は consumed の @f では幅0になる（#742）。
-            // 入力以外の原文は Java と同じく収集前の子の原文で拒否する（下の検査）。
             let kind = self.token_mode().kind;
             if fragment.source.as_deref().is_some_and(|source| {
                 source.classic && source.kind != kind && source.text.is_none() && !source.generated
@@ -4628,14 +4679,6 @@ impl<'a> ParseContext<'a> {
         );
         if !owned {
             // Keep the existing AST field contract and its input-only metadata.
-            if fragment
-                .source
-                .as_deref()
-                .is_some_and(|source| source.text.is_some() || source.generated)
-            {
-                self.fail("AST field capture requires original input source; use capture_owned for general replay");
-                return None;
-            }
             self.captures.push(name, span);
             fragment.captures.push(Capture {
                 name,
@@ -4643,9 +4686,7 @@ impl<'a> ParseContext<'a> {
                 nodes: fragment.nodes.clone(),
             });
             // @f は consumed の収集境界。外側の owned capture へ Parsed 原文を渡さない。
-            if self.track_owned_source {
-                fragment.clear_parsed_source();
-            }
+            fragment.clear_parsed_source();
             if fragment
                 .source
                 .as_deref()
@@ -4655,7 +4696,7 @@ impl<'a> ParseContext<'a> {
             }
             return Some(fragment);
         }
-        let source = match source.filter(|source| source.classic) {
+        let source = match source {
             Some(source) if source.generated => token::TokenSource::Generated {
                 anchor: source.span.start,
                 text: source
@@ -4791,6 +4832,14 @@ impl<'a> ParseContext<'a> {
             | Expr::InputCaptureBoundary(_, child) => {
                 let start = self.position;
                 let mut fragment = self.expression(child, depth)?;
+                if matches!(expression, Expr::InputCaptureBoundary(_, _))
+                    && fragment
+                        .parsed_source()
+                        .is_some_and(|source| source.text.is_some() || source.generated)
+                {
+                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
+                    return None;
+                }
                 if self.track_owned_source {
                     fragment.clear_parsed_source();
                 }
@@ -4801,15 +4850,6 @@ impl<'a> ParseContext<'a> {
                     .is_some_and(|source| !source.classic)
                 {
                     fragment.source = None;
-                }
-                if matches!(expression, Expr::InputCaptureBoundary(_, _))
-                    && fragment
-                        .source
-                        .as_deref()
-                        .is_some_and(|source| source.text.is_some() || source.generated)
-                {
-                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
-                    return None;
                 }
                 if let Expr::CaptureBoundary(kind, _) | Expr::InputCaptureBoundary(kind, _) =
                     expression
@@ -5141,7 +5181,7 @@ impl<'a> ParseContext<'a> {
         let Some(table) = &self.first_sets else {
             return false;
         };
-        if self.token_mode.is_some() || self.lexical_trivia.is_some() {
+        if self.token_mode.is_some() || self.lexical_trivia.is_some() || self.line_comments {
             return false;
         }
         if first::of(candidate, table).may_start(&self.input[self.position..], self.whitespace) {
@@ -5172,6 +5212,13 @@ impl<'a> ParseContext<'a> {
                 position = end;
             }
             return &raw[position..];
+        }
+        if self.line_comments {
+            let mut rest = raw;
+            while let Some(comment) = rest.strip_prefix("//") {
+                rest = &comment[comment.find(['\r', '\n']).unwrap_or(comment.len())..];
+            }
+            return rest;
         }
         if !self.whitespace {
             return raw;
@@ -5244,6 +5291,10 @@ impl<'a> ParseContext<'a> {
             }
             return;
         }
+        if self.line_comments {
+            self.skip_line_comments();
+            return;
+        }
         if !self.whitespace {
             return;
         }
@@ -5278,6 +5329,22 @@ impl<'a> ParseContext<'a> {
                 break;
             }
             self.matched_position = self.position;
+        }
+    }
+
+    /// Java `ZeroOrMore(CPPComment)`: `//` and the rest of the line are consumed, while the
+    /// `MatchOnly` line terminator (CRLF, CR, LF or EOF) still advances the matched cursor.
+    fn skip_line_comments(&mut self) {
+        while self.input[self.position..].starts_with("//") {
+            let body = &self.input[self.position + 2..];
+            self.position += 2 + body.find(['\r', '\n']).unwrap_or(body.len());
+            let rest = &self.input[self.position..];
+            self.matched_position = self.position
+                + if rest.starts_with("\r\n") {
+                    2
+                } else {
+                    usize::from(rest.starts_with(['\r', '\n']))
+                };
         }
     }
 

@@ -275,7 +275,7 @@
   },
   {
     "name": "comment",
-    "note": "@comment is not analysed yet (#712): Java and Rust differ.",
+    "note": "@comment is not analysed yet (#745), although its Java and Rust meaning agree since #712.",
     "grammar": "grammar Commented {\n  @comment: { line: '//' }\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
     "findings": []
   },
