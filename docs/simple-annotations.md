@@ -132,7 +132,7 @@ Java 生成物、Java-host Rust の生成物と CLI 出力、移植可能性検�
 
 ## 制限
 
-- `W-COMMENT-IGNORED`（#712 / PR #748）はまだこの仕組みに載せていない。後続 issue で扱う。
+- `W-COMMENT-IGNORED`（#712）はまだこの仕組みに載せていない（validator と `global_comment::warnings` だけが出す）。#777 で扱う。
 - `@autoCommit` の解析は、他の Simple annotation を持つ rule を従来どおり opaque として扱う
   （その rule 自身の `@autoCommit` は `W-AUTO-COMMIT-SKIPPED`、reason=opaque）。警告文はこれを示すが、
   実際に挿入が変わったかどうかまでは判定しない。
