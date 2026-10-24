@@ -303,7 +303,7 @@ let matched = context.parse(&MyParser)?;
 
 `source`/`remaining`/`position`/`advance`/`text`で入力を扱い、`set_state`/`state::<T>`/`state_mut::<T>`で`Any + Clone`の値を共有する。位置・移動量はコードポイント単位。利用者状態の`Clone`は変更可能な内容を独立コピーする必要がある。`Rc<RefCell<_>>`等の共有内部状態、ファイル操作等の副作用、panic unwindはrollback対象ではない。panicを捕捉した後はcontextを再利用しない。
 
-`Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。genericな無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。UBNFではJava互換用の`JavaOptional`/`JavaRepeat`等も生成する。Custom・BackreferenceのUBNF接続は未実装。
+`Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。genericな無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。UBNFではJava互換用の`JavaOptional`/`JavaRepeat`等も生成する。この低水準 `Custom(fn)` / `Backreference(name)` を直接指定するUBNF構文はない。明示adapter bindingは [ADAPTER](../docs/token-adapters.md)、owned capture/replayは [CAPTURE / SAME_AS](../docs/general-owned-capture-syntax.md) から両hostで生成できる。後者は下記のcontext全体のcaptureとは異なる契約である（[台帳](../docs/parity-ledger.md)）。
 
 `captured(name)`と`Backreference(name)`はcontext全体の同名captureの最新成功分を使用する。`capture_spans`は成功履歴を返す。字句スコープやJavaのcapture伝播規則を再現したものではない。
 `Expr::compare_captures(name, child)`は別のeffectで、childが返す同名captureを完了順に比較し、
@@ -341,7 +341,7 @@ Javaの`ParseContext`は消費位置とマッチ専用位置を分ける。Rust�
 
 例えば`LOOKAHEAD('a')`の後に`LOOKAHEAD('b')`を置くと、`ab`を消費せず順にマッチする。`Expr::literal("a").ahead()`を2回行うPEGの検査とは異なる。既存の`ahead`/`not_ahead`/`Until`/`Empty`の契約は変更していない。UBNFのマッチ専用tokenをcaptureした文字列は**消費した部分**なので空文字であり、先読みしたpattern本体ではない。
 
-UBNFのoptional/repeatは`optional_java`/`repeat_java`を生成する。Java `Occurs`と同じく、有限repeatも消費が進まない成功を1回数えた時点で停止する。上限0でも子を1回試し、成功すれば個数超過で失敗するJavaの挙動も保持する。直接の消費atomが失敗した場合、optionalやrepeat内ではマッチ位置だけが消費位置へ戻る。一方、rule/sequence/captureで包んだ子はtransactionで元の位置へ戻る。これらをgenericな`optional`/`repeat`に混入させない。空消費が可能な無限repeatは引き続きUBNF生成前に拒否する。
+UBNFのoptional/repeatは`optional_java`/`repeat_java`を生成する。Java `Occurs`と同じく、active cursorが進まない成功を1回数えた時点で停止する。[上限0の通常反復](../docs/zero-repetition.md)は両版で子を実行せず成功する（歴史的な `Zero` / `ZeroMatch` の負の検査とは別）。直接の消費atomが失敗した場合、optionalやrepeat内ではマッチ位置だけが消費位置へ戻る。一方、rule/sequence/captureで包んだ子はtransactionで元の位置へ戻る。これらをgenericな`optional`/`repeat`に混入させない。通常のUBNF規則では[nullableな無限反復](../docs/nullable-repetition.md)もこの停止規則で生成できる。宣言的字句式のnullable検証とpure PEGのzero-progress拒否は別契約である。
 
 `CHAR_RANGE`境界は現在のUBNF ASTの`char`型に合わせて単一の非surrogate BMP文字に限定し、空・複数文字・補助文字・逆順は明示拒否する。`ANY`/`NEGATION`と文字列patternは補助文字もコードポイントとして扱う。Rustへ渡す文字列の不正な単独surrogateは生成前に拒否する。
 

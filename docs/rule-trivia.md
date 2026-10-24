@@ -66,12 +66,10 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
 CI は `target/rust-rule-trivia.tsv` を必須 artifact にする。Rust 無効の通常ローカル
 test で skip されたことを、この適合性検証の成功には数えない。
 
-任意 trivia parser の登録、global comment 設定、scope metadata、evaluator、
-full tinyexpression-rs、rustcodeblock、LSP/DAP は別の未完了項目として追跡する。
-
-実 tinyexpression `2a2db7c` の P4 文法を native generator へ渡すと、この変更で
+以下は #172 当時の履歴であり、現在の未対応一覧ではない。実 tinyexpression `2a2db7c` の P4 文法を native generator へ渡すと、この変更で
 `Formula` の `@interleave` を通過し、次の未対応 `@scopeTree(mode=lexical)` を
-exit 3 で明示拒否する。P4 全体の生成成功や full-spec 完了を意味しない。
+exit 3 で明示拒否していた。scope metadata は #176、evaluator や Rust LSP/DAP も後続で対応済み。
+global comment は #712、残る full-spec 範囲は #111 と [既知差台帳](parity-ledger.md) を参照する。
 
 ## 名前付き lexical 空白定義（#393、親 #368）
 

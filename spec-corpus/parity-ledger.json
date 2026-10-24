@@ -1,0 +1,1540 @@
+{
+  "schema_version": 1,
+  "audited_on": "2026-10-24",
+  "audited_revision": "49c9ab295d8cd5d5ed3a841908ab7a0a9eb842d9",
+  "scope_notes": [
+    "Java runtime/生成物、Rust runtimeとJava-host/nativeの両生成経路を区別する。hostの省略は互換性の証明にはしない。",
+    "docs、README、rust/FULL-SPEC、spec-corpus/conformance、Java test resources、docs/fixtures、全Java/Rust/Pythonのdisable/assume/skip、CIの条件を横断した。過去のstory/dge/設計案と実装済みの規範文書は区別する。",
+    "検索例: `rg -n \"@Disabled|@Ignore|Assume|assumeTrue|assumeFalse|#\\[ignore|skipUnless|skipIf|skipTest|pytest.skip\" --glob \"*.java\" --glob \"*.rs\" --glob \"*.py\"`。さらに `skipped_validate` / `RUNTIME_SCOPE_IDS` 等の条件分岐を確認した。",
+    "3分類を項目ごとに記録する。試験環境のopt-inは製品差ではないので契約として分類し、内部の未駆動caseは検証の未修正差として明記する。",
+    "`spec-corpus/property-based/known-differences.json` はPBT findingの許可表なので空のまま維持する。全repo台帳をPBTの許可表へコピーして失敗を抑制しない。",
+    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。CST #767、Number #752、Java生成 #754、作業量 #758は別のOPEN issueへ結ぶ。#741の境界差は契約化済み。",
+    "CLOSED #331/#545/#571/#176/#537の後に残った旧未対応記述（回復内match-only、汎用伝播、Rust LSP/DAP、scopeTree、enum/eval、Backreference）は現行契約へ訂正する。未解決範囲はOPEN #111と個別子issueで追跡する。",
+    "規範違反の量指定子overflow #783 と、内部条件付き除外の検証漏れ #784 を新規作成した。個別issueのない残機能群は既存全仕様issue #111の受け入れ範囲に結ぶ。",
+    "catalog/corpus.jsonのGsonが許していた単引用符escapeを同じ復号値の標準JSONへ訂正した。JSONの不正構文を黙って走査から除外しない。",
+    "host別corpusの値の一致/差と未対応の意味分類は人が監査する。検査は新しいファイル/キー/出現数と台帳参照の欠落を落とすが、任意の新規skip条件や文書の意味を自動分類しない。"
+  ],
+  "issues": {
+    "111": {
+      "state": "OPEN",
+      "title": "Rust full-spec: UBNF・context/combinatorからtinyexpression native toolchainまで"
+    },
+    "157": {
+      "state": "CLOSED",
+      "title": "feat: Java/Rust共通の移植可能性チェックと診断レポート"
+    },
+    "176": {
+      "state": "CLOSED",
+      "title": "feat: scopeTree/declares/スコープ参照をJava/Rustの生成コードへ接続"
+    },
+    "180": {
+      "state": "CLOSED",
+      "title": "feat: Rust生成で@catalog contextとcapture metadataを保持"
+    },
+    "184": {
+      "state": "OPEN",
+      "title": "perf: Java/Rust生成parserにcontext-aware memoization方針を追加する"
+    },
+    "197": {
+      "state": "OPEN",
+      "title": "handoff: Java/Rust benchmark以降のRust full-spec残作業"
+    },
+    "318": {
+      "state": "CLOSED",
+      "title": "UBNF frontend: Java の owned source snapshot と Rust span の共通検証"
+    },
+    "331": {
+      "state": "CLOSED",
+      "title": "feat: Java/Rustに状態付きエラー回復とUBNF recovery生成を実装する"
+    },
+    "379": {
+      "state": "CLOSED",
+      "title": "複雑な構文の曖昧性・左再帰・名前解決との連携を設計する"
+    },
+    "384": {
+      "state": "CLOSED",
+      "title": "継続ロードマップ: ユーザー定義型から複雑な言語の解析・検証・編集支援まで"
+    },
+    "422": {
+      "state": "CLOSED",
+      "title": "明示 unique-longest profile: 同率候補と空一致の拒否をJava/Rustで揃える"
+    },
+    "427": {
+      "state": "CLOSED",
+      "title": "名前 snapshot の immutable runtime と fatal entry 境界を Java/Rust 共通化"
+    },
+    "438": {
+      "state": "CLOSED",
+      "title": "Classic: portable token種別・metadata・関連node APIをJava/Rust共通契約で実装する"
+    },
+    "451": {
+      "state": "CLOSED",
+      "title": "Classic Rust LSP transport and opt-in generator with shared Java protocol contract"
+    },
+    "462": {
+      "state": "CLOSED",
+      "title": "Classic Rust DAP typed AST stepping with shared Java wire oracle"
+    },
+    "463": {
+      "state": "CLOSED",
+      "title": "Classic Rust token DAP: retain real parser leaf trace with rollback oracle"
+    },
+    "490": {
+      "state": "CLOSED",
+      "title": "design: distinguish Java match-only and PEG positive assertion contracts"
+    },
+    "506": {
+      "state": "CLOSED",
+      "title": "fix: Rust runtime の再帰上限を通常スレッドスタックで確実に適用する"
+    },
+    "510": {
+      "state": "CLOSED",
+      "title": "feat: CP走査と併用できるJava/Rust書記素parser・型付き位置API"
+    },
+    "516": {
+      "state": "CLOSED",
+      "title": "fix: bound Java parser recursion and close aborted transactions safely"
+    },
+    "533": {
+      "state": "CLOSED",
+      "title": "Rust parity: Unicode固定のCIトークンを両生成経路へ実装する"
+    },
+    "535": {
+      "state": "CLOSED",
+      "title": "Rust parity: semantic tokens full transportと実providerをJava生成LSPに揃える"
+    },
+    "538": {
+      "state": "CLOSED",
+      "title": "UBNF parity: Java frontendのannotation境界・eval既定値・commonField triviaを修正"
+    },
+    "541": {
+      "state": "CLOSED",
+      "title": "Rust parity: @commonFieldの型付き共通accessorとJava schema検証を揃える"
+    },
+    "545": {
+      "state": "CLOSED",
+      "title": "Rust parity: 任意childのMatchOnly・consume/invert伝播・replayを公開APIへ揃える"
+    },
+    "546": {
+      "state": "CLOSED",
+      "title": "Rust parity: 増分キャッシュと編集後無効化をJava runtime相当に揃える"
+    },
+    "552": {
+      "state": "CLOSED",
+      "title": "LSP parity: 不完全式の最遠失敗位置をJava/Rustで揃える"
+    },
+    "566": {
+      "state": "CLOSED",
+      "title": "AST parity: int数値captureのJava/Rust型・範囲・失敗契約を揃える"
+    },
+    "571": {
+      "state": "CLOSED",
+      "title": "Add general Classic token-mode Expr entry and transactional parity"
+    },
+    "583": {
+      "state": "CLOSED",
+      "title": "AST parity: 外側captureのnested optional/list構造を保存する"
+    },
+    "592": {
+      "state": "CLOSED",
+      "title": "AST parity: commonField 非依存の sum/dotted/shared projection と preferred 対応"
+    },
+    "593": {
+      "state": "CLOSED",
+      "title": "AST parity: associative literal spine・mixed operand と preferred 対応"
+    },
+    "598": {
+      "state": "CLOSED",
+      "title": "fix(runtime): zero-maximum repetition must not execute its child in Java or Rust"
+    },
+    "612": {
+      "state": "CLOSED",
+      "title": "Retire REGEX DSL execution in favor of declarative lexical combinators"
+    },
+    "621": {
+      "state": "CLOSED",
+      "title": "Fix Java memo keys omitting matched-cursor reset policy"
+    },
+    "629": {
+      "state": "CLOSED",
+      "title": "feat(memo): align versioned stateful failure caching across Java and Rust"
+    },
+    "649": {
+      "state": "CLOSED",
+      "title": "fix(runtime): unwind ordinary child callback exceptions through general parser boundaries"
+    },
+    "653": {
+      "state": "CLOSED",
+      "title": "AST parity: typed nested containers preserve mixed scalar variants and source spans"
+    },
+    "655": {
+      "state": "CLOSED",
+      "title": "Verify prior-matched diagnostic frontiers at matching Classic and PEG API boundaries"
+    },
+    "660": {
+      "state": "CLOSED",
+      "title": "Support shallow typeof constraints for typed nested captures in Java and Rust"
+    },
+    "693": {
+      "state": "OPEN",
+      "title": "nested capture: container を選択肢に持つ choice（mixed）"
+    },
+    "694": {
+      "state": "OPEN",
+      "title": "nested capture: nested 所有 rule 自身の @eval（literal/passthrough/manual）"
+    },
+    "695": {
+      "state": "OPEN",
+      "title": "nested capture: nested 規則の @leftAssoc / @rightAssoc 投影"
+    },
+    "696": {
+      "state": "OPEN",
+      "title": "nested capture: tokenStream との併用"
+    },
+    "697": {
+      "state": "OPEN",
+      "title": "nested capture: sum を持つ規則（grouped sum owner）自体の nested と @commonField"
+    },
+    "706": {
+      "state": "CLOSED",
+      "title": "parity: 正の LOOKAHEAD token 後の失敗で diagnose の CP 位置が Java と Rust で異なる（#705 で検出）"
+    },
+    "712": {
+      "state": "OPEN",
+      "title": "parity: Javaのglobal @comment設定をRust両生成経路へ揃える"
+    },
+    "713": {
+      "state": "CLOSED",
+      "title": "parity: 空literalのJava WordParser契約をRust生成器へ実装する"
+    },
+    "714": {
+      "state": "OPEN",
+      "title": "parity: 複数grammarファイルのRust生成と移植checkをJavaと揃える"
+    },
+    "715": {
+      "state": "OPEN",
+      "title": "parity: 未知のSimple annotationの受理・診断をJava/Rustで統一する"
+    },
+    "716": {
+      "state": "OPEN",
+      "title": "parity: Java公開combinatorのRust利用経路を全API対応表と共通corpusで埋める"
+    },
+    "717": {
+      "state": "CLOSED",
+      "title": "parity: 不完全な指数を含むNumber tokenの診断差を共通oracleで解消する"
+    },
+    "718": {
+      "state": "CLOSED",
+      "title": "ci: 全Maven install経路をjob専用repositoryへ隔離して公開3.3.0の混同を防ぐ"
+    },
+    "719": {
+      "state": "OPEN",
+      "title": "ci: opt-in適合性のskip・未実行を検出し実Tiny Catalog検証を補完する"
+    },
+    "740": {
+      "state": "CLOSED",
+      "title": "parity: 再帰と深いネストの文法で、Java host は E-RECURSIVE-SHAPE で拒否し native は受理する"
+    },
+    "741": {
+      "state": "CLOSED",
+      "title": "parity: UBNF の入れ子上限が Rust frontend は 128 段、Java は約 199 段で異なる"
+    },
+    "750": {
+      "state": "OPEN",
+      "title": "Rust の診断表示で空の期待候補 '' が見えない（LSP message と ParseError の Display）"
+    },
+    "752": {
+      "state": "OPEN",
+      "title": "parity: Rust native Number が不完全な指数以外の Java 内部失敗を記録しない（負の先読みで診断位置が異なる）"
+    },
+    "753": {
+      "state": "OPEN",
+      "title": "parity: trivia の読み飛ばしで LOOKAHEAD の matched cursor が小さく上書きされる（#706・#712 後続）"
+    },
+    "754": {
+      "state": "OPEN",
+      "title": "parity: 再帰と深いネストの文法で、Java の Java 生成だけが E-RECURSIVE-SHAPE で拒否する（#740 の後続）"
+    },
+    "758": {
+      "state": "OPEN",
+      "title": "parity: Java の型推論が作業量の上限に達すると、Java host の Rust 生成だけが失敗する（#755 の後続）"
+    },
+    "761": {
+      "state": "OPEN",
+      "title": "Rust: 生成・投影した原文の @f 拒否が Choice/rule 経由と全入力解析で漏れる"
+    },
+    "762": {
+      "state": "OPEN",
+      "title": "Rust: MatchOnly + reset=true で繰り返しを包む @f が Java と違う"
+    },
+    "767": {
+      "state": "OPEN",
+      "title": "parity: root が choice のとき Java の CST には root rule が残らず Rust は残る"
+    },
+    "768": {
+      "state": "OPEN",
+      "title": "parity: token-stream / lexical-context で空でない literal の Classic 反転の幅が Java 0 / Rust 1 文字（#716 の子）"
+    },
+    "777": {
+      "state": "OPEN",
+      "title": "parity: W-COMMENT-IGNORED を生成の警告（GenerationWarnings / warnings::collect）と Rust CLI に載せる"
+    },
+    "783": {
+      "state": "OPEN",
+      "title": "parity: 量指定子 overflow が Java/Rust とも E-BOUNDED-OVERFLOW に到達しない"
+    },
+    "784": {
+      "state": "OPEN",
+      "title": "test(parity): spec corpus の validate/runtime 条件付き除外を両言語の実行先へ結ぶ"
+    }
+  },
+  "entries": [
+    {
+      "id": "host-types",
+      "category": "contract",
+      "title": "生成型・consumer・API impact の言語表現",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        541,
+        566,
+        583,
+        653,
+        660
+      ],
+      "observation": "Java の List/Optional/Object・node 引数と Rust の Vec/Option/AstValue・borrowed 引数は異なる。java/rust、FieldTypes、Type、Methods、Args、Changes、rustCheck は各言語の compile/map/eval oracle。値・CP span の不一致を許可するものではない。numeric-capture の javaInt は同じ i32 範囲の期待値で、host 別の許容範囲ではない。",
+      "evidence": [
+        "docs/common-fields.md",
+        "docs/numeric-captures.md",
+        "docs/typed-nested-captures.md",
+        "docs/api-impact-report.md"
+      ]
+    },
+    {
+      "id": "diagnostic-display",
+      "category": "contract",
+      "title": "期待候補の引用符・補助候補・表示形式",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        552,
+        713,
+        331
+      ],
+      "observation": "empty-literal の javaDiagnostic 51 件と error-elements の10件は引用符、trivia/RootParser 等の補助候補、trailing-input の farthest 表示を個別に固定する。受理・主要失敗位置の共通条件は維持する。空候補が不可視になる不具合は empty-expectation-display に分離。evolution の javaOffset/rustOffset 8件は現在すべて等しい。",
+      "evidence": [
+        "docs/empty-literal.md",
+        "docs/error-elements.md",
+        "unlaxer-dsl/src/test/resources/evolution/diagnostics.json"
+      ]
+    },
+    {
+      "id": "generator-diagnostics",
+      "category": "contract",
+      "title": "生成前拒否の層・順序と診断表現",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        157,
+        422,
+        427,
+        592,
+        593
+      ],
+      "observation": "nativeError/nativeMessage/javaGeneratorError は構造検証の fail-first 順序・説明文を区別する。例: family cyclic-sum の Java generator は E-LEFT-RECURSION、schema validator は E-COMMONFIELD-MISMATCH。受理してよい差ではなく、両経路の拒否を固定する。公開 check の共通診断契約とは区別する。",
+      "evidence": [
+        "docs/portability-check.md",
+        "spec-corpus/associative-projection/invalid-cases.json",
+        "spec-corpus/family-projection/invalid-cases.json",
+        "unlaxer-dsl/src/test/resources/unique-longest/invalid.json",
+        "unlaxer-dsl/src/test/resources/name-predicate/invalid.json",
+        "unlaxer-dsl/src/test/resources/ambiguity-boundaries/invalid.json"
+      ]
+    },
+    {
+      "id": "legacy-assertions",
+      "category": "contract",
+      "title": "Classic MatchOnly と pure PEG Ahead",
+      "hosts": "Java runtime / Rust runtime",
+      "issues": [
+        490,
+        510,
+        571
+      ],
+      "observation": "MatchOnly は matched cursor/token を公開し、Ahead は両 cursor と投機結果を復元する別 API。書記素 ahead は matched が Java 7 / Rust 0。現在の同等入口は Java PegLookahead と Rust ahead、または Java MatchOnly と Rust match_only。旧 assertion corpus の host 列は残す。",
+      "evidence": [
+        "docs/positive-assertion-contracts.md",
+        "docs/grapheme-coordinates.md",
+        "docs/classic-token-propagation.md"
+      ]
+    },
+    {
+      "id": "peg-frontier",
+      "category": "contract",
+      "title": "native PEG と Classic の診断入口",
+      "hosts": "Java runtime / Rust runtime",
+      "issues": [
+        545,
+        655,
+        706
+      ],
+      "observation": "Java の成功到達位置と Rust の failure()=0、prior matched を含む Classic frontier と native PEG の source frontier を別列で保持する。nativeClassicCP は Java の Classic と比較する。grammar 呼出しでの不一致 #706 は修正済みで、旧差を未修正として数えない。",
+      "evidence": [
+        "docs/peg-assertions.md",
+        "docs/prior-matched-diagnostics.md",
+        "conformance/prior-matched-diagnostics/cases.tsv"
+      ]
+    },
+    {
+      "id": "callback-failure",
+      "category": "contract",
+      "title": "Java 例外 / Rust Err・panic の制御フロー",
+      "hosts": "Java runtime / Rust runtime",
+      "issues": [
+        649
+      ],
+      "observation": "Java callback の例外は optional/choice でも伝播する。Rust Result::Err は通常の構文不一致で吸収・別候補への遷移が可能。state.tsv の host 列はこの差を固定する。Rust panic 後の context 再利用は保証せず破棄する。登録状態・CP・再試行の検証は両版で行う。",
+      "evidence": [
+        "docs/ordinary-parser-exceptions.md",
+        "conformance/ordinary-exceptions/state.tsv"
+      ]
+    },
+    {
+      "id": "resource-limits",
+      "category": "contract",
+      "title": "runtime / frontend の再帰・資源上限",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        506,
+        516,
+        741
+      ],
+      "observation": "Java は parser frame 1024、Rust は rule 256/expression 1024。UBNF frontend は Java が形により126〜168括弧、native は127括弧。#741 CLOSED はこの差の契約化と境界テストによる。lowering の深さ256とは別。未解決の Java生成深さ・作業量は後述の #754/#758 に残す。",
+      "evidence": [
+        "docs/java-parser-limits.md",
+        "rust/unlaxer-ubnf/src/lib.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustUbnfFrontendConformanceTest.java"
+      ]
+    },
+    {
+      "id": "memo-accounting",
+      "category": "contract",
+      "title": "memo hit の観測単位・メモリ計上",
+      "hosts": "Java runtime / Rust runtime",
+      "issues": [
+        621,
+        197,
+        629,
+        184
+      ],
+      "observation": "memo-reset-policy の java_hits は Java 同一context の warm/next。Rust の同fixtureは別grammar sessionで意味だけ比較し、実hitは別probeが検証する。byte予算は言語のlayoutに依存する。measurement-metadata.json の java は計測JDKで期待値ではないが保守的な走査対象として登録。性能改善は #197 の凍結に従い本PRでは行わない。 capture比較effectやopaque callbackを自動memo/cache対象にする条件にもhost差がある。Javaのlistener通知を省略せず、Rustの未監査effectは保守的に除外する。hit数の一致と構文結果の一致を混同しない。",
+      "evidence": [
+        "docs/memo-reset-policy.md",
+        "docs/failure-memo-budget.md",
+        "conformance/memo-scaling/measurement-metadata.json",
+        "docs/generated-scope-effects.md",
+        "docs/incremental-cache.md"
+      ]
+    },
+    {
+      "id": "frontend-representation",
+      "category": "contract",
+      "title": "frontend AST と構文失敗の表現",
+      "hosts": "Java frontend / Rust native frontend",
+      "issues": [
+        318,
+        538
+      ],
+      "observation": "Java SequenceBody と Rust Vec<Sequence> は canonical比較時に正規化する。Java構文失敗は先頭80文字中心、nativeはkind/spanを持ち、すべての構文失敗位置の同値を保証しない。known fixture は #538 等の修正済み回帰であり現在の例外リストではない。",
+      "evidence": [
+        "rust/unlaxer-ubnf/README.md",
+        "docs/ubnf-source-snapshot.md"
+      ]
+    },
+    {
+      "id": "peg-classic-primitives",
+      "category": "contract",
+      "title": "手書き PEG と Java 互換生成の空 literal・反復",
+      "hosts": "Java runtime / Rust runtime・両生成host",
+      "issues": [
+        598,
+        713
+      ],
+      "observation": "通常UBNFの空literalは両版でWordParser相当の失敗、lexicalでは幅0成功。手書きRust Expr::literal(\"\")のPEG成功やzero-progress反復の拒否と、Java互換Exprの反復停止は別契約。生成経路が片方だけ未対応という意味ではない。 Rust READMEに残っていた「上限0でも子を試す」「nullableな通常UBNF反復を生成前拒否」という旧記述も、現在の両版の契約へ訂正した。",
+      "evidence": [
+        "docs/empty-literal.md",
+        "docs/zero-repetition.md",
+        "docs/nullable-repetition.md"
+      ]
+    },
+    {
+      "id": "host-bindings",
+      "category": "contract",
+      "title": "JavaクラスとRust明示binding境界",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111,
+        716
+      ],
+      "observation": "javaClass/java/rust は組込みJava token classとRustの対応実装・consumerを区別する。任意JVM class/bytecodeをnativeで直接実行せず、ADAPTER registryと明示bindingを使う。未棚卸しの公開APIは public-api-audit で追跡。",
+      "evidence": [
+        "docs/token-adapters.md",
+        "spec-corpus/java-token-bindings/cases.json",
+        "spec-corpus/token-adapters/README.md"
+      ]
+    },
+    {
+      "id": "optin-environment",
+      "category": "contract",
+      "title": "適合性・外部依存・JDK・計測環境による skip",
+      "hosts": "Java tests / Python tests",
+      "issues": [
+        719,
+        718
+      ],
+      "observation": "Assume/assumeTrue は rustConformance、tokenStreamBench、JDK21、tinyexpression.grammar/classes、JVM allocation counter を条件にする。Python skipUnless は node/mvn/共有tail pluginの存在条件3か所。通常mvn testのskipはRust未対応の証拠ではない。必須jobでの未実行は #719 が検出する。active @Disabled/@Ignore/assumeFalse、Rust #[ignore]、Python skipTest/pytest.skip は監査時0件（コメント中の @Ignore は除外）。",
+      "evidence": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/Java21TestSupport.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustCatalogConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/TokenStreamConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ParserScalingSmokeTest.java",
+        "scripts/tests/test_maven_job_repository.py"
+      ]
+    },
+    {
+      "id": "conditional-optin",
+      "category": "contract",
+      "title": "テスト内部のif/returnとプラットフォーム条件",
+      "hosts": "Java tests / Rust tests",
+      "issues": [
+        719
+      ],
+      "observation": "rustConformanceがfalseならRust部分のみreturnするClassicDap/ClassicLspKeyword/RaisingOperatorや、if内でnativeを実行するContextualLexing/Typeof等がある。JUnitのskipped数だけでは実行証明にならず、#719のflag・artifact・対象method検査へ結ぶ。Rust native/playgroundのsymlink試験2件は#[cfg(unix)]による条件付きcompileで、CIのLinuxでは有効。製品のJava/Rust機能差とは数えない。",
+      "evidence": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ClassicDapProtocolConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ClassicLspKeywordConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RaisingOperatorConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ContextualLexingConformanceTest.java",
+        "rust/unlaxer-generator/tests/native.rs",
+        "rust/unlaxer-generator/tests/playground.rs"
+      ]
+    },
+    {
+      "id": "nested-rejection-contract",
+      "category": "contract",
+      "title": "nested helper/owner の確定した拒否境界",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        583
+      ],
+      "observation": "循環helper、@skip/注釈付きhelper、captureを含むhelper、mixed-choice helper、rule-local trivia下のalias、nested owner自体の@skip/@enumは位置付き拒否の契約。非再帰の透過aliasは対応済み。拡張予定の5組合せは #693〜#697 に分離し、閉じた #583 に残課題を隠さない。",
+      "evidence": [
+        "docs/typed-nested-captures.md",
+        "spec-corpus/typed-nested-captures/invalid.json",
+        "spec-corpus/nested-alias-captures/invalid.json"
+      ]
+    },
+    {
+      "id": "choice-root-cst",
+      "category": "unresolved",
+      "title": "choice root の CST node 欠落",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        767
+      ],
+      "observation": "CaptureRollback / Labeled / AutoCommit で Java はroot ruleを残さずRustは残す。javaCst 3件で吸収される現在の差であり、#713が閉じても解消していない。",
+      "evidence": [
+        "spec-corpus/empty-literal/corpus.json",
+        "docs/empty-literal.md"
+      ]
+    },
+    {
+      "id": "empty-expectation-display",
+      "category": "unresolved",
+      "title": "空の期待候補が Rust 表示で不可視",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        750
+      ],
+      "observation": "Rustの空literal候補 \"\" をjoinする表示が Expected  or b 等になる。#713の空literal受理/失敗自体の修正と分ける。javaDiagnosticの引用符差すべてをこの不具合とはしない。",
+      "evidence": [
+        "docs/empty-literal.md",
+        "rust/unlaxer-lsp/src/lib.rs",
+        "rust/unlaxer-runtime/src/lib.rs"
+      ]
+    },
+    {
+      "id": "lexical-invert",
+      "category": "unresolved",
+      "title": "非空 lexical literal の Classic 反転幅",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        768,
+        716
+      ],
+      "observation": "tokenStream/lexicalContextで非空literalを反転するとJava幅0、Rust幅1。empty-literal corpusは宣言的tokenで交絡を避けるため、この成功を解消の証拠にしない。",
+      "evidence": [
+        "docs/empty-literal.md"
+      ]
+    },
+    {
+      "id": "global-comment",
+      "category": "unresolved",
+      "title": "global @comment の生成差",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        712,
+        777,
+        753
+      ],
+      "observation": "監査基準ではJavaが受理するglobal @commentをRust両生成経路は拒否する。並行する対応と警告公開は #712/#777、triviaによるmatched cursor上書きは #753。別branchの実装をこの基準の対応済みとして数えない。",
+      "evidence": [
+        "docs/rule-trivia.md",
+        "docs/portability-check.md",
+        "rust/unlaxer-generator/src/lowering.rs"
+      ]
+    },
+    {
+      "id": "multi-grammar",
+      "category": "unresolved",
+      "title": "複数 grammar の生成と check",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        714
+      ],
+      "observation": "Java CLIは同一fileの複数grammarを生成するがRust両hostはP-GRAMMAR-COUNT等で拒否する。frontendが複数grammarを読めることとは別。",
+      "evidence": [
+        "docs/portability-check.md",
+        "rust/unlaxer-ubnf/README.md"
+      ]
+    },
+    {
+      "id": "simple-annotation",
+      "category": "unresolved",
+      "title": "未知 Simple annotation の無視/拒否",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        715
+      ],
+      "observation": "Java生成は未知Simple注釈を無言で無視し、Rust両hostは拒否する。@enum/@eval等の実装済み注釈を未対応とする古いskip文書は訂正する。",
+      "evidence": [
+        "docs/skip-ast-projection.md",
+        "docs/portability-check.md",
+        "rust/FULL-SPEC.md"
+      ]
+    },
+    {
+      "id": "java-generation-depth",
+      "category": "unresolved",
+      "title": "Java target の再帰shape深さ",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        754,
+        740
+      ],
+      "observation": "#740 CLOSED でRust両hostのlowered IR解析は揃ったが、Java targetのAST型推論は深い再帰helperをE-RECURSIVE-SHAPEで拒否する。残差はOPEN #754。",
+      "evidence": [
+        "docs/java-parser-limits.md",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java"
+      ]
+    },
+    {
+      "id": "analysis-work-limit",
+      "category": "unresolved",
+      "title": "Java-host の数値型推論作業量上限",
+      "hosts": "Rust Java-host / Rust native",
+      "issues": [
+        758,
+        740
+      ],
+      "observation": "numericBesideAnalysisWork(560)でJava-hostはanalysis work exceeds 1000000、nativeは生成可能。深さ256のfallbackを直した #740 と別の残差。",
+      "evidence": [
+        "docs/java-parser-limits.md",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java"
+      ]
+    },
+    {
+      "id": "number-internal-failures",
+      "category": "unresolved",
+      "title": "Numberの内部失敗と負の先読み診断",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        752,
+        717
+      ],
+      "observation": "#717 CLOSED の不完全指数の診断は共通oracleで修正済み。ただし符号・小数等の内部失敗が負の先読みへ残る差は #752 に残る。PBT known-differences=[]から差ゼロとは推論しない。",
+      "evidence": [
+        "conformance/number-token/cases.tsv",
+        "rust/FULL-SPEC.md"
+      ]
+    },
+    {
+      "id": "capture-generated-source",
+      "category": "unresolved",
+      "title": "生成/投影sourceのfield capture拒否漏れ",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        761
+      ],
+      "observation": "Tが非消費でbbを生成すると、(T | q) @fや全入力入口でRustが受理してJavaはCP0失敗となる。直接captureの一部検査成功だけでは解消しない。",
+      "evidence": [
+        "docs/general-owned-capture-syntax.md",
+        "rust/unlaxer-runtime/src/lib.rs"
+      ]
+    },
+    {
+      "id": "capture-reset",
+      "category": "unresolved",
+      "title": "MatchOnly反復を包むfield captureのreset",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        762
+      ],
+      "observation": "入力x、明示MatchOnly、reset=trueの反復captureでJavaは成功(cursor 0,1 / w=x)、Rustはsource由来の拒否。memo ON/OFFとも追跡対象。",
+      "evidence": [
+        "docs/general-owned-capture-syntax.md",
+        "rust/unlaxer-runtime/src/lib.rs"
+      ]
+    },
+    {
+      "id": "bounded-overflow",
+      "category": "unresolved",
+      "title": "量指定子 overflow の規範診断が出ない",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        783
+      ],
+      "observation": "quantifier/huge-boundはE-BOUNDED-OVERFLOWを要求するがJava mapperはNumberFormatException、native frontendはrepeat bound exceeds 2147483647。JavaのDOCUMENTED_DEVIATIONSに残り、Rustのvalidate除外が隠す。新規 #783 で両版の診断コード/CPを追跡。",
+      "evidence": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/bootstrap/UbnfSpecCorpusTest.java",
+        "unlaxer-dsl/src/test/resources/spec-corpus/ubnf/quantifiers.json",
+        "rust/unlaxer-ubnf/src/parser.rs"
+      ]
+    },
+    {
+      "id": "spec-driver-coverage",
+      "category": "unresolved",
+      "title": "仕様 corpus の条件付き除外",
+      "hosts": "Java tests / Rust native tests",
+      "issues": [
+        784,
+        719
+      ],
+      "observation": "Rust spec_corpusはscope=validateの18件をcontinueする。runtimeの3件は両frontend driverから除外する。製品機能が全て未実装とは断定せず、実行先と期待値の対応の不足として新規 #784 で追跡する。Surefire/#[ignore]だけでは検出できない。",
+      "evidence": [
+        "rust/unlaxer-ubnf/tests/spec_corpus.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/bootstrap/UbnfSpecCorpusTest.java"
+      ]
+    },
+    {
+      "id": "public-api-audit",
+      "category": "unresolved",
+      "title": "Java公開combinatorの全API対応の未確認",
+      "hosts": "Java runtime / Rust runtime",
+      "issues": [
+        716,
+        111
+      ],
+      "observation": "ChildOccursWithTerminator/MatchedChoice/StartOfLine/Suggest/TagWrapper等の実用上同等なRust利用経路と共通fixtureを棚卸し中。名前検索での不在を機能未実装と断定しない。既存のclosed #545は全公開APIの完了ではない。",
+      "evidence": [
+        "rust/FULL-SPEC.md",
+        "docs/parser-execution-design-qa-ja.md"
+      ]
+    },
+    {
+      "id": "catalog-resolver",
+      "category": "unsupported",
+      "title": "catalogからresolverへの自動接続",
+      "hosts": "Java LSP / Rust LSP・両生成host",
+      "issues": [
+        111,
+        180
+      ],
+      "observation": "#180 CLOSED はRustの静的CATALOGSとJavaの拡張API境界まで。Javaの基底completion/hoverもcatalogを自動呼出しせず、Rustのcontext/nameからのresolver自動選択も未実装。明示providerや下流の独自実装と、自動接続の完成を区別しOPEN #111で追跡する。",
+      "evidence": [
+        "docs/catalog-metadata.md",
+        "rust/FULL-SPEC.md"
+      ]
+    },
+    {
+      "id": "lsp-interrupt",
+      "category": "unresolved",
+      "title": "Rust LSP parse中のcancellation",
+      "hosts": "Java LSP / Rust LSP・両生成host",
+      "issues": [
+        111,
+        451
+      ],
+      "observation": "Rust stdio transportはserialでparse中のcancel notificationを読んで割り込めない。#451 CLOSED の基本transport実装だけでJavaの非同期cancelと同等とはしない。",
+      "evidence": [
+        "docs/classic-rust-lsp.md",
+        "docs/lsp-dap-ide-gap-inventory.md"
+      ]
+    },
+    {
+      "id": "dap-generated-source",
+      "category": "unresolved",
+      "title": "detached generated source のRust DAP表示",
+      "hosts": "Java DAP / Rust DAP・両生成host",
+      "issues": [
+        111,
+        463
+      ],
+      "observation": "runtime traceはGenerated sourceを保持するが、Rust DAPは原文slice表示なのでconsumed generated sourceを拒否する。Javaの任意Token表示との境界が残る。",
+      "evidence": [
+        "docs/token-trace.md",
+        "docs/classic-rust-dap.md"
+      ]
+    },
+    {
+      "id": "engine-facade",
+      "category": "unresolved",
+      "title": "既存engine再利用のJava facade",
+      "hosts": "Java / Rust実験driver",
+      "issues": [
+        111,
+        197
+      ],
+      "observation": "Rust限定の隔離driverは存在するがJavaは共通oracle/proof参照まで。lean facade/共通APIは未実装であり、共通製品機能の完成とはしない。性能改善は本PRの対象外。",
+      "evidence": [
+        "docs/engine-reuse-experiment-ja.md",
+        "docs/parser-execution-design-qa-ja.md"
+      ]
+    },
+    {
+      "id": "nested-container-choice",
+      "category": "unsupported",
+      "title": "containerを選択肢に持つnested choice",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        693,
+        583
+      ],
+      "observation": "両版で位置付きE-NESTED-SHAPE拒否。閉じた #583 の実装範囲に含めず、OPENの子issueで両言語の拡張と共通corpusを追跡する。",
+      "evidence": [
+        "docs/typed-nested-captures.md",
+        "spec-corpus/typed-nested-captures/invalid.json"
+      ]
+    },
+    {
+      "id": "nested-owner-eval",
+      "category": "unsupported",
+      "title": "nested owner自身のeval",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        694,
+        583
+      ],
+      "observation": "両版で位置付きE-NESTED-SHAPE拒否。閉じた #583 の実装範囲に含めず、OPENの子issueで両言語の拡張と共通corpusを追跡する。",
+      "evidence": [
+        "docs/typed-nested-captures.md",
+        "spec-corpus/typed-nested-captures/invalid.json"
+      ]
+    },
+    {
+      "id": "nested-associative",
+      "category": "unsupported",
+      "title": "nested ownerのleft/rightAssoc",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        695,
+        583
+      ],
+      "observation": "両版で位置付きE-NESTED-SHAPE拒否。閉じた #583 の実装範囲に含めず、OPENの子issueで両言語の拡張と共通corpusを追跡する。",
+      "evidence": [
+        "docs/typed-nested-captures.md",
+        "spec-corpus/typed-nested-captures/invalid.json"
+      ]
+    },
+    {
+      "id": "nested-token-stream",
+      "category": "unsupported",
+      "title": "nestedとtokenStreamの併用",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        696,
+        583
+      ],
+      "observation": "両版で位置付きE-NESTED-SHAPE拒否。閉じた #583 の実装範囲に含めず、OPENの子issueで両言語の拡張と共通corpusを追跡する。",
+      "evidence": [
+        "docs/typed-nested-captures.md",
+        "spec-corpus/typed-nested-captures/invalid.json"
+      ]
+    },
+    {
+      "id": "nested-grouped-common",
+      "category": "unsupported",
+      "title": "nested grouped sum ownerのcommonField",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        697,
+        583
+      ],
+      "observation": "両版で位置付きE-NESTED-SHAPE拒否。閉じた #583 の実装範囲に含めず、OPENの子issueで両言語の拡張と共通corpusを追跡する。",
+      "evidence": [
+        "docs/typed-nested-captures.md",
+        "spec-corpus/typed-nested-captures/invalid.json"
+      ]
+    },
+    {
+      "id": "partial-recovery-ast",
+      "category": "unsupported",
+      "title": "回復後のpartial/error AST",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111,
+        331
+      ],
+      "observation": "回復CST/markerはあるが通常mapperはcannot map recovered syntaxで拒否する。型付きpartial/error ASTは未対応。旧文書にあった汎用mode伝播とRust LSP/DAPの未対応は後続で実装済みのため訂正する。",
+      "evidence": [
+        "docs/error-recovery.md",
+        "spec-corpus/recovery/README.md"
+      ]
+    },
+    {
+      "id": "incremental-splicing",
+      "category": "unsupported",
+      "title": "編集後の部分CST再接合・依存範囲",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111,
+        546
+      ],
+      "observation": "#546 CLOSED はsnapshot/chunk cacheと無効化。編集後は全文解析で、部分CSTの再配置/接合と文法依存invalidation-rangeは両版未実装。",
+      "evidence": [
+        "docs/incremental-cache.md",
+        "docs/parser-execution-design-qa-ja.md"
+      ]
+    },
+    {
+      "id": "lsp-edit-transports",
+      "category": "unsupported",
+      "title": "LSP rename/format/codeAction・incremental sync",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111,
+        384,
+        451
+      ],
+      "observation": "runtime/Playgroundの編集基盤とcapabilityはあるが、共通LSP transportへは未接続。部分syncも未対応。closed #384/#451の完了範囲から切り離し親 #111 で継続。",
+      "evidence": [
+        "docs/source-preserving-edits.md",
+        "docs/language-profiles.md",
+        "docs/classic-rust-lsp.md"
+      ]
+    },
+    {
+      "id": "semantic-token-range-delta",
+      "category": "unsupported",
+      "title": "semanticTokens range/deltaと自動色付け",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111,
+        535
+      ],
+      "observation": "#535 CLOSED はfull provider/legend hook。range/delta、文法からの自動色付けは未対応で、既定full dataは空。",
+      "evidence": [
+        "docs/lsp-dap-ide-gap-inventory.md",
+        "docs/classic-rust-lsp.md"
+      ]
+    },
+    {
+      "id": "advanced-dap",
+      "category": "unsupported",
+      "title": "live evaluator debugger と advanced DAP",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111,
+        462,
+        463
+      ],
+      "observation": "AST/token inspectionのstepと変数hookは対応済み。live evaluatorの実行制御、未対応複合atom/未宣言customのtrace、advanced DAPは別範囲。",
+      "evidence": [
+        "docs/classic-rust-dap.md",
+        "docs/token-trace.md"
+      ]
+    },
+    {
+      "id": "provenance-imports",
+      "category": "unsupported",
+      "title": "複数file source provenance と一般import合成",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111,
+        318
+      ],
+      "observation": "source snapshotは単一file。token module/packageは対応するが、import展開後の複数file provenance、rule/evaluator/host-code importと一般grammar合成は未対応。同一fileの複数grammar生成差は #714 に分離。",
+      "evidence": [
+        "docs/ubnf-source-snapshot.md",
+        "docs/ubnf-packages.md",
+        "rust/FULL-SPEC.md"
+      ]
+    },
+    {
+      "id": "full-language-semantics",
+      "category": "unsupported",
+      "title": "完全な対象言語・GLR/Earley・動的字句規則",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111,
+        379
+      ],
+      "observation": "Java/TS/Rust profileは固定版の部分文法。完全な意味規則、一般左再帰、GLR/Earley/全候補forest、完全C++ template/type inference、動的indent/ASI/完全TSXは未対応。未知機能をUNSUPPORTEDとして報告することを機能実装と数えない。 引数付き規則の高階規則・ラムダも両版の対応範囲外。",
+      "evidence": [
+        "docs/language-profiles.md",
+        "docs/semantic-model.md",
+        "docs/explicit-ambiguity-profiles.md",
+        "docs/contextual-lexing.md",
+        "docs/external-language-providers.md"
+      ]
+    },
+    {
+      "id": "scope-evaluation-environment",
+      "category": "unsupported",
+      "title": "scope storeのAST埋込み・評価時dynamic環境",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111,
+        176
+      ],
+      "observation": "#176 CLOSED は解析時scope/declares/backref。typed ASTへのscope store埋込み、評価時dynamic環境/closure、scope annotation自体からLSP/DAPへ自動搬送する経路は未対応。一般のsemantic query/IDE連携の有無とは別。",
+      "evidence": [
+        "docs/generated-scope-effects.md",
+        "rust/FULL-SPEC.md"
+      ]
+    },
+    {
+      "id": "java-target-check",
+      "category": "unsupported",
+      "title": "check --target java",
+      "hosts": "Java CLI / Rust native CLI",
+      "issues": [
+        111,
+        157
+      ],
+      "observation": "両CLIのportability checkはRust target用。Java targetの可否検査は引数エラーで、Javaコード生成が存在しないという意味ではない。",
+      "evidence": [
+        "docs/portability-check.md"
+      ]
+    },
+    {
+      "id": "frontend-selfhosting",
+      "category": "unsupported",
+      "title": "UBNF frontend回復と完全自己ホスト",
+      "hosts": "Java frontend / Rust native frontend",
+      "issues": [
+        111
+      ],
+      "observation": "frontendは最初のエラーで停止し部分AST回復を提供しない。完全自己ホスト（生成parserと生成mapperで再生成するfixpoint）は未完成で、Java shimの委譲/決定性試験はその完成証拠ではない。UBNF自身のblock commentも未対応。対象DSLのrecoveryやjavaStyleとは別。",
+      "evidence": [
+        "rust/unlaxer-ubnf/README.md",
+        "docs/architecture.md",
+        "README.md",
+        "unlaxer-dsl/README.md"
+      ]
+    },
+    {
+      "id": "aot-and-service-boundaries",
+      "category": "unsupported",
+      "title": "DSL全体AOT・外部サービス統合の残範囲",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        111
+      ],
+      "observation": "下流rustcodeblockの明示AOTはあるがJava自動翻訳、FormulaInfo全体AOT、AOTのLSP/DAP統合、DSL全式machine-code loweringは未対応。MCP/HTTP/healthz等の設計文書も実装済みとはしない。下流や計画文書を本repoのparity証拠へ混ぜない。",
+      "evidence": [
+        "rust/FULL-SPEC.md",
+        "docs/mcp/SURVEY.md",
+        "docs/tinyexpression-production-bridge.md"
+      ]
+    },
+    {
+      "id": "unicode-legacy",
+      "category": "contract",
+      "title": "固定Unicodeと既存JDK依存API",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        533
+      ],
+      "observation": "生成CIは両版Unicode17固定。Java旧IgnoreCaseWordParserはJDK依存を維持し、legacy deltaはJDK17で95行/JDK21で55行。これは生成host間の不具合ではなく旧APIとの互換境界。Javaに渡せる単独surrogateはscalar照合では拒否し、Rust strには表現できない。",
+      "evidence": [
+        "docs/case-insensitive-tokens.md",
+        "spec-corpus/case-insensitive/README.md",
+        "spec-corpus/case-insensitive/README-generated.md",
+        "spec-corpus/case-insensitive/jdk17-legacy-delta.tsv",
+        "spec-corpus/case-insensitive/jdk21-legacy-delta.tsv"
+      ]
+    },
+    {
+      "id": "token-representation",
+      "category": "contract",
+      "title": "CST wrapper・trace label・portable metadata",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        438,
+        463,
+        571
+      ],
+      "observation": "補助CSTのJava class名とRust node/trace labelはhost固有。portable metadataはstringと同一parseの安定IDを共通化し、Java任意Object identity/raw mapの自動移植は行わない。Java observerでmemoが無効になる観測は別probeで検証する。root rule欠落の #767 を補助wrapperの差として許可しない。",
+      "evidence": [
+        "docs/portable-token-metadata.md",
+        "docs/token-trace.md",
+        "spec-corpus/token-stream/README.md",
+        "conformance/classic-memo/README.md"
+      ]
+    },
+    {
+      "id": "catalog-metadata-boundary",
+      "category": "contract",
+      "title": "catalog metadataの公開先と構造検証",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        180
+      ],
+      "observation": "Javaはcatalogの有無でLSP拡張APIを条件生成する。Rustはrule/context/ローカルcaptureを静的CATALOGSへ保持し、captureなしや重複catalogを両Rust loweringで拒否する。この追加検査はJava一般validatorとは別であることを契約に明記済み。自動resolver接続は両版未対応の別行。",
+      "evidence": [
+        "docs/catalog-metadata.md",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustCatalogConformanceTest.java",
+        "unlaxer-dsl/src/test/resources/catalog/corpus.json"
+      ]
+    },
+    {
+      "id": "retired-regex",
+      "category": "contract",
+      "title": "旧REGEXの共通廃止",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        612
+      ],
+      "observation": "旧docsのRust REGEX未対応をJavaだけが対応する現行差として数えない。開発版では両frontend/generatorがE-REGEX-RETIREDとCP位置で拒否し、宣言的字句式へ移行する契約。公開済み3.3.0とは区別する。",
+      "evidence": [
+        "docs/regex-retirement.md",
+        "spec-corpus/regex-retirement/README.md"
+      ]
+    }
+  ],
+  "corpora": [
+    {
+      "path": "conformance/memo-reset-policy/cases.tsv",
+      "fields": {
+        "java_hits": 1
+      },
+      "entries": [
+        "memo-accounting"
+      ]
+    },
+    {
+      "path": "conformance/memo-scaling/measurement-metadata.json",
+      "fields": {
+        "java": 1
+      },
+      "entries": [
+        "memo-accounting"
+      ]
+    },
+    {
+      "path": "conformance/ordinary-exceptions/state.tsv",
+      "fields": {
+        "javaAfterRetry": 1,
+        "javaConsumed": 1,
+        "javaOutcome": 1,
+        "javaRetry": 1,
+        "rustAfterRetry": 1,
+        "rustConsumed": 1,
+        "rustOutcome": 1,
+        "rustRetry": 1
+      },
+      "entries": [
+        "callback-failure"
+      ]
+    },
+    {
+      "path": "conformance/peg-assertion/cases.tsv",
+      "fields": {
+        "javaOffset": 1,
+        "rustOffset": 1
+      },
+      "entries": [
+        "peg-frontier"
+      ]
+    },
+    {
+      "path": "conformance/prior-matched-diagnostics/cases.tsv",
+      "fields": {
+        "nativeClassicCP": 1,
+        "nativeLegacyCP": 1
+      },
+      "entries": [
+        "peg-frontier"
+      ]
+    },
+    {
+      "path": "docs/fixtures/assertion-contracts/cases.json",
+      "fields": {
+        "java": 18,
+        "rust": 18
+      },
+      "entries": [
+        "legacy-assertions"
+      ]
+    },
+    {
+      "path": "docs/fixtures/assertion-contracts/retries.json",
+      "fields": {
+        "java": 3,
+        "rust": 3
+      },
+      "entries": [
+        "legacy-assertions"
+      ]
+    },
+    {
+      "path": "spec-corpus/api-impact/cases.json",
+      "fields": {
+        "java": 32,
+        "javaChanges": 16,
+        "rust": 32,
+        "rustChanges": 16
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/associative-delimiters/cases.json",
+      "fields": {
+        "java": 7,
+        "rust": 7,
+        "rustCheck": 1
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/associative-nullable-delimiters/cases.json",
+      "fields": {
+        "java": 6,
+        "rust": 6,
+        "rustCheck": 1
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/associative-projection/cases.json",
+      "fields": {
+        "java": 21,
+        "rust": 21,
+        "rustCheck": 3
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/associative-projection/invalid-cases.json",
+      "fields": {
+        "nativeError": 3
+      },
+      "entries": [
+        "generator-diagnostics"
+      ]
+    },
+    {
+      "path": "spec-corpus/case-insensitive/jdk17-legacy-delta.tsv",
+      "fields": {
+        "javaLegacyFold": 95
+      },
+      "entries": [
+        "unicode-legacy"
+      ]
+    },
+    {
+      "path": "spec-corpus/case-insensitive/jdk21-legacy-delta.tsv",
+      "fields": {
+        "javaLegacyFold": 55
+      },
+      "entries": [
+        "unicode-legacy"
+      ]
+    },
+    {
+      "path": "spec-corpus/common-fields/generated-cases.json",
+      "fields": {
+        "java": 10,
+        "rust": 10
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/empty-literal/corpus.json",
+      "fields": {
+        "javaCst": 3,
+        "javaDiagnostic": 51
+      },
+      "entries": [
+        "diagnostic-display",
+        "choice-root-cst",
+        "empty-expectation-display"
+      ]
+    },
+    {
+      "path": "spec-corpus/error-elements/corpus.json",
+      "fields": {
+        "javaDiagnostic": 10
+      },
+      "entries": [
+        "diagnostic-display"
+      ]
+    },
+    {
+      "path": "spec-corpus/family-projection/cases.json",
+      "fields": {
+        "java": 9,
+        "rust": 9
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/family-projection/invalid-cases.json",
+      "fields": {
+        "javaGeneratorError": 1
+      },
+      "entries": [
+        "generator-diagnostics"
+      ]
+    },
+    {
+      "path": "spec-corpus/grapheme/parser.tsv",
+      "fields": {
+        "Java matched": 1,
+        "Java root end": 1,
+        "Rust matched": 1,
+        "Rust root end": 1
+      },
+      "entries": [
+        "legacy-assertions"
+      ]
+    },
+    {
+      "path": "spec-corpus/java-token-bindings/cases.json",
+      "fields": {
+        "java": 10,
+        "javaClass": 10,
+        "rust": 10
+      },
+      "entries": [
+        "host-bindings"
+      ]
+    },
+    {
+      "path": "spec-corpus/nested-alias-captures/cases.json",
+      "fields": {
+        "javaFieldTypes": 11,
+        "rustFieldTypes": 11
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/nested-mapped-leaves/cases.json",
+      "fields": {
+        "javaFieldTypes": 17,
+        "rustFieldTypes": 17
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/nested-mixed-values/cases.json",
+      "fields": {
+        "javaType": 20,
+        "rustType": 20
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/nested-separated-captures/cases.json",
+      "fields": {
+        "javaFieldTypes": 11,
+        "rustFieldTypes": 11
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/nested-separated-captures/mapped.json",
+      "fields": {
+        "javaFieldTypes": 6,
+        "rustFieldTypes": 6
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/nested-shared-fields/cases.json",
+      "fields": {
+        "javaFieldTypes": 9,
+        "rustFieldTypes": 9
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/nested-shared-fields/family-generated.json",
+      "fields": {
+        "java": 3,
+        "rust": 3
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/nested-typeof/generated-cases.json",
+      "fields": {
+        "javaMethods": 23,
+        "rustMethods": 23
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/numeric-captures/cases.json",
+      "fields": {
+        "java": 8,
+        "rust": 8,
+        "rustArgs": 8
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/owned-nested-capture/cases.json",
+      "fields": {
+        "javaFieldTypes": 5,
+        "rustFieldTypes": 5
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/preferred-ast/cases.json",
+      "fields": {
+        "java": 23,
+        "rust": 23
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/recursive-helpers/generated-cases.json",
+      "fields": {
+        "javaMethods": 14,
+        "rustMethods": 14
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/typed-nested-captures/cases.json",
+      "fields": {
+        "javaFieldTypes": 14,
+        "rustFieldTypes": 14
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "spec-corpus/typeof/generated-cases.json",
+      "fields": {
+        "javaMethods": 32,
+        "rustMethods": 32
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/resources/ambiguity-boundaries/invalid.json",
+      "fields": {
+        "nativeMessage": 2
+      },
+      "entries": [
+        "generator-diagnostics"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/resources/evolution/diagnostics.json",
+      "fields": {
+        "javaOffset": 8,
+        "rustOffset": 8
+      },
+      "entries": [
+        "diagnostic-display"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/resources/name-predicate/invalid.json",
+      "fields": {
+        "nativeMessage": 12
+      },
+      "entries": [
+        "generator-diagnostics"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/resources/nested-captures/corpus.json",
+      "fields": {
+        "javaFieldTypes": 8,
+        "rustFieldTypes": 8
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/resources/numeric-capture/conformance.json",
+      "fields": {
+        "javaInt": 13
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/resources/semantic-cardinality/pure-alias.json",
+      "fields": {
+        "javaType": 11
+      },
+      "entries": [
+        "host-types"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/resources/unique-longest/invalid.json",
+      "fields": {
+        "nativeMessage": 9
+      },
+      "entries": [
+        "generator-diagnostics"
+      ]
+    }
+  ]
+}
