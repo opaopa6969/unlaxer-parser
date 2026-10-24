@@ -53,16 +53,37 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/master'
     needs: build
-    # The local runner's DNS lookup can exceed the Pages action's connect timeout.
-    # Standard hosted runners are free for this public repository.
     runs-on: [unlaxer-parser-ci, Linux, X64]
     permissions:
       pages: write
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
+    env:
+      # The runners' resolver answers A for api.github.com at once but leaves AAAA unanswered
+      # for 10-15 s. Node waits for both, so the Pages actions hit their 10 s connect timeout
+      # ("Connect Timeout Error", run 39976413660). One 2 s try per query keeps the lookup
+      # near 4 s; glibc 2.35 on the runners has no no-aaaa option.
+      RES_OPTIONS: single-request timeout:2 attempts:1
+    # Neither action retries a connection failure. Each runs at most twice: the first try may
+    # fail, the second one decides the job. Both are safe to repeat: configure-pages only reads
+    # the site, and deploy-pages can only publish the artifact this run uploaded.
     steps:
       - uses: actions/configure-pages@v5
+        id: configure
+        continue-on-error: true
+      - name: Wait before configuring Pages again
+        if: steps.configure.outcome == 'failure'
+        run: sleep 30
+      - uses: actions/configure-pages@v5
+        if: steps.configure.outcome == 'failure'
       - uses: actions/deploy-pages@v4
         id: deployment
+        continue-on-error: true
+      - name: Wait before deploying Pages again
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - uses: actions/deploy-pages@v4
+        id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
