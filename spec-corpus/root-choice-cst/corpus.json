@@ -1,0 +1,286 @@
+[
+  {
+    "name": "ChoiceLiteral",
+    "cstOnly": true,
+    "grammar": "grammar ChoiceLiteral { @package: org.example.emptyliteral  @root @mapping(Root) Root ::= '😀' | 'b'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "😀",
+        "cst": "Root[0,1)",
+        "cstModes": [
+          "Root[0,1)",
+          "Root[0,1)",
+          "Root[0,1)"
+        ]
+      },
+      {
+        "id": "1",
+        "input": "b",
+        "cst": "Root[0,1)",
+        "cstModes": [
+          "Root[0,1)",
+          "Root[0,1)",
+          "Root[0,1)"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ChoiceSequence",
+    "cstOnly": true,
+    "grammar": "grammar ChoiceSequence { @package: org.example.emptyliteral  @root @mapping(Root) Root ::= '😀' 'a' | 'b' 'c'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "😀a",
+        "cst": "Root[0,2)",
+        "cstModes": [
+          "Root[0,2)",
+          "Root[0,2)",
+          "Root[0,2)"
+        ]
+      },
+      {
+        "id": "1",
+        "input": "bc",
+        "cst": "Root[0,2)",
+        "cstModes": [
+          "Root[0,2)",
+          "Root[0,2)",
+          "Root[0,2)"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ChoiceReference",
+    "cstOnly": true,
+    "grammar": "grammar ChoiceReference { @package: org.example.emptyliteral  @root @mapping(Root) Root ::= Item | Other; Item ::= '😀'; Other ::= 'b'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "😀",
+        "cst": "Root[0,1){Item[0,1)}",
+        "cstModes": [
+          "Root[0,1){Item[0,1)}",
+          "Root[0,1){Item[0,1)}",
+          "Root[0,1){Item[0,1)}"
+        ]
+      },
+      {
+        "id": "1",
+        "input": "b",
+        "cst": "Root[0,1){Other[0,1)}",
+        "cstModes": [
+          "Root[0,1){Other[0,1)}",
+          "Root[0,1){Other[0,1)}",
+          "Root[0,1){Other[0,1)}"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ChoiceNested",
+    "cstOnly": true,
+    "grammar": "grammar ChoiceNested { @package: org.example.emptyliteral  @root @mapping(Root) Root ::= Item | Other; Item ::= '😀' | 'x'; Other ::= 'b'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "😀",
+        "cst": "Root[0,1){Item[0,1)}",
+        "cstModes": [
+          "Root[0,1){Item[0,1)}",
+          "Root[0,1){Item[0,1)}",
+          "Root[0,1){Item[0,1)}"
+        ]
+      },
+      {
+        "id": "1",
+        "input": "x",
+        "cst": "Root[0,1){Item[0,1)}",
+        "cstModes": [
+          "Root[0,1){Item[0,1)}",
+          "Root[0,1){Item[0,1)}",
+          "Root[0,1){Item[0,1)}"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SequenceChoice",
+    "cstOnly": true,
+    "grammar": "grammar SequenceChoice { @package: org.example.emptyliteral  @root @mapping(Root) Root ::= '(' Item ')'; Item ::= '😀' | 'x'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "(😀)",
+        "cst": "Root[0,3){Item[1,2)}",
+        "cstModes": [
+          "Root[0,3){Item[1,2)}",
+          "Root[0,3){Item[1,2)}",
+          "Root[0,3){Item[1,2)}"
+        ]
+      },
+      {
+        "id": "1",
+        "input": "(x)",
+        "cst": "Root[0,3){Item[1,2)}",
+        "cstModes": [
+          "Root[0,3){Item[1,2)}",
+          "Root[0,3){Item[1,2)}",
+          "Root[0,3){Item[1,2)}"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "AliasChoice",
+    "cstOnly": true,
+    "grammar": "grammar AliasChoice { @package: org.example.emptyliteral  @root @mapping(Root) Root ::= Item; Item ::= '😀' | 'x'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "😀",
+        "cst": "Root[0,1){Item[0,1)}",
+        "cstModes": [
+          "Root[0,1){Item[0,1)}",
+          "Root[0,1){Item[0,1)}",
+          "Root[0,1){Item[0,1)}"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LiteralRoot",
+    "cstOnly": true,
+    "grammar": "grammar LiteralRoot { @package: org.example.emptyliteral  @root @mapping(Root) Root ::= '😀'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "😀",
+        "cst": "Root[0,1)",
+        "cstModes": [
+          "Root[0,1)",
+          "Root[0,1)",
+          "Root[0,1)"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "PredictiveRoot",
+    "cstOnly": true,
+    "grammar": "grammar PredictiveRoot { @package: org.example.emptyliteral  @root @predictiveChoice @mapping(Root) Root ::= '😀' | 'b'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "😀",
+        "cst": "Root[0,1)",
+        "cstModes": [
+          "Root[0,1)",
+          "Root[0,1)",
+          "Root[0,1)"
+        ]
+      },
+      {
+        "id": "1",
+        "input": "b",
+        "cst": "Root[0,1)",
+        "cstModes": [
+          "Root[0,1)",
+          "Root[0,1)",
+          "Root[0,1)"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LongestRoot",
+    "cstOnly": true,
+    "grammar": "grammar LongestRoot { @package: org.example.emptyliteral  @root @longestChoice @mapping(Root) Root ::= '😀' | 'b'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "😀",
+        "cst": "Root[0,1)",
+        "cstModes": [
+          "Root[0,1)",
+          "Root[0,1)",
+          "Root[0,1)"
+        ]
+      },
+      {
+        "id": "1",
+        "input": "b",
+        "cst": "Root[0,1)",
+        "cstModes": [
+          "Root[0,1)",
+          "Root[0,1)",
+          "Root[0,1)"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "UniqueLongestRoot",
+    "cstOnly": true,
+    "grammar": "grammar UniqueLongestRoot { @package: org.example.emptyliteral  @root @uniqueLongestChoice @mapping(Root) Root ::= '😀' | 'b'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "😀",
+        "cst": "Root[0,1)",
+        "cstModes": [
+          "Root[0,1)",
+          "Root[0,1)",
+          "Root[0,1)"
+        ]
+      },
+      {
+        "id": "1",
+        "input": "b",
+        "cst": "Root[0,1)",
+        "cstModes": [
+          "Root[0,1)",
+          "Root[0,1)",
+          "Root[0,1)"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ChoiceTrivia",
+    "cstOnly": true,
+    "grammar": "grammar ChoiceTrivia { @package: org.example.emptyliteral @whitespace: javaStyle @root @mapping(Root) Root ::= Item | 'z'; Item ::= '😀' 'x'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": " 😀 x ",
+        "cst": "Root[0,5){Item[0,5)}",
+        "cstModes": [
+          "Root[0,5){Item[0,5)}",
+          "Root[0,5){Item[0,5)}",
+          "Root[0,5){Item[0,5)}"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ChoiceZeroWidth",
+    "cstOnly": true,
+    "grammar": "grammar ChoiceZeroWidth { @package: org.example.emptyliteral @ubnf: v2 @tokenStream: enabled @root @mapping(Root) Root ::= '' | 'x'; }",
+    "cases": [
+      {
+        "id": "0",
+        "input": "",
+        "cst": "Root[0,0)",
+        "cstModes": [
+          "Root[0,0)",
+          "Root[0,0)",
+          "Root[0,0)"
+        ]
+      }
+    ]
+  }
+]

@@ -8,7 +8,7 @@
     "検索例: `rg -n \"@Disabled|@Ignore|Assume|assumeTrue|assumeFalse|#\\[ignore|skipUnless|skipIf|skipTest|pytest.skip\" --glob \"*.java\" --glob \"*.rs\" --glob \"*.py\"`。さらに `skipped_validate` / `RUNTIME_SCOPE_IDS` 等の条件分岐を確認した。",
     "3分類を項目ごとに記録する。試験環境のopt-inは製品差ではないので契約として分類し、内部の未駆動caseは検証の未修正差として明記する。",
     "`spec-corpus/property-based/known-differences.json` はPBT findingの許可表なので空のまま維持する。全repo台帳をPBTの許可表へコピーして失敗を抑制しない。",
-    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。CST #767、Number #752、Java生成 #754、作業量 #758は別のOPEN issueへ結ぶ。#741の境界差は契約化済み。",
+    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。Number #752、Java生成 #754、作業量 #758は別のOPEN issueへ結ぶ。#767のCST観測対象の訂正と、#741の境界差は契約化済み。",
     "CLOSED #331/#545/#571/#176/#537の後に残った旧未対応記述（回復内match-only、汎用伝播、Rust LSP/DAP、scopeTree、enum/eval、Backreference）は現行契約へ訂正する。未解決範囲はOPEN #111と個別子issueで追跡する。",
     "規範違反の量指定子overflow #783 と、内部条件付き除外の検証漏れ #784 を新規作成した。個別issueのない残機能群は既存全仕様issue #111の受け入れ範囲に結ぶ。",
     "catalog/corpus.jsonのGsonが許していた単引用符escapeを同じ復号値の標準JSONへ訂正した。JSONの不正構文を黙って走査から除外しない。",
@@ -548,15 +548,17 @@
     },
     {
       "id": "choice-root-cst",
-      "category": "unresolved",
-      "title": "choice root の CST node 欠落",
+      "category": "contract",
+      "title": "choice の返却 Parsed と commit 済み CST の区別",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         767
       ],
-      "observation": "CaptureRollback / Labeled / AutoCommit で Java はroot ruleを残さずRustは残す。javaCst 3件で吸収される現在の差であり、#713が閉じても解消していない。",
+      "observation": "Java 3.3.0 の Choice は選択枝の Parsed を返す一方、context に root rule を commit し、生成 mapper もその root を要求する。Rust Tree / Classic の CST はこの commit 済み木と共通。異なる対象を比べていたテストを訂正し、javaCst 3件を削除。root・非root・spanを共通oracleで検証する。返却 Parsed と Rust ParseMatch のAPI差は残すが、CST欠落ではない。",
       "evidence": [
         "spec-corpus/empty-literal/corpus.json",
+        "spec-corpus/root-choice-cst/corpus.json",
+        "docs/root-choice-cst.md",
         "docs/empty-literal.md"
       ]
     },
@@ -1270,12 +1272,10 @@
     {
       "path": "spec-corpus/empty-literal/corpus.json",
       "fields": {
-        "javaCst": 3,
         "javaDiagnostic": 51
       },
       "entries": [
-        "diagnostic-display",
-        "choice-root-cst"
+        "diagnostic-display"
       ]
     },
     {

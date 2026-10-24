@@ -14,6 +14,8 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- root choice の CST 比較を Java 3.3.0 の commit 済み root に揃え、`javaCst` の別期待値3件を削除した (#767)。Java の返却 `Parsed` は選択枝、生成 mapper と Rust `Tree` は commit 済み木を使うという API の区別を契約化し、両 Rust 生成経路・Classic・非 root choice の共通回帰を追加。公開 parser・生成物・Rust CST の利用者に見える振る舞いは変えない。[根拠](docs/root-choice-cst.md)。
+
 - Rust の `@f` が生成・投影原文を Choice／rule 経由や全入力解析で受理する問題を修正し、Java と同じ入力由来検査・失敗位置を保つ (#761)。
 - Rust の LSP の message と `ParseError` / `ParseDiagnostic` の `Display` で、空の期待候補（通常の文法の `''`）を Java の生成 LSP と同じ `''` と表示する (#750)。以前は `Expected  or b` のように候補が見えなかった。canonical JSON・`data.expectedTokens` の値 `""`、空でない候補の表示、LSP の range・code は変えない。表示用に `unlaxer_runtime::display_expected` を追加した。[表示の対応](docs/empty-literal.md#人が読む表示750)。
 - 生成した Rust parser の Number token が、不完全な指数（`2e`・`2e+`）で Java の `NumberParser` と同じく指数記号・符号の後を失敗位置として記録するよう修正 (#717)。`R0 ::= NUM 'a'` に `2e` の診断は CP1 → CP2（`2e+` は CP3）。受理と消費は従来どおり仮数部まで。共通 oracle `conformance/number-token/cases.tsv` を追加し、PBT の既知差 `number-incomplete-exponent` を削除。
