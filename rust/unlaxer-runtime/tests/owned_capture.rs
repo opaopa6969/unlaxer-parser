@@ -172,6 +172,18 @@ fn scenario(
                 inv,
             );
         }
+        "field-failure-reset" => {
+            c.set_reset_matched_with_consumed(true);
+            // Java の失敗した LazyChain は begin 前に外側へ設定した reset=false を残す。
+            assert!(c
+                .parse_with_token_mode(&w("y").capture("f"), TokenKind::Consumed, false)
+                .is_err());
+            return c.parse_with_token_mode(
+                &cap(w("x").match_only().repeat_java(0, Some(2))),
+                k,
+                inv,
+            );
+        }
         "match-only" => {
             parse(c, roots, cap(w("a")));
             return c.parse_with_token_mode(&cap(w("b")).match_only(), k, inv);
