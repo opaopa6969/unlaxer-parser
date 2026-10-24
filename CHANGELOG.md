@@ -8,6 +8,10 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Added
+
+- Java / Rust（native・Java-host）の既知差・未対応・条件付き skip を issue へ結ぶ [台帳](docs/parity-ledger.md) と JSON、host 別 corpus（JSON・JSON Lines・TSV・CSV・YAML、host 列の行）とテスト内の無条件 skip・差分表・除外集合の登録漏れ、文書の不一致を検出する既存 CI の検査を追加 (#771)。
+
 ### Fixed
 
 - Rust の `@f` が生成・投影原文を Choice／rule 経由や全入力解析で受理する問題を修正し、Java と同じ入力由来検査・失敗位置を保つ (#761)。
