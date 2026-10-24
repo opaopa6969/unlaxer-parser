@@ -1641,7 +1641,12 @@ impl Lowering<'_> {
         if !visiting.insert(rule) {
             let cache = &self.recursive_shapes[usize::from(enum_nodes)];
             if cache.get().is_none() {
-                let _ = cache.set(self.recursive_shapes(enum_nodes)?);
+                // The fixed point is solved once for every rule, not as a nested part of
+                // the caller's analysis, so it starts from a fresh structural depth (#740).
+                let outer = self.analysis_depth.replace(0);
+                let solved = self.recursive_shapes(enum_nodes);
+                self.analysis_depth.set(outer);
+                let _ = cache.set(solved?);
             }
             return Ok(cache.get().expect("shape cache initialized")[rule].clone());
         }

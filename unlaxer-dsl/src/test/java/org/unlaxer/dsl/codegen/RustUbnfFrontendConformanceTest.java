@@ -17,6 +17,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.unlaxer.dsl.bootstrap.UBNFAST;
+import org.unlaxer.dsl.NestingLimitGrammars;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 
 /**
@@ -48,12 +49,7 @@ public class RustUbnfFrontendConformanceTest {
         }
         assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
         Path crate = repo.resolve("rust/unlaxer-ubnf");
-        Path library = temporary.getRoot().toPath().resolve("libunlaxer_ubnf.rlib");
-        run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_ubnf",
-            crate.resolve("src/lib.rs").toString(), "-o", library.toString()));
-        Path binary = temporary.getRoot().toPath().resolve("inspect");
-        run(List.of("rustc", "--edition=2021", crate.resolve("examples/inspect.rs").toString(),
-            "--extern", "unlaxer_ubnf=" + library, "-o", binary.toString()));
+        Path binary = inspectBinary();
 
         List<Path> positives;
         try (var paths = Files.list(crate.resolve("tests/fixtures/positive"))) {
@@ -102,6 +98,73 @@ public class RustUbnfFrontendConformanceTest {
             }
         }
         Files.write(Path.of("target/rust-ubnf-frontend.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * #741: the frontends bound rule body nesting differently, as docs/java-parser-limits.md
+     * states. The native frontend counts 128 body levels; the Java frontend has no counter and
+     * stops when its 1024 parser frames run out, which depends on the nested construct. Both
+     * count declarative token groups the same (128 levels). The Java part needs no toolchain.
+     */
+    @Test public void frontendNestingLimitsAreTheDocumentedContract() throws Exception {
+        record Shape(String name, java.util.function.IntFunction<String> grammar, int javaLimit) {}
+        var shapes = List.of(new Shape("groups", NestingLimitGrammars::groups, NestingLimitGrammars.JAVA_GROUPS),
+            new Shape("alternatives", NestingLimitGrammars::alternatives, NestingLimitGrammars.JAVA_ALTERNATIVES));
+        for (var shape : shapes) {
+            int limit = shape.javaLimit();
+            UBNFMapper.parse(shape.grammar().apply(limit));
+            var error = assertThrows(shape.name(), org.unlaxer.context.ParseLimitException.class,
+                () -> UBNFMapper.parse(shape.grammar().apply(limit + 1)));
+            assertEquals("ULX-PARSE-DEPTH-LIMIT", error.code());
+            assertEquals(1024, error.limit());
+        }
+        UBNFMapper.parse(NestingLimitGrammars.tokenGroups(NestingLimitGrammars.NATIVE_BODY_LEVELS - 1));
+        var tokenError = assertThrows(IllegalArgumentException.class,
+            () -> UBNFMapper.parse(NestingLimitGrammars.tokenGroups(NestingLimitGrammars.NATIVE_BODY_LEVELS)));
+        assertTrue(tokenError.getMessage(), tokenError.getMessage().startsWith("UBNF パース失敗"));
+        assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
+        Path binary = inspectBinary();
+        var report = new ArrayList<>(List.of("case\tjava\trust"));
+        for (var shape : shapes) {
+            for (int depth = 126; depth <= 200; depth++) {
+                String name = shape.name() + "-" + depth;
+                Path source = temporary.newFile(name + ".ubnf").toPath();
+                Files.writeString(source, shape.grammar().apply(depth));
+                boolean javaAccepted = depth <= shape.javaLimit();
+                if (javaAccepted) UBNFMapper.parse(Files.readString(source));
+                else assertThrows(name, org.unlaxer.context.ParseLimitException.class, () -> UBNFMapper.parse(Files.readString(source)));
+                String nativeError = nativeError(binary, source);
+                // The rule body itself is the first of the native body levels.
+                assertEquals(name, depth < NestingLimitGrammars.NATIVE_BODY_LEVELS ? null : "UBNF nesting limit exceeded", nativeError);
+                report.add(name + "\t" + (javaAccepted ? "accepted" : "ULX-PARSE-DEPTH-LIMIT") + "\t"
+                    + (nativeError == null ? "accepted" : nativeError));
+            }
+        }
+        for (int depth : List.of(NestingLimitGrammars.NATIVE_BODY_LEVELS - 1, NestingLimitGrammars.NATIVE_BODY_LEVELS)) {
+            Path source = temporary.newFile("token-" + depth + ".ubnf").toPath();
+            Files.writeString(source, NestingLimitGrammars.tokenGroups(depth));
+            assertEquals("token-" + depth, depth < NestingLimitGrammars.NATIVE_BODY_LEVELS ? null : "lexical nesting exceeds 128",
+                nativeError(binary, source));
+        }
+        Files.write(Path.of("target/rust-ubnf-nesting-limits.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    /** The native error message, or null for an AST (too deep for Gson's JSON nesting limit). */
+    private String nativeError(Path binary, Path input) throws Exception {
+        String output = run(List.of(binary.toString(), input.toString()));
+        if (output.startsWith("{\"ast\":")) return null;
+        return JsonParser.parseString(output).getAsJsonObject().get("error").getAsString();
+    }
+
+    private Path inspectBinary() throws Exception {
+        Path crate = repo.resolve("rust/unlaxer-ubnf");
+        Path library = temporary.getRoot().toPath().resolve("libunlaxer_ubnf.rlib");
+        run(List.of("rustc", "--edition=2021", "--crate-type=rlib", "--crate-name=unlaxer_ubnf",
+            crate.resolve("src/lib.rs").toString(), "-o", library.toString()));
+        Path binary = temporary.getRoot().toPath().resolve("inspect");
+        run(List.of("rustc", "--edition=2021", crate.resolve("examples/inspect.rs").toString(),
+            "--extern", "unlaxer_ubnf=" + library, "-o", binary.toString()));
+        return binary;
     }
 
     private JsonObject inspect(Path binary, Path input) throws Exception {

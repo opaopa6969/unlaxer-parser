@@ -37,16 +37,17 @@ public final class RustGrammarLowering {
     private final Set<Integer> nullableRules = new HashSet<>();
     private int analysisDepth;
     private boolean nestedRule;
-    private final org.unlaxer.dsl.codegen.RecursiveSemanticShapes[] recursiveShapes;
+    /** Solved recursive rule shapes, without and with enum nodes; null until the first revisit. */
+    private final Shape[][] recursiveShapes = new Shape[2][];
+    /** The Empty state of lowering.rs FixedShape; null is Unknown, any other shape is a Value. */
+    private static final Shape FIXED_EMPTY = new Shape(null, null);
+    private static final Shape TEXT_SHAPE = new Shape(Kind.TEXT, Cardinality.ONE);
     private record Shape(Kind kind, Cardinality cardinality, String enumName) {
         Shape(Kind kind,Cardinality cardinality) { this(kind,cardinality,null); }
     }
 
     private RustGrammarLowering(GrammarDecl grammar) {
         this.grammar = grammar;
-        this.recursiveShapes = new org.unlaxer.dsl.codegen.RecursiveSemanticShapes[] {
-            new org.unlaxer.dsl.codegen.RecursiveSemanticShapes(grammar, false),
-            new org.unlaxer.dsl.codegen.RecursiveSemanticShapes(grammar, true) };
         this.adapters = TokenAdapterRegistry.requireValid(grammar);
     }
 
@@ -1174,19 +1175,22 @@ public final class RustGrammarLowering {
     private Shape shape(int rule, Set<Integer> visiting, boolean enumNodes) {
         enterAnalysis();
         try {
-            if (skips.get(rule)) return new Shape(Kind.TEXT, Cardinality.ONE);
-            if (EnumSchema.isEnum(grammar.rules().get(rule))) return enumNodes ? new Shape(Kind.NODE, Cardinality.ONE) : new Shape(Kind.ENUM,Cardinality.ONE,grammar.rules().get(rule).name());
-            if (mappings.get(rule) != null) return new Shape(Kind.NODE, Cardinality.ONE);
+            Shape terminal = terminalShape(rule, enumNodes);
+            if (terminal != null) return terminal;
             if (!visiting.add(rule)) {
-                var recursive = recursiveShapes[enumNodes ? 1 : 0].rule(grammar.rules().get(rule).name());
-                Kind kind = switch (recursive.kind()) {
-                    case "#text" -> Kind.TEXT;
-                    case "#node" -> Kind.NODE;
-                    case "#join" -> Kind.VALUE;
-                    default -> enumNodes ? Kind.NODE : Kind.ENUM;
-                };
-                return new Shape(kind, Cardinality.valueOf(recursive.count().name()),
-                    kind == Kind.ENUM ? recursive.kind() : null);
+                int index = enumNodes ? 1 : 0;
+                if (recursiveShapes[index] == null) {
+                    // Solved once for every rule, not as a nested part of the caller's
+                    // analysis: start from a fresh structural depth, as lowering.rs does (#740).
+                    int outer = analysisDepth;
+                    analysisDepth = 0;
+                    try {
+                        recursiveShapes[index] = recursiveShapes(enumNodes);
+                    } finally {
+                        analysisDepth = outer;
+                    }
+                }
+                return recursiveShapes[index][rule];
             }
             if (visiting.size() > MAX_ANALYSIS_DEPTH) throw unsupported("rule shape depth exceeds 256");
             Shape result = shape(bodies.get(rule), visiting, enumNodes);
@@ -1247,6 +1251,104 @@ public final class RustGrammarLowering {
         } finally {
             leaveAnalysis();
         }
+    }
+
+    private Shape terminalShape(int rule, boolean enumNodes) {
+        if (skips.get(rule)) return TEXT_SHAPE;
+        if (EnumSchema.isEnum(grammar.rules().get(rule))) return enumNodes ? new Shape(Kind.NODE, Cardinality.ONE) : new Shape(Kind.ENUM,Cardinality.ONE,grammar.rules().get(rule).name());
+        if (mappings.get(rule) != null) return new Shape(Kind.NODE, Cardinality.ONE);
+        return null;
+    }
+
+    // Solve recursive rule references as a finite graph over the lowered IR, as lowering.rs
+    // recursive_shapes / fixed_shape do (#740). Each expression enters the shared structural
+    // analysis depth, so the nesting limit and its diagnostic are the same on both hosts.
+    // Unknown (null) is an as-yet unknown finite derivation, not a text alternative.
+    private Shape[] recursiveShapes(boolean enumNodes) {
+        List<Shape> current = new ArrayList<>();
+        for (int rule = 0; rule < bodies.size(); rule++) current.add(terminalShape(rule, enumNodes));
+        int[] work = {0};
+        for (int iteration = 0; iteration < 4 * bodies.size() + 4; iteration++) {
+            List<Shape> next = new ArrayList<>(current);
+            for (int rule = 0; rule < bodies.size(); rule++) {
+                if (terminalShape(rule, enumNodes) != null) continue;
+                next.set(rule, fixedShape(bodies.get(rule), current, work));
+            }
+            if (next.equals(current)) {
+                Shape[] result = new Shape[next.size()];
+                for (int rule = 0; rule < result.length; rule++) {
+                    Shape shape = next.get(rule);
+                    result[rule] = shape == null || FIXED_EMPTY.equals(shape) ? TEXT_SHAPE : shape;
+                }
+                return result;
+            }
+            current = next;
+        }
+        throw new IllegalArgumentException("E-RECURSIVE-SHAPE: transparent shape analysis did not converge");
+    }
+
+    private Shape fixedShape(Expression expression, List<Shape> state, int[] work) {
+        if (++work[0] > 1_000_000) throw new IllegalArgumentException("E-RECURSIVE-SHAPE: analysis work exceeds 1000000");
+        enterAnalysis();
+        try {
+            if (expression instanceof CatchLabels caught) return fixedShape(caught.asChoice(), state, work);
+            if (expression instanceof CaptureBoundary boundary) {
+                return boundary.kind() == BoundaryKind.SEPARATOR ? TEXT_SHAPE : fixedShape(boundary.child(), state, work);
+            }
+            if (expression instanceof Reference reference) return state.get(reference.rule());
+            if (expression instanceof GeneralBody general) return fixedShape(general.child(), state, work);
+            if (expression instanceof Capture capture) return fixedShape(capture.expression(), state, work);
+            if (expression instanceof Delimited delimited) return fixedShape(delimited.child(), state, work);
+            if (expression instanceof CaptureEquality equality) return fixedShape(equality.child(), state, work);
+            if (expression instanceof OptionalExpr optional) {
+                return fixedWrap(fixedShape(optional.child(), state, work), Cardinality.OPTIONAL, true);
+            }
+            if (expression instanceof Repeat repeat) {
+                return fixedWrap(fixedShape(repeat.child(), state, work), Cardinality.MANY, repeat.min() == 0);
+            }
+            if (expression instanceof Separated separated) {
+                Shape separator = fixedShape(separated.separator(), state, work);
+                if (separator != null && !FIXED_EMPTY.equals(separator) && separator.kind() != Kind.TEXT) throw unsupported("mapped separator");
+                return fixedWrap(fixedShape(separated.child(), state, work), Cardinality.MANY, false);
+            }
+            if (expression instanceof Sequence sequence) {
+                Shape result = FIXED_EMPTY;
+                boolean text = false;
+                for (var element : sequence.elements()) {
+                    Shape shape = fixedShape(element, state, work);
+                    if (shape != null && shape.kind() == Kind.TEXT) {
+                        text = true;
+                        continue;
+                    }
+                    result = fixedJoin(result, shape, true);
+                }
+                return text && FIXED_EMPTY.equals(result) ? TEXT_SHAPE : result;
+            }
+            List<Expression> alternatives = expression instanceof Choice choice ? choice.alternatives()
+                : expression instanceof PredictiveChoice choice ? choice.alternatives() : null;
+            if (alternatives != null) {
+                Shape result = null;
+                for (var alternative : alternatives) result = fixedJoin(result, fixedShape(alternative, state, work), false);
+                return result;
+            }
+            return TEXT_SHAPE;
+        } finally {
+            leaveAnalysis();
+        }
+    }
+
+    private Shape fixedWrap(Shape shape, Cardinality cardinality, boolean nullable) {
+        if (shape == null) return nullable ? FIXED_EMPTY : null;
+        return FIXED_EMPTY.equals(shape) ? shape : wrapNode(shape, cardinality);
+    }
+
+    private Shape fixedJoin(Shape left, Shape right, boolean sequence) {
+        if (!sequence && left == null) return right;
+        if (!sequence && right == null) return left;
+        if (left == null || right == null) return null;
+        if (FIXED_EMPTY.equals(left)) return sequence ? right : fixedWrap(right, Cardinality.OPTIONAL, true);
+        if (FIXED_EMPTY.equals(right)) return sequence ? left : fixedWrap(left, Cardinality.OPTIONAL, true);
+        return merge(left, right, sequence);
     }
 
     private Shape wrapNode(Shape shape, Cardinality cardinality) {
