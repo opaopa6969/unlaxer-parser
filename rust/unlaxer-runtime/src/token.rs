@@ -1388,14 +1388,11 @@ impl ParseContext<'_> {
         label: &'static str,
     ) -> Fragment {
         // Java Choice は選択した子の Parsed を返す。CST の収集値で上書きしない。
-        let selected_source = (self.track_owned_source
-            && matches!(label, "Choice" | "LongestChoice" | "UniqueLongestChoice"))
-        .then(|| {
-            fragment
-                .parsed_source()
-                .map(|source| Box::new(source.clone()))
-        })
-        .flatten();
+        let selected_source = fragment
+            .parsed_source()
+            .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
+            .filter(|_| matches!(label, "Choice" | "LongestChoice" | "UniqueLongestChoice"))
+            .map(|source| Box::new(source.clone()));
         let mut original = fragment.nodes.clone();
         // Java Choice publishes the selected child's Parsed object, while the
         // committed CST still contains the Choice collector.

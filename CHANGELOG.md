@@ -10,6 +10,8 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- Rust の `@f` が生成・投影原文を Choice／rule 経由や全入力解析で受理する問題を修正し、Java と同じ入力由来検査・失敗位置を保つ (#761)。
+
 - 生成した Rust parser の Number token が、不完全な指数（`2e`・`2e+`）で Java の `NumberParser` と同じく指数記号・符号の後を失敗位置として記録するよう修正 (#717)。`R0 ::= NUM 'a'` に `2e` の診断は CP1 → CP2（`2e+` は CP3）。受理と消費は従来どおり仮数部まで。共通 oracle `conformance/number-token/cases.tsv` を追加し、PBT の既知差 `number-incomplete-exponent` を削除。
 - provider transport の通常拒否と意図した timeout の予算を Java/Rust 共通 fixture で分離し、正常応答付き stderr の上限超過と stdout/stderr のちょうど 4MiB の受理を検証する (#721)。製品の timeout 既定値は変更しない。
 - Rust の非 Classic 経路の CAPTURE が、Java と同じ子の root token の原文を保存するよう修正 (#729)。直接の LOOKAHEAD の値を保持し、consumed の Chain・EMPTY・UNTIL の先読み部分は値に含めない。SAME_AS は保存した値を consumed cursor から再照合する。入口のモード選択・AST field capture・CST は従来どおり。Classic 経路でも Choice／rule 参照が owned capture へ返す Parsed の原文を、CST に commit する原文と分離する。field capture と CaptureBoundary は commit 済み原文を使い、公開 `ParseMatch.span` も従来の値を保つ（先読み Choice の consumed span は `[0,0]`）。Optional／Recovery／CaptureBoundary が直接の先読み原文を集めないことを Java/Rust で検証した。field capture（`@f`）自身も子の Parsed 原文を破棄し、外側の owned capture へ伝えない。Classic・非 Classic・成功 memo 再生を共通 corpus と直接 API で固定した。

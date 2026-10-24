@@ -826,7 +826,7 @@ struct Fragment {
 
 #[derive(Debug, Clone)]
 struct FragmentSource {
-    // owned capture のときだけ保持する、commit 済み原文と異なる Parsed 原文。
+    // owned capture の値と @f の入力由来検査に使う、commit 済み原文と異なる Parsed 原文。
     parsed_source: Option<Box<FragmentSource>>,
     span: Span,
     kind: token::TokenKind,
@@ -3260,14 +3260,10 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
         // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
-        self.rule_result_source = self
-            .track_owned_source
-            .then(|| {
-                fragment
-                    .parsed_source()
-                    .map(|source| Box::new(source.clone()))
-            })
-            .flatten();
+        self.rule_result_source = fragment
+            .parsed_source()
+            .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
+            .map(|source| Box::new(source.clone()));
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
         let classic = fragment
             .source
@@ -3376,7 +3372,7 @@ impl<'a> ParseContext<'a> {
                 captures: Vec::new(),
                 source: self.tokens.values.get(&id).map(|value| {
                     Box::new(FragmentSource {
-                        parsed_source: None,
+                        parsed_source: self.rule_result_source.take(),
                         span: self.nodes[id].span,
                         kind: value.kind,
                         classic: value.classic,
@@ -4141,6 +4137,9 @@ impl<'a> ParseContext<'a> {
                         .first()
                         .and_then(|index| self.tokens.values.get(index));
                     let classic = self.token_mode.is_some()
+                        || info.is_some_and(|info| {
+                            !matches!(info.source, token::TokenSource::Input(_))
+                        })
                         || matched.nodes.iter().any(|index| {
                             self.tokens
                                 .values
@@ -4584,10 +4583,18 @@ impl<'a> ParseContext<'a> {
         anchor: usize,
         owned: bool,
     ) -> Option<Fragment> {
+        // Java は Choice/rule が返した Parsed を、@f の収集より先に検査する。
+        if !owned
+            && fragment
+                .parsed_source()
+                .is_some_and(|source| source.text.is_some() || source.generated)
+        {
+            self.fail("AST field capture requires original input source; use capture_owned for general replay");
+            return None;
+        }
         if !owned && self.token_mode.is_some() {
             // Java の @f は LazyChain なので、現在の kind の子だけを収集する。
             // 直接の LOOKAHEAD（match-only）は consumed の @f では幅0になる（#742）。
-            // 入力以外の原文は Java と同じく収集前の子の原文で拒否する（下の検査）。
             let kind = self.token_mode().kind;
             if fragment.source.as_deref().is_some_and(|source| {
                 source.classic && source.kind != kind && source.text.is_none() && !source.generated
@@ -4610,14 +4617,6 @@ impl<'a> ParseContext<'a> {
         );
         if !owned {
             // Keep the existing AST field contract and its input-only metadata.
-            if fragment
-                .source
-                .as_deref()
-                .is_some_and(|source| source.text.is_some() || source.generated)
-            {
-                self.fail("AST field capture requires original input source; use capture_owned for general replay");
-                return None;
-            }
             self.captures.push(name, span);
             fragment.captures.push(Capture {
                 name,
@@ -4625,9 +4624,7 @@ impl<'a> ParseContext<'a> {
                 nodes: fragment.nodes.clone(),
             });
             // @f は consumed の収集境界。外側の owned capture へ Parsed 原文を渡さない。
-            if self.track_owned_source {
-                fragment.clear_parsed_source();
-            }
+            fragment.clear_parsed_source();
             if fragment
                 .source
                 .as_deref()
