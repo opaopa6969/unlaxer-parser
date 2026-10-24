@@ -123,7 +123,8 @@ public class GlobalCommentConformanceTest extends AtomicTriviaConformanceTest {
             var issues = GrammarValidator.validate(grammar);
             assertEquals(name + " validator errors", List.of(), issues.stream()
                 .filter(issue -> issue.severity().equals("ERROR")).toList());
-            assertEquals(name + " validator warnings", warnings.size(), issues.stream()
+            // Like W-ANNOTATION-IGNORED, only GenerationWarnings reports this to the flag CLI.
+            assertEquals(name + " validator warnings", 0, issues.stream()
                 .filter(issue -> issue.code().equals(GlobalComment.IGNORED)
                     && issue.severity().equals("WARNING")).count());
             assertEquals(name + " Java parser", new ParserGenerator().generate(baseline),

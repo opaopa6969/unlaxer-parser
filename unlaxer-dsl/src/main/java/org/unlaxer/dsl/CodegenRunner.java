@@ -437,6 +437,8 @@ final class CodegenRunner {
                 warning.code(), "WARNING", "GENERAL", warning.line(),
                 warning.code().equals(org.unlaxer.dsl.bootstrap.AutoCommit.SKIPPED)
                     ? "Remove @autoCommit, or make the rule reachable and analysable (docs/auto-commit.md)."
+                    : warning.code().equals(org.unlaxer.dsl.codegen.GlobalComment.IGNORED)
+                    ? "Remove this @comment setting (docs/rule-trivia.md)."
                     : "Write the annotation as documented, or remove it (docs/simple-annotations.md)."));
         }
         for (GrammarDecl grammar : file.grammars()) {

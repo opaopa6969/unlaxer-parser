@@ -140,11 +140,14 @@ setting 全体の code point span を同じ値で報告する。
 `//` を既に読み飛ばすので、3.3.0 の Java 生成器はこれらを javaStyle 単独と同じに生成していた
 （ubnfc の oracle corpus などが実際に使っている）。3.3.0 との互換を最小の変更で保つため、
 生成物は javaStyle 単独と同じにしたまま、該当する setting ごとに `W-COMMENT-IGNORED`
-（subject `comment`、setting 全体の code point span）を出す。Java は `GrammarValidator`
-（severity WARNING。CLI は `Validation warnings:` に表示）と `GlobalComment.warnings`、
-Rust は `unlaxer_generator::global_comment::warnings` が同じ code と span を返す。
-portability check では portable のままで、diagnostic にも出さない（native CLI には warning を
-出す経路がまだ無い）。
+（subject `comment`、setting 全体の code point span）を出す。Java の `GlobalComment.warnings` と
+Rust の `unlaxer_generator::global_comment::warnings` が同じ code と span を返す。
+#777 で `GenerationWarnings.collect` / `warnings::collect` に統合し、両方とも message は
+`W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle` とする。
+Java の flag CLI は `Validation warnings:` に一度だけ表示する（`GrammarValidator` は重ねて返さない）。
+Java-host Rust 生成と native `unlaxer generate` は同じ `warning: CP <start>..<end>: <message>` を
+stderr に出す。3経路とも `--strict` / `--fail-on warning` では生成物を書かず終了コード 5。
+portability check では portable のままで、diagnostic にも出さない。
 
 ### Java の変更と移行
 
@@ -185,7 +188,9 @@ token mode の cursor と CST 原文）も比較する。両 Rust 生成物は b
 無効設定 11 件は Java 検証器・両生成器・両 portability check で code / subject / span を比較する。
 javaStyle と併記した 8 件（`ignored.json`）は、`W-COMMENT-IGNORED` の code / subject / span を
 Java と native で比較し、Java・Java-host Rust・native の生成物が javaStyle 単独と一致すること、
-portability check が portable のままであることを確認する。
+portability check が portable のままであることを確認する。同じ8例の `generationWarnings` と
+`spec-corpus/generation-warnings/corpus.json` で、収集 API の code / message / CP span、3経路の
+stderr、重複しないこと、strict の終了コードと無出力も固定する。
 
 ```sh
 mvn -B -pl unlaxer-common,unlaxer-dsl -am test \

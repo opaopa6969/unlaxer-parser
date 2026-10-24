@@ -4,7 +4,8 @@
     "note": "The supported form adds nothing next to javaStyle and is not reported (tinyexpression P4).",
     "grammar": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: { line: '//' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
     "baseline": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
-    "warnings": []
+    "warnings": [],
+    "generationWarnings": []
   },
   {
     "name": "hash-prefix",
@@ -19,6 +20,19 @@
           96,
           119
         ]
+      }
+    ],
+    "generationWarnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Ignored",
+        "rule": "comment",
+        "span": [
+          96,
+          119
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 96..119: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
       }
     ]
   },
@@ -36,6 +50,19 @@
           153
         ]
       }
+    ],
+    "generationWarnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Ignored",
+        "rule": "comment",
+        "span": [
+          96,
+          153
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 96..153: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
+      }
     ]
   },
   {
@@ -51,6 +78,19 @@
           96,
           130
         ]
+      }
+    ],
+    "generationWarnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Ignored",
+        "rule": "comment",
+        "span": [
+          96,
+          130
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 96..130: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
       }
     ]
   },
@@ -68,6 +108,19 @@
           124
         ]
       }
+    ],
+    "generationWarnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Ignored",
+        "rule": "comment",
+        "span": [
+          96,
+          124
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 96..124: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
+      }
     ]
   },
   {
@@ -84,6 +137,19 @@
           113
         ]
       }
+    ],
+    "generationWarnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Ignored",
+        "rule": "comment",
+        "span": [
+          96,
+          113
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 96..113: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
+      }
     ]
   },
   {
@@ -99,6 +165,19 @@
           122,
           146
         ]
+      }
+    ],
+    "generationWarnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Ignored",
+        "rule": "comment",
+        "span": [
+          122,
+          146
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 122..146: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
       }
     ]
   },
@@ -123,6 +202,30 @@
           121,
           145
         ]
+      }
+    ],
+    "generationWarnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Ignored",
+        "rule": "comment",
+        "span": [
+          96,
+          119
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 96..119: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
+      },
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Ignored",
+        "rule": "comment",
+        "span": [
+          121,
+          145
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 121..145: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
       }
     ]
   }
