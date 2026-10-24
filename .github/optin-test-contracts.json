@@ -4,9 +4,9 @@
     "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
     "properties": {"rustConformance": "true", "tokenStreamBench": "true", "tinyexpression.grammar": null},
     "required": {
-      "org.unlaxer.dsl.RustBackendTest": ["generationIsDeterministicAndExhaustive", "generatedParserSharesOneGrammarWithoutBreakingRulesSnapshotApi", "generatedMapperDispatchesToBoundedRuleFunctions", "unsupportedFeaturesAreRejectedBeforeEmission", "memoSafeTokenIsValidatedAndIsANoopForBuiltInRustExpressions", "zeroWidthTokensCannotCreateUnboundedLoopsOrLeftRecursion", "invalidUnicodeTextIsRejectedBeforeRustEmission", "lexicalBindingsUseAnExplicitAllowlistAndEofStaysNullable", "tinyExpressionStringLiteralUsesDoubleThenSingleQuotedChoice", "tinyExpressionCodeFencesUseExactAtomicBindings", "cardinalityReachesAstAndSemantics", "sharedMappingsAreDeduplicatedButTheirSchemasMustAgree", "mixedValuesKeepTextBranchesAndCardinalityInGeneratedApis", "sharedMappingsJoinKindsBeforeRewritingAllCaptureSites", "nestedMixedChoicesAndSemanticSequencesAreRetained", "mixedUncapturedChoicesDoNotChangeExistingArtifacts", "sharedAssocSchemasValidateLocallyBeforePromotion", "rightAssocSyntheticChoiceDoesNotBecomeATextValueBranch", "literalTextCannotEnableInternalPreferredCaptures", "leftAssocMetadataDoesNotRewriteTheGrammarAndInvalidShapesAreRejected", "rightAssocRewritesOnlyCanonicalRecursionAndPreservesVectorSchema", "cliValidatesOperatorMetadataBeforeCreatingArtifacts", "cliAcceptsRightAssocAndRejectsConflictingMetadataBeforeOutput", "cliChecksDriftAndProtectsHandwrittenFiles", "explicitRustWhitespaceNoneRemainsAcceptedByTheCli"],
+      "org.unlaxer.dsl.RustBackendTest": ["generationIsDeterministicAndExhaustive", "generatedParserSharesOneGrammarWithoutBreakingRulesSnapshotApi", "generatedMapperDispatchesToBoundedRuleFunctions", "unsupportedFeaturesAreRejectedBeforeEmission", "memoSafeTokenIsValidatedAndIsANoopForBuiltInRustExpressions", "zeroWidthTokensCannotCreateUnboundedLoopsOrLeftRecursion", "invalidUnicodeTextIsRejectedBeforeRustEmission", "lexicalBindingsUseAnExplicitAllowlistAndEofStaysNullable", "tinyExpressionStringLiteralUsesDoubleThenSingleQuotedChoice", "tinyExpressionCodeFencesUseExactAtomicBindings", "cardinalityReachesAstAndSemantics", "sharedMappingsAreDeduplicatedButTheirSchemasMustAgree", "mixedValuesKeepTextBranchesAndCardinalityInGeneratedApis", "sharedMappingsJoinKindsBeforeRewritingAllCaptureSites", "nestedMixedChoicesAndSemanticSequencesAreRetained", "mixedUncapturedChoicesDoNotChangeExistingArtifacts", "sharedAssocSchemasValidateLocallyBeforePromotion", "rightAssocSyntheticChoiceDoesNotBecomeATextValueBranch", "literalTextCannotEnableInternalPreferredCaptures", "leftAssocMetadataDoesNotRewriteTheGrammarAndInvalidShapesAreRejected", "rightAssocRewritesOnlyCanonicalRecursionAndPreservesVectorSchema", "cliValidatesOperatorMetadataBeforeCreatingArtifacts", "cliAcceptsRightAssocAndRejectsConflictingMetadataBeforeOutput", "cliChecksDriftAndProtectsHandwrittenFiles", "explicitRustWhitespaceNoneRemainsAcceptedByTheCli", "recursiveShapesShareTheStructuralAnalysisDepth", "recursiveShapesKeepThePreviousJavaAcceptance"],
       "org.unlaxer.dsl.codegen.RustConformanceTest": ["primitiveTokensPreserveCapturesAndCodePointSpans", "semanticCardinalityRustOracle", "semanticCardinalityJavaOracle", "semanticCardinalityJavaAndRustAgree", "lexicalTokensPreserveRawTextAndCodePointSpans", "mixedValueFixturesPreserveJavaObjectFieldsAndValues", "delimitedMixedFixturesPreserveJavaWholeCaptureText", "mixedTextAndNodesPreserveCardinalityValuesCursorsAndSpans", "delimitedMixedValuesPreserveCaptureTextAndNodeBoundaries", "sharedMixedMappingsAreExecutableInBothDeclarationOrders", "rightAssociativeRecursionPreservesValuesCursorsAndAllSpans", "sharedLeftAssociativeVariantsPreserveOperatorsEvaluationAndSpans", "capturePlacementAndTransparentCollectionsAreExecutable", "cardinalityPreservesOptionalListsSpansAndEvaluation", "diagnosticEdgeCasesAgreeAcrossBackends", "sameGrammarPreservesAstSpansResultsAndEvolutionObligations"],
-      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax"],
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"],
       "org.unlaxer.dsl.codegen.RustUbnfSourceConformanceTest": ["everyNodeHasTheSameCodepointSpanAndOriginalText"],
       "org.unlaxer.dsl.RustPortabilityConformanceTest": ["inventoriesAndCliExitCodesAgreeWithoutWritingGeneratedFiles", "tokenAdapterRegistryDiagnosticsAgreeWithSourcePositions"],
       "org.unlaxer.dsl.codegen.TokenAdapterConformanceTest": ["customBindingsCompileAndPreserveCursorsCapturesSpansAndRollback"],
@@ -21,7 +21,7 @@
       "org.unlaxer.dsl.bootstrap.UbnfSpecCorpusTest": ["corpusKeepsItsShapeAndDoesNotGuessWhereTheSpecIsSilent", "everyCitationResolvesToARealHeadingAndSentenceInTheSpec", "javaBootstrapAgreesWithEverySpecDerivedExpectation"],
       "org.unlaxer.dsl.codegen.NumericCaptureRuntimeTest": ["scalarKeepsIntApiAndRejectsNonIntegerSpellingsAndOverflow", "rustMapsTheSameCheckedIntegersAndRetainsOriginalSource", "optionalAndRepeatedNumbersAreBoxedAndActuallyMapped", "digitTokenSupportsPrimitiveAndBoxedCaptures", "numericCaptureAbsentFromAChoiceBranchIsOptionalRatherThanZero"],
       "org.unlaxer.dsl.RustNativeEmitterTest": ["nativeEmitterMatchesJavaByteForByte"],
-      "org.unlaxer.dsl.RustNativeGeneratorTest": ["nativeFrontendLoweringAndEmissionMatchTheSupportedCorpus", "preferredShapeLimitsMatchJavaWithoutEagerFixedPoint", "preferredShapeLimitsMatchJavaWithMappedRecursion"],
+      "org.unlaxer.dsl.RustNativeGeneratorTest": ["nativeFrontendLoweringAndEmissionMatchTheSupportedCorpus", "preferredShapeLimitsMatchJavaWithoutEagerFixedPoint", "preferredShapeLimitsMatchJavaWithMappedRecursion", "recursiveNestingLimitsMatchJavaHost"],
       "org.unlaxer.dsl.codegen.RuleTriviaConformanceTest": ["ruleTriviaPoliciesPreserveCursorsAcceptanceAstAndSpans"],
       "org.unlaxer.dsl.codegen.ScopeStoreConformanceTest": ["transactionsRestoreScopeStateAndBothCursors"],
       "org.unlaxer.dsl.codegen.ScopeAnnotationConformanceTest": ["generatedScopeEffectsPreserveMetadataEventsAstAndRollback"],
@@ -162,7 +162,7 @@
     "required": {
       "org.unlaxer.parser.elementary.UnicodeIgnoreCaseWordParserTest": ["everyScalarMatchesOfficialUnicode17SimpleMappings", "sharedOriginalTextSpansRollbackLookaheadAndFirstSets", "legacyFirstSetsCannotExcludeInverseCaseEquivalents", "invertedAndMatchOnlyKeepWordParserCursorContract", "derivedWordsKeepPinnedSemanticsAndMalformedUtf16DoesNotMatch", "longWordsScanOnce"],
       "org.unlaxer.dsl.codegen.CaseInsensitiveConformanceTest": ["generatedJavaMatchesIndependentOracle", "emptyCiIsRejectedEvenWhenUnused", "documentedLegacyJdkDeltaIsExplicit", "bothRustFrontendsCompileAndMatchIndependentOracle"],
-      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax"]
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"]
     }
   },
   "downstream-tokens": {
@@ -203,7 +203,7 @@
       "org.unlaxer.dsl.codegen.NestedCaptureConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality"],
       "org.unlaxer.dsl.codegen.CaptureEqualityConformanceTest": ["captureEqualityPreservesSyntaxAstAndTransactionalDiagnostics"],
       "org.unlaxer.dsl.codegen.TokenAdapterConformanceTest": ["customBindingsCompileAndPreserveCursorsCapturesSpansAndRollback"],
-      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax"],
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"],
       "org.unlaxer.dsl.codegen.SharedLanguageCallConformanceTest": ["generatedAdaptersRetainOwnedChildrenAndRollbackOnBothHosts"]
     }
   },
@@ -221,7 +221,7 @@
       "org.unlaxer.dsl.codegen.LanguageProfileEditReplayConformanceTest": ["persistentThreeProfileSessionsRejectAllHistoricalBindings"],
       "org.unlaxer.dsl.LanguageProfileCommandTest": ["fixedProfileCliAndInvalidChoiceHaveExplicitResults", "profileGenerationRejectsEmptyAndMismatchedEntryGrammars", "packageSelectorRequiresManifestAndSupportsVerifiedCheck"],
       "org.unlaxer.dsl.PlaygroundCommandTest": ["newProjectAndCheckAreDeterministicAndNeverOverwrite", "unsupportedHostBindingAndInvalidOptionsCreateNothing", "symlinkAncestorsAreRejectedBeforeAnyWrite"],
-      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax"]
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"]
     }
   },
   "language-queries": {
@@ -257,7 +257,7 @@
     "properties": {"rustConformance": "true"},
     "required": {
       "org.unlaxer.dsl.codegen.SharedLanguageCallConformanceTest": ["generatedAdaptersRetainOwnedChildrenAndRollbackOnBothHosts"],
-      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax"]
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"]
     }
   },
   "embedded-grammars": {
