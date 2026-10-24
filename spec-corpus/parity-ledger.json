@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "audited_on": "2026-10-24",
-  "audited_revision": "49c9ab295d8cd5d5ed3a841908ab7a0a9eb842d9",
+  "audited_revision": "274bf68319fa377ef6d99a2048b48d70a1fdd325",
   "scope_notes": [
     "Java runtime/生成物、Rust runtimeとJava-host/nativeの両生成経路を区別する。hostの省略は互換性の証明にはしない。",
     "docs、README、rust/FULL-SPEC、spec-corpus/conformance、Java test resources、docs/fixtures、全Java/Rust/Pythonのdisable/assume/skip、CIの条件を横断した。過去のstory/dge/設計案と実装済みの規範文書は区別する。",
@@ -200,7 +200,7 @@
       "title": "parity: 正の LOOKAHEAD token 後の失敗で diagnose の CP 位置が Java と Rust で異なる（#705 で検出）"
     },
     "712": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: Javaのglobal @comment設定をRust両生成経路へ揃える"
     },
     "713": {
@@ -240,7 +240,7 @@
       "title": "parity: UBNF の入れ子上限が Rust frontend は 128 段、Java は約 199 段で異なる"
     },
     "750": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "Rust の診断表示で空の期待候補 '' が見えない（LSP message と ParseError の Display）"
     },
     "752": {
@@ -319,7 +319,7 @@
         713,
         331
       ],
-      "observation": "empty-literal の javaDiagnostic 51 件と error-elements の10件は引用符、trivia/RootParser 等の補助候補、trailing-input の farthest 表示を個別に固定する。受理・主要失敗位置の共通条件は維持する。空候補が不可視になる不具合は empty-expectation-display に分離。evolution の javaOffset/rustOffset 8件は現在すべて等しい。",
+      "observation": "empty-literal の javaDiagnostic 51 件と error-elements の10件は引用符、trivia/RootParser 等の補助候補、trailing-input の farthest 表示を個別に固定する。受理・主要失敗位置の共通条件は維持する。空候補が不可視になる不具合は #750（PR #773）で修正済み。evolution の javaOffset/rustOffset 8件は現在すべて等しい。",
       "evidence": [
         "docs/empty-literal.md",
         "docs/error-elements.md",
@@ -561,21 +561,6 @@
       ]
     },
     {
-      "id": "empty-expectation-display",
-      "category": "unresolved",
-      "title": "空の期待候補が Rust 表示で不可視",
-      "hosts": "Java / Rust（Java-host・native）",
-      "issues": [
-        750
-      ],
-      "observation": "Rustの空literal候補 \"\" をjoinする表示が Expected  or b 等になる。#713の空literal受理/失敗自体の修正と分ける。javaDiagnosticの引用符差すべてをこの不具合とはしない。",
-      "evidence": [
-        "docs/empty-literal.md",
-        "rust/unlaxer-lsp/src/lib.rs",
-        "rust/unlaxer-runtime/src/lib.rs"
-      ]
-    },
-    {
       "id": "lexical-invert",
       "category": "unresolved",
       "title": "非空 lexical literal の Classic 反転幅",
@@ -599,11 +584,11 @@
         777,
         753
       ],
-      "observation": "監査基準ではJavaが受理するglobal @commentをRust両生成経路は拒否する。並行する対応と警告公開は #712/#777、triviaによるmatched cursor上書きは #753。別branchの実装をこの基準の対応済みとして数えない。",
+      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。残りは、javaStyle併記時のW-COMMENT-IGNOREDをnative CLIへ出す経路（#777）と、triviaの読み飛ばしでLOOKAHEADのmatched cursorが小さく上書きされる差（#753）。",
       "evidence": [
         "docs/rule-trivia.md",
-        "docs/portability-check.md",
-        "rust/unlaxer-generator/src/lowering.rs"
+        "spec-corpus/global-comment/README.md",
+        "rust/unlaxer-runtime/src/lib.rs"
       ]
     },
     {
@@ -1290,8 +1275,7 @@
       },
       "entries": [
         "diagnostic-display",
-        "choice-root-cst",
-        "empty-expectation-display"
+        "choice-root-cst"
       ]
     },
     {
