@@ -71,7 +71,7 @@ rust/target/release/unlaxer generate --target rust \
 
 122文法・610生成ファイルのJava/native byte一致を`RustNativeGeneratorTest`で検査し、生成と`--check`は空のPATHで実行する。Javaは比較用oracleで、native生成経路の依存ではない。native構文解析は128、両hostのRust loweringの構造shape分析は256の再帰深度上限を持ち、超過は診断になる。
 
-終了コードは0=成功、2=引数不正、3=構文/意味/未対応機能、4=I/O・drift・上書き保護。全artifactを事前検査し、手書きファイルやsymlink（出力先・祖先・各file）を上書きしない。各fileは一時ファイルから置換するが、ディレクトリ全体のtransactionや敵対的な同時ファイル差し替えへのsandboxではない。排他的に管理できる出力先を使う。
+終了コードは0=成功、2=引数不正、3=構文/意味/未対応機能、4=I/O・drift・上書き保護、5=`--strict` / `--fail-on warning` で警告あり（何も書かない）。生成物を変えない警告（`W-ANNOTATION-IGNORED`・`W-AUTO-COMMIT-SKIPPED`）は `warning: CP <start>..<end>: <message>` の形で stderr に出す（[契約](../docs/simple-annotations.md#生成の警告を-cli-まで届ける)、#715）。全artifactを事前検査し、手書きファイルやsymlink（出力先・祖先・各file）を上書きしない。各fileは一時ファイルから置換するが、ディレクトリ全体のtransactionや敵対的な同時ファイル差し替えへのsandboxではない。排他的に管理できる出力先を使う。
 
 ### Java frontendを使う既存経路
 
@@ -87,7 +87,7 @@ java --enable-preview \
   --output rust/examples/evolution/src/generated
 ```
 
-同じコマンドに`--check`を付けると書き込まずに生成物の完全一致を検査する。未対応文法は出力前に拒否する。出力先の5ファイルを事前検査し、生成マーカーのない既存ファイルやsymlinkは上書きしない。生成済みファイルは再生成で置き換わるので編集しない。終了コードは成功`0`、CLI誤り`2`、文法・サブセット検証失敗`3`、I/O・衝突・差分検出`4`。
+同じコマンドに`--check`を付けると書き込まずに生成物の完全一致を検査する。未対応文法は出力前に拒否する。出力先の5ファイルを事前検査し、生成マーカーのない既存ファイルやsymlinkは上書きしない。生成済みファイルは再生成で置き換わるので編集しない。終了コードは成功`0`、CLI誤り`2`、文法・サブセット検証失敗`3`、I/O・衝突・差分検出`4`、`--strict` / `--fail-on warning` で警告あり`5`。警告の stderr は native と同じ。
 
 出力は`mod.rs`、`parser.rs`、`ast.rs`、`mapper.rs`、`evaluator.rs`。呼出側crateにruntimeのpath dependencyと`pub mod generated;`を追加する。手書きのsemanticsやCargo manifestは生成器の管理外。exampleのように`#[rustfmt::skip]`をmodule宣言に付け、生成テキストをformatterで改変しない。
 

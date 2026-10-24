@@ -424,6 +424,17 @@ An element-level annotation written **inside** a rule body (not on the rule). It
 Assignment ::= IDENTIFIER @name @typeof(value) '=' Expression @value ;
 ```
 
+### Other names (`@name`)
+
+Any other `@name` before a rule is a *Simple annotation*: it is kept as metadata (syntax tree, parser IR)
+and every generator treats the grammar as if it were absent. Only `@nestedCaptures` and `@autoCommit`
+have an effect. Every other one is reported as the warning `W-ANNOTATION-IGNORED` at the annotation,
+with the nearest known name when there is one (`@leftassoc` → `did you mean @leftAssoc?`), and
+`--strict` / `--fail-on warning` turn it into a failure. A known name written with a space after `@`
+(`@ leftAssoc`) or, for an annotation with arguments, without its `(` (`@mapping`) is such a Simple
+annotation too. `@name(args)` with an unknown name is a syntax error. See
+[Simple annotations](simple-annotations.md) (#715).
+
 ---
 
 ## Operator Associativity

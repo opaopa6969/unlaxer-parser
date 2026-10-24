@@ -374,11 +374,9 @@ impl Inventory {
             AnnotationKind::Eval { .. } => {}
             AnnotationKind::Doc { .. } | AnnotationKind::Recovery { .. } => {}
             AnnotationKind::Skip => {}
-            AnnotationKind::Simple { name } => {
-                if name != "nestedCaptures" {
-                    self.add("P-ANNOTATION", name, span);
-                }
-            }
+            // Generated as if absent, like Java; `simple_annotations::warnings` reports the
+            // ignored ones as W-ANNOTATION-IGNORED (#715), so P-ANNOTATION is no longer issued.
+            AnnotationKind::Simple { .. } => {}
             AnnotationKind::CommonField { .. } => {}
             AnnotationKind::Enum => {}
         }

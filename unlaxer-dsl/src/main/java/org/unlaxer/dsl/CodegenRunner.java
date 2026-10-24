@@ -69,7 +69,7 @@ final class CodegenRunner {
 
         Map<String, CodeGenerator> generatorMap = generatorMap(config.javaRelease());
 
-        List<ReportJsonWriter.ValidationIssueRow> validationRows = collectValidationRows(file);
+        List<ReportJsonWriter.ValidationIssueRow> validationRows = collectValidationRows(file, source);
         List<ReportJsonWriter.ValidationIssueRow> sortedRows = sortValidationRows(validationRows);
 
         boolean hasErrors = hasErrorRows(sortedRows);
@@ -427,8 +427,16 @@ final class CodegenRunner {
         return generatorMap;
     }
 
-    private static List<ReportJsonWriter.ValidationIssueRow> collectValidationRows(UBNFFile file) {
+    private static List<ReportJsonWriter.ValidationIssueRow> collectValidationRows(UBNFFile file, String source) {
         List<ReportJsonWriter.ValidationIssueRow> validationRows = new ArrayList<>();
+        // The validator sees the rewritten AST, where @autoCommit is gone: take its skipped
+        // annotations from the shared generation warnings of the entry source (#715).
+        for (var warning : org.unlaxer.dsl.codegen.GenerationWarnings.collect(source)) {
+            if (!warning.code().equals(org.unlaxer.dsl.bootstrap.AutoCommit.SKIPPED)) continue;
+            validationRows.add(new ReportJsonWriter.ValidationIssueRow(warning.grammar(), warning.rule(),
+                warning.code(), "WARNING", "GENERAL", warning.message(),
+                "Remove @autoCommit, or make the rule reachable and analysable (docs/auto-commit.md)."));
+        }
         for (GrammarDecl grammar : file.grammars()) {
             List<GrammarValidator.ValidationIssue> issues = new ArrayList<>(GrammarValidator.validate(grammar));
             issues.addAll(GrammarValidator.detectLeftRecursionIssues(grammar));

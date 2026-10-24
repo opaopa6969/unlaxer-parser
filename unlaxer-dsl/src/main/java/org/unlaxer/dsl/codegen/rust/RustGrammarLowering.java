@@ -228,7 +228,9 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof CatalogAnnotation value) {
                     if (catalog != null) throw unsupported("duplicate @catalog on " + rule.name());
                     catalog = value.context();
-                } else if (annotation instanceof SimpleAnnotation a && a.name().equals("nestedCaptures")) {
+                } else if (annotation instanceof SimpleAnnotation) {
+                    // Retained metadata, generated as if absent like Java; reported as
+                    // W-ANNOTATION-IGNORED by SimpleAnnotations.warnings (#715).
                 } else throw unsupported("annotation " + annotation + " on " + rule.name());
             }
             comparisons.add(hasScope ? null : backref);

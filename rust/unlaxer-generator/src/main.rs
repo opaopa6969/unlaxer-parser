@@ -6,7 +6,7 @@ use std::process::ExitCode;
 use unlaxer_codegen::GeneratedFile;
 
 const HELP: &str =
-    "Usage: unlaxer profile --file <profile.tsv>\n       unlaxer generate [--target rust] --grammar <file.ubnf> --output <module-directory> [--check] [--lsp] [--dap]\n       unlaxer playground (--grammar <file.ubnf> | --profile <profile.tsv> | --package <id> --manifest <ubnf.json>) --output <new-directory> [--check]\n       unlaxer check --target rust --grammar <file.ubnf> [--format json]\n       unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
+    "Usage: unlaxer profile --file <profile.tsv>\n       unlaxer generate [--target rust] --grammar <file.ubnf> --output <module-directory> [--check] [--lsp] [--dap] [--strict | --fail-on warning]\n       unlaxer playground (--grammar <file.ubnf> | --profile <profile.tsv> | --package <id> --manifest <ubnf.json>) --output <new-directory> [--check]\n       unlaxer check --target rust --grammar <file.ubnf> [--format json]\n       unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
 const CHECK_HELP: &str = "Usage: unlaxer check --target rust --grammar <file.ubnf> [--format json]";
 const IMPACT_HELP: &str =
     "Usage: unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
@@ -174,11 +174,27 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     let mut lsp = false;
     let mut dap = false;
     let mut explicit_target = false;
+    let mut strict = false;
     let mut cursor = 1;
     while cursor < args.len() {
         let option = args[cursor]
             .to_str()
             .ok_or((2, "invalid option encoding".into()))?;
+        // Warnings fail generation (#715); `--fail-on warning` is the Java CLI's spelling.
+        if option == "--strict" || option == "--fail-on" {
+            if strict {
+                return Err((2, "duplicate --strict / --fail-on".into()));
+            }
+            if option == "--fail-on" {
+                if args.get(cursor + 1).and_then(|value| value.to_str()) != Some("warning") {
+                    return Err((2, "--fail-on accepts only warning".into()));
+                }
+                cursor += 1;
+            }
+            strict = true;
+            cursor += 1;
+            continue;
+        }
         if option == "--dap" {
             if dap {
                 return Err((2, "duplicate --dap".into()));
@@ -233,13 +249,21 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
         return Err((2, "grammar and output paths must not be empty".into()));
     }
     // Keep I/O exit status separate from grammar/link errors for the entry file.
-    fs::read_to_string(&grammar).map_err(io_error)?;
+    let source = fs::read_to_string(&grammar).map_err(io_error)?;
     let files = (if lsp || dap {
         unlaxer_generator::generate_file_with_protocols(&grammar, lsp, dap)
     } else {
         unlaxer_generator::generate_file(&grammar)
     })
     .map_err(|message| (3, message))?;
+    // Errors come first; under --strict a warning fails before anything is written.
+    let warnings = unlaxer_generator::warnings::report(
+        &unlaxer_generator::warnings::collect(&source),
+        strict,
+    )?;
+    if !warnings.is_empty() {
+        eprintln!("{warnings}");
+    }
     write_artifacts(&output, &files, check).map_err(io_error)?;
     Ok(format!(
         "{} {} Rust module files in {}",
