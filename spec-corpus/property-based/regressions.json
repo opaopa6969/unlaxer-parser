@@ -11,6 +11,17 @@
     ]
   },
   {
+    "id": "capture-memo-choice-returned-parsed",
+    "issue": "#744",
+    "note": "Java の Choice は miss で選んだ子の Parsed を返す。SAFE_FAILURES の成功 memo を再生しても同じ Parsed を返すので、1 つ目の分岐の R1 @f で memo した R1 を CAPTURE しても w は x。入力 x で memo の設定に関係なく context の consumed / matched は CP1。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= R1 @f 'z' | CAPTURE(w, R1) SAME_AS(w) ; R1 ::= AHEAD | 'q' ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xz"
+    ]
+  },
+  {
     "id": "owned-capture-field-direct-choice-lookahead",
     "issue": "#729",
     "note": "@f の consumed collector は先読みの Parsed 原文を外側の CAPTURE へ渡さない。入力 x で w は空文字列、context の consumed は CP0、全入力解析は trailing_input CP0。",
@@ -530,6 +541,17 @@
       "a",
       "ya,",
       ""
+    ]
+  },
+  {
+    "id": "capture-field-direct-token-lookahead",
+    "issue": "#742",
+    "note": "@f は Java の LazyChain の collector。直接の先読み token を @f にしても consumed の子がないため、外側の CAPTURE の w は空文字列。入力 x で context の consumed / matched は CP0、全入力解析は trailing_input CP0。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= CAPTURE(w, AHEAD @f) SAME_AS(w) ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xx"
     ]
   }
 ]

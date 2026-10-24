@@ -460,6 +460,44 @@ public class RustBackendTest {
         assertTrue(Files.readString(output.resolve("parser.rs")).contains("0, false, source"));
     }
 
+    /**
+     * #740: recursive shapes are solved on the lowered IR under the shared structural depth, as in
+     * the native host, so the Java host no longer rejects 85..122 groups with E-RECURSIVE-SHAPE.
+     */
+    @Test public void recursiveShapesShareTheStructuralAnalysisDepth() {
+        for (var grammar : List.<java.util.function.IntFunction<String>>of(NestingLimitGrammars::recursivePlus,
+                NestingLimitGrammars::recursiveSeparator, NestingLimitGrammars::recursivePlusWithNumber)) {
+            for (int depth : List.of(84, 85, NestingLimitGrammars.LOWERED)) {
+                var files = new RustBackend().generate(UBNFMapper.parse(grammar.apply(depth)).grammars().get(0));
+                assertEquals(5, files.size());
+                if (grammar.apply(depth).contains("NUM @n")) {
+                    // Integer refinement still applies beside the recursion (numeric_fields.rs).
+                    assertTrue(files.get(1).content().contains("r#x: Vec<AstValue>, r#n: i32"));
+                }
+            }
+            var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(
+                UBNFMapper.parse(grammar.apply(NestingLimitGrammars.LOWERED + 1)).grammars().get(0)));
+            assertEquals("Rust subset: structural analysis depth exceeds 256", error.getMessage());
+        }
+    }
+
+    /**
+     * #740 review: the fixed point starts from a fresh structural depth instead of the caller's,
+     * so grammars that the AST fixed point accepted before #740 stay accepted.
+     */
+    @Test public void recursiveShapesKeepThePreviousJavaAcceptance() {
+        for (var entry : NestingLimitGrammars.acceptedBefore740().entrySet()) {
+            var files = new RustBackend().generate(UBNFMapper.parse(entry.getValue()).grammars().get(0));
+            assertEquals(entry.getKey(), 5, files.size());
+        }
+        // The deepest analysis: 256 levels before the first revisit, then 256 in the fixed point.
+        assertEquals(5, new RustBackend().generate(UBNFMapper.parse(
+            NestingLimitGrammars.chainBesideNestedRecursion(82, NestingLimitGrammars.LOWERED)).grammars().get(0)).size());
+        var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(UBNFMapper.parse(
+            NestingLimitGrammars.chainBesideNestedRecursion(83, NestingLimitGrammars.LOWERED)).grammars().get(0)));
+        assertEquals("Rust subset: structural analysis depth exceeds 256", error.getMessage());
+    }
+
     private int run(String... args) {
         var bytes = new ByteArrayOutputStream();
         try (var stream = new PrintStream(bytes, true, StandardCharsets.UTF_8)) {
