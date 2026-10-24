@@ -22,8 +22,18 @@ pub fn resolve(
         cache: BTreeMap::new(),
         stack: BTreeSet::from([path.clone()]),
     };
+    let multiple = file.grammars.len() > 1;
     for grammar in &mut file.grammars {
-        loader.link(grammar, &path)?;
+        loader.link(grammar, &path).map_err(|error| {
+            if multiple {
+                format!(
+                    "grammar {} [{},{}): {error}",
+                    grammar.name, grammar.span.codepoint_start, grammar.span.codepoint_end
+                )
+            } else {
+                error
+            }
+        })?;
     }
     Ok(file)
 }

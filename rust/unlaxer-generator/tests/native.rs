@@ -423,7 +423,7 @@ fn lowerer_rejects_unsupported_or_inconsistent_grammars_without_artifacts() {
             simple.replace("grammar G {", "grammar G { @whitespace: python\n"),
             "unsupported setting",
         ),
-        (format!("{simple}\n{simple}"), "exactly one grammar"),
+        (format!("{simple}\n{simple}"), "P-OUTPUT-COLLISION"),
     ];
     let directory = Directory::new();
     let grammar = directory.0.join("input.ubnf");
