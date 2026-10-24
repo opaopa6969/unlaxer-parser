@@ -80,8 +80,23 @@ fn scenario(
     name: &str,
     k: TokenKind,
     inv: bool,
+    metadata: Option<&'static str>,
 ) -> ParseResult {
+    let annotate = |child| match metadata {
+        Some(name) => Expr::MetadataCapture(name, Box::new(child)),
+        None => child,
+    };
     match name {
+        "metadata-choice-reset" | "metadata-match-reset" => {
+            c.set_reset_matched_with_consumed(true);
+            let repeat = w("x").match_only().repeat_java(0, Some(2));
+            let child = if name == "metadata-choice-reset" {
+                annotate(Expr::choice([repeat]))
+            } else {
+                annotate(repeat).match_only()
+            };
+            return c.parse_with_token_mode(&cap(child), k, inv);
+        }
         "input" => parse(c, roots, cap(w("a"))),
         "unicode" => parse(c, roots, cap(w("😀"))),
         "combining" => parse(c, roots, cap(w("e\u{301}"))),
@@ -222,6 +237,16 @@ fn kind(s: &str) -> TokenKind {
 }
 #[test]
 fn shared_independent_oracle() {
+    for metadata in [
+        None,
+        Some("#preferred-schema:0"),
+        Some("#preferred-depth:1"),
+        Some("#preferred-extra:2"),
+    ] {
+        check_independent_oracle(metadata);
+    }
+}
+fn check_independent_oracle(metadata: Option<&'static str>) {
     let rows = include_str!("../../../conformance/owned-capture/cases.tsv");
     let mut failures = Vec::new();
     for memo in [Memoization::Off, Memoization::SafeFailures] {
@@ -241,11 +266,18 @@ fn shared_independent_oracle() {
                     ParseOptions::with_memoization(memo).with_diagnostics(diagnostic),
                 );
                 let mut roots = Vec::new();
-                let result = scenario(&mut c, &mut roots, e[2], kind(e[3]), e[4] == "true");
+                let result = scenario(
+                    &mut c,
+                    &mut roots,
+                    e[2],
+                    kind(e[3]),
+                    e[4] == "true",
+                    metadata,
+                );
                 if let Ok(matched) = &result {
                     roots.extend(matched.nodes.iter().copied());
                 }
-                let label = format!("{}/{memo:?}/{diagnostic:?}", e[0]);
+                let label = format!("{}/{memo:?}/{diagnostic:?}/{metadata:?}", e[0]);
                 let mut check = |actual: String, expected: &str| {
                     if actual != expected {
                         failures.push(format!("{label}: actual {actual:?}, expected {expected:?}"));
@@ -516,7 +548,14 @@ fn committed_terminal_trace_keeps_replay_positions_and_discards_failed_branches(
             let options = ParseOptions::with_memoization(memo)
                 .with_token_trace(unlaxer_runtime::token_trace::Limits::default());
             let mut c = ParseContext::with_options(&input, options);
-            let _ = scenario(&mut c, &mut Vec::new(), e[1], TokenKind::Consumed, false);
+            let _ = scenario(
+                &mut c,
+                &mut Vec::new(),
+                e[1],
+                TokenKind::Consumed,
+                false,
+                None,
+            );
             let actual = c
                 .token_trace()
                 .unwrap()
@@ -601,8 +640,15 @@ fn failed_replay_has_the_shared_name_and_code_point_diagnostic() {
                     &input,
                     ParseOptions::with_memoization(memo).with_diagnostics(diagnostic),
                 );
-                let error = scenario(&mut c, &mut Vec::new(), e[1], kind(e[2]), e[3] == "true")
-                    .unwrap_err();
+                let error = scenario(
+                    &mut c,
+                    &mut Vec::new(),
+                    e[1],
+                    kind(e[2]),
+                    e[3] == "true",
+                    None,
+                )
+                .unwrap_err();
                 let deferred = diagnostic == Diagnostics::DetailedOnFailure;
                 assert_eq!(
                     error.offset,

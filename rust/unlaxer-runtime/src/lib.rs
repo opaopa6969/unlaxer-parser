@@ -135,6 +135,8 @@ pub enum Expr {
         predictors: Vec<Predictor>,
     },
     Capture(&'static str, Box<Expr>),
+    /// CST-only annotation: no binding, source collection, or cursor-policy boundary.
+    MetadataCapture(&'static str, Box<Expr>),
     /// Read outer bindings, discard local captures on exit without discarding child results.
     CaptureScope(Box<Expr>),
     /// General owned binding, separate from AST field captures. CST-transparent.
@@ -3348,6 +3350,11 @@ impl<'a> ParseContext<'a> {
         // another one, so anything still pending here was caught.
         self.raised = None;
         self.expression_depth += 1;
+        // Metadata has no Java parser/transaction counterpart. In particular, a failed
+        // child must retain its own cursor policy exactly as without this wrapper.
+        if let Expr::MetadataCapture(name, child) = expression {
+            return self.expression_metadata_capture(name, child, depth);
+        }
         let checkpoint = self.checkpoint();
         let parent_policy = self.match_cursor_policy;
         // Chain sets the policy before beginning its own transaction, so a successful
@@ -4143,7 +4150,10 @@ impl<'a> ParseContext<'a> {
                 unreachable!("combinators are dispatched by expression")
             }
 
-            Expr::Capture(_, _) | Expr::OwnedCapture(_, _) | Expr::CaptureScope(_) => {
+            Expr::Capture(_, _)
+            | Expr::MetadataCapture(_, _)
+            | Expr::OwnedCapture(_, _)
+            | Expr::CaptureScope(_) => {
                 unreachable!("recursive expression dispatched by expression")
             }
             Expr::RuleEffects { .. } => {
@@ -4619,6 +4629,25 @@ impl<'a> ParseContext<'a> {
             }
             _ => unreachable!("recursive expression dispatched by variant"),
         }
+    }
+
+    #[inline(never)]
+    fn expression_metadata_capture(
+        &mut self,
+        name: &'static str,
+        child: &Expr,
+        depth: usize,
+    ) -> Option<Fragment> {
+        let start = self.position;
+        let result = self.expression(child, depth);
+        self.expression_depth -= 1;
+        let mut fragment = result?;
+        fragment.captures.push(Capture {
+            name,
+            span: self.span(start),
+            nodes: fragment.nodes.clone(),
+        });
+        Some(fragment)
     }
 
     #[inline(never)]
@@ -5372,7 +5401,8 @@ impl<'a> ParseContext<'a> {
         if self.token_mode.is_some_and(|mode| !mode.kind.is_consumed()) {
             return;
         }
-        if let Expr::TextValue(child)
+        if let Expr::MetadataCapture(_, child)
+        | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
         | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
@@ -5509,6 +5539,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::OwnedCapture(_, child)
         | Expr::CaptureScope(child)
         | Expr::Capture(_, child)
+        | Expr::MetadataCapture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
         | Expr::InputCaptureBoundary(_, child)
@@ -5648,6 +5679,7 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             | Expr::StopInvert(child)
             | Expr::StopConsume(child)
             | Expr::Capture(_, child)
+            | Expr::MetadataCapture(_, child)
             | Expr::TextValue(child)
             | Expr::CaptureBoundary(_, child)
             | Expr::InputCaptureBoundary(_, child)
@@ -5779,6 +5811,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::StopInvert(child)
         | Expr::StopConsume(child)
         | Expr::Capture(_, child)
+        | Expr::MetadataCapture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
         | Expr::InputCaptureBoundary(_, child)
@@ -7198,6 +7231,7 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
                 ..
             } => scan.children(children),
             Expr::Capture(_, child)
+            | Expr::MetadataCapture(_, child)
             | Expr::TextValue(child)
             | Expr::CaptureBoundary(_, child)
             | Expr::InputCaptureBoundary(_, child)

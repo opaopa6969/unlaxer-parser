@@ -327,6 +327,7 @@ pub fn literal_completions(grammar: &SharedGrammar) -> Vec<&'static str> {
             OwnedCapture(_, child)
             | CaptureScope(child)
             | Capture(_, child)
+            | MetadataCapture(_, child)
             | TextValue(child)
             | CaptureBoundary(_, child)
             | InputCaptureBoundary(_, child)

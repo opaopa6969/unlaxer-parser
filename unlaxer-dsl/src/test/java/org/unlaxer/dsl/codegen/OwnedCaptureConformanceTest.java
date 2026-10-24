@@ -223,6 +223,36 @@ public class OwnedCaptureConformanceTest {
                             assert_eq!((error.diagnostic.kind,error.diagnostic.offset),("syntax",offset));
                         }
                         if phase=="resource"{let error=result.as_ref().unwrap_err();assert!(error.expected.iter().any(|value|value.contains("below")));assert_eq!(&context.parse(&Expr::Literal("unused").repeat_java(0,Some(0))).unwrap_err(),error);}
+                        // Preferred annotations must preserve parsing, user captures, CST and AST.
+                        // Resource-depth limits count the additional metadata frames separately.
+                        if phase!="resource" {
+                            let grammar=generated::parser::mapping_grammar().expect("supported preferred grammar");
+                            let options=ParseOptions::with_memoization(memo).with_diagnostics(mode);
+                            let mut preferred=ParseContext::with_options(input,options);
+                            preferred.parse(&Expr::Literal("unused").repeat_java(0,Some(0)).capture_owned("sentinel")).unwrap();
+                            let annotated=preferred.parse_shared_grammar(grammar,root,false);
+                            assert_eq!(annotated.is_ok(),success,"preferred acceptance: {input:?}");
+                            assert_eq!((preferred.position(),preferred.matched_position(),preferred.reset_matched_with_consumed()),
+                                (context.position(),context.matched_position(),context.reset_matched_with_consumed()));
+                            assert_eq!(binding(&preferred),binding(&context));
+                            assert_eq!(preferred.captured_text("sentinel"),Some(""));
+                            if let (Ok(a),Ok(b))=(&result,&annotated) {
+                                let ordinary=context.tree(a.nodes[0]).unwrap();
+                                let tree=preferred.tree(b.nodes[0]).unwrap();
+                                let mut normalized=tree.clone();
+                                for node in &mut normalized.nodes {node.captures.retain(|c|!c.name.starts_with("#preferred-"));}
+                                assert_eq!(format!("{:?}",ordinary),format!("{:?}",normalized),"preferred CST: {input:?}");
+                                assert_eq!(generated::mapper::map(&ordinary).unwrap().canonical_json(),
+                                    generated::mapper::map_parsed_tree(&tree).unwrap().select_default().ast().canonical_json());
+                            } else {assert_eq!(result.as_ref().unwrap_err(),annotated.as_ref().unwrap_err());}
+                            let ordinary=generated::parser::parse_tree_with_options(input,options);
+                            let annotated=generated::parser::parse_tree_for_mapping_with_options(input,options);
+                            assert_eq!(ordinary.is_ok(),annotated.is_ok());
+                            if let (Err(a),Err(b))=(&ordinary,&annotated){assert_eq!(a,b);}
+                            let snapshots=generated::parser::parse_tree_for_mapping_with_name_snapshots(input,&[],options);
+                            assert_eq!(annotated.is_ok(),snapshots.is_ok());
+                            if let (Err(a),Err(b))=(&annotated,&snapshots){assert_eq!(a,&b.farthest);}
+                        }
                         let ast=if let Ok(parsed)=result{let tree=context.tree(parsed.nodes[0]).unwrap();generated::mapper::map(&tree).unwrap().canonical_json()}else{"null".into()};
                         assert_eq!(context.captured_text("sentinel"),Some(""));
                         println!("{}\t{}\t{}\t{}\t{}",success,context.position(),context.matched_position(),ast,binding(&context));

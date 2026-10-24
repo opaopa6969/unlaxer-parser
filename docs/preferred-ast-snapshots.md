@@ -37,6 +37,8 @@ let original_text = snapshot.source_text(selected.span());
 
 通常の `parse_tree` と `map` は従来の CST / AST 契約を保ちます。snapshot は別入口 `parse_tree_for_mapping`、`parse_tree_for_mapping_with_options`、`parse_tree_for_mapping_with_name_snapshots` が作る CST を使ってください。`map_parsed_tree` は grammar root、`map_subtree_tree` は明示した rule entry を扱います。代替 entry を runtime で解析する場合は `parser::mapping_grammar()` が返す共有 grammar を使用できます。
 
+合成 capture（`#preferred-schema:` / `#preferred-depth:` / `#preferred-extra:`）は、両ホストの生成時に `Expr::MetadataCapture` へ変換します。CST の capture edge だけを記録し、ユーザーの `@f` の入力原文検査・Classic の収集・Parsed 原文の破棄・matched cursor の reset は行いません。replay 用 binding も公開しません。失敗した子の reset 方針を保持するため、独自の transaction を開始しません（#788）。ユーザーの `@f` は引き続き `Expr::Capture` として Java の `__CaptureSite` / LazyChain の契約に従います（#762）。 旧生成物に残る合成 `Expr::Capture` を置き換えるには、parser を再生成してください。
+
 認識規則は共通ですが、metadata capture が追加されるため、資源上限に達する入力深さは通常入口と異なる場合があります。
 
 内部 capture は call site の Java 深さと grammar schema と source call-site および `@typeof` 制約の fingerprint を記録し、通常の transaction / memo に従います。標準 CST、別 grammar の CST、synthetic value node を entry に渡した場合はエラーです。root に `@mapping` がある場合はその root rule が必須です。代替 entry の全入力消費は呼出側が確認してください。候補の `node_id()` は Rust の rule entry を示し、Java wrapper token への参照ではありません。回復 wrapper を持つ rule entry は、その wrapper を含めた深さから列挙します。
@@ -67,3 +69,5 @@ cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml \
 ```
 
 Rust を使う観測は `-DrustConformance=true` が必須です。素の Maven 実行で skip した結果を両版の検証根拠にはしません。
+
+`OwnedCaptureConformanceTest` は Classic の MatchOnly・生成原文・投影原文を含む共通 corpus について、通常 parser と preferred parser の成否・両 cursor・reset 方針・診断・ユーザー binding・metadata を除いた CST・AST を比較します。両 Rust 生成ホストの実行結果を Java と同じ期待値で検証します。資源上限ケースは上記の深さの差があるため、この同値比較から除外します。低水準 API の再現は `conformance/owned-capture/cases.tsv` と Rust の `metadata_capture` テストで固定しています。
