@@ -148,6 +148,8 @@ public final class GrammarValidator {
                 ? "Use a single @comment: { line: '//' } setting."
                 : "Put line comments into the named whitespace token, or use @whitespace: javaStyle."));
         }
+        // Kept for the API and the UBNF LSP (#748). The flag CLI reports W-COMMENT-IGNORED once,
+        // from GenerationWarnings with its source span, and drops this row (#777).
         for (var issue : GlobalComment.warnings(grammar)) {
             errors.add(new ValidationIssue(issue.code(), issue.subject(),
                 "@whitespace: javaStyle already skips // comments; remove this @comment setting."));

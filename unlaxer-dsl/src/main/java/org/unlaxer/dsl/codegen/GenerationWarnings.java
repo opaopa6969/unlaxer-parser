@@ -19,7 +19,7 @@ import org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot.Span;
  *
  * <p>Sources: {@code W-ANNOTATION-IGNORED} ({@link SimpleAnnotations}) and
  * {@code W-AUTO-COMMIT-SKIPPED} ({@link AutoCommit}, read before the rewrite removes the
- * annotation).
+ * annotation), and {@code W-COMMENT-IGNORED} ({@link GlobalComment}).
  */
 public final class GenerationWarnings {
     private GenerationWarnings() {}
@@ -60,6 +60,11 @@ public final class GenerationWarnings {
             }
             for (var warning : AutoCommit.warnings(grammar, before)) {
                 found.add(new Warning(warning.code(), grammar.name(), warning.rule(), warning.span(), warning.message()));
+            }
+            for (var warning : GlobalComment.warnings(grammar)) {
+                found.add(new Warning(warning.code(), grammar.name(), warning.subject(),
+                    before.spanOf(warning.node()), warning.code() + ": " + warning.subject()
+                        + ": @comment has no effect with @whitespace: javaStyle"));
             }
             found.sort(Comparator.<Warning, Boolean>comparing(w -> w.span().isEmpty())
                 .thenComparing(w -> w.span().map(Span::start).orElse(0))

@@ -90,9 +90,14 @@ API:
 - Java: `GenerationWarnings.collect(String source)` → `Warning(code, grammar, rule, span, message)`
 - Rust: `unlaxer_generator::warnings::collect(&str)` → `Warning { code, grammar, rule, span, message }`
 
-いまの対象は `W-ANNOTATION-IGNORED` と `W-AUTO-COMMIT-SKIPPED`（[autoCommit](auto-commit.md)。
-書き換え前の木から読む）。grammar の順、その中は span の（開始、終了、code）順に並べる。
+対象は `W-ANNOTATION-IGNORED`、`W-AUTO-COMMIT-SKIPPED`（[autoCommit](auto-commit.md)）、
+`W-COMMENT-IGNORED`（[global comment](rule-trivia.md#global-comment712)、#777）。
+書き換え前の木から読み、grammar の順、その中は span の（開始、終了、code）順に並べる。
 構文エラーの source は空を返す（生成がその誤りを報告する）。
+`W-COMMENT-IGNORED` の `rule` は設定の subject と同じ `comment`、span は setting 全体、message は
+`W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle`。
+`GrammarValidator` は #748 からこの警告を返し続ける（API と UBNF LSP の診断）が、flag CLI は収集 API の
+行だけを一度報告し、validator の同じ code の行は捨てる。
 
 | CLI | 既定 | `--strict` / `--fail-on warning` |
 |---|---|---|
@@ -102,7 +107,7 @@ API:
 
 stderr の 1 行は `warning: CP <start>..<end>: <message>`。strict で失敗するときは最後に
 `strict: <件数> warning(s) fail generation` を足す。文法・構造のエラーは警告より先に報告する（終了コード `3`）。
-`--fail-on` が受け付けるのは Rust 生成 CLI では `warning` だけ。Java の flag CLI は、両方の警告を
+`--fail-on` が受け付けるのは Rust 生成 CLI では `warning` だけ。Java の flag CLI は、これらの警告を
 検証 issue（WARNING、category `GENERAL`）として報告し、その `message` は上の 1 行（`warning: CP <start>..<end>: ...`）
 そのものにする。JSON レポートの `issues[].message` も同じ。
 
@@ -119,9 +124,14 @@ stderr の 1 行は `warning: CP <start>..<end>: <message>`。strict で失敗�
   `contrast` とは生成物が異なることも確かめる。span と message は
   実装を使わずに文法の文字列と上の契約から計算し、suggestion は手で決めた。
 - `spec-corpus/simple-annotations/rejected.json`（4 文法）: 引数付き・空引数・`@ mapping(X)`・`@namePredicate`。
-- `spec-corpus/generation-warnings/corpus.json`（6 文法）: 警告なし、`W-ANNOTATION-IGNORED`、
+- `spec-corpus/generation-warnings/corpus.json`（8 例）: 警告なし、`W-ANNOTATION-IGNORED`、
   `W-AUTO-COMMIT-SKIPPED`、両者の位置順の混在、`@autoCommit` と同じ rule への併記、`@autoCommit` の rule
-  から参照される rule への注釈。各警告に CLI の 1 行を持つ。
+  から参照される rule への注釈、`W-COMMENT-IGNORED` 単独・3種類の混在。
+  各警告に CLI の 1 行を持つ。
+- `spec-corpus/generation-warnings/ordering.json`: 複数 grammar の収集順序を両ライブラリで検証する。
+  Rust 生成 CLI の複数 grammar 対応は #714 の範囲で、今回も既存の拒否を保つ。
+- `spec-corpus/global-comment/ignored.json`（8 例）の `generationWarnings` も同じテストで使い、
+  対応済みの形は警告なし、無効・重複した設定は各1件であることを確かめる。
 
 `SimpleAnnotationConformanceTest`（Java）は、警告に加えて、Parser・AST・Mapper・Evaluator・LSP・DAP の
 Java 生成物、Java-host Rust の生成物と CLI 出力、移植可能性検査が baseline と同じであること、parser IR に
@@ -132,7 +142,6 @@ Java 生成物、Java-host Rust の生成物と CLI 出力、移植可能性検�
 
 ## 制限
 
-- `W-COMMENT-IGNORED`（#712）はまだこの仕組みに載せていない（validator と `global_comment::warnings` だけが出す）。#777 で扱う。
 - `@autoCommit` の解析は、他の Simple annotation を持つ rule を従来どおり opaque として扱う
   （その rule 自身の `@autoCommit` は `W-AUTO-COMMIT-SKIPPED`、reason=opaque）。警告文はこれを示すが、
   実際に挿入が変わったかどうかまでは判定しない。

@@ -27,7 +27,9 @@ public class GenerationWarningsConformanceTest {
     private static final Path CORPUS = Path.of("..").toAbsolutePath().normalize().resolve("spec-corpus/generation-warnings/corpus.json");
 
     @Test public void libraryMatchesTheSharedCorpus() throws Exception {
-        for (JsonElement element : corpus()) {
+        var rows = corpus();
+        rows.addAll(JsonParser.parseString(Files.readString(CORPUS.resolveSibling("ordering.json"))).getAsJsonArray());
+        for (JsonElement element : rows) {
             JsonObject row = element.getAsJsonObject();
             var out = new JsonArray();
             for (var warning : GenerationWarnings.collect(row.get("grammar").getAsString())) {
@@ -92,7 +94,9 @@ public class GenerationWarningsConformanceTest {
             var plain = run("--grammar", grammar.toString(), "--validate-only");
             assertEquals(name + " " + plain, CodegenMain.EXIT_OK, plain.code());
             for (List<String> policy : List.of(List.of("--strict"), List.of("--fail-on", "warning"))) {
-                var args = new ArrayList<>(List.of("--grammar", grammar.toString(), "--validate-only"));
+                Path output = work.resolve(name + "-" + policy.get(0).substring(2));
+                var args = new ArrayList<>(List.of("--grammar", grammar.toString(), "--output", output.toString(),
+                    "--generators", "Parser"));
                 args.addAll(policy);
                 var result = run(args.toArray(String[]::new));
                 var warnings = row.getAsJsonArray("warnings");
@@ -107,6 +111,9 @@ public class GenerationWarningsConformanceTest {
                     assertTrue(name + " " + plain, plain.err().contains(row_));
                 }
                 assertEquals(name + " " + plain, warnings.size(), plain.err().lines().filter(l -> l.contains("warning: CP ")).count());
+                assertEquals(name + " no duplicate warnings: " + result, warnings.size(),
+                    result.err().lines().filter(l -> l.startsWith(" - grammar ") && l.contains("[code: W-")).count());
+                if (!warnings.isEmpty()) assertFalse(name + " nothing written", Files.exists(output));
             }
         }
     }
@@ -118,7 +125,16 @@ public class GenerationWarningsConformanceTest {
     }
 
     private static JsonArray corpus() throws Exception {
-        return JsonParser.parseString(Files.readString(CORPUS)).getAsJsonArray();
+        var rows = JsonParser.parseString(Files.readString(CORPUS)).getAsJsonArray();
+        var ignored = JsonParser.parseString(Files.readString(
+            CORPUS.getParent().getParent().resolve("global-comment/ignored.json"))).getAsJsonArray();
+        for (JsonElement element : ignored) {
+            var row = element.getAsJsonObject().deepCopy();
+            row.addProperty("name", "global-comment-" + row.get("name").getAsString());
+            row.add("warnings", row.get("generationWarnings"));
+            rows.add(row);
+        }
+        return rows;
     }
 
     private record Run(int code, String out, String err) {}
