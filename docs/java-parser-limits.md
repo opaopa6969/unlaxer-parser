@@ -102,6 +102,10 @@ Rust の `preferred_plan.rs` も同じ深さを使う。#737 の旧境界の直�
 84〜130 段の 3 形（再帰 helper、separator 側の再帰、数値 capture 付き）の掃引で両 Rust host の
 5 ファイルを byte 比較し、受理範囲では preferred projection があることも確認する。生成 Java parser を
 コンパイルして成功・失敗入力を解析し、両 host の成否・CST・AST・位置を 12 設定で比較する。
+生成は成功したまま固定点の上限で projection だけが外れる新しい境界（mapped 値を含む再帰の横に置いた
+helper の `( )+` 85 / 86 段、`( )?`・`( )*` 63 / 64 段）でも、両 host の 5 ファイルが一致し、Java 生成が
+成功する段で projection があり、拒否する段で無いことを確かめる。`( )`・`[ ]`・`{ }` はこの形では
+native frontend が受理する最後の 127 段まで projection を保つ。
 
 Rust 生成の整数 field の判定だけは、この深さの拒否の代わりに `numeric_fields.rs` と同じ「capture がすべて
 数値 token」の規則を使う。作業量の上限（`analysis work exceeds 1000000`）と非収束は、従来どおり Java host の

@@ -167,6 +167,34 @@ public class RustNativeGeneratorTest {
                     recursiveNestedHelper(depth, wrapper[0], wrapper[1], true), true, report);
             }
         }
+        // #754 review: the new boundary, where generation still succeeds but the projection flips.
+        // Java-target generation succeeds exactly when both Rust hosts keep the projection.
+        for (String[] wrapper : List.of(new String[] {"(", ")+", "85", "plus"},
+                new String[] {"(", ")?", "63", "optional"}, new String[] {"(", ")*", "63", "star"},
+                new String[] {"(", ")", "127", "paren"}, new String[] {"[", "]", "127", "bracket"},
+                new String[] {"{", "}", "127", "brace"})) {
+            int limit = Integer.parseInt(wrapper[2]);
+            // Plain groups keep the projection up to the native frontend's last accepted depth.
+            int last = limit == 127 ? limit : limit + 1;
+            for (int depth = limit; depth <= last; depth++) {
+                String source = recursiveNestedHelper(depth, wrapper[0], wrapper[1], true);
+                assertGeneratedBytes(binary, "mapped-recursive-new-" + wrapper[3] + "-" + depth,
+                    source, depth == limit, report);
+                var grammar = UBNFMapper.parse(source).grammars().get(0);
+                var shapes = new RecursiveSemanticShapes(grammar, true);
+                if (depth == limit) {
+                    assertEquals("#node", shapes.rule("H").kind());
+                    new org.unlaxer.dsl.codegen.ParserGenerator().generate(grammar);
+                    new org.unlaxer.dsl.codegen.MapperGenerator().generate(grammar);
+                } else {
+                    assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256",
+                        assertThrows(IllegalArgumentException.class, () -> shapes.rule("H")).getMessage());
+                    // ( )+ reaches the left-recursion analysis limit first; Java generation fails either way.
+                    assertThrows(IllegalArgumentException.class,
+                        () -> new org.unlaxer.dsl.codegen.ParserGenerator().generate(grammar));
+                }
+            }
+        }
         Files.write(Path.of("target/rust-preferred-recursive-shape-limits.tsv"), report, StandardCharsets.UTF_8);
     }
 
