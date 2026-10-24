@@ -111,6 +111,16 @@ public final class AutoCommit {
     }
 
     /**
+     * Whether {@code @autoCommit} analyses this grammar: it has an {@code @autoCommit} rule (pass the
+     * tree of {@link #parseBeforeAutoCommit}) and is inside the analysed subset. Its other rules then
+     * take part in the analysis unless an annotation makes them opaque (#715). The native
+     * {@code auto_commit::analyses} is the same predicate.
+     */
+    public static boolean analyses(GrammarDecl grammar) {
+        return grammar.rules().stream().anyMatch(AutoCommit::annotated) && Analysis.create(grammar) != null;
+    }
+
+    /**
      * One warning per {@code @autoCommit} that cannot insert anything, in rule order. Pass the tree
      * of {@link #parseBeforeAutoCommit}: the rewritten tree no longer has the annotation.
      */

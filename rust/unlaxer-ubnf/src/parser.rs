@@ -607,8 +607,29 @@ impl Parser<'_> {
     fn annotation(&mut self) -> Result<Annotation> {
         let start = self.current().span;
         self.expect('@')?;
+        // Java's annotation keywords are single words (`@leftAssoc`, `@mapping(`), while its
+        // catch-all is `'@' IDENTIFIER` with ordinary trivia between: `@ leftAssoc` and an
+        // argument keyword without its `(` are Simple annotations there (#715).
+        let spaced = self.current().span.byte_start != self.previous().byte_end;
         let name = self.identifier()?;
+        let bare = !self.is('(')
+            && matches!(
+                name.as_str(),
+                "mapping"
+                    | "eval"
+                    | "lexicalContext"
+                    | "interleave"
+                    | "backref"
+                    | "scopeTree"
+                    | "declares"
+                    | "catalog"
+                    | "precedence"
+                    | "doc"
+                    | "recovery"
+                    | "commonField"
+            );
         let kind = match name.as_str() {
+            _ if spaced || bare => self.simple_annotation(start, name)?,
             "root" => AnnotationKind::Root,
             "leftAssoc" => AnnotationKind::LeftAssoc,
             "rightAssoc" => AnnotationKind::RightAssoc,
@@ -798,22 +819,23 @@ impl Parser<'_> {
                 self.expect(')')?;
                 AnnotationKind::CommonField { fields }
             }
-            _ => {
-                if self.is('(') {
-                    return Err(diagnostic(
-                        self.source,
-                        self.span_from(start),
-                        DiagnosticKind::UnsupportedSyntax,
-                        format!("unknown parameterized annotation @{name}"),
-                    ));
-                }
-                AnnotationKind::Simple { name }
-            }
+            _ => self.simple_annotation(start, name)?,
         };
         Ok(Spanned {
             kind,
             span: self.span_from(start),
         })
+    }
+    fn simple_annotation(&self, start: Span, name: String) -> Result<AnnotationKind> {
+        if self.is('(') {
+            return Err(diagnostic(
+                self.source,
+                self.span_from(start),
+                DiagnosticKind::UnsupportedSyntax,
+                format!("unknown parameterized annotation @{name}"),
+            ));
+        }
+        Ok(AnnotationKind::Simple { name })
     }
     fn body(&mut self) -> Result<RuleBody> {
         if self.depth >= MAX_NESTING {

@@ -353,7 +353,13 @@ Rustのowned `Tree.scopes()`は取得時のscope store snapshotを持つ。
 ### セマンティクス
 
 - 上記の特定アノテーションに該当しない汎用アノテーション
-- メタデータとして保持される
+- メタデータとして保持される（構文木・parser IR export・BNF 変換）。生成器は名前を使わない。ただし `@autoCommit` の解析はこの注釈を持つ rule を opaque として外すので、`@autoCommit` を使う文法では挿入位置が変わり得る（警告文がそれを示す）
+- 生成に作用する Simple annotation は `@nestedCaptures` と `@autoCommit` だけ。それ以外は注釈ごとに
+  警告 `W-ANNOTATION-IGNORED`（span は注釈、近い既知名があれば候補を示す）を出す。strict / fail-on-warning では失敗する
+- 既知名でも `@ leftAssoc`（`@` の後に trivia）や `@mapping`（引数が必要な名前を `(` なしで）は Simple annotation になる
+- 引数付き（`@custom(x)`）は構文エラー
+
+Java / Rust 共通の契約: [docs/simple-annotations.md](../../docs/simple-annotations.md)（#715）。
 
 ---
 
@@ -365,6 +371,7 @@ Rustのowned `Tree.scopes()`は取得時のscope store snapshotを持つ。
 
 ## 変更履歴
 
+- 2026-10-24: SimpleAnnotation の境界・`W-ANNOTATION-IGNORED`・既知名の別の書き方を明記（#715）。
 - 2026-09-30: scopeなし`@backref`のJava/Rust capture比較、診断位置、rollback、移行を明記（#325）。
 - 2026-09-24: `@root` の SHOULD 違反（複数ルール付与）時の挙動を明記（現在の実装は検出・
   警告せず受理する）。`ubnf-syntax.md` の完全版 MiniLang 文法が本ドキュメントの

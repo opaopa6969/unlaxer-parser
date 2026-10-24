@@ -627,10 +627,9 @@ impl Lowering<'_> {
                     | AnnotationKind::Enum
                     | AnnotationKind::Eval { .. }
                     | AnnotationKind::CommonField { .. } => {}
-                    AnnotationKind::Simple { name } if name == "nestedCaptures" => {}
-                    other => {
-                        return Err(format!("unsupported annotation {other:?} on {}", rule.name))
-                    }
+                    // Retained metadata, generated as if absent like Java; reported as
+                    // W-ANNOTATION-IGNORED by `simple_annotations::warnings` (#715).
+                    AnnotationKind::Simple { .. } => {}
                 }
             }
             rule_effects.push(effects);
