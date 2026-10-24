@@ -267,7 +267,7 @@ class WorkflowTest(unittest.TestCase):
 
     def test_this_test_runs_before_the_conformance_tests(self):
         index = self.step('Check memo budget evidence gate (#789)')
-        self.assertIn('scripts/tests/test_memo_budget_evidence.py', self.steps[index]['run'])
+        self.assertIn('scripts.tests.test_memo_budget_evidence', self.steps[index]['run'])
         self.assertLess(index, self.step('Cross-language fixtures, compile failures, and generated-file drift'))
 
 
