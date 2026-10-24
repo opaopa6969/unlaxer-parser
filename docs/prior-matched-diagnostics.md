@@ -162,7 +162,7 @@ max(consumed, matched) で、R1 が失敗するとその frame が失敗候補�
 `a  xy` に当てたとき Rust だけ拒否する。成功した rule の開始も候補にしない
 （`R0 ::= 'a' LOOKAHEAD('  xy') R1 'w' ; R1 ::= ['q']` の `a  xy` は両版で syntax CP3）。
 
-**対象外（未対応）**: rule でない入れ子の式（group・選択）の frame の開始は記録しない。
+**対象外（未対応、[#793](https://github.com/opaopa6969/unlaxer-parser/issues/793)）**: rule でない入れ子の式（group・選択）の frame の開始は記録しない。
 `R0 ::= 'a' LOOKAHEAD('xyz') ( 'x' 'q' )` の `axyz` は Java が syntax CP4、Rust が CP2 のまま。
 
 **費用**: rule 呼び出しが失敗したときに比較が 1 回増え、条件を満たすときだけ cold path の

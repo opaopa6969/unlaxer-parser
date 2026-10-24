@@ -10,7 +10,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
-- 正の `LOOKAHEAD` の後に呼んだ rule が、中の trivia（global `@comment`・javaStyle・名前付き whitespace）や消費で matched cursor を下げてから失敗したとき、生成した Rust parser の診断位置が Java より小さかった問題を修正 (#753)。Java と同じく、失敗した rule の frame の開始 max(consumed, matched) を失敗位置として記録する（`a//c\nxy` で CP5 → CP7、`R1 ::= 'x' 'q'` の `axyz` で CP2 → CP4）。trivia の後の matched cursor は Java の transaction cursor のまま変えない。rule でない group・選択の frame は対象外。[説明](docs/prior-matched-diagnostics.md#失敗した-rule-frame-の開始753)。
+- 正の `LOOKAHEAD` の後に呼んだ rule が、中の trivia（global `@comment`・javaStyle・名前付き whitespace）や消費で matched cursor を下げてから失敗したとき、生成した Rust parser の診断位置が Java より小さかった問題を修正 (#753)。Java と同じく、失敗した rule の frame の開始 max(consumed, matched) を失敗位置として記録する（`a//c\nxy` で CP5 → CP7、`R1 ::= 'x' 'q'` の `axyz` で CP2 → CP4）。trivia の後の matched cursor は Java の transaction cursor のまま変えない。rule でない group・選択の frame は対象外（#793）。[説明](docs/prior-matched-diagnostics.md#失敗した-rule-frame-の開始753)。
 - Rust の `@f` が生成・投影原文を Choice／rule 経由や全入力解析で受理する問題を修正し、Java と同じ入力由来検査・失敗位置を保つ (#761)。
 - Rust の LSP の message と `ParseError` / `ParseDiagnostic` の `Display` で、空の期待候補（通常の文法の `''`）を Java の生成 LSP と同じ `''` と表示する (#750)。以前は `Expected  or b` のように候補が見えなかった。canonical JSON・`data.expectedTokens` の値 `""`、空でない候補の表示、LSP の range・code は変えない。表示用に `unlaxer_runtime::display_expected` を追加した。[表示の対応](docs/empty-literal.md#人が読む表示750)。
 - 生成した Rust parser の Number token が、不完全な指数（`2e`・`2e+`）で Java の `NumberParser` と同じく指数記号・符号の後を失敗位置として記録するよう修正 (#717)。`R0 ::= NUM 'a'` に `2e` の診断は CP1 → CP2（`2e+` は CP3）。受理と消費は従来どおり仮数部まで。共通 oracle `conformance/number-token/cases.tsv` を追加し、PBT の既知差 `number-incomplete-exponent` を削除。
