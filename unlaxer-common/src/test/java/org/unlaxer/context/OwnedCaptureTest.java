@@ -75,6 +75,13 @@ public class OwnedCaptureTest {
             case "scope-failure":
                 parse(c, cap(w("a")));
                 return new CaptureScope(new Chain(cap(w("b")), w("z"))).parse(c);
+            // Preferred metadata has no Java parser counterpart: use the ordinary expression.
+            case "metadata-choice-reset":
+                c.getCurrent().setResetMatchedWithConsumed(true);
+                return cap(new Choice(new Repeat(new MatchOnly(w("x")), 0, 2))).parse(c, kind, invert);
+            case "metadata-match-reset":
+                c.getCurrent().setResetMatchedWithConsumed(true);
+                return cap(new MatchOnly(new Repeat(new MatchOnly(w("x")), 0, 2))).parse(c, kind, invert);
             case "field-repeat-reset", "field-repeat-preserve":
                 c.getCurrent().setResetMatchedWithConsumed(name.equals("field-repeat-reset"));
                 return cap(field(new Repeat(new MatchOnly(w("x")), 0, 2))).parse(c, kind, invert);

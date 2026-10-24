@@ -15,6 +15,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 ### Fixed
 
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
+- Rust preferred AST の合成 capture を CST metadata 専用の `Expr::MetadataCapture` に分離し、通常 parser・Java と Classic の成否・cursor・原文・AST が異なる問題を修正 (#788)。Java/Rust 両生成ホストに適用し、ユーザーの `@f` の原文検査と reset 契約 (#762) は維持する。
 - Rust の `@f` が生成・投影原文を Choice／rule 経由や全入力解析で受理する問題を修正し、Java と同じ入力由来検査・失敗位置を保つ (#761)。
 - CI の memo budget 適合性の証跡 gate が、libtest の進捗行（`test X ... `）と Rust の oracle の `BUDGET` 行が同じ行に混ざると 600 件を 599 件と数えて落ちる問題を修正 (#789)。Rust の oracle は stdout ではなく環境変数 `UNLAXER_TEST_FAILURE_BUDGET_EVIDENCE` / `UNLAXER_TEST_SUCCESS_BUDGET_EVIDENCE` のファイルへ全行をまとめて書き、gate は `scripts/check-memo-budget-evidence.py` で Java / Rust の TSV の header・列数・値・case id・キーの一意性と全組み合わせ・600 行を検査する。キーの値は証跡から推定せず Java/Rust の固定した全600構成と照合する。再実行開始時に古い TSV を消し、Rust の証跡は全プロセス成功後に公開する。コンパイル・テスト失敗時のログも artifact `memo-budget-evidence` に残す。600 ケースと Java / Rust の oracle は変えていない。
 - Rust の LSP の message と `ParseError` / `ParseDiagnostic` の `Display` で、空の期待候補（通常の文法の `''`）を Java の生成 LSP と同じ `''` と表示する (#750)。以前は `Expected  or b` のように候補が見えなかった。canonical JSON・`data.expectedTokens` の値 `""`、空でない候補の表示、LSP の range・code は変えない。表示用に `unlaxer_runtime::display_expected` を追加した。[表示の対応](docs/empty-literal.md#人が読む表示750)。
