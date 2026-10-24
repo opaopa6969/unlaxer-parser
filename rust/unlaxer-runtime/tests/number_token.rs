@@ -181,3 +181,13 @@ fn native_number_and_grammar_entry_match_the_shared_oracle() {
         }
     }
 }
+
+#[path = "support/number_token_diagnostics.rs"]
+mod diagnostics;
+
+#[test]
+fn internal_failure_diagnostics_match_java() {
+    diagnostics::check(diagnostics::rules, false, |context| {
+        context.failure().expected
+    });
+}

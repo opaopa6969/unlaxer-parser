@@ -1708,6 +1708,8 @@ pub struct ParseContext<'a> {
     // public entry decides; expression entries (parse, parse_with_token_mode,
     // parse_token) clear it for their duration. Not applied in a token-stream session.
     grammar_frontier: bool,
+    // Java Number's empty-display terminals inherit the enclosing negative PEG assertion's hint.
+    number_negative_hint: bool,
     match_cursor_policy: MatchCursorPolicy,
     bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
@@ -2146,6 +2148,7 @@ impl<'a> ParseContext<'a> {
             classic_max_reached: None,
             classic_failure_seen: false,
             grammar_frontier: false,
+            number_negative_hint: false,
             match_cursor_policy: MatchCursorPolicy::default(),
             whitespace: false,
             line_comments: false,
@@ -4583,7 +4586,11 @@ impl<'a> ParseContext<'a> {
                 if previous.is_some() {
                     self.token_mode = Some(token::ParseMode::default());
                 }
+                let previous_hint = self.number_negative_hint;
+                self.number_negative_hint |=
+                    !*positive && self.options.diagnostics == Diagnostics::Detailed;
                 let matched = self.expression(child, depth).is_some();
+                self.number_negative_hint = previous_hint;
                 self.token_mode = previous;
                 self.restore(checkpoint);
                 // A committed or labeled child failure fails either polarity and keeps
@@ -5397,18 +5404,35 @@ impl<'a> ParseContext<'a> {
 
     // Matches Java NumberParser: optional sign, decimal, optional complete exponent.
     fn number(&mut self) -> bool {
+        if self.options.diagnostics == Diagnostics::Detailed {
+            self.number_with_diagnostics::<true>()
+        } else {
+            self.number_with_diagnostics::<false>()
+        }
+    }
+
+    // Select once per token: the deferred success path keeps the original scanner without
+    // a diagnostic-mode branch at every sign, digit run and optional exponent.
+    fn number_with_diagnostics<const RECORD: bool>(&mut self) -> bool {
         let start = self.position;
-        self.sign();
-        let before = self.digits();
+        self.sign::<RECORD>();
+        let mantissa = self.position;
+        let before = self.digits::<RECORD>();
         let mut after = false;
         if self.input.as_bytes().get(self.position) == Some(&b'.') {
             let point = self.position;
             self.position += 1;
             self.trace_atom("PointParser", point);
-            after = self.digits();
+            after = self.digits::<RECORD>();
+        } else if RECORD {
+            self.fail(".");
         }
         if !before && !after {
-            self.fail("number");
+            if RECORD {
+                // Failed Choice/Number frames start before the point/digit probes.
+                self.fail_at(mantissa, "Chain");
+                self.fail_at(start, "NumberParser");
+            }
             self.position = start;
             return false;
         }
@@ -5422,23 +5446,34 @@ impl<'a> ParseContext<'a> {
         {
             self.position += 1;
             self.trace_atom("EParser", exponent);
-            self.sign();
-            if !self.digits() {
-                // Java's ExponentParser fails here, after the marker and an optional sign,
-                // and that failure is the reach the diagnostic reports (#717). The token
-                // still accepts only the mantissa.
-                self.fail("number");
+            self.sign::<RECORD>();
+            if !self.digits::<RECORD>() {
+                // Keep the digit/sign failures, but accept only the mantissa (#717/#752).
                 self.position = exponent;
                 trace.restore(self.token_trace.as_mut());
                 self.trace_atom("Optional", exponent);
             }
         } else {
+            if RECORD {
+                self.number_failure("EParser");
+                self.number_failure("ExponentParser");
+            }
             self.trace_atom("Optional", exponent);
         }
         true
     }
 
-    fn sign(&mut self) {
+    // These parsers have no Java display hint. Their failed frames contribute their
+    // class name, followed by the nearest enclosing terminal hint (PegLookahead).
+    // As in Java, successful memo replay keeps the hint recorded by the first call.
+    fn number_failure(&mut self, expected: &str) {
+        self.fail(expected);
+        if self.number_negative_hint {
+            self.fail("negative lookahead");
+        }
+    }
+
+    fn sign<const RECORD: bool>(&mut self) {
         let start = self.position;
         if self
             .input
@@ -5449,11 +5484,14 @@ impl<'a> ParseContext<'a> {
             self.position += 1;
             self.trace_atom("SignParser", start);
         } else {
+            if RECORD {
+                self.number_failure("SignParser");
+            }
             self.trace_atom("Optional", start);
         }
     }
 
-    fn digits(&mut self) -> bool {
+    fn digits<const RECORD: bool>(&mut self) -> bool {
         let start = self.position;
         while self
             .input
@@ -5464,6 +5502,14 @@ impl<'a> ParseContext<'a> {
             let digit = self.position;
             self.position += 1;
             self.trace_atom("DigitParser", digit);
+        }
+        // DetailedOnFailure (including the successful Auto full-input pass) must not
+        // intern names or allocate diagnostic records. Java skips these same failures.
+        if RECORD {
+            self.number_failure("DigitParser");
+            if self.position == start {
+                self.number_failure("OneOrMore");
+            }
         }
         self.position > start
     }
@@ -7596,5 +7642,105 @@ mod classic_mode_scan_tests {
             rules.push(rule("Last", Expr::literal("Z")));
             assert!(!requires_classic_mode(&Expr::Rule(0), &rules));
         });
+    }
+}
+
+#[test]
+fn number_internal_failure_recording_order_matches_java() {
+    // Public ParseError.expected remains sorted; check the retained order before presentation.
+    // The same Java oracle drives the public API and generated-host tests.
+    for row in include_str!("../../../conformance/number-token/diagnostics.tsv")
+        .lines()
+        .filter(|row| !row.starts_with('#'))
+    {
+        let c: Vec<_> = row.split('\t').collect();
+        let bytes = if c[1] == "~" {
+            vec![]
+        } else {
+            (0..c[1].len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&c[1][i..i + 2], 16).unwrap())
+                .collect()
+        };
+        let input = String::from_utf8(bytes).unwrap();
+        let memo = if c[2] == "OFF" {
+            Memoization::Off
+        } else {
+            Memoization::SafeFailures
+        };
+        for mode in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            let mut context = ParseContext::with_options(
+                &input,
+                ParseOptions::with_memoization(memo).with_diagnostics(mode),
+            );
+            if c[0] == "bare" {
+                let _ = context.parse(&Expr::Number);
+            } else {
+                let _ = context.parse_grammar(rules(c[0]), 0, false);
+            }
+            let expected = if mode == Diagnostics::DetailedOnFailure {
+                vec![]
+            } else {
+                c[7].split(',')
+                    .map(|name| name.trim_matches('\''))
+                    .collect()
+            };
+            assert_eq!(
+                context
+                    .expected
+                    .iter()
+                    .map(|&id| context.expected_names.name(id))
+                    .collect::<Vec<_>>(),
+                expected,
+                "{row}/{mode:?}"
+            );
+        }
+    }
+    fn rules(shape: &str) -> Vec<Rule> {
+        let number = Expr::Rule(1);
+        let body = match shape {
+            "number" | "bare" => number,
+            "not" => number.not_ahead().then(Expr::literal("x")),
+            "optional" => number.optional_java(),
+            "choice" => Expr::choice([Expr::literal("x"), number]),
+            "after-optional" => Expr::literal("x").optional_java().then(number),
+            "tail" => number.then(Expr::literal("e").optional_java()),
+            "memo" => number
+                .clone()
+                .ahead()
+                .then(number.clone().ahead())
+                .then(number.not_ahead()),
+            _ => panic!("{shape}"),
+        };
+        vec![
+            Rule {
+                name: "Root",
+                expression: body,
+            },
+            Rule {
+                name: "Num",
+                expression: Expr::Number,
+            },
+        ]
+    }
+}
+
+#[test]
+fn number_deferred_success_does_not_allocate_diagnostic_names() {
+    for input in ["2", "2.", ".5", "+2.5E-3", "2e", "2e+"] {
+        let mut context = ParseContext::with_options(
+            input,
+            ParseOptions::default().with_diagnostics(Diagnostics::DetailedOnFailure),
+        );
+        assert!(context.parse(&Expr::Number).is_ok());
+        assert!(context.expected_names.first.is_none());
+        assert_eq!(context.expected_names.remaining.capacity(), 0);
+        assert_eq!(context.expected_names.ids.capacity(), 0);
+        assert_eq!(context.expected.capacity(), 0);
+        assert_eq!(context.diagnostic_frames.capacity(), 0);
     }
 }
