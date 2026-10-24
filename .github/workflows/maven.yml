@@ -441,6 +441,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Check parity ledger coverage (#771)
+      run: |
+        python3 scripts/check-parity-ledger.py
+        python3 scripts/tests/test_parity_ledger.py
     
     - name: Set up JDK 21
       uses: actions/setup-java@v4

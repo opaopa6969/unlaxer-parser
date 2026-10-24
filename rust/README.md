@@ -71,7 +71,7 @@ rust/target/release/unlaxer generate --target rust \
 
 122文法・610生成ファイルのJava/native byte一致を`RustNativeGeneratorTest`で検査し、生成と`--check`は空のPATHで実行する。Javaは比較用oracleで、native生成経路の依存ではない。native構文解析は128、両hostのRust loweringの構造shape分析は256の再帰深度上限を持ち、超過は診断になる。
 
-終了コードは0=成功、2=引数不正、3=構文/意味/未対応機能、4=I/O・drift・上書き保護。全artifactを事前検査し、手書きファイルやsymlink（出力先・祖先・各file）を上書きしない。各fileは一時ファイルから置換するが、ディレクトリ全体のtransactionや敵対的な同時ファイル差し替えへのsandboxではない。排他的に管理できる出力先を使う。
+終了コードは0=成功、2=引数不正、3=構文/意味/未対応機能、4=I/O・drift・上書き保護、5=`--strict` / `--fail-on warning` で警告あり（何も書かない）。生成物を変えない警告（`W-ANNOTATION-IGNORED`・`W-AUTO-COMMIT-SKIPPED`）は `warning: CP <start>..<end>: <message>` の形で stderr に出す（[契約](../docs/simple-annotations.md#生成の警告を-cli-まで届ける)、#715）。全artifactを事前検査し、手書きファイルやsymlink（出力先・祖先・各file）を上書きしない。各fileは一時ファイルから置換するが、ディレクトリ全体のtransactionや敵対的な同時ファイル差し替えへのsandboxではない。排他的に管理できる出力先を使う。
 
 ### Java frontendを使う既存経路
 
@@ -87,7 +87,7 @@ java --enable-preview \
   --output rust/examples/evolution/src/generated
 ```
 
-同じコマンドに`--check`を付けると書き込まずに生成物の完全一致を検査する。未対応文法は出力前に拒否する。出力先の5ファイルを事前検査し、生成マーカーのない既存ファイルやsymlinkは上書きしない。生成済みファイルは再生成で置き換わるので編集しない。終了コードは成功`0`、CLI誤り`2`、文法・サブセット検証失敗`3`、I/O・衝突・差分検出`4`。
+同じコマンドに`--check`を付けると書き込まずに生成物の完全一致を検査する。未対応文法は出力前に拒否する。出力先の5ファイルを事前検査し、生成マーカーのない既存ファイルやsymlinkは上書きしない。生成済みファイルは再生成で置き換わるので編集しない。終了コードは成功`0`、CLI誤り`2`、文法・サブセット検証失敗`3`、I/O・衝突・差分検出`4`、`--strict` / `--fail-on warning` で警告あり`5`。警告の stderr は native と同じ。
 
 出力は`mod.rs`、`parser.rs`、`ast.rs`、`mapper.rs`、`evaluator.rs`。呼出側crateにruntimeのpath dependencyと`pub mod generated;`を追加する。手書きのsemanticsやCargo manifestは生成器の管理外。exampleのように`#[rustfmt::skip]`をmodule宣言に付け、生成テキストをformatterで改変しない。
 
@@ -303,7 +303,7 @@ let matched = context.parse(&MyParser)?;
 
 `source`/`remaining`/`position`/`advance`/`text`で入力を扱い、`set_state`/`state::<T>`/`state_mut::<T>`で`Any + Clone`の値を共有する。位置・移動量はコードポイント単位。利用者状態の`Clone`は変更可能な内容を独立コピーする必要がある。`Rc<RefCell<_>>`等の共有内部状態、ファイル操作等の副作用、panic unwindはrollback対象ではない。panicを捕捉した後はcontextを再利用しない。
 
-`Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。genericな無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。UBNFではJava互換用の`JavaOptional`/`JavaRepeat`等も生成する。Custom・BackreferenceのUBNF接続は未実装。
+`Expr`には`then`/`or`/`optional`/`repeat`/`zero_or_more`/`one_or_more`/`separated_by`/`capture`/`ahead`/`not_ahead`を用意する。`separated_by`は1個以上。genericな無限反復の子が入力を消費せず成功した場合はエラーとする。`Custom(fn)`でcontextを取る関数を組み込める。`Any`/`CharRange`/`Except`は1コードポイント、`Until`は終端の直前まで（終端がなければ失敗）、`Eof`/`Empty`/`Error`も利用できる。UBNFではJava互換用の`JavaOptional`/`JavaRepeat`等も生成する。この低水準 `Custom(fn)` / `Backreference(name)` を直接指定するUBNF構文はない。明示adapter bindingは [ADAPTER](../docs/token-adapters.md)、owned capture/replayは [CAPTURE / SAME_AS](../docs/general-owned-capture-syntax.md) から両hostで生成できる。後者は下記のcontext全体のcaptureとは異なる契約である（[台帳](../docs/parity-ledger.md)）。
 
 `captured(name)`と`Backreference(name)`はcontext全体の同名captureの最新成功分を使用する。`capture_spans`は成功履歴を返す。字句スコープやJavaのcapture伝播規則を再現したものではない。
 `Expr::compare_captures(name, child)`は別のeffectで、childが返す同名captureを完了順に比較し、
@@ -341,7 +341,7 @@ Javaの`ParseContext`は消費位置とマッチ専用位置を分ける。Rust�
 
 例えば`LOOKAHEAD('a')`の後に`LOOKAHEAD('b')`を置くと、`ab`を消費せず順にマッチする。`Expr::literal("a").ahead()`を2回行うPEGの検査とは異なる。既存の`ahead`/`not_ahead`/`Until`/`Empty`の契約は変更していない。UBNFのマッチ専用tokenをcaptureした文字列は**消費した部分**なので空文字であり、先読みしたpattern本体ではない。
 
-UBNFのoptional/repeatは`optional_java`/`repeat_java`を生成する。Java `Occurs`と同じく、有限repeatも消費が進まない成功を1回数えた時点で停止する。上限0でも子を1回試し、成功すれば個数超過で失敗するJavaの挙動も保持する。直接の消費atomが失敗した場合、optionalやrepeat内ではマッチ位置だけが消費位置へ戻る。一方、rule/sequence/captureで包んだ子はtransactionで元の位置へ戻る。これらをgenericな`optional`/`repeat`に混入させない。空消費が可能な無限repeatは引き続きUBNF生成前に拒否する。
+UBNFのoptional/repeatは`optional_java`/`repeat_java`を生成する。Java `Occurs`と同じく、active cursorが進まない成功を1回数えた時点で停止する。[上限0の通常反復](../docs/zero-repetition.md)は両版で子を実行せず成功する（歴史的な `Zero` / `ZeroMatch` の負の検査とは別）。直接の消費atomが失敗した場合、optionalやrepeat内ではマッチ位置だけが消費位置へ戻る。一方、rule/sequence/captureで包んだ子はtransactionで元の位置へ戻る。これらをgenericな`optional`/`repeat`に混入させない。通常のUBNF規則では[nullableな無限反復](../docs/nullable-repetition.md)もこの停止規則で生成できる。宣言的字句式のnullable検証とpure PEGのzero-progress拒否は別契約である。
 
 `CHAR_RANGE`境界は現在のUBNF ASTの`char`型に合わせて単一の非surrogate BMP文字に限定し、空・複数文字・補助文字・逆順は明示拒否する。`ANY`/`NEGATION`と文字列patternは補助文字もコードポイントとして扱う。Rustへ渡す文字列の不正な単独surrogateは生成前に拒否する。
 

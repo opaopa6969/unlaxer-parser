@@ -439,6 +439,18 @@ Separator ::= ',' ;
 Assignment ::= IDENTIFIER @name @typeof(value) '=' Expression @value ;
 ```
 
+### その他の名前（`@name`）
+
+ルールの前のその他の `@name` は *Simple annotation* です。metadata（構文木・parser IR）として残り、
+どの生成器もその名前を使いません。生成に作用するのは `@nestedCaptures` と `@autoCommit` だけです。
+ただし `@autoCommit` は、この注釈を持つ rule を解析対象から外すので、`@autoCommit` を使う文法では
+COMMIT の挿入位置が変わり得ます（警告文がそれを示します）。
+それ以外は注釈の位置で警告 `W-ANNOTATION-IGNORED` を出し、近い既知名があれば候補を示します
+（`@leftassoc` → `did you mean @leftAssoc?`）。`--strict` / `--fail-on warning` では失敗します。
+既知名でも、`@` の後に空白を入れた形（`@ leftAssoc`）や、引数が必要な annotation を `(` なしで書いた形
+（`@mapping`）は Simple annotation です。未知名に引数を付けた `@name(args)` は構文エラーです。
+[Simple annotation](simple-annotations.md) を参照してください（#715）。
+
 ---
 
 ## 演算子の結合性

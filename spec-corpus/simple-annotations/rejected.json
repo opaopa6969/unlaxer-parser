@@ -1,0 +1,22 @@
+[
+  {
+    "name": "arguments",
+    "note": "引数付きの未知名は構文エラー",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @custom(x)\n  Item ::= 'n' ;\n}\n"
+  },
+  {
+    "name": "empty-arguments",
+    "note": "空の引数も構文エラー",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @custom()\n  Item ::= 'n' ;\n}\n"
+  },
+  {
+    "name": "spaced-keyword-arguments",
+    "note": "@ の後に空白がある既知名に引数を付けると構文エラー",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @ mapping(Item)\n  Item ::= 'n' ;\n}\n"
+  },
+  {
+    "name": "bare-name-predicate",
+    "note": "@namePredicate は ( なしでも Simple annotation にならず構文エラー",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @namePredicate\n  Item ::= 'n' ;\n}\n"
+  }
+]
