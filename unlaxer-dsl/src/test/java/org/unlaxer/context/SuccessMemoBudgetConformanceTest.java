@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /** Located in the DSL module to include semantic ScopeStore in the runtime oracle. */
@@ -248,9 +249,18 @@ public class SuccessMemoBudgetConformanceTest {
                             repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(),
                             "-o",
                             binary.toString()));
+            // #789: the oracle rows go to their own file. libtest's progress lines share
+            // stdout with the test threads, so the .log is kept only for diagnosis.
+            Path evidence = Path.of("target/success-memo-budget-rust.tsv").toAbsolutePath();
+            Files.deleteIfExists(evidence);
             Files.writeString(
                     Path.of("target/success-memo-budget-rust.log"),
-                    run(List.of(binary.toString(), "success_budget_", "--nocapture")));
+                    run(
+                            List.of(binary.toString(), "success_budget_", "--nocapture"),
+                            Map.of(
+                                    "UNLAXER_TEST_SUCCESS_BUDGET_EVIDENCE",
+                                    evidence.toString())));
+            assertEquals(601, Files.readAllLines(evidence).size());
         } finally {
             try (var paths = Files.walk(dir)) {
                 for (var p : paths.sorted(java.util.Comparator.reverseOrder()).toList())
@@ -260,12 +270,14 @@ public class SuccessMemoBudgetConformanceTest {
     }
 
     private String run(List<String> command) throws Exception {
+        return run(command, Map.of());
+    }
+
+    private String run(List<String> command, Map<String, String> environment) throws Exception {
         Path log = Files.createTempFile("success-budget-command", ".log");
-        var p =
-                new ProcessBuilder(command)
-                        .redirectErrorStream(true)
-                        .redirectOutput(log.toFile())
-                        .start();
+        var builder = new ProcessBuilder(command);
+        builder.environment().putAll(environment);
+        var p = builder.redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {
             assertTrue(command.toString(), p.waitFor(60, TimeUnit.SECONDS));
             String text = Files.readString(log);

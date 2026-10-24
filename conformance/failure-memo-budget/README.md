@@ -36,7 +36,9 @@ mvn -pl unlaxer-common,unlaxer-dsl -am test \
 ```
 
 Java21/Rust1.85。Java report は `unlaxer-dsl/target/failure-memo-budget-java.tsv`、
-Rust report は `unlaxer-dsl/target/failure-memo-budget-rust.log`。
+Rust report は `unlaxer-dsl/target/failure-memo-budget-rust.tsv`（Rust の oracle が
+`UNLAXER_TEST_FAILURE_BUDGET_EVIDENCE` のファイルへ書く。`-rust.log` は libtest の stdout で、診断用）。
+CI は両方を `scripts/check-memo-budget-evidence.py` で検査します（#789）。
 保持 bytes 自体は各言語の [charge 契約](../../docs/failure-memo-budget.md) に従い、
 同一件数を同一byte数と見なさず、それぞれ上限内か検証します。
 

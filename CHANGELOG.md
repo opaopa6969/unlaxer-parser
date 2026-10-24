@@ -10,6 +10,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- CI の memo budget 適合性の証跡 gate が、libtest の進捗行（`test X ... `）と Rust の oracle の `BUDGET` 行が同じ行に混ざると 600 件を 599 件と数えて落ちる問題を修正 (#789)。Rust の oracle は stdout ではなく環境変数 `UNLAXER_TEST_FAILURE_BUDGET_EVIDENCE` / `UNLAXER_TEST_SUCCESS_BUDGET_EVIDENCE` のファイルへ全行をまとめて書き、gate は `scripts/check-memo-budget-evidence.py` で Java / Rust の TSV の header・列数・値・case id・キーの一意性と全組み合わせ・600 行を検査する。検査対象は失敗時も artifact `memo-budget-evidence` に残す。600 ケースと Java / Rust の oracle は変えていない。
 - Rust の LSP の message と `ParseError` / `ParseDiagnostic` の `Display` で、空の期待候補（通常の文法の `''`）を Java の生成 LSP と同じ `''` と表示する (#750)。以前は `Expected  or b` のように候補が見えなかった。canonical JSON・`data.expectedTokens` の値 `""`、空でない候補の表示、LSP の range・code は変えない。表示用に `unlaxer_runtime::display_expected` を追加した。[表示の対応](docs/empty-literal.md#人が読む表示750)。
 - 生成した Rust parser の Number token が、不完全な指数（`2e`・`2e+`）で Java の `NumberParser` と同じく指数記号・符号の後を失敗位置として記録するよう修正 (#717)。`R0 ::= NUM 'a'` に `2e` の診断は CP1 → CP2（`2e+` は CP3）。受理と消費は従来どおり仮数部まで。共通 oracle `conformance/number-token/cases.tsv` を追加し、PBT の既知差 `number-incomplete-exponent` を削除。
 - provider transport の通常拒否と意図した timeout の予算を Java/Rust 共通 fixture で分離し、正常応答付き stderr の上限超過と stdout/stderr のちょうど 4MiB の受理を検証する (#721)。製品の timeout 既定値は変更しない。

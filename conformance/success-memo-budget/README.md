@@ -34,7 +34,7 @@ mvn -pl unlaxer-common,unlaxer-dsl -am test \
 ```
 
 Java21/Rust1.85。`unlaxer-dsl/target/success-memo-budget-java.tsv` と
-`unlaxer-dsl/target/success-memo-budget-rust.log` が共通観測reportです。
+`unlaxer-dsl/target/success-memo-budget-rust.tsv`（`UNLAXER_TEST_SUCCESS_BUDGET_EVIDENCE`、#789）が共通観測reportです。
 言語固有storage試験は単体/合計/件数の正確な境界、置換と古payload解放、外部Source/不正tree、
 深い正常treeの非再帰copy、巨大text/expected payload、distant indexとoverflowを補います。
 
