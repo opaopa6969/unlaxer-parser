@@ -4623,6 +4623,17 @@ impl<'a> ParseContext<'a> {
         anchor: usize,
         owned: bool,
     ) -> Option<Fragment> {
+        if !owned && self.token_mode.is_some() {
+            // Java の @f は LazyChain なので、現在の kind の子だけを収集する。
+            // 直接の LOOKAHEAD（match-only）は consumed の @f では幅0になる（#742）。
+            // 入力以外の原文は Java と同じく収集前の子の原文で拒否する（下の検査）。
+            let kind = self.token_mode().kind;
+            if fragment.source.as_deref().is_some_and(|source| {
+                source.classic && source.kind != kind && source.text.is_none() && !source.generated
+            }) {
+                fragment = self.collect_classic_fragment(fragment, kind);
+            }
+        }
         let source = if owned {
             fragment.parsed_source()
         } else {
