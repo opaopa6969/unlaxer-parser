@@ -561,20 +561,6 @@
       ]
     },
     {
-      "id": "lexical-invert",
-      "category": "unresolved",
-      "title": "非空 lexical literal の Classic 反転幅",
-      "hosts": "Java / Rust（Java-host・native）",
-      "issues": [
-        768,
-        716
-      ],
-      "observation": "tokenStream/lexicalContextで非空literalを反転するとJava幅0、Rust幅1。empty-literal corpusは宣言的tokenで交絡を避けるため、この成功を解消の証拠にしない。",
-      "evidence": [
-        "docs/empty-literal.md"
-      ]
-    },
-    {
       "id": "global-comment",
       "category": "unresolved",
       "title": "global @comment の生成差",
@@ -1271,7 +1257,7 @@
       "path": "spec-corpus/empty-literal/corpus.json",
       "fields": {
         "javaCst": 3,
-        "javaDiagnostic": 51
+        "javaDiagnostic": 112
       },
       "entries": [
         "diagnostic-display",

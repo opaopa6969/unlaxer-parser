@@ -504,6 +504,7 @@ fn expression(expr: &Expression) -> String {
         }
         Literal(s) if s.is_empty() => "Expr::JavaEmptyLiteral".into(),
         Literal(s) => format!("Expr::Literal({})", quote(s)),
+        LexicalLiteral(s) => format!("Expr::JavaLiteral({})", quote(s)),
         EmptyWordToken => "Expr::JavaEmptyWord".into(),
         ErrorExpected(message) => format!("Expr::Error({})", quote(message)),
         NumberToken => "Expr::Number".into(),

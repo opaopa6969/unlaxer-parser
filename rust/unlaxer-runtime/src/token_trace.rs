@@ -311,7 +311,7 @@ impl ParseContext<'_> {
                 self.position,
             ),
             // Java's Lexing.LiteralParser("") is a LexicalTokenParser that adds a zero-width token.
-            Expr::Lexical(_, _) | Expr::JavaEmptyLiteral => (
+            Expr::Lexical(_, _) | Expr::JavaLiteral(_) | Expr::JavaEmptyLiteral => (
                 "LexicalTokenParser",
                 TokenKind::Consumed,
                 start,

@@ -70,7 +70,7 @@ Java の生成器は grammar の字句方式によって `''` を別の parser �
 
 ## 共通 oracle と検証
 
-[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 22 文法 92 入力。root / sequence / choice の rollback /
+[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 30 文法 196 入力。root / sequence / choice の rollback /
 field capture の rollback / optional・repeat（capture 付き）/ `''+`・`''{0,3}`・`'' % ','`・`{ [ '' ] }` の進捗停止 /
 `javaStyle` trivia / 先読み後の matched cursor / 宣言的 token の `''`・`LOOKAHEAD('')`・`NEGATIVE_LOOKAHEAD('')` /
 tokenStream / lexicalContext / 左結合の prefix・tail delimiter / `COMMIT('')`・`[ COMMIT('', 'never') ]` /
@@ -130,9 +130,34 @@ Rust の非空 literal を引用符付きに変えるのは既存の表示を全
 - choice を root とする rule で選ばれた枝が capture helper の場合、Java の token 木に root rule の token が残らない
   （CaptureRollback の `javaCst`。非空 literal でも同じ差）。
 
-既知の範囲外: token-stream / lexical-context grammar の Classic token mode で、**非空** literal を反転させたときの意味
-（Java の `LiteralParser` は幅0成功、Rust Classic は `WordParser` と同じく1文字単位）は本変更以前からの差であり、ここでは扱わない。
-corpus の token-stream 例はこの差に交絡しないよう、`;` を宣言的 token にしている。
+### 非空 lexical literal の Classic 反転（#768）
+
+`@tokenStream` または規則単位の `@lexicalContext` がある文法では、非空 literal も Java の
+`Lexing.LiteralParser`（`LexicalTokenParser`）になる。`LexicalTokenParser.parse(context, kind, invert)` は
+lexical match の有無を反転し、反転成功時の長さを明示的に 0 にする。これは同じ開始位置で評価する `Not(literal)` と同じ負の
+assertion の受理判定であり、`WordParser` の「同じ文字数の別の語を消費する」反転ではない。
+`Not` と異なり、成功した literal 自身の幅0の token を指定された kind で残す。
+
+| 非空 literal `ab` の反転 | 受理 | 消費幅・CST | cursor・失敗位置 |
+|---|---|---|---|
+| 不一致、短い入力、EOF | 成功 | 幅0の lexical leaf と rule CST | consumed / matched とも変更しない |
+| lexical match が成功 | 失敗 | token を残さない | cursor を変更せず、直接 parse の失敗位置は max(consumed, matched) |
+| goal に `ab` / `abc` があり入力が `abc` | 成功 | 最長一致の勝者は `abc` なので `ab` は幅0で反転成功 | cursor を変更しない |
+
+Java のソースにある「inverted use is a pure assertion」という明示的な契約と、`Not` との比較テストが根拠である。
+Java parser の実装・公開済み 3.3.0 は変更していない。Rust は両 frontend で非空 lexical literal を
+IR `LexicalLiteral` → runtime `Expr::JavaLiteral` として生成し、通常の `Expr::Literal`（Classic では
+`WordParser`）から区別する。現在の session / goal の有無だけで区別すると、別の規則だけに
+`@lexicalContext` がある文法の literal を誤分類するため、生成時の parser 選択を保持する。
+`JavaLiteral` は失敗時の `consume(0)` による matched cursor の reset 対象に含めない。
+非 Classic の照合・FIRST・memo・completion は既存 literal と同じ経路を使う。
+
+corpus の追加8文法・104入力は、通常の `WordParser` の対照、root / optional / repeat / sequence、
+lexical goal 内外、EOF・非 BMP・途中で切れた入力を含む。`classicStart: [consumed, matched]` で
+先読み後や非 BMP の後の開始位置を設定し、4モードそれぞれの `classicCst`（rule CST）と
+`classicFailure`（失敗時の CP 位置、成功なら null）を Java・Java-host Rust・native Rust 共通で固定した。
+Java / Rust の直接 API テストでも、幅0 leaf の kind・source と失敗後の cursor を確認する。
+既存の CI は同じ `EmptyLiteralConformanceTest` を実行し、証跡 TSV の必要行数を corpus から計算する。
 
 ```sh
 RUSTUP_TOOLCHAIN=1.85.0 mvn -pl unlaxer-common,unlaxer-dsl -am test \

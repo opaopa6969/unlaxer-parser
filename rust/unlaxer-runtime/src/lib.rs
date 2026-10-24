@@ -100,6 +100,8 @@ pub enum Expr {
     /// An atomic token compiled from a declarative UBNF lexical expression.
     Lexical(&'static str, lexical::LexicalExpression),
     Literal(&'static str),
+    /// Java Lexing.LiteralParser: inverted lexical mismatch succeeds without consuming.
+    JavaLiteral(&'static str),
     /// Unicode 17.0.0 simple lower(upper(cp)) equality, preserving original text.
     /// No normalization, locale tailoring, or multi-scalar folding. Empty words fail.
     CaseInsensitive(&'static str),
@@ -3596,7 +3598,7 @@ impl<'a> ParseContext<'a> {
         };
         if result.is_none() {
             // A failed consuming Java leaf calls consume(0), which resets the matched cursor.
-            // Java LiteralParser("") (JavaEmptyLiteral) never does, so it is not listed.
+            // Java Lexing.LiteralParser (JavaLiteral / JavaEmptyLiteral) never does.
             let leaf_reset = self.token_mode.is_some_and(|mode| mode.kind.is_consumed())
                 && matches!(
                     expression,
@@ -3995,7 +3997,7 @@ impl<'a> ParseContext<'a> {
                     None
                 }
             }
-            Expr::Literal(literal) => {
+            Expr::Literal(literal) | Expr::JavaLiteral(literal) => {
                 let end = match &mut self.lexing {
                     Some(session) => session.match_at(
                         literal,
@@ -5537,6 +5539,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         }
         Expr::Lexical(_, _)
         | Expr::Literal(_)
+        | Expr::JavaLiteral(_)
         | Expr::CaseInsensitive(_)
         | Expr::Number
         | Expr::Identifier
@@ -5676,6 +5679,7 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             }
             Expr::Lexical(_, _)
             | Expr::Literal(_)
+            | Expr::JavaLiteral(_)
             | Expr::CaseInsensitive(_)
             | Expr::Number
             | Expr::Identifier
@@ -5804,6 +5808,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         }
         Expr::Lexical(_, _)
         | Expr::Literal(_)
+        | Expr::JavaLiteral(_)
         | Expr::CaseInsensitive(_)
         | Expr::Number
         | Expr::Identifier

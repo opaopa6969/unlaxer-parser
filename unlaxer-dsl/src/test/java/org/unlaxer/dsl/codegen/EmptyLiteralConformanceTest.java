@@ -50,10 +50,34 @@ import org.unlaxer.parser.Parser;
  */
 public class EmptyLiteralConformanceTest {
     private static final String PACKAGE = "org.example.emptyliteral";
-    private static final List<String> KEYS = List.of("prefix", "classic", "diagnostic", "ruleStack", "ast", "cst");
+    private static final List<String> KEYS = List.of("prefix", "classic", "diagnostic", "ruleStack", "ast", "cst", "classicCst", "classicFailure");
 
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
+
+    /** #768: the lexical assertion has Not's truth table and retains its own zero-width token. */
+    @Test public void lexicalInversionIsANegativeAssertionWithALeaf() {
+        for (String input : List.of("", "a", "ab", "xy", "😀x")) {
+            for (TokenKind kind : List.of(TokenKind.consumed, TokenKind.matchOnly)) {
+                try (var context = new ParseContext(StringSource.createRootSource(input));
+                     var lookahead = new ParseContext(StringSource.createRootSource(input))) {
+                    var literal = new org.unlaxer.dsl.runtime.Lexing.LiteralParser("ab");
+                    var parsed = literal.parse(context, kind, true);
+                    boolean expected = new org.unlaxer.parser.combinator.Not(literal).parse(lookahead).isSucceeded();
+                    assertEquals(input + "/" + kind, expected, parsed.isSucceeded());
+                    assertEquals(!input.startsWith("ab"), parsed.isSucceeded());
+                    assertEquals(0, context.getConsumedPosition().value());
+                    assertEquals(0, context.getMatchedPosition().value());
+                    if (parsed.isSucceeded()) {
+                        Token leaf = parsed.getRootToken();
+                        assertSame(literal, leaf.parser);
+                        assertEquals(kind, leaf.tokenKind);
+                        assertEquals(0, leaf.source.codePointLength().value());
+                    }
+                }
+            }
+        }
+    }
 
     @Test public void javaGeneratedParsersMatchTheSharedOracle() throws Exception {
         var mismatches = new ArrayList<String>();
@@ -75,7 +99,7 @@ public class EmptyLiteralConformanceTest {
                 for (JsonElement caseElement : fixture.getAsJsonArray("cases")) {
                     JsonObject row = caseElement.getAsJsonObject();
                     String input = row.get("input").getAsString();
-                    JsonObject actual = javaObservation(parser, parsers, rules, mapper, input);
+                    JsonObject actual = javaObservation(parser, parsers, rules, mapper, input, row);
                     compare(name + "/" + row.get("id").getAsString() + " Java", row, true, actual, mismatches);
                     report.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input") + "\t" + actual);
                 }
@@ -136,7 +160,8 @@ public class EmptyLiteralConformanceTest {
                     main.toString(), "-o", binary.toString()), "", false));
                 JsonArray cases = fixture.getAsJsonArray("cases");
                 String framed = cases.asList().stream().map(row -> HexFormat.of().formatHex(
-                    row.getAsJsonObject().get("input").getAsString().getBytes(StandardCharsets.UTF_8)) + "\n")
+                    row.getAsJsonObject().get("input").getAsString().getBytes(StandardCharsets.UTF_8)) + ":"
+                    + classicStart(row.getAsJsonObject(), 0) + ":" + classicStart(row.getAsJsonObject(), 1) + "\n")
                     .collect(Collectors.joining());
                 ProcessResult result = run(List.of(binary.toString()), framed, false);
                 success(result);
@@ -361,6 +386,7 @@ public class EmptyLiteralConformanceTest {
         for (String key : KEYS) {
             String override = (java ? "java" : "rust") + Character.toUpperCase(key.charAt(0)) + key.substring(1);
             JsonElement expected = row.has(override) ? row.get(override) : row.get(key);
+            if (expected == null && (key.equals("classicCst") || key.equals("classicFailure"))) continue;
             if (expected == null) {
                 mismatches.add(label + " missing oracle " + key + "; actual " + actual.get(key));
             } else if (false == expected.equals(actual.get(key))) {
@@ -370,11 +396,13 @@ public class EmptyLiteralConformanceTest {
     }
 
     private JsonObject javaObservation(Parser parser, Class<?> parsers, Set<String> rules, Class<?> mapper,
-            String input) throws Exception {
+            String input, JsonObject row) throws Exception {
         var result = new JsonObject();
         var variance = new ArrayList<String>();
         JsonArray prefix = null;
         JsonArray classic = null;
+        JsonArray classicCst = null;
+        JsonArray classicFailure = null;
         for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES)) {
             ParseOptions options = ParseOptions.withMemoization(memo);
             JsonArray memoPrefix;
@@ -382,22 +410,42 @@ public class EmptyLiteralConformanceTest {
                 memoPrefix = cursors(parser.parse(context).isSucceeded(), context);
             }
             var memoClassic = new JsonArray();
+            var memoCst = new JsonArray();
+            var memoFailure = new JsonArray();
             for (TokenKind kind : List.of(TokenKind.consumed, TokenKind.matchOnly)) {
                 for (boolean invert : new boolean[] {false, true}) {
                     try (var context = ParseContext.withOptions(StringSource.createRootSource(input), options)) {
-                        memoClassic.add(cursors(parser.parse(context, kind, invert).isSucceeded(), context));
+                        for (int cp = 0; cp < classicStart(row, 0); cp++) {
+                            assertTrue(new org.unlaxer.parser.elementary.WildCardCharacterParser()
+                                .parse(context, TokenKind.consumed, false).isSucceeded());
+                        }
+                        for (int cp = classicStart(row, 0); cp < classicStart(row, 1); cp++) {
+                            assertTrue(new org.unlaxer.parser.elementary.WildCardCharacterParser()
+                                .parse(context, TokenKind.matchOnly, false).isSucceeded());
+                        }
+                        var parsed = parser.parse(context, kind, invert);
+                        memoClassic.add(cursors(parsed.isSucceeded(), context));
+                        memoCst.add(parsed.isSucceeded()
+                            ? new JsonPrimitive(String.join(",", cst(parsed.getRootToken(), parsers, rules))) : JsonNull.INSTANCE);
+                        memoFailure.add(parsed.isSucceeded() ? JsonNull.INSTANCE
+                            : new JsonPrimitive(context.getParseFailureDiagnostics().getFarthestOffset()));
                     }
                 }
             }
             if (prefix == null) {
                 prefix = memoPrefix;
                 classic = memoClassic;
-            } else if (false == prefix.equals(memoPrefix) || false == classic.equals(memoClassic)) {
+                classicCst = memoCst;
+                classicFailure = memoFailure;
+            } else if (false == prefix.equals(memoPrefix) || false == classic.equals(memoClassic)
+                    || false == classicCst.equals(memoCst) || false == classicFailure.equals(memoFailure)) {
                 variance.add("memo " + memo + " cursors " + memoPrefix + " " + memoClassic);
             }
         }
         result.add("prefix", prefix);
         result.add("classic", classic);
+        result.add("classicCst", classicCst);
+        result.add("classicFailure", classicFailure);
         // Rule stacks (#703) exist only under DETAILED: the failed and the unconsumed-input stack.
         JsonArray ruleStack = null;
         for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES)) {
@@ -446,6 +494,10 @@ public class EmptyLiteralConformanceTest {
         return new JsonPrimitive(stack.get().offset() + ":" + stack.get().frames().stream()
             .map(frame -> frame.rule() + "@" + frame.start()).collect(Collectors.joining(">"))
             + "|" + stack.get().omitted());
+    }
+
+    private static int classicStart(JsonObject row, int index) {
+        return row.has("classicStart") ? row.getAsJsonArray("classicStart").get(index).getAsInt() : 0;
     }
 
     private static JsonArray cursors(boolean succeeded, ParseContext context) {
@@ -562,25 +614,51 @@ public class EmptyLiteralConformanceTest {
                 let modes = [(TokenKind::Consumed, false), (TokenKind::Consumed, true),
                     (TokenKind::MatchOnly, false), (TokenKind::MatchOnly, true)];
                 for line in io::stdin().lock().lines() {
-                    let encoded = line.unwrap();
+                    let framed = line.unwrap();
+                    let fields = framed.split(':').collect::<Vec<_>>();
+                    let encoded = fields[0];
+                    let consumed: usize = fields[1].parse().unwrap();
+                    let matched: usize = fields[2].parse().unwrap();
                     let bytes = (0..encoded.len()).step_by(2)
                         .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16).unwrap()).collect();
                     let input = String::from_utf8(bytes).unwrap();
                     let mut variance = Vec::new();
-                    let mut cursor_results: Option<(String, String)> = None;
+                    let mut cursor_results: Option<(String, String, String, String)> = None;
                     for memo in memos {
                         let options = ParseOptions::with_memoization(memo);
                         let mut context = ParseContext::with_options(&input, options);
                         let ok = generated::parser::parse_context(&mut context).is_ok();
                         let prefix = cursors(ok, &context);
+                        let mut classic_cst = Vec::new();
+                        let mut classic_failure = Vec::new();
                         let classic = modes.iter().map(|&(kind, invert)| {
                             let mut context = ParseContext::with_options(&input, options);
-                            let ok = context.parse_with_token_mode(&generated::parser::GeneratedParser, kind, invert).is_ok();
-                            cursors(ok, &context)
+                            for _ in 0..consumed {
+                                context.parse_with_token_mode(&unlaxer_runtime::Expr::Any, TokenKind::Consumed, false).unwrap();
+                            }
+                            for _ in consumed..matched {
+                                context.parse_with_token_mode(&unlaxer_runtime::Expr::Any, TokenKind::MatchOnly, false).unwrap();
+                            }
+                            let parsed = context.parse_with_token_mode(&generated::parser::GeneratedParser, kind, invert);
+                            let mut nodes = Vec::new();
+                            match &parsed {
+                                Ok(parsed) => {
+                                    let tree = context.tree(parsed.nodes[0]).unwrap();
+                                    cst(&tree, tree.root, &mut nodes);
+                                    classic_cst.push(json_string(&nodes.join(",")));
+                                    classic_failure.push("null".to_owned());
+                                }
+                                Err(error) => {
+                                    classic_cst.push("null".to_owned());
+                                    classic_failure.push(error.offset.to_string());
+                                }
+                            }
+                            cursors(parsed.is_ok(), &context)
                         }).collect::<Vec<_>>().join(",");
                         match &cursor_results {
-                            None => cursor_results = Some((prefix, classic)),
-                            Some((p, c)) if *p != prefix || *c != classic =>
+                            None => cursor_results = Some((prefix, classic, classic_cst.join(","), classic_failure.join(","))),
+                            Some((p, c, t, f)) if *p != prefix || *c != classic
+                                || *t != classic_cst.join(",") || *f != classic_failure.join(",") =>
                                 variance.push(format!("memo {:?} cursors {} {}", memo, prefix, classic)),
                             Some(_) => {}
                         }
@@ -622,11 +700,11 @@ public class EmptyLiteralConformanceTest {
                         }
                         Err(_) => ("null".to_owned(), "null".to_owned()),
                     };
-                    let (prefix, classic) = cursor_results.unwrap();
+                    let (prefix, classic, classic_cst, classic_failure) = cursor_results.unwrap();
                     let variance = if variance.is_empty() { String::new() }
                         else { format!(",\\"variance\\":{}", json_string(&variance.join("; "))) };
-                    println!("{{\\"prefix\\":{},\\"classic\\":[{}],\\"diagnostic\\":{},\\"ruleStack\\":{},\\"ast\\":{},\\"cst\\":{}{}}}",
-                        prefix, classic, diagnostic.unwrap(), rule_stack.unwrap(), ast, cst_text, variance);
+                    println!("{{\\"prefix\\":{},\\"classic\\":[{}],\\"classicCst\\":[{}],\\"classicFailure\\":[{}],\\"diagnostic\\":{},\\"ruleStack\\":{},\\"ast\\":{},\\"cst\\":{}{}}}",
+                        prefix, classic, classic_cst, classic_failure, diagnostic.unwrap(), rule_stack.unwrap(), ast, cst_text, variance);
                 }
             }
             """;
