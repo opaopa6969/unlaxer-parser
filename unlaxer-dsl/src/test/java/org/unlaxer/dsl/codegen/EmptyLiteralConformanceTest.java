@@ -160,6 +160,196 @@ public class EmptyLiteralConformanceTest {
         assertEquals(String.join("\n", mismatches), List.of(), mismatches);
     }
 
+    /**
+     * #750: the empty expected candidate is readable in the editor message. The Labeled fixture
+     * fails at {@code a😀} expecting {@code ''} and {@code b}; Java's generated server shows
+     * {@code Expected '' or 'b' (in WordParser)}, the Rust one {@code Expected '' or b}. The range, code, kind and
+     * {@code data.expectedTokens} (the contract value {@code ""}) are unchanged.
+     */
+    @Test public void generatedLanguageServersShowTheEmptyExpectedCandidate() throws Exception {
+        JsonObject fixture = corpus().asList().stream().map(JsonElement::getAsJsonObject)
+            .filter(row -> row.get("name").getAsString().equals("Labeled")).findFirst().orElseThrow();
+        String source = fixture.get("grammar").getAsString();
+        GrammarDecl grammar = UBNFMapper.parse(source).grammars().get(0);
+        var units = new ArrayList<JavaFileObject>();
+        for (CodeGenerator generator : List.<CodeGenerator>of(new ParserGenerator(), new ASTGenerator(), new MapperGenerator(),
+                new LSPGenerator(), new LSPLauncherGenerator())) {
+            GeneratedSource generated = generator.generate(grammar);
+            units.add(source(generated.packageName() + "." + generated.className(), generated.source()));
+        }
+        units.add(source(PACKAGE + ".DiagnosticMain", """
+            package org.example.emptyliteral;
+            public final class DiagnosticMain extends LabeledLspLauncher {
+                @Override protected LabeledLanguageServer createServer() { return new LabeledLanguageServer() {}; }
+                public static void main(String[] args) throws Exception { System.exit(new DiagnosticMain().launchStdio()); }
+            }
+            """));
+        Path classes = temporary.newFolder("lsp-classes").toPath();
+        var compiler = ToolProvider.getSystemJavaCompiler();
+        var diagnostics = new DiagnosticCollector<JavaFileObject>();
+        try (var manager = compiler.getStandardFileManager(diagnostics, null, null)) {
+            assertTrue(diagnostics.getDiagnostics().toString(), compiler.getTask(null, manager, diagnostics,
+                List.of("--release", "17", "-classpath", System.getProperty("java.class.path"), "-d", classes.toString()),
+                null, units).call());
+        }
+        String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        try (var wire = new LspWire(new ProcessBuilder(java, "-cp", classes + File.pathSeparator + System.getProperty("java.class.path"),
+                PACKAGE + ".DiagnosticMain").redirectError(temporary.newFile("java-lsp-stderr.log")).start())) {
+            exerciseLabeledServer(wire, "Java", "Expected '' or 'b' (in WordParser)", List.of("''", "'b'"));
+        }
+        if (false == Boolean.getBoolean("rustConformance")) {
+            System.out.println("[assumption] EmptyLiteralConformanceTest Rust LSP skipped: requires -DrustConformance=true");
+            return;
+        }
+        Path project = temporary.newFolder("rust-lsp-project").toPath();
+        Path modules = Files.createDirectories(project.resolve("src/generated"));
+        Path ubnf = project.resolve("Labeled.ubnf");
+        Files.writeString(ubnf, source);
+        Path nativeOutput = project.resolve("native");
+        Path target = repo.resolve("rust/target");
+        success(run(List.of("cargo", "run", "--quiet", "--locked", "--manifest-path", repo.resolve("rust/Cargo.toml").toString(),
+            "--target-dir", target.toString(), "-p", "unlaxer-generator", "--bin", "unlaxer", "--",
+            "generate", "--target", "rust", "--grammar", ubnf.toString(), "--output", nativeOutput.toString(), "--lsp"), "", false));
+        for (var file : new RustBackend().generateWithLsp(grammar)) {
+            assertEquals("both generator hosts: " + file.relativePath(), file.content(),
+                Files.readString(nativeOutput.resolve(file.relativePath())));
+            Files.writeString(modules.resolve(file.relativePath()), file.content());
+        }
+        Files.writeString(project.resolve("Cargo.toml"), """
+            [package]
+            name="empty-literal-lsp-fixture"
+            version="0.1.0"
+            edition="2021"
+            [dependencies]
+            unlaxer-runtime={path="%s"}
+            unlaxer-lsp={path="%s"}
+            """.formatted(repo.resolve("rust/unlaxer-runtime"), repo.resolve("rust/unlaxer-lsp")));
+        Files.writeString(project.resolve("src/main.rs"),
+            "mod generated; fn main() { std::process::exit(generated::lsp::serve_stdio_status().unwrap()); }\n");
+        success(run(List.of("cargo", "build", "--quiet", "--offline", "--manifest-path", project.resolve("Cargo.toml").toString(),
+            "--target-dir", target.toString()), "", false));
+        try (var wire = new LspWire(new ProcessBuilder(target.resolve("debug/empty-literal-lsp-fixture").toString())
+                .redirectError(temporary.newFile("rust-lsp-stderr.log")).start())) {
+            exerciseLabeledServer(wire, "Rust", "Expected '' or b", List.of("", "b"));
+        }
+    }
+
+    private static void exerciseLabeledServer(LspWire wire, String backend, String message, List<String> expectedTokens) throws Exception {
+        wire.request("initialize", java.util.Map.of("capabilities", java.util.Map.of()));
+        wire.notify("initialized", java.util.Map.of());
+        String uri = "file:///empty-literal-labeled";
+        wire.notify("textDocument/didOpen", java.util.Map.of("textDocument", java.util.Map.of(
+            "uri", uri, "languageId", "labeled", "version", 1, "text", "a\uD83D\uDE00")));
+        var diagnostics = wire.notification("textDocument/publishDiagnostics").getAsJsonArray("diagnostics");
+        assertEquals(backend + " " + diagnostics, 1, diagnostics.size());
+        var diagnostic = diagnostics.get(0).getAsJsonObject();
+        var range = diagnostic.getAsJsonObject("range");
+        // The supplementary scalar is two UTF-16 units: the range covers both.
+        assertEquals(backend + " " + diagnostic, List.of(0, 1, 0, 3), List.of(
+            range.getAsJsonObject("start").get("line").getAsInt(), range.getAsJsonObject("start").get("character").getAsInt(),
+            range.getAsJsonObject("end").get("line").getAsInt(), range.getAsJsonObject("end").get("character").getAsInt()));
+        assertEquals(backend + " " + diagnostic, "ULX-PARSE-001", diagnostic.get("code").getAsString());
+        assertEquals(backend + " " + diagnostic, message, diagnostic.get("message").getAsString());
+        var data = diagnostic.getAsJsonObject("data");
+        assertEquals(backend + " " + diagnostic, "syntax", data.get("kind").getAsString());
+        assertEquals(backend + " " + diagnostic, 1, data.get("offset").getAsInt());
+        assertEquals(backend + " " + diagnostic, new Gson().toJsonTree(expectedTokens), data.getAsJsonArray("expectedTokens"));
+        wire.notify("textDocument/didClose", java.util.Map.of("textDocument", java.util.Map.of("uri", uri)));
+        wire.notification("textDocument/publishDiagnostics");
+        wire.request("shutdown", null);
+        wire.notify("exit", null);
+        assertTrue(backend, wire.process.waitFor(5, TimeUnit.SECONDS));
+    }
+
+    private static JavaFileObject source(String name, String body) {
+        return new SimpleJavaFileObject(URI.create("string:///" + name.replace('.', '/') + ".java"), JavaFileObject.Kind.SOURCE) {
+            @Override public CharSequence getCharContent(boolean ignore) { return body; }
+        };
+    }
+
+    /** Content-Length framed JSON-RPC over a child process, as in ClassicLspDiagnosticsConformanceTest. */
+    private static final class LspWire implements AutoCloseable {
+        private static final Gson JSON = new com.google.gson.GsonBuilder().serializeNulls().create();
+        final Process process;
+        final java.io.BufferedInputStream input;
+        final java.io.OutputStream output;
+        final java.util.concurrent.ExecutorService reader = java.util.concurrent.Executors.newSingleThreadExecutor();
+        final List<JsonObject> pending = new ArrayList<>();
+        int next;
+
+        LspWire(Process process) {
+            this.process = process;
+            input = new java.io.BufferedInputStream(process.getInputStream());
+            output = process.getOutputStream();
+        }
+        void notify(String method, Object params) throws Exception { send(method, params, null); }
+        void send(String method, Object params, Integer id) throws Exception {
+            var message = new JsonObject();
+            message.addProperty("jsonrpc", "2.0");
+            message.addProperty("method", method);
+            if (params != null) message.add("params", JSON.toJsonTree(params));
+            if (id != null) message.addProperty("id", id);
+            byte[] body = JSON.toJson(message).getBytes(StandardCharsets.UTF_8);
+            output.write(("Content-Length: " + body.length + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            output.write(body);
+            output.flush();
+        }
+        JsonObject read() throws Exception {
+            return reader.submit(() -> {
+                int length = -1;
+                var line = new StringBuilder();
+                while (true) {
+                    int unit = input.read();
+                    if (unit < 0) throw new java.io.EOFException();
+                    line.append((char) unit);
+                    if (unit == '\n') {
+                        String header = line.toString();
+                        line.setLength(0);
+                        if (header.equals("\r\n")) break;
+                        if (header.startsWith("Content-Length:")) length = Integer.parseInt(header.substring(15).trim());
+                    }
+                }
+                if (length < 0 || length > 4 * 1024 * 1024) throw new java.io.IOException("invalid frame");
+                byte[] bytes = input.readNBytes(length);
+                if (bytes.length != length) throw new java.io.EOFException();
+                return JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8)).getAsJsonObject();
+            }).get(20, TimeUnit.SECONDS);
+        }
+        JsonObject request(String method, Object params) throws Exception {
+            int id = ++next;
+            send(method, params, id);
+            while (true) {
+                var result = read();
+                if (result.has("id") && result.get("id").getAsInt() == id) {
+                    assertFalse(result.toString(), result.has("error"));
+                    return result;
+                }
+                pending.add(result);
+            }
+        }
+        JsonObject notification(String method) throws Exception {
+            for (var iterator = pending.iterator(); iterator.hasNext();) {
+                var candidate = iterator.next();
+                if (candidate.has("method") && candidate.get("method").getAsString().equals(method)) {
+                    iterator.remove();
+                    return candidate.getAsJsonObject("params");
+                }
+            }
+            while (true) {
+                var candidate = read();
+                if (candidate.has("method") && candidate.get("method").getAsString().equals(method))
+                    return candidate.getAsJsonObject("params");
+                pending.add(candidate);
+            }
+        }
+        @Override public void close() throws Exception {
+            output.close();
+            process.destroyForcibly();
+            reader.shutdownNow();
+            process.waitFor(5, TimeUnit.SECONDS);
+        }
+    }
+
     private JsonArray corpus() throws Exception {
         return JsonParser.parseString(Files.readString(repo.resolve("spec-corpus/empty-literal/corpus.json")))
             .getAsJsonArray();

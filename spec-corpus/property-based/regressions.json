@@ -544,6 +544,22 @@
     ]
   },
   {
+    "id": "step-budget-capture-mutual-recursion",
+    "issue": "#739",
+    "note": "seed 81 の縮小例。相互再帰する R0 / R1 が同じ位置で R1 を繰り返し試し、memo なし（ParseOptions.DEFAULT）では x が 4 個増えるごとに手数が約 16 倍になる。CAPTURE / SAME_AS を含むので SAFE_FAILURES でも memo されない。x 32 個は harness の手数上限（STEP_BUDGET）を超えるので両 host とも観測せず、overBudget に一致することだけを確かめる。上限が無いと Java の受理判定が終わらない。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @root @mapping(N0) R0 ::= R1 ',' | R1 R1 | ',' ; R1 ::= CAPTURE(w0, 'x' R0) SAME_AS(w0) ; }",
+    "inputs": [
+      ",",
+      "x,x,,",
+      "x,x,",
+      "xx,xx,",
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ],
+    "overBudget": [
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ]
+  },
+  {
     "id": "capture-field-direct-token-lookahead",
     "issue": "#742",
     "note": "@f は Java の LazyChain の collector。直接の先読み token を @f にしても consumed の子がないため、外側の CAPTURE の w は空文字列。入力 x で context の consumed / matched は CP0、全入力解析は trailing_input CP0。",
