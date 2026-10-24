@@ -34,7 +34,8 @@ import org.unlaxer.dsl.ir.GrammarToParserIrExporter;
 
 /**
  * Simple annotations (#715): the shared corpus {@code spec-corpus/simple-annotations} fixes the
- * 3.3.0 Java behaviour (accepted, generated as if absent) and the {@code W-ANNOTATION-IGNORED}
+ * 3.3.0 Java behaviour (accepted, generated as if absent, except that {@code @autoCommit} leaves the
+ * rule out of its analysis) and the {@code W-ANNOTATION-IGNORED}
  * warnings with their code-point spans, suggestions and messages. The native generator reads the
  * same corpus in {@code rust/unlaxer-generator/tests/simple_annotations.rs}.
  */
@@ -45,10 +46,14 @@ public class SimpleAnnotationConformanceTest {
         for (JsonElement element : corpus("corpus.json")) {
             JsonObject row = element.getAsJsonObject();
             String name = row.get("name").getAsString(), source = row.get("grammar").getAsString();
-            // Before and after the @autoCommit rewrite: that annotation is functional, never reported.
-            for (var snapshot : List.of(UBNFMapper.parseWithSource(source), UBNFMapper.parseWithSourceBeforeAutoCommit(source))) {
-                assertEquals(name, row.get("warnings"), warnings(snapshot));
-            }
+            // The tree before the @autoCommit rewrite shows whether that analysis runs (#715).
+            assertEquals(name, row.get("warnings"), warnings(UBNFMapper.parseWithSourceBeforeAutoCommit(source)));
+            var lines = new JsonArray();
+            for (JsonElement warning : row.getAsJsonArray("warnings")) lines.add(line(warning.getAsJsonObject()));
+            var collected = new JsonArray();
+            for (var warning : org.unlaxer.dsl.codegen.GenerationWarnings.collect(source))
+                if (warning.code().equals(SimpleAnnotations.IGNORED)) collected.add(warning.line());
+            assertEquals(name + " generation warnings", lines, collected);
         }
     }
 
@@ -63,18 +68,18 @@ public class SimpleAnnotationConformanceTest {
             GrammarDecl baseline = UBNFMapper.parse(baselineSource).grammars().get(0);
             var issues = GrammarValidator.validate(grammar);
             assertEquals(name + " validator errors", List.of(), issues.stream().filter(i -> i.severity().equals("ERROR")).toList());
-            var ignored = issues.stream().filter(i -> i.code().equals(SimpleAnnotations.IGNORED)).toList();
-            assertEquals(name + " validator warnings", row.getAsJsonArray("warnings").size(), ignored.size());
-            for (int i = 0; i < ignored.size(); i++) {
-                JsonObject expected = row.getAsJsonArray("warnings").get(i).getAsJsonObject();
-                assertEquals(name, "WARNING", ignored.get(i).severity());
-                assertEquals(name, expected.get("message").getAsString(), ignored.get(i).message());
-                assertEquals(name, expected.get("rule").getAsString(), ignored.get(i).rule());
-            }
+            // The validator sees the rewritten tree; GenerationWarnings reports these (with spans).
+            assertEquals(name + " validator", 0, issues.stream().filter(i -> i.code().equals(SimpleAnnotations.IGNORED)).count());
             for (CodeGenerator generator : generators) {
                 assertEquals(name + " " + generator.getClass().getSimpleName(), generator.generate(baseline), generator.generate(grammar));
             }
             assertEquals(name + " Java-host Rust", new RustBackend().generate(baseline), new RustBackend().generate(grammar));
+            if (row.has("contrast")) {
+                // With @autoCommit the annotation is not inert: removing only it changes the output.
+                GrammarDecl contrast = UBNFMapper.parse(row.get("contrast").getAsString()).grammars().get(0);
+                assertNotEquals(name + " contrast", new ParserGenerator().generate(contrast), new ParserGenerator().generate(grammar));
+                assertNotEquals(name + " contrast Rust", new RustBackend().generate(contrast), new RustBackend().generate(grammar));
+            }
             var portability = PortabilityCheck.check(source);
             assertEquals(name + " portability", PortabilityCheck.check(baselineSource), portability);
             assertTrue(name + " portable: " + portability, portability.portable());
@@ -125,9 +130,9 @@ public class SimpleAnnotationConformanceTest {
             assertEquals(name + " " + generated, CodegenMain.EXIT_OK, generated.code());
             assertTrue(name + " Java output", Files.isDirectory(java));
             for (int i = 0; i < warnings; i++) {
-                String message = row.getAsJsonArray("warnings").get(i).getAsJsonObject().get("message").getAsString();
+                String line = line(row.getAsJsonArray("warnings").get(i).getAsJsonObject());
                 assertTrue(name + " " + generated, generated.err().contains("Validation warnings:")
-                    && generated.err().contains(message));
+                    && generated.err().contains(" - grammar " + grammarName(row) + ": " + line + " [code: "));
             }
             for (String[] policy : List.of(new String[] {"--strict"}, new String[] {"--fail-on", "warning"})) {
                 var args = new ArrayList<>(List.of("--grammar", grammar.toString(), "--validate-only"));
@@ -151,6 +156,16 @@ public class SimpleAnnotationConformanceTest {
         }
     }
 
+    /** The CLI line of a corpus warning, from its span and message. */
+    private static String line(JsonObject warning) {
+        var span = warning.getAsJsonArray("span");
+        return "warning: CP " + span.get(0).getAsInt() + ".." + span.get(1).getAsInt() + ": " + warning.get("message").getAsString();
+    }
+
+    private static String grammarName(JsonObject row) {
+        return UBNFMapper.parse(row.get("grammar").getAsString()).grammars().get(0).name();
+    }
+
     private static JsonArray warnings(UBNFSourceSnapshot snapshot) {
         var out = new JsonArray();
         for (var warning : SimpleAnnotations.warnings(snapshot.ast().grammars().get(0))) {
@@ -166,6 +181,7 @@ public class SimpleAnnotationConformanceTest {
             if (warning.suggestion() == null) value.add("suggestion", JsonNull.INSTANCE);
             else value.addProperty("suggestion", warning.suggestion());
             value.addProperty("message", warning.message());
+            value.addProperty("excludesAutoCommit", warning.excludesAutoCommit());
             out.add(value);
         }
         return out;

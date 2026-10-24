@@ -17,6 +17,10 @@ import org.unlaxer.dsl.bootstrap.UBNFAST.SimpleAnnotation;
  * annotations. Every other one is reported as {@code W-ANNOTATION-IGNORED} at the annotation
  * span, so a typo or a misspelt form of a functional annotation is not lost silently; a strict /
  * fail-on-warning run turns it into a failure.
+ *
+ * <p>One interaction remains: the {@code @autoCommit} analysis treats a rule with such an
+ * annotation as opaque, so in a grammar it analyses the annotation can change where commits are
+ * inserted. The warning then says so ({@link Warning#excludesAutoCommit()}).
  */
 public final class SimpleAnnotations {
     private SimpleAnnotations() {}
@@ -45,20 +49,25 @@ public final class SimpleAnnotations {
     /**
      * One ignored Simple annotation; {@code node} is the annotation, whose source span runs from
      * {@code @} to the end of its name. {@code suggestion} is the annotation the author probably
-     * meant, or null (see {@link #suggestion(String)}).
+     * meant, or null (see {@link #suggestion(String)}). {@code excludesAutoCommit} is true when the
+     * grammar is analysed by {@code @autoCommit} ({@link AutoCommit#analyses}), which then leaves
+     * this rule out as opaque.
      */
-    public record Warning(String rule, String subject, SimpleAnnotation node, String suggestion) {
+    public record Warning(String rule, String subject, SimpleAnnotation node, String suggestion, boolean excludesAutoCommit) {
         public String code() { return IGNORED; }
 
         public String message() {
+            String effect = excludesAutoCommit
+                ? "is not used by the generator, but it excludes rule " + rule + " from @autoCommit analysis"
+                : "has no effect";
             String text;
             if (KEYWORDS.contains(subject)) {
-                text = "@" + subject + " is a plain annotation here and has no effect; write @" + subject
+                text = "@" + subject + " is a plain annotation here and " + effect + "; write @" + subject
                     + (ARGUMENTS.contains(subject) ? "(...)" : "") + " with no space after '@'";
             } else if (suggestion != null) {
-                text = "unknown annotation @" + subject + " has no effect; did you mean @" + suggestion + "?";
+                text = "unknown annotation @" + subject + " " + effect + "; did you mean @" + suggestion + "?";
             } else {
-                text = "unknown annotation @" + subject + " has no effect";
+                text = "unknown annotation @" + subject + " " + effect;
             }
             return IGNORED + ": " + rule + ": " + text;
         }
@@ -66,14 +75,17 @@ public final class SimpleAnnotations {
 
     /**
      * One warning per Simple annotation without an effect, in rule order and then source order.
-     * A tree that still has {@code @autoCommit} may be passed: that name is never reported.
+     * Pass the tree of {@link AutoCommit#parseBeforeAutoCommit}, like {@link AutoCommit#warnings}:
+     * the rewritten tree no longer shows whether {@code @autoCommit} analyses the grammar.
      */
     public static List<Warning> warnings(GrammarDecl grammar) {
         var out = new ArrayList<Warning>();
+        Boolean analysed = null;
         for (RuleDecl rule : grammar.rules()) {
             for (Annotation annotation : rule.annotations()) {
                 if (!(annotation instanceof SimpleAnnotation simple) || FUNCTIONAL.contains(simple.name())) continue;
-                out.add(new Warning(rule.name(), simple.name(), simple, suggestion(simple.name())));
+                if (analysed == null) analysed = AutoCommit.analyses(grammar);
+                out.add(new Warning(rule.name(), simple.name(), simple, suggestion(simple.name()), analysed));
             }
         }
         return List.copyOf(out);

@@ -5,6 +5,10 @@
 //! `@autoCommit` act as Simple annotations. Every other one is reported as `W-ANNOTATION-IGNORED`
 //! at the annotation span, so a typo or a misspelt form of a functional annotation is not lost
 //! silently; a strict / fail-on-warning run turns it into a failure.
+//!
+//! One interaction remains: the `@autoCommit` analysis treats a rule with such an annotation as
+//! opaque, so in a grammar it analyses the annotation can change where commits are inserted.
+//! The warning then says so ([`Warning::excludes_auto_commit`]).
 use unlaxer_ubnf::*;
 
 pub const IGNORED: &str = "W-ANNOTATION-IGNORED";
@@ -66,6 +70,9 @@ pub struct Warning {
     /// The annotation the author probably meant: the keyword itself for a keyword name,
     /// otherwise the nearest known name (see [`suggestion`]).
     pub suggestion: Option<&'static str>,
+    /// The grammar is analysed by `@autoCommit` ([`unlaxer_ubnf::auto_commit::analyses`]),
+    /// which then leaves this rule out as opaque.
+    pub excludes_auto_commit: bool,
 }
 
 impl Warning {
@@ -79,6 +86,14 @@ impl Warning {
 
     pub fn message(&self) -> String {
         let name = &self.subject;
+        let effect = if self.excludes_auto_commit {
+            format!(
+                "is not used by the generator, but it excludes rule {} from @autoCommit analysis",
+                self.rule
+            )
+        } else {
+            "has no effect".to_owned()
+        };
         let text = if KEYWORDS.contains(&name.as_str()) {
             let arguments = if ARGUMENTS.contains(&name.as_str()) {
                 "(...)"
@@ -86,22 +101,25 @@ impl Warning {
                 ""
             };
             format!(
-                "@{name} is a plain annotation here and has no effect; \
+                "@{name} is a plain annotation here and {effect}; \
                  write @{name}{arguments} with no space after '@'"
             )
         } else if let Some(known) = self.suggestion {
-            format!("unknown annotation @{name} has no effect; did you mean @{known}?")
+            format!("unknown annotation @{name} {effect}; did you mean @{known}?")
         } else {
-            format!("unknown annotation @{name} has no effect")
+            format!("unknown annotation @{name} {effect}")
         };
         format!("{IGNORED}: {}: {text}", self.rule)
     }
 }
 
 /// One warning per Simple annotation without an effect, in rule order and then source order.
-/// Pass a tree that still has `@autoCommit` or not: that name is never reported.
+/// Pass the tree of [`unlaxer_ubnf::auto_commit::parse_before_auto_commit`], like
+/// `auto_commit::warnings`: the rewritten tree no longer shows whether `@autoCommit` analyses
+/// the grammar.
 pub fn warnings(grammar: &GrammarDecl) -> Vec<Warning> {
     let mut out = Vec::new();
+    let mut analysed = None;
     for rule in &grammar.rules {
         for annotation in &rule.annotations {
             let AnnotationKind::Simple { name } = &annotation.kind else {
@@ -110,11 +128,14 @@ pub fn warnings(grammar: &GrammarDecl) -> Vec<Warning> {
             if FUNCTIONAL.contains(&name.as_str()) {
                 continue;
             }
+            let excludes_auto_commit =
+                *analysed.get_or_insert_with(|| unlaxer_ubnf::auto_commit::analyses(grammar));
             out.push(Warning {
                 rule: rule.name.clone(),
                 subject: name.clone(),
                 span: annotation.span,
                 suggestion: suggestion(name),
+                excludes_auto_commit,
             });
         }
     }

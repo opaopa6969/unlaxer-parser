@@ -25,6 +25,7 @@ fn warnings(file: &unlaxer_ubnf::UbnfFile) -> Value {
                 "span": [warning.span.codepoint_start, warning.span.codepoint_end],
                 "suggestion": warning.suggestion,
                 "message": warning.message(),
+                "excludesAutoCommit": warning.excludes_auto_commit,
             })
         })
         .collect()
@@ -33,22 +34,32 @@ fn warnings(file: &unlaxer_ubnf::UbnfFile) -> Value {
 #[test]
 fn ignored_annotations_are_warned_about_and_generated_as_absent() {
     let rows = corpus("corpus.json");
-    assert_eq!(15, rows.len());
+    assert_eq!(16, rows.len());
     for row in &rows {
         let name = row["name"].as_str().unwrap();
         let source = row["grammar"].as_str().unwrap();
         let baseline = row["baseline"].as_str().unwrap();
-        // Before and after the @autoCommit rewrite: that annotation is functional, never reported.
-        let rewritten = unlaxer_ubnf::parse(source).unwrap();
+        // The tree before the @autoCommit rewrite shows whether that analysis runs (#715).
         let before = unlaxer_ubnf::auto_commit::parse_before_auto_commit(source).unwrap();
-        assert_eq!(row["warnings"], warnings(&rewritten), "{name}");
-        assert_eq!(
-            row["warnings"],
-            warnings(&before),
-            "{name} before @autoCommit"
-        );
+        assert_eq!(row["warnings"], warnings(&before), "{name}");
+        let lines: Vec<String> = unlaxer_generator::warnings::collect(source)
+            .into_iter()
+            .filter(|w| w.code == simple_annotations::IGNORED)
+            .map(|w| w.message)
+            .collect();
+        let expected: Vec<&str> = row["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| w["message"].as_str().unwrap())
+            .collect();
+        assert_eq!(expected, lines, "{name} generation warnings");
         assert_eq!(generate(baseline), generate(source), "{name} native output");
         assert!(generate(source).is_ok(), "{name}");
+        if let Some(contrast) = row["contrast"].as_str() {
+            // With @autoCommit the annotation is not inert: removing only it changes the output.
+            assert_ne!(generate(contrast), generate(source), "{name} contrast");
+        }
         let report = check(source);
         assert!(report.portable, "{name}: {report:?}");
         assert_eq!(check(baseline), report, "{name} portability");

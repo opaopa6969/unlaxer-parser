@@ -98,11 +98,15 @@ public class GenerationWarningsConformanceTest {
                 var warnings = row.getAsJsonArray("warnings");
                 assertEquals(name + " " + result, warnings.isEmpty() ? CodegenMain.EXIT_OK
                     : CodegenMain.EXIT_STRICT_VALIDATION_ERROR, result.code());
+                // The same `warning: CP s..e: <message>` line as the Rust CLIs, in each issue row.
                 for (JsonElement warning : warnings) {
-                    String message = warning.getAsJsonObject().get("message").getAsString();
-                    assertTrue(name + " " + result, result.err().contains(message));
-                    assertTrue(name + " " + plain, plain.err().contains(message));
+                    var value = warning.getAsJsonObject();
+                    String row_ = " - grammar " + value.get("grammar").getAsString() + ": " + value.get("line").getAsString() + " [code: "
+                        + value.get("code").getAsString() + "]";
+                    assertTrue(name + " " + result, result.err().contains(row_));
+                    assertTrue(name + " " + plain, plain.err().contains(row_));
                 }
+                assertEquals(name + " " + plain, warnings.size(), plain.err().lines().filter(l -> l.contains("warning: CP ")).count());
             }
         }
     }

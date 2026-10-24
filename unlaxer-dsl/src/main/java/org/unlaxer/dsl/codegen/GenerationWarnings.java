@@ -44,23 +44,21 @@ public final class GenerationWarnings {
      * generation reports that error instead.
      */
     public static List<Warning> collect(String source) {
-        UBNFSourceSnapshot file, before;
+        UBNFSourceSnapshot before;
         try {
-            file = UBNFMapper.parseWithSource(source);
+            UBNFMapper.parseWithSource(source); // the generators' parse, with the rewrite
             before = AutoCommit.parseBeforeAutoCommit(source);
         } catch (RuntimeException invalid) {
             return List.of();
         }
         var out = new ArrayList<Warning>();
-        var grammars = file.ast().grammars();
-        for (int i = 0; i < grammars.size() && i < before.ast().grammars().size(); i++) {
-            GrammarDecl grammar = grammars.get(i);
+        for (GrammarDecl grammar : before.ast().grammars()) {
             var found = new ArrayList<Warning>();
             for (var warning : SimpleAnnotations.warnings(grammar)) {
                 found.add(new Warning(warning.code(), grammar.name(), warning.rule(),
-                    file.spanOf(warning.node()), warning.message()));
+                    before.spanOf(warning.node()), warning.message()));
             }
-            for (var warning : AutoCommit.warnings(before.ast().grammars().get(i), before)) {
+            for (var warning : AutoCommit.warnings(grammar, before)) {
                 found.add(new Warning(warning.code(), grammar.name(), warning.rule(), warning.span(), warning.message()));
             }
             found.sort(Comparator.<Warning, Boolean>comparing(w -> w.span().isEmpty())

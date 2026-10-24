@@ -119,12 +119,6 @@ public final class GrammarValidator {
                 "Rewrite using repetition or input-consuming right recursion."));
         }
         errors.addAll(NestedCaptures.problems(grammar));
-        for (var warning : SimpleAnnotations.warnings(grammar)) {
-            errors.add(new ValidationIssue(warning.code(), warning.message(), warning.suggestion() == null
-                ? "Remove the annotation, or keep it as metadata that generators ignore."
-                : "Write @" + warning.suggestion() + " as documented, or keep it as metadata that generators ignore.",
-                warning.rule()));
-        }
         validateScalarRanges(grammar, errors);
         errors.addAll(validateCaseInsensitiveTokens(grammar));
 

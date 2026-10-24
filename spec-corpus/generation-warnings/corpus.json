@@ -43,7 +43,7 @@
   },
   {
     "name": "ordered-by-span",
-    "note": "種類をまたいで位置順（開始・終了・code）に並べる。@autoCommit の解析は他の Simple annotation を持つ rule を opaque とする（Java / Rust 共通の既存挙動）",
+    "note": "種類をまたいで位置順（開始・終了・code）に並べる。@autoCommit の解析は他の Simple annotation を持つ rule を opaque とする（Java / Rust 共通の既存挙動）。@autoCommit が解析する文法なので、未知の注釈の警告は rule を解析対象から外すことを示す",
     "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @LeftAssoc\n  Item ::= 'n' ;\n  @autoCommit @custom\n  Lost ::= 'l' Item ;\n}\n",
     "warnings": [
       {
@@ -54,8 +54,8 @@
           264,
           274
         ],
-        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @LeftAssoc has no effect; did you mean @leftAssoc?",
-        "line": "warning: CP 264..274: W-ANNOTATION-IGNORED: Item: unknown annotation @LeftAssoc has no effect; did you mean @leftAssoc?"
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @LeftAssoc is not used by the generator, but it excludes rule Item from @autoCommit analysis; did you mean @leftAssoc?",
+        "line": "warning: CP 264..274: W-ANNOTATION-IGNORED: Item: unknown annotation @LeftAssoc is not used by the generator, but it excludes rule Item from @autoCommit analysis; did you mean @leftAssoc?"
       },
       {
         "code": "W-AUTO-COMMIT-SKIPPED",
@@ -76,8 +76,55 @@
           306,
           313
         ],
-        "message": "W-ANNOTATION-IGNORED: Lost: unknown annotation @custom has no effect",
-        "line": "warning: CP 306..313: W-ANNOTATION-IGNORED: Lost: unknown annotation @custom has no effect"
+        "message": "W-ANNOTATION-IGNORED: Lost: unknown annotation @custom is not used by the generator, but it excludes rule Lost from @autoCommit analysis",
+        "line": "warning: CP 306..313: W-ANNOTATION-IGNORED: Lost: unknown annotation @custom is not used by the generator, but it excludes rule Lost from @autoCommit analysis"
+      }
+    ]
+  },
+  {
+    "name": "auto-commit-excluded",
+    "note": "@autoCommit と未知の注釈を同じ rule に併記（#715 のレビュー反例）。両方の警告が位置順に出る",
+    "grammar": "// 😀 positions are code points\ngrammar G {\n  @package: org.example.g\n  @root @mapping(Root) @autoCommit @custom\n  R ::= 'a' X | 'b' Y ;\n  X ::= 'x' ;\n  Y ::= 'y' ;\n}\n",
+    "warnings": [
+      {
+        "code": "W-AUTO-COMMIT-SKIPPED",
+        "grammar": "G",
+        "rule": "R",
+        "span": [
+          92,
+          103
+        ],
+        "message": "W-AUTO-COMMIT-SKIPPED: R: @autoCommit inserts nothing: the rule has an annotation the analysis does not model",
+        "line": "warning: CP 92..103: W-AUTO-COMMIT-SKIPPED: R: @autoCommit inserts nothing: the rule has an annotation the analysis does not model"
+      },
+      {
+        "code": "W-ANNOTATION-IGNORED",
+        "grammar": "G",
+        "rule": "R",
+        "span": [
+          104,
+          111
+        ],
+        "message": "W-ANNOTATION-IGNORED: R: unknown annotation @custom is not used by the generator, but it excludes rule R from @autoCommit analysis",
+        "line": "warning: CP 104..111: W-ANNOTATION-IGNORED: R: unknown annotation @custom is not used by the generator, but it excludes rule R from @autoCommit analysis"
+      }
+    ]
+  },
+  {
+    "name": "auto-commit-referenced-rule",
+    "note": "@autoCommit の rule から参照される rule に未知の注釈。その rule が解析対象から外れる",
+    "grammar": "// 😀 positions are code points\ngrammar G {\n  @package: org.example.g\n  @root @mapping(Root) @autoCommit\n  R ::= 'a' X | 'b' Y ;\n  @custom X ::= 'x' ;\n  Y ::= 'y' ;\n}\n",
+    "warnings": [
+      {
+        "code": "W-ANNOTATION-IGNORED",
+        "grammar": "G",
+        "rule": "X",
+        "span": [
+          130,
+          137
+        ],
+        "message": "W-ANNOTATION-IGNORED: X: unknown annotation @custom is not used by the generator, but it excludes rule X from @autoCommit analysis",
+        "line": "warning: CP 130..137: W-ANNOTATION-IGNORED: X: unknown annotation @custom is not used by the generator, but it excludes rule X from @autoCommit analysis"
       }
     ]
   }

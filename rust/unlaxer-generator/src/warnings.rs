@@ -43,12 +43,11 @@ impl Warning {
 /// warning without a span comes last in its grammar. A source that does not parse has none:
 /// generation reports that error instead.
 pub fn collect(source: &str) -> Vec<Warning> {
-    let (Ok(file), Ok(before)) = (parse(source), auto_commit::parse_before_auto_commit(source))
-    else {
+    let (Ok(_), Ok(before)) = (parse(source), auto_commit::parse_before_auto_commit(source)) else {
         return Vec::new();
     };
     let mut out = Vec::new();
-    for (grammar, written) in file.grammars.iter().zip(&before.grammars) {
+    for grammar in &before.grammars {
         let mut found = Vec::new();
         for warning in crate::simple_annotations::warnings(grammar) {
             found.push(Warning {
@@ -59,7 +58,7 @@ pub fn collect(source: &str) -> Vec<Warning> {
                 message: warning.message(),
             });
         }
-        for warning in auto_commit::warnings(written) {
+        for warning in auto_commit::warnings(grammar) {
             found.push(Warning {
                 code: warning.code(),
                 grammar: grammar.name.clone(),

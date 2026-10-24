@@ -353,7 +353,7 @@ Rustのowned `Tree.scopes()`は取得時のscope store snapshotを持つ。
 ### セマンティクス
 
 - 上記の特定アノテーションに該当しない汎用アノテーション
-- メタデータとして保持される（構文木・parser IR export・BNF 変換）。生成には作用しない
+- メタデータとして保持される（構文木・parser IR export・BNF 変換）。生成器は名前を使わない。ただし `@autoCommit` の解析はこの注釈を持つ rule を opaque として外すので、`@autoCommit` を使う文法では挿入位置が変わり得る（警告文がそれを示す）
 - 生成に作用する Simple annotation は `@nestedCaptures` と `@autoCommit` だけ。それ以外は注釈ごとに
   警告 `W-ANNOTATION-IGNORED`（span は注釈、近い既知名があれば候補を示す）を出す。strict / fail-on-warning では失敗する
 - 既知名でも `@ leftAssoc`（`@` の後に trivia）や `@mapping`（引数が必要な名前を `(` なしで）は Simple annotation になる
