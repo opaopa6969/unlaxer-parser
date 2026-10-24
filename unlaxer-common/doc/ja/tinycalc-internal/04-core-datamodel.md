@@ -181,6 +181,8 @@ AST: '1+2*3' : ExpressionParser
     '3' : DigitParser
 ```
 
+最上位の parser が Choice（`Choice`・`LazyChoice`・生成された選択肢の rule など）のときは注意が要ります。Choice は選んだ枝の `Parsed` をそのまま返すので、`getRootToken()` の根は Choice 自身ではなく選ばれた枝の token です（その枝も Choice ならさらに内側の枝）。Choice 自身を根とする木は context に commit されているので、context を閉じる前に `context.getCurrent().getTokens()` から取ります。生成 mapper の `mapParsedToken` に渡すのもこの木です。木の内側の Choice の token は、どちらの取り方でも残ります。詳しくは [root choice の CST 契約](../../../../docs/root-choice-cst.md) を参照してください（公開済みの 3.3.0 以前からの既存の動作です）。
+
 ### TokenPrinter
 
 `TokenPrinter` はトークンツリーを人間が読みやすい形式で出力するユーティリティです。

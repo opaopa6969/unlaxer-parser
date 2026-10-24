@@ -175,6 +175,8 @@ AST: '1+2*3' : ExpressionParser
     '3' : DigitParser
 ```
 
+When the top-level parser is a choice (`Choice`, `LazyChoice`, a generated rule with alternatives, and so on), the choice returns the selected alternative's `Parsed` unchanged. The root of `getRootToken()` is then the selected alternative's token, not the choice itself (and, if that alternative is also a choice, a token further inside). The tree rooted at the choice is committed to the context: read it from `context.getCurrent().getTokens()` before closing the context. This is also the token that a generated mapper's `mapParsedToken` expects. Choice tokens inside the tree are kept either way. See [the root choice CST contract](../../../../docs/root-choice-cst.md) (long-standing behavior, unchanged in the published 3.3.0).
+
 ### TokenPrinter
 
 `TokenPrinter` prints token trees in a human-readable format.
