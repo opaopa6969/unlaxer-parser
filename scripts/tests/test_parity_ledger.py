@@ -32,6 +32,7 @@ class ParityLedgerTest(unittest.TestCase):
             entries=[dict(id="cst", category="unresolved", title="CST", hosts="Java / Rust",
                           observation="root の有無", issues=[767], evidence=["docs/contract.md"])],
             corpora=[dict(path=self.path, fields={"javaCst": 1}, entries=["cst"])],
+            test_markers=[],
         )
 
     def write_corpus(self, value):
@@ -62,7 +63,7 @@ class ParityLedgerTest(unittest.TestCase):
 
     def test_new_nested_host_key_and_occurrence_require_review(self):
         self.write_corpus([{"cases": [{"javaCst": []}, {"javaCst": [], "nativeDiagnostic": 1}]}])
-        self.assertIn("host 別キー/出現数が不一致", self.errors())
+        self.assertIn("host 別 corpus のキー/出現数が不一致", self.errors())
 
     def test_removed_host_field_is_stale(self):
         self.write_corpus([{"cst": []}])
@@ -85,6 +86,63 @@ class ParityLedgerTest(unittest.TestCase):
         self.assertEqual({"javaLegacyFold": 1},
                          ledger.inventory(self.root)["spec-corpus/jdk21-legacy-delta.tsv"])
         self.assertIn("台帳にない host 別 corpus", self.errors())
+
+    def write(self, relative, text):
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def test_json_lines_and_host_values_are_detected(self):
+        self.write("conformance/extra/cases.jsonl",
+                   '{"id": "a", "rustOffset": 1}\n\n{"id": "b", "host": "java", "hosts": ["rust", "x"]}\n')
+        self.assertEqual({"host=java": 1, "hosts=rust": 1, "rustOffset": 1},
+                         ledger.inventory(self.root)["conformance/extra/cases.jsonl"])
+        self.write("conformance/bad.ndjson", '{"javaCst": 1}\n{"javaCst":\n')
+        with self.assertRaises(ValueError):
+            ledger.inventory(self.root)
+
+    def test_other_table_headers_and_host_rows_are_detected(self):
+        self.write("spec-corpus/x/measurement.tsv", "host\tcase\tjavaNanos\njava\ta\t1\nrust\ta\t2\nrust\tb\t3\n")
+        self.write("conformance/x/space.tsv", "# prose without tabs\n# id rustOffset\nx\t1\n")
+        self.write("docs/fixtures/x/cases.csv", "id,nativeMessage\nx,m\n")
+        self.write("docs/fixtures/x/cases.yaml", "cases:\n  - id: x\n    javaCst: []\n    note: javaStyle\n")
+        inventory = ledger.inventory(self.root)
+        self.assertEqual({"host=java": 1, "host=rust": 2, "javaNanos": 1}, inventory["spec-corpus/x/measurement.tsv"])
+        self.assertEqual({"rustOffset": 1}, inventory["conformance/x/space.tsv"])
+        self.assertEqual({"nativeMessage": 1}, inventory["docs/fixtures/x/cases.csv"])
+        self.assertEqual({"javaCst": 1}, inventory["docs/fixtures/x/cases.yaml"])
+
+    def test_headerless_data_rows_are_not_headers(self):
+        self.write("docs/fixtures/x/entries.tsv", "java-source\tjava\tJava21\t0.1.0\t2f2f\n")
+        self.write("conformance/x/prose.tsv", "# Java -Xms64m; Rust rustc -O.\n# id\tvalue\nx\tjava-ast\n")
+        self.assertEqual("", self.errors())
+
+    def test_unconditional_skip_and_deviation_tables_require_registration(self):
+        self.write("unlaxer-dsl/src/test/java/A.java",
+                   "class A {\n//\t@Ignore\n  @Disabled(\"x\")\n  void a() {}\n"
+                   "  static final Set<String> RUNTIME_SCOPE_IDS =\n      Set.of(\"a/b\", \"c\");\n"
+                   "  static final Map<String, Deviation> DOCUMENTED_DEVIATIONS = Map.of(\"q\", new Deviation(\"o\", \"r\"));\n}\n")
+        self.write("rust/x/tests/a.rs",
+                   "#[test]\n#[ignore]\nfn a() {}\nconst DOCUMENTED_DEVIATIONS: [(&str, &str, &str); 0] = [];\n"
+                   "const RUNTIME_SCOPE_IDS: [&str; 2] = [\"a\", \"b\"];\nfn b() { skipped_validate += 1; }\n")
+        self.write("rust/target/debug/build/generated.rs", "#[ignore]\n")
+        self.write("tiny-catalog/.git", "gitdir: elsewhere\n")
+        self.write("tiny-catalog/src/test/java/B.java", "  @Disabled\n")
+        self.assertEqual({
+            "rust/x/tests/a.rs": {"countedSkip": 1, "disabled": 1, "runtimeScopeExclusion": 2},
+            "unlaxer-dsl/src/test/java/A.java": {"disabled": 1, "documentedDeviation": 1, "runtimeScopeExclusion": 2},
+        }, ledger.test_markers(self.root))
+        self.assertIn("台帳にない テスト内の除外", self.errors())
+        self.data["test_markers"] = [
+            dict(path="rust/x/tests/a.rs", markers={"countedSkip": 1, "disabled": 1, "runtimeScopeExclusion": 2}, entries=["cst"]),
+            dict(path="unlaxer-dsl/src/test/java/A.java",
+                 markers={"disabled": 1, "documentedDeviation": 1, "runtimeScopeExclusion": 2}, entries=["cst"]),
+        ]
+        self.assertEqual("", self.errors())
+        self.data["test_markers"][1]["entries"] = ["missing"]
+        self.assertIn("台帳 ID の参照がない/不正", self.errors())
+        self.data["test_markers"].pop()
+        self.assertIn("台帳にない テスト内の除外", self.errors())
 
     def test_closed_issue_cannot_hide_remaining_work(self):
         self.data["issues"]["767"]["state"] = "CLOSED"

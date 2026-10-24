@@ -434,6 +434,21 @@
       ]
     },
     {
+      "id": "measurement-snapshots",
+      "category": "contract",
+      "title": "host 別の計測記録の行",
+      "hosts": "Java harness / Rust harness",
+      "issues": [
+        197
+      ],
+      "observation": "token-stream の measurement.tsv は host 列で Java/Rust の行を分ける開発時1回の計測記録で、期待値ファイルではない。時間・割当量は host・JIT・負荷に依存し、CI の成功条件や性能順位にしない。構文結果の一致は corpus.json の共通期待値が担う。",
+      "evidence": [
+        "spec-corpus/token-stream/README.md",
+        "docs/token-stream.md",
+        "spec-corpus/token-stream/measurement.tsv"
+      ]
+    },
+    {
       "id": "frontend-representation",
       "category": "contract",
       "title": "frontend AST と構文失敗の表現",
@@ -489,7 +504,7 @@
         719,
         718
       ],
-      "observation": "Assume/assumeTrue は rustConformance、tokenStreamBench、JDK21、tinyexpression.grammar/classes、JVM allocation counter を条件にする。Python skipUnless は node/mvn/共有tail pluginの存在条件3か所。通常mvn testのskipはRust未対応の証拠ではない。必須jobでの未実行は #719 が検出する。active @Disabled/@Ignore/assumeFalse、Rust #[ignore]、Python skipTest/pytest.skip は監査時0件（コメント中の @Ignore は除外）。",
+      "observation": "Assume/assumeTrue は rustConformance、tokenStreamBench、JDK21、tinyexpression.grammar/classes、JVM allocation counter を条件にする。Python skipUnless は node/mvn/共有tail pluginの存在条件3か所。通常mvn testのskipはRust未対応の証拠ではない。必須jobでの未実行は #719 が検出する。active @Disabled/@Ignore/assumeFalse、Rust #[ignore]、Python skipTest/pytest.skip は監査時0件（コメント中の @Ignore は除外）。active な @Disabled/@Ignore/#[ignore] の追加は test_markers の検査が落とす。",
       "evidence": [
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/Java21TestSupport.java",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustCatalogConformanceTest.java",
@@ -1452,6 +1467,16 @@
       ]
     },
     {
+      "path": "spec-corpus/token-stream/measurement.tsv",
+      "fields": {
+        "host=java": 12,
+        "host=rust": 12
+      },
+      "entries": [
+        "measurement-snapshots"
+      ]
+    },
+    {
       "path": "spec-corpus/typed-nested-captures/cases.json",
       "fields": {
         "javaFieldTypes": 14,
@@ -1534,6 +1559,29 @@
       },
       "entries": [
         "generator-diagnostics"
+      ]
+    }
+  ],
+  "test_markers": [
+    {
+      "path": "rust/unlaxer-ubnf/tests/spec_corpus.rs",
+      "markers": {
+        "countedSkip": 1,
+        "runtimeScopeExclusion": 3
+      },
+      "entries": [
+        "spec-driver-coverage"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/java/org/unlaxer/dsl/bootstrap/UbnfSpecCorpusTest.java",
+      "markers": {
+        "documentedDeviation": 1,
+        "runtimeScopeExclusion": 3
+      },
+      "entries": [
+        "bounded-overflow",
+        "spec-driver-coverage"
       ]
     }
   ]
