@@ -153,7 +153,7 @@ public class OwnedCaptureConformanceTest {
         Files.write(Path.of("target/owned-capture-rust-hosts.tsv"),report);
     }
     private static String phase(JsonObject row,JsonObject expected){
-        if(expected.has("failureOffset"))return "reject:"+expected.get("failureOffset").getAsInt();
+        if(expected.has("failureOffset"))return (row.get("name").getAsString().startsWith("nested-")?"retry:":"reject:")+expected.get("failureOffset").getAsInt();
         if(expected.has("resource"))return "resource";
         return row.get("name").getAsString().startsWith("nested-")&&!expected.get("success").getAsBoolean()?"retry":"normal";
     }
@@ -210,7 +210,7 @@ public class OwnedCaptureConformanceTest {
                         let mut context=ParseContext::with_options(&input,ParseOptions::with_memoization(memo).with_diagnostics(mode));
                         context.parse(&Expr::Literal("unused").repeat_java(0,Some(0)).capture_owned("sentinel")).unwrap();
                         let result=context.parse_shared_grammar(generated::parser::grammar(),root,false);let success=result.is_ok();
-                        if let Some(offset)=phase.strip_prefix("reject:") {
+                        if let Some((_,offset))=phase.split_once(':') {
                             let offset=offset.parse::<usize>().unwrap();
                             let error=result.as_ref().expect_err("context must reject non-input @f");
                             if mode==Diagnostics::Detailed {assert_eq!(error.offset,offset);}
@@ -226,7 +226,7 @@ public class OwnedCaptureConformanceTest {
                         let ast=if let Ok(parsed)=result{let tree=context.tree(parsed.nodes[0]).unwrap();generated::mapper::map(&tree).unwrap().canonical_json()}else{"null".into()};
                         assert_eq!(context.captured_text("sentinel"),Some(""));
                         println!("{}\t{}\t{}\t{}\t{}",success,context.position(),context.matched_position(),ast,binding(&context));
-                        if phase=="retry"{
+                        if phase.starts_with("retry"){
                             assert!(!success);
                             let before=(context.position(),context.matched_position(),context.reset_matched_with_consumed());
                             let before_binding=binding(&context);let before_nodes=(0..).map_while(|i|context.node(i)).map(|node|format!("{node:?}")).collect::<Vec<_>>();

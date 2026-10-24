@@ -855,7 +855,8 @@
         "success": false,
         "consumed": 0,
         "matched": 0,
-        "word": null
+        "word": null,
+        "failureOffset": 0
       }
     ]
   },
@@ -898,7 +899,8 @@
         "success": false,
         "consumed": 0,
         "matched": 0,
-        "word": null
+        "word": null,
+        "failureOffset": 1
       }
     ]
   },

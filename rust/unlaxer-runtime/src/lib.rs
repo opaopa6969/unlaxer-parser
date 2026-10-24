@@ -3370,16 +3370,21 @@ impl<'a> ParseContext<'a> {
             Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
                 nodes: vec![id],
                 captures: Vec::new(),
-                source: self.tokens.values.get(&id).map(|value| {
-                    Box::new(FragmentSource {
-                        parsed_source: self.rule_result_source.take(),
-                        span: self.nodes[id].span,
-                        kind: value.kind,
-                        classic: value.classic,
-                        generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                        text: value.source.owned_shared().map(Box::new),
+                source: self
+                    .tokens
+                    .values
+                    .get(&id)
+                    .map(|value| {
+                        Box::new(FragmentSource {
+                            parsed_source: self.rule_result_source.take(),
+                            span: self.nodes[id].span,
+                            kind: value.kind,
+                            classic: value.classic,
+                            generated: matches!(value.source, token::TokenSource::Generated { .. }),
+                            text: value.source.owned_shared().map(Box::new),
+                        })
                     })
-                }),
+                    .or_else(|| self.rule_result_source.take()),
             }),
             Expr::LexicalContextScope { child, terminals } => {
                 self.expression_with_lexical_context(child, terminals, depth)
@@ -4137,21 +4142,21 @@ impl<'a> ParseContext<'a> {
                         .first()
                         .and_then(|index| self.tokens.values.get(index));
                     let classic = self.token_mode.is_some()
-                        || info.is_some_and(|info| {
-                            !matches!(info.source, token::TokenSource::Input(_))
-                        })
                         || matched.nodes.iter().any(|index| {
                             self.tokens
                                 .values
                                 .get(index)
                                 .is_some_and(|info| info.classic)
                         });
-                    let source = classic.then(|| {
+                    // 原文の由来は Classic の収集モードとは独立して保持する。
+                    let non_input = info
+                        .is_some_and(|info| !matches!(info.source, token::TokenSource::Input(_)));
+                    let source = (classic || non_input).then(|| {
                         Box::new(FragmentSource {
                             parsed_source: None,
                             span: matched.span,
                             kind: info.map_or(self.token_mode().kind, |info| info.kind),
-                            classic: true,
+                            classic,
                             generated: info.is_some_and(|info| {
                                 matches!(info.source, token::TokenSource::Generated { .. })
                             }),
@@ -4634,7 +4639,7 @@ impl<'a> ParseContext<'a> {
             }
             return Some(fragment);
         }
-        let source = match source.filter(|source| source.classic) {
+        let source = match source {
             Some(source) if source.generated => token::TokenSource::Generated {
                 anchor: source.span.start,
                 text: source
@@ -4770,6 +4775,14 @@ impl<'a> ParseContext<'a> {
             | Expr::InputCaptureBoundary(_, child) => {
                 let start = self.position;
                 let mut fragment = self.expression(child, depth)?;
+                if matches!(expression, Expr::InputCaptureBoundary(_, _))
+                    && fragment
+                        .parsed_source()
+                        .is_some_and(|source| source.text.is_some() || source.generated)
+                {
+                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
+                    return None;
+                }
                 if self.track_owned_source {
                     fragment.clear_parsed_source();
                 }
@@ -4780,15 +4793,6 @@ impl<'a> ParseContext<'a> {
                     .is_some_and(|source| !source.classic)
                 {
                     fragment.source = None;
-                }
-                if matches!(expression, Expr::InputCaptureBoundary(_, _))
-                    && fragment
-                        .source
-                        .as_deref()
-                        .is_some_and(|source| source.text.is_some() || source.generated)
-                {
-                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
-                    return None;
                 }
                 if let Expr::CaptureBoundary(kind, _) | Expr::InputCaptureBoundary(kind, _) =
                     expression
