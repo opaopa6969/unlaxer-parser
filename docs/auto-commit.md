@@ -119,7 +119,9 @@ span は注釈 `@autoCommit` の位置）を返す。`reason` は次のどれか
 | `unreachable` | root からたどれない |
 
 解析できたが候補が無い規則は警告しない（なぜ無いかは lint の位置で確かめる）。frontend の構文解析は
-警告を出さずに注釈を取り除くので、警告は lint の API から得る。
+警告を出さずに注釈を取り除くので、警告は lint の API か、生成の警告（`GenerationWarnings.collect` /
+`unlaxer_generator::warnings::collect`）から得る。生成の CLI はこれを表示し、`--strict` / `--fail-on warning`
+では失敗する（#715、[契約](simple-annotations.md#生成の警告を-cli-まで届ける)）。
 
 ## 条件
 
@@ -468,10 +470,13 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ub
 - 判定は保守的で、意味を変えない位置でも報告しないことがある（例: corpus の
   `separated-trailing`）。
 - 解析の対象外の文法（`@comment`・宣言的 token の空白などのある文法）、不透明な規則、到達できない規則では、frontend は注釈を
-  警告なしに取り除く。警告 `W-AUTO-COMMIT-SKIPPED` は lint の API（`lintWarnings` /
-  `lint_warnings`）から得る。解析できたが候補が無い規則は警告しない。
+  取り除く。警告 `W-AUTO-COMMIT-SKIPPED` は lint の API（`lintWarnings` /
+  `lint_warnings`）と、生成の警告（`GenerationWarnings` / `warnings::collect`）から得る。生成の CLI
+  （native `unlaxer generate`、Java-host `generate --target rust`、Java の flag CLI）も表示し、
+  `--strict` / `--fail-on warning` では失敗する（#715、[契約](simple-annotations.md#生成の警告を-cli-まで届ける)）。
+  解析できたが候補が無い規則は警告しない。生成に作用しない Simple annotation を持つ規則も opaque になる。
 - lint（すべての規則を調べる）は、候補ごとに文脈を root までたどるので、大きな文法では規則数の
   2 乗に近い時間がかかり得る。frontend の書き換えは注釈を付けた規則だけを調べる。
-- lint の CLI は無い。Java / Rust の API から呼ぶ。
+- lint（`I-AUTO-COMMIT`）の CLI は無い。Java / Rust の API から呼ぶ。`W-AUTO-COMMIT-SKIPPED` は生成の CLI に出る（#715）。
 - `COMMIT` を含む文法は #700 のとおり snapshot 全体の incremental cache の対象外なので、
   `@autoCommit` で `COMMIT` が入った文法も対象外になる。

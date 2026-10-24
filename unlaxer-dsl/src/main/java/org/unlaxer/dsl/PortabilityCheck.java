@@ -174,10 +174,8 @@ public final class PortabilityCheck {
     }
 
     private static void scanAnnotation(GrammarDecl grammar, Annotation annotation, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
-        String unsupported = null;
-        if (annotation instanceof SimpleAnnotation simple && !simple.name().equals("nestedCaptures")) unsupported = simple.name();
-
-        if (unsupported != null) add(out, "P-ANNOTATION", snapshot, annotation, unsupported);
+        // A Simple annotation is generated as if absent, like Java; SimpleAnnotations.warnings
+        // reports the ignored ones as W-ANNOTATION-IGNORED (#715), so P-ANNOTATION is no longer issued.
 
         if (annotation instanceof MappingAnnotation mapping) {
             if (!identifier(org.unlaxer.dsl.codegen.CommonFieldSchema.rustName(mapping.className()))) add(out, "P-MAPPING-TYPE", snapshot, annotation, mapping.className());

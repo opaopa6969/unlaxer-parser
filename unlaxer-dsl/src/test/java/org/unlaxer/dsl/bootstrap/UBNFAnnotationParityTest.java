@@ -38,6 +38,18 @@ public class UBNFAnnotationParityTest {
         assertThrows(IllegalArgumentException.class, () -> annotation("@rooted('x')"));
     }
 
+    /** #715: the native frontend reads these as Simple annotations too (annotation-plain-forms.ubnf). */
+    @Test public void spacedKeywordsAndBareArgumentKeywordsAreSimpleAnnotations() {
+        for (String keyword : List.of("root", "leftAssoc", "skip", "enum", "whitespace", "namePredicate", "mapping"))
+            assertEquals(new UBNFAST.SimpleAnnotation(keyword), annotation("@ " + keyword));
+        for (String keyword : List.of("mapping", "eval", "interleave", "lexicalContext", "backref", "scopeTree",
+                "declares", "catalog", "precedence", "doc", "recovery", "commonField"))
+            assertEquals(new UBNFAST.SimpleAnnotation(keyword), annotation("@" + keyword));
+        assertEquals(new UBNFAST.MappingAnnotation("Root", List.of()), annotation("@mapping (Root)"));
+        for (String text : List.of("@ mapping(X)", "@ root('x')", "@namePredicate"))
+            assertThrows(text, IllegalArgumentException.class, () -> annotation(text));
+    }
+
     @Test public void commonFieldAcceptsOrdinaryTriviaAndPreservesOrder() {
         assertEquals(new UBNFAST.CommonFieldAnnotation(List.of("left", "right", "third")),
             annotation("@commonField(left, // 😀 comment\r\n right,\tthird)"));
