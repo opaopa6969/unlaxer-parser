@@ -102,6 +102,49 @@ Rust の compile が重いので、文法ごとに crate を作らない。1 bat
 Rust runtime は文法を `Expr` の表として解釈するので、生成 module は小さく、24 文法でも compile は
 数秒で済む。compile に失敗した場合は文法ごとに compile し直して原因の文法を特定する。
 
+## 入力ごとの手数の上限（#739）
+
+memo なし（`ParseOptions.DEFAULT` と `OFF` の設定）の PEG は、同じ位置で同じ rule を何度も試す
+文法では入力長に対して指数的に遅くなる。`CAPTURE` / `SAME_AS` を含む rule は `SAFE_FAILURES`
+でも memo されない（[packrat-memoization.md](packrat-memoization.md)）ので、どの設定でも速くならない。
+seed 81 では、相互再帰する 3 rule の文法に対する 54 CP の予備の導出で、Java の受理判定
+（`Mapper.diagnose`）も Rust も数分以上返らなかった。parser の欠陥ではなく、memo なしの PEG の
+計算量であり、Java と Rust の結果も途中までの長さでは一致していた。
+
+そこで harness は、観測する前にすべての入力（生成入力、corpus の入力、予備の導出と破壊入力）を
+Java の `ParseOptions.DEFAULT` で 1 回解析し、始まった parser transaction の数（手数）を数える。
+数えるのは `addMemoizationTransparentTransactionListener` で登録した観測用 listener で、上限を超えると
+例外を投げて解析を打ち切る。observer の例外は解析を中断して呼出し元へそのまま伝わる契約
+（[parser-observer-failures.md](parser-observer-failures.md)）なので、その context は捨てる。
+
+- 上限は `ParityHarness.STEP_BUDGET`（既定 100,000、`-Dpbt.stepBudget` で変更）。wall-clock でなく手数
+  なので、機械の負荷によらず同じ入力が除外される。memo の hit は手数を減らすだけで、
+  `DETAILED_ON_FAILURE` の再試行は同じ解析を 1 回繰り返すだけなので、他の設定の手数もこの数倍に収まる。
+- 上限を超えた入力は、両 host とも観測しない。件数は `[pbt] ... overBudget=` に、入力は
+  `property-based-parity-observations.jsonl` に `{"case", "overBudget", "stepBudget"}` の行として出る。
+  予備の組は、導出か破壊入力のどれかが上限を超えると、受理されない導出と同じく組ごと使わない。
+- corpus の entry では、上限を超える入力を `overBudget` に過不足なく書く（無ければ空）。実際と
+  違えば `step-budget` の finding になる。`step-budget-capture-mutual-recursion` はその回帰例で、
+  `PropertyBasedParityTest.overBudgetInputsFinishInBoundedTime` が時間の上限（300 秒）付きで
+  単独に確かめる（手元で約 8 秒）。同じ文法で予備の組も作り（上限を超える導出、受理される導出と
+  上限を超える破壊入力、上限内の組）、seed 81 で止まった予備の選別の経路も通す。導出の判定を外すと
+  受理判定が返らず 300 秒で、破壊入力か corpus の入力の判定を外すと Rust probe の 130 秒の timeout で落ちる。
+- 子プロセス（Rust probe、`unlaxer generate`、`rustc`）には標準入力をファイルから渡し、timeout を
+  起動時点から数える。子が入力を読まなくなっても、送り残しで待たずに期限で戻る。timeout のときも
+  それまでの出力を残すので、最後の進捗行（`#<TAB><index><TAB><hex>`）から、止まった入力を
+  `rust-probe-failed` の finding に出す（`executeTimeoutCoversAChildThatStopsReading`）。
+- 既定の上限で seed `1..320`（batch 40）を回すと、除外は seed 81 の 17 入力、seed 62 の 2 入力と
+  corpus の回帰例 1 件で、finding は 0（手元で約 3 分）。観測した 4,704 入力の最大は 61,566 手で、
+  Rust の最も遅い入力は約 4 秒だった。上限を 1,000,000 にすると除外は seed 81 の 13 入力だけになるが、
+  184,755 手の入力に Rust が約 24 秒かかる。CI の seed `1..24` と corpus の最大は 4,292 手で、
+  除外は corpus の回帰例 1 件だけである。
+  観測した入力の手数と Rust の時間（全 12 設定の合計）は、evidence の `javaSteps` / `rustMillis` に出る。
+
+これは test の予算であり、parser の資源上限ではない。生成 parser と runtime の受理・CST・診断は
+変えていない。parser 側の上限（[java-parser-limits.md](java-parser-limits.md) の
+`ULX-PARSE-DEPTH-LIMIT`、Rust の rule 呼出の上限）は深さに対するもので、この形の指数的な探索は
+深さが入力長以下のまま進むので止めない。
+
 ## 縮小と corpus
 
 不一致や不変条件違反が見つかると、`Shrinker` が入力 → 文法 → 入力の順に貪欲に縮小する。
@@ -119,7 +162,7 @@ Rust runtime は文法を `Expr` の表として解釈するので、生成 modu
 
 - `spec-corpus/property-based/regressions.json`: 過去の run で見つけて固定した縮小例。毎回
   ランダム文法の前に再生する。`expectedRejection` を持つ entry は、両 frontend がその code で
-  拒否することを確かめる。
+  拒否することを確かめる。`overBudget` は手数の上限を超える入力の一覧（上記）。
 - `spec-corpus/property-based/known-differences.json`: 既知差。各 entry は `issue` と `reason` を
   必須とし、`kind`（finding 種別の正規表現）と、任意で `grammar` / `detail` の正規表現、および
   正規表現で書けない数値条件 `condition` で対象を限定する。`condition` には
@@ -163,6 +206,7 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=PropertyBasedParityTest \
 | `pbt.shrinkLimit` | `3` | 縮小する finding の最大数（種別の異なる代表を優先） |
 | `pbt.shrinkSeconds` | `300` | 縮小に使う合計時間の上限（秒） |
 | `pbt.ignoreKnown` | `false` | `known-differences.json` を使わず、既知差も finding として出す |
+| `pbt.stepBudget` | `100000` | 1 入力の Java の手数（parser transaction の数）の上限。超えた入力は観測しない（#739） |
 | `pbt.injectFault` | `false` | 縮小器の自己確認用。補助文字を含み prefix が受理される入力すべてに合成 finding を出す（テストは失敗する） |
 
 `-Dpbt.injectFault=true -Dpbt.seed=3 -Dpbt.grammars=1` では、元の 3 rule・約 40 node の文法と

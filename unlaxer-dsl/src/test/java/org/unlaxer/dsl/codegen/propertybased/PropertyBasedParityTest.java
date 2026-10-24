@@ -95,6 +95,50 @@ public class PropertyBasedParityTest {
         assertFalse("different omitted", KnownDifferences.javaStackStartsAfterRust("java=\"2|1|R0@0>R1@2\" rust=\"2|0|R0@0>R1@1\"" + tail));
     }
 
+    /**
+     * #739: inputs above {@link ParityHarness#STEP_BUDGET} finish in bounded time and exactly the
+     * declared ones are left unobserved, both as corpus inputs and on the reserve path where seed 81
+     * hung. Without the budget the Java acceptance check of a reserve derivation does not return, and
+     * an observed over-budget input stops the Rust probe, so this test times out or fails.
+     */
+    @Test(timeout = 300_000)
+    public void overBudgetInputsFinishInBoundedTime() throws Exception {
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        var cases = new ArrayList<>(corpusCases().stream().filter(c -> !c.overBudget().isEmpty()).toList());
+        assertFalse("the corpus must keep an over-budget regression", cases.isEmpty());
+        var regression = cases.stream().filter(c -> c.id().equals("step-budget-capture-mutual-recursion")).findFirst().orElseThrow();
+        String over = regression.overBudget().get(0);
+        // Reserve groups as built for generated seeds: an over-budget derivation, an accepted
+        // derivation with an over-budget mutation (both skipped), then a group that fits.
+        cases.add(new ParityHarness.Case(regression.id() + "-reserve", regression.grammar(), List.of(), Map.of("corpus", 1), null,
+                List.of(List.of(over, ","), List.of(",", over), List.of("x,x,,", "x,x,")), List.of(over)));
+        var stats = new ParityHarness.Stats();
+        var findings = new ParityHarness(repo, temporary.getRoot().toPath()).evaluate(cases, stats);
+        assertTrue(findings.toString(), findings.isEmpty());
+        assertEquals("both frontends accept the grammars", 0, stats.rejected);
+        assertEquals(cases.stream().mapToInt(c -> c.overBudget().size()).sum(), stats.overBudget);
+        int expected = 2; // the fitting reserve group
+        for (var c : cases) if (c.reserve().isEmpty()) expected += c.inputs().size() - c.overBudget().size();
+        assertEquals("within-budget inputs are still observed", expected, stats.inputs);
+    }
+
+    /**
+     * #739 review: the deadline of a child process covers its standard input. The child reads
+     * 8,192 bytes, reports progress and stops reading; the rest of the input must not keep
+     * {@code execute} past its timeout, and the progress so far stays in the result.
+     */
+    @Test(timeout = 60_000)
+    public void executeTimeoutCoversAChildThatStopsReading() throws Exception {
+        String child = "dd bs=8192 count=1 of=/dev/null 2>/dev/null; printf '#\\t7\\t78\\n'; exec sleep 30";
+        long started = System.nanoTime();
+        var result = ParityHarness.execute(temporary.getRoot().toPath(), List.of("sh", "-c", child), "x".repeat(1 << 20), 1);
+        long millis = (System.nanoTime() - started) / 1_000_000;
+        assertEquals(result.output(), -1, result.code());
+        assertTrue(result.output(), result.output().startsWith("#\t7\t78\n"));
+        assertTrue(result.output(), result.output().endsWith("timeout after 1s: [sh, -c, " + child + "]"));
+        assertTrue("returned after " + millis + " ms", millis < 10_000);
+    }
+
     @Test
     public void generatedGrammarsAgreeAcrossHostsConfigurationsAndInvariants() throws Exception {
         if (!Boolean.getBoolean("rustConformance"))
@@ -112,14 +156,7 @@ public class PropertyBasedParityTest {
         var excluded = new LinkedHashMap<String, Integer>();
 
         // 1. Fixed regressions found by earlier runs (minimized, corpus form).
-        var corpus = new ArrayList<ParityHarness.Case>();
-        for (var element : corpusEntries()) {
-            var entry = element.getAsJsonObject();
-            var inputs = new ArrayList<String>();
-            entry.getAsJsonArray("inputs").forEach(i -> inputs.add(i.getAsString()));
-            corpus.add(new ParityHarness.Case(entry.get("id").getAsString(), entry.get("grammar").getAsString(), inputs, Map.of("corpus", 1),
-                    entry.has("expectedRejection") ? entry.get("expectedRejection").getAsString() : null));
-        }
+        var corpus = corpusCases();
         var cases = new ArrayList<>(corpus);
         // 2. Seeded random grammars.
         for (long seed = first; seed < first + grammars; seed++) {
@@ -201,6 +238,21 @@ public class PropertyBasedParityTest {
 
     private static ParityHarness.Case caseOf(List<ParityHarness.Case> cases, String id) {
         return cases.stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow();
+    }
+
+    /** Corpus entries; {@code overBudget} lists exactly the inputs expected above the step budget (#739). */
+    private List<ParityHarness.Case> corpusCases() throws Exception {
+        var corpus = new ArrayList<ParityHarness.Case>();
+        for (var element : corpusEntries()) {
+            var entry = element.getAsJsonObject();
+            var inputs = new ArrayList<String>();
+            entry.getAsJsonArray("inputs").forEach(i -> inputs.add(i.getAsString()));
+            var over = new ArrayList<String>();
+            if (entry.has("overBudget")) entry.getAsJsonArray("overBudget").forEach(i -> over.add(i.getAsString()));
+            corpus.add(new ParityHarness.Case(entry.get("id").getAsString(), entry.get("grammar").getAsString(), inputs, Map.of("corpus", 1),
+                    entry.has("expectedRejection") ? entry.get("expectedRejection").getAsString() : null, List.of(), over));
+        }
+        return corpus;
     }
 
     private JsonArray corpusEntries() throws Exception {
