@@ -8,7 +8,7 @@
     "検索例: `rg -n \"@Disabled|@Ignore|Assume|assumeTrue|assumeFalse|#\\[ignore|skipUnless|skipIf|skipTest|pytest.skip\" --glob \"*.java\" --glob \"*.rs\" --glob \"*.py\"`。さらに `skipped_validate` / `RUNTIME_SCOPE_IDS` 等の条件分岐を確認した。",
     "3分類を項目ごとに記録する。試験環境のopt-inは製品差ではないので契約として分類し、内部の未駆動caseは検証の未修正差として明記する。",
     "`spec-corpus/property-based/known-differences.json` はPBT findingの許可表なので空のまま維持する。全repo台帳をPBTの許可表へコピーして失敗を抑制しない。",
-    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。CST #767、Number #752、Java生成 #754、作業量 #758は別のOPEN issueへ結ぶ。#741の境界差は契約化済み。",
+    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。CST #767、Number #752、作業量 #758は別のOPEN issueへ結ぶ。#754のJava生成の早期拒否は修正し、残るtarget別の資源上限は#741と同様に契約として記録する。",
     "CLOSED #331/#545/#571/#176/#537の後に残った旧未対応記述（回復内match-only、汎用伝播、Rust LSP/DAP、scopeTree、enum/eval、Backreference）は現行契約へ訂正する。未解決範囲はOPEN #111と個別子issueで追跡する。",
     "規範違反の量指定子overflow #783 と、内部条件付き除外の検証漏れ #784 を新規作成した。個別issueのない残機能群は既存全仕様issue #111の受け入れ範囲に結ぶ。",
     "catalog/corpus.jsonのGsonが許していた単引用符escapeを同じ復号値の標準JSONへ訂正した。JSONの不正構文を黙って走査から除外しない。",
@@ -406,7 +406,7 @@
         516,
         741
       ],
-      "observation": "Java は parser frame 1024、Rust は rule 256/expression 1024。UBNF frontend は Java が形により126〜168括弧、native は127括弧。#741 CLOSED はこの差の契約化と境界テストによる。lowering の深さ256とは別。未解決の Java生成深さ・作業量は後述の #754/#758 に残す。",
+      "observation": "Java は parser frame 1024、Rust は rule 256/expression 1024。UBNF frontend は Java が形により126〜168括弧、native は127括弧。#741 CLOSED はこの差の契約化と境界テストによる。lowering の深さ256とは別。Java生成深さの契約は後述の #754、未解決の作業量は #758 に残す。",
       "evidence": [
         "docs/java-parser-limits.md",
         "rust/unlaxer-ubnf/src/lib.rs",
@@ -622,17 +622,20 @@
     },
     {
       "id": "java-generation-depth",
-      "category": "unresolved",
+      "category": "contract",
       "title": "Java target の再帰shape深さ",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         754,
         740
       ],
-      "observation": "#740 CLOSED でRust両hostのlowered IR解析は揃ったが、Java targetのAST型推論は深い再帰helperをE-RECURSIVE-SHAPEで拒否する。残差はOPEN #754。",
+      "observation": "#754で単一選択肢のchoiceを追加深さから除外し、Rust preferred_planも同じ計数にした。再帰helperの84〜122括弧はJava生成とRust両hostで受理し、生成parserの成否・CST・ASTが一致する。資源上限256は維持し、この形のJava生成は126段まで、127段でE-RECURSIVE-SHAPE。Rust生成はlowered IRの122/123段を維持する。target別の上限は契約で、作業量の残差は#758。",
       "evidence": [
         "docs/java-parser-limits.md",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/RustNativeGeneratorTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/propertybased/PropertyBasedParityTest.java",
+        "rust/unlaxer-generator/src/preferred_plan.rs"
       ]
     },
     {

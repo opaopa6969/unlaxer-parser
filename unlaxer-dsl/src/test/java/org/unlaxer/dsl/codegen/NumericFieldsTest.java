@@ -40,12 +40,20 @@ public class NumericFieldsTest {
 
     /** Past the AST fixed point's depth, the Java host uses the native capture rule instead of rejecting. */
     @Test public void recursiveShapeLimitFallsBackToTheNativeCaptureRule() {
-        GrammarDecl grammar = UBNFMapper.parse(NestingLimitGrammars.recursivePlusWithNumber(86)).grammars().get(0);
-        RuleDecl root = grammar.rules().get(0);
-        var error = assertThrows(IllegalArgumentException.class, () -> new ASTGenerator().inferType(grammar, root, "n"));
-        assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256", error.getMessage());
-        assertTrue(NumericFields.isInteger(grammar, root, "n"));
-        assertFalse(NumericFields.isInteger(grammar, root, "x"));
+        for (int depth : List.of(86, 122, 126, 127)) {
+            GrammarDecl grammar = UBNFMapper.parse(NestingLimitGrammars.recursivePlusWithNumber(depth)).grammars().get(0);
+            RuleDecl root = grammar.rules().get(0);
+            if (depth <= 126) {
+                // #754: the previous fallback case now succeeds in ordinary Java inference.
+                assertEquals("int", new ASTGenerator().inferType(grammar, root, "n"));
+            } else {
+                var error = assertThrows(IllegalArgumentException.class,
+                    () -> new ASTGenerator().inferType(grammar, root, "n"));
+                assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256", error.getMessage());
+            }
+            assertTrue(NumericFields.isInteger(grammar, root, "n"));
+            assertFalse(NumericFields.isInteger(grammar, root, "x"));
+        }
     }
 
     /** Only the depth limit falls back: exceeding the analysis work still fails, as before #740. */
