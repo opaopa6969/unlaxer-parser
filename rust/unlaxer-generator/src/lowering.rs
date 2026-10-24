@@ -1362,6 +1362,13 @@ impl Lowering<'_> {
             {
                 Expression::EmptyWordToken
             }
+            ElementKind::Terminal(text)
+                if !text.is_empty()
+                    && (crate::token_stream::enabled(self.grammar)
+                        || crate::lexical_contexts::enabled(self.grammar)) =>
+            {
+                Expression::LexicalLiteral(text.clone())
+            }
             ElementKind::Terminal(text) => Expression::Literal(text.clone()),
             ElementKind::RuleRef { namespace, name } => {
                 if namespace.is_some() {
@@ -1447,7 +1454,12 @@ impl Lowering<'_> {
                     body.alternatives[0].elements[0].element.kind,
                     ElementKind::RuleRef { .. }
                 ) || (!only_reference
-                    && matches!(bare, Expression::Literal(_) | Expression::EmptyWordToken))
+                    && matches!(
+                        bare,
+                        Expression::Literal(_)
+                            | Expression::LexicalLiteral(_)
+                            | Expression::EmptyWordToken
+                    ))
                 {
                     return Ok(child.clone());
                 }
@@ -1461,7 +1473,10 @@ impl Lowering<'_> {
         Ok(
             if matches!(
                 child,
-                Expression::Choice(_) | Expression::Literal(_) | Expression::EmptyWordToken
+                Expression::Choice(_)
+                    | Expression::Literal(_)
+                    | Expression::LexicalLiteral(_)
+                    | Expression::EmptyWordToken
             ) {
                 Expression::Delimited(Box::new(child))
             } else if matches!(atom.kind, ElementKind::RuleRef { .. })
@@ -1934,7 +1949,9 @@ impl Lowering<'_> {
             return Predictor::Any;
         }
         match expression {
-            Expression::Literal(value) if !value.is_empty() => Predictor::Literal(value.clone()),
+            Expression::Literal(value) | Expression::LexicalLiteral(value) if !value.is_empty() => {
+                Predictor::Literal(value.clone())
+            }
             Expression::NumberToken => Predictor::Number,
             Expression::IdentifierToken => Predictor::Identifier,
             Expression::QuotedToken(quote) => Predictor::Quoted(*quote),
@@ -2434,7 +2451,7 @@ fn assoc_skeleton(expression: &Expression) -> Vec<&Expression> {
 
 fn assoc_delimiter(expression: &Expression) -> bool {
     match expression {
-        Expression::Literal(_) | Expression::EmptyWordToken => true,
+        Expression::Literal(_) | Expression::LexicalLiteral(_) | Expression::EmptyWordToken => true,
         Expression::OptionalExpr(child)
         | Expression::Repeat {
             child,
@@ -2448,11 +2465,16 @@ fn assoc_delimiter(expression: &Expression) -> bool {
 // Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
 fn literal_delimiter_body(expression: &Expression) -> bool {
     match expression {
-        Expression::Literal(_) | Expression::EmptyWordToken => true,
+        Expression::Literal(_) | Expression::LexicalLiteral(_) | Expression::EmptyWordToken => true,
         Expression::Sequence(elements) => {
             !elements.is_empty()
                 && elements.iter().all(|element| {
-                    matches!(element, Expression::Literal(_) | Expression::EmptyWordToken)
+                    matches!(
+                        element,
+                        Expression::Literal(_)
+                            | Expression::LexicalLiteral(_)
+                            | Expression::EmptyWordToken
+                    )
                 })
         }
         _ => false,

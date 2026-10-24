@@ -700,6 +700,28 @@ impl ParseContext<'_> {
                     full && (raw.starts_with(word) != mode.invert),
                 )
             }
+            Expr::JavaLiteral(word) => {
+                let end = match &mut self.lexing {
+                    Some(session) => {
+                        session.match_at(word, true, None, start, self.lexical_context.as_ref())
+                    }
+                    None => match &self.lexical_context {
+                        Some(goal) => {
+                            super::lexing::match_goal(self.input, start, word, true, goal)
+                        }
+                        None => raw.starts_with(word).then_some(start + word.len()),
+                    },
+                };
+                (
+                    "LiteralParser",
+                    if mode.invert {
+                        start
+                    } else {
+                        end.unwrap_or(start)
+                    },
+                    end.is_some() != mode.invert,
+                )
+            }
             Expr::CaseInsensitive(word) => {
                 let mut input = raw.chars();
                 let mut end = start;
@@ -856,7 +878,9 @@ impl ParseContext<'_> {
                 self.fail_at(
                     at,
                     match expression {
-                        Expr::Literal(word) | Expr::CaseInsensitive(word) => word,
+                        Expr::Literal(word)
+                        | Expr::JavaLiteral(word)
+                        | Expr::CaseInsensitive(word) => word,
                         Expr::JavaEmptyWord | Expr::JavaEmptyLiteral => "",
                         Expr::LongCodeBlock => "long code block",
                         _ => "character",
@@ -875,7 +899,10 @@ impl ParseContext<'_> {
             end: self.code_point(end),
         };
         if mode.kind.is_consumed()
-            && !(matches!(expression, Expr::Lexical(_, _) | Expr::JavaEmptyLiteral) && start == end)
+            && !(matches!(
+                expression,
+                Expr::Lexical(_, _) | Expr::JavaLiteral(_) | Expr::JavaEmptyLiteral
+            ) && start == end)
         {
             let target = self.position().checked_add(span.end - span.start)?;
             self.position = *self.byte_offsets.get(target)?;
