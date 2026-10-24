@@ -53,6 +53,7 @@ public final class PlaygroundGenerator {
     }
 
     private static Map<String, String> generate(String source, UBNFAST.UBNFFile file, String vocabulary) {
+        if (file.grammars().size() != 1) throw new IllegalArgumentException("playground requires exactly one grammar");
         var grammar = file.grammars().get(0);
         for (var token : grammar.tokens()) if (!(token instanceof UBNFAST.TokenDecl.Declarative)
                 && !(token instanceof UBNFAST.TokenDecl.CaseInsensitive)) {

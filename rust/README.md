@@ -78,10 +78,10 @@ rust/target/release/unlaxer generate --target rust \
 こちらの経路にはJava 21、Maven 3.9系が必要。Java版の既存CLIは変更せず、`generate`サブコマンドを追加した。
 
 ```sh
-mvn -B -pl unlaxer-common,unlaxer-dsl -am install -DskipTests -Dgpg.skip=true
-mvn -q -pl unlaxer-dsl dependency:build-classpath -Dmdep.outputFile=target/rust-classpath.txt
+mvn -B -o -pl unlaxer-common,unlaxer-dsl -am package -DskipTests -Dgpg.skip=true
+mvn -q -o -pl unlaxer-dsl dependency:build-classpath -Dmdep.outputFile=target/rust-classpath.txt
 java --enable-preview \
-  -cp "unlaxer-dsl/target/classes:$(tr -d '\n' < unlaxer-dsl/target/rust-classpath.txt)" \
+  -cp "unlaxer-common/target/classes:unlaxer-dsl/target/classes:$(tr -d '\n' < unlaxer-dsl/target/rust-classpath.txt)" \
   org.unlaxer.dsl.CodegenMain generate --target rust \
   --grammar unlaxer-dsl/src/test/resources/evolution/3/Evolution.ubnf \
   --output rust/examples/evolution/src/generated
@@ -90,6 +90,10 @@ java --enable-preview \
 同じコマンドに`--check`を付けると書き込まずに生成物の完全一致を検査する。未対応文法は出力前に拒否する。出力先の5ファイルを事前検査し、生成マーカーのない既存ファイルやsymlinkは上書きしない。生成済みファイルは再生成で置き換わるので編集しない。終了コードは成功`0`、CLI誤り`2`、文法・サブセット検証失敗`3`、I/O・衝突・差分検出`4`、`--strict` / `--fail-on warning` で警告あり`5`。警告の stderr は native と同じ。
 
 出力は`mod.rs`、`parser.rs`、`ast.rs`、`mapper.rs`、`evaluator.rs`。呼出側crateにruntimeのpath dependencyと`pub mod generated;`を追加する。手書きのsemanticsやCargo manifestは生成器の管理外。exampleのように`#[rustfmt::skip]`をmodule宣言に付け、生成テキストをformatterで改変しない。
+
+開発版 #714 は同一ファイルの複数 grammar にも対応する。複数の場合は root の `mod.rs` と
+`grammar_<ASCII小文字名>/` ごとの上記5ファイルを生成する。名前衝突、独立した参照、
+配布利用、`impact` の単一 grammar 制限は[複数 grammar 契約](../docs/multiple-grammars.md)を参照。
 
 ### 生成せずに移植可能性を確認する
 
