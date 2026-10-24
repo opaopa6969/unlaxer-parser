@@ -3,27 +3,15 @@ package org.unlaxer.dsl.codegen;
 import java.util.List;
 import org.unlaxer.dsl.bootstrap.UBNFAST.*;
 
-/** Existing Java int contracts, including the effective schema of shared mappings. */
+/** Rust integer refinement, including the effective schema of shared mappings. */
 public final class NumericFields {
     private NumericFields() {}
 
-    private static final String DEPTH_LIMIT = "E-RECURSIVE-SHAPE: expression depth exceeds 256";
-
     public static boolean isInteger(GrammarDecl grammar, RuleDecl rule, String name) {
-        String type;
-        try {
-            type = new ASTGenerator().inferType(grammar, rule, name);
-        } catch (IllegalArgumentException error) {
-            // The Java AST type inference bounds the depth of its recursive shape fixed point more
-            // tightly than the lowered IR does. The Rust host refines integers from the captures
-            // alone (numeric_fields.rs), so use that rule instead of rejecting the grammar (#740).
-            // The work and convergence limits keep failing as before.
-            if (!DEPTH_LIMIT.equals(error.getMessage())) throw error;
-            return numericCaptures(grammar, rule, name);
-        }
-        return type.equals("int")
-                || type.equals("Optional<Integer>")
-                || type.equals("List<Integer>");
+        // Lowering has already computed kind/cardinality. Integer refinement only needs the
+        // captures, exactly as numeric_fields.rs does. Java AST inference would also solve
+        // unrelated recursive shapes for every field and can exhaust its work limit (#758).
+        return numericCaptures(grammar, rule, name);
     }
 
     /** Port of numeric_fields.rs refine: every contributor of the mapping captures only numbers. */
