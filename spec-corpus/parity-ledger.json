@@ -8,7 +8,7 @@
     "検索例: `rg -n \"@Disabled|@Ignore|Assume|assumeTrue|assumeFalse|#\\[ignore|skipUnless|skipIf|skipTest|pytest.skip\" --glob \"*.java\" --glob \"*.rs\" --glob \"*.py\"`。さらに `skipped_validate` / `RUNTIME_SCOPE_IDS` 等の条件分岐を確認した。",
     "3分類を項目ごとに記録する。試験環境のopt-inは製品差ではないので契約として分類し、内部の未駆動caseは検証の未修正差として明記する。",
     "`spec-corpus/property-based/known-differences.json` はPBT findingの許可表なので空のまま維持する。全repo台帳をPBTの許可表へコピーして失敗を抑制しない。",
-    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。CST #767、Number #752、Java生成 #754、作業量 #758は別のOPEN issueへ結ぶ。#741の境界差は契約化済み。",
+    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。CST #767、Number #752、Java生成 #754は別のOPEN issueへ結ぶ。数値判定の作業量差 #758は不要なAST型推論を省いて修正し、解析の適用範囲を契約として記録する（issueはmerge前のOPEN）。#741の境界差は契約化済み。",
     "CLOSED #331/#545/#571/#176/#537の後に残った旧未対応記述（回復内match-only、汎用伝播、Rust LSP/DAP、scopeTree、enum/eval、Backreference）は現行契約へ訂正する。未解決範囲はOPEN #111と個別子issueで追跡する。",
     "規範違反の量指定子overflow #783 と、内部条件付き除外の検証漏れ #784 を新規作成した。個別issueのない残機能群は既存全仕様issue #111の受け入れ範囲に結ぶ。",
     "catalog/corpus.jsonのGsonが許していた単引用符escapeを同じ復号値の標準JSONへ訂正した。JSONの不正構文を黙って走査から除外しない。",
@@ -637,17 +637,19 @@
     },
     {
       "id": "analysis-work-limit",
-      "category": "unresolved",
-      "title": "Java-host の数値型推論作業量上限",
-      "hosts": "Rust Java-host / Rust native",
+      "category": "contract",
+      "title": "数値判定と AST 固定点の適用範囲（#758 修正済み）",
+      "hosts": "Java target / Rust Java-host・native",
       "issues": [
         758,
         740
       ],
-      "observation": "numericBesideAnalysisWork(560)でJava-hostはanalysis work exceeds 1000000、nativeは生成可能。深さ256のfallbackを直した #740 と別の残差。",
+      "observation": "Rust両hostの数値判定はcaptureから直接行う。numericBesideAnalysisWork(560)等でJava-hostだけがAST型推論の作業量上限に達する差を修正し、0/500/550/560/575 fillerで生成物5ファイルのbyte一致、580/600/700で同じ作業量診断を検証する。@typeof制約のcaptureも同じ規則で判定し、typeofBesideAnalysisWorkで同じ掃引を行う。Java targetのAST型推論とその作業量上限、両hostのlowered IR・preferred projectionの上限は維持する。#758はPR merge前のためOPEN。",
       "evidence": [
         "docs/java-parser-limits.md",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NumericFieldsTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/RustNativeGeneratorTest.java",
+        "rust/unlaxer-generator/tests/nesting_limits.rs"
       ]
     },
     {
