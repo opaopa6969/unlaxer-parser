@@ -5,16 +5,18 @@ Each evidence file is written by one test as a whole file (Java report, or the R
 UNLAXER_TEST_*_BUDGET_EVIDENCE), never parsed out of libtest stdout. A file passes only when:
 
 * the first line is exactly HEADER and every row has len(COLUMNS) non-empty fields;
-* reset is true/false and entries/charge are non-negative integers;
+* mode/reset/memo/diagnostics belong to one fixed Java or Rust profile and
+  entries/charge are non-negative integers;
 * every id is a case of --cases and every case appears;
 * the key (id, mode, reset, memo, diagnostics) is unique;
-* the keys are the full cartesian product of the observed values of each key column
-  (so a missing combination cannot be hidden by a duplicate elsewhere);
+* the keys are the full cartesian product of the required values of each key column
+  (the evidence cannot redefine the required coverage);
 * the number of rows is exactly --rows.
 
 Every problem is printed with the file name before exiting with status 1.
 """
 import argparse
+from itertools import product
 from pathlib import Path
 import re
 import sys
@@ -24,6 +26,21 @@ HEADER = '\t'.join(COLUMNS)
 KEY = len(COLUMNS) - 2
 INTEGER = re.compile(r'(0|[1-9][0-9]*)\Z')
 MAX_REPORTED = 10
+# Keep these independent of the evidence: 10 cases x 5 modes x 2 resets x 2 memo
+# policies x 3 diagnostics. Java and Rust spell their enums differently.
+PROFILES = {
+    'Java': (
+        ('normal', 'consumed', 'matchOnly', 'virtualTokenConsumed', 'virtualTokenMatchOnly'),
+        ('false', 'true'), ('OFF', 'SAFE_FAILURES'),
+        ('AUTO', 'DETAILED', 'DETAILED_ON_FAILURE'),
+    ),
+    'Rust': (
+        ('None', *(f'Some(ParseMode {{ kind: {kind}, invert: false }})'
+                   for kind in ('Consumed', 'MatchOnly', 'VirtualConsumed', 'VirtualMatchOnly'))),
+        ('false', 'true'), ('Off', 'SafeFailures'),
+        ('Auto', 'Detailed', 'DetailedOnFailure'),
+    ),
+}
 
 
 def case_ids(cases):
@@ -59,6 +76,7 @@ def check(path, cases, rows):
     expected_ids = case_ids(cases)
     known = set(expected_ids)
     seen = {}
+    profile = None
     for number, line in enumerate(lines[1:], start=2):
         fields = line.split('\t')
         if len(fields) != len(COLUMNS) or any(not field for field in fields):
@@ -66,8 +84,14 @@ def check(path, cases, rows):
             continue
         if fields[0] not in known:
             problems.append(f'{path}:{number}: unknown case id {fields[0]!r}')
-        if fields[2] not in ('true', 'false'):
-            problems.append(f'{path}:{number}: reset {fields[2]!r} is not true/false')
+        if profile is None:
+            profile = next((values for values in PROFILES.values() if fields[1] in values[0]), None)
+        if profile is None:
+            problems.append(f'{path}:{number}: unknown mode {fields[1]!r}')
+        else:
+            for column, allowed in enumerate(profile, start=1):
+                if fields[column] not in allowed:
+                    problems.append(f'{path}:{number}: invalid {COLUMNS[column]} {fields[column]!r}; expected one of {allowed}')
         for column in (5, 6):
             if not INTEGER.match(fields[column]):
                 problems.append(f'{path}:{number}: {COLUMNS[column]} {fields[column]!r} is not a non-negative integer')
@@ -79,13 +103,13 @@ def check(path, cases, rows):
     missing_ids = [case for case in expected_ids if case not in {key[0] for key in seen}]
     if missing_ids:
         problems.append(f'{path}: missing case ids {missing_ids}')
-    values = [sorted({key[column] for key in seen}) for column in range(KEY)]
-    product = 1
-    for column in values:
-        product *= len(column)
-    if product != len(seen):
-        dimensions = ' x '.join(f'{COLUMNS[i]}={len(v)}' for i, v in enumerate(values))
-        problems.append(f'{path}: {len(seen)} distinct keys, but {dimensions} = {product} combinations')
+    if profile is not None:
+        expected = set(product(expected_ids, *profile))
+        missing = expected - seen.keys()
+        extra = seen.keys() - expected
+        if missing or extra:
+            problems.append(f'{path}: combinations: {len(missing)} missing, {len(extra)} unexpected '
+                            f'({len(seen)} distinct keys, expected {len(expected)})')
     count = len(lines) - 1
     if count != rows:
         problems.append(f'{path}: {count} rows, expected {rows}')

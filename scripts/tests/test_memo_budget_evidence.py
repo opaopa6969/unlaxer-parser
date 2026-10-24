@@ -78,6 +78,70 @@ class EvidenceCheckTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn('OK', result.stdout)
 
+    def test_java_and_success_profiles_pass(self):
+        # All enum spellings, including the success oracle, must be accepted.
+        replacements = {
+            'None': 'normal',
+            'Some(ParseMode { kind: Consumed, invert: false })': 'consumed',
+            'Some(ParseMode { kind: MatchOnly, invert: false })': 'matchOnly',
+            'Some(ParseMode { kind: VirtualConsumed, invert: false })': 'virtualTokenConsumed',
+            'Some(ParseMode { kind: VirtualMatchOnly, invert: false })': 'virtualTokenMatchOnly',
+            'Off': 'OFF', 'SafeFailures': 'SAFE_FAILURES',
+            'Auto': 'AUTO', 'Detailed': 'DETAILED', 'DetailedOnFailure': 'DETAILED_ON_FAILURE',
+        }
+        java = ['\t'.join(replacements.get(f, f) for f in line.split('\t')) for line in self.lines]
+        for lines in (self.lines, java):
+            for kind in ('failure', 'success'):
+                with self.subTest(java=lines is java, kind=kind):
+                    result = check(self.write(lines), cases=ROOT / f'conformance/{kind}-memo-budget/cases.tsv')
+                    self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_entire_enum_value_cannot_be_renamed(self):
+        # The observed cartesian product still has 600 unique rows after each rename.
+        for column, original in ((1, 'None'), (3, 'Off'), (4, 'Auto')):
+            with self.subTest(column=column):
+                lines = [self.lines[0]]
+                for line in self.lines[1:]:
+                    fields = line.split('\t')
+                    if fields[column] == original:
+                        fields[column] = 'unsupported'
+                    lines.append('\t'.join(fields))
+                self.assert_rejected(self.write(lines), 'unsupported')
+
+    def test_missing_reset_cannot_be_replaced_by_extra_diagnostics(self):
+        # 10 x 5 x 1 x 2 x 6 = 600: count and observed-product checks both pass.
+        lines = [self.lines[0]]
+        for line in self.lines[1:]:
+            fields = line.split('\t')
+            if fields[2] == 'true':
+                fields[2] = 'false'
+                fields[4] += 'Extra'
+            lines.append('\t'.join(fields))
+        self.assert_rejected(self.write(lines), 'invalid diagnostics')
+
+    def test_missing_enum_dimension_is_rejected_even_with_reduced_row_count(self):
+        for column, value in ((1, 'None'), (2, 'true'), (3, 'Off'), (4, 'Auto')):
+            with self.subTest(column=column):
+                lines = [self.lines[0]] + [line for line in self.lines[1:] if line.split('\t')[column] != value]
+                self.assert_rejected(self.write(lines), 'combinations', rows=len(lines) - 1)
+
+    def test_java_and_rust_enums_cannot_be_mixed_in_one_file(self):
+        self.assert_rejected(self.write([line.replace('\tOff\t', '\tOFF\t') for line in self.lines]),
+                             "invalid memo 'OFF'")
+
+    def test_invalid_numeric_encodings_are_rejected(self):
+        for column in (5, 6):
+            for value in ('-1', '1.0', '+1', '01', 'NaN', '１'):
+                with self.subTest(column=column, value=value):
+                    lines = self.lines[:]
+                    fields = lines[1].split('\t')
+                    fields[column] = value
+                    lines[1] = '\t'.join(fields)
+                    self.assert_rejected(self.write(lines), 'non-negative integer')
+
+    def test_invalid_utf8_is_rejected(self):
+        self.assert_rejected(self.write(raw=b'\xff\n'), 'not UTF-8')
+
     def test_duplicate_row_with_unchanged_count_is_rejected(self):
         # Exactly what a count-only gate would accept.
         lines = self.lines[:]
@@ -186,10 +250,17 @@ class WorkflowTest(unittest.TestCase):
 
     def test_evidence_is_uploaded_even_when_the_gate_fails(self):
         upload = self.step('Upload memo budget evidence')
-        self.assertLess(upload, self.step('Require bounded failure memo conformance evidence'))
+        self.assertGreater(upload, self.step('Require bounded failure memo conformance evidence'))
+        self.assertGreater(upload, self.step('Require bounded success memo conformance evidence'))
         self.assertGreater(upload, self.step('Cross-language fixtures, compile failures, and generated-file drift'))
         step = self.steps[upload]
         self.assertEqual(step['if'], 'always()')
+        self.assertNotIn('continue-on-error', step)
+        for kind in ('failure', 'success'):
+            gate = self.steps[self.step(f'Require bounded {kind} memo conformance evidence')]
+            self.assertNotIn('continue-on-error', gate)
+        self.assertNotIn('continue-on-error', self.steps[self.step(
+            'Cross-language fixtures, compile failures, and generated-file drift')])
         for kind in ('failure', 'success'):
             for name in (f'{kind}-memo-budget-java.tsv', f'{kind}-memo-budget-rust.tsv', f'{kind}-memo-budget-rust.log'):
                 self.assertIn(f'unlaxer-dsl/target/{name}', step['with']['path'])

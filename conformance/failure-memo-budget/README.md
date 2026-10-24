@@ -35,6 +35,8 @@ mvn -pl unlaxer-common,unlaxer-dsl -am test \
   -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
+各テストは開始時に以前の証跡を削除します。Rust は全 budget テストと単独 oracle が成功した後だけ、一時 TSV を report として公開します。コンパイル・テストの stdout/stderr は失敗時も log に残します。gate は Java/Rust ごとの固定した mode・reset・memo・diagnostics の全600構成を要求します。
+
 Java21/Rust1.85。Java report は `unlaxer-dsl/target/failure-memo-budget-java.tsv`、
 Rust report は `unlaxer-dsl/target/failure-memo-budget-rust.tsv`（Rust の oracle が
 `UNLAXER_TEST_FAILURE_BUDGET_EVIDENCE` のファイルへ書く。`-rust.log` は libtest の stdout で、診断用）。
