@@ -63,6 +63,9 @@ public class EmptyLiteralConformanceTest {
             String name = fixture.get("name").getAsString();
             GrammarDecl grammar = UBNFMapper.parse(fixture.get("grammar").getAsString()).grammars().get(0);
             GrammarValidator.validateOrThrow(grammar);
+            // #749: '' is nullable only under @tokenStream / @lexicalContext, where it succeeds.
+            assertTrue(name, org.unlaxer.dsl.PortabilityCheck.check(fixture.get("grammar").getAsString()).diagnostics()
+                .stream().noneMatch(diagnostic -> diagnostic.code().equals("E-RAISING-REPETITION")));
             try (URLClassLoader loader = compileJava(grammar)) {
                 Class<?> parsers = loader.loadClass(PACKAGE + "." + name + "Parsers");
                 Parser parser = (Parser) parsers.getMethod("getRootParser").invoke(null);

@@ -55,8 +55,12 @@ Java の生成器は grammar の字句方式によって `''` を別の parser �
   `JavaEmptyLiteral` は token stream / lexical context の grammar だけで生成され、失敗しない（Classic の反転を除く）ので、session 内の consumed frontier の例外とは交わらない。
   Java の `EMPTY`（matched-only の1文字先読み、Rust `JavaEmpty`）は `''` とは別の要素であり、本変更はその扱いを変えない。
 - cut とラベル付き失敗（[#700](cut-and-labeled-failures.md)）: `COMMIT('')`・`COMMIT('', 'message')`・`LABEL(L, '')` は本体が必ず失敗するので、到達すれば必ず raise する。
-  `CATCH` は通常どおり label を捕まえて代替へ進む。`E-RAISING-REPETITION` の nullable 判定は空 literal を nullable とみなす過大近似（両 host 共通）なので、
-  `{ COMMIT('') }` は拒否されず、実行時に最初の反復で raise する（`'z'` に置き換えた対照は拒否される）。通常の文法で拒否するかは [#749](https://github.com/opaopa6969/unlaxer-parser/issues/749)。
+  `CATCH` は通常どおり label を捕まえて代替へ進む。`E-RAISING-REPETITION` の nullable 判定（[#749](https://github.com/opaopa6969/unlaxer-parser/issues/749)）は、
+  `''` を lowering と同じ条件で分ける。通常の文法では成功しない（nullable でない）ので、`{ COMMIT('') }`・`{ COMMIT('', 'm') }`・捕まえない `{ LABEL(L, '') }` は
+  非空の `'z'` と同じく位置付きで拒否する（Java の `GrammarValidator` / `RaisingOperators`、native generator、両 portability check）。
+  `@tokenStream` / `@lexicalContext` の文法では幅0で成功する（nullable）ので `{ COMMIT('') }` は拒否せず、反復は幅0の成功で正常に終わる。
+  `CATCH({ LABEL(L, '') } 'x', 'y', L)` のように捕まえられる反復も拒否しない。Cut fixture は反復を `[ COMMIT('', 'never') ]` に変え、
+  拒否は `spec-corpus/cut-labeled-failure/invalid.json`、受理は TokenStreamCommitRepeat / LexicalContextCommitRepeat / CaughtLabelRepeat で確かめる。
 - rule stack（[#703](rule-stack-diagnostics.md)）: `''` の失敗も他の終端と同じく失敗した rule の frame を持つ。失敗した parse の stack と、成功して入力が残った parse の stack を両方比較する。
 - `@autoCommit`（[#702](auto-commit.md)、#728）: FIRST 解析は `''` を nullable（`EPSILON`）として扱う。`WordParser("")` は成功しないので実際の FIRST より広い過大近似であり、
   挿入される `COMMIT` を減らす方向にしか働かない。挿入位置は両 frontend で同じ（生成物の byte 一致で確認）。
@@ -66,12 +70,13 @@ Java の生成器は grammar の字句方式によって `''` を別の parser �
 
 ## 共通 oracle と検証
 
-[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 19 文法 80 入力。root / sequence / choice の rollback /
+[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 22 文法 92 入力。root / sequence / choice の rollback /
 field capture の rollback / optional・repeat（capture 付き）/ `''+`・`''{0,3}`・`'' % ','`・`{ [ '' ] }` の進捗停止 /
 `javaStyle` trivia / 先読み後の matched cursor / 宣言的 token の `''`・`LOOKAHEAD('')`・`NEGATIVE_LOOKAHEAD('')` /
-tokenStream / lexicalContext / 左結合の prefix・tail delimiter / `COMMIT('')`・`COMMIT('', 'never')` の反復 /
+tokenStream / lexicalContext / 左結合の prefix・tail delimiter / `COMMIT('')`・`[ COMMIT('', 'never') ]` /
 `CATCH` で捕まえる `LABEL(L, '')` と捕まえない `LABEL(M, '')` / 入れ子 rule の rule stack / `@autoCommit` の後の `''` /
-規則単位の `@lexicalContext` がある文法と tokenStream の choice の先頭の `''`（FIRST の nullable 分類）を含み、
+規則単位の `@lexicalContext` がある文法と tokenStream の choice の先頭の `''`（FIRST の nullable 分類）/
+tokenStream・lexicalContext の `{ COMMIT('') }` と捕まえる `{ LABEL(L, '') }` の反復（#749）を含み、
 非 BMP 文字・EOF・空入力の code point 位置を確認する。
 
 各入力について次を記録する。
