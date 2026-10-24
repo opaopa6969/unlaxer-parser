@@ -63,6 +63,14 @@ public class OwnedCaptureConformanceTest {
                         assertEquals(label,expected.get("success").getAsBoolean(),parsed.isSucceeded());
                         assertEquals(label,expected.get("consumed").getAsInt(),context.getConsumedPosition().value());
                         assertEquals(label,expected.get("matched").getAsInt(),context.getMatchedPosition().value());
+                        if(expected.has("failureOffset")) {
+                            if(mode==ParseOptions.Diagnostics.DETAILED)
+                                assertEquals(label+" context diagnostic",expected.get("failureOffset").getAsInt(),context.getParseFailureDiagnostics().getFarthestOffset());
+                            var diagnostic=((Optional<?>)mapper.getMethod("diagnose",String.class,ParseOptions.class)
+                                .invoke(null,input,ParseOptions.withMemoization(memo).withDiagnostics(mode))).orElseThrow();
+                            assertEquals(label+" full-input kind","syntax",diagnostic.getClass().getMethod("kind").invoke(diagnostic));
+                            assertEquals(label+" full-input offset",expected.get("failureOffset").getAsInt(),diagnostic.getClass().getMethod("offset").invoke(diagnostic));
+                        }
                         assertEquals(label,1,context.getTokenStack().size());
                         assertEquals(label,"",context.captured("sentinel").orElseThrow().text());
                         var binding=context.captured("word");
@@ -145,6 +153,7 @@ public class OwnedCaptureConformanceTest {
         Files.write(Path.of("target/owned-capture-rust-hosts.tsv"),report);
     }
     private static String phase(JsonObject row,JsonObject expected){
+        if(expected.has("failureOffset"))return (row.get("name").getAsString().startsWith("nested-")?"retry:":"reject:")+expected.get("failureOffset").getAsInt();
         if(expected.has("resource"))return "resource";
         return row.get("name").getAsString().startsWith("nested-")&&!expected.get("success").getAsBoolean()?"retry":"normal";
     }
@@ -201,11 +210,23 @@ public class OwnedCaptureConformanceTest {
                         let mut context=ParseContext::with_options(&input,ParseOptions::with_memoization(memo).with_diagnostics(mode));
                         context.parse(&Expr::Literal("unused").repeat_java(0,Some(0)).capture_owned("sentinel")).unwrap();
                         let result=context.parse_shared_grammar(generated::parser::grammar(),root,false);let success=result.is_ok();
+                        if let Some((_,offset))=phase.split_once(':') {
+                            let offset=offset.parse::<usize>().unwrap();
+                            let error=result.as_ref().expect_err("context must reject non-input @f");
+                            if mode==Diagnostics::Detailed {assert_eq!(error.offset,offset);}
+                            assert!(error.expected.iter().any(|e|e.contains("original input source")) || mode!=Diagnostics::Detailed);
+                            let options=ParseOptions::with_memoization(memo).with_diagnostics(mode);
+                            let error=generated::parser::parse_tree_detailed_with_options(input,options).unwrap_err();
+                            assert_eq!((error.kind,error.offset),("syntax",offset));
+                            let grammar=generated::parser::grammar();
+                            let error=parse_detailed_shared_with_rule_stack(&grammar,root,false,input,options).unwrap_err();
+                            assert_eq!((error.diagnostic.kind,error.diagnostic.offset),("syntax",offset));
+                        }
                         if phase=="resource"{let error=result.as_ref().unwrap_err();assert!(error.expected.iter().any(|value|value.contains("below")));assert_eq!(&context.parse(&Expr::Literal("unused").repeat_java(0,Some(0))).unwrap_err(),error);}
                         let ast=if let Ok(parsed)=result{let tree=context.tree(parsed.nodes[0]).unwrap();generated::mapper::map(&tree).unwrap().canonical_json()}else{"null".into()};
                         assert_eq!(context.captured_text("sentinel"),Some(""));
                         println!("{}\t{}\t{}\t{}\t{}",success,context.position(),context.matched_position(),ast,binding(&context));
-                        if phase=="retry"{
+                        if phase.starts_with("retry"){
                             assert!(!success);
                             let before=(context.position(),context.matched_position(),context.reset_matched_with_consumed());
                             let before_binding=binding(&context);let before_nodes=(0..).map_while(|i|context.node(i)).map(|node|format!("{node:?}")).collect::<Vec<_>>();
