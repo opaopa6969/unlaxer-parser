@@ -131,6 +131,19 @@ impl Parser<'_> {
             Err(self.error("expected unsigned ASCII integer"))
         }
     }
+    // Syntax accepts every ASCII digit run; validation owns the signed-32-bit limit.
+    fn repeat_bound(&mut self) -> Result<u32> {
+        if let Kind::Number(value) = &self.current().kind {
+            let number = value
+                .parse::<u32>()
+                .unwrap_or(u32::MAX)
+                .min(i32::MAX as u32 + 1);
+            self.pos += 1;
+            Ok(number)
+        } else {
+            Err(self.error("expected unsigned ASCII integer"))
+        }
+    }
     fn dotted(&mut self) -> Result<String> {
         let mut value = self.identifier()?;
         while self.eat('.') {
@@ -931,12 +944,12 @@ impl Parser<'_> {
                 .is_some_and(|t| matches!(t.kind, Kind::Number(_)))
         {
             self.pos += 1;
-            let min = self.integer()?;
+            let min = self.repeat_bound()?;
             let max = if self.eat(',') {
                 if self.is('}') {
                     None
                 } else {
-                    Some(self.integer()?)
+                    Some(self.repeat_bound()?)
                 }
             } else {
                 Some(min)

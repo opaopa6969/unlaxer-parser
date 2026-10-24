@@ -173,7 +173,7 @@ public final class UBNFModuleLoader {
         if (value instanceof OneOrMoreElement repeat)
             return new OneOrMoreElement(atom(repeat.body(), imported, tokens, used, synthetic));
         if (value instanceof BoundedRepeatElement repeat)
-            return new BoundedRepeatElement(atom(repeat.body(), imported, tokens, used, synthetic), repeat.min(), repeat.max());
+            return BoundedQuantifiers.copy(new BoundedRepeatElement(atom(repeat.body(), imported, tokens, used, synthetic), repeat.min(), repeat.max()), repeat);
         if (value instanceof SeparatedElement separated)
             return new SeparatedElement(atom(separated.element(), imported, tokens, used, synthetic),
                 atom(separated.separator(), imported, tokens, used, synthetic));

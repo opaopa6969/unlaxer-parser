@@ -1,6 +1,7 @@
 //! Native UBNF -> normalized IR -> Rust modules. No Java process is launched.
 pub mod adapters;
 mod associative_spines;
+mod bounded;
 mod common_fields;
 mod embedded;
 mod evaluation;

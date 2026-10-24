@@ -141,6 +141,17 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 `ubnf-syntax.md` の `Quantifier` production は構文としては `min > max` や範囲外の
 整数値を制約しないが、この2つはバリデーション層で拒否する。
 
+`E-BOUNDED-OVERFLOW` は `{n}` / `{n,m}` / `{n,}` の明示された各境界に適用する。
+`2147483647` は受理し、`2147483648` 以上（任意長の数字列を含む）は拒否する。
+先頭のゼロは値を変えず、省略された上限は overflow としない。
+ソースから解析した反復の診断には、元ソースの反復式全体（被反復要素から量指定子の
+閉じ `}` まで。外側の空白・capture suffix は除く）の 0 始まり半開 CP 範囲を
+`at CP start..end` として含める。非 BMP 文字は 1 CP と数える。
+Java、Java-host Rust、native Rust の validator / generator に共通し、
+未使用ルールやゼロ回反復の内側も検証する。Java の AST を直接構築して origin がない場合は
+CP 位置を付けず、Rust は AST に明示された span を使う。
+既存の Java の int 境界 API と開放上限の表現は維持する。
+
 ---
 
 ## バリデーション結果の集約
