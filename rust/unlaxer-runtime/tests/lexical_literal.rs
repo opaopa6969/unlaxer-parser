@@ -98,3 +98,36 @@ fn lexical_goal_winner_controls_inversion_instead_of_raw_prefix() {
         );
     }
 }
+
+#[test]
+fn token_trace_records_a_lexical_literal_as_a_lexical_token_leaf() {
+    // Java's Lexing.LiteralParser is a LexicalTokenParser, like LiteralParser("") (#713).
+    use unlaxer_runtime::token_trace::Limits;
+    use unlaxer_runtime::{parse_with_options, ParseOptions, Rule};
+    for (expression, label) in [
+        (Expr::JavaLiteral("ab"), "LexicalTokenParser"),
+        (Expr::literal("ab"), "WordParser"),
+    ] {
+        let rules = vec![Rule {
+            name: "Root",
+            expression,
+        }];
+        let traced = parse_with_options(
+            &rules,
+            0,
+            false,
+            "ab",
+            ParseOptions::default().with_token_trace(Limits::default()),
+        )
+        .unwrap();
+        let leaves = traced.token_trace().unwrap().unwrap();
+        assert_eq!(
+            leaves.iter().map(|leaf| leaf.label).collect::<Vec<_>>(),
+            [label]
+        );
+        assert_eq!(
+            leaves[0].source,
+            TokenSource::Input(Span { start: 0, end: 2 })
+        );
+    }
+}

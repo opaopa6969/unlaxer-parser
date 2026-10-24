@@ -152,6 +152,12 @@ IR `LexicalLiteral` → runtime `Expr::JavaLiteral` として生成し、通常�
 `JavaLiteral` は失敗時の `consume(0)` による matched cursor の reset 対象に含めない。
 非 Classic の照合・FIRST・memo・completion は既存 literal と同じ経路を使う。
 
+反転以外にも、同じ区別から次の3点が Java の `LexicalTokenParser` に揃う（いずれも token-stream / lexical-context 文法だけ）。
+
+- Classic の非反転照合も session / lexical goal を通す。goal に `ab` / `abc` があり入力が `abc` なら、`ab` は Classic でも失敗する（以前は原文の前方一致で成功）。
+- Java 互換の optional / repeat の中で literal が失敗しても、通常 parse・Classic とも matched cursor を consumed へ戻さない（`WordParser` の `consume(0)` がないため）。
+- opt-in の token trace（[#463](token-trace.md)）の label は `WordParser` から `LexicalTokenParser` になる（`''` と同じ）。
+
 corpus の追加8文法・104入力は、通常の `WordParser` の対照、root / optional / repeat / sequence、
 lexical goal 内外、EOF・非 BMP・途中で切れた入力を含む。`classicStart: [consumed, matched]` で
 先読み後や非 BMP の後の開始位置を設定し、4モードそれぞれの `classicCst`（rule CST）と
