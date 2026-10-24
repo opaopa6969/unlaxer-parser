@@ -1329,6 +1329,12 @@ impl FailureMemoKey {
         self.depth_and_modes |= usize::from(enabled) << 16;
         self
     }
+    /// Grammar and explicit native expression entries can share rules and cursors,
+    /// but retain different failure frontiers, including inside successful memos.
+    fn with_grammar_frontier(mut self, enabled: bool) -> Self {
+        self.depth_and_modes |= usize::from(enabled) << 17;
+        self
+    }
     fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
         self.depth_and_modes = (self.depth_and_modes & !6)
             | (usize::from(policy.reset) << 2)
@@ -2990,6 +2996,25 @@ impl<'a> ParseContext<'a> {
         result
     }
 
+    /// Java registers a failed rule's `ParseFrame` as a failure candidate at its start,
+    /// max(consumed, matched) (#753). A failure site inside the rule only sees the live
+    /// matched cursor, which trivia or consumption in the rule lowers below a preceding
+    /// LOOKAHEAD's reach, so the failed rule records its start itself. It adds no expected
+    /// name, which keeps memo replay and re-execution equal when a failure inside already
+    /// reached the start. The matched cursor is not raised: LOOKAHEAD / UNTIL / EMPTY read
+    /// it as Java's transaction cursor. Classic token mode records its failed frames itself,
+    /// and the frontier keeps the consumed position in a token-stream session (#734).
+    #[cold]
+    #[inline(never)]
+    fn fail_rule_frame(&mut self) {
+        if self.token_mode.is_none()
+            && self.resource_failure.is_none()
+            && self.frontier(self.position) > self.position
+        {
+            self.fail_without_expected();
+        }
+    }
+
     // A no-cache recursive rule must not retain the large memo snapshot/key
     // frame. In particular name-resolution rules still reach their depth guard
     // on the default 2 MiB thread stack after the state-version key was added.
@@ -3021,6 +3046,7 @@ impl<'a> ParseContext<'a> {
         .with_token_mode(self.token_mode)
         .with_owned_source(self.track_owned_source)
         .with_line_comments(self.line_comments)
+        .with_grammar_frontier(self.grammar_frontier)
         .with_state_version(self.scopes.memo_version().expect("memo version checked"));
         let position = self.code_point(self.position);
         if let Some(result) = self.probe_rule_memo(position, &key) {

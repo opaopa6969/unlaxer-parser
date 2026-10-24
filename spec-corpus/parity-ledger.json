@@ -286,6 +286,10 @@
     "784": {
       "state": "OPEN",
       "title": "test(parity): spec corpus の validate/runtime 条件付き除外を両言語の実行先へ結ぶ"
+    },
+    "793": {
+      "state": "OPEN",
+      "title": "parity: 正の LOOKAHEAD の後の group・選択が失敗したとき、frame の開始が Rust の失敗位置に入らない（#753 後続）"
     }
   },
   "entries": [
@@ -319,11 +323,13 @@
         713,
         331
       ],
-      "observation": "empty-literal の javaDiagnostic 51 件と error-elements の10件は引用符、trivia/RootParser 等の補助候補、trailing-input の farthest 表示を個別に固定する。受理・主要失敗位置の共通条件は維持する。空候補が不可視になる不具合は #750（PR #773）で修正済み。evolution の javaOffset/rustOffset 8件は現在すべて等しい。",
+      "observation": "empty-literal の javaDiagnostic 51 件と error-elements の10件は引用符、trivia/RootParser 等の補助候補、trailing-input の farthest 表示を個別に固定する。受理・主要失敗位置の共通条件は維持する。空候補が不可視になる不具合は #750（PR #773）で修正済み。evolution の javaOffset/rustOffset 8件は現在すべて等しい。global-comment の expectedHints 10件はJavaのrule子parser由来の候補とRustの末端候補（frameだけが最遠なら空）を固定する。種別・CP位置とhost内の設定非依存は共通条件。",
       "evidence": [
         "docs/empty-literal.md",
         "docs/error-elements.md",
-        "unlaxer-dsl/src/test/resources/evolution/diagnostics.json"
+        "unlaxer-dsl/src/test/resources/evolution/diagnostics.json",
+        "docs/prior-matched-diagnostics.md",
+        "spec-corpus/global-comment/corpus.json"
       ]
     },
     {
@@ -581,14 +587,29 @@
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         712,
-        777,
-        753
+        777
       ],
-      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。残りは、javaStyle併記時のW-COMMENT-IGNOREDをnative CLIへ出す経路（#777）と、triviaの読み飛ばしでLOOKAHEADのmatched cursorが小さく上書きされる差（#753）。",
+      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。残りは、javaStyle併記時のW-COMMENT-IGNOREDをnative CLIへ出す経路（#777）。triviaの後で失敗するruleの診断位置（#753）は、失敗したruleのframeの開始をRustも失敗位置に記録して解消した（PR #791）。trivia後のmatched cursorはJavaのtransaction cursorのまま。期待候補はbackend固有（Javaの子parser展開とRustの末端候補の差）で、種別・位置の一致と区別してcorpusに固定。",
       "evidence": [
         "docs/rule-trivia.md",
         "spec-corpus/global-comment/README.md",
-        "rust/unlaxer-runtime/src/lib.rs"
+        "docs/prior-matched-diagnostics.md",
+        "rust/unlaxer-runtime/src/lib.rs",
+        "rust/unlaxer-runtime/src/rule_stack.rs",
+        "conformance/prior-matched-diagnostics/rule-frames.tsv"
+      ]
+    },
+    {
+      "id": "lookahead-group-frame",
+      "category": "unresolved",
+      "title": "正の LOOKAHEAD の後の group・選択の失敗位置",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        793
+      ],
+      "observation": "失敗したruleのframeの開始は#753でRustも失敗位置に記録するが、ruleでないgroup・選択のframeは記録しない。`R0 ::= 'a' LOOKAHEAD('xyz') ( 'x' 'q' )`に`axyz`でJava CP4、Rust CP2（6設定とも）。明示Classic入口は両版CP4で一致、任意・反復は一致。",
+      "evidence": [
+        "docs/prior-matched-diagnostics.md"
       ]
     },
     {
@@ -1306,6 +1327,16 @@
       },
       "entries": [
         "generator-diagnostics"
+      ]
+    },
+    {
+      "path": "spec-corpus/global-comment/corpus.json",
+      "fields": {
+        "java": 10,
+        "rust": 10
+      },
+      "entries": [
+        "diagnostic-display"
       ]
     },
     {
