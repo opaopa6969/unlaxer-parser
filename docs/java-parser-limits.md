@@ -84,11 +84,23 @@ lowered IR の上で同じ数え方で固定点を解くので、両 host は同
 Java の Java 生成（`ParserGenerator` など）は、AST 上の固定点（`RecursiveSemanticShapes`、深さ 256）を
 使い続ける。この固定点は preferred projection の上限として Rust の `preferred_plan.rs` と同じ数え方をしており（#737）、
 Java 生成では上限を超えると `E-RECURSIVE-SHAPE: expression depth exceeds 256` で拒否する。
-Rust 生成の整数 field の判定だけは、この深さの拒否の代わりに `numeric_fields.rs` と同じ「capture がすべて
-数値 token」の規則を使う。作業量の上限（`analysis work exceeds 1000000`）と非収束は、従来どおり Java host の
-Rust 生成でも失敗になる（native は整数の判定にこの解析を使わないので受理する。既知の差で #758）。
+Rust 生成の整数 field の判定は、両 host とも `numeric_fields.rs` と同じ「mapping を共有する、
+`@skip` でない全規則の対象 capture がすべて数値 token」の規則を直接使う（#758）。`@typeof` の制約に使う
+capture も同じで、mapping の field はその判定結果に従い、mapping にない capture は自分の規則の capture だけで判定する。lowered IR が既に
+値の種類と個数を求めているため、数値への絞り込みに Java AST 全体の型推論は必要ない。以前は field ごとに
+この型推論を呼び、無関係な規則も固定点の各反復で再走査したため、80 規則の参照連鎖と 560 規則の literal 列が
+隣にあるだけで `analysis work exceeds 1000000` に達し、Java host だけが生成に失敗した。
+
+native にも lowered IR と preferred projection の解析作業量上限 1,000,000 はある。差の原因は native の
+上限欠如ではなく、Java host の数値判定だけが行う余分な解析だった。このため上限の引き上げや、上限に達してからの
+fallback ではなく、不要な固定点呼び出しを省く方法を選んだ。固定点の memo 化・反復方法の変更は preferred AST の
+生成可否にも影響するので、この修正には含めない。数値判定は AST 固定点の深さ・作業量・非収束に依存しなくなるが、
+lowered IR の解析失敗は両 host とも従来どおり返し、preferred projection の解析失敗は従来どおり投影を無効にする。
+Java target の AST 型推論とその制限（#754）、公開 API、生成 parser/runtime の処理は変更しない。
 
 回帰テスト: `RustBackendTest`、`NumericFieldsTest`、`RustNativeGeneratorTest`
-（`recursiveNestingLimitsMatchJavaHost`、84〜130 段の掃引）、`RustUbnfFrontendConformanceTest`
+（`recursiveNestingLimitsMatchJavaHost`、84〜130 段の掃引、`numericAnalysisWorkMatchesNative`、
+0 / 500 / 550 / 560 / 575 規則の filler と数値 capture の生成物 5 ファイルの byte 一致、
+580 / 600 / 700 規則で同じ作業量診断。`@typeof` 付きの `typeofBesideAnalysisWork` も同じ掃引）、`RustUbnfFrontendConformanceTest`
 （`frontendNestingLimitsAreTheDocumentedContract`、126〜200 段の掃引）、Rust の
 `unlaxer-generator/tests/nesting_limits.rs` と `unlaxer-ubnf/tests/frontend.rs`。

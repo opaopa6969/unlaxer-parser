@@ -1314,6 +1314,30 @@ impl ParseContext<'_> {
         result.nodes.append(&mut child.nodes);
         result.captures.append(&mut child.captures);
     }
+    /// CST edge of a preferred metadata capture. Classic collection later keeps only
+    /// nodes of the current kind and drops a capture whose nodes all disappear, so
+    /// record the already collected nodes as the former `Capture` did. The fragment
+    /// itself stays uncollected: metadata must not change evaluation (#788).
+    pub(crate) fn metadata_capture_nodes(&self, fragment: &Fragment) -> Vec<usize> {
+        match self.token_mode {
+            Some(mode)
+                if fragment.source.as_deref().is_some_and(|source| {
+                    source.classic
+                        && source.kind != mode.kind
+                        && source.text.is_none()
+                        && !source.generated
+                }) =>
+            {
+                fragment
+                    .nodes
+                    .iter()
+                    .copied()
+                    .filter(|&index| self.token_kind_at(index) == mode.kind)
+                    .collect()
+            }
+            _ => fragment.nodes.clone(),
+        }
+    }
     pub(crate) fn collect_classic_fragment(
         &self,
         mut fragment: Fragment,
