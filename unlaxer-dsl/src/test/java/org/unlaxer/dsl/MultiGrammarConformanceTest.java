@@ -134,7 +134,9 @@ public class MultiGrammarConformanceTest {
                     assertEquals(Map.of("sentinel", "unchanged"), files(output));
                     if (fixture.get("name").getAsString().contains("collision") || fixture.get("name").getAsString().equals("duplicate-name")) {
                         var span = expected.get(0).getAsJsonObject().getAsJsonObject("span");
-                        assertTrue(result.text(), result.text().contains("P-OUTPUT-COLLISION [" + span.get("start") + "," + span.get("end") + "): grammar_alpha"));
+                        String subject = host == 0 ? "org.example.multiple."
+                            + UBNFMapper.parse(Files.readString(input)).grammars().get(1).name() + "AST" : "grammar_alpha";
+                        assertTrue(result.text(), result.text().contains("P-OUTPUT-COLLISION [" + span.get("start") + "," + span.get("end") + "): " + subject));
                     }
                 }
                 evidence.add(fixture.get("name") + "\t" + crlf + "\t" + actual.get("diagnostics"));
@@ -198,6 +200,127 @@ public class MultiGrammarConformanceTest {
         Run result = nativeRun(binary, "impact", "--target", "rust", "--before", input.toString(), "--after", input.toString());
         assertEquals(3, result.code());
         assertEquals("I-SCHEMA", JsonParser.parseString(result.text()).getAsJsonObject().getAsJsonArray("diagnostics").get(0).getAsJsonObject().get("code").getAsString());
+    }
+
+    @Test public void sameNameInDifferentJavaPackagesCompilesAndExecutes() throws Exception {
+        Path input = temporary.newFile().toPath(), out = temporary.newFolder().toPath();
+        Files.writeString(input, reviewGrammar("Calc", "org.p1", "one") + reviewGrammar("Calc", "org.p2", "two"));
+        success(javaRun("--grammar", input.toString(), "--output", out.toString(), "--generators", "AST,Parser,Mapper,Evaluator"));
+        for (String pkg : List.of("org.p1", "org.p2")) {
+            Path source = out.resolve(pkg.replace('.', '/')).resolve("Probe.java");
+            Files.writeString(source, "package " + pkg + "; public class Probe extends CalcEvaluator<String> {"
+                + "protected String evalValue(CalcAST.Value node) { return node.text() + \"!\"; }"
+                + "public static String run(String input) { return new Probe().eval(CalcMapper.parse(input)); }}");
+        }
+        Path classes = temporary.newFolder().toPath();
+        var args = new ArrayList<>(List.of("--release", "21", "-classpath", System.getProperty("java.class.path"), "-d", classes.toString()));
+        try (var walk = Files.walk(out)) { args.addAll(walk.filter(p -> p.toString().endsWith(".java")).map(Path::toString).toList()); }
+        assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(String[]::new)));
+        try (var loader = new URLClassLoader(new URL[] {classes.toUri().toURL()}, getClass().getClassLoader())) {
+            assertEquals("one!", loader.loadClass("org.p1.Probe").getMethod("run", String.class).invoke(null, "one"));
+            assertEquals("two!", loader.loadClass("org.p2.Probe").getMethod("run", String.class).invoke(null, "two"));
+        }
+    }
+
+    @Test public void javaCollisionReportsAndManifestsUseJavaClassNames() throws Exception {
+        for (String second : List.of("Calc", "CALC")) for (String format : List.of("json", "ndjson")) {
+            Path dir = temporary.newFolder().toPath(), input = dir.resolve("input.ubnf");
+            Files.writeString(input, reviewGrammar("Calc", "org.p1", "one") + reviewGrammar(second, "org.p1", "two"));
+            Path report = dir.resolve("report.json"), manifest = dir.resolve("manifest.json"), output = dir.resolve("out");
+            Run result = javaRun("--grammar", input.toString(), "--output", output.toString(), "--generators", "AST",
+                "--report-format", format, "--report-file", report.toString(), "--output-manifest", manifest.toString(), "--report-schema-check");
+            assertEquals(result.text(), 3, result.code());
+            String payload = Files.readString(report);
+            assertTrue(payload, payload.contains("P-OUTPUT-COLLISION"));
+            assertTrue(payload, payload.contains("org.p1." + second + "AST"));
+            assertFalse(payload, payload.contains("grammar_calc"));
+            assertFalse(JsonParser.parseString(payload).getAsJsonObject().get("ok").getAsBoolean());
+            assertTrue(Files.readString(manifest).contains("\"writtenCount\":0"));
+            assertFalse(Files.exists(output));
+        }
+    }
+
+    @Test public void javaHostAcceptsCallerOwnedSymlinkAncestors() throws Exception {
+        Path dir = temporary.newFolder().toPath(), actual = Files.createDirectory(dir.resolve("actual"));
+        Path link = Files.createSymbolicLink(dir.resolve("link"), actual);
+        for (boolean multiple : List.of(false, true)) {
+            Path input = dir.resolve("input-" + multiple + ".ubnf");
+            Files.writeString(input, reviewGrammar("A", "p", "a") + (multiple ? reviewGrammar("B", "p", "b") : ""));
+            Path out = link.resolve("project-" + multiple).resolve("generated");
+            success(generate(null, input, out, false, false));
+            success(generate(null, input, out, false, true));
+            assertTrue(Files.isRegularFile(out.resolve("mod.rs")));
+        }
+        // The explicit output directory itself and generated descendants retain their existing protection.
+        Path input = dir.resolve("input-false.ubnf");
+        assertEquals(4, generate(null, input, link, false, false).code());
+    }
+
+    @Test public void importedCollisionAndLateErrorsKeepOriginalGrammarLocations() throws Exception {
+        Path binary = binary(), dir = temporary.newFolder().toPath(), input = dir.resolve("input.ubnf");
+        Files.writeString(dir.resolve("part.ubnf"), "grammar Part { @ubnf: v2 token X ::= 'x'; }\n");
+        String first = "// 😀 original CP\n" + reviewGrammar("A", "p", "a");
+        String imported = "grammar B { @import part from 'part.ubnf' @ubnf: v2 @package: p "
+            + "token T ::= part.X; @root @mapping(Value,params=[text]) Root ::= T @text; }\n";
+        for (String kind : List.of("collision", "mapping", "evaluator", "import")) for (boolean crlf : List.of(false, true)) {
+            String second = kind.equals("collision") ? imported.replace("grammar B", "grammar A")
+                : kind.equals("mapping") ? imported.replace("params=[text]", "params=[missing]")
+                : kind.equals("import") ? imported.replace("part.ubnf", "missing.ubnf")
+                : imported.replace("@root", "@root @eval(kind='binary_arithmetic')");
+            String prefix = crlf ? first.replace("\n", "\r\n") : first;
+            second = crlf ? second.replace("\n", "\r\n") : second;
+            String source = prefix + second;
+            Files.writeString(input, source);
+            String location = "[" + prefix.codePointCount(0, prefix.length()) + ","
+                + source.stripTrailing().codePointCount(0, source.stripTrailing().length()) + ")";
+            for (int host = 0; host < 3; host++) {
+                Path out = dir.resolve("out-" + kind + crlf + host);
+                Run result = host == 0 ? javaRun("--grammar", input.toString(), "--output", out.toString(), "--generators", "AST,Parser,Mapper,Evaluator")
+                    : generate(host == 1 ? null : binary, input, out, false, false);
+                assertNotEquals(result.text(), 0, result.code());
+                assertTrue(result.text(), result.text().contains(location));
+                if (!kind.equals("collision")) assertTrue(result.text(), result.text().contains("grammar B " + location));
+                assertFalse(Files.exists(out));
+            }
+        }
+    }
+
+    @Test public void singleJavaGrammarEmitterFailureWritesNoFiles() throws Exception {
+        Path input = temporary.newFile().toPath(), output = temporary.getRoot().toPath().resolve("late-failure");
+        Files.writeString(input, reviewGrammar("Calc", "p", "x").replace("@root", "@root @eval(kind='binary_arithmetic')"));
+        Run result = javaRun("--grammar", input.toString(), "--output", output.toString(), "--generators", "AST,Parser,Mapper,Evaluator");
+        assertNotEquals(result.text(), 0, result.code());
+        assertFalse(Files.exists(output));
+    }
+
+    @Test public void invalidProgrammaticGrammarNameIsADiagnostic() {
+        var snapshot = UBNFMapper.parseWithSource(reviewGrammar("A", "p", "x"));
+        var g = snapshot.ast().grammars().get(0);
+        var invalid = new org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl("文法", g.imports(), g.settings(), g.tokens(), g.rules());
+        var result = PortabilityCheck.check(snapshot, new org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile(List.of(invalid)));
+        assertFalse(result.portable());
+        assertEquals("P-GRAMMAR-NAME", result.diagnostics().get(0).code());
+    }
+
+    @Test public void ioFailureDoesNotPublishRootIndexAndNamesFailedPath() throws Exception {
+        String source = reviewGrammar("A", "p", "a") + reviewGrammar("B", "p", "b");
+        var generated = new RustBackend().generateFile(UBNFMapper.parse(source), false, false);
+        assertEquals("mod.rs", generated.get(generated.size() - 1).relativePath());
+        for (boolean existingIndex : List.of(false, true)) {
+            Path output = temporary.newFolder().toPath();
+            if (existingIndex) Files.writeString(output.resolve("mod.rs"), "old index");
+            // Exercise an actual write failure after one child, below CLI preflight.
+            Files.createDirectories(output.resolve("grammar_a/ast.rs"));
+            var error = assertThrows(java.io.IOException.class, () -> RustGenerateCommand.writeArtifacts(output, generated));
+            assertTrue(error.toString(), error.getMessage().contains(output.resolve("grammar_a/ast.rs").toString()));
+            assertTrue(Files.exists(output.resolve("grammar_a/mod.rs")));
+            if (existingIndex) assertEquals("old index", Files.readString(output.resolve("mod.rs")));
+            else assertFalse(Files.exists(output.resolve("mod.rs")));
+        }
+    }
+
+    private static String reviewGrammar(String name, String pkg, String literal) {
+        return "grammar " + name + " { @package: " + pkg + " @root @mapping(Value,params=[text]) Root ::= '" + literal + "' @text; }\n";
     }
 
     private List<String> javaObservations(Path input, JsonObject fixture) throws Exception {

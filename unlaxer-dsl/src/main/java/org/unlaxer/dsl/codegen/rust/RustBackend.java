@@ -37,17 +37,27 @@ public final class RustBackend {
     /** Whole-file API: validate and emit in memory before the caller writes any artifacts. */
     public List<GeneratedFile> generateFile(org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file,
                                            boolean lsp, boolean dap) {
-        org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, null);
+        return generateFile(file, lsp, dap, null);
+    }
+
+    public List<GeneratedFile> generateFile(org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file,
+            boolean lsp, boolean dap, org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot snapshot) {
+        org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, snapshot);
         if (file.grammars().size() == 1) return generateWithProtocols(file.grammars().get(0), lsp, dap);
         var files = new ArrayList<GeneratedFile>();
         var index = new StringBuilder(HEADER);
-        for (var grammar : file.grammars()) {
+        for (int ordinal = 0; ordinal < file.grammars().size(); ordinal++) {
+            var grammar = file.grammars().get(ordinal);
             String module = org.unlaxer.dsl.codegen.GrammarFileLayout.moduleName(grammar);
             index.append("pub mod ").append(module).append(";\n");
-            for (var artifact : generateWithProtocols(grammar, lsp, dap))
-                files.add(new GeneratedFile(module + "/" + artifact.relativePath(), artifact.content()));
+            try {
+                for (var artifact : generateWithProtocols(grammar, lsp, dap))
+                    files.add(new GeneratedFile(module + "/" + artifact.relativePath(), artifact.content()));
+            } catch (RuntimeException error) {
+                throw org.unlaxer.dsl.codegen.GrammarFileLayout.failure(file, ordinal, snapshot, error);
+            }
         }
-        files.add(0, new GeneratedFile("mod.rs", index.toString()));
+        files.add(new GeneratedFile("mod.rs", index.toString()));
         return List.copyOf(files);
     }
 

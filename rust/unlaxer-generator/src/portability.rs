@@ -179,6 +179,11 @@ pub fn check_ast(file: &UbnfFile) -> Report {
     if file.grammars.is_empty() {
         inventory.add("P-GRAMMAR-COUNT", "expected one grammar", file.span);
     }
+    for grammar in &file.grammars {
+        if !crate::grammar_files::valid_name(grammar) {
+            inventory.add("P-GRAMMAR-NAME", &grammar.name, grammar.span);
+        }
+    }
     for (grammar, module) in crate::grammar_files::collisions(file) {
         inventory.add("P-OUTPUT-COLLISION", module, grammar.span);
     }

@@ -52,19 +52,28 @@ rule や token が別 grammar に存在しても共有しない。別 grammar �
 
 ## 名前衝突・検証・書き込み
 
-ファイル内の grammar 名は ASCII 大小文字を無視して一意にする。`Alpha` / `ALPHA` や
-同名 grammar は package が異なっても `P-OUTPUT-COLLISION` で拒否する。この共通の
-ファイル契約は Java 向け生成にも適用し、case-insensitive なファイルシステムでも同じ結果にする。
-診断対象は後出 grammar、subject は衝突した module 名。`check` の span は元ソースの Unicode
-code point 半開区間で、CRLF と非 BMP 文字をそのまま数える。生成 CLI の衝突エラーにも
-`P-OUTPUT-COLLISION [start,end): grammar_name` を含める。
+Rust 出力ではファイル内の grammar 名を ASCII 大小文字を無視して一意にする。`Alpha` / `ALPHA`
+や同名 grammar は package が異なっても `P-OUTPUT-COLLISION` で拒否する。診断対象は後出 grammar、
+subject は衝突した module 名。Java 出力は別の規則で、package と小文字化した生成クラス名の組が
+一致したときだけ拒否する。別 package の同名 grammar は従来どおり受理する。同一 package の
+大小文字だけ違うクラスは case-insensitive な FS での上書きを防ぐため拒否する。
+Java の診断は Java クラス名を示し、既存の validation report / manifest にも記録する。
+
+`check` の span は元ソースの Unicode code point 半開区間で、CRLF と非 BMP 文字をそのまま数える。
+生成 CLI の衝突エラーにも `P-OUTPUT-COLLISION [start,end): <出力名>` を含める。
+import の link 前の宣言から位置を取り、後続 grammar の生成・link 失敗には名前と元宣言の CP 範囲を付ける。
+programmatic AST の非 ASCII grammar 名も `check` では `P-GRAMMAR-NAME` の診断として返す。
 
 各 host はすべての grammar の検証・コード生成をメモリ内で終えてから書き込む。
 後続 grammar の意味エラーや evaluator 生成失敗では、先行 grammar の部分出力を残さない。
 Rust の書き出しは全成果物の事前検査を行い、手書きファイル、ディレクトリとの衝突、
-子ディレクトリの symlink、通常ファイルになっている親を拒否する。
+子ディレクトリの symlink、通常ファイルになっている親を拒否する。Java host は明示した出力先と
+生成する子パスの symlink を拒否し、出力先より上の既存 symlink は従来どおり許容する。
+native は以前から祖先 symlink も拒否しており、この host 差は残る。
 `generate --check` は子ディレクトリを含む生成物を比較し、差分があっても書き換えない。
 
+複数 grammar の root `mod.rs` は全子 module の後に書く。子の書き込みに失敗した場合は root index を
+公開・更新せず、I/O エラーに失敗したパスを含める。ただし、それまでに書いた子ファイルの rollback、
 OS の書き込み失敗・敵対的な同時変更に対するディレクトリ全体の transaction は保証しない。
 以前の grammar を削除・改名した後の不要な生成ファイルも自動削除しない。複数から単一への
 変更では配置が変わるため、新しい出力ディレクトリで生成し consumer の参照を更新する。
@@ -89,6 +98,10 @@ Cargo の runtime 依存と `mod generated;` の設定は [Rust README](../rust/
 を直接渡すと Java / Rust target・両 host とも `I-SCHEMA`（終了3）となる。比較対象の grammar を
 それぞれ単一 grammar ファイルとして渡す。ファイル全体の module 追加・削除・配置変更は
 `impact` の判定範囲に含まれない。[impact 契約](api-impact-report.md)も参照。
+
+import を持つファイルの `check` で、関係のない grammar も含めて診断位置が null 化され、同じ診断が
+統合される既存の制限は [#776](https://github.com/opaopa6969/unlaxer-parser/issues/776) で対応する。
+import 先の位置を root ファイルの位置と混同しない出典保持が必要なため、今回の生成診断とは分ける。
 
 ## 検証範囲
 

@@ -45,7 +45,7 @@ java -cp "unlaxer-dsl/target/classes:$(tr -d '\n' < unlaxer-dsl/target/rust-clas
   Java は class 探索を除いた共通 validator を使う。native CLI は空の `PATH` でも動く。
 - module 解決エラーは `P-MODULE`（終了 3）。複数ファイルを解決した後の診断は `span: null` とする。
   schemaVersion 1 の単一ファイル offset を別ファイルの位置として返さない。ファイルごとの
-  元の構文位置が必要な場合は文字列 API を使う。複数ソース provenance の JSON 拡張は別段階。
+  元の構文位置が必要な場合は文字列 API を使う。独立 grammar の診断まで null 化・dedup される制限と複数ソース provenance は [#776](https://github.com/opaopa6969/unlaxer-parser/issues/776) で追跡する。
 
 | 終了コード | stdout | stderr |
 |---|---|---|
@@ -108,6 +108,7 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | code | 対象 / subject |
 |---|---|
 | `P-GRAMMAR-COUNT` | grammar が0件の AST / `expected one grammar`（ファイル全体）。複数 grammar は #714 で対応 |
+| `P-GRAMMAR-NAME` | programmatic AST の不正な grammar 名 / 名前（通常のソース入力は frontend が構文検証） |
 | `P-OUTPUT-COLLISION` | ASCII 大小文字を無視した grammar 名の衝突 / `grammar_` + 小文字名（後出 grammar 全体） |
 | `P-IMPORT` | import / path |
 | `P-SETTING` | 未対応 key または block setting / key |

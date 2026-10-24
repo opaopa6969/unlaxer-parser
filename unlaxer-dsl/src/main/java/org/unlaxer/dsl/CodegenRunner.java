@@ -66,17 +66,12 @@ final class CodegenRunner {
         String source = fs.readString(Path.of(config.grammarFile()));
         var snapshot = UBNFMapper.parseWithSource(source);
         UBNFFile file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(
-            snapshot.ast(), Path.of(config.grammarFile()), fs::readString);
-        try {
-            org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, snapshot);
-        } catch (IllegalArgumentException error) {
-            err.println(error.getMessage());
-            return CodegenMain.EXIT_VALIDATION_ERROR;
-        }
+            snapshot, Path.of(config.grammarFile()), fs::readString);
 
         Map<String, CodeGenerator> generatorMap = generatorMap(config.javaRelease());
 
-        List<ReportJsonWriter.ValidationIssueRow> validationRows = collectValidationRows(file);
+        List<ReportJsonWriter.ValidationIssueRow> validationRows = collectValidationRows(file, snapshot);
+        validationRows.addAll(javaOutputCollisions(file, snapshot, config.generators()));
         List<ReportJsonWriter.ValidationIssueRow> sortedRows = sortValidationRows(validationRows);
 
         boolean hasErrors = hasErrorRows(sortedRows);
@@ -246,7 +241,8 @@ final class CodegenRunner {
 
         // Complete every generator before touching output, including a later grammar's failure.
         List<CodeGenerator.GeneratedSource> plannedSources = new ArrayList<>();
-        for (GrammarDecl grammar : file.grammars()) {
+        for (int index = 0; index < file.grammars().size(); index++) {
+            GrammarDecl grammar = file.grammars().get(index);
             for (String name : config.generators()) {
                 String key = name.trim();
                 CodeGenerator gen = generatorMap.get(key);
@@ -263,7 +259,11 @@ final class CodegenRunner {
                     return CodegenMain.EXIT_CLI_ERROR;
                 }
 
-                plannedSources.add(gen.generate(grammar));
+                try {
+                    plannedSources.add(gen.generate(grammar));
+                } catch (RuntimeException error) {
+                    throw org.unlaxer.dsl.codegen.GrammarFileLayout.failure(file, index, snapshot, error);
+                }
             }
         }
         for (CodeGenerator.GeneratedSource src : plannedSources) {
@@ -438,9 +438,11 @@ final class CodegenRunner {
         return generatorMap;
     }
 
-    private static List<ReportJsonWriter.ValidationIssueRow> collectValidationRows(UBNFFile file) {
+    private static List<ReportJsonWriter.ValidationIssueRow> collectValidationRows(UBNFFile file,
+            org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot snapshot) {
         List<ReportJsonWriter.ValidationIssueRow> validationRows = new ArrayList<>();
-        for (GrammarDecl grammar : file.grammars()) {
+        for (int index = 0; index < file.grammars().size(); index++) {
+            GrammarDecl grammar = file.grammars().get(index);
             List<GrammarValidator.ValidationIssue> issues = new ArrayList<>(GrammarValidator.validate(grammar));
             issues.addAll(GrammarValidator.detectLeftRecursionIssues(grammar));
             for (GrammarValidator.ValidationIssue issue : issues) {
@@ -450,12 +452,42 @@ final class CodegenRunner {
                     issue.code(),
                     issue.severity(),
                     issue.category(),
-                    issue.message(),
+                    file.grammars().size() == 1 ? issue.message()
+                        : "grammar " + grammar.name() + org.unlaxer.dsl.codegen.GrammarFileLayout.position(snapshot, index) + ": " + issue.message(),
                     issue.hint()
                 ));
             }
         }
         return validationRows;
+    }
+
+    private static List<ReportJsonWriter.ValidationIssueRow> javaOutputCollisions(UBNFFile file,
+            org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot snapshot, List<String> generators) {
+        // Match the actual Java package/class destinations, independently of Rust module names.
+        Map<String, String> suffixes = Map.of("AST", "AST", "Parser", "Parsers", "Mapper", "Mapper",
+            "Evaluator", "Evaluator", "LSP", "LanguageServer", "Launcher", "LspLauncher",
+            "DAP", "DebugAdapter", "DAPLauncher", "DapLauncher");
+        Map<String, Integer> owners = new LinkedHashMap<>();
+        List<ReportJsonWriter.ValidationIssueRow> rows = new ArrayList<>();
+        for (int index = 0; index < file.grammars().size(); index++) {
+            var grammar = file.grammars().get(index);
+            String packageName = grammar.settings().stream().filter(setting -> setting.key().equals("package"))
+                .map(setting -> setting.value() instanceof org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue value
+                    ? value.value() : "").findFirst().orElse("generated");
+            for (String generator : generators.stream().map(String::trim).distinct().toList()) {
+                String suffix = suffixes.get(generator);
+                if (suffix == null) continue; // The existing CLI error path handles unknown generators.
+                String className = grammar.name() + suffix;
+                String key = packageName + "/" + className.toLowerCase(java.util.Locale.ROOT);
+                Integer owner = owners.putIfAbsent(key, index);
+                if (owner != null && owner != index) rows.add(new ReportJsonWriter.ValidationIssueRow(
+                    grammar.name(), null, "P-OUTPUT-COLLISION", "ERROR", "OUTPUT",
+                    "P-OUTPUT-COLLISION" + org.unlaxer.dsl.codegen.GrammarFileLayout.position(snapshot, index)
+                        + ": " + packageName + "." + className,
+                    "Use distinct class names within each Java package."));
+            }
+        }
+        return rows;
     }
 
     private static List<ReportJsonWriter.ValidationIssueRow> sortValidationRows(

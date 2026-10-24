@@ -76,6 +76,9 @@ public final class PortabilityCheck {
         List<Diagnostic> diagnostics = new ArrayList<>();
         List<GrammarDecl> grammars = file.grammars();
         if (grammars.isEmpty()) add(diagnostics, "P-GRAMMAR-COUNT", snapshot, snapshot.ast(), "expected one grammar");
+        for (GrammarDecl grammar : grammars)
+            if (!org.unlaxer.dsl.codegen.GrammarFileLayout.validName(grammar))
+                add(diagnostics, "P-GRAMMAR-NAME", snapshot, grammar, grammar.name());
         for (var collision : org.unlaxer.dsl.codegen.GrammarFileLayout.collisions(file))
             add(diagnostics, "P-OUTPUT-COLLISION", snapshot, collision.grammar(), collision.module());
         for (GrammarDecl grammar : grammars) scanGrammar(grammar, snapshot, diagnostics);

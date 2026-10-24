@@ -16,6 +16,7 @@ fn independent_grammars_keep_single_grammar_bytes_and_private_names() {
         let files = generate(source).unwrap();
         let parsed = unlaxer_ubnf::parse(source).unwrap();
         assert_eq!(1 + 5 * parsed.grammars.len(), files.len());
+        assert_eq!("mod.rs", files.last().unwrap().relative_path);
         for grammar in parsed.grammars {
             let original = &source[grammar.span.byte_start..grammar.span.byte_end];
             let module = format!("grammar_{}", grammar.name.to_ascii_lowercase());
@@ -53,4 +54,13 @@ fn shared_rejections_have_exact_codepoint_origins() {
         );
         assert!(generate(source).is_err(), "{row}");
     }
+}
+
+#[test]
+fn invalid_programmatic_grammar_name_is_a_diagnostic() {
+    let mut file = unlaxer_ubnf::parse("grammar A { @root Root ::= 'a'; }").unwrap();
+    file.grammars[0].name = "文法".into();
+    let report = unlaxer_generator::portability::check_ast(&file);
+    assert!(!report.portable);
+    assert_eq!("P-GRAMMAR-NAME", report.diagnostics[0].code);
 }

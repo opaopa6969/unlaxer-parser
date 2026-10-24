@@ -57,11 +57,12 @@ final class RustGenerateCommand {
         try {
             Path grammarPath = Path.of(options.get("--grammar"));
             var snapshot = UBNFMapper.parseWithSource(Files.readString(grammarPath));
-            var file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(snapshot.ast(), grammarPath, Files::readString);
+            var file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(snapshot, grammarPath, Files::readString);
             org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, snapshot);
             // Java class-resolution warnings do not define Rust token support: lowering
             // enforces an explicit Rust allowlist. Common grammar errors remain fatal.
-            for (var grammar : file.grammars()) {
+            for (int index = 0; index < file.grammars().size(); index++) {
+                var grammar = file.grammars().get(index);
                 // Explicit "none" is part of the Rust backend contract, whereas Java's
                 // common validator only accepts named trivia implementations. Validate it
                 // as absent here; lowering still checks the original settings/duplicates.
@@ -72,15 +73,16 @@ final class RustGenerateCommand {
                             && value.value().equals("none"))).toList(), grammar.tokens(), grammar.rules());
                 var errors = GrammarValidator.validateWithoutClassLoading(validationGrammar).stream()
                     .filter(issue -> "ERROR".equals(issue.severity())).map(GrammarValidator.ValidationIssue::format).toList();
-                if (!errors.isEmpty()) throw new IllegalArgumentException("Grammar validation failed:\n - " + String.join("\n - ", errors));
+                if (!errors.isEmpty()) throw org.unlaxer.dsl.codegen.GrammarFileLayout.failure(file, index, snapshot,
+                    new IllegalArgumentException("Grammar validation failed:\n - " + String.join("\n - ", errors)));
             }
-            var generated = new RustBackend().generateFile(file, lsp, dap);
+            var generated = new RustBackend().generateFile(file, lsp, dap, snapshot);
             Path output = Path.of(options.get("--output"));
-            validateParentDirectories(output.resolve("mod.rs"));
+            if (Files.isSymbolicLink(output)) throw new IOException("output directory must not be a symbolic link: " + output);
             // Preflight every file before writing: never replace handwritten code or follow file symlinks.
             for (var artifact : generated) {
                 Path destination = output.resolve(artifact.relativePath());
-                validateParentDirectories(destination);
+                validateGeneratedParents(output, destination);
                 if (Files.isSymbolicLink(destination)) throw new IOException("refusing symbolic link " + destination);
                 if (check) {
                     if (!Files.isRegularFile(destination) || !Files.readString(destination).equals(artifact.content())) {
@@ -91,14 +93,7 @@ final class RustGenerateCommand {
                     throw new IOException("refusing to overwrite non-generated file " + destination);
                 }
             }
-            if (!check) {
-                Files.createDirectories(output);
-                for (var artifact : generated) {
-                    Path destination = output.resolve(artifact.relativePath());
-                    Files.createDirectories(destination.getParent());
-                    Files.writeString(destination, artifact.content());
-                }
-            }
+            if (!check) writeArtifacts(output, generated);
             out.println((check ? "Verified " : "Generated ") + generated.size() + " Rust module files in " + output);
             return CodegenMain.EXIT_OK;
         } catch (IllegalArgumentException error) {
@@ -109,11 +104,24 @@ final class RustGenerateCommand {
             return CodegenMain.EXIT_GENERATION_ERROR;
         }
     }
-    private static void validateParentDirectories(Path destination) throws IOException {
-        for (Path parent = destination.toAbsolutePath().getParent(); parent != null; parent = parent.getParent()) {
+    // Only generated descendants are owned by this command. Existing output ancestors are caller-owned.
+    private static void validateGeneratedParents(Path output, Path destination) throws IOException {
+        for (Path parent = destination.getParent(); parent != null && !parent.equals(output); parent = parent.getParent()) {
             if (Files.isSymbolicLink(parent)) throw new IOException("refusing symbolic link " + parent);
             if (Files.exists(parent) && !Files.isDirectory(parent))
                 throw new IOException("refusing non-directory " + parent);
+        }
+    }
+
+    static void writeArtifacts(Path output, java.util.List<RustBackend.GeneratedFile> generated) throws IOException {
+        for (var artifact : generated) {
+            Path destination = output.resolve(artifact.relativePath());
+            try {
+                Files.createDirectories(destination.getParent());
+                Files.writeString(destination, artifact.content());
+            } catch (IOException error) {
+                throw new IOException("cannot write " + destination + ": " + error.getMessage(), error);
+            }
         }
     }
 }

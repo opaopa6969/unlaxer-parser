@@ -224,9 +224,13 @@ jobs:
       run: test -s unlaxer-dsl/target/rust-portability.tsv
     - name: Require multiple grammar consumers and rejection evidence
       run: |
-        test -s unlaxer-dsl/target/multiple-grammars-java.tsv
-        test -s unlaxer-dsl/target/multiple-grammars-rust.tsv
-        test -s unlaxer-dsl/target/multiple-grammars-rejections.tsv
+        cases=$(python3 -c "import json; c=json.load(open('spec-corpus/multiple-grammars/corpus.json')); print(sum(len(f['cases']) for f in c['valid']))")
+        rejected=$(python3 -c "import json; print(len(json.load(open('spec-corpus/multiple-grammars/corpus.json'))['invalid']))")
+        test "$cases" -gt 0
+        test "$rejected" -gt 0
+        awk -v rows="$((1 + 2 * cases))" 'END {exit NR != rows}' unlaxer-dsl/target/multiple-grammars-java.tsv
+        awk -v rows="$((1 + 8 * cases))" 'END {exit NR != rows}' unlaxer-dsl/target/multiple-grammars-rust.tsv
+        awk -v rows="$((1 + 2 * rejected))" 'END {exit NR != rows}' unlaxer-dsl/target/multiple-grammars-rejections.tsv
     - name: Require token adapter diagnostics and runtime evidence
       run: |
         test -s unlaxer-dsl/target/rust-token-adapter-diagnostics.tsv
