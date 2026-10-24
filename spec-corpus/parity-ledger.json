@@ -554,12 +554,13 @@
       "issues": [
         767
       ],
-      "observation": "Java 3.3.0 の Choice は選択枝の Parsed を返す一方、context に root rule を commit し、生成 mapper もその root を要求する。Rust Tree / Classic の CST はこの commit 済み木と共通。異なる対象を比べていたテストを訂正し、javaCst 3件を削除。root・非root・spanを共通oracleで検証する。返却 Parsed と Rust ParseMatch のAPI差は残すが、CST欠落ではない。",
+      "observation": "Java 3.3.0 の Choice は選択枝の Parsed を返す一方、context に root rule を commit し、生成 mapper もその root を要求する。Rust Tree / Classic の CST はこの commit 済み木と共通。異なる対象を比べていたテストを訂正し、javaCst 3件を削除。root・非root・spanを共通oracleで検証する。Java の返却 Parsed（入れ子のchoice ruleも外れる）とRust ParseMatch/TreeのAPI差は契約として残し、利用者向けにroot-choice-cstとunlaxer-commonのデータモデル文書へ書く。CST欠落ではない。",
       "evidence": [
         "spec-corpus/empty-literal/corpus.json",
         "spec-corpus/root-choice-cst/corpus.json",
         "docs/root-choice-cst.md",
-        "docs/empty-literal.md"
+        "docs/empty-literal.md",
+        "unlaxer-common/doc/ja/tinycalc-internal/04-core-datamodel.md"
       ]
     },
     {
@@ -1074,7 +1075,7 @@
         463,
         571
       ],
-      "observation": "補助CSTのJava class名とRust node/trace labelはhost固有。portable metadataはstringと同一parseの安定IDを共通化し、Java任意Object identity/raw mapの自動移植は行わない。Java observerでmemoが無効になる観測は別probeで検証する。root rule欠落の #767 を補助wrapperの差として許可しない。",
+      "observation": "補助CSTのJava class名とRust node/trace labelはhost固有。portable metadataはstringと同一parseの安定IDを共通化し、Java任意Object identity/raw mapの自動移植は行わない。Java observerでmemoが無効になる観測は別probeで検証する。choice root の #767 は返却Parsedとcommit済みCSTの区別（choice-root-cst）であり、補助wrapperの差として扱わない。",
       "evidence": [
         "docs/portable-token-metadata.md",
         "docs/token-trace.md",

@@ -41,14 +41,36 @@ if (parsed.isSucceeded()) {
 }
 ```
 
+`@namePredicate` を使う文法では `getRootParser()` が `NameResolutionScope` で包んだ parser を返す。この wrapper は token を作らないので、
+commit 済み root の `parser` は wrapper ではなく `getRootSyntaxParser()`（root rule の parser）である。root を parser で探すときはこちらと比べる
+（生成 mapper の `parseWithNameSnapshots` も同じ）。
+
+入口ごとの実測（生成 parser、choice root、受理した入力）は次のとおり。`Parsed.getConsumed()` は `getRootToken()` と同じ token を返す。
+
+| 入口 | root rule の node |
+|---|---|
+| Java `getRootParser().parse(context)` → `Parsed.getRootToken()` / `getRootToken(true)` / `getConsumed()` | 無い（選ばれた枝の token） |
+| Java Classic `parse(context, consumed / matchOnly, false)` → `Parsed.getRootToken()` | 無い（同上） |
+| Java 上の各入口の後の `context.getCurrent().getTokens()` | 有る |
+| Java 生成 mapper の `parse` / `parseWithSourceMap` / `parseWithNameSnapshots` | 有る（commit 済み root を map する） |
+| Java 生成 mapper の `mapParsedToken(parsed.getRootToken())` | `IllegalArgumentException`（root-stripped token として拒否） |
+| Rust `parse_tree` / `parse_tree_detailed` → `Tree.root` | 有る |
+| Rust `parse_context` / Classic `parse_with_token_mode` → `ParseMatch.root_node()` | 有る |
+
 Rust の full-input 入口は `Tree.root`、prefix / Classic 入口は
 `context.tree(matched.root_node().unwrap())` が対応する commit 済み木を返す。
 helper / terminal の表現は各言語で異なるため、共通 oracle は rule 名・親子関係・code point span を比較する。
 root 以外の choice と choice でない root も保持する。空入力の成功では root span は `[0,0)`。
 
-**残る API の区別:** Java の生の `Parsed.getRootToken()` は選択枝を指し、Rust `ParseMatch.nodes` は
-commit 済み rule を指す。この戻り値をそのまま同一視しない。今回その API を変更・統一することはしない。
-Java の返却 `Parsed` を CST と呼んでいた従来の記述は、この区別が抜けていた。
+**残る API の区別（契約）:** Java の生の `Parsed.getRootToken()` は選ばれた枝の token を指す。選ばれた枝が choice の rule なら
+その rule の token も外れ、さらに内側の枝になる（`Root ::= Item | Other; Item ::= '😀' | 'x';` で `x` を読むと、
+返却 token は `'x'` の終端で、`Root` と `Item` の node はどちらも無い。commit 済み木は `Root[0,1){Item[0,1)}`）。
+Rust の `ParseMatch.nodes` と `Tree.root` は commit 済み rule を指し、Rust に Java の返却 `Parsed` に当たる「root を外した」戻り値は無い。
+Rust の戻り値に対応するのは Java の commit 済み root であり、Java の返却 `Parsed` ではない。
+公開済みの 3.3.0 を変えない前提なので、この区別は統一せず契約として残す。Rust から root を外すと、Java の公開 mapper が拒否する
+root-stripped token と同じ形になり、Rust の mapper・source map が前提とする root も失われ得る。
+Java の返却 `Parsed` を CST と呼んでいた従来の記述は、この区別が抜けていた。Classic の利用者向けの説明
+（[unlaxer-common のデータモデル](../unlaxer-common/doc/ja/tinycalc-internal/04-core-datamodel.md#完全トークンツリー-vs-ast)）にも同じ注意を書いた。
 
 ## 検証
 

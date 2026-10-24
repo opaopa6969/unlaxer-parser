@@ -363,7 +363,12 @@ public class EmptyLiteralConformanceTest {
     /** Only diagnostic display has a host-specific oracle; CST must use the shared contract (#767). */
     private void compare(String label, JsonObject row, boolean java, boolean cstOnly, JsonObject actual, List<String> mismatches) {
         if (actual.has("variance")) mismatches.add(label + " memo/diagnostics variance: " + actual.get("variance"));
-        assertFalse(label + " must not override the shared CST", row.has("javaCst") || row.has("rustCst"));
+        // A host-specific key other than the diagnostic display would otherwise be ignored silently.
+        for (String field : row.keySet()) {
+            assertTrue(label + " must not override the shared oracle with " + field,
+                false == (field.startsWith("java") || field.startsWith("rust"))
+                    || field.equals("javaDiagnostic") || field.equals("rustDiagnostic"));
+        }
         var keys = new ArrayList<>(cstOnly ? CST_KEYS : KEYS);
         if (!cstOnly && row.has("cstModes")) keys.add("cstModes");
         for (String key : keys) {
