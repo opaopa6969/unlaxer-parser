@@ -1,4 +1,8 @@
-use std::{collections::HashSet, path::PathBuf, time::Duration};
+use std::{
+    collections::HashSet,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 use unlaxer_runtime::{
     provider_process::ProviderProcess,
     provider_protocol::{self, Frame, Status},
@@ -51,28 +55,50 @@ fn process_failure_states_and_no_execution_gate() {
         .unwrap()
         .lines()
     {
+        if line.starts_with('#') {
+            continue;
+        }
         let row: Vec<_> = line.split('\t').collect();
-        let command = if row[0] == "missing" {
+        assert_eq!(row.len(), 6, "{line}");
+        let command = if row[1] == "missing" {
             vec!["/unlaxer-provider-missing".into()]
         } else {
             vec![
                 "python3".into(),
                 path.join("transport.py").display().to_string(),
-                row[0].into(),
+                row[1].into(),
+                row[4].into(),
+                row[5].into(),
             ]
         };
         let process = ProviderProcess {
             command,
             identity: owned.provider.clone(),
             operations: HashSet::from([Operation::Hover]),
-            timeout: Duration::from_millis(200),
+            timeout: Duration::from_millis(row[3].parse().unwrap()),
         };
-        assert_eq!(
-            format!("{:?}", process.invoke(&owned.as_request()).unwrap().status).to_uppercase(),
-            row[1],
-            "{}",
-            row[0]
+        let started = Instant::now();
+        let actual = process.invoke(&owned.as_request()).unwrap().status;
+        let elapsed = started.elapsed();
+        let observation = format!(
+            "{} expected={} actual={:?} deadline_ms={} elapsed_ms={}",
+            row[0],
+            row[2],
+            actual,
+            row[3],
+            elapsed.as_millis()
         );
+        println!("[provider-transport] {observation}");
+        assert_eq!(
+            format!("{actual:?}").to_uppercase(),
+            row[2],
+            "{observation}"
+        );
+        if actual == Status::Timeout {
+            assert!(elapsed >= process.timeout, "{observation}");
+            // 固定 10 秒で 30 秒の fixture 待機を検出する。deadline の延長は検査しない。
+            assert!(elapsed < Duration::from_secs(10), "{observation}");
+        }
     }
     let marker =
         std::env::temp_dir().join(format!("unlaxer-provider-execute-{}", std::process::id()));
