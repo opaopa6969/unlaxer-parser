@@ -148,8 +148,12 @@ public final class GrammarValidator {
                 ? "Use a single @comment: { line: '//' } setting."
                 : "Put line comments into the named whitespace token, or use @whitespace: javaStyle."));
         }
-        // GenerationWarnings reports W-COMMENT-IGNORED with source spans, like
-        // W-ANNOTATION-IGNORED; the flag CLI must not report it twice.
+        // Kept for the API and the UBNF LSP (#748). The flag CLI reports W-COMMENT-IGNORED once,
+        // from GenerationWarnings with its source span, and drops this row (#777).
+        for (var issue : GlobalComment.warnings(grammar)) {
+            errors.add(new ValidationIssue(issue.code(), issue.subject(),
+                "@whitespace: javaStyle already skips // comments; remove this @comment setting."));
+        }
         try { LexicalContexts.requireValid(grammar); }
         catch (IllegalArgumentException error) {
             String code = error.getMessage().startsWith("E-LEXICAL-CONTEXT-") ? error.getMessage().split(":",2)[0] : "E-LEXICAL-CONTEXT";

@@ -144,7 +144,9 @@ setting 全体の code point span を同じ値で報告する。
 Rust の `unlaxer_generator::global_comment::warnings` が同じ code と span を返す。
 #777 で `GenerationWarnings.collect` / `warnings::collect` に統合し、両方とも message は
 `W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle` とする。
-Java の flag CLI は `Validation warnings:` に一度だけ表示する（`GrammarValidator` は重ねて返さない）。
+`GrammarValidator` も従来どおり WARNING として返す（API と UBNF LSP の診断。#748 の契約）。
+Java の flag CLI は収集 API の行（`warning: CP <start>..<end>: <message>`）だけを `Validation warnings:` に
+一度表示し、validator の同じ code の行は出さない（JSON レポートの `issues[]` も同じ）。
 Java-host Rust 生成と native `unlaxer generate` は同じ `warning: CP <start>..<end>: <message>` を
 stderr に出す。3経路とも `--strict` / `--fail-on warning` では生成物を書かず終了コード 5。
 portability check では portable のままで、diagnostic にも出さない。

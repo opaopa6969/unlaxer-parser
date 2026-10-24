@@ -445,6 +445,8 @@ final class CodegenRunner {
             List<GrammarValidator.ValidationIssue> issues = new ArrayList<>(GrammarValidator.validate(grammar));
             issues.addAll(GrammarValidator.detectLeftRecursionIssues(grammar));
             for (GrammarValidator.ValidationIssue issue : issues) {
+                // Reported above from GenerationWarnings, with the CP span (#777).
+                if (org.unlaxer.dsl.codegen.GlobalComment.IGNORED.equals(issue.code())) continue;
                 validationRows.add(new ReportJsonWriter.ValidationIssueRow(
                     grammar.name(),
                     issue.rule(),

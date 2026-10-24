@@ -96,7 +96,8 @@ API:
 構文エラーの source は空を返す（生成がその誤りを報告する）。
 `W-COMMENT-IGNORED` の `rule` は設定の subject と同じ `comment`、span は setting 全体、message は
 `W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle`。
-`GrammarValidator` はこの警告を重ねて返さず、flag CLI は収集 API から一度だけ報告する。
+`GrammarValidator` は #748 からこの警告を返し続ける（API と UBNF LSP の診断）が、flag CLI は収集 API の
+行だけを一度報告し、validator の同じ code の行は捨てる。
 
 | CLI | 既定 | `--strict` / `--fail-on warning` |
 |---|---|---|
