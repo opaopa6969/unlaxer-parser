@@ -5,13 +5,15 @@ org.unlaxer には UBNF 文法からパーサを得る経路が 2 つある。**
 | 名前 | 何か | 置き場所 |
 |---|---|---|
 | **unlaxer Classic**（`classic`） | コンビネータ実行系。`ParseContext` / transaction / Token 木の上で、`unlaxer-dsl` の生成器がパーサを組み立てる。3.0.x 系 | `unlaxer-parser`（`unlaxer-common`, `unlaxer-dsl`）|
-| **ubnfc** | UBNF コンパイラ。Rust の front が Grammar IR を作り、Java / Rust の backend が**実行系に依存しないパーサ**（ubnfc parser）を書き出す | `ubnfc`（private）|
+| **ubnfc** | UBNF コンパイラ。Rust の front が Grammar IR を作り、Java / Rust の backend が**実行系に依存しないパーサ**（ubnfc parser）を書き出す | [`ubnfc`](https://github.com/opaopa6969/ubnfc)（2026-10-23 から public）|
 
 tinyexpression 2.0.0 からは ubnfc parser が既定エンジン、Classic は `classic` モードで 2.x の間だけ残る（3.0 で削除）。
 
 ## まず結論
 
-- **新しく文法を書くなら ubnfc**。UBNF 2 の機能（左再帰・語境界・code point クラス・パラメータ化・到達不能検査）は ubnfc にしか無い。
+- **新しく文法を書くなら ubnfc**。UBNF 2 の機能（左再帰・語境界・code point クラス・到達不能検査）は ubnfc にしか無い。
+  引数付き規則は Classic にもある（[一階・名前渡しの `Name(p) ::= ...`](parameterized-rules.md) を生成前に単相化する。PR #708。
+  [値渡し引数 `Name(=p)`](call-by-value-arguments.md) は PR #711）。ubnfc の雛形 `Name<P> ::= ...` とは綴りと展開方式が違う。
 - **既に Classic で動いていて、下の「Classic を選ぶ理由」に 1 つも当たらないなら ubnfc へ移す**。移行は facade（同じ公開面のクラスを差し替える）で済み、tinyexpression で実証済み。
 - **Classic を選ぶ理由が 1 つでもあるなら Classic**。それらは ubnfc の設計上の割り切り（下記）なので、当面は解消しない。
 
@@ -35,7 +37,7 @@ tinyexpression 2.0.0 からは ubnfc parser が既定エンジン、Classic は 
 | **依存ゼロ** | 生成物は JDK 21 / Rust std のみ。Rust は `#![forbid(unsafe_code)]`、wasm32 でビルド可 |
 | **2 実装の機械的突き合わせ** | 同じ文法から Java と Rust を生成し、corpus 1,212 件・差分ファジング・JSONTestSuite・仕様由来ケースで同値を検査 |
 | **静的検査** | 到達不能な候補、語境界、`@recovery` の危険な配置、再入不能な memo、注釈の誤記（`@rooted`）を validate が警告 |
-| **UBNF 2** | 左再帰（候補順＝優先順位）、語境界既定、code point クラス、パラメータ化ルール、中立 token 名 |
+| **UBNF 2** | 左再帰（候補順＝優先順位）、語境界既定、code point クラス、中立 token 名（引数付き規則は Classic にもある。上記「まず結論」） |
 | **typed AST** | `@mapping` から型付き AST を生成。Classic は Token 木から mapper で組む |
 | **IDE** | `--emit-lsp` / `--emit-dap`（opt-in）で LSP / VSIX / 文法デバッガ DAP を生成 |
 | **JVM 不要** | Rust backend ＋ tinyexpression-rs（評価器込み、Java と 953 式で全件一致） |
