@@ -40,6 +40,19 @@ import org.unlaxer.dsl.codegen.GrammarValidator;
 public class UbnfSpecCorpusTest {
 
     /**
+     * 期待値を実装に合わせて書き換えず、かつ黙って skip もしない差分。
+     *
+     * <p>キーはケース ID、値は {@link Deviation}。{@code observation} は実測の文言そのもので、
+     * 一致しなくなったら（= 実装が直った / 別の壊れ方をした）このテストは落ちる。直ったら
+     * このエントリを消すこと。差分を放置しないための番人であって、skip の別名ではない。
+     */
+    // quantifier/huge-bound は #783 で解消した。Rust の driver と同じく空の番人を残す。
+    private static final Map<String, Deviation> DOCUMENTED_DEVIATIONS = Map.of();
+
+    /** 記録済みの差分。{@code observation} は実測の文言、{@code reason} はなぜそうなるか。 */
+    private record Deviation(String observation, String reason) {}
+
+    /**
      * 構文木の比較でしか判定できず、`accept` / `reject` / `diagnostic` のどれにも決められないケース。
      * corpus 側で {@code scope: runtime} かつ {@code verdict: undetermined} として明示されている。
      */
@@ -202,12 +215,15 @@ public class UbnfSpecCorpusTest {
     public void javaBootstrapAgreesWithEverySpecDerivedExpectation() {
         List<SpecCase> cases = load();
         Map<String, String> canonicalById = new LinkedHashMap<>();
+        Map<String, String> verdicts = new LinkedHashMap<>();
         List<String> failures = new ArrayList<>();
+        Set<String> honoured = new LinkedHashSet<>();
         int driven = 0;
 
         for (SpecCase specCase : cases) {
             if (RUNTIME_SCOPE_IDS.contains(specCase.id())) {
                 // 生成パーサの実行時挙動。UBNF を読む処理系の入出力からは観測できない。
+                verdicts.put(specCase.id(), "skipped(runtime)");
                 continue;
             }
             driven++;
@@ -218,6 +234,8 @@ public class UbnfSpecCorpusTest {
             } catch (RuntimeException | StackOverflowError error) {
                 parseError = error.getClass().getSimpleName() + ": " + error.getMessage();
             }
+            String observed = parsed != null ? "accept" : "reject";
+            verdicts.put(specCase.id(), observed);
             if (parsed != null) {
                 canonicalById.put(specCase.id(), canonical(parsed));
             }
@@ -225,28 +243,28 @@ public class UbnfSpecCorpusTest {
             switch (specCase.verdict()) {
                 case "accept" -> {
                     if (parsed == null) {
-                        record(specCase, "受理されるべきだが拒否された: " + parseError, failures);
+                        record(specCase, "受理されるべきだが拒否された: " + parseError, failures, honoured);
                     }
                 }
                 case "reject" -> {
                     if (parsed != null) {
-                        record(specCase, "拒否されるべきだが受理された", failures);
+                        record(specCase, "拒否されるべきだが受理された", failures, honoured);
                     }
                 }
                 case "diagnostic" -> {
                     if (parsed == null) {
                         record(specCase,
                             "診断 " + specCase.code() + " を期待したが構文解析で落ちた: " + parseError,
-                            failures);
+                            failures, honoured);
                         break;
                     }
                     List<String> codes = diagnosticCodes(parsed);
                     if (!codes.contains(specCase.code())) {
                         record(specCase, "期待した診断コードが出ない。実測: "
-                            + (codes.isEmpty() ? "診断なし" : String.join(",", codes)), failures);
+                            + (codes.isEmpty() ? "診断なし" : String.join(",", codes)), failures, honoured);
                     }
                 }
-                default -> record(specCase, "未知の verdict: " + specCase.verdict(), failures);
+                default -> record(specCase, "未知の verdict: " + specCase.verdict(), failures, honoured);
             }
         }
 
@@ -258,7 +276,7 @@ public class UbnfSpecCorpusTest {
             }
             for (String fragment : specCase.canonicalContains()) {
                 if (!canonicalJson.contains(fragment)) {
-                    record(specCase, "受理したが構造が違う。無い断片: " + fragment, failures);
+                    record(specCase, "受理したが構造が違う。無い断片: " + fragment, failures, honoured);
                 }
             }
             if (specCase.sameCanonicalAs() != null) {
@@ -266,22 +284,40 @@ public class UbnfSpecCorpusTest {
                 if (other == null) {
                     record(specCase,
                         "比較先 " + specCase.sameCanonicalAs() + " が受理されないので比較できない",
-                        failures);
+                        failures, honoured);
                 } else if (!other.equals(canonicalJson)) {
                     record(specCase, "受理したが " + specCase.sameCanonicalAs() + " と構文木が違う",
-                        failures);
+                        failures, honoured);
                 }
             }
         }
 
         assertEquals("駆動したケース数", cases.size() - RUNTIME_SCOPE_IDS.size(), driven);
         assertEquals("Java bootstrap が仕様由来の期待と食い違う", List.of(), failures);
+        // 差分を黙って skip しないための番人: 記録済みの差分は実在し、かつ今も起きていること。
+        for (String id : DOCUMENTED_DEVIATIONS.keySet()) {
+            assertTrue("DOCUMENTED_DEVIATIONS が実在しないケースを指している: " + id,
+                verdicts.containsKey(id));
+        }
+        assertEquals("記録済みの差分が起きなくなった（直ったなら DOCUMENTED_DEVIATIONS から消す）",
+            DOCUMENTED_DEVIATIONS.keySet(), honoured);
     }
 
-    private static void record(SpecCase specCase, String observation, List<String> failures) {
+    /** 期待と食い違った 1 件を、記録済みの差分なら {@code honoured} へ、そうでなければ失敗へ。 */
+    private static void record(SpecCase specCase, String observation,
+            List<String> failures, Set<String> honoured) {
+        Deviation deviation = DOCUMENTED_DEVIATIONS.get(specCase.id());
+        if (deviation != null && deviation.observation().equals(observation)) {
+            honoured.add(specCase.id());
+            return;
+        }
+        String where = specCase.citationFile() + " " + specCase.citationHeading();
         failures.add(specCase.id() + " [" + specCase.file() + "] 期待="
             + (specCase.code() != null ? specCase.code() : specCase.verdict())
-            + " 実測=" + observation + " 引用=" + specCase.citationFile() + " " + specCase.citationHeading());
+            + " 入力=" + specCase.input().replace("\n", "\\n")
+            + " 実測=" + observation + " 引用=" + where
+            + (deviation == null ? ""
+                : " 記録済みの差分と実測が違う。記録=" + deviation.observation()));
     }
 
     private static List<String> diagnosticCodes(UBNFAST.UBNFFile file) {

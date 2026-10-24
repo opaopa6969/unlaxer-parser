@@ -33,7 +33,7 @@ public class BoundedOverflowConformanceTest {
                 else {
                     assertEquals(row.toString(), 1, issues.size());
                     assertEquals(row.toString(), row.get("code").getAsString(), issues.get(0).code());
-                    assertTrue(row + " " + issues, issues.get(0).message().endsWith("at CP " + row.get("span").getAsString()));
+                    assertEquals(row + " " + issues, MESSAGE + row.get("span").getAsString(), issues.get(0).message());
                 }
                 for (var generator : List.of(new ParserGenerator(), new ASTGenerator(), new MapperGenerator(), new EvaluatorGenerator(21))) {
                     if (accepted) assertNotNull(generator.generate(grammar));
@@ -45,9 +45,11 @@ public class BoundedOverflowConformanceTest {
         }
     }
 
+    // Java generators, Java-host Rust and the native generator share this exact text.
+    private static final String MESSAGE = "repetition bound exceeds 2147483647 at CP ";
+
     private static void diagnostic(JsonObject row, String message) {
-        assertTrue(row + " " + message, message.contains(row.get("code").getAsString()));
-        assertTrue(row + " " + message, message.endsWith("at CP " + row.get("span").getAsString()));
+        assertEquals(row.toString(), row.get("code").getAsString() + ": " + MESSAGE + row.get("span").getAsString(), message);
     }
 
     @Test public void nativeValidatorAndGeneratorRunTheSameFixtures() throws Exception {

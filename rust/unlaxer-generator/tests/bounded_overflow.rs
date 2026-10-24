@@ -18,15 +18,14 @@ fn validator_and_generator_match_shared_code_and_original_cp_oracle() {
             lowered.unwrap_or_else(|e| panic!("{name}: {e}"));
             assert_eq!(generated.unwrap_or_else(|e| panic!("{name}: {e}")).len(), 5);
         } else {
+            // Same text as the Java generators and the Java-host Rust backend.
+            let expected = format!(
+                "{}: repetition bound exceeds 2147483647 at CP {}",
+                row.required_text("code", name),
+                row.required_text("span", name)
+            );
             for message in [lowered.unwrap_err(), generated.unwrap_err()] {
-                assert!(
-                    message.contains(row.required_text("code", name)),
-                    "{name}: {message}"
-                );
-                assert!(
-                    message.ends_with(&format!("at CP {}", row.required_text("span", name))),
-                    "{name}: {message}"
-                );
+                assert_eq!(message, expected, "{name}");
             }
         }
     }
