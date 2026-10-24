@@ -133,3 +133,42 @@ rule frame の開始で比較を 1 回、公開入口で `bool` を 1 つ退避�
 `lookahead-later-start` / `lookahead-extra-frame` を Java `RuleStackTest` と Rust
 `tests/rule_stack.rs` が両方とも検証する。`PropertyBasedParityTest` は既知差の除外なしで、
 `regressions.json` の #706 の 5 例を Java / Rust の 12 設定で比べる。
+
+## 失敗した rule frame の開始（#753）
+
+[#753](https://github.com/opaopa6969/unlaxer-parser/issues/753) では、正の `LOOKAHEAD` の後に
+呼んだ rule の中で trivia（global `@comment`・javaStyle・名前付き whitespace）か消費が matched
+cursor を下げてから失敗すると、Rust だけ失敗位置が小さかった。
+
+| 文法と入力 | Java | 修正前の Rust | 修正後の Rust |
+|---|---|---|---|
+| `@comment` で `R0 ::= 'a' LOOKAHEAD('//c\nxy') R1 ; R1 ::= 'z'` に `a//c\nxy` | syntax CP7 | syntax CP5 | syntax CP7 |
+| `@whitespace: none` で `R0 ::= 'a' LOOKAHEAD('xyz') R1 ; R1 ::= 'x' 'q'` に `axyz` | syntax CP4 | syntax CP2 | syntax CP4 |
+
+Java では trivia も消費も transaction の matched cursor を consumed（とコメント終端の先読み）まで
+下げる。失敗位置が先読みの到達になるのは、R1 を呼んだときの `ParseFrame` の開始が
+max(consumed, matched) で、R1 が失敗するとその frame が失敗候補になるからである。
+
+**揃え方**: Rust の rule 呼び出しが失敗したとき、本体の失敗で戻った cursor から frame の開始
+（#706 の frontier）を求め、consumed より先なら失敗位置として記録する。期待候補は足さない
+（同じ位置に中の失敗が届いていれば名前はそのまま、届いていなければ空）。名前を足すと、memo の
+再生と再実行で同じ位置の候補が食い違うためである。Classic token mode は失敗した frame を
+自分で記録しており、token stream の lexing session の中は #706 / #734 のとおり consumed で測るので、
+どちらも対象外である。
+
+**matched cursor は上げない**: trivia の後の matched cursor は Java の transaction cursor のままにする。
+`LOOKAHEAD` / `NEGATIVE_LOOKAHEAD` / `UNTIL` / `EMPTY` はこの cursor から読むので、trivia が
+先読みの到達を保つ（max を取る）と、`R1 ::= LOOKAHEAD('xy') 'x' 'y'` を javaStyle の R1 で
+`a  xy` に当てたとき Rust だけ拒否する。成功した rule の開始も候補にしない
+（`R0 ::= 'a' LOOKAHEAD('  xy') R1 'w' ; R1 ::= ['q']` の `a  xy` は両版で syntax CP3）。
+
+**対象外（未対応）**: rule でない入れ子の式（group・選択）の frame の開始は記録しない。
+`R0 ::= 'a' LOOKAHEAD('xyz') ( 'x' 'q' )` の `axyz` は Java が syntax CP4、Rust が CP2 のまま。
+
+**費用**: rule 呼び出しが失敗したときに比較が 1 回増え、条件を満たすときだけ cold path の
+記録を呼ぶ。割当は増えない。
+
+**検証**: 共通 corpus の `spec-corpus/global-comment/corpus.json`（`#753` の 18 文法 30 入力）を
+`GlobalCommentConformanceTest` が Java・Java-host / native の Rust で memo 2 種 × 診断 3 種に照合する。
+Rust `prior_matched_diagnostics` の `a_failed_rule_records_its_start_at_the_matched_reach` は
+消費・trivia・trivia 後の `LOOKAHEAD`・成功した rule の 4 形を同じ 6 設定で確かめる。

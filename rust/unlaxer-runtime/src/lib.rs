@@ -2982,10 +2982,34 @@ impl<'a> ParseContext<'a> {
         } else {
             self.execute_rule(id, depth)
         };
+        // The failed body restored the cursors: a matched cursor beyond the consumed
+        // one is the reach of a preceding LOOKAHEAD at this rule's entry.
+        if result.is_none() && self.matched_position > self.position {
+            self.fail_rule_frame();
+        }
         if tracked {
             self.leave_rule_frame(result.is_none());
         }
         result
+    }
+
+    /// Java registers a failed rule's `ParseFrame` as a failure candidate at its start,
+    /// max(consumed, matched) (#753). A failure site inside the rule only sees the live
+    /// matched cursor, which trivia or consumption in the rule lowers below a preceding
+    /// LOOKAHEAD's reach, so the failed rule records its start itself. It adds no expected
+    /// name, which keeps memo replay and re-execution equal when a failure inside already
+    /// reached the start. The matched cursor is not raised: LOOKAHEAD / UNTIL / EMPTY read
+    /// it as Java's transaction cursor. Classic token mode records its failed frames itself,
+    /// and the frontier keeps the consumed position in a token-stream session (#734).
+    #[cold]
+    #[inline(never)]
+    fn fail_rule_frame(&mut self) {
+        if self.token_mode.is_none()
+            && self.resource_failure.is_none()
+            && self.frontier(self.position) > self.position
+        {
+            self.fail_without_expected();
+        }
     }
 
     // A no-cache recursive rule must not retain the large memo snapshot/key
@@ -5284,7 +5308,7 @@ impl<'a> ParseContext<'a> {
                     break;
                 }
                 self.position = end;
-                self.matched_position = self.matched_position.max(end);
+                self.matched_position = end;
             }
             return;
         }
@@ -5325,8 +5349,7 @@ impl<'a> ParseContext<'a> {
             if self.position == start {
                 break;
             }
-            // Trivia must retain the enclosing Java parse frame's prior LOOKAHEAD reach.
-            self.matched_position = self.matched_position.max(self.position);
+            self.matched_position = self.position;
         }
     }
 
@@ -5337,13 +5360,12 @@ impl<'a> ParseContext<'a> {
             let body = &self.input[self.position + 2..];
             self.position += 2 + body.find(['\r', '\n']).unwrap_or(body.len());
             let rest = &self.input[self.position..];
-            let matched = self.position
+            self.matched_position = self.position
                 + if rest.starts_with("\r\n") {
                     2
                 } else {
                     usize::from(rest.starts_with(['\r', '\n']))
                 };
-            self.matched_position = self.matched_position.max(matched);
         }
     }
 

@@ -101,6 +101,99 @@ fn grammar_invocations_measure_failures_at_the_matched_reach() {
     }
 }
 
+/// `'a' LOOKAHEAD(ahead) R1` where R1 has its own trivia policy (#753).
+fn rule_after_lookahead(ahead: &'static str, r1: Expr, trivia: bool) -> Vec<unlaxer_runtime::Rule> {
+    let r1 = if trivia {
+        Expr::TriviaScope {
+            child: Box::new(r1),
+            whitespace: true,
+            line_comments: false,
+        }
+    } else {
+        r1
+    };
+    vec![
+        unlaxer_runtime::Rule {
+            name: "R0",
+            expression: Expr::sequence([
+                Expr::literal("a"),
+                Expr::JavaLookahead {
+                    pattern: ahead,
+                    positive: true,
+                },
+                Expr::Rule(1),
+            ]),
+        },
+        unlaxer_runtime::Rule {
+            name: "R1",
+            expression: r1,
+        },
+    ]
+}
+
+#[test]
+fn a_failed_rule_records_its_start_at_the_matched_reach() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            let options = options(memo, diagnostics);
+            let parse = |rules: Vec<unlaxer_runtime::Rule>, input: &str| {
+                unlaxer_runtime::parse_detailed_with_options(&rules, 0, false, input, options)
+                    .map(|_| ())
+                    .map_err(|failure| (failure.kind, failure.offset))
+            };
+            let label = format!("{memo:?}/{diagnostics:?}");
+            let consume = || Expr::sequence([Expr::literal("x"), Expr::literal("q")]);
+            // Java: R1's ParseFrame starts at max(consumed CP1, matched CP4). Consumption
+            // (CP2) or trivia (CP3) inside R1 lowers the matched cursor before 'q' fails.
+            assert_eq!(
+                parse(rule_after_lookahead("xyz", consume(), false), "axyz"),
+                Err(("syntax", 4)),
+                "{label}"
+            );
+            assert_eq!(
+                parse(rule_after_lookahead("  xyz", consume(), true), "a  xyz"),
+                Err(("syntax", 6)),
+                "{label}"
+            );
+            let z = Expr::sequence([Expr::literal("z")]);
+            assert_eq!(
+                parse(rule_after_lookahead("  xy", z, true), "a  xy"),
+                Err(("syntax", 5)),
+                "{label}"
+            );
+            // The trivia leaves the matched cursor at CP3 for a LOOKAHEAD in R1, as Java's
+            // transaction cursor; raising it to CP5 would reject this input.
+            let ahead = Expr::sequence([
+                Expr::JavaLookahead {
+                    pattern: "xy",
+                    positive: true,
+                },
+                Expr::literal("x"),
+                Expr::literal("y"),
+            ]);
+            assert_eq!(
+                parse(rule_after_lookahead("  xy", ahead, true), "a  xy"),
+                Ok(()),
+                "{label}"
+            );
+            // A rule that succeeds adds nothing: 'w' fails at CP3, not at R1's start CP5.
+            let mut rules = rule_after_lookahead(
+                "  xy",
+                Expr::sequence([Expr::literal("q").optional()]),
+                true,
+            );
+            if let Expr::Sequence(elements) = &mut rules[0].expression {
+                elements.push(Expr::literal("w"));
+            }
+            assert_eq!(parse(rules, "a  xy"), Err(("syntax", 3)), "{label}");
+        }
+    }
+}
+
 thread_local! {
     static BC_REGISTRY: unlaxer_runtime::shared_calls::Registry = {
         let grammar = unlaxer_runtime::embedded::CstGrammar {

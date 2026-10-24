@@ -30,26 +30,40 @@ cursor（memo 有無）、診断種別と位置、AST の全 field と node span
 期待値は契約から独立に作った。変更前の Java と照合した差は、上記の漏れ 3 件と、行末記号の
 先読みで matched cursor が進む 2 件（Java が正しく、期待値側を Java の仕様に合わせた）だった。
 
-## LOOKAHEAD の到達位置を保つ trivia（#753）
+## LOOKAHEAD の後に失敗する rule（#753）
 
-`*Lookahead` の9文法18入力は、trivia の後で失敗する正の `LOOKAHEAD` の回帰ケース。
-期待値は Java の parse frame の規則 `max(consumed, matched)` から手で求めた。
-`CommentLookahead` の `a//c\nxy` では `a` の消費後 CP1、先読みの到達 CP7、
-コメントの消費 CP4、行末の先読み CP5 なので、後続の `z` の失敗位置は CP7。
-CRLF と補助文字も code point で数え、UTF-8 の byte 数や UTF-16 の unit 数は使わない。
+`issue: "#753"` の18文法30入力は、正の `LOOKAHEAD` の後に呼んだ rule の回帰ケース。
+期待値は Java の parse frame の規則から手で求めた。rule を呼んだときの `ParseFrame` の開始は
+max(consumed, matched) で、その rule が失敗するとこの開始が失敗候補になる。一方、trivia と消費は
+transaction の matched cursor を consumed（と行コメント終端の先読み）まで下げ、後続の `LOOKAHEAD` /
+`NEGATIVE_LOOKAHEAD` / `UNTIL` はその cursor から読む。CRLF と補助文字も code point で数え、
+UTF-8 の byte 数や UTF-16 の unit 数は使わない。
 
-javaStyle の空白・block comment・line comment の連続、規則の `@whitespace`、
-全体と規則の名前付き whitespace（1文字の GAP を繰り返し読む）、入れ子と選択による
-複数回の trivia 試行も同じ最大到達の規則を使う。根の失敗は transaction の rollback
-により prefix が `[false, 0, 0]`。`CommentPrefixLookahead` は任意の `z` が無くても
-成功し、根の消費はコメント末尾 CP4 までなので prefix は `[true, 4, 4]`、
-全入力診断は `trailing_input` CP4（先読み CP7 ではない）になる。
+- `CommentLookahead` から `CommentPrefixLookahead` まで（9文法18入力）: trivia の後で失敗する rule。`CommentLookahead` の `a//c\nxy` では
+  `a` の消費後 CP1、先読みの到達 CP7 で R1 を呼ぶので R1 の frame は CP7 から始まる。R1 の中の
+  コメントの消費 CP4・行末の先読み CP5 の後で `z` が失敗し、R1 の失敗で CP7。javaStyle の空白・
+  block comment・line comment の連続、規則の `@whitespace`、全体と規則の名前付き whitespace
+  （1文字の GAP を繰り返し読む）、入れ子と選択による複数回の trivia 試行も同じ規則。根の失敗は
+  transaction の rollback により prefix が `[false, 0, 0]`。`CommentPrefixLookahead` は任意の `z` が
+  無くても成功し、根の消費はコメント末尾 CP4 までなので prefix は `[true, 4, 4]`、全入力診断は
+  `trailing_input` CP4（先読み CP7 ではない）。
+- `*AfterTrivia`（4文法7入力）: trivia の後の matched cursor から読む要素。javaStyle の R1 は空白を
+  CP3 まで消費し、matched も CP3 になるので、`LOOKAHEAD('xy')`・`UNTIL('x')` は CP3 の `xy` を見て
+  受理し、`NEGATIVE_LOOKAHEAD('x')` は失敗する（第2候補の `w` が CP5 で失敗）。行コメントでは
+  matched が行末の先読み CP5 なので、`LOOKAHEAD('xy')` が成功し、`'\n'` を CP4 から消費する。
+  先読みの到達（CP5 / CP7）を trivia が保つと、これらは逆の結果になる。
+- `JavaStyleLookaheadRuleSucceeds`: 成功した rule の開始は候補にならない。R1 の `['q']` は CP3 で
+  失敗して R1 は成功し、続く `w` が CP3 で失敗するので syntax CP3（R1 の開始 CP5 ではない）。
+- `JavaStyleConsumeAfterTrivia` / `ConsumeAfterLookahead*`: rule の中の消費の後の失敗。
+  `axyz` では R1 が CP4 から始まり、`x` の消費後 CP2 で `q` が失敗、R1 の失敗で CP4。選択の全候補が
+  失敗する場合と、同じ位置で2度呼ぶ rule（memo ON では2度目が memo の再生）も同じ。
 
 `RuleTriviaConformanceTest` の共通 harness は prefix と全入力診断を memo OFF/ON ×
 Detailed / DetailedOnFailure / Auto の6設定で照合する。Java-host と native Rust は
 別々に生成・compile・実行し、既存の明示 Classic 入口との比較も行う。
 
-修正は Rust の非 Classic・session 外の読み飛ばしで現在の matched と trivia の到達位置の
-最大値を保つだけで、Java の実装、Classic の専用 trivia parser、token-stream session の
-消費位置、#706 / #734 の frontier 選択は変更しない。修正前の runtime で診断の16入力が
-失敗し、prefix 成功の2入力は前後とも一致することを mutation 確認した。
+修正は Rust の rule 呼び出しが失敗したときに frame の開始を失敗位置として記録するだけで、
+trivia の読み飛ばし、matched cursor、Java の実装、Classic の専用 trivia parser、token-stream
+session の消費位置、#706 / #734 の frontier 選択は変えない（[説明](../../docs/prior-matched-diagnostics.md#失敗した-rule-frame-の開始753)）。
+修正前の runtime では30入力のうち20入力（trivia の16と消費の4）が失敗し、trivia で matched を
+max に保つ実装では12入力（`*AfterTrivia` の7、成功した rule の1、消費の4）が失敗する。
