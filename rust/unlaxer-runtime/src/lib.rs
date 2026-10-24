@@ -1305,6 +1305,12 @@ impl FailureMemoKey {
         self.depth_and_modes |= usize::from(enabled) << 15;
         self
     }
+    /// The comment-only trivia of a global `@comment` (#712) is a policy of its own: a rule's
+    /// result under it is not its result with whitespace on or off, for failures and successes.
+    fn with_line_comments(mut self, enabled: bool) -> Self {
+        self.depth_and_modes |= usize::from(enabled) << 16;
+        self
+    }
     fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
         self.depth_and_modes = (self.depth_and_modes & !6)
             | (usize::from(policy.reset) << 2)
@@ -2996,6 +3002,7 @@ impl<'a> ParseContext<'a> {
         .with_match_policy(self.match_cursor_policy)
         .with_token_mode(self.token_mode)
         .with_owned_source(self.track_owned_source)
+        .with_line_comments(self.line_comments)
         .with_state_version(self.scopes.memo_version().expect("memo version checked"));
         let position = self.code_point(self.position);
         if let Some(result) = self.probe_rule_memo(position, &key) {
