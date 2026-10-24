@@ -370,6 +370,10 @@ impl Lowering<'_> {
         if let Some(issue) = crate::token_stream::problems(self.grammar).first() {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
+        if let Some(issue) = crate::global_comment::problems(self.grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
+        let line_comments = crate::global_comment::line_comments(self.grammar);
         let whitespace_definitions = lexical.clone();
         let mut whitespace = false;
         let mut global_style = "none".to_owned();
@@ -378,7 +382,7 @@ impl Lowering<'_> {
         for setting in &self.grammar.settings {
             if matches!(
                 setting.key.as_str(),
-                "tokenAdapter" | "tokenContract" | "embedded" | "embedding"
+                "tokenAdapter" | "tokenContract" | "embedded" | "embedding" | "comment"
             ) {
                 continue;
             }
@@ -460,6 +464,7 @@ impl Lowering<'_> {
         });
         let mut rule_effects = Vec::new();
         let mut rule_whitespace = Vec::new();
+        let mut rule_line_comments = Vec::new();
         let mut has_local_trivia = false;
         let mut methods = HashMap::new();
         let mut associativity_by_level = HashMap::new();
@@ -669,6 +674,8 @@ impl Lowering<'_> {
             self.recoveries.push(recovery);
             has_local_trivia |= local_whitespace.is_some() || interleave;
             rule_whitespace.push(local_whitespace.unwrap_or(whitespace || interleave));
+            // A rule-local setting elsewhere must not widen this rule's inherited policy.
+            rule_line_comments.push(line_comments && local_whitespace.is_none() && !interleave);
             if associativity.is_some() != precedence.is_some() {
                 return Err(format!(
                     "associativity and @precedence must occur together on {}",
@@ -1110,10 +1117,12 @@ impl Lowering<'_> {
                     child: Box::new(rule.body.clone()),
                     definition: definition.clone(),
                 };
-            } else if has_local_trivia || whitespace_style(&global_style).is_err() {
+            } else if has_local_trivia || line_comments || whitespace_style(&global_style).is_err()
+            {
                 rule.body = Expression::TriviaScope {
                     child: Box::new(rule.body.clone()),
                     java_whitespace: rule_whitespace[i],
+                    line_comments: rule_line_comments[i],
                 };
             }
             for annotation in &self.grammar.rules[i].annotations {

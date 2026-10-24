@@ -236,6 +236,10 @@ struct Raising<'a> {
     out: HashMap<&'a str, Vec<usize>>,
     /// Rules that may match the empty string; a token or an unknown reference counts as nullable.
     nullable: HashSet<&'a str>,
+    /// Whether `''` succeeds with width 0 (#749): Java's `Lexing.LiteralParser("")` under
+    /// `@tokenStream` or `@lexicalContext`. Otherwise it is `WordParser("")`, which always fails
+    /// (#713), so it is not nullable. Same condition as the lowering.
+    empty_literal_succeeds: bool,
     /// Kinds a rule may raise: every COMMIT and LABEL in it and in the rules it references.
     raisable: HashMap<&'a str, BTreeSet<&'a str>>,
     /// Labels caught around some reference path to a rule.
@@ -263,6 +267,8 @@ impl<'a> Raising<'a> {
             into: HashMap::new(),
             out: HashMap::new(),
             nullable: HashSet::new(),
+            empty_literal_succeeds: crate::token_stream::enabled(grammar)
+                || crate::lexical_contexts::enabled(grammar),
             raisable: HashMap::new(),
             catchable: HashMap::new(),
             recovered: HashSet::new(),
@@ -434,7 +440,7 @@ impl<'a> Raising<'a> {
 
     fn nullable_element(&self, element: &AtomicElement) -> bool {
         match &element.kind {
-            ElementKind::Terminal(value) => value.is_empty(),
+            ElementKind::Terminal(value) => value.is_empty() && self.empty_literal_succeeds,
             ElementKind::RuleRef { namespace, name } => {
                 namespace.is_some()
                     || !self.rules.contains_key(name.as_str())

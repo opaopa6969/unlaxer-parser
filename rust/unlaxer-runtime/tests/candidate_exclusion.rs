@@ -304,3 +304,55 @@ fn predictive_choice_uses_structural_first_sets_without_retry_when_deferred() {
     }]);
     assert_same_outcomes(&longest, &["a", "ab", "b", "bc", "c"]);
 }
+
+// A global `@comment` (#712): rules inheriting it skip only `//` comments, also before the
+// first element of each of their sequences. A candidate entered from a rule without trivia,
+// where a comment remains (the rule reference `Lines`, and `Alt`'s first alternative), may
+// start with `/` and must not be excluded by its FIRST set.
+fn line_comment_grammar() -> Vec<Rule> {
+    vec![
+        Rule {
+            name: "root",
+            expression: Expr::sequence([
+                Expr::literal("a").capture("value"),
+                Expr::choice([Expr::Rule(1), Expr::Rule(2)]),
+            ])
+            .trivia_scope(false),
+        },
+        Rule {
+            name: "lines",
+            expression: Expr::sequence([Expr::literal("\n"), Expr::literal("x")])
+                .line_comment_scope(),
+        },
+        Rule {
+            name: "alt",
+            expression: Expr::choice([
+                Expr::sequence([Expr::literal("\r\n"), Expr::literal("y")]),
+                Expr::literal("w"),
+            ])
+            .line_comment_scope(),
+        },
+    ]
+}
+
+#[test]
+fn line_comment_candidates_are_not_excluded_by_their_first_set() {
+    let grammar = share_grammar(line_comment_grammar());
+    let accepted = ["a//c\nx", "a//c\r\ny", "aw"];
+    assert_same_outcomes(&grammar, &accepted);
+    assert_same_outcomes(&grammar, &["a//c\nw", "a//c", "a\nx", "a/x"]);
+    set_candidate_exclusion_for_current_thread(Some(CandidateExclusion::On));
+    let deferred = ParseOptions::default().with_diagnostics(Diagnostics::DetailedOnFailure);
+    for input in accepted {
+        assert!(
+            parse_detailed_shared_with_options(&grammar, 0, false, input, deferred).is_ok(),
+            "{input:?}"
+        );
+        // A context runs once, without the full-input functions' retry after a deferred
+        // failure, so a wrongly excluded candidate would reject the input here.
+        let mut context = ParseContext::with_options(input, deferred);
+        let matched: ParseMatch = context.parse_shared_grammar(&grammar, 0, false).unwrap();
+        assert_eq!(input.chars().count(), matched.span.end, "{input:?}");
+    }
+    set_candidate_exclusion_for_current_thread(None);
+}

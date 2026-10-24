@@ -289,11 +289,21 @@ prefix は最適化されません。詳細は[チューニング実践ノート
 
 ### `@comment: { line: '//' }`
 
-暗黙のコメントスキップを挿入します。ブロック形式は `line` キーを受け付けます：
+grammar 既定を継承する rule に `//` 行コメントの暗黙スキップを挿入します。受け付ける形は
+`@comment` 1 個で、ブロックの中身がちょうど `line: '//'` のものだけです：
 
 ```ubnf
 @comment: { line: '//' }
 ```
+
+`@whitespace: javaStyle` と併記した場合は追加効果がありません（javaStyle は行コメントを含む）。
+global whitespace が無い（または `none`）場合、継承 rule は `//` から CR / LF / EOF の直前までだけを
+読み飛ばします。改行・空白・block comment は有意なままなので、改行を明示的に書く行指向の文法に
+向きます。rule の `@whitespace(...)` と `@interleave` はそれぞれの設定を使います。その他の形、
+重複、名前付き global whitespace との併記は `E-COMMENT-SETTING` / `E-COMMENT-WHITESPACE` で
+拒否します。ただし `@whitespace: javaStyle` と併記した場合は、3.3.0 が javaStyle 単独と同じに
+生成していたため拒否せず、同じ生成物のまま警告 `W-COMMENT-IGNORED` を出します。Java・Java-host Rust・native Rust の生成物は同じ動作です。詳細は
+[trivia 契約](rule-trivia.md#global-comment712)。
 
 ### `@enum`
 

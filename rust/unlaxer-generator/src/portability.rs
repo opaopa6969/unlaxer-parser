@@ -263,6 +263,9 @@ impl Inventory {
         for problem in crate::raising::problems(grammar) {
             self.add(problem.code, problem.subject, problem.span);
         }
+        for issue in crate::global_comment::problems(grammar) {
+            self.add(issue.code, issue.subject, issue.span);
+        }
         for import in &grammar.imports {
             self.add("P-IMPORT", &import.path, import.span);
         }
@@ -282,7 +285,8 @@ impl Inventory {
                             | "tokenProgressContractsV1"
                             | "declarativeTokensV1"
                     ) => {}
-                ("tokenAdapter" | "tokenContract" | "embedded", _) => {}
+                // @comment has its own E-COMMENT-* diagnostics, including the block form check.
+                ("tokenAdapter" | "tokenContract" | "embedded" | "comment", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
                     if !named_whitespace(grammar, value) {
                         self.add("P-WHITESPACE", value, setting.value_span);

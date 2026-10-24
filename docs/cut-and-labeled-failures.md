@@ -207,10 +207,18 @@ the repetition normally: `{ COMMIT(['a']) } 'x'`, `{ Item } 'x'` with
 `Item ::= COMMIT(Opt)` and `Opt ::= ['a']` all accept `x`, and are accepted (the first was
 rejected from #710 until #722). The nullable
 analysis is an over-approximation shared by both hosts: an optional, a repetition with
-minimum 0, a replay, an empty literal, a token, a qualified or unknown reference, and a rule
+minimum 0, a replay, a token, a qualified or unknown reference, and a rule
 whose body may match empty all count as nullable, so a body that reaches a token (for
 example `{ LABEL(L, NUMBER) }`) is not rejected; an error is reported only when the
 repetition certainly cannot succeed.
+
+An empty literal `''` counts as nullable only in a grammar where it succeeds with width 0,
+that is, with `@tokenStream` or any `@lexicalContext` (Java `Lexing.LiteralParser("")`).
+In an ordinary grammar it is Java's `WordParser("")`, which always fails
+([empty literal](empty-literal.md), #713), so it is not nullable (#749): `{ COMMIT('') }`,
+`{ COMMIT('', 'm') }` and an uncaught `{ LABEL(L, '') }` raise on the first iteration and are
+rejected, while `CATCH({ LABEL(L, '') } 'x', 'y', L)` is accepted. The condition is the one
+both frontends use to lower `''`, so the two hosts and the generated parser agree.
 
 - A labeled failure `L` is caught only inside the body operand of a `CATCH` that lists
   `L`, in the same rule or around a rule reference on some path to the rule:
@@ -325,7 +333,8 @@ The UBNF slice uses [`spec-corpus/cut-labeled-failure`](../spec-corpus/cut-label
 nested catch, a memoized rule, recovery, supplementary scalars with CRLF and the
 repetitions that #722 accepts through references, instances, recovery and bodies that
 may match the empty string;
-`invalid.json` has the 12 positioned rejections, 8 of them `E-RAISING-REPETITION`. `RaisingOperatorConformanceTest`
+`invalid.json` has the 15 positioned rejections, 11 of them `E-RAISING-REPETITION`
+(3 with an ordinary-grammar `''`, #749). `RaisingOperatorConformanceTest`
 compiles and runs the Java consumer, generates Rust from both hosts, checks the
 files byte for byte, and builds and runs both Rust consumers under all six
 memo × diagnostics settings, plus both language servers over JSON-RPC.

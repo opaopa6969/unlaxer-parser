@@ -77,12 +77,15 @@ public final class RustGrammarLowering {
         org.unlaxer.dsl.codegen.LexicalContexts.requireValid(grammar);
         org.unlaxer.dsl.codegen.NamePredicates.requireValid(grammar);
         var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
+        org.unlaxer.dsl.codegen.TokenStreamGrammar.requireValid(grammar);
+        org.unlaxer.dsl.codegen.GlobalComment.requireValid(grammar);
+        boolean lineComments = org.unlaxer.dsl.codegen.GlobalComment.lineComments(grammar);
         boolean whitespace = false;
         String globalStyle = "none";
         Set<String> settings = new HashSet<>();
         Set<String> memoSafeTokens = new HashSet<>();
         for (var setting : grammar.settings()) {
-            if (Set.of("tokenAdapter", "tokenContract", "embedded", "embedding").contains(setting.key())) continue;
+            if (Set.of("tokenAdapter", "tokenContract", "embedded", "embedding", "comment").contains(setting.key())) continue;
             if (setting.key().equals("feature")) {
                 if (!org.unlaxer.dsl.bootstrap.UBNFFeatures.validate(grammar).isEmpty()) throw unsupported("invalid feature");
                 continue;
@@ -121,7 +124,6 @@ public final class RustGrammarLowering {
                 throw unsupported("setting " + setting.key());
             }
         }
-        org.unlaxer.dsl.codegen.TokenStreamGrammar.requireValid(grammar);
         for (var token : grammar.tokens()) {
             Expression value = token instanceof TokenDecl.Declarative
                 ? new LexicalToken(token.name(), lexical.get(token.name())) : token(token);
@@ -392,8 +394,9 @@ public final class RustGrammarLowering {
                 .orElse(grammar.rules().get(i).annotations().stream().anyMatch(InterleaveAnnotation.class::isInstance) ? "javaStyle" : globalStyle);
             var definition = org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, lexical);
             if (definition != null) expression = new LexicalTriviaScope(expression, definition);
-            else if (hasLocalTrivia || !globalStyle.equalsIgnoreCase("none") && !globalStyle.equalsIgnoreCase("javaStyle"))
-                expression = new TriviaScope(expression, ruleWhitespace.get(i));
+            else if (hasLocalTrivia || lineComments || !globalStyle.equalsIgnoreCase("none") && !globalStyle.equalsIgnoreCase("javaStyle"))
+                expression = new TriviaScope(expression, ruleWhitespace.get(i), lineComments && grammar.rules().get(i).annotations().stream()
+                    .noneMatch(a -> a instanceof WhitespaceAnnotation || a instanceof InterleaveAnnotation));
             for (var annotation : grammar.rules().get(i).annotations()) if (annotation instanceof LexicalContextAnnotation context)
                 expression = new LexicalContextScope(expression, org.unlaxer.dsl.codegen.LexicalContexts.terminals(grammar, context));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));

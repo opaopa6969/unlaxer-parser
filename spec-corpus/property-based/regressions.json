@@ -11,6 +11,17 @@
     ]
   },
   {
+    "id": "capture-memo-choice-returned-parsed",
+    "issue": "#744",
+    "note": "Java の Choice は miss で選んだ子の Parsed を返す。SAFE_FAILURES の成功 memo を再生しても同じ Parsed を返すので、1 つ目の分岐の R1 @f で memo した R1 を CAPTURE しても w は x。入力 x で memo の設定に関係なく context の consumed / matched は CP1。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(N0, params=[f]) R0 ::= R1 @f 'z' | CAPTURE(w, R1) SAME_AS(w) ; R1 ::= AHEAD | 'q' ; }",
+    "inputs": [
+      "x",
+      "q",
+      "xz"
+    ]
+  },
+  {
     "id": "owned-capture-field-direct-choice-lookahead",
     "issue": "#729",
     "note": "@f の consumed collector は先読みの Parsed 原文を外側の CAPTURE へ渡さない。入力 x で w は空文字列、context の consumed は CP0、全入力解析は trailing_input CP0。",
@@ -530,6 +541,22 @@
       "a",
       "ya,",
       ""
+    ]
+  },
+  {
+    "id": "step-budget-capture-mutual-recursion",
+    "issue": "#739",
+    "note": "seed 81 の縮小例。相互再帰する R0 / R1 が同じ位置で R1 を繰り返し試し、memo なし（ParseOptions.DEFAULT）では x が 4 個増えるごとに手数が約 16 倍になる。CAPTURE / SAME_AS を含むので SAFE_FAILURES でも memo されない。x 32 個は harness の手数上限（STEP_BUDGET）を超えるので両 host とも観測せず、overBudget に一致することだけを確かめる。上限が無いと Java の受理判定が終わらない。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @root @mapping(N0) R0 ::= R1 ',' | R1 R1 | ',' ; R1 ::= CAPTURE(w0, 'x' R0) SAME_AS(w0) ; }",
+    "inputs": [
+      ",",
+      "x,x,,",
+      "x,x,",
+      "xx,xx,",
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ],
+    "overBudget": [
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     ]
   },
   {
