@@ -8,6 +8,10 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Added
+
+- Java / Rust（native・Java-host）の既知差・未対応・条件付き skip を issue へ結ぶ [台帳](docs/parity-ledger.md) と JSON、host 別 corpus（JSON・JSON Lines・TSV・CSV・YAML、host 列の行）とテスト内の無条件 skip・差分表・除外集合の登録漏れ、文書の不一致を検出する既存 CI の検査を追加 (#771)。
+
 ### Fixed
 
 - 正の `LOOKAHEAD` の後に呼んだ rule が、中の trivia（global `@comment`・javaStyle・名前付き whitespace）や消費で matched cursor を下げてから失敗したとき、生成した Rust parser の診断位置が Java より小さかった問題を修正 (#753)。Java と同じく、失敗した rule の frame の開始 max(consumed, matched) を失敗位置として記録する（`a//c\nxy` で CP5 → CP7、`R1 ::= 'x' 'q'` の `axyz` で CP2 → CP4）。trivia の後の matched cursor は Java の transaction cursor のまま変えない。rule でない group・選択の frame は対象外（#793）。[説明](docs/prior-matched-diagnostics.md#失敗した-rule-frame-の開始753)。
