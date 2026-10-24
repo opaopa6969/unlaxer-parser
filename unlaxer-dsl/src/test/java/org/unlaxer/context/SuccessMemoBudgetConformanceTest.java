@@ -249,6 +249,7 @@ public class SuccessMemoBudgetConformanceTest {
                             repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(),
                             "-o",
                             binary.toString()));
+            run(List.of(binary.toString(), "success_budget_"));
             // #789: the oracle rows go to their own file. libtest's progress lines share
             // stdout with the test threads, so the .log is kept only for diagnosis.
             Path evidence = Path.of("target/success-memo-budget-rust.tsv").toAbsolutePath();
@@ -256,7 +257,9 @@ public class SuccessMemoBudgetConformanceTest {
             Files.writeString(
                     Path.of("target/success-memo-budget-rust.log"),
                     run(
-                            List.of(binary.toString(), "success_budget_", "--nocapture"),
+                            List.of(binary.toString(), "--exact",
+                                    "memo_retention_tests::success_budget_shared_oracle_bounds_epochs_and_preserves_real_hits",
+                                    "--nocapture"),
                             Map.of(
                                     "UNLAXER_TEST_SUCCESS_BUDGET_EVIDENCE",
                                     evidence.toString())));

@@ -72,3 +72,70 @@ fn scoped_rules_still_reject_nullable_repeats_and_left_recursion() {
         assert!(unlaxer_generator::generate(&source).is_err(), "{body}");
     }
 }
+
+#[test]
+fn global_comment_is_only_the_inherited_default() {
+    let scopes = |settings: &str, root: &str| {
+        lower(&format!("@comment: {{ line: '//' }} {settings}"), root, "")
+            .rules
+            .iter()
+            .map(|rule| match &rule.body {
+                Expression::TriviaScope {
+                    java_whitespace,
+                    line_comments,
+                    ..
+                } => Some((*java_whitespace, *line_comments)),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    // A rule-local setting elsewhere must not widen the inherited comment-only policy.
+    for (settings, root, expected) in [
+        ("", "", [Some((false, true)), Some((false, true))]),
+        (
+            "@whitespace: NONE",
+            "",
+            [Some((false, true)), Some((false, true))],
+        ),
+        (
+            "",
+            "@whitespace",
+            [Some((true, false)), Some((false, true))],
+        ),
+        (
+            "",
+            "@whitespace(none)",
+            [Some((false, false)), Some((false, true))],
+        ),
+        (
+            "",
+            "@interleave(profile=commentsAndSpaces)",
+            [Some((true, false)), Some((false, true))],
+        ),
+        ("@whitespace: javaStyle", "", [None, None]),
+    ] {
+        assert_eq!(
+            expected.to_vec(),
+            scopes(settings, root),
+            "{settings} {root}"
+        );
+    }
+    assert!(
+        unlaxer_codegen::generate(&lower("@comment: { line: '//' }", "", ""))
+            .unwrap()
+            .iter()
+            .any(|file| file.content.contains(".line_comment_scope()"))
+    );
+    for comment in [
+        "@comment: { line: '#' }",
+        "@comment: { line: '//' } @comment: { line: '//' }",
+        "@comment: slashes",
+        "@ubnf: v2 @whitespace: GAP @comment: { line: '//' } token GAP ::= ' '+;",
+    ] {
+        let source = format!(
+            "grammar G {{ {comment} @root @mapping(Root, params=[value]) Start ::= 'a' @value ; }}"
+        );
+        let error = unlaxer_generator::generate(&source).unwrap_err();
+        assert!(error.contains("E-COMMENT-"), "{comment}: {error}");
+    }
+}
