@@ -209,7 +209,14 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. } => of(child, rules),
         Expr::LexicalTriviaScope { .. } | Expr::LexicalContextScope { .. } => FirstSet::UNKNOWN,
-        Expr::TriviaScope { child, whitespace } => {
+        // Comment-only trivia may start with `/`; never exclude a candidate under it.
+        Expr::TriviaScope {
+            line_comments: true,
+            ..
+        } => FirstSet::UNKNOWN,
+        Expr::TriviaScope {
+            child, whitespace, ..
+        } => {
             let mut set = of(child, rules);
             set.trivia = match (set.trivia, whitespace) {
                 (Trivia::Dynamic, true) => Trivia::Always,

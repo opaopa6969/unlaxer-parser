@@ -190,13 +190,13 @@ Write global settings in the form `@key: value`.
 |---|---|---|
 | `@package` | `org.example.generated` | Package name of generated Java files |
 | `@whitespace` | `javaStyle` | Whitespace handling style. With `javaStyle`, spaces between rule elements are skipped automatically |
-| `@comment` | `{ line: "//" }` | Comment format. With `line: "//"`, line comments are skipped like whitespace |
+| `@comment` | `{ line: '//' }` | Line comments (`//` to the end of the line). The only accepted form is `{ line: '//' }`; with `@whitespace: javaStyle` it adds nothing, otherwise inheriting rules skip only line comments ([trivia contract](../docs/rule-trivia.md#global-comment712)) |
 
 ```ubnf
 grammar MyLang {
     @package: com.example.mylang
     @whitespace: javaStyle
-    @comment: { line: "//" }
+    @comment: { line: '//' }
     ...
 }
 ```

@@ -1,0 +1,129 @@
+[
+  {
+    "name": "line-slashes",
+    "note": "The supported form adds nothing next to javaStyle and is not reported (tinyexpression P4).",
+    "grammar": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: { line: '//' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "baseline": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "warnings": []
+  },
+  {
+    "name": "hash-prefix",
+    "note": "ubnfc corpus/oracle/comment-whitespace.json",
+    "grammar": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: { line: '#' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "baseline": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "warnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "subject": "comment",
+        "span": [
+          96,
+          119
+        ]
+      }
+    ]
+  },
+  {
+    "name": "extra-keys",
+    "note": "rust/unlaxer-ubnf/tests/fixtures/positive/all-tokens.ubnf form",
+    "grammar": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: { line: '//' blockOpen: '/*' blockClose: '*/' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "baseline": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "warnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "subject": "comment",
+        "span": [
+          96,
+          153
+        ]
+      }
+    ]
+  },
+  {
+    "name": "unknown-key",
+    "note": "rust/unlaxer-ubnf/tests/fixtures/source/locations.ubnf form",
+    "grammar": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: { line: '//' end: '*/' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "baseline": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "warnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "subject": "comment",
+        "span": [
+          96,
+          130
+        ]
+      }
+    ]
+  },
+  {
+    "name": "block-only",
+    "note": "No line key",
+    "grammar": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: { block: '(* *)' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "baseline": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "warnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "subject": "comment",
+        "span": [
+          96,
+          124
+        ]
+      }
+    ]
+  },
+  {
+    "name": "scalar",
+    "note": "Scalar value",
+    "grammar": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: slashes\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "baseline": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "warnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "subject": "comment",
+        "span": [
+          96,
+          113
+        ]
+      }
+    ]
+  },
+  {
+    "name": "duplicate",
+    "note": "Only the repeated setting is reported",
+    "grammar": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: { line: '//' }\n @comment: { line: '//' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "baseline": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "warnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "subject": "comment",
+        "span": [
+          122,
+          146
+        ]
+      }
+    ]
+  },
+  {
+    "name": "duplicate-invalid",
+    "note": "Every unsupported or repeated setting is reported, in source order",
+    "grammar": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: { line: '#' }\n @comment: { line: '//' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "baseline": "// 😀 code-point spans\ngrammar Ignored {\n @package: org.example.ignored\n @whitespace: javaStyle\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "warnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "subject": "comment",
+        "span": [
+          96,
+          119
+        ]
+      },
+      {
+        "code": "W-COMMENT-IGNORED",
+        "subject": "comment",
+        "span": [
+          121,
+          145
+        ]
+      }
+    ]
+  }
+]
