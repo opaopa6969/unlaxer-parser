@@ -25,10 +25,11 @@ jobs:
         run: python3 scripts/verify-optin-tests.py embedded-grammars --prepare
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=EmbeddedLanguagesTest,EmbeddedGrammarConformanceTest,PlaygroundCommandTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
       - name: Verify required tests (embedded-grammars)
-        if: always()
+        id: verify-embedded-grammars
+        if: success()
         run: python3 scripts/verify-optin-tests.py embedded-grammars
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() && steps.verify-embedded-grammars.outcome != 'skipped' }}
         with:
           name: optin-embedded-grammars
           path: |

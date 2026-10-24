@@ -150,6 +150,24 @@ class SurefireTest(unittest.TestCase):
         self.report('skipped', name='unrelated.Test')
         self.assertTrue(self.verify()['ok'])
 
+    def test_all_reports_contract_checks_unlisted_xml_too(self):
+        self.report()
+        self.contract['all_reports'] = True
+        for fixture, ok in [('success', True), ('skipped', False), ('failure', False), ('error', False)]:
+            path = self.report(fixture, name='other.Test')
+            def rename(suite):
+                suite.set('name', 'other.Test')
+                suite.find('testcase').set('classname', 'other.Test')
+            self.rewrite(path, rename)
+            result = self.verify()
+            self.assertEqual(result['ok'], ok, result)
+            self.assertEqual(len(result['suites']), 2)
+            self.assertTrue((self.output / path.name).exists())
+        path.write_text('<testsuite')
+        self.assertFalse(self.verify()['ok'])
+        VERIFIER.prepare(self.root, self.contract, self.output)
+        self.assertEqual(list(self.reports.glob('TEST-*.xml')), [])
+
     def test_parameterized_names_and_testsuites_wrapper(self):
         path = self.report()
         suite = ET.parse(path).getroot()
@@ -204,10 +222,12 @@ class WorkflowTest(unittest.TestCase):
                             prepared.add(name)
                         else:
                             verified.add(name)
-                            self.assertEqual(step.get('if'), 'always()', (path, name))
+                            self.assertEqual(step.get('if'), 'success()', (path, name))
+                            self.assertEqual(step.get('id'), 'verify-' + name)
                     if 'upload-artifact@' in step.get('uses', '') and 'optin-evidence/' in step.get('with', {}).get('path', ''):
                         artifacts.append(step['with']['path'])
-                        self.assertEqual(step.get('if'), 'always()')
+                        self.assertIn(".outcome != 'skipped'", step.get('if', ''))
+                        self.assertIn('!cancelled()', step['if'])
         self.assertEqual(verified, set(contracts))
         # tiny-catalog uses the same freshly prepared cross-language invocation.
         self.assertEqual(prepared, set(contracts) - {'tiny-catalog'})
@@ -228,9 +248,46 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('reportMeasuredWorkAndAllocation', required['org.unlaxer.dsl.codegen.TokenStreamConformanceTest'])
         self.assertIn('realTinyGrammarAdvancesPastCatalogToTheSameGenerationFrontier',
                       required['org.unlaxer.dsl.codegen.RustCatalogConformanceTest'])
-        # Other PRs may extend -Dtest without editing this baseline contract in the same line.
-        selected = set(re.search(r'-Dtest=([^\s]+)', cross)[1].split(','))
-        self.assertTrue({fq.rsplit('.', 1)[1] for fq in required} <= selected)
+        portability = 'org.unlaxer.dsl.RustPortabilityConformanceTest'
+        real = 'realTinyGrammarPassesAndItsExplicitlyInjectedGapsAreAllReported'
+        self.assertNotIn(real, required[portability])
+        self.assertIn(real, contracts['downstream-portability']['required'][portability])
+
+    def test_every_selected_class_and_method_has_a_contract_and_vice_versa(self):
+        contracts = json.loads(VERIFIER.CONTRACTS.read_text())
+        checked = set()
+        for path in (ROOT / '.github/workflows').glob('*.yml'):
+            for job in yaml.safe_load(path.read_text())['jobs'].values():
+                steps = job.get('steps', [])
+                for index, step in enumerate(steps):
+                    prepare = re.search(r'verify-optin-tests.py ([\w-]+) --prepare', step.get('run', ''))
+                    if not prepare:
+                        continue
+                    name = prepare[1]
+                    execution = steps[index + 1]
+                    run = execution.get('run', '')
+                    for key, value in execution.get('env', {}).items():
+                        run = run.replace('${' + key + '}', str(value))
+                    match = re.search(r'-Dtest=([^\s]+)', run)
+                    if not match:
+                        # These two fixed consumer profiles choose tests in their pinned pom.xml.
+                        self.assertIn(name, ['downstream-p4-smoke', 'downstream-ide-smoke'])
+                        self.assertIn('-P', run)
+                        continue
+                    selected = {}
+                    for selector in match[1].split(','):
+                        cls, sep, methods = selector.partition('#')
+                        self.assertNotIn(cls, selected)
+                        selected[cls] = set(methods.split('+')) if sep else None
+                    required = {fq.rsplit('.', 1)[1]: set(methods)
+                                for fq, methods in contracts[name]['required'].items()}
+                    self.assertEqual(set(selected), set(required), (path, name))
+                    for cls, methods in selected.items():
+                        if methods is not None:
+                            self.assertEqual(methods, required[cls], (path, name, cls))
+                    checked.add(name)
+        self.assertEqual(checked, set(contracts) - {'tiny-catalog', 'downstream-p4-smoke', 'downstream-ide-smoke'})
+        self.assertTrue(contracts['assertion-contracts']['all_reports'])
 
 
 if __name__ == '__main__':

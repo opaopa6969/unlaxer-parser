@@ -73,29 +73,34 @@ jobs:
     - name: Prepare required tests (cross-language)
       run: python3 scripts/verify-optin-tests.py cross-language --prepare
     - name: Cross-language fixtures, compile failures, and generated-file drift
+      env:
+        # 実 Tiny grammar の Portability は downstream だけで実行する。
+        PORTABILITY_TESTS: RustPortabilityConformanceTest#inventoriesAndCliExitCodesAgreeWithoutWritingGeneratedFiles+tokenAdapterRegistryDiagnosticsAgreeWithSourcePositions
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,RustPortabilityConformanceTest,TokenAdapterConformanceTest,JavaTokenBindingConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,ClassicSemanticTokensConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest,NonOrderedParityTest,NonOrderedStateTest,ClassicLspLifecycleConformanceTest,ClassicLspDiagnosticsConformanceTest,EnumConformanceTest,PegLookaheadTest,PegLookaheadStateTest,ClassicLspKeywordConformanceTest,DapLauncherLifecycleConformanceTest,MixedEnumConformanceTest,IncrementalCacheConformanceTest,CommonFieldConformanceTest,NumericCaptureConformanceTest,GeneralTokenPropagationTest,GeneralLexicalPropagationTest,GeneralTokenPropagationStateTest,EvaluationConformanceTest,ApiImpactOverloadTest,TypeofConformanceTest,ObserverFailureTest,ObserverScopeStateTest,RecursiveHelperConformanceTest,PreferredAstConformanceTest,FamilyProjectionConformanceTest,LeftRecursionConformanceTest,OwnedCaptureTest,AssociativeProjectionConformanceTest,AssociativeDelimiterConformanceTest,AssociativeNullableDelimiterConformanceTest,AtomicTriviaConformanceTest,ZeroRepeatBoundaryTest,ZeroRepeatGenerationTest,RegexRetirementConformanceTest,CaptureBoundaryTest,NullableRepeatStateTest,NullableRepeatConformanceTest,NullableSeparationStateTest,NullableSeparationConformanceTest,MemoResetPolicyTest,MemoEvictionTest,MemoResourceDepthTest,TypedNestedSchemaTest,TypedNestedCaptureConformanceTest,PureSuccessRollbackTest,PureSuccessMemoizationConformanceTest,VersionedFailureMemoizationConformanceTest,SafeSuccessMemoizationTest,ResourcePublicationTest,NestedMappedCaptureConformanceTest,ClassicMemoizationConformanceTest,OwnedCaptureConformanceTest,OwnedCaptureSyntaxTest,NestedSharedFieldConformanceTest,MappingGuardTest,PublicMapperCstConformanceTest,OrdinaryParserExceptionTest,OrdinaryExceptionOracleTest,PriorMatchedDiagnosticsTest,OrdinaryParserExceptionConformanceTest,NestedSeparatedBoundaryTest,NestedSeparatedCaptureConformanceTest,NestedMixedValueConformanceTest,NestedSeparatedMappedCaptureConformanceTest,FailureMemoBudgetTest,FailureMemoBudgetConformanceTest,SuccessMemoBudgetTest,SuccessMemoBudgetConformanceTest,ParserScalingSmokeTest,MemoScalingConformanceTest,OwnedNestedCaptureConformanceTest,NestedTypeofConformanceTest,NestedAutoEvalConformanceTest,NestedAliasCaptureConformanceTest,FailureMemoConfigurationTest,ParameterizedRuleConformanceTest,CallByValueConformanceTest,PropertyBasedParityTest,CutLabeledFailureTest,RuleStackTest,RuleStackLspConformanceTest,RaisingOperatorConformanceTest,AutoCommitConformanceTest,AutoCommitWhitespaceFuzzTest,EmptyLiteralConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,${PORTABILITY_TESTS},TokenAdapterConformanceTest,JavaTokenBindingConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,ClassicSemanticTokensConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest,NonOrderedParityTest,NonOrderedStateTest,ClassicLspLifecycleConformanceTest,ClassicLspDiagnosticsConformanceTest,EnumConformanceTest,PegLookaheadTest,PegLookaheadStateTest,ClassicLspKeywordConformanceTest,DapLauncherLifecycleConformanceTest,MixedEnumConformanceTest,IncrementalCacheConformanceTest,CommonFieldConformanceTest,NumericCaptureConformanceTest,GeneralTokenPropagationTest,GeneralLexicalPropagationTest,GeneralTokenPropagationStateTest,EvaluationConformanceTest,ApiImpactOverloadTest,TypeofConformanceTest,ObserverFailureTest,ObserverScopeStateTest,RecursiveHelperConformanceTest,PreferredAstConformanceTest,FamilyProjectionConformanceTest,LeftRecursionConformanceTest,OwnedCaptureTest,AssociativeProjectionConformanceTest,AssociativeDelimiterConformanceTest,AssociativeNullableDelimiterConformanceTest,AtomicTriviaConformanceTest,ZeroRepeatBoundaryTest,ZeroRepeatGenerationTest,RegexRetirementConformanceTest,CaptureBoundaryTest,NullableRepeatStateTest,NullableRepeatConformanceTest,NullableSeparationStateTest,NullableSeparationConformanceTest,MemoResetPolicyTest,MemoEvictionTest,MemoResourceDepthTest,TypedNestedSchemaTest,TypedNestedCaptureConformanceTest,PureSuccessRollbackTest,PureSuccessMemoizationConformanceTest,VersionedFailureMemoizationConformanceTest,SafeSuccessMemoizationTest,ResourcePublicationTest,NestedMappedCaptureConformanceTest,ClassicMemoizationConformanceTest,OwnedCaptureConformanceTest,OwnedCaptureSyntaxTest,NestedSharedFieldConformanceTest,MappingGuardTest,PublicMapperCstConformanceTest,OrdinaryParserExceptionTest,OrdinaryExceptionOracleTest,PriorMatchedDiagnosticsTest,OrdinaryParserExceptionConformanceTest,NestedSeparatedBoundaryTest,NestedSeparatedCaptureConformanceTest,NestedMixedValueConformanceTest,NestedSeparatedMappedCaptureConformanceTest,FailureMemoBudgetTest,FailureMemoBudgetConformanceTest,SuccessMemoBudgetTest,SuccessMemoBudgetConformanceTest,ParserScalingSmokeTest,MemoScalingConformanceTest,OwnedNestedCaptureConformanceTest,NestedTypeofConformanceTest,NestedAutoEvalConformanceTest,NestedAliasCaptureConformanceTest,FailureMemoConfigurationTest,ParameterizedRuleConformanceTest,CallByValueConformanceTest,PropertyBasedParityTest,CutLabeledFailureTest,RuleStackTest,RuleStackLspConformanceTest,RaisingOperatorConformanceTest,AutoCommitConformanceTest,AutoCommitWhitespaceFuzzTest,EmptyLiteralConformanceTest -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
         -Dtinyexpression.grammar=${{ github.workspace }}/tiny-catalog/tools/tinyexpression-p4-lsp-vscode/grammar/tinyexpression-p4.ubnf
     - name: Verify required tests (cross-language)
-      if: always()
+      id: verify-cross-language
+      if: success()
       run: python3 scripts/verify-optin-tests.py cross-language
     - name: Verify required tests (tiny-catalog)
-      if: always()
+      id: verify-tiny-catalog
+      if: success()
       run: |
         python3 scripts/verify-optin-tests.py tiny-catalog
         test -s unlaxer-dsl/target/rust-catalog-tiny-frontier.txt
         test -s unlaxer-dsl/target/rust-catalog-tiny-revision.txt
     - uses: actions/upload-artifact@v4
-      if: always()
+      if: ${{ !cancelled() && steps.verify-cross-language.outcome != 'skipped' }}
       with:
         name: optin-cross-language
         path: |
           target/optin-evidence/cross-language/
         if-no-files-found: error
     - uses: actions/upload-artifact@v4
-      if: always()
+      if: ${{ !cancelled() && steps.verify-tiny-catalog.outcome != 'skipped' }}
       with:
         name: tiny-catalog-conformance
         path: |
@@ -473,13 +478,13 @@ jobs:
 
     - name: Validate Central release guard
       run: |
-        python3 scripts/tests/test_central_release_guard.py
+        python3 scripts/run-required-unittests.py scripts.tests.test_central_release_guard
         python3 scripts/tests/test_version_sync.py
         bash -n scripts/release-central.sh
 
     - name: Check job-local Maven repository wiring (#718)
       run: |
-        python3 scripts/tests/test_maven_job_repository.py
+        python3 scripts/run-required-unittests.py scripts.tests.test_maven_job_repository
         bash -n scripts/check-job-maven-repository.sh
         bash -n scripts/check-published-consumer.sh
         bash -n .github/actions/maven-job-repository/select.sh
@@ -487,7 +492,7 @@ jobs:
         node --check .github/actions/maven-job-repository/post.js
 
     - name: Test required Surefire execution verifier (#719)
-      run: python3 scripts/tests/test_verify_optin_tests.py
+      run: python3 scripts/run-required-unittests.py scripts.tests.test_verify_optin_tests scripts.tests.test_required_unittests
 
     - name: Build with Maven
       run: mvn -B clean test
@@ -548,10 +553,11 @@ jobs:
         test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
         test -s unlaxer-dsl/target/case-insensitive-java.tsv
     - name: Verify required tests (jdk17-parity)
-      if: always()
+      id: verify-jdk17-parity
+      if: success()
       run: python3 scripts/verify-optin-tests.py jdk17-parity
     - uses: actions/upload-artifact@v4
-      if: always()
+      if: ${{ !cancelled() && steps.verify-jdk17-parity.outcome != 'skipped' }}
       with:
         name: optin-jdk17-parity
         path: |
@@ -735,11 +741,12 @@ jobs:
         mvn -B -P p4-smoke test -Dgpg.skip=true
 
     - name: Verify required tests (downstream-p4-smoke)
-      if: always()
+      id: verify-downstream-p4-smoke
+      if: success()
       working-directory: tinyexpression-consumer
       run: python3 ../unlaxer-parser/scripts/verify-optin-tests.py downstream-p4-smoke
     - uses: actions/upload-artifact@v4
-      if: always()
+      if: ${{ !cancelled() && steps.verify-downstream-p4-smoke.outcome != 'skipped' }}
       with:
         name: optin-downstream-p4-smoke
         path: |
@@ -758,11 +765,12 @@ jobs:
         -Dtest=P4SourceMappingTest,P4OwnedSliceSourceTest
 
     - name: Verify required tests (downstream-node-alias)
-      if: always()
+      id: verify-downstream-node-alias
+      if: success()
       working-directory: tinyexpression
       run: python3 ../unlaxer-parser/scripts/verify-optin-tests.py downstream-node-alias
     - uses: actions/upload-artifact@v4
-      if: always()
+      if: ${{ !cancelled() && steps.verify-downstream-node-alias.outcome != 'skipped' }}
       with:
         name: optin-downstream-node-alias
         path: |
@@ -793,11 +801,12 @@ jobs:
         test -s unlaxer-dsl/target/tiny-classic-mode/rust.tsv
 
     - name: Verify required tests (downstream-tokens)
-      if: always()
+      id: verify-downstream-tokens
+      if: success()
       working-directory: unlaxer-parser
       run: python3 scripts/verify-optin-tests.py downstream-tokens
     - uses: actions/upload-artifact@v4
-      if: always()
+      if: ${{ !cancelled() && steps.verify-downstream-tokens.outcome != 'skipped' }}
       with:
         name: optin-downstream-tokens
         path: |
@@ -837,11 +846,12 @@ jobs:
         test -s unlaxer-dsl/target/rust-portability-tiny.tsv
 
     - name: Verify required tests (downstream-portability)
-      if: always()
+      id: verify-downstream-portability
+      if: success()
       working-directory: unlaxer-parser
       run: python3 scripts/verify-optin-tests.py downstream-portability
     - uses: actions/upload-artifact@v4
-      if: always()
+      if: ${{ !cancelled() && steps.verify-downstream-portability.outcome != 'skipped' }}
       with:
         name: optin-downstream-portability
         path: |
@@ -880,11 +890,12 @@ jobs:
         mvn -B -P p4-smoke test -Dgpg.skip=true
 
     - name: Verify required tests (downstream-ide-smoke)
-      if: always()
+      id: verify-downstream-ide-smoke
+      if: success()
       working-directory: tinyexpression/tools/tinyexpression-p4-lsp-vscode
       run: python3 ../../../unlaxer-parser/scripts/verify-optin-tests.py downstream-ide-smoke
     - uses: actions/upload-artifact@v4
-      if: always()
+      if: ${{ !cancelled() && steps.verify-downstream-ide-smoke.outcome != 'skipped' }}
       with:
         name: optin-downstream-ide-smoke
         path: |

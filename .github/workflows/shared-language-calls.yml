@@ -24,10 +24,11 @@ jobs:
         env:
           CARGO_INCREMENTAL: '0'
       - name: Verify required tests (shared-language-calls)
-        if: always()
+        id: verify-shared-language-calls
+        if: success()
         run: python3 scripts/verify-optin-tests.py shared-language-calls
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() && steps.verify-shared-language-calls.outcome != 'skipped' }}
         with:
           name: optin-shared-language-calls
           path: |

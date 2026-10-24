@@ -12,6 +12,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 - 生成した Rust parser の Number token が、不完全な指数（`2e`・`2e+`）で Java の `NumberParser` と同じく指数記号・符号の後を失敗位置として記録するよう修正 (#717)。`R0 ::= NUM 'a'` に `2e` の診断は CP1 → CP2（`2e+` は CP3）。受理と消費は従来どおり仮数部まで。共通 oracle `conformance/number-token/cases.tsv` を追加し、PBT の既知差 `number-incomplete-exponent` を削除。
 - Rust の非 Classic 経路の CAPTURE が、Java と同じ子の root token の原文を保存するよう修正 (#729)。直接の LOOKAHEAD の値を保持し、consumed の Chain・EMPTY・UNTIL の先読み部分は値に含めない。SAME_AS は保存した値を consumed cursor から再照合する。入口のモード選択・AST field capture・CST は従来どおり。Classic 経路でも Choice／rule 参照が owned capture へ返す Parsed の原文を、CST に commit する原文と分離する。field capture と CaptureBoundary は commit 済み原文を使い、公開 `ParseMatch.span` も従来の値を保つ（先読み Choice の consumed span は `[0,0]`）。Optional／Recovery／CaptureBoundary が直接の先読み原文を集めないことを Java/Rust で検証した。field capture（`@f`）自身も子の Parsed 原文を破棄し、外側の owned capture へ伝えない。Classic・非 Classic・成功 memo 再生を共通 corpus と直接 API で固定した。
+- CI の必須 opt-in を実 Surefire XML と Python unittest の skip / ゼロ実行検査で保証し、固定 revision の実 Tiny Catalog 証跡を保存する (#719)。
 - Rust host の Rust 生成器で、再帰する未 mapping 規則の値の種類・個数を固定点から求め、反復・separated 内の preferred AST 用の深さと schema hash を Java host に揃えた (#730)。PBT seed 59 の生成物不一致を解消し、縮小した2文法を共有回帰 corpus に追加した。
 
 ### Changed

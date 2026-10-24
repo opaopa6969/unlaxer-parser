@@ -1,6 +1,6 @@
 {
   "cross-language": {
-    "description": "maven.yml / rust: Java21・Rust1.85 共通適合性、frontend、意味・位置・IDE、token stream 計測の実行。性能判定は追加しない。",
+    "description": "maven.yml / rust: Java21・Rust1.85 共通適合性、frontend、意味・位置・IDE、token stream 計測の実行。実 Tiny Portability は downstream が担当する。性能判定は追加しない。",
     "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
     "properties": {"rustConformance": "true", "tokenStreamBench": "true", "tinyexpression.grammar": null},
     "required": {
@@ -8,7 +8,7 @@
       "org.unlaxer.dsl.codegen.RustConformanceTest": ["primitiveTokensPreserveCapturesAndCodePointSpans", "semanticCardinalityRustOracle", "semanticCardinalityJavaOracle", "semanticCardinalityJavaAndRustAgree", "lexicalTokensPreserveRawTextAndCodePointSpans", "mixedValueFixturesPreserveJavaObjectFieldsAndValues", "delimitedMixedFixturesPreserveJavaWholeCaptureText", "mixedTextAndNodesPreserveCardinalityValuesCursorsAndSpans", "delimitedMixedValuesPreserveCaptureTextAndNodeBoundaries", "sharedMixedMappingsAreExecutableInBothDeclarationOrders", "rightAssociativeRecursionPreservesValuesCursorsAndAllSpans", "sharedLeftAssociativeVariantsPreserveOperatorsEvaluationAndSpans", "capturePlacementAndTransparentCollectionsAreExecutable", "cardinalityPreservesOptionalListsSpansAndEvaluation", "diagnosticEdgeCasesAgreeAcrossBackends", "sameGrammarPreservesAstSpansResultsAndEvolutionObligations"],
       "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax"],
       "org.unlaxer.dsl.codegen.RustUbnfSourceConformanceTest": ["everyNodeHasTheSameCodepointSpanAndOriginalText"],
-      "org.unlaxer.dsl.RustPortabilityConformanceTest": ["inventoriesAndCliExitCodesAgreeWithoutWritingGeneratedFiles", "realTinyGrammarPassesAndItsExplicitlyInjectedGapsAreAllReported", "tokenAdapterRegistryDiagnosticsAgreeWithSourcePositions"],
+      "org.unlaxer.dsl.RustPortabilityConformanceTest": ["inventoriesAndCliExitCodesAgreeWithoutWritingGeneratedFiles", "tokenAdapterRegistryDiagnosticsAgreeWithSourcePositions"],
       "org.unlaxer.dsl.codegen.TokenAdapterConformanceTest": ["customBindingsCompileAndPreserveCursorsCapturesSpansAndRollback"],
       "org.unlaxer.dsl.codegen.JavaTokenBindingConformanceTest": ["explicitFinalAdapterIsRejectedBeforeReturningSource", "simpleFinalAliasIsRejectedBeforeReturningSource", "javaValidationAvailabilityAndRealAliasBehaviorFollowTheMatrix", "javaCliRejectsKnownFinalsBeforeWritingAnyArtifacts", "bothRustHostsRunRegardlessOfOptionalJavaClassAvailability"],
       "org.unlaxer.parser.elementary.UnicodeIgnoreCaseWordParserTest": ["everyScalarMatchesOfficialUnicode17SimpleMappings", "sharedOriginalTextSpansRollbackLookaheadAndFirstSets", "legacyFirstSetsCannotExcludeInverseCaseEquivalents", "invertedAndMatchOnlyKeepWordParserCursorContract", "derivedWordsKeepPinnedSemanticsAndMalformedUtf16DoesNotMatch", "longWordsScanOnce"],
@@ -184,7 +184,8 @@
     }
   },
   "assertion-contracts": {
-    "description": "assertion-contracts.yml: 名前を挙げた Java/Rust 共通検証の全メソッド。",
+    "all_reports": true,
+    "description": "assertion-contracts.yml: 必須メソッドと、契約外を含む全 XML の成功を検査。",
     "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
     "properties": {"rustConformance": "true"},
     "required": {

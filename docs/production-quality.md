@@ -37,12 +37,20 @@ CI の check が緑、または `-Dtest` にクラスがあるだけでは実行
 Catalog の frontier 比較は、それ以降の未対応機能や Tiny 全体の実行成功を保証するものではない。
 `tokenStreamBench` は既存の測定テストの実行確認であり、性能改善・新しい性能合否基準は追加しない。
 
-各 Maven 実行の前に `--prepare` でその契約の古い XML だけを消す。
-実行後は `if: always()` で検査し、対象 XML と `result.json` を
+各 Maven 実行の前に `--prepare` でその契約が検査する古い XML を消す。
+Maven が成功した後に検査し、対象 XML と `result.json` を
 `target/optin-evidence/<契約名>/` に保存して artifact 化する。
+verifier が失敗しても証跡はアップロードし、Maven 未実行・失敗時の XML 欠落ノイズを避ける。
 別の Maven 実行が XML を上書きする前に検査・保存する。
 対象の追加・削除・改名時には契約も更新する。workflow の長い `-Dtest` 一覧とは別ファイルなので、
-他の機能 PR による一覧の追加と競合しにくい。
+他の機能 PR による一覧の追加と競合しにくい。`WorkflowTest` は `-Dtest` と契約を双方向に照合する。
+`assertion-contracts` では契約外も含め全 XML を検査し、従来の全 skip 禁止範囲を維持する。
+実 Tiny Portability のメソッドは downstream だけで実行し、共通 job は同クラスの残り2メソッドを選ぶ。
+
+Python unittest の CI 実行は `scripts/run-required-unittests.py` に統一し、skip とゼロ実行も失敗にする。
+`skipUnless`（node / Maven / tail の plugin 不足）、`skipTest`、class setup の skip も対象。
+全 workflow を横断した結果、既存の条件付き skip は Maven repository テストの3クラスのみだった。
+ローカルで各テストを直接実行する場合の通常の unittest skip は維持する。
 
 Surefire を使わない `tiny-classic-oracle.yml:semantic-oracle` は既存の
 12 semantic configurations / 216 samples と Java・両 Rust の独立期待値検査を維持する。

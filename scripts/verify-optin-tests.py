@@ -21,11 +21,19 @@ def report_paths(root, contract, name):
     return [root / directory / f'TEST-{name}.xml' for directory in contract['reports']]
 
 
+def all_report_paths(root, contract):
+    return [path for directory in contract['reports']
+            for path in (root / directory).glob('TEST-*.xml')]
+
+
 def prepare(root, contract, output):
     """Remove only this contract's generated XML; an older pass cannot mask omission."""
     for name in contract['required']:
         for path in report_paths(root, contract, name):
             path.unlink(missing_ok=True)
+    if contract.get('all_reports'):
+        for path in all_report_paths(root, contract):
+            path.unlink()
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
@@ -74,7 +82,12 @@ def verify(root, contract, output):
         shutil.rmtree(output)
     output.mkdir(parents=True, exist_ok=True)
     errors, observations = [], []
-    for name, methods in contract['required'].items():
+    required = dict(contract['required'])
+    if contract.get('all_reports'):
+        # assertion-contracts の従来の「全 XML」検査も維持する。
+        for path in all_report_paths(root, contract):
+            required.setdefault(path.name[len('TEST-'):-len('.xml')], [])
+    for name, methods in required.items():
         paths = [p for p in report_paths(root, contract, name) if p.is_file()]
         if len(paths) != 1:
             errors.append(f'{name}: Surefire XML は 1 個必要（実際: {len(paths)}）')
@@ -88,7 +101,8 @@ def verify(root, contract, output):
             if len(suites) != 1:
                 errors.append(f'{name}: 対象 testsuite がない、または重複している')
                 continue
-            problems, tests = check_suite(suites[0], name, methods, contract.get('properties', {}))
+            properties = contract.get('properties', {}) if name in contract['required'] else {}
+            problems, tests = check_suite(suites[0], name, methods, properties)
             errors.extend(f'{name}: {problem}' for problem in problems)
             observations.append({'class': name, 'tests': tests, 'report': str(path), 'ok': not problems})
         except (ET.ParseError, OSError) as error:
