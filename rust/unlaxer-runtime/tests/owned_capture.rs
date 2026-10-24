@@ -910,3 +910,99 @@ fn classic_field_capture_collects_direct_lookahead_before_owned_capture() {
         assert_eq!((error.kind, error.offset), ("trailing_input", 0));
     }
 }
+
+#[test]
+fn field_capture_rejects_non_input_parsed_source_at_every_entry() {
+    use unlaxer_runtime::{
+        parse_detailed_shared_with_rule_stack, parse_detailed_with_options, Rule,
+    };
+
+    fn projected(c: &mut ParseContext<'_>) -> ParseResult {
+        let id = c
+            .add_token_node(
+                unlaxer_runtime::TOKEN_LEAF_RULE,
+                TokenKind::VirtualConsumed,
+                TokenSource::Projected {
+                    span: Span { start: 1, end: 3 },
+                    text: std::sync::Arc::from("bb"),
+                },
+            )
+            .unwrap();
+        assert!(c.advance(1));
+        Ok(ParseMatch {
+            span: Span { start: 1, end: 3 },
+            nodes: vec![id.index()],
+            captures: vec![],
+        })
+    }
+
+    for (callback, input, offset) in [
+        (
+            generated as fn(&mut ParseContext<'_>) -> ParseResult,
+            "x",
+            0,
+        ),
+        (projected, "abx", 1),
+    ] {
+        for memo in [Memoization::Off, Memoization::SafeFailures] {
+            for diagnostics in [
+                Diagnostics::Auto,
+                Diagnostics::Detailed,
+                Diagnostics::DetailedOnFailure,
+            ] {
+                let options = ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+                for child in [
+                    Expr::Custom(callback),
+                    Expr::choice([Expr::Custom(callback), w("q")]),
+                    Expr::Rule(1),
+                ] {
+                    for shape in ["plain", "owned", "classic"] {
+                        let field = child.clone().capture("f");
+                        let expression = match shape {
+                            "owned" => Expr::sequence([
+                                field.capture_owned("w"),
+                                Expr::Replay("w"),
+                                w("x"),
+                            ]),
+                            // owned capture なしでも MatchOnly で Classic 経路になる形。
+                            "classic" => Expr::sequence([field, w("x").match_only(), w("x")]),
+                            _ => Expr::sequence([field, w("x")]),
+                        };
+                        let rules = [
+                            Rule {
+                                name: "Root",
+                                expression,
+                            },
+                            Rule {
+                                name: "H",
+                                expression: Expr::choice([Expr::Custom(callback), w("q")]),
+                            },
+                        ];
+                        let error = parse_detailed_with_options(&rules, 0, false, input, options)
+                            .unwrap_err();
+                        assert_eq!((error.kind, error.offset), ("syntax", offset));
+                        let mut context = ParseContext::with_options(input, options);
+                        let error = context.parse_grammar(rules.to_vec(), 0, false).unwrap_err();
+                        assert_eq!((context.position(), context.matched_position()), (0, 0));
+                        assert_eq!(context.captured_text("w"), None);
+                        if diagnostics == Diagnostics::Detailed {
+                            assert_eq!(error.offset, offset);
+                        }
+                        let error = parse_detailed_shared_with_rule_stack(
+                            &std::sync::Arc::from(rules),
+                            0,
+                            false,
+                            input,
+                            options,
+                        )
+                        .unwrap_err();
+                        assert_eq!(
+                            (error.diagnostic.kind, error.diagnostic.offset),
+                            ("syntax", offset)
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

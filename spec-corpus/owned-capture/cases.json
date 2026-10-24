@@ -855,7 +855,8 @@
         "success": false,
         "consumed": 0,
         "matched": 0,
-        "word": null
+        "word": null,
+        "failureOffset": 0
       }
     ]
   },
@@ -898,7 +899,8 @@
         "success": false,
         "consumed": 0,
         "matched": 0,
-        "word": null
+        "word": null,
+        "failureOffset": 1
       }
     ]
   },
@@ -955,6 +957,174 @@
         "consumed": 0,
         "matched": 0,
         "word": null
+      }
+    ]
+  },
+  {
+    "name": "field-source-generated-direct",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @mapping(Value, params=[f]) Root ::= CAPTURE(word, T @f) SAME_AS(word) 'x';  }",
+    "cases": [
+      {
+        "input": "x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 0
+      }
+    ]
+  },
+  {
+    "name": "field-source-generated-direct-without-owned",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @mapping(Value, params=[f]) Root ::= T @f 'x';  }",
+    "cases": [
+      {
+        "input": "x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 0
+      }
+    ]
+  },
+  {
+    "name": "field-source-generated-choice",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @mapping(Value, params=[f]) Root ::= CAPTURE(word, (T | 'q') @f) SAME_AS(word) 'x';  }",
+    "cases": [
+      {
+        "input": "x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 0
+      }
+    ]
+  },
+  {
+    "name": "field-source-generated-choice-without-owned",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @mapping(Value, params=[f]) Root ::= (T | 'q') @f 'x';  }",
+    "cases": [
+      {
+        "input": "x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 0
+      }
+    ]
+  },
+  {
+    "name": "field-source-generated-rule",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @mapping(Value, params=[f]) Root ::= CAPTURE(word, H @f) SAME_AS(word) 'x'; H ::= T | 'q'; }",
+    "cases": [
+      {
+        "input": "x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 0
+      }
+    ]
+  },
+  {
+    "name": "field-source-generated-rule-without-owned",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @mapping(Value, params=[f]) Root ::= H @f 'x'; H ::= T | 'q'; }",
+    "cases": [
+      {
+        "input": "x",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 0
+      }
+    ]
+  },
+  {
+    "name": "field-source-projected-direct",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @mapping(Value, params=[f]) Root ::= CAPTURE(word, T @f) SAME_AS(word) 'x';  }",
+    "cases": [
+      {
+        "input": "abx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 1
+      }
+    ]
+  },
+  {
+    "name": "field-source-projected-direct-without-owned",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @mapping(Value, params=[f]) Root ::= T @f 'x';  }",
+    "cases": [
+      {
+        "input": "abx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 1
+      }
+    ]
+  },
+  {
+    "name": "field-source-projected-choice",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @mapping(Value, params=[f]) Root ::= CAPTURE(word, (T | 'q') @f) SAME_AS(word) 'x';  }",
+    "cases": [
+      {
+        "input": "abx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 1
+      }
+    ]
+  },
+  {
+    "name": "field-source-projected-choice-without-owned",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @mapping(Value, params=[f]) Root ::= (T | 'q') @f 'x';  }",
+    "cases": [
+      {
+        "input": "abx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 1
+      }
+    ]
+  },
+  {
+    "name": "field-source-projected-rule",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @mapping(Value, params=[f]) Root ::= CAPTURE(word, H @f) SAME_AS(word) 'x'; H ::= T | 'q'; }",
+    "cases": [
+      {
+        "input": "abx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 1
+      }
+    ]
+  },
+  {
+    "name": "field-source-projected-rule-without-owned",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @mapping(Value, params=[f]) Root ::= H @f 'x'; H ::= T | 'q'; }",
+    "cases": [
+      {
+        "input": "abx",
+        "success": false,
+        "consumed": 0,
+        "matched": 0,
+        "word": null,
+        "failureOffset": 1
       }
     ]
   }

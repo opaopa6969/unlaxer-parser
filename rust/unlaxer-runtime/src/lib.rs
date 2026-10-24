@@ -853,7 +853,7 @@ struct Fragment {
 
 #[derive(Debug, Clone)]
 struct FragmentSource {
-    // owned capture のときだけ保持する、commit 済み原文と異なる Parsed 原文。
+    // owned capture の値と @f の入力由来検査に使う、commit 済み原文と異なる Parsed 原文。
     parsed_source: Option<Box<FragmentSource>>,
     span: Span,
     kind: token::TokenKind,
@@ -3344,14 +3344,10 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
         // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
-        self.rule_result_source = self
-            .track_owned_source
-            .then(|| {
-                fragment
-                    .parsed_source()
-                    .map(|source| Box::new(source.clone()))
-            })
-            .flatten();
+        self.rule_result_source = fragment
+            .parsed_source()
+            .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
+            .map(|source| Box::new(source.clone()));
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
         let classic = fragment
             .source
@@ -3458,16 +3454,21 @@ impl<'a> ParseContext<'a> {
             Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
                 nodes: vec![id],
                 captures: Vec::new(),
-                source: self.tokens.values.get(&id).map(|value| {
-                    Box::new(FragmentSource {
-                        parsed_source: None,
-                        span: self.nodes[id].span,
-                        kind: value.kind,
-                        classic: value.classic,
-                        generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                        text: value.source.owned_shared().map(Box::new),
+                source: self
+                    .tokens
+                    .values
+                    .get(&id)
+                    .map(|value| {
+                        Box::new(FragmentSource {
+                            parsed_source: self.rule_result_source.take(),
+                            span: self.nodes[id].span,
+                            kind: value.kind,
+                            classic: value.classic,
+                            generated: matches!(value.source, token::TokenSource::Generated { .. }),
+                            text: value.source.owned_shared().map(Box::new),
+                        })
                     })
-                }),
+                    .or_else(|| self.rule_result_source.take()),
             }),
             Expr::LexicalContextScope { child, terminals } => {
                 self.expression_with_lexical_context(child, terminals, depth)
@@ -4237,12 +4238,15 @@ impl<'a> ParseContext<'a> {
                                 .get(index)
                                 .is_some_and(|info| info.classic)
                         });
-                    let source = classic.then(|| {
+                    // 原文の由来は Classic の収集モードとは独立して保持する。
+                    let non_input = info
+                        .is_some_and(|info| !matches!(info.source, token::TokenSource::Input(_)));
+                    let source = (classic || non_input).then(|| {
                         Box::new(FragmentSource {
                             parsed_source: None,
                             span: matched.span,
                             kind: info.map_or(self.token_mode().kind, |info| info.kind),
-                            classic: true,
+                            classic,
                             generated: info.is_some_and(|info| {
                                 matches!(info.source, token::TokenSource::Generated { .. })
                             }),
@@ -4678,10 +4682,18 @@ impl<'a> ParseContext<'a> {
         anchor: usize,
         owned: bool,
     ) -> Option<Fragment> {
+        // Java は Choice/rule が返した Parsed を、@f の収集より先に検査する。
+        if !owned
+            && fragment
+                .parsed_source()
+                .is_some_and(|source| source.text.is_some() || source.generated)
+        {
+            self.fail("AST field capture requires original input source; use capture_owned for general replay");
+            return None;
+        }
         if !owned && self.token_mode.is_some() {
             // Java の @f は LazyChain なので、現在の kind の子だけを収集する。
             // 直接の LOOKAHEAD（match-only）は consumed の @f では幅0になる（#742）。
-            // 入力以外の原文は Java と同じく収集前の子の原文で拒否する（下の検査）。
             let kind = self.token_mode().kind;
             if fragment.source.as_deref().is_some_and(|source| {
                 source.classic && source.kind != kind && source.text.is_none() && !source.generated
@@ -4704,14 +4716,6 @@ impl<'a> ParseContext<'a> {
         );
         if !owned {
             // Keep the existing AST field contract and its input-only metadata.
-            if fragment
-                .source
-                .as_deref()
-                .is_some_and(|source| source.text.is_some() || source.generated)
-            {
-                self.fail("AST field capture requires original input source; use capture_owned for general replay");
-                return None;
-            }
             self.captures.push(name, span);
             fragment.captures.push(Capture {
                 name,
@@ -4719,9 +4723,7 @@ impl<'a> ParseContext<'a> {
                 nodes: fragment.nodes.clone(),
             });
             // @f は consumed の収集境界。外側の owned capture へ Parsed 原文を渡さない。
-            if self.track_owned_source {
-                fragment.clear_parsed_source();
-            }
+            fragment.clear_parsed_source();
             if fragment
                 .source
                 .as_deref()
@@ -4731,7 +4733,7 @@ impl<'a> ParseContext<'a> {
             }
             return Some(fragment);
         }
-        let source = match source.filter(|source| source.classic) {
+        let source = match source {
             Some(source) if source.generated => token::TokenSource::Generated {
                 anchor: source.span.start,
                 text: source
@@ -4867,6 +4869,14 @@ impl<'a> ParseContext<'a> {
             | Expr::InputCaptureBoundary(_, child) => {
                 let start = self.position;
                 let mut fragment = self.expression(child, depth)?;
+                if matches!(expression, Expr::InputCaptureBoundary(_, _))
+                    && fragment
+                        .parsed_source()
+                        .is_some_and(|source| source.text.is_some() || source.generated)
+                {
+                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
+                    return None;
+                }
                 if self.track_owned_source {
                     fragment.clear_parsed_source();
                 }
@@ -4877,15 +4887,6 @@ impl<'a> ParseContext<'a> {
                     .is_some_and(|source| !source.classic)
                 {
                     fragment.source = None;
-                }
-                if matches!(expression, Expr::InputCaptureBoundary(_, _))
-                    && fragment
-                        .source
-                        .as_deref()
-                        .is_some_and(|source| source.text.is_some() || source.generated)
-                {
-                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
-                    return None;
                 }
                 if let Expr::CaptureBoundary(kind, _) | Expr::InputCaptureBoundary(kind, _) =
                     expression

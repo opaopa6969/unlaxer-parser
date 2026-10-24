@@ -168,8 +168,9 @@ Java の `ParseOptions.DEFAULT` で 1 回解析し、始まった parser transac
   正規表現で書けない数値条件 `condition` で対象を限定する。`condition` には
   `java-syntax-offset-after-rust`（両方とも `syntax` 失敗で、Java の offset が Rust より大きい）と
   `java-stack-starts-after-rust`（`KnownDifferences.javaStackStartsAfterRust`）がある。どちらも
-  #706 のために作ったもので、#706 の修正後はどの entry も使っていない。現在の既知差は 0 件
-  （file は `[]`）。
+  #706 のために作ったもので、#706 の修正後はどの entry も使っていない。現在の **PBT 除外登録**は 0 件
+  （file は `[]`）。repo 全体の既知差がないという意味ではなく、host 別期待値・skip・未対応は
+  [既知差台帳](parity-ledger.md) と各 issue で追跡する。
   除外した件数は毎回 `[pbt] ... excludedKnown=` に出る。1 件も除外しなかった entry があると
   テストは失敗する（直った差や、範囲がずれた entry を残さないため）。黙って除外しない。
 
