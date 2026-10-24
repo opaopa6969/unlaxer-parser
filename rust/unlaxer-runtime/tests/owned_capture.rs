@@ -956,12 +956,17 @@ fn field_capture_rejects_non_input_parsed_source_at_every_entry() {
                     Expr::choice([Expr::Custom(callback), w("q")]),
                     Expr::Rule(1),
                 ] {
-                    for owned in [false, true] {
+                    for shape in ["plain", "owned", "classic"] {
                         let field = child.clone().capture("f");
-                        let expression = if owned {
-                            Expr::sequence([field.capture_owned("w"), Expr::Replay("w"), w("x")])
-                        } else {
-                            Expr::sequence([field, w("x")])
+                        let expression = match shape {
+                            "owned" => Expr::sequence([
+                                field.capture_owned("w"),
+                                Expr::Replay("w"),
+                                w("x"),
+                            ]),
+                            // owned capture なしでも MatchOnly で Classic 経路になる形。
+                            "classic" => Expr::sequence([field, w("x").match_only(), w("x")]),
+                            _ => Expr::sequence([field, w("x")]),
                         };
                         let rules = [
                             Rule {
