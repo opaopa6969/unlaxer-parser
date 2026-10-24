@@ -13,6 +13,15 @@ Java側は生成クラスの直接の `SafeSuccessMemoizable` markerとlistener 
 成功entryは終了consumed/matched、終了cursor policy、局所syntax診断、captureへの追加順、
 owned CST snapshotを持ちます。CSTのedgeはentry内の相対indexとして保存し、再生先arenaへ付け替えます。
 copy-in/outにより返却treeの変更をcacheへ戻しません。NodeIdや可変portable metadataは保存しません。
+JavaのChoice（LongestChoice / PredictiveChoiceを含む）はmissのとき選んだ子の `Parsed` を返すため、
+成功entryはその `Parsed` のtoken（root と original tokens）・status（`stopped` を含む）・messageも
+同じsnapshotに保持し、hitでも同じ `Parsed` を返します（#744）。CSTにあるtokenは再生したCSTの複製を
+共有し、match-onlyの先読みのようにCSTから外れたtokenだけを隠れた部分木として複製します。
+CAPTUREの値はmemoの設定に依存しません。返すtokenのID配列（16 B + 4 B/件）は確保する前に、
+保持するmessage（64 B + 2 B/文字）は保存する前に、隠れた部分木はCSTと同じnode単位で、成功entryの
+予算に計上します。返すtoken列はコピーせずに件数を判定するため、予算外の長いoriginal tokensにも
+比例した確保をしません。予算を超えるentryは保存しないため、
+予算が飽和する入力ではhitが修正前よりわずかに減ることがあります。
 rollbackしたIDはstaleのまま、再生tokenには新しいgenerationのIDを発行できます。
 既存のtransactionが再生CST/capture/新metadataもrollbackします。診断は通常のspeculative failureと同様に保持します。
 

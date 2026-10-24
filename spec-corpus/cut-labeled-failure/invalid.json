@@ -84,5 +84,26 @@
     "code": "E-RAISING-REPETITION",
     "startCP": 100,
     "endCP": 116
+  },
+  {
+    "id": "empty-literal-commit-repetition",
+    "grammar": "grammar Bad { @root Root ::= '😀' { COMMIT('') } ; }",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 33,
+    "endCP": 47
+  },
+  {
+    "id": "empty-literal-commit-message-repetition",
+    "grammar": "grammar Bad { @root Root ::= 'a' { COMMIT('', 'm') } ; }",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 33,
+    "endCP": 52
+  },
+  {
+    "id": "empty-literal-uncaught-label-repetition",
+    "grammar": "grammar Bad { @root Root ::= 'a' { LABEL(L, '') } ; }",
+    "code": "E-RAISING-REPETITION",
+    "startCP": 33,
+    "endCP": 49
   }
 ]

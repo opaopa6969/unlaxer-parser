@@ -75,33 +75,39 @@ public final class PortabilityCheck {
     public static Result check(UBNFSourceSnapshot snapshot, org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file) {
         List<Diagnostic> diagnostics = new ArrayList<>();
         List<GrammarDecl> grammars = file.grammars();
-        if (grammars.size() != 1) add(diagnostics, "P-GRAMMAR-COUNT", snapshot, snapshot.ast(), "expected one grammar");
+        if (grammars.isEmpty()) add(diagnostics, "P-GRAMMAR-COUNT", snapshot, snapshot.ast(), "expected one grammar");
+        for (GrammarDecl grammar : grammars)
+            if (!org.unlaxer.dsl.codegen.GrammarFileLayout.validName(grammar))
+                add(diagnostics, "P-GRAMMAR-NAME", snapshot, grammar, grammar.name());
+        for (var collision : org.unlaxer.dsl.codegen.GrammarFileLayout.collisions(file))
+            add(diagnostics, "P-OUTPUT-COLLISION", snapshot, collision.grammar(), collision.module());
         for (GrammarDecl grammar : grammars) scanGrammar(grammar, snapshot, diagnostics);
         if (!diagnostics.isEmpty()) return result(false, "blocked", diagnostics);
 
-        GrammarDecl grammar = grammars.get(0);
-        try {
-            // Lowering is a pure IR conversion. The common validator's token
-            // suggestion path is excluded to avoid probing Java classes.
-            RustGrammarLowering.lower(grammar);
-            boolean invalid = GrammarValidator.validateWithoutClassLoading(grammar).stream()
-                .anyMatch(issue -> "ERROR".equals(issue.severity()));
-            invalid |= grammar.rules().stream().anyMatch(rule ->
-                rule.annotations().stream().anyMatch(annotation -> annotation instanceof LeftAssocAnnotation
-                    || annotation instanceof RightAssocAnnotation)
-                    && rule.annotations().stream().noneMatch(annotation -> annotation instanceof PrecedenceAnnotation));
-            if (invalid) add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
-        } catch (RuntimeException error) {
-            var nestedIssues = error.getMessage() != null && error.getMessage().contains("E-NESTED-SHAPE")
-                ? org.unlaxer.dsl.codegen.NestedCaptures.problems(grammar) : List.<GrammarValidator.ValidationIssue>of();
-            var commonRule=org.unlaxer.dsl.codegen.CommonFieldSchema.errorRule(error);
-            if(!nestedIssues.isEmpty()) {
-                var origin=grammar.rules().stream().filter(r->r.name().equals(nestedIssues.get(0).rule())).findFirst().orElseThrow();
-                add(diagnostics,"P-NESTED-SHAPE",snapshot,origin,"nested capture schema");
-            } else if(commonRule.isPresent()) {
-                var origin=grammar.rules().stream().filter(r->r.name().equals(commonRule.get())).findFirst().orElseThrow();
-                add(diagnostics,"P-COMMONFIELD",snapshot,origin,"commonField schema");
-            } else add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
+        for (GrammarDecl grammar : grammars) {
+            try {
+                // Lowering is a pure IR conversion. The common validator's token
+                // suggestion path is excluded to avoid probing Java classes.
+                RustGrammarLowering.lower(grammar);
+                boolean invalid = GrammarValidator.validateWithoutClassLoading(grammar).stream()
+                    .anyMatch(issue -> "ERROR".equals(issue.severity()));
+                invalid |= grammar.rules().stream().anyMatch(rule ->
+                    rule.annotations().stream().anyMatch(annotation -> annotation instanceof LeftAssocAnnotation
+                        || annotation instanceof RightAssocAnnotation)
+                        && rule.annotations().stream().noneMatch(annotation -> annotation instanceof PrecedenceAnnotation));
+                if (invalid) add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
+            } catch (RuntimeException error) {
+                var nestedIssues = error.getMessage() != null && error.getMessage().contains("E-NESTED-SHAPE")
+                    ? org.unlaxer.dsl.codegen.NestedCaptures.problems(grammar) : List.<GrammarValidator.ValidationIssue>of();
+                var commonRule=org.unlaxer.dsl.codegen.CommonFieldSchema.errorRule(error);
+                if(!nestedIssues.isEmpty()) {
+                    var origin=grammar.rules().stream().filter(r->r.name().equals(nestedIssues.get(0).rule())).findFirst().orElseThrow();
+                    add(diagnostics,"P-NESTED-SHAPE",snapshot,origin,"nested capture schema");
+                } else if(commonRule.isPresent()) {
+                    var origin=grammar.rules().stream().filter(r->r.name().equals(commonRule.get())).findFirst().orElseThrow();
+                    add(diagnostics,"P-COMMONFIELD",snapshot,origin,"commonField schema");
+                } else add(diagnostics, "P-STRUCTURE", snapshot, grammar, "Rust structural constraints");
+            }
         }
         return diagnostics.isEmpty() ? result(true, "passed", diagnostics) : result(false, "failed", diagnostics);
     }
@@ -132,10 +138,13 @@ public final class PortabilityCheck {
             add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (var problem : org.unlaxer.dsl.codegen.RaisingOperators.problems(grammar))
             add(out, problem.code(), snapshot, problem.element(), problem.subject());
+        for (var issue : org.unlaxer.dsl.codegen.GlobalComment.problems(grammar))
+            add(out, issue.code(), snapshot, issue.node(), issue.subject());
         for (ImportDecl decl : grammar.imports()) add(out, "P-IMPORT", snapshot, decl, decl.path());
         for (GlobalSetting setting : grammar.settings()) {
-            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream", "embedded", "embedding").contains(setting.key())
-                || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract", "embedded").contains(setting.key()))) {
+            // @comment has its own E-COMMENT-* diagnostics, including the block form check.
+            if (!Set.of("whitespace", "package", "memoSafeToken", "tokenAdapter", "tokenContract", "ubnf", "feature", "tokenStream", "embedded", "embedding", "comment").contains(setting.key())
+                || (setting.value() instanceof BlockSettingValue && !Set.of("tokenAdapter", "tokenContract", "embedded", "comment").contains(setting.key()))) {
                 add(out, "P-SETTING", snapshot, setting, setting.key());
             }
             if (setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value
@@ -171,10 +180,8 @@ public final class PortabilityCheck {
     }
 
     private static void scanAnnotation(GrammarDecl grammar, Annotation annotation, UBNFSourceSnapshot snapshot, List<Diagnostic> out) {
-        String unsupported = null;
-        if (annotation instanceof SimpleAnnotation simple && !simple.name().equals("nestedCaptures")) unsupported = simple.name();
-
-        if (unsupported != null) add(out, "P-ANNOTATION", snapshot, annotation, unsupported);
+        // A Simple annotation is generated as if absent, like Java; SimpleAnnotations.warnings
+        // reports the ignored ones as W-ANNOTATION-IGNORED (#715), so P-ANNOTATION is no longer issued.
 
         if (annotation instanceof MappingAnnotation mapping) {
             if (!identifier(org.unlaxer.dsl.codegen.CommonFieldSchema.rustName(mapping.className()))) add(out, "P-MAPPING-TYPE", snapshot, annotation, mapping.className());

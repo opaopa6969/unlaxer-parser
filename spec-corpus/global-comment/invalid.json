@@ -1,0 +1,112 @@
+[
+  {
+    "name": "duplicate",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @comment: { line: '//' }\n @comment: { line: '//' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-SETTING",
+    "subject": "comment",
+    "span": [
+      98,
+      122
+    ]
+  },
+  {
+    "name": "hash-prefix",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @comment: { line: '#' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-SETTING",
+    "subject": "comment",
+    "span": [
+      72,
+      95
+    ]
+  },
+  {
+    "name": "empty-prefix",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @comment: { line: '' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-SETTING",
+    "subject": "comment",
+    "span": [
+      72,
+      94
+    ]
+  },
+  {
+    "name": "escaped-prefix",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @comment: { line: '\\/\\/' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-SETTING",
+    "subject": "comment",
+    "span": [
+      72,
+      98
+    ]
+  },
+  {
+    "name": "block-only",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @comment: { block: '/*' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-SETTING",
+    "subject": "comment",
+    "span": [
+      72,
+      97
+    ]
+  },
+  {
+    "name": "extra-keys",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @comment: { line: '//' blockOpen: '/*' blockClose: '*/' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-SETTING",
+    "subject": "comment",
+    "span": [
+      72,
+      129
+    ]
+  },
+  {
+    "name": "repeated-line-key",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @comment: { line: '//' line: '//' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-SETTING",
+    "subject": "comment",
+    "span": [
+      72,
+      107
+    ]
+  },
+  {
+    "name": "key-case",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @comment: { Line: '//' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-SETTING",
+    "subject": "comment",
+    "span": [
+      72,
+      96
+    ]
+  },
+  {
+    "name": "scalar",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @comment: slashes\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-SETTING",
+    "subject": "comment",
+    "span": [
+      72,
+      89
+    ]
+  },
+  {
+    "name": "named-global-whitespace",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @ubnf: v2\n @whitespace: GAP\n @comment: { line: '//' }\n token GAP ::= ' '+;\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-COMMENT-WHITESPACE",
+    "subject": "GAP",
+    "span": [
+      101,
+      125
+    ]
+  },
+  {
+    "name": "token-stream",
+    "grammar": "// 😀 code-point spans\ngrammar Invalid {\n @package: org.example.invalid\n @ubnf: v2\n @tokenStream: enabled\n @comment: { line: '//' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value;\n}",
+    "code": "E-TOKEN-STREAM-TRIVIA",
+    "subject": "comment",
+    "span": [
+      106,
+      130
+    ]
+  }
+]

@@ -86,6 +86,9 @@ fn generate_resolved(
     file: &unlaxer_ubnf::UbnfFile,
     vocabulary: &serde_json::Value,
 ) -> Result<Vec<GeneratedFile>, String> {
+    if file.grammars.len() != 1 {
+        return Err("playground requires exactly one grammar".into());
+    }
     let grammar = &file.grammars[0];
     for token in &grammar.tokens {
         if !matches!(

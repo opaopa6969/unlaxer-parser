@@ -213,7 +213,7 @@ grammar LanguageName {
 |---------|--------|-------------|
 | `@package` | `@package: com.example.pkg` | Target Java package for generated code |
 | `@whitespace` | `@whitespace: javaStyle` | Whitespace handling profile |
-| `@comment` | `@comment: { line: '//' }` | Comment syntax definition |
+| `@comment` | `@comment: { line: '//' }` | Line comments (`//` to the end of the line). Only this exact form is accepted (other forms: `E-COMMENT-SETTING`, or `W-COMMENT-IGNORED` next to `@whitespace: javaStyle`); with javaStyle it adds nothing |
 
 ### Built-in Token Parsers
 
@@ -343,6 +343,14 @@ Expression ::= Term @left { AddOp @op Term @right } ;
 ```
 
 See Section 8 for all `@eval` kinds.
+
+#### Other `@name` (Simple annotation)
+
+Any other `@name` before a rule is kept as metadata and is not used by the generators, except
+`@nestedCaptures` and `@autoCommit` (but `@autoCommit` leaves a rule carrying one out of its analysis). Each one is reported as the warning `W-ANNOTATION-IGNORED`
+(with `did you mean @...?` for a near known name); `--strict` / `--fail-on warning` fail on it.
+`@ leftAssoc` (space after `@`) and `@mapping` (no arguments) are Simple annotations too, so write
+annotations exactly as documented. See `docs/simple-annotations.md`.
 
 ---
 

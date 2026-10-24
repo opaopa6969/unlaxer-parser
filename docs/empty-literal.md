@@ -55,8 +55,12 @@ Java の生成器は grammar の字句方式によって `''` を別の parser �
   `JavaEmptyLiteral` は token stream / lexical context の grammar だけで生成され、失敗しない（Classic の反転を除く）ので、session 内の consumed frontier の例外とは交わらない。
   Java の `EMPTY`（matched-only の1文字先読み、Rust `JavaEmpty`）は `''` とは別の要素であり、本変更はその扱いを変えない。
 - cut とラベル付き失敗（[#700](cut-and-labeled-failures.md)）: `COMMIT('')`・`COMMIT('', 'message')`・`LABEL(L, '')` は本体が必ず失敗するので、到達すれば必ず raise する。
-  `CATCH` は通常どおり label を捕まえて代替へ進む。`E-RAISING-REPETITION` の nullable 判定は空 literal を nullable とみなす過大近似（両 host 共通）なので、
-  `{ COMMIT('') }` は拒否されず、実行時に最初の反復で raise する（`'z'` に置き換えた対照は拒否される）。通常の文法で拒否するかは [#749](https://github.com/opaopa6969/unlaxer-parser/issues/749)。
+  `CATCH` は通常どおり label を捕まえて代替へ進む。`E-RAISING-REPETITION` の nullable 判定（[#749](https://github.com/opaopa6969/unlaxer-parser/issues/749)）は、
+  `''` を lowering と同じ条件で分ける。通常の文法では成功しない（nullable でない）ので、`{ COMMIT('') }`・`{ COMMIT('', 'm') }`・捕まえない `{ LABEL(L, '') }` は
+  非空の `'z'` と同じく位置付きで拒否する（Java の `GrammarValidator` / `RaisingOperators`、native generator、両 portability check）。
+  `@tokenStream` / `@lexicalContext` の文法では幅0で成功する（nullable）ので `{ COMMIT('') }` は拒否せず、反復は幅0の成功で正常に終わる。
+  `CATCH({ LABEL(L, '') } 'x', 'y', L)` のように捕まえられる反復も拒否しない。Cut fixture は反復を `[ COMMIT('', 'never') ]` に変え、
+  拒否は `spec-corpus/cut-labeled-failure/invalid.json`、受理は TokenStreamCommitRepeat / LexicalContextCommitRepeat / CaughtLabelRepeat で確かめる。
 - rule stack（[#703](rule-stack-diagnostics.md)）: `''` の失敗も他の終端と同じく失敗した rule の frame を持つ。失敗した parse の stack と、成功して入力が残った parse の stack を両方比較する。
 - `@autoCommit`（[#702](auto-commit.md)、#728）: FIRST 解析は `''` を nullable（`EPSILON`）として扱う。`WordParser("")` は成功しないので実際の FIRST より広い過大近似であり、
   挿入される `COMMIT` を減らす方向にしか働かない。挿入位置は両 frontend で同じ（生成物の byte 一致で確認）。
@@ -66,12 +70,13 @@ Java の生成器は grammar の字句方式によって `''` を別の parser �
 
 ## 共通 oracle と検証
 
-[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 19 文法 80 入力。root / sequence / choice の rollback /
+[`spec-corpus/empty-literal`](../spec-corpus/empty-literal/) は 22 文法 92 入力。root / sequence / choice の rollback /
 field capture の rollback / optional・repeat（capture 付き）/ `''+`・`''{0,3}`・`'' % ','`・`{ [ '' ] }` の進捗停止 /
 `javaStyle` trivia / 先読み後の matched cursor / 宣言的 token の `''`・`LOOKAHEAD('')`・`NEGATIVE_LOOKAHEAD('')` /
-tokenStream / lexicalContext / 左結合の prefix・tail delimiter / `COMMIT('')`・`COMMIT('', 'never')` の反復 /
+tokenStream / lexicalContext / 左結合の prefix・tail delimiter / `COMMIT('')`・`[ COMMIT('', 'never') ]` /
 `CATCH` で捕まえる `LABEL(L, '')` と捕まえない `LABEL(M, '')` / 入れ子 rule の rule stack / `@autoCommit` の後の `''` /
-規則単位の `@lexicalContext` がある文法と tokenStream の choice の先頭の `''`（FIRST の nullable 分類）を含み、
+規則単位の `@lexicalContext` がある文法と tokenStream の choice の先頭の `''`（FIRST の nullable 分類）/
+tokenStream・lexicalContext の `{ COMMIT('') }` と捕まえる `{ LABEL(L, '') }` の反復（#749）を含み、
 非 BMP 文字・EOF・空入力の code point 位置を確認する。
 
 各入力について次を記録する。
@@ -91,8 +96,31 @@ native generator は空 `PATH` で起動する。
 ### Java 側の既存表示差
 
 `diagnostic` は Rust 側の期待値であり、Java の既存表示が異なる入力だけ `javaDiagnostic` を記録する（受理・kind・primary offset は全入力で共通）。
-空 literal の期待候補は Rust では `""`、Java では `''` と表示する（Rust の LSP message と `ParseError` の表示で空の候補が読めない点は [#750](https://github.com/opaopa6969/unlaxer-parser/issues/750)）。ほかの差は非空 literal に置き換えた対照文法でも同じく現れる既存差で、
+空 literal の期待候補は Rust では `""`、Java では `''` と表示する。ほかの差は非空 literal に置き換えた対照文法でも同じく現れる既存差で、
 空 literal 固有ではない。
+
+### 人が読む表示（#750）
+
+`diagnostic`・canonical JSON・LSP の `data.expectedTokens` に入る値は契約の一部なので、Rust では `""` のまま変えない。
+変えたのは人が読む文字列だけで、Rust の LSP の message（`Expected … or …`）と `ParseError` / `ParseDiagnostic` の `Display`
+（`expected …, …`）は、空の候補を `''` と表示する（`unlaxer_runtime::display_expected`）。以前は `Expected  or b` のように空白が並ぶだけで、
+何が期待されたか読めなかった。空でない候補・区切り・LSP の range・code・kind、commit / label の宣言した message はそのまま。
+
+| 表示 | Labeled の `a😀`（CP 1 で `''` と `b` を期待） |
+|---|---|
+| 生成 Java LSP の message | `Expected '' or 'b' (in WordParser)`（`expectedTokens` は `["''","'b'"]`） |
+| 生成 Rust LSP の message | `Expected '' or b`（`expectedTokens` は `["","b"]`、range は UTF-16 の 1..3） |
+| Rust `ParseDiagnostic` の `Display` | `syntax at code point 1: expected '', b` |
+| Rust `ParseError` の `Display` | `at code point 1: expected '', b` |
+
+`''` を選んだのは、Java の生成 LSP と同じ綴りで、両方の editor で同じ見た目になるためである。Java は literal をすべて引用符付きで表示し、
+Rust は非空の literal を引用符なしで表示するので、空の候補だけを Java と同じ `''` にした。`<empty>` のような独自の表記は Java と食い違い、
+Rust の非空 literal を引用符付きに変えるのは既存の表示を全部変えてしまう。ただし Rust では、2文字の literal `''`（引用符2個）の候補と
+表示が同じになる（候補が `["", "''"]` なら `Expected '' or ''`）。値（`expectedTokens`）では区別できる。この制限は
+`unlaxer-runtime` と `unlaxer-lsp` のテストで固定している。
+`EmptyLiteralConformanceTest#generatedLanguageServersShowTheEmptyExpectedCandidate` は、Java の生成 LSP server を stdio で起動する。
+`-DrustConformance=true` では、Java host と native host が生成した Rust の LSP ファイルが byte 一致することを確かめたうえで、
+代表として Java host の生成物から Rust LSP server を 1 つ build し、stdio で起動する。どちらもこの入力の message・range・code・`data` を確かめる。
 
 - Java は literal を引用符付きで表示し、`javaStyle` trivia の補助候補、同じ chain の後続要素、`RootParser` などの class 名、
   幅0で成功した token 名を候補に加え、trailing input の farthest 候補が異なる。Cut / Labeled / Stack / AutoCommit の `''` を `'z'` に

@@ -129,6 +129,7 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 | `E-ANNOTATION-SCOPETREE-MODE` | `@scopeTree` の `mode` が不正な値 |
 | `E-ANNOTATION-DECLARES-CAPTURE` | `@declares(symbol=...)` の対象captureが同じルール本体に存在しない |
 | `E-ANNOTATION-BACKREF-CAPTURE` | scopeの有無によらず`@backref(name=...)` の対象captureが同じルール本体に存在しない |
+| `W-ANNOTATION-IGNORED`（WARNING） | 生成器が使わない Simple annotation（`@nestedCaptures` / `@autoCommit` 以外）。生成は続ける。`GrammarValidator` ではなく、CLI の検証報告が生成の警告（`GenerationWarnings`）から位置付きで載せる（[契約](../../docs/simple-annotations.md)、#715） |
 
 ### BOUNDED エラー（量指定子 `{n}` / `{n,m}` / `{n,}`）
 
@@ -161,6 +162,7 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 ## 変更履歴
 
 - 2026-03-01: 初版作成
+- 2026-10-24: `W-ANNOTATION-IGNORED` を追加（#715）
 - 2026-09-24: エラーコード名を `GrammarValidator` の実装に合わせて訂正
   （`E-MAPPING-EXTRA-CAPTURE` → `E-MAPPING-UNLISTED-CAPTURE`、
   `E-ASSOC-WITHOUT-PRECEDENCE` → `E-ASSOC-NO-PRECEDENCE`、

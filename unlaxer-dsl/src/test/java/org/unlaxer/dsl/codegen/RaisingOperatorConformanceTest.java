@@ -76,7 +76,7 @@ public class RaisingOperatorConformanceTest {
 
     @Test public void validatorRejectsWithSourcePositions() throws Exception {
         var rows = corpus("invalid.json");
-        assertEquals(12, rows.size());
+        assertEquals(15, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String id = row.get("id").getAsString(), code = row.get("code").getAsString();

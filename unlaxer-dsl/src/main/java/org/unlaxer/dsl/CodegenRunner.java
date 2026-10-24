@@ -64,12 +64,14 @@ final class CodegenRunner {
         FileSystemPort fs
     ) throws IOException {
         String source = fs.readString(Path.of(config.grammarFile()));
+        var snapshot = UBNFMapper.parseWithSource(source);
         UBNFFile file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(
-            UBNFMapper.parse(source), Path.of(config.grammarFile()), fs::readString);
+            snapshot, Path.of(config.grammarFile()), fs::readString);
 
         Map<String, CodeGenerator> generatorMap = generatorMap(config.javaRelease());
 
-        List<ReportJsonWriter.ValidationIssueRow> validationRows = collectValidationRows(file);
+        List<ReportJsonWriter.ValidationIssueRow> validationRows = collectValidationRows(file, snapshot);
+        validationRows.addAll(javaOutputCollisions(file, snapshot, config.generators()));
         List<ReportJsonWriter.ValidationIssueRow> sortedRows = sortValidationRows(validationRows);
 
         boolean hasErrors = hasErrorRows(sortedRows);
@@ -237,7 +239,10 @@ final class CodegenRunner {
         int conflictCount = 0;
         int dryRunCount = 0;
 
-        for (GrammarDecl grammar : file.grammars()) {
+        // Complete every generator before touching output, including a later grammar's failure.
+        List<CodeGenerator.GeneratedSource> plannedSources = new ArrayList<>();
+        for (int index = 0; index < file.grammars().size(); index++) {
+            GrammarDecl grammar = file.grammars().get(index);
             for (String name : config.generators()) {
                 String key = name.trim();
                 CodeGenerator gen = generatorMap.get(key);
@@ -254,63 +259,69 @@ final class CodegenRunner {
                     return CodegenMain.EXIT_CLI_ERROR;
                 }
 
-                CodeGenerator.GeneratedSource src = gen.generate(grammar);
-                Path pkgDir = outPath.resolve(src.packageName().replace('.', '/'));
-                Path javaFile = pkgDir.resolve(src.className() + ".java");
-
-                if (config.cleanOutput() && !config.dryRun()) {
-                    if (fs.deleteIfExists(javaFile)) {
-                        fileEvents.add(new FileEvent("cleaned", javaFile.toString()));
-                        if ("ndjson".equals(config.reportFormat())) {
-                            out.println(ndjsonFileEvent("cleaned", javaFile.toString()));
-                        }
-                    }
+                try {
+                    plannedSources.add(gen.generate(grammar));
+                } catch (RuntimeException error) {
+                    throw org.unlaxer.dsl.codegen.GrammarFileLayout.failure(file, index, snapshot, error);
                 }
-
-                WriteAction action = writeGeneratedSource(config, fs, pkgDir, javaFile, src.source());
-                if (action == WriteAction.CONFLICT) {
-                    conflictCount++;
-                    fileEvents.add(new FileEvent("conflict", javaFile.toString()));
-                    if (!"ndjson".equals(config.reportFormat())) {
-                        err.println("Conflict (not overwritten): " + javaFile);
-                    }
-                    if ("ndjson".equals(config.reportFormat())) {
-                        out.println(ndjsonFileEvent("conflict", javaFile.toString()));
-                    }
-                    continue;
-                }
-                if (action == WriteAction.SKIPPED) {
-                    skippedCount++;
-                    fileEvents.add(new FileEvent("skipped", javaFile.toString()));
-                    if (!"ndjson".equals(config.reportFormat())) {
-                        out.println("Skipped (unchanged): " + javaFile);
-                    }
-                    if ("ndjson".equals(config.reportFormat())) {
-                        out.println(ndjsonFileEvent("skipped", javaFile.toString()));
-                    }
-                    continue;
-                }
-                if (action == WriteAction.DRY_RUN) {
-                    dryRunCount++;
-                    fileEvents.add(new FileEvent("dry-run", javaFile.toString()));
-                    if (!"ndjson".equals(config.reportFormat())) {
-                        out.println("Dry-run: would generate " + javaFile);
-                    }
-                    if ("ndjson".equals(config.reportFormat())) {
-                        out.println(ndjsonFileEvent("dry-run", javaFile.toString()));
-                    }
-                } else {
-                    writtenCount++;
-                    fileEvents.add(new FileEvent("written", javaFile.toString()));
-                    if (!"ndjson".equals(config.reportFormat())) {
-                        out.println("Generated: " + javaFile);
-                    }
-                    if ("ndjson".equals(config.reportFormat())) {
-                        out.println(ndjsonFileEvent("written", javaFile.toString()));
-                    }
-                }
-                generatedFiles.add(javaFile.toString());
             }
+        }
+        for (CodeGenerator.GeneratedSource src : plannedSources) {
+            Path pkgDir = outPath.resolve(src.packageName().replace('.', '/'));
+            Path javaFile = pkgDir.resolve(src.className() + ".java");
+
+            if (config.cleanOutput() && !config.dryRun()) {
+                if (fs.deleteIfExists(javaFile)) {
+                    fileEvents.add(new FileEvent("cleaned", javaFile.toString()));
+                    if ("ndjson".equals(config.reportFormat())) {
+                        out.println(ndjsonFileEvent("cleaned", javaFile.toString()));
+                    }
+                }
+            }
+
+            WriteAction action = writeGeneratedSource(config, fs, pkgDir, javaFile, src.source());
+            if (action == WriteAction.CONFLICT) {
+                conflictCount++;
+                fileEvents.add(new FileEvent("conflict", javaFile.toString()));
+                if (!"ndjson".equals(config.reportFormat())) {
+                    err.println("Conflict (not overwritten): " + javaFile);
+                }
+                if ("ndjson".equals(config.reportFormat())) {
+                    out.println(ndjsonFileEvent("conflict", javaFile.toString()));
+                }
+                continue;
+            }
+            if (action == WriteAction.SKIPPED) {
+                skippedCount++;
+                fileEvents.add(new FileEvent("skipped", javaFile.toString()));
+                if (!"ndjson".equals(config.reportFormat())) {
+                    out.println("Skipped (unchanged): " + javaFile);
+                }
+                if ("ndjson".equals(config.reportFormat())) {
+                    out.println(ndjsonFileEvent("skipped", javaFile.toString()));
+                }
+                continue;
+            }
+            if (action == WriteAction.DRY_RUN) {
+                dryRunCount++;
+                fileEvents.add(new FileEvent("dry-run", javaFile.toString()));
+                if (!"ndjson".equals(config.reportFormat())) {
+                    out.println("Dry-run: would generate " + javaFile);
+                }
+                if ("ndjson".equals(config.reportFormat())) {
+                    out.println(ndjsonFileEvent("dry-run", javaFile.toString()));
+                }
+            } else {
+                writtenCount++;
+                fileEvents.add(new FileEvent("written", javaFile.toString()));
+                if (!"ndjson".equals(config.reportFormat())) {
+                    out.println("Generated: " + javaFile);
+                }
+                if ("ndjson".equals(config.reportFormat())) {
+                    out.println(ndjsonFileEvent("written", javaFile.toString()));
+                }
+            }
+            generatedFiles.add(javaFile.toString());
         }
 
         String generationFailReason = generationPolicyFailReason(config, fileEvents, skippedCount, conflictCount);
@@ -427,9 +438,21 @@ final class CodegenRunner {
         return generatorMap;
     }
 
-    private static List<ReportJsonWriter.ValidationIssueRow> collectValidationRows(UBNFFile file) {
+    private static List<ReportJsonWriter.ValidationIssueRow> collectValidationRows(UBNFFile file,
+            org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot snapshot) {
         List<ReportJsonWriter.ValidationIssueRow> validationRows = new ArrayList<>();
-        for (GrammarDecl grammar : file.grammars()) {
+        // The validator sees the rewritten AST, where @autoCommit is gone: the generation warnings
+        // of the entry source come from the shared collector, and their message is the same
+        // `warning: CP s..e: ...` line that the Rust CLIs print (#715).
+        for (var warning : org.unlaxer.dsl.codegen.GenerationWarnings.collect(snapshot.source())) {
+            validationRows.add(new ReportJsonWriter.ValidationIssueRow(warning.grammar(), warning.rule(),
+                warning.code(), "WARNING", "GENERAL", warning.line(),
+                warning.code().equals(org.unlaxer.dsl.bootstrap.AutoCommit.SKIPPED)
+                    ? "Remove @autoCommit, or make the rule reachable and analysable (docs/auto-commit.md)."
+                    : "Write the annotation as documented, or remove it (docs/simple-annotations.md)."));
+        }
+        for (int index = 0; index < file.grammars().size(); index++) {
+            GrammarDecl grammar = file.grammars().get(index);
             List<GrammarValidator.ValidationIssue> issues = new ArrayList<>(GrammarValidator.validate(grammar));
             issues.addAll(GrammarValidator.detectLeftRecursionIssues(grammar));
             for (GrammarValidator.ValidationIssue issue : issues) {
@@ -439,12 +462,42 @@ final class CodegenRunner {
                     issue.code(),
                     issue.severity(),
                     issue.category(),
-                    issue.message(),
+                    file.grammars().size() == 1 ? issue.message()
+                        : "grammar " + grammar.name() + org.unlaxer.dsl.codegen.GrammarFileLayout.position(snapshot, index) + ": " + issue.message(),
                     issue.hint()
                 ));
             }
         }
         return validationRows;
+    }
+
+    private static List<ReportJsonWriter.ValidationIssueRow> javaOutputCollisions(UBNFFile file,
+            org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot snapshot, List<String> generators) {
+        // Match the actual Java package/class destinations, independently of Rust module names.
+        Map<String, String> suffixes = Map.of("AST", "AST", "Parser", "Parsers", "Mapper", "Mapper",
+            "Evaluator", "Evaluator", "LSP", "LanguageServer", "Launcher", "LspLauncher",
+            "DAP", "DebugAdapter", "DAPLauncher", "DapLauncher");
+        Map<String, Integer> owners = new LinkedHashMap<>();
+        List<ReportJsonWriter.ValidationIssueRow> rows = new ArrayList<>();
+        for (int index = 0; index < file.grammars().size(); index++) {
+            var grammar = file.grammars().get(index);
+            String packageName = grammar.settings().stream().filter(setting -> setting.key().equals("package"))
+                .map(setting -> setting.value() instanceof org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue value
+                    ? value.value() : "").findFirst().orElse("generated");
+            for (String generator : generators.stream().map(String::trim).distinct().toList()) {
+                String suffix = suffixes.get(generator);
+                if (suffix == null) continue; // The existing CLI error path handles unknown generators.
+                String className = grammar.name() + suffix;
+                String key = packageName + "/" + className.toLowerCase(java.util.Locale.ROOT);
+                Integer owner = owners.putIfAbsent(key, index);
+                if (owner != null && owner != index) rows.add(new ReportJsonWriter.ValidationIssueRow(
+                    grammar.name(), null, "P-OUTPUT-COLLISION", "ERROR", "OUTPUT",
+                    "P-OUTPUT-COLLISION" + org.unlaxer.dsl.codegen.GrammarFileLayout.position(snapshot, index)
+                        + ": " + packageName + "." + className,
+                    "Use distinct class names within each Java package."));
+            }
+        }
+        return rows;
     }
 
     private static List<ReportJsonWriter.ValidationIssueRow> sortValidationRows(

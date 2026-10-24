@@ -3,9 +3,13 @@
 `PropertyBasedParityTest` がランダム文法の前に毎回再生する。仕組みと再現手順は
 [docs/property-based-testing.md](../../docs/property-based-testing.md)。
 
+`known-differences.json` の `[]` は PBT の除外登録がないことだけを表す。
+repo 全体の host 別期待値・skip・未対応は [既知差台帳](../../docs/parity-ledger.md) で追跡する。
+
 - `regressions.json`: 縮小した再現例と、memo の実行経路を必ず通すための anchor。
   各 entry は `id`、`grammar`（1 行の UBNF。文法名と `@package` は実行時に置き換える）、
-  `inputs`、任意の `note` / `issue` / `expectedRejection`。失敗したテストが
+  `inputs`、任意の `note` / `issue` / `expectedRejection` / `overBudget`（手数の上限を超えるので
+  観測しない入力。過不足なく書く。#739）。失敗したテストが
   `unlaxer-dsl/target/property-based-parity.json` に出した entry は、`id` / `grammar` /
   `inputs` をそのまま写せば追加できる。
 - `known-differences.json`: 既知差。各 entry は追跡 issue と理由を必須とし、

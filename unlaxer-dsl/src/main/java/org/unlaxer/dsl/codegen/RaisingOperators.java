@@ -163,6 +163,12 @@ public final class RaisingOperators {
         final Map<String, List<Reference>> out = new HashMap<>();
         /** Rules that may match the empty string; a token or an unknown reference counts as nullable. */
         final Set<String> nullable = new HashSet<>();
+        /**
+         * Whether {@code ''} succeeds with width 0 (#749): {@code Lexing.LiteralParser("")} under
+         * {@code @tokenStream} or {@code @lexicalContext}. Otherwise it is {@code WordParser("")},
+         * which always fails (#713), so it is not nullable. Same condition as the generators.
+         */
+        final boolean emptyLiteralSucceeds;
         /** Kinds a rule may raise: every COMMIT and LABEL in it and in the rules it references. */
         final Map<String, Set<String>> raisable = new HashMap<>();
         /** Labels caught around some reference path to a rule. */
@@ -175,6 +181,7 @@ public final class RaisingOperators {
         final Set<String> only = new HashSet<>();
 
         Raising(GrammarDecl grammar, Walk walk) {
+            emptyLiteralSucceeds = TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar);
             for (RuleDecl rule : grammar.rules()) rules.putIfAbsent(rule.name(), rule);
             for (RuleDecl rule : rules.values()) {
                 into.put(rule.name(), new ArrayList<>());
@@ -291,7 +298,7 @@ public final class RaisingOperators {
         }
 
         boolean nullable(AtomicElement element) {
-            if (element instanceof UBNFAST.TerminalElement terminal) return terminal.value().isEmpty();
+            if (element instanceof UBNFAST.TerminalElement terminal) return terminal.value().isEmpty() && emptyLiteralSucceeds;
             if (element instanceof UBNFAST.RuleRefElement ref) {
                 return ref.namespace().isPresent() || !rules.containsKey(ref.name()) || nullable.contains(ref.name());
             }

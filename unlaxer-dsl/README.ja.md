@@ -205,13 +205,13 @@ grammar GrammarName {
 |---|---|---|
 | `@package` | `org.example.generated` | 生成される Java ファイルのパッケージ名 |
 | `@whitespace` | `javaStyle` | 空白処理スタイル。`javaStyle` の場合、ルール間にスペースが自動的に読み飛ばされる |
-| `@comment` | `{ line: "//" }` | コメント形式。`line: "//"` の場合、行コメントを空白と同様に読み飛ばす |
+| `@comment` | `{ line: '//' }` | 行コメント（`//` から行末まで）。受け付ける形は `{ line: '//' }` だけ。`@whitespace: javaStyle` と併記した場合は追加効果が無く、それ以外では継承 rule が行コメントだけを読み飛ばす（[trivia 契約](../docs/rule-trivia.md#global-comment712)） |
 
 ```ubnf
 grammar MyLang {
     @package: com.example.mylang
     @whitespace: javaStyle
-    @comment: { line: "//" }
+    @comment: { line: '//' }
     ...
 }
 ```

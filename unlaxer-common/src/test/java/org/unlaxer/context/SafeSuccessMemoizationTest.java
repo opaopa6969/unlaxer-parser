@@ -339,4 +339,177 @@ public class SafeSuccessMemoizationTest {
             assertEquals(1, on.getPackratMemoTable().successHits());
         }
     }
+
+    private static void sameReturned(Parsed expected, Parsed actual) {
+        assertEquals(expected.status, actual.status);
+        assertEquals(expected.isCollected(), actual.isCollected());
+        assertEquals(expected.getTokenOptional().isPresent(), actual.getTokenOptional().isPresent());
+        assertEquals(expected.getOriginalTokens().size(), actual.getOriginalTokens().size());
+        Token expectedRoot = expected.getRootToken(), actualRoot = actual.getRootToken();
+        assertSame(expectedRoot.parser, actualRoot.parser);
+        assertEquals(expectedRoot.tokenKind, actualRoot.tokenKind);
+        assertEquals(expectedRoot.source.sourceAsString(), actualRoot.source.sourceAsString());
+        assertEquals(expectedRoot.source.offsetFromRoot(), actualRoot.source.offsetFromRoot());
+        assertEquals(expectedRoot.source.codePointLength(), actualRoot.source.codePointLength());
+    }
+
+    // A Choice returns its selected child's Parsed on a miss; a hit must return the same (#744).
+    @Test public void choiceHitReturnsTheSelectedChildParsedLikeAMiss() {
+        for (String input : List.of("x", "a")) {
+            for (java.util.function.Supplier<Parser> factory : List.<java.util.function.Supplier<Parser>>of(
+                    // The selected root is filtered out of the committed CST.
+                    () -> new SafeChoice(new MatchOnly(new WordParser("x")), new WordParser("a")),
+                    // A nested Choice drops it from the outer snapshot's CST as well.
+                    () -> new SafeChoice(new SafeChoice(new MatchOnly(new WordParser("x"))), new WordParser("a")),
+                    () -> new SafeLongest(new MatchOnly(new WordParser("x")), new WordParser("a")),
+                    () -> new SafePredictive(new WordParser("z"), new WordParser("a")))) {
+                try (ParseContext off = context(input, Memoization.OFF);
+                     ParseContext on = context(input, Memoization.SAFE_FAILURES)) {
+                    Parser parser = factory.get();
+                    Parsed expected = parser.parse(off);
+                    if (expected.isFailed()) continue;
+                    on.begin(parser);
+                    sameReturned(expected, parser.parse(on));
+                    on.rollback(parser);
+                    Parsed actual = parser.parse(on);
+                    assertEquals(1, on.getPackratMemoTable().successHits());
+                    sameReturned(expected, actual);
+                    sameTree(off.getCurrent().getTokens().get(0), on.getCurrent().getTokens().get(0));
+                    // A returned token that is in the CST is the replayed CST copy, as on a miss.
+                    Token committed = on.getCurrent().getTokens().get(0);
+                    boolean inCst = committed.getOriginalChildren().stream().anyMatch(t -> t == actual.getRootToken());
+                    boolean expectedInCst = off.getCurrent().getTokens().get(0).getOriginalChildren().stream()
+                        .anyMatch(t -> t == expected.getRootToken());
+                    assertEquals(expectedInCst, inCst);
+                }
+            }
+        }
+    }
+
+    @Test public void captureOfAReplayedChoiceKeepsTheSelectedLookaheadText() {
+        for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES)) {
+            SafeChoice choice = new SafeChoice(new MatchOnly(new WordParser("x")), new WordParser("q"));
+            // R0 ::= R1 'z' | CAPTURE(w, R1) SAME_AS(w) ; R1 ::= LOOKAHEAD('x') | 'q'
+            // The first use is as deep as the capture, so the memo entry has the budget to hit.
+            Parser root = new Choice(new Chain(new Chain(choice), new WordParser("z")),
+                new Chain(new NamedCapture("w", choice), new org.unlaxer.parser.elementary.ReplayParser("w")));
+            try (ParseContext context = context("x", memo)) {
+                assertTrue(root.parse(context).isSucceeded());
+                assertEquals("x", context.captured("w").orElseThrow().text());
+                assertEquals(1, context.getConsumedPosition().value());
+                if (memo != Memoization.OFF) assertEquals(1, context.getPackratMemoTable().successHits());
+            }
+        }
+    }
+
+    static final class StoppingWord extends WordParser {
+        StoppingWord(String word) { super(word); }
+        @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+            Parsed parsed = super.parse(context, kind, invert);
+            if (parsed.isSucceeded()) {
+                parsed.status = Parsed.Status.stopped;
+                parsed.setMessage("stop here");
+            }
+            return parsed;
+        }
+    }
+
+    // The returned Parsed keeps the selected child's stopped status and message on a hit (#744).
+    @Test public void choiceHitKeepsTheSelectedChildStatusAndMessage() {
+        for (String message : List.of("stop here", "")) {
+            try (ParseContext off = context("x", Memoization.OFF);
+                 ParseContext on = context("x", Memoization.SAFE_FAILURES)) {
+                Parser stopping = message.isEmpty() ? new WordParser("x") : new StoppingWord("x");
+                SafeChoice parser = new SafeChoice(stopping, new WordParser("a"));
+                Parsed expected = parser.parse(off);
+                on.begin(parser);
+                parser.parse(on);
+                on.rollback(parser);
+                Parsed actual = parser.parse(on);
+                assertEquals(1, on.getPackratMemoTable().successHits());
+                assertEquals(message.isEmpty() ? Parsed.Status.succeeded : Parsed.Status.stopped, actual.status);
+                assertEquals(expected.status, actual.status);
+                assertEquals(expected.getMessage(), actual.getMessage());
+                sameReturned(expected, actual);
+            }
+        }
+    }
+
+    // The returned id array is charged before allocation and bounded by the entry budget (#744).
+    @Test public void returnedTokensAreChargedAndBoundedByTheSnapshotBudget() {
+        Token token = new Token(TokenKind.consumed, StringSource.createRootSource("x"), new WordParser("x"));
+        long plain = Token.prepareMemoSnapshot(new TokenList(token), 1024).retainedBytes();
+        Token.MemoSnapshot two = Token.prepareMemoSnapshot(new TokenList(token), List.of(token, token), 1024);
+        assertEquals(plain + 16 + 4 * 2, two.retainedBytes());
+        assertEquals(2, two.replay().returned().size());
+        assertSame(two.replay().roots().get(0).parser, two.replay().returned().get(0).parser);
+        // A list far beyond the budget is refused before its id array is allocated.
+        assertNull(Token.prepareMemoSnapshot(new TokenList(token), java.util.Collections.nCopies(1_000_000, token), 1024));
+        assertNull(Token.prepareMemoSnapshot(new TokenList(token),
+            java.util.Collections.nCopies((int) ((1024 - plain - 16) / 4) + 1, token), 1024));
+        assertNotNull(Token.prepareMemoSnapshot(new TokenList(token),
+            java.util.Collections.nCopies((int) ((1024 - plain - 16) / 4), token), 1024));
+    }
+
+    // A child that returns its Parsed with a message and an arbitrary original-token list.
+    static final class ReturningWord extends WordParser {
+        final String message;
+        final int originals;
+        Parsed prepared;
+        ReturningWord(String message, int originals) { super("x"); this.message = message; this.originals = originals; }
+        @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+            Parsed parsed = super.parse(context, kind, invert);
+            if (parsed.isFailed() || originals == 0) return message.isEmpty() ? parsed : parsed.setMessage(message);
+            // Built once (Committed copies the list), so a measured parse allocates no list itself.
+            if (prepared == null) prepared = new Parsed(parsed.getRootToken(),
+                new TokenList(java.util.Collections.nCopies(originals, parsed.getRootToken())), Parsed.Status.succeeded);
+            return prepared;
+        }
+    }
+
+    private static long[] storeAndHit(ReturningWord child, long entryBytes, boolean measure) {
+        SafeChoice parser = new SafeChoice(child, new WordParser("a"));
+        try (ParseContext on = context("x", Memoization.SAFE_FAILURES)) {
+            PackratMemoTable table = on.getPackratMemoTable();
+            if (entryBytes > 0) table.setSuccessBudget(16, 1 << 24, entryBytes);
+            var threads = (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+            child.parse(context("x", Memoization.OFF));  // builds the shared original-token list
+            long before = measure ? threads.getCurrentThreadAllocatedBytes() : 0;
+            on.begin(parser);
+            assertTrue(parser.parse(on).isSucceeded());
+            long allocated = measure ? threads.getCurrentThreadAllocatedBytes() - before : 0;
+            on.rollback(parser);
+            Parsed hit = parser.parse(on);
+            assertTrue(hit.isSucceeded());
+            if (table.successHits() == 1) assertEquals("succeeded:" + child.message, hit.getMessage());
+            return new long[] {table.successHits(), table.successRetainedBytes(), table.successBudgetMisses(), allocated};
+        }
+    }
+
+    // The returned message is charged before the entry is stored (#744).
+    @Test public void returnedMessageIsChargedBeforeTheSuccessEntryIsStored() {
+        long plain = storeAndHit(new ReturningWord("", 0), 0, false)[1];
+        String large = "m".repeat(10_000);
+        long[] stored = storeAndHit(new ReturningWord(large, 0), 0, false);
+        assertEquals(1, stored[0]);
+        assertEquals(plain + 64 + 2L * large.length(), stored[1]);
+        long[] exact = storeAndHit(new ReturningWord(large, 0), stored[1], false);
+        assertEquals(1, exact[0]);
+        long[] over = storeAndHit(new ReturningWord(large, 0), stored[1] - 1, false);
+        assertEquals(0, over[0]);
+        assertEquals(0, over[1]);
+        assertTrue(over[2] > 0);
+    }
+
+    // A long original-token list is refused before anything proportional to it is copied (#744).
+    @Test public void longReturnedOriginalTokensAreRefusedBeforeCopying() {
+        long[] small = storeAndHit(new ReturningWord("", 3), 0, false);
+        assertEquals(1, small[0]);
+        long[] refused = storeAndHit(new ReturningWord("", 4_000_000), 4096, true);
+        assertEquals(0, refused[0]);
+        assertEquals(0, refused[1]);
+        assertTrue(refused[2] > 0);
+        // A copy of the four million references would allocate at least 16 MB.
+        assertTrue("allocated " + refused[3], refused[3] < 4L * 1024 * 1024);
+    }
 }

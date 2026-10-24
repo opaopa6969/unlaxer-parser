@@ -39,7 +39,8 @@ AST の `Packet.first` / `second` / `others` と各 `Atom.value` をすべて比
 文字がある入力では主位置13に一致し、Classic Rust の最遠位置は13、他3経路は直前の
 投機的失敗位置11を保持する。これを AST / 受理の不一致や、同じ診断内容と読み替えない。
 
-private ubnfc の source、内部文書、生成物は公開リポジトリへコピーしない。
+実験時点（2026-10-12）の ubnfc は private だったため、その source、内部文書、生成物はこの公開リポジトリへコピーしない。
+ubnfc は 2026-10-23 に [public](https://github.com/opaopa6969/ubnfc) になったが、この方針と下の公開CIの範囲は変えていない。
 公開するのは新規に書いた文法・oracle・adapter・driver と、この文法に対する結果だけ。
 生成物・build log は ignored `target/engine-reuse/` に置く。
 
@@ -126,7 +127,7 @@ parser 実行回数と同一ではない。直接起動して制御できる既�
 | ubnfc Java / Rust | 同じ文法の生成物と明示adapterを再利用 | 他profile、stateful/外部callbackの証明 |
 | Rust 隔離driver | oracle・binding・期限・再試行制御を検証 | production API、汎用IR分析、資源測定 |
 | Java | 同じoracleとcapability/proofの参照を実行 | **lean facade / 共通API は未実装** |
-| 公開CI | 現在の Classic 両言語、共通fixture、Rust driver | private ubnfc の2経路は公開CIでは実行しない |
+| 公開CI | 現在の Classic 両言語、共通fixture、Rust driver | ubnfc の2経路は公開CIでは実行しない（別 repo の checkout が要るため） |
 
 したがって判断は「固定 fixture の再利用は成立」「production 採用には証拠不足」。
 既存 ubnfc を使えばこの検証に足り、新 engine を実装する必要は無かった。
@@ -134,13 +135,13 @@ parser 実行回数と同一ではない。直接起動して制御できる既�
 
 ## 再現
 
-公開側だけを検証する（private access不要、CIもこのコマンド）:
+公開側だけを検証する（ubnfc の checkout 不要、CIもこのコマンド）:
 
 ```sh
 python3 examples/engine-reuse/run.py
 ```
 
-固定4経路の検証（private ubnfc のclean checkoutへのアクセスが必要）:
+固定4経路の検証（[ubnfc](https://github.com/opaopa6969/ubnfc) の固定 revision の clean checkout が必要）:
 
 ```sh
 python3 examples/engine-reuse/run.py --ubnfc /path/to/ubnfc
@@ -149,5 +150,5 @@ python3 examples/engine-reuse/run.py --ubnfc /path/to/ubnfc
 後者は ubnfc の HEAD と clean 状態、Classic の対象 source が固定revisionから変更されていないことを
 確認してから build / generate / compile する。保存された manifest と raw TSV は
 [reports/engine-reuse-435](reports/engine-reuse-435/) にある。公開CIでは、そのCI revisionの
-Classicを検証して artifact に記録する。privateを含む固定4経路を毎回検証するものではない。
+Classicを検証して artifact に記録する。ubnfc を含む固定4経路を毎回検証するものではない。
 `--skip-build` は同じ生成物で adapter の修正を検証するときの開発補助で、初回再現には使わない。
