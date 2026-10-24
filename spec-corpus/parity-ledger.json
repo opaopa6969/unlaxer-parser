@@ -8,7 +8,7 @@
     "検索例: `rg -n \"@Disabled|@Ignore|Assume|assumeTrue|assumeFalse|#\\[ignore|skipUnless|skipIf|skipTest|pytest.skip\" --glob \"*.java\" --glob \"*.rs\" --glob \"*.py\"`。さらに `skipped_validate` / `RUNTIME_SCOPE_IDS` 等の条件分岐を確認した。",
     "3分類を項目ごとに記録する。試験環境のopt-inは製品差ではないので契約として分類し、内部の未駆動caseは検証の未修正差として明記する。",
     "`spec-corpus/property-based/known-differences.json` はPBT findingの許可表なので空のまま維持する。全repo台帳をPBTの許可表へコピーして失敗を抑制しない。",
-    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。CST #767、Number #752、Java生成 #754、作業量 #758は別のOPEN issueへ結ぶ。#741の境界差は契約化済み。",
+    "CLOSED #713/#717/#730/#740/#752はそれぞれ空literal/不完全指数/生成物/解析深さ/Number内部失敗の限定修正。CST #767、Number #794、Java生成 #754、作業量 #758は別のOPEN issueへ結ぶ。#741の境界差は契約化済み。",
     "CLOSED #331/#545/#571/#176/#537の後に残った旧未対応記述（回復内match-only、汎用伝播、Rust LSP/DAP、scopeTree、enum/eval、Backreference）は現行契約へ訂正する。未解決範囲はOPEN #111と個別子issueで追跡する。",
     "規範違反の量指定子overflow #783 と、内部条件付き除外の検証漏れ #784 を新規作成した。個別issueのない残機能群は既存全仕様issue #111の受け入れ範囲に結ぶ。",
     "catalog/corpus.jsonのGsonが許していた単引用符escapeを同じ復号値の標準JSONへ訂正した。JSONの不正構文を黙って走査から除外しない。",
@@ -244,7 +244,7 @@
       "title": "Rust の診断表示で空の期待候補 '' が見えない（LSP message と ParseError の Display）"
     },
     "752": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: Rust native Number が不完全な指数以外の Java 内部失敗を記録しない（負の先読みで診断位置が異なる）"
     },
     "753": {
@@ -286,6 +286,10 @@
     "784": {
       "state": "OPEN",
       "title": "test(parity): spec corpus の validate/runtime 条件付き除外を両言語の実行先へ結ぶ"
+    },
+    "794": {
+      "state": "OPEN",
+      "title": "parity: SAFE_FAILURES で負の先読み内の Num failure memo を Java は再生し、Rust は再評価する（negative lookahead の候補差）"
     }
   },
   "entries": [
@@ -656,12 +660,15 @@
       "title": "Numberの内部失敗と負の先読み診断",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
+        794,
         752,
         717
       ],
-      "observation": "#717 CLOSED の不完全指数の診断は共通oracleで修正済み。ただし符号・小数等の内部失敗が負の先読みへ残る差は #752 に残る。PBT known-differences=[]から差ゼロとは推論しない。",
+      "observation": "#717 CLOSED の不完全指数と #752 CLOSED の符号・小数・指数の内部失敗（負の先読みの hint、成功 memo の再生を含む）は共通oracleで一致。SAFE_FAILURES で負の先読み内で失敗した Num を後で同じ位置から呼ぶと、Java は failure memo を再生して negative lookahead を候補に含め、Rust は memo key が rule の深さを含むので再評価して含めない差が #794 に残る。表示 hint の無い rule の class 名 fallback と、失敗した Chain の子 hint 展開は host 固有の候補で、oracle は比べない。PBT known-differences=[]から差ゼロとは推論しない。",
       "evidence": [
         "conformance/number-token/cases.tsv",
+        "conformance/number-token/diagnostics.tsv",
+        "conformance/number-token/README.md",
         "rust/FULL-SPEC.md"
       ]
     },
