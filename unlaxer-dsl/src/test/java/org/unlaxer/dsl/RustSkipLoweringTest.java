@@ -1,6 +1,7 @@
 package org.unlaxer.dsl;
 
 import static org.junit.Assert.*;
+import java.util.List;
 import org.junit.Test;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.codegen.rust.GrammarIR;
@@ -73,10 +74,14 @@ public class RustSkipLoweringTest {
         for (String body : new String[] {
             "@root @skip Root ::= Missing;",
             "@root @skip Root ::= Root;",
-            "@root @skip @unknown Root ::= 'x';",
             "@root @skip @mapping(Ghost, params=[missing]) Root ::= 'x';"
         }) {
             assertFalse(body, PortabilityCheck.check("grammar Skip { " + body + " }").portable());
         }
+        // #715: an unknown Simple annotation is generated as if absent and reported as a warning.
+        String unknown = "grammar Skip { @root @skip @unknown Root ::= 'x'; }";
+        assertTrue(PortabilityCheck.check(unknown).portable());
+        assertEquals(List.of("W-ANNOTATION-IGNORED"), org.unlaxer.dsl.codegen.GenerationWarnings.collect(unknown).stream()
+            .map(org.unlaxer.dsl.codegen.GenerationWarnings.Warning::code).toList());
     }
 }

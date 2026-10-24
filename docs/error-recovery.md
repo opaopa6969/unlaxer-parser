@@ -71,7 +71,9 @@ NBSP/EM SPACEはJavaの`trim()`では除去されないため同期tokenとし�
   childの構文失敗履歴は消さない。同期点より先で失敗したchildの最遠位置が、後続のfatal診断に残る場合がある。
 
 Java `MatchOnly` 内の回復は消費cursorを進めず、既存の照合cursorだけを進める。
-Rust `Ahead` は照合cursorも戻す既存の契約であり、このcursor差は汎用伝播の未対応範囲として残る。
+Rust `Ahead` は照合cursorも戻す pure PEG の契約であり、Java の対応入口は `PegLookahead`。
+Classic の `MatchOnly` に対応する Rust `.match_only()` は #571 で実装済みで、
+この別 API 間の cursor 差を汎用伝播の未対応とは数えない（[既知差台帳](parity-ledger.md)）。
 どちらも外側へ回復markerを公開せず、回復できるchildの先読みは成功する。
 
 生成rootもrule参照も同じ回復wrapperを使う。正常時のAST形状は変えない。
@@ -112,5 +114,6 @@ CIは`unlaxer-dsl/target/rust-recovery.tsv`を必須artifactとする。
 root annotationの有効化、全幅marker、AUTOのdelimiter保持、回復時の明示診断とmapping拒否である。
 旧来の「回復したなら通常ASTも必ず作れる」という扱いには依存しないこと。
 
-部分/error ASTの型、汎用consume/invert伝播、増分解析、Rust LSP/DAPは別の未完了項目。
-これらをこの回復実装のテスト成功で完了扱いにはしない。
+部分/error ASTの型と編集後の部分CST再接合は #111 の未完了範囲。
+汎用consume/invert伝播は #571、snapshot/chunk cache は #546、Rust LSP/DAP の基本transportは
+#451 / #462 / #463 で対応済み。残る範囲は [既知差台帳](parity-ledger.md) で分けて追跡する。

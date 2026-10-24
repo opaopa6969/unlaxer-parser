@@ -93,7 +93,7 @@ Glyph ::= '😀' | 'a';
 | nested 所有規則自身の `@eval`（literal / passthrough / `strategy='manual'`） | 両版で位置付き拒否、拡張は #694。通常 leaf の auto-eval との合成は [nested-auto-eval](../spec-corpus/nested-auto-eval/README.md) で検証済み |
 | nested 所有規則の `@skip` / `@enum` | 公開 mapping / 列挙値と nested field が両立しないため、両版で位置付き拒否で確定 |
 | token-stream と nested の併用 | 両版で位置付き拒否、拡張は #696 |
-| nested 値を扱う family commonField / preferred snapshot | #626 で直接 mapped family 葉の commonField と preferred を実検証。全組合せは #583 に残す |
+| nested 値を扱う family commonField / preferred snapshot | #626 で直接 mapped family 葉の commonField と preferred を実検証。#583 は完了済みで、残る組合せは #693〜#697 と [台帳](parity-ledger.md) へ分離 |
 
 上表の「位置付き拒否」は Java（`NestedCaptures`）・Java host の Rust 生成・native Rust（`nested_captures.rs`）が同じ `E-NESTED-SHAPE` code、同じ規則 CP 範囲、同じ説明文で生成前に拒否し、出力を書かないことを意味する。説明文には追跡 issue 番号を含め、`spec-corpus/typed-nested-captures/invalid.json` の `detail` で 3 経路の一致を検査する。今後の拡張は各子 issue で扱う。
 

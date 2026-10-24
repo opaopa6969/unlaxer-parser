@@ -1,0 +1,346 @@
+[
+  {
+    "name": "unknown",
+    "note": "未知の名前。生成物は注釈なしと同じ",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @custom\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "custom",
+        "span": [
+          266,
+          273
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @custom has no effect",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "unknown-far",
+    "note": "既知名から遠い（@doc まで距離2、上限1）ので候補なし",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @foo\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "foo",
+        "span": [
+          266,
+          270
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @foo has no effect",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "typo-case",
+    "note": "大文字小文字だけの違い",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @LeftAssoc\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "LeftAssoc",
+        "span": [
+          266,
+          276
+        ],
+        "suggestion": "leftAssoc",
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @LeftAssoc has no effect; did you mean @leftAssoc?",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "typo-substitution",
+    "note": "1文字の置換",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @presedence\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "presedence",
+        "span": [
+          266,
+          277
+        ],
+        "suggestion": "precedence",
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @presedence has no effect; did you mean @precedence?",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "typo-transposition",
+    "note": "隣接2文字の入れ替え（機能を持つ Simple annotation の誤記）",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @nestedCpatures\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "nestedCpatures",
+        "span": [
+          266,
+          281
+        ],
+        "suggestion": "nestedCaptures",
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @nestedCpatures has no effect; did you mean @nestedCaptures?",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "typo-suffix",
+    "note": "接尾辞付き（距離2、上限2）",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @rooted\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "rooted",
+        "span": [
+          266,
+          273
+        ],
+        "suggestion": "root",
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @rooted has no effect; did you mean @root?",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "spaced-keyword",
+    "note": "@ の後に空白がある既知名は Java では Simple annotation",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @ leftAssoc\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "leftAssoc",
+        "span": [
+          266,
+          277
+        ],
+        "suggestion": "leftAssoc",
+        "message": "W-ANNOTATION-IGNORED: Item: @leftAssoc is a plain annotation here and has no effect; write @leftAssoc with no space after '@'",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "spaced-keyword-comment",
+    "note": "@ と名前の間の行コメントと改行も trivia",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @ // note\n  skip\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "skip",
+        "span": [
+          266,
+          282
+        ],
+        "suggestion": "skip",
+        "message": "W-ANNOTATION-IGNORED: Item: @skip is a plain annotation here and has no effect; write @skip with no space after '@'",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "bare-argument-keyword",
+    "note": "引数を要する既知名を ( なしで書くと Simple annotation",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @mapping\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "mapping",
+        "span": [
+          266,
+          274
+        ],
+        "suggestion": "mapping",
+        "message": "W-ANNOTATION-IGNORED: Item: @mapping is a plain annotation here and has no effect; write @mapping(...) with no space after '@'",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "bare-doc",
+    "note": "@doc も ( なしでは metadata ではなく Simple annotation",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @doc\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "doc",
+        "span": [
+          266,
+          270
+        ],
+        "suggestion": "doc",
+        "message": "W-ANNOTATION-IGNORED: Item: @doc is a plain annotation here and has no effect; write @doc(...) with no space after '@'",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "duplicate",
+    "note": "重複はそれぞれの位置で報告",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @custom @custom\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "custom",
+        "span": [
+          266,
+          273
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @custom has no effect",
+        "excludesAutoCommit": false
+      },
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "custom",
+        "span": [
+          274,
+          281
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @custom has no effect",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "with-associativity",
+    "note": "生成に効果を持つ @leftAssoc / @precedence / @mapping との合成",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc @trace @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Sum",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "trace",
+        "span": [
+          153,
+          159
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: Sum: unknown annotation @trace has no effect",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "with-root",
+    "note": "@root / @mapping との合成",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root @entry @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Start",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "entry",
+        "span": [
+          83,
+          89
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: Start: unknown annotation @entry has no effect",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "every-rule",
+    "note": "rule 順・出現順で報告",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root @a @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc @b @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @c\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  \n  Item ::= 'n' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "Start",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "a",
+        "span": [
+          83,
+          85
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: Start: unknown annotation @a has no effect",
+        "excludesAutoCommit": false
+      },
+      {
+        "rule": "Sum",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "b",
+        "span": [
+          155,
+          157
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: Sum: unknown annotation @b has no effect",
+        "excludesAutoCommit": false
+      },
+      {
+        "rule": "Item",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "c",
+        "span": [
+          270,
+          272
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @c has no effect",
+        "excludesAutoCommit": false
+      }
+    ]
+  },
+  {
+    "name": "functional-auto-commit",
+    "note": "機能を持つ Simple annotation は報告しない（baseline は同じ文法）",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @autoCommit\n  Item ::= 'n' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @autoCommit\n  Item ::= 'n' ;\n}\n",
+    "warnings": []
+  },
+  {
+    "name": "with-auto-commit",
+    "note": "@autoCommit が解析する文法では、未知の注釈が rule を解析対象から外す（opaque）。生成物は注釈と @autoCommit の両方を除いた baseline と同じで、注釈だけを除いた contrast（COMMIT が入る）とは異なる",
+    "grammar": "// 😀 positions are code points\ngrammar G {\n  @package: org.example.g\n  @root @mapping(Root) @autoCommit @custom\n  R ::= 'a' X | 'b' Y ;\n  X ::= 'x' ;\n  Y ::= 'y' ;\n}\n",
+    "baseline": "// 😀 positions are code points\ngrammar G {\n  @package: org.example.g\n  @root @mapping(Root)\n  R ::= 'a' X | 'b' Y ;\n  X ::= 'x' ;\n  Y ::= 'y' ;\n}\n",
+    "contrast": "// 😀 positions are code points\ngrammar G {\n  @package: org.example.g\n  @root @mapping(Root) @autoCommit\n  R ::= 'a' X | 'b' Y ;\n  X ::= 'x' ;\n  Y ::= 'y' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "R",
+        "code": "W-ANNOTATION-IGNORED",
+        "subject": "custom",
+        "span": [
+          104,
+          111
+        ],
+        "suggestion": null,
+        "message": "W-ANNOTATION-IGNORED: R: unknown annotation @custom is not used by the generator, but it excludes rule R from @autoCommit analysis",
+        "excludesAutoCommit": true
+      }
+    ]
+  }
+]

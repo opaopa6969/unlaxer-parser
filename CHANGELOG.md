@@ -8,8 +8,13 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ## [Unreleased]
 
+### Added
+
+- Java / Rust（native・Java-host）の既知差・未対応・条件付き skip を issue へ結ぶ [台帳](docs/parity-ledger.md) と JSON、host 別 corpus（JSON・JSON Lines・TSV・CSV・YAML、host 列の行）とテスト内の無条件 skip・差分表・除外集合の登録漏れ、文書の不一致を検出する既存 CI の検査を追加 (#771)。
+
 ### Fixed
 
+- Rust の `@f` が生成・投影原文を Choice／rule 経由や全入力解析で受理する問題を修正し、Java と同じ入力由来検査・失敗位置を保つ (#761)。
 - Rust の LSP の message と `ParseError` / `ParseDiagnostic` の `Display` で、空の期待候補（通常の文法の `''`）を Java の生成 LSP と同じ `''` と表示する (#750)。以前は `Expected  or b` のように候補が見えなかった。canonical JSON・`data.expectedTokens` の値 `""`、空でない候補の表示、LSP の range・code は変えない。表示用に `unlaxer_runtime::display_expected` を追加した。[表示の対応](docs/empty-literal.md#人が読む表示750)。
 - 生成した Rust parser の Number token が、不完全な指数（`2e`・`2e+`）で Java の `NumberParser` と同じく指数記号・符号の後を失敗位置として記録するよう修正 (#717)。`R0 ::= NUM 'a'` に `2e` の診断は CP1 → CP2（`2e+` は CP3）。受理と消費は従来どおり仮数部まで。共通 oracle `conformance/number-token/cases.tsv` を追加し、PBT の既知差 `number-incomplete-exponent` を削除。
 - provider transport の通常拒否と意図した timeout の予算を Java/Rust 共通 fixture で分離し、正常応答付き stderr の上限超過と stdout/stderr のちょうど 4MiB の受理を検証する (#721)。製品の timeout 既定値は変更しない。
@@ -34,6 +39,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - 複数 grammar の生成失敗に grammar 名と元ソース CP 範囲を付け、Rust の root `mod.rs` は全子 module の後に書く。I/O エラーには失敗パスを付ける (#714)。Java-host Rust の出力先の祖先 symlink は従来どおり許容し、生成する子ディレクトリ・ファイルと明示した出力先自体の symlink は拒否する。native の祖先拒否は既存差として残す。OS 書き込み失敗時に既に書いた子ファイルを巻き戻す保証はしない。
 - `E-RAISING-REPETITION` の nullable 判定で、通常の文法の空 literal `''`（Java の `WordParser("")`、常に失敗）を nullable とみなさないようにした (#749)。`{ COMMIT('') }`・`{ COMMIT('', 'm') }`・捕まえない `{ LABEL(L, '') }` は、Java の `GrammarValidator` / 生成器、native generator、両 portability check で位置付きで拒否する。`@tokenStream` / `@lexicalContext` の文法（`Lexing.LiteralParser("")`、幅0で成功）では従来どおり nullable で、拒否しない。Java と Rust の判定は lowering と同じ条件で揃えた。[契約](docs/empty-literal.md)。
 - #729 の Parsed 原文の追跡を、owned capture（CAPTURE / SAME_AS / CaptureScope、call-by-value の脱糖後を含む）がある文法・式だけに限定した。未使用時は Parsed 原文を生成・伝搬せず、成功 memo にも保存しない。共有文法ごとの判定結果は Weak 参照で最大64件キャッシュし、小入力でも毎 parse の全 rule 走査を避ける。入れ子の呼び出しでは外側の追跡を引き継ぎ、終了時に復元する。原文の追加情報は既存の boxed source に移し、Rust の `Fragment` を x86_64 で 64 → 56 B（master と同サイズ）へ戻した。深さ255の非 Classic CAPTURE 再帰について、Rust 1.85.0・release（opt-level=3、debuginfo=1）で最小要求スタックを16 B刻み・各境界3回確認すると、A' `ae11e746` 747,904 B、修正前 `def95dc8` 784,640 B、修正後 768,256 B。A' 比の増加は約4.9%から約2.7%へ縮小したが、残差はある。再帰上限は変更していない。
+- 生成に作用しない Simple annotation（`@custom` など、`@nestedCaptures`・`@autoCommit` 以外の `@name`）を、Java・Java-host Rust・native Rust のすべてで受理し、生成器は名前を使わない (#715)。生成物は、`@autoCommit` が解析しない文法では注釈が無い場合と byte 一致する。`@autoCommit` の解析は従来どおりこの注釈を持つ rule を opaque として外すので、`@autoCommit` を使う文法では挿入位置が変わり得て、警告文が `... is not used by the generator, but it excludes rule R from @autoCommit analysis` とそれを示す。3.3.0 の Java の挙動（受理して無視、parser IR には名前を残す）は変えず、native の `unlaxer check` は `P-ANNOTATION` で blocked とせず passed とする。注釈ごとに警告 `W-ANNOTATION-IGNORED`（span は注釈、近い既知名があれば `did you mean @leftAssoc?` の候補）を両 host で同じ code・位置・文字列で出す。native の frontend は Java に合わせ、`@ leftAssoc`（`@` の後に空白）を `@leftAssoc` として適用せず Simple annotation に、`@mapping`（引数が必要な名前を `(` なしで）を構文エラーにせず Simple annotation にする。生成物を変えない警告（`W-ANNOTATION-IGNORED`・`W-AUTO-COMMIT-SKIPPED`）を `GenerationWarnings.collect` / `unlaxer_generator::warnings::collect` に集め、native `unlaxer generate` と Java-host `generate --target rust` が stderr に `warning: CP <start>..<end>: <message>` を出し、新しい `--strict` / `--fail-on warning` で終了コード 5 として何も書かずに失敗する。Java の flag CLI は両方の警告を検証 warning（category `GENERAL`）として報告し（`--strict` で失敗）、その message を Rust CLI と同じ `warning: CP <start>..<end>: <message>` の 1 行にする（text 表示と JSON の `issues[].message` の両方。既存の警告の表示は変えない）。`GrammarValidator.validate` 自体はこの 2 つを返さない（書き換え後の木では位置と `@autoCommit` との関係が分からないため）。[契約](docs/simple-annotations.md)。
 
 - 生成した Rust parser の失敗位置と rule stack を Java に揃えた (#706)。UBNF の正の `LOOKAHEAD`・`EMPTY`・`UNTIL` が matched cursor だけを進めた後の失敗は、Java と同じく matched の到達位置（たとえば `R0 ::= 'a' AHEAD 'é'` に `ax` で CP1 → CP2）で報告され、その後に始まる rule の開始位置も同じく後ろへ進む。受理・cursor・CST・AST は変わらない。式単位の入口（`ParseContext::parse` など）と token stream の中は従来どおり。[契約](docs/prior-matched-diagnostics.md#grammar-呼び出しの-frontier706)。
 

@@ -19,11 +19,20 @@ final class RustGenerateCommand {
         boolean check = false;
         boolean lsp = false;
         boolean dap = false;
+        boolean strict = false;
         try {
             for (int i = 1; i < args.length; i++) {
                 String option = args[i];
+                // Warnings fail generation (#715); --fail-on warning is the flag CLI's spelling.
+                if (option.equals("--strict") || option.equals("--fail-on")) {
+                    if (strict) throw new IllegalArgumentException("duplicate --strict / --fail-on");
+                    if (option.equals("--fail-on") && (i + 1 == args.length || !args[++i].equals("warning")))
+                        throw new IllegalArgumentException("--fail-on accepts only warning");
+                    strict = true;
+                    continue;
+                }
                 if (option.equals("--help")) {
-                    out.println("Usage: generate --target rust --grammar <file.ubnf> --output <module-directory> [--check] [--lsp] [--dap]");
+                    out.println("Usage: generate --target rust --grammar <file.ubnf> --output <module-directory> [--check] [--lsp] [--dap] [--strict | --fail-on warning]");
                     return 0;
                 }
                 if (option.equals("--dap")) {
@@ -77,6 +86,10 @@ final class RustGenerateCommand {
                     new IllegalArgumentException("Grammar validation failed:\n - " + String.join("\n - ", errors)));
             }
             var generated = new RustBackend().generateFile(file, lsp, dap, snapshot);
+            // Errors come first; under --strict a warning fails before anything is written.
+            var warnings = org.unlaxer.dsl.codegen.GenerationWarnings.collect(snapshot.source());
+            if (!warnings.isEmpty()) err.println(org.unlaxer.dsl.codegen.GenerationWarnings.report(warnings, strict));
+            if (strict && !warnings.isEmpty()) return CodegenMain.EXIT_STRICT_VALIDATION_ERROR;
             Path output = Path.of(options.get("--output"));
             if (Files.isSymbolicLink(output)) throw new IOException("output directory must not be a symbolic link: " + output);
             // Preflight every file before writing: never replace handwritten code or follow file symlinks.
