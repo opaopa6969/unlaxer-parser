@@ -32,7 +32,7 @@ cursor（memo 有無）、診断種別と位置、AST の全 field と node span
 
 ## LOOKAHEAD の後に失敗する rule（#753）
 
-`issue: "#753"` の18文法30入力は、正の `LOOKAHEAD` の後に呼んだ rule の回帰ケース。
+`issue: "#753"` の25文法37入力は、正の `LOOKAHEAD` の後に呼んだ rule の回帰ケース。
 期待値は Java の parse frame の規則から手で求めた。rule を呼んだときの `ParseFrame` の開始は
 max(consumed, matched) で、その rule が失敗するとこの開始が失敗候補になる。一方、trivia と消費は
 transaction の matched cursor を consumed（と行コメント終端の先読み）まで下げ、後続の `LOOKAHEAD` /
@@ -65,5 +65,19 @@ Detailed / DetailedOnFailure / Auto の6設定で照合する。Java-host と na
 修正は Rust の rule 呼び出しが失敗したときに frame の開始を失敗位置として記録するだけで、
 trivia の読み飛ばし、matched cursor、Java の実装、Classic の専用 trivia parser、token-stream
 session の消費位置、#706 / #734 の frontier 選択は変えない（[説明](../../docs/prior-matched-diagnostics.md#失敗した-rule-frame-の開始753)）。
-修正前の runtime では30入力のうち20入力（trivia の16と消費の4）が失敗し、trivia で matched を
+最初の18文法30入力は、修正前の runtime では20入力（trivia の16と消費の4）が失敗し、trivia で matched を
 max に保つ実装では12入力（`*AfterTrivia` の7、成功した rule の1、消費の4）が失敗する。
+
+再レビューで追加した7文法は、後続の Choice の枝が成功した後の失敗、全体の成功、任意・反復の
+最後の失敗、成功 memo の再生、末端が同じ frontier / さらに遠方に届く場合を扱う。`axyz` の
+失敗した子 rule は CP4 に候補を残すので、後続の枝が `x` で成功した後に `v` が CP2 で失敗しても
+診断は CP4。全入力を受理すれば診断は返さない。末端の `q` が CP4 / CP5 で失敗した場合は
+その候補を保持する。
+
+`memoHitsAtLeast` は `[failure, success]` の最低 hit 数で、memo ON の各診断方針について
+Java と両 Rust host の実 hit を検証する。単に ON/OFF を切り替えただけの試験とは区別する。
+`expectedHints` は backend 固有の候補を両列に固定する。たとえば `CommentLookahead` は
+Java `["'z'"]` / Rust `[]`、`LookaheadRuleFartherFailure` は Java `["'q'"]` / Rust `["q"]`。
+共通契約は種別・位置であり、候補を追加しないことを「Java と候補も一致」とは扱わない。
+再レビューの mutation では `fail_rule_frame` を無効にした専用コピーで corpus の
+`CommentLookahead/reach` が CP7 / CP5 の差で落ち、Rust の2つの rule-frame 回帰テストも落ちる。

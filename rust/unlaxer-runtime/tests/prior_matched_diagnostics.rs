@@ -194,6 +194,217 @@ fn a_failed_rule_records_its_start_at_the_matched_reach() {
     }
 }
 
+#[test]
+fn failed_rule_frames_respect_assertion_speculation() {
+    for row in include_str!("../../../conformance/prior-matched-diagnostics/rule-frames.tsv")
+        .lines()
+        .filter(|row| !row.starts_with('#') && !row.is_empty())
+    {
+        let c: Vec<_> = row.split('\t').collect();
+        for memo in [Memoization::Off, Memoization::SafeFailures] {
+            for diagnostics in [
+                Diagnostics::Auto,
+                Diagnostics::Detailed,
+                Diagnostics::DetailedOnFailure,
+            ] {
+                let body = if c[1] == "fallback" {
+                    Expr::Rule(1)
+                } else {
+                    Expr::Rule(2)
+                };
+                let wrapped = match c[2] {
+                    "plain" => body,
+                    "positive" => body.ahead(),
+                    "negative" => body.not_ahead(),
+                    "match-only" => body.match_only(),
+                    "positive-twice" => Expr::sequence([body.clone().ahead(), body.ahead()]),
+                    "negative-twice" => {
+                        Expr::sequence([body.clone().not_ahead(), body.not_ahead()])
+                    }
+                    _ => panic!("unknown wrapper"),
+                };
+                let child = match c[1] {
+                    "not-failure" => Expr::sequence([
+                        Expr::literal("x"),
+                        Expr::JavaLookahead {
+                            pattern: "y",
+                            positive: false,
+                        },
+                    ]),
+                    "not-success" => Expr::sequence([
+                        Expr::literal("x"),
+                        Expr::JavaLookahead {
+                            pattern: "q",
+                            positive: false,
+                        },
+                        Expr::literal("y"),
+                    ]),
+                    _ => Expr::sequence([Expr::literal("x"), Expr::literal("q")]),
+                };
+                let rules = vec![
+                    unlaxer_runtime::Rule {
+                        name: "R0",
+                        expression: Expr::sequence([
+                            Expr::literal("a"),
+                            Expr::JavaLookahead {
+                                pattern: "xyz",
+                                positive: true,
+                            },
+                            wrapped,
+                            Expr::literal("x"),
+                            Expr::literal("v"),
+                        ]),
+                    },
+                    unlaxer_runtime::Rule {
+                        name: "R1",
+                        expression: Expr::choice([Expr::Rule(2), Expr::literal("x")]),
+                    },
+                    unlaxer_runtime::Rule {
+                        name: "R2",
+                        expression: child,
+                    },
+                ];
+                let mut context = ParseContext::with_options("axyz", options(memo, diagnostics));
+                assert!(
+                    context.parse_grammar(rules.clone(), 0, false).is_err(),
+                    "{row}"
+                );
+                assert_eq!(
+                    (context.position(), context.matched_position()),
+                    (0, 0),
+                    "{row}"
+                );
+                let offset = c[3].parse::<usize>().unwrap();
+                assert_eq!(
+                    context.failure().offset,
+                    if diagnostics == Diagnostics::DetailedOnFailure {
+                        0
+                    } else {
+                        offset
+                    },
+                    "{row}/{memo:?}/{diagnostics:?}"
+                );
+                if c.len() == 6 {
+                    let expected = if memo == Memoization::SafeFailures {
+                        (
+                            c[4].parse::<usize>().unwrap(),
+                            c[5].parse::<usize>().unwrap(),
+                        )
+                    } else {
+                        (0, 0)
+                    };
+                    assert_eq!(
+                        (
+                            context.memoized_failure_hits(),
+                            context.memoized_success_hits()
+                        ),
+                        expected,
+                        "{row}"
+                    );
+                }
+                assert_eq!(
+                    unlaxer_runtime::parse_detailed_with_options(
+                        &rules,
+                        0,
+                        false,
+                        "axyz",
+                        options(memo, diagnostics)
+                    )
+                    .unwrap_err()
+                    .offset,
+                    offset,
+                    "{row}/{memo:?}/{diagnostics:?}"
+                );
+            }
+        }
+    }
+}
+
+fn native_rule_after_discarded_grammar_failure(context: &mut ParseContext<'_>) -> ParseResult {
+    let succeeds = context.state::<bool>("succeeds").copied().unwrap();
+    let memo = context.state::<bool>("memo").copied().unwrap();
+    for attempt in 0..2 {
+        let rollback: Result<(), unlaxer_runtime::ParseError> = context.transaction(|context| {
+            let result = context.parse(&Expr::Rule(3));
+            assert_eq!(result.is_ok(), succeeds);
+            // Native expression entries retain the source failure even when a
+            // successful rule has a failed alternative. Grammar uses CP4 instead.
+            let failure = context.failure();
+            assert_eq!(failure.offset, 2);
+            assert_eq!(failure.expected, ["q"]);
+            Err(failure)
+        });
+        assert!(rollback.is_err());
+        let hits = usize::from(memo) * attempt;
+        assert_eq!(
+            context.memoized_failure_hits(),
+            if succeeds { 0 } else { hits }
+        );
+        assert_eq!(
+            context.memoized_success_hits(),
+            if succeeds { hits } else { 0 }
+        );
+    }
+    Ok(unlaxer_runtime::ParseMatch::empty(unlaxer_runtime::Span {
+        start: 1,
+        end: 1,
+    }))
+}
+
+#[test]
+fn grammar_and_native_frontiers_do_not_share_failure_or_success_memos() {
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for succeeds in [false, true] {
+            let rules = vec![
+                unlaxer_runtime::Rule {
+                    name: "R0",
+                    expression: Expr::sequence([
+                        Expr::literal("a"),
+                        Expr::JavaLookahead {
+                            pattern: "xyz",
+                            positive: true,
+                        },
+                        if succeeds {
+                            Expr::Rule(2).ahead()
+                        } else {
+                            Expr::Rule(2).not_ahead()
+                        },
+                        Expr::Custom(native_rule_after_discarded_grammar_failure),
+                    ]),
+                },
+                unlaxer_runtime::Rule {
+                    name: "R1",
+                    expression: Expr::sequence([Expr::literal("x"), Expr::literal("q")]),
+                },
+                // Match the rule-depth key of the callback's reentrant expression
+                // entry; otherwise a cache miss would hide the frontier collision.
+                unlaxer_runtime::Rule {
+                    name: "Alias1",
+                    expression: Expr::Rule(4),
+                },
+                unlaxer_runtime::Rule {
+                    name: "MemoTarget",
+                    expression: if succeeds {
+                        Expr::choice([Expr::Rule(1), Expr::literal("x")])
+                    } else {
+                        Expr::Rule(1)
+                    },
+                },
+                unlaxer_runtime::Rule {
+                    name: "Alias2",
+                    expression: Expr::Rule(3),
+                },
+            ];
+            let mut context =
+                ParseContext::with_options("axyz", options(memo, Diagnostics::Detailed));
+            context.set_state("succeeds", succeeds);
+            context.set_state("memo", memo == Memoization::SafeFailures);
+            context.parse_grammar(rules, 0, false).unwrap();
+            assert_eq!((context.position(), context.matched_position()), (1, 4));
+        }
+    }
+}
+
 thread_local! {
     static BC_REGISTRY: unlaxer_runtime::shared_calls::Registry = {
         let grammar = unlaxer_runtime::embedded::CstGrammar {

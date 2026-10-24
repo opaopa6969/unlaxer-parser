@@ -1327,6 +1327,12 @@ impl FailureMemoKey {
         self.depth_and_modes |= usize::from(enabled) << 16;
         self
     }
+    /// Grammar and explicit native expression entries can share rules and cursors,
+    /// but retain different failure frontiers, including inside successful memos.
+    fn with_grammar_frontier(mut self, enabled: bool) -> Self {
+        self.depth_and_modes |= usize::from(enabled) << 17;
+        self
+    }
     fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
         self.depth_and_modes = (self.depth_and_modes & !6)
             | (usize::from(policy.reset) << 2)
@@ -2982,11 +2988,6 @@ impl<'a> ParseContext<'a> {
         } else {
             self.execute_rule(id, depth)
         };
-        // The failed body restored the cursors: a matched cursor beyond the consumed
-        // one is the reach of a preceding LOOKAHEAD at this rule's entry.
-        if result.is_none() && self.matched_position > self.position {
-            self.fail_rule_frame();
-        }
         if tracked {
             self.leave_rule_frame(result.is_none());
         }
@@ -3043,6 +3044,7 @@ impl<'a> ParseContext<'a> {
         .with_token_mode(self.token_mode)
         .with_owned_source(self.track_owned_source)
         .with_line_comments(self.line_comments)
+        .with_grammar_frontier(self.grammar_frontier)
         .with_state_version(self.scopes.memo_version().expect("memo version checked"));
         let position = self.code_point(self.position);
         if let Some(result) = self.probe_rule_memo(position, &key) {

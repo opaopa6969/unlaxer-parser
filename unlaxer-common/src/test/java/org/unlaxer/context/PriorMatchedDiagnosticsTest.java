@@ -46,6 +46,53 @@ public class PriorMatchedDiagnosticsTest {
         };
     }
 
+    private static final class FrameRule extends LazyChain
+            implements SafeSuccessMemoizable, org.unlaxer.parser.GrammarRule {
+        private final org.unlaxer.parser.Parsers body;
+        FrameRule(Parser... children) { body = new org.unlaxer.parser.Parsers(children); }
+        @Override public org.unlaxer.parser.Parsers getLazyParsers() { return body; }
+    }
+
+    @Test public void failedRuleFramesRespectAssertionSpeculation() throws Exception {
+        for (String row : Files.readAllLines(Path.of("../conformance/prior-matched-diagnostics/rule-frames.tsv"))) {
+            if (row.startsWith("#") || row.isBlank()) continue;
+            String[] c = row.split("\t");
+            for (var memo : Memoization.values()) for (var policy : ParseOptions.Diagnostics.values()) {
+                Parser failed = new FrameRule(new WordParser("x"), new WordParser("q"));
+                Parser body = switch (c[1]) {
+                    case "failure" -> failed;
+                    case "not-failure" -> new FrameRule(new WordParser("x"), new Not(new WordParser("y")));
+                    case "not-success" -> new FrameRule(new WordParser("x"), new Not(new WordParser("q")), new WordParser("y"));
+                    default -> new FrameRule(new Choice(failed, new WordParser("x")));
+                };
+                Parser wrapped = switch (c[2]) {
+                    case "plain" -> body;
+                    case "positive" -> new PegLookahead(body);
+                    case "negative" -> new PegLookahead(body, false);
+                    case "match-only" -> new MatchOnly(body);
+                    case "positive-twice" -> new Chain(new PegLookahead(body), new PegLookahead(body));
+                    case "negative-twice" -> new Chain(new PegLookahead(body, false), new PegLookahead(body, false));
+                    default -> throw new AssertionError(c[2]);
+                };
+                Parser root = new Chain(new WordParser("a"), new MatchOnly(new WordParser("xyz")),
+                    wrapped, new WordParser("x"), new WordParser("v"));
+                try (var context = ParseContext.withOptions(StringSource.createRootSource("axyz"),
+                        ParseOptions.withMemoization(memo).withDiagnostics(policy))) {
+                    String label = c[0] + "/" + memo + "/" + policy;
+                    assertTrue(label, root.parse(context).isFailed());
+                    assertEquals(label, 0, context.position());
+                    assertEquals(label, 0, context.matchedPosition());
+                    assertEquals(label, policy == ParseOptions.Diagnostics.DETAILED_ON_FAILURE ? 0
+                        : Integer.parseInt(c[3]), context.getParseFailureDiagnostics().getFarthestOffset());
+                    if (c.length == 6 && memo == Memoization.SAFE_FAILURES) {
+                        assertEquals(label, Integer.parseInt(c[4]), context.getPackratMemoTable().failureHits());
+                        assertEquals(label, Integer.parseInt(c[5]), context.getPackratMemoTable().successHits());
+                    }
+                }
+            }
+        }
+    }
+
     /** The Java side of #706: a failure after a positive LOOKAHEAD token is at its matched reach. */
     @Test public void failureAfterAPositiveLookaheadTokenIsAtTheMatchedReach() {
         for (var memo : Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {

@@ -151,8 +151,7 @@ max(consumed, matched) で、R1 が失敗するとその frame が失敗候補�
 
 **揃え方**: Rust の rule 呼び出しが失敗したとき、本体の失敗で戻った cursor から frame の開始
 （#706 の frontier）を求め、consumed より先なら失敗位置として記録する。期待候補は足さない
-（同じ位置に中の失敗が届いていれば名前はそのまま、届いていなければ空）。名前を足すと、memo の
-再生と再実行で同じ位置の候補が食い違うためである。Classic token mode は失敗した frame を
+（同じ位置に中の失敗が届いていれば名前はそのまま、届いていなければ空）。Classic token mode は失敗した frame を
 自分で記録しており、token stream の lexing session の中は #706 / #734 のとおり consumed で測るので、
 どちらも対象外である。
 
@@ -165,10 +164,37 @@ max(consumed, matched) で、R1 が失敗するとその frame が失敗候補�
 **対象外（未対応、[#793](https://github.com/opaopa6969/unlaxer-parser/issues/793)）**: rule でない入れ子の式（group・選択）の frame の開始は記録しない。
 `R0 ::= 'a' LOOKAHEAD('xyz') ( 'x' 'q' )` の `axyz` は Java が syntax CP4、Rust が CP2 のまま。
 
-**費用**: rule 呼び出しが失敗したときに比較が 1 回増え、条件を満たすときだけ cold path の
-記録を呼ぶ。割当は増えない。
+**期待候補の境界**: Java の `registerFailureCandidate` は失敗した parser の子を深さ2まで
+展開するため、`CommentLookahead` は Java `['z']` / Rust `[]`、`ConsumeAfterLookahead` は
+Java `['q', 'x']` / Rust `[]` となる。これは位置だけの補正で候補も一致する、という意味ではない。
+生成 Mapper の Javadoc と [PBT の契約](property-based-testing.md) は native syntax hints を
+backend 固有としている。#706 / #753 の共通契約は診断種別・CP位置であり、候補文字列の完全一致は
+対象外。`expectedHints` に両側の期待値を明記し、各 host 内では memo・診断方針に依存しないことを
+検証する。同じ CP4 に末端の失敗が届けば Rust の `q` は保持され、さらに遠い CP5 の失敗も戻さない。
+ここで expected が空でも、全入力 API の `syntax` は実際の構文失敗である。成功到達だけを表す
+低水準 context の fallback と混同しない。
 
-**検証**: 共通 corpus の `spec-corpus/global-comment/corpus.json`（`#753` の 18 文法 30 入力）を
+**memo と破棄**: 通常の Choice の失敗候補は、後の枝が成功しても保持される。反復を終える
+失敗も同じ。成功した PEG assertion は、その内部の候補を memo hit の場合も破棄する。
+rule 自身の開始位置は、その rule の memo 保存後に記録する。ただし、**親 rule の memo には子の
+frame の候補が入る**。このため記録順序だけでは、grammar と明示 native 式入口の混用を守れない。
+`x q` の source failure は CP2、grammar の frame 開始は CP4。先読みが診断を破棄した後で、
+子の CP4 を保存した親 rule の memo を native 式入口が再利用すると、memo ON だけ CP4 を返す
+退行が再レビューで見つかった（master は OFF/ON とも CP2）。親 rule が失敗する場合だけでなく、
+後続の枝で成功して内部診断を保持する成功 memo でも同じ問題が起きる。
+成功・失敗 memo 共通のキーの `depth_and_modes` の bit17 に `grammar_frontier` を加え、
+異なる frontier 間では再評価し、同じ入口内では従来どおり再利用する。
+
+**費用**: Detailed の `leave_rule_frame` に既存の失敗分岐があり、その中から cold path の
+`fail_rule_frame` を呼ぶ。成功した rule と deferred pass に追加の分岐・割当はない。
+memo 有効時のキーに1 bitを設定する演算は増えるが、分岐・割当・キーのサイズは増やさない。
+
+**検証**: 共通 corpus の `spec-corpus/global-comment/corpus.json`（`#753` の 25 文法 37 入力）を
 `GlobalCommentConformanceTest` が Java・Java-host / native の Rust で memo 2 種 × 診断 3 種に照合する。
 Rust `prior_matched_diagnostics` の `a_failed_rule_records_its_start_at_the_matched_reach` は
 消費・trivia・trivia 後の `LOOKAHEAD`・成功した rule の 4 形を同じ 6 設定で確かめる。
+`conformance/prior-matched-diagnostics/rule-frames.tsv` の10形は Java と Rust で、Not、MatchOnly、
+PEG assertion の両極性、成功・失敗 memo の実 hit と候補の破棄を照合する。deferred context の
+offset=0 と全入力 API の Detailed 再試行も区別する。Rust の
+`grammar_and_native_frontiers_do_not_share_failure_or_success_memos` は、親の成功・失敗 memo の
+両方で入口の切り替え後に CP2 を保ち、native 内の2回目は実 memo hit（OFF=0 / ON=1）となることを確認する。
