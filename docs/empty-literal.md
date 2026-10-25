@@ -86,7 +86,7 @@ tokenStream・lexicalContext の `{ COMMIT('') }` と捕まえる `{ LABEL(L, ''
 - `diagnostic`: 全入力診断（memo 2 × Auto / Detailed / DetailedOnFailure の 6 通りで同一）
 - `ruleStack`: Detailed の直接 parse の `[失敗時の rule stack, 入力が残ったときの rule stack]`（`offset:Rule@start>…|omitted`、memo 2 通りで同一）
 - `ast`: 受理時の AST 全 field と code point span
-- `cst`: 受理時の rule 単位 CST（rule 名と code point 範囲。helper・終端は透過）
+- `cst`: 受理時の **commit 済み** rule 単位 CST（rule 名と code point 範囲。helper・終端は透過）。Java は `context.getCurrent().getTokens()`、Rust は `Tree.root` から読む（[#767 の根拠](root-choice-cst.md)）
 
 `EmptyLiteralConformanceTest` は、素の `mvn test` でも Java 生成 parser（`javac` で compile）を oracle と照合する。
 `-DrustConformance=true` では、Java host と native host の Rust 5 ファイルの byte 一致を確認したうえで、
@@ -124,11 +124,15 @@ Rust の非空 literal を引用符付きに変えるのは既存の表示を全
 
 - Java は literal を引用符付きで表示し、`javaStyle` trivia の補助候補、同じ chain の後続要素、`RootParser` などの class 名、
   幅0で成功した token 名を候補に加え、trailing input の farthest 候補が異なる。Cut / Labeled / Stack / AutoCommit の `''` を `'z'` に
-  置き換えた対照文法でも、後続要素（`'c'`・`'z'`）・`RootParser`・choice root の token 欠落が同じく現れる。
+  置き換えた対照文法でも、後続要素（`'c'`・`'z'`）・`RootParser` が期待候補に加わる。
 - 以前は MatchedCursor（先読みで matched cursor が進んだ後の失敗）の farthest も Java は matched 位置、Rust は consumed 位置で異なっていたが、
   #706 で Rust が Java に揃ったので、現在の差は引用符の表示だけである。
-- choice を root とする rule で選ばれた枝が capture helper の場合、Java の token 木に root rule の token が残らない
-  （CaptureRollback の `javaCst`。非空 literal でも同じ差）。
+
+choice root の CST 差としていた CaptureRollback / Labeled / AutoCommit の3件は、Java の返却 `Parsed` の部分木と
+Rust の commit 済み CST を比較した観測対象の誤りだった（#767）。Java 3.3.0 も choice root を context に commit し、
+mapper はその root を要求する。返却 `Parsed` が選択した枝を返すのは既存の仕様である。`cst` は root を保持する共通期待値にし、
+`javaCst` は削除した。host 別 CST 期待値をテストで禁止し、3件は通常入口と Classic consumed / matchOnly の CST も比較する。
+公開 parser・生成物・Rust CST は変えない。判断と利用 API の区別は [root choice の CST 契約](root-choice-cst.md) を参照。
 
 既知の範囲外: token-stream / lexical-context grammar の Classic token mode で、**非空** literal を反転させたときの意味
 （Java の `LiteralParser` は幅0成功、Rust Classic は `WordParser` と同じく1文字単位）は本変更以前からの差であり、ここでは扱わない。
