@@ -1681,6 +1681,25 @@ struct MatchCursorPolicy {
     reset: bool,
     non_ordered: bool,
 }
+/// Java Chain implementations, which set `resetMatchedWithConsumed=false` on their owner
+/// before the memo lookup and their own transaction. These built-in lexical parsers are
+/// Chain implementations in Java too.
+#[inline(always)]
+fn java_chain_disables_owner_reset(expression: &Expr) -> bool {
+    matches!(
+        expression,
+        Expr::Sequence(_)
+            | Expr::Number
+            | Expr::Identifier
+            | Expr::Quoted(_)
+            | Expr::CodeStart
+            | Expr::CodeEnd
+            | Expr::Capture(_, _)
+            | Expr::CaptureBoundary(_, _)
+            | Expr::InputCaptureBoundary(_, _)
+    )
+}
+
 impl Default for MatchCursorPolicy {
     fn default() -> Self {
         Self {
@@ -3070,15 +3089,16 @@ impl<'a> ParseContext<'a> {
 
     #[inline(never)]
     fn memoized_rule(&mut self, id: usize, depth: usize) -> Option<usize> {
-        // Java's Chain disables matched-cursor reset before memo lookup. Sequence
-        // and Number do the same in expression(), but waiting until a miss gives
+        // Java's Chain disables matched-cursor reset before memo lookup. expression()
+        // does the same for every Chain counterpart, but waiting until a miss gives
         // (!Num 'x') | Num two different keys (#794). Metadata adds no parser frame.
-        // Preserve the policy on hits too; rule/expression depth guards stay intact.
+        // Rule/expression depth guards stay intact.
+        let parent_reset = self.match_cursor_policy.reset;
         let mut expression = &self.rules[id].expression;
         while let Expr::MetadataCapture(_, child) = expression {
             expression = child;
         }
-        if matches!(expression, Expr::Sequence(_) | Expr::Number) {
+        if java_chain_disables_owner_reset(expression) {
             self.match_cursor_policy.reset = false;
         }
         let key = FailureMemoKey::new(
@@ -3096,6 +3116,10 @@ impl<'a> ParseContext<'a> {
         .with_state_version(self.scopes.memo_version().expect("memo version checked"));
         let position = self.code_point(self.position);
         if let Some(result) = self.probe_rule_memo(position, &key) {
+            if result.is_none() && self.token_mode.is_none() {
+                // A replayed failure leaves the policy as the evaluation below does.
+                self.match_cursor_policy.reset = parent_reset;
+            }
             return result;
         }
         let success = self.token_trace.is_none();
@@ -3121,6 +3145,11 @@ impl<'a> ParseContext<'a> {
         };
         let result = self.execute_rule(id, depth);
         self.finish_rule_memo(call, result);
+        // Without memo the failed Chain restores its owner's policy outside Classic token
+        // mode, and on a resource failure (expression()); keep memo transparent there.
+        if result.is_none() && (self.token_mode.is_none() || self.resource_failure.is_some()) {
+            self.match_cursor_policy.reset = parent_reset;
+        }
         result
     }
 
@@ -3432,18 +3461,7 @@ impl<'a> ParseContext<'a> {
         // Chain sets the policy before beginning its own transaction, so a successful
         // Sequence changes the policy for following siblings in the same owner.
         // These built-in lexical parsers are also Chain implementations in Java.
-        if matches!(
-            expression,
-            Expr::Sequence(_)
-                | Expr::Number
-                | Expr::Identifier
-                | Expr::Quoted(_)
-                | Expr::CodeStart
-                | Expr::CodeEnd
-                | Expr::Capture(_, _)
-                | Expr::CaptureBoundary(_, _)
-                | Expr::InputCaptureBoundary(_, _)
-        ) {
+        if java_chain_disables_owner_reset(expression) {
             self.match_cursor_policy.reset = false;
         }
         let java_transaction = matches!(
@@ -3702,20 +3720,7 @@ impl<'a> ParseContext<'a> {
                 // Java Chain sets this on its owner before beginning the local
                 // transaction, so syntax failure retains it until an enclosing
                 // transaction rolls back. Resource failures keep full rollback.
-                if self.token_mode.is_some()
-                    && matches!(
-                        expression,
-                        Expr::Sequence(_)
-                            | Expr::Number
-                            | Expr::Identifier
-                            | Expr::Quoted(_)
-                            | Expr::CodeStart
-                            | Expr::CodeEnd
-                            | Expr::Capture(_, _)
-                            | Expr::CaptureBoundary(_, _)
-                            | Expr::InputCaptureBoundary(_, _)
-                    )
-                {
+                if self.token_mode.is_some() && java_chain_disables_owner_reset(expression) {
                     self.match_cursor_policy.reset = false;
                 }
                 if self.token_mode.is_some()
@@ -7127,6 +7132,69 @@ mod tests {
                 ],
             }
         );
+    }
+
+    // #794 normalizes reset before the memo lookup, but a failed rule must still leave the
+    // owner's cursor policy as the unmemoized evaluation does (memo transparency).
+    #[test]
+    fn memoized_rule_leaves_the_unmemoized_cursor_policy() {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "sequence",
+                expression: Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("b")]),
+            },
+            Rule {
+                name: "number",
+                expression: Expr::Number,
+            },
+            Rule {
+                name: "identifier",
+                expression: Expr::Identifier,
+            },
+        ]);
+        for (input, rule) in [("ax", 0), ("ab", 0), ("-", 1), ("1", 1), ("-", 2), ("a", 2)] {
+            for token_mode in [None, Some(token::ParseMode::default())] {
+                let observe = |memoization| {
+                    let mut context = ParseContext::with_options(
+                        input,
+                        ParseOptions::with_memoization(memoization),
+                    );
+                    context.rules = Arc::clone(&grammar);
+                    context.memo_safe_rules = memo_safe_rules(&grammar);
+                    context.token_mode = token_mode;
+                    // The third call starts after a sibling Chain set reset=false; Java's
+                    // Chain uses the same key for it, so it also replays.
+                    let observed = [true, true, false]
+                        .into_iter()
+                        .map(|reset| {
+                            context.position = 0;
+                            context.matched_position = 0;
+                            context.match_cursor_policy = MatchCursorPolicy {
+                                reset,
+                                non_ordered: false,
+                            };
+                            let result = context.rule(rule, 0).is_some();
+                            let policy = context.match_cursor_policy;
+                            (
+                                result,
+                                context.position,
+                                context.matched_position,
+                                policy.reset,
+                                policy.non_ordered,
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    let hits = context.memoized_failure_hits() + context.memoized_success_hits();
+                    (observed, hits)
+                };
+                let (off, _) = observe(Memoization::Off);
+                let (memo, hits) = observe(Memoization::SafeFailures);
+                assert_eq!(memo, off, "{input}/{rule}/{token_mode:?}");
+                if !off[0].0 {
+                    assert_eq!(hits, 2, "{input}/{rule}/{token_mode:?}");
+                }
+            }
+        }
     }
 
     #[test]

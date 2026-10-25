@@ -32,8 +32,9 @@ mvn -B -o -pl unlaxer-common -am test -Dtest=NumberTokenOracleTest \
   Java の key は parser identity・consumed/matched・TokenKind・invert・stateVersion・reset policy。
   深さを key に含めず、保存時より深い再生を lookup で拒否する。Chain は lookup **前**に reset policy を false にする。
   Rust のこの再現例では先読み内外の rule 深さは同じで、旧 key の差は reset bit（false / true）だった。
-  Number / Sequence rule（生成 Num の Chain を含む）は式の評価時と同じ false を lookup 前にも設定し、
-  hit 時にもその副作用を保つ。parser frame を加えない MetadataCapture を透過し、mapping 用の生成 rule も検証する。
+  Chain に当たる rule（Sequence・Number・Identifier・CAPTURE など。生成 Num の Chain を含む）は式の評価時と同じ false を lookup 前にも設定し、
+  成功と Classic token mode の失敗は hit でもその false を残し、それ以外の失敗の後は memo OFF と同じく
+  呼び出し前の reset に戻す（memo の透過性）。parser frame を加えない MetadataCapture を透過し、mapping 用の生成 rule も検証する。
   rule 深さを含む key・expression 深さの再生検査・他の parser の reset/nonOrdered key は変更しない。
   異なる rule 深さ全般で Java と同じ hit を保証するものではない。
 - 低水準 API の Auto は Detailed。DetailedOnFailure は記録せず、最遠位置0・空候補・stack無し。
