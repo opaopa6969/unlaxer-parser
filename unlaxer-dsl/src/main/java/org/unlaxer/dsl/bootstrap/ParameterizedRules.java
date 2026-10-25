@@ -751,7 +751,7 @@ public final class ParameterizedRules {
             if (element instanceof BoundedRepeatElement bounded) {
                 AtomicElement inner = atomic(bounded.body(), env);
                 return inner == bounded.body() ? bounded
-                    : copy(origins, new BoundedRepeatElement(inner, bounded.min(), bounded.max()), bounded);
+                    : copy(origins, BoundedQuantifiers.copy(new BoundedRepeatElement(inner, bounded.min(), bounded.max()), bounded), bounded);
             }
             if (element instanceof SeparatedElement separated) {
                 AtomicElement item = atomic(separated.element(), env);

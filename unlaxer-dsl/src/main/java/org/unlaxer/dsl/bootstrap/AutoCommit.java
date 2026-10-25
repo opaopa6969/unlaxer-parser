@@ -325,7 +325,7 @@ public final class AutoCommit {
                 if (inner != repeat.body()) result = new OneOrMoreElement(inner);
             } else if (element instanceof BoundedRepeatElement repeat) {
                 AtomicElement inner = element(repeat.body());
-                if (inner != repeat.body()) result = new BoundedRepeatElement(inner, repeat.min(), repeat.max());
+                if (inner != repeat.body()) result = BoundedQuantifiers.copy(new BoundedRepeatElement(inner, repeat.min(), repeat.max()), repeat);
             } else if (element instanceof SeparatedElement separated) {
                 AtomicElement item = element(separated.element());
                 AtomicElement separator = element(separated.separator());

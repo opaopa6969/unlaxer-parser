@@ -152,7 +152,8 @@
       "org.unlaxer.dsl.codegen.NumberTokenConformanceTest": ["generatedJavaMatchesTheDiagnosticOracle", "bothRustHostsMatchTheDiagnosticOracle"],
       "org.unlaxer.dsl.GenerationWarningsConformanceTest": ["libraryMatchesTheSharedCorpus", "javaHostRustCliPrintsTheLinesAndFailsWhenStrict", "javaFlagCliReportsEveryWarningAndFailsWhenStrict"],
       "org.unlaxer.dsl.SimpleAnnotationConformanceTest": ["warningsMatchTheSharedCorpus", "everyJavaConsumerGeneratesIgnoredAnnotationsAsAbsent", "suggestionsFollowTheDocumentedDistance", "parserIrKeepsTheNameAsMetadata", "rejectedFormsFailInEveryJavaConsumer", "cliWarnsAndStrictOrFailOnWarningFails"],
-      "org.unlaxer.dsl.CodegenRunnerTest": ["testHasErrorRowsDetectsNonWarningSeverity", "testHasWarningRowsDetectsWarningSeverity", "testExecuteUsesInjectedFileSystemPort"]
+      "org.unlaxer.dsl.CodegenRunnerTest": ["testHasErrorRowsDetectsNonWarningSeverity", "testHasWarningRowsDetectsWarningSeverity", "testExecuteUsesInjectedFileSystemPort"],
+      "org.unlaxer.dsl.codegen.BoundedOverflowConformanceTest": ["javaAndJavaHostRustMatchTheSharedOracle", "nativeValidatorAndGeneratorRunTheSameFixtures"]
     }
   },
   "tiny-catalog": {
