@@ -1,6 +1,8 @@
 package org.unlaxer.dsl.tools.bnf;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -23,6 +25,13 @@ public class UBNFToBNFConverterTest {
         String result=UBNFToBNFConverter.convert(grammar,true);
         assertTrue(result,result.contains("@lexicalContext(tokens=['T'], literals=['>'])"));
         assertFalse(UBNFToBNFConverter.convert(grammar,false).contains("@lexicalContext"));
+    }
+
+    @Test public void boundedOverflowIsRejectedInsteadOfPrintedAsANegativeCount() {
+        UBNFAST.UBNFFile grammar=UBNFMapper.parse("grammar G { R ::= 'x'{2147483647} 'y'{0,2147483648}; }");
+        IllegalArgumentException error=assertThrows(IllegalArgumentException.class,
+            () -> UBNFToBNFConverter.convert(grammar,false));
+        assertEquals("E-BOUNDED-OVERFLOW: repetition bound exceeds 2147483647 at CP 34..51", error.getMessage());
     }
 
     /**

@@ -720,17 +720,18 @@
     },
     {
       "id": "bounded-overflow",
-      "category": "unresolved",
-      "title": "量指定子 overflow の規範診断が出ない",
+      "category": "contract",
+      "title": "量指定子 overflow の診断契約",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         783
       ],
-      "observation": "quantifier/huge-boundはE-BOUNDED-OVERFLOWを要求するがJava mapperはNumberFormatException、native frontendはrepeat bound exceeds 2147483647。JavaのDOCUMENTED_DEVIATIONSに残り、Rustのvalidate除外が隠す。新規 #783 で両版の診断コード/CPを追跡。",
+      "observation": "Java / Java-host Rust / native Rust は構文層で範囲外の数字列を受理し、検証・生成で E-BOUNDED-OVERFLOW と元ソースの反復式の CP 範囲を報告する。{n}/{n,m}/{n,} の 2147483647/2147483648 境界・非 BMP・死んだ定義を共通 fixture で検証。#783 はレビュー・merge 後に close。",
       "evidence": [
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/bootstrap/UbnfSpecCorpusTest.java",
-        "unlaxer-dsl/src/test/resources/spec-corpus/ubnf/quantifiers.json",
-        "rust/unlaxer-ubnf/src/parser.rs"
+        "conformance/bounded-overflow/corpus.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/BoundedOverflowConformanceTest.java",
+        "rust/unlaxer-generator/tests/bounded_overflow.rs",
+        "unlaxer-dsl/specs/validation.md"
       ]
     },
     {
@@ -1593,11 +1594,9 @@
     {
       "path": "unlaxer-dsl/src/test/java/org/unlaxer/dsl/bootstrap/UbnfSpecCorpusTest.java",
       "markers": {
-        "documentedDeviation": 1,
         "runtimeScopeExclusion": 3
       },
       "entries": [
-        "bounded-overflow",
         "spec-driver-coverage"
       ]
     }

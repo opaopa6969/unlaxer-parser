@@ -83,6 +83,7 @@ impl FixedShape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    crate::bounded::validate(grammar)?;
     for token in &grammar.tokens {
         if matches!(&token.kind, TokenKind::Regex { .. })
             || matches!(&token.kind, TokenKind::Simple { parser_class }

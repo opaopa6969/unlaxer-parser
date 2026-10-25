@@ -1,0 +1,134 @@
+[
+  {
+    "name": "exact-max",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{2147483647}; }",
+    "code": "accept",
+    "span": "67..82"
+  },
+  {
+    "name": "range-max",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{0,2147483647}; }",
+    "code": "accept",
+    "span": "67..84"
+  },
+  {
+    "name": "both-max",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{2147483647,2147483647}; }",
+    "code": "accept",
+    "span": "67..93"
+  },
+  {
+    "name": "open-max",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{2147483647,}; }",
+    "code": "accept",
+    "span": "67..83"
+  },
+  {
+    "name": "exact-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{2147483648}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "67..82"
+  },
+  {
+    "name": "range-min-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{2147483648,2147483647}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "67..93"
+  },
+  {
+    "name": "range-max-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{0,2147483648}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "67..84"
+  },
+  {
+    "name": "range-both-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{2147483648,2147483648}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "67..93"
+  },
+  {
+    "name": "open-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{2147483648,}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "67..83"
+  },
+  {
+    "name": "huge-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{999999999999999999999999999999999999}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "67..108"
+  },
+  {
+    "name": "leading-zero-max",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{0000000000000000000002147483647}; }",
+    "code": "accept",
+    "span": "67..103"
+  },
+  {
+    "name": "leading-zero-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{0000000000000000000002147483648}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "67..103"
+  },
+  {
+    "name": "zero",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{0}; }",
+    "code": "accept",
+    "span": "67..73"
+  },
+  {
+    "name": "small",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'{1,2}; }",
+    "code": "accept",
+    "span": "67..75"
+  },
+  {
+    "name": "non-bmp-literal",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= '😀'{2147483648}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "67..82"
+  },
+  {
+    "name": "trivia",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x' // 😀\n { 2147483648 }; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "67..91"
+  },
+  {
+    "name": "unused",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'; Unused ::= 'z'{2147483648}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "83..98"
+  },
+  {
+    "name": "nested-zero",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= ('x'{2147483648}){0} 'x'; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "68..83"
+  },
+  {
+    "name": "nested-plus",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= ('x'{2147483648})+; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "68..83"
+  },
+  {
+    "name": "same-expression-later",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= 'x'; Other ::= 'x'{2147483648}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "82..97"
+  },
+  {
+    "name": "parameter-expansion",
+    "grammar": "// 😀\ngrammar G { @package: boundsprobe @root @mapping(Node) R ::= Wrap('x'); Wrap(p) ::= p{2147483648}; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "89..102"
+  },
+  {
+    "name": "capture-suffix",
+    "grammar": "// 😀\r\ngrammar G { @package: boundsprobe @root @mapping(Node, params=[v]) R ::= 'x'{2147483648} @v; }",
+    "code": "E-BOUNDED-OVERFLOW",
+    "span": "79..94"
+  }
+]

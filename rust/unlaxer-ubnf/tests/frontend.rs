@@ -260,7 +260,7 @@ fn spans_are_utf8_and_codepoint_ranges_and_diagnostics_use_crlf_lines() {
 }
 
 #[test]
-fn malformed_or_unknown_constructs_and_overflow_are_explicit_errors() {
+fn malformed_or_unknown_constructs_and_precedence_overflow_are_explicit_errors() {
     for line in include_str!("fixtures/negative.tsv").lines() {
         let (name, source) = line.split_once('\t').unwrap_or((line, ""));
         parse(source).expect_err(name);
@@ -281,7 +281,6 @@ fn malformed_or_unknown_constructs_and_overflow_are_explicit_errors() {
         "grammar G { @eval(kind='x',kind='y') R ::= 'x'; }",
         "grammar G { @recovery(magic) R ::= 'x'; }",
         "grammar G { @precedence(level=2147483648) R ::= 'x'; }",
-        "grammar G { R ::= 'x'{2147483648}; }",
         "grammar G { R ::= 'x'+?; }",
         "grammar G { token T=CHAR_RANGE('','a') R ::= T; }",
         "grammar G { token T=CHAR_RANGE('ab','z') R ::= T; }",
