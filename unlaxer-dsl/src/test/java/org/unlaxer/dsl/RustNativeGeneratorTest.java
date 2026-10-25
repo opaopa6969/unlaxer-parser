@@ -353,6 +353,50 @@ public class RustNativeGeneratorTest {
         assertGeneratedBytes(binary, name, source, true, report);
     }
 
+    /** #758: irrelevant rules must not make integer refinement run Java's AST fixed point. */
+    @Test public void numericAnalysisWorkMatchesNative() throws Exception {
+        assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        assertEquals(0, command(List.of("cargo", "build", "--locked", "--manifest-path",
+            repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
+        Path binary = repo.resolve("rust/target/debug/unlaxer");
+        var report = new ArrayList<>(List.of("case\toutcome\tfiles_identical"));
+        assertAnalysisWorkMatchesNative(binary, "numeric-work-", NestingLimitGrammars::numericBesideAnalysisWork, report);
+        // @typeof refines its captures with the same rule, so it must not run the AST fixed point either.
+        assertAnalysisWorkMatchesNative(binary, "typeof-work-", NestingLimitGrammars::typeofBesideAnalysisWork, report);
+        Files.write(Path.of("target/rust-numeric-analysis-work.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    private void assertAnalysisWorkMatchesNative(Path binary, String prefix,
+            java.util.function.IntFunction<String> grammars, List<String> report) throws Exception {
+        for (int fillers : List.of(0, 500, 550, 560, 575, 580, 600, 700)) {
+            String name = prefix + fillers;
+            String source = grammars.apply(fillers);
+            Path grammar = temporary.newFile(name + ".ubnf").toPath();
+            Files.writeString(grammar, source);
+            Path output = temporary.getRoot().toPath().resolve(name);
+            var nativeRun = command(List.of(binary.toString(), "generate", "--grammar", grammar.toString(),
+                "--output", output.toString()), true);
+            var parsed = UBNFMapper.parse(source).grammars().get(0);
+            if (fillers >= 580) {
+                // The shared lowered-IR work limit still rejects genuinely excessive analysis.
+                var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(parsed));
+                assertEquals("E-RECURSIVE-SHAPE: analysis work exceeds 1000000", error.getMessage());
+                assertNotEquals(name, 0, nativeRun.code());
+                assertEquals(name, error.getMessage(), nativeRun.output().strip());
+                report.add(name + "\trejected\t0");
+                continue;
+            }
+            assertEquals(name + "\n" + nativeRun.output(), 0, nativeRun.code());
+            var expected = new RustBackend().generate(parsed);
+            assertEquals(name, 5, expected.size());
+            for (var file : expected) assertArrayEquals(name + " / " + file.relativePath(),
+                file.content().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(output.resolve(file.relativePath())));
+            String ast = Files.readString(output.resolve("ast.rs"));
+            assertTrue(name + "\n" + ast, ast.contains("r#n: i32"));
+            report.add(name + "\taccepted\t5");
+        }
+    }
+
     private void assertGeneratedBytes(Path binary, String name, String source, boolean preferred, List<String> report) throws Exception {
         Path grammar = temporary.newFile(name + ".ubnf").toPath();
         Files.writeString(grammar, source);

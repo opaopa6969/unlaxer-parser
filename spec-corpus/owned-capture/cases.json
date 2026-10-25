@@ -1127,5 +1127,97 @@
         "failureOffset": 1
       }
     ]
+  },
+  {
+    "name": "preferred-rule-generated-actual-text",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.generated' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedGeneratedTokenParser' rust: 'crate::generated_token' } token T = ADAPTER('owned.generated', version=1) @root @mapping(Value, params=[again]) Root ::= CAPTURE(word,H) SAME_AS(word) @again; H ::= T | 'q'; }",
+    "cases": [
+      {
+        "input": "bb",
+        "success": true,
+        "consumed": 2,
+        "matched": 2,
+        "word": "bb",
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "again": "bb"
+          }
+        },
+        "binding": {
+          "text": "bb",
+          "source": "GENERATED",
+          "start": 0,
+          "end": 0
+        }
+      }
+    ]
+  },
+  {
+    "name": "preferred-rule-projected-actual-text",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none @tokenAdapter: { id: 'owned.projected' version: '1' java: 'org.unlaxer.dsl.codegen.OwnedProjectedTokenParser' rust: 'crate::projected_token' } token T = ADAPTER('owned.projected', version=1) @root @mapping(Value, params=[again]) Root ::= CAPTURE(word,H) SAME_AS(word) @again; H ::= T | 'q'; }",
+    "cases": [
+      {
+        "input": "abb",
+        "success": true,
+        "consumed": 3,
+        "matched": 3,
+        "word": "bb",
+        "ast": {
+          "type": "Value",
+          "span": [
+            1,
+            3
+          ],
+          "fields": {
+            "again": "bb"
+          }
+        },
+        "binding": {
+          "text": "bb",
+          "source": "PROJECTED",
+          "start": 1,
+          "end": 3
+        }
+      }
+    ]
+  },
+  {
+    "name": "preferred-rule-match-only",
+    "grammar": "grammar Owned { @package: ownedprobe @whitespace: none token AHEAD = LOOKAHEAD('x') @root @mapping(Value, params=[again]) Root ::= CAPTURE(word,H) SAME_AS(word) @again; H ::= AHEAD | 'q'; }",
+    "cases": [
+      {
+        "input": "x",
+        "success": true,
+        "consumed": 1,
+        "matched": 1,
+        "ast": {
+          "type": "Value",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "again": "x"
+          }
+        },
+        "binding": {
+          "text": "x",
+          "source": "INPUT",
+          "start": 0,
+          "end": 1
+        }
+      },
+      {
+        "input": "z",
+        "success": false,
+        "consumed": 0,
+        "matched": 0
+      }
+    ]
   }
 ]
