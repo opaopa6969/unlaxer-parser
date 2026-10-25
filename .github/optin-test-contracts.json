@@ -148,7 +148,10 @@
       "org.unlaxer.dsl.MultiGrammarConformanceTest": ["javaArtifactsCompileParseMapAndEvaluateTheSharedCorpus", "bothRustHostsCompileAndExecuteEveryGrammarIncludingProtocols", "rejectionOriginsAndNoPartialOutputAgree", "nestedOutputPreflightAndDriftNeverTouchEarlierArtifacts", "playgroundDoesNotSilentlySelectTheFirstGrammar", "impactRemainsExplicitlySingleGrammar", "sameNameInDifferentJavaPackagesCompilesAndExecutes", "javaCollisionReportsAndManifestsUseJavaClassNames", "javaHostAcceptsCallerOwnedSymlinkAncestors", "importedCollisionAndLateErrorsKeepOriginalGrammarLocations", "singleJavaGrammarEmitterFailureWritesNoFiles", "invalidProgrammaticGrammarNameIsADiagnostic", "ioFailureDoesNotPublishRootIndexAndNamesFailedPath"],
       "org.unlaxer.dsl.codegen.GlobalCommentConformanceTest": ["javaRejectsInvalidSettingsWithCodeSubjectAndSpan", "nativeGeneratorRejectsInvalidSettingsLikeJava", "javaStyleKeepsIgnoredSettingsAsWarnings", "nativeGeneratorGeneratesIgnoredSettingsAsJavaStyle"],
       "org.unlaxer.parser.elementary.NumberTokenOracleTest": ["oracleFileIsWhatJavaObserves", "numberParserMatchesTheSharedOracle", "internalFailureDiagnosticsMatchTheSharedOracle"],
-      "org.unlaxer.dsl.codegen.NumberTokenConformanceTest": ["generatedJavaMatchesTheDiagnosticOracle", "bothRustHostsMatchTheDiagnosticOracle"]
+      "org.unlaxer.dsl.codegen.NumberTokenConformanceTest": ["generatedJavaMatchesTheDiagnosticOracle", "bothRustHostsMatchTheDiagnosticOracle"],
+      "org.unlaxer.dsl.GenerationWarningsConformanceTest": ["libraryMatchesTheSharedCorpus", "javaHostRustCliPrintsTheLinesAndFailsWhenStrict", "javaFlagCliReportsEveryWarningAndFailsWhenStrict"],
+      "org.unlaxer.dsl.SimpleAnnotationConformanceTest": ["warningsMatchTheSharedCorpus", "everyJavaConsumerGeneratesIgnoredAnnotationsAsAbsent", "suggestionsFollowTheDocumentedDistance", "parserIrKeepsTheNameAsMetadata", "rejectedFormsFailInEveryJavaConsumer", "cliWarnsAndStrictOrFailOnWarningFails"],
+      "org.unlaxer.dsl.CodegenRunnerTest": ["testHasErrorRowsDetectsNonWarningSeverity", "testHasWarningRowsDetectsWarningSeverity", "testExecuteUsesInjectedFileSystemPort"]
     }
   },
   "tiny-catalog": {

@@ -123,6 +123,8 @@ public class GlobalCommentConformanceTest extends AtomicTriviaConformanceTest {
             var issues = GrammarValidator.validate(grammar);
             assertEquals(name + " validator errors", List.of(), issues.stream()
                 .filter(issue -> issue.severity().equals("ERROR")).toList());
+            // The validator (API, UBNF LSP) keeps the warning; the flag CLI shows it once, from
+            // GenerationWarnings (GenerationWarningsConformanceTest, #777).
             assertEquals(name + " validator warnings", warnings.size(), issues.stream()
                 .filter(issue -> issue.code().equals(GlobalComment.IGNORED)
                     && issue.severity().equals("WARNING")).count());

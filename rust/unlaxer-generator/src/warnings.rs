@@ -4,7 +4,8 @@
 //! same code, span and text, and fail alike under `--strict` / `--fail-on warning`.
 //!
 //! Sources: `W-ANNOTATION-IGNORED` ([`crate::simple_annotations`]) and `W-AUTO-COMMIT-SKIPPED`
-//! ([`unlaxer_ubnf::auto_commit`], read before the rewrite removes the annotation).
+//! ([`unlaxer_ubnf::auto_commit`], read before the rewrite removes the annotation), and
+//! `W-COMMENT-IGNORED` ([`crate::global_comment`]).
 use unlaxer_ubnf::*;
 
 /// The exit status of `generate` when `--strict` / `--fail-on warning` meets a warning; the
@@ -65,6 +66,18 @@ pub fn collect(source: &str) -> Vec<Warning> {
                 rule: warning.rule.clone(),
                 span: Some(warning.span),
                 message: warning.message(),
+            });
+        }
+        for warning in crate::global_comment::warnings(grammar) {
+            found.push(Warning {
+                code: warning.code,
+                grammar: grammar.name.clone(),
+                rule: warning.subject.clone(),
+                span: Some(warning.span),
+                message: format!(
+                    "{}: {}: @comment has no effect with @whitespace: javaStyle",
+                    warning.code, warning.subject
+                ),
             });
         }
         found.sort_by_key(|w| {

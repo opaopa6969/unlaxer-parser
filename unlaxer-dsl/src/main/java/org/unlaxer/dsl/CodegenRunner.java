@@ -449,6 +449,8 @@ final class CodegenRunner {
                 warning.code(), "WARNING", "GENERAL", warning.line(),
                 warning.code().equals(org.unlaxer.dsl.bootstrap.AutoCommit.SKIPPED)
                     ? "Remove @autoCommit, or make the rule reachable and analysable (docs/auto-commit.md)."
+                    : warning.code().equals(org.unlaxer.dsl.codegen.GlobalComment.IGNORED)
+                    ? "Remove this @comment setting (docs/rule-trivia.md)."
                     : "Write the annotation as documented, or remove it (docs/simple-annotations.md)."));
         }
         for (int index = 0; index < file.grammars().size(); index++) {
@@ -456,6 +458,8 @@ final class CodegenRunner {
             List<GrammarValidator.ValidationIssue> issues = new ArrayList<>(GrammarValidator.validate(grammar));
             issues.addAll(GrammarValidator.detectLeftRecursionIssues(grammar));
             for (GrammarValidator.ValidationIssue issue : issues) {
+                // Reported above from GenerationWarnings, with the CP span (#777).
+                if (org.unlaxer.dsl.codegen.GlobalComment.IGNORED.equals(issue.code())) continue;
                 validationRows.add(new ReportJsonWriter.ValidationIssueRow(
                     grammar.name(),
                     issue.rule(),
