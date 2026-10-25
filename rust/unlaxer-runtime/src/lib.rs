@@ -3050,17 +3050,17 @@ impl<'a> ParseContext<'a> {
         result
     }
 
-    /// Java registers a failed rule's `ParseFrame` as a failure candidate at its start,
-    /// max(consumed, matched) (#753). A failure site inside the rule only sees the live
-    /// matched cursor, which trivia or consumption in the rule lowers below a preceding
-    /// LOOKAHEAD's reach, so the failed rule records its start itself. It adds no expected
+    /// Java registers a failed parser's `ParseFrame` as a failure candidate at its start,
+    /// max(consumed, matched) (#753, #793). A failure site inside only sees the live
+    /// matched cursor, which trivia or consumption lowers below a preceding LOOKAHEAD's
+    /// reach. Call after restoring the entry checkpoint to record its start. It adds no expected
     /// name, which keeps memo replay and re-execution equal when a failure inside already
     /// reached the start. The matched cursor is not raised: LOOKAHEAD / UNTIL / EMPTY read
     /// it as Java's transaction cursor. Classic token mode records its failed frames itself,
     /// and the frontier keeps the consumed position in a token-stream session (#734).
     #[cold]
     #[inline(never)]
-    fn fail_rule_frame(&mut self) {
+    fn fail_parser_frame(&mut self) {
         if self.token_mode.is_none()
             && self.resource_failure.is_none()
             && self.frontier(self.position) > self.position
@@ -3712,6 +3712,23 @@ impl<'a> ParseContext<'a> {
             let failed_matched = self.matched_position;
             self.restore(checkpoint);
             if self.resource_failure.is_none() {
+                // Group/choice parsers have frames even without a rule invocation (#793).
+                // A bounded repeat (`'x'{2}`) is a Java Repeat frame that fails after its
+                // earlier iterations consumed. Reuse the restored cursors; successful
+                // expressions and the deferred pass need no frame bookkeeping. Classic
+                // records its frames below.
+                if self.options.diagnostics == Diagnostics::Detailed
+                    && matches!(
+                        expression,
+                        Expr::Sequence(_)
+                            | Expr::Choice(_)
+                            | Expr::PredictiveChoice { .. }
+                            | Expr::Repeat { .. }
+                            | Expr::JavaRepeat { .. }
+                    )
+                {
+                    self.fail_parser_frame();
+                }
                 if leaf_reset {
                     self.matched_position = self.position;
                 } else if transparent {

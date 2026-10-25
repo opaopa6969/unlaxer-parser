@@ -611,15 +611,19 @@
     },
     {
       "id": "lookahead-group-frame",
-      "category": "unresolved",
+      "category": "contract",
       "title": "正の LOOKAHEAD の後の group・選択の失敗位置",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         793
       ],
-      "observation": "失敗したruleのframeの開始は#753でRustも失敗位置に記録するが、ruleでないgroup・選択のframeは記録しない。`R0 ::= 'a' LOOKAHEAD('xyz') ( 'x' 'q' )`に`axyz`でJava CP4、Rust CP2（6設定とも）。明示Classic入口は両版CP4で一致、任意・反復は一致。",
+      "observation": "#793でRustのgroup・選択・回数指定の反復（Sequence / Choice / PredictiveChoice / Repeat）が失敗したとき、既存checkpointから復元したmax(consumed, matched)を失敗候補に加える。Javaのparse frameと同じく、axyzのgroup・選択・入れ子groupはsyntax CP4、prefixは[false,0,0]。共通corpusの19文法19入力をJavaとRust両生成経路でmemo OFF/ON × 3診断方針に照合する。成功した式の開始は候補にせず、matched cursorとtoken-streamの規則は維持。候補文字列はbackend固有。issueはmerge前のOPEN。",
       "evidence": [
-        "docs/prior-matched-diagnostics.md"
+        "docs/prior-matched-diagnostics.md",
+        "spec-corpus/lookahead-group-frame/README.md",
+        "spec-corpus/lookahead-group-frame/corpus.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LookaheadGroupFrameConformanceTest.java",
+        "rust/unlaxer-runtime/tests/prior_matched_diagnostics.rs"
       ]
     },
     {

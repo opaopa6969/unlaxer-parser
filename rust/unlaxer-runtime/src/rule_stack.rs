@@ -214,7 +214,7 @@ impl ParseContext<'_> {
             // The body (or memo replay) restored the cursors. Record this entry's
             // frame after freezing its body diagnostic. Reuse the existing failure
             // branch; successful rules and deferred diagnostics do no extra work.
-            self.fail_rule_frame();
+            self.fail_parser_frame();
             if let Some(reach) = self.rule_stacks.active.last().and_then(|frame| frame.reach) {
                 self.offer_rule_candidate(reach);
             }
