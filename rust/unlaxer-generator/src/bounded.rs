@@ -3,34 +3,40 @@ use unlaxer_ubnf::{AtomicElement, ElementKind, GrammarDecl, RuleBody};
 
 pub(crate) fn validate(grammar: &GrammarDecl) -> Result<(), String> {
     let mut pending = Vec::new();
-    for rule in grammar.rules.iter().rev() {
+    for rule in &grammar.rules {
         elements(&rule.body, &mut pending);
-    }
-    while let Some(node) = pending.pop() {
-        match &node.kind {
-            ElementKind::BoundedRepeat { element, min, max } => {
-                if *min > i32::MAX as u32 || max.is_some_and(|n| n > i32::MAX as u32) {
-                    return Err(format!(
-                        "E-BOUNDED-OVERFLOW: repetition bound exceeds 2147483647 at CP {}..{}",
-                        node.span.codepoint_start, node.span.codepoint_end
-                    ));
+        while let Some(node) = pending.pop() {
+            match &node.kind {
+                ElementKind::BoundedRepeat { element, min, max } => {
+                    if *min > i32::MAX as u32 || max.is_some_and(|n| n > i32::MAX as u32) {
+                        return Err(format!(
+                            "E-BOUNDED-OVERFLOW: repetition bound exceeds 2147483647 at CP {}..{}",
+                            node.span.codepoint_start, node.span.codepoint_end
+                        ));
+                    }
+                    if max.is_some_and(|n| n < *min) {
+                        return Err(format!(
+                            "E-BOUNDED-INVALID: rule {} has BoundedRepeatElement with min={}, max={}",
+                            rule.name, min, max.unwrap()
+                        ));
+                    }
+                    pending.push(element);
                 }
-                pending.push(element);
+                ElementKind::Group(body)
+                | ElementKind::Optional(body)
+                | ElementKind::Repeat(body)
+                | ElementKind::OwnedCapture { body, .. }
+                | ElementKind::CaptureScope(body)
+                | ElementKind::Commit { body, .. }
+                | ElementKind::Label { body, .. }
+                | ElementKind::Catch { choice: body, .. } => elements(body, &mut pending),
+                ElementKind::OneOrMore(child) => pending.push(child),
+                ElementKind::Separated { element, separator } => {
+                    pending.push(separator);
+                    pending.push(element);
+                }
+                _ => {}
             }
-            ElementKind::Group(body)
-            | ElementKind::Optional(body)
-            | ElementKind::Repeat(body)
-            | ElementKind::OwnedCapture { body, .. }
-            | ElementKind::CaptureScope(body)
-            | ElementKind::Commit { body, .. }
-            | ElementKind::Label { body, .. }
-            | ElementKind::Catch { choice: body, .. } => elements(body, &mut pending),
-            ElementKind::OneOrMore(child) => pending.push(child),
-            ElementKind::Separated { element, separator } => {
-                pending.push(separator);
-                pending.push(element);
-            }
-            _ => {}
         }
     }
     Ok(())

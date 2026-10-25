@@ -84,6 +84,19 @@ impl FixedShape {
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     crate::bounded::validate(grammar)?;
+    for rule in &grammar.rules {
+        for annotation in &rule.annotations {
+            if matches!(
+                annotation.kind,
+                AnnotationKind::Precedence { level: i32::MIN }
+            ) {
+                return Err(format!(
+                    "E-PRECEDENCE-OVERFLOW: precedence level exceeds 2147483647 at CP {}..{}",
+                    annotation.span.codepoint_start, annotation.span.codepoint_end
+                ));
+            }
+        }
+    }
     for token in &grammar.tokens {
         if matches!(&token.kind, TokenKind::Regex { .. })
             || matches!(&token.kind, TokenKind::Simple { parser_class }
@@ -1414,18 +1427,13 @@ impl Lowering<'_> {
                 min: 1,
                 max: None,
             },
-            ElementKind::BoundedRepeat { element, min, max } => {
-                if max.is_some_and(|max| max < *min) {
-                    return Err("invalid repetition bounds".into());
-                }
-                Expression::Repeat {
-                    child: Box::new(self.repeated_atom(element)?),
-                    min: *min as usize,
-                    max: max
-                        .filter(|value| *value != i32::MAX as u32)
-                        .map(|value| value as usize),
-                }
-            }
+            ElementKind::BoundedRepeat { element, min, max } => Expression::Repeat {
+                child: Box::new(self.repeated_atom(element)?),
+                min: *min as usize,
+                max: max
+                    .filter(|value| *value != i32::MAX as u32)
+                    .map(|value| value as usize),
+            },
             ElementKind::Separated { element, separator } => Expression::Separated {
                 child: Box::new(self.atomic(element)?),
                 separator: Box::new(self.atomic(separator)?),

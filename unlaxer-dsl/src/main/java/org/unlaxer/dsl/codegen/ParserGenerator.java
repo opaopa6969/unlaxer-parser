@@ -188,6 +188,7 @@ public class ParserGenerator implements CodeGenerator {
     public GeneratedSource generate(GrammarDecl grammar) {
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        org.unlaxer.dsl.bootstrap.PrecedenceLevels.requireNoOverflow(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         RaisingOperators.requireValid(grammar);
         TypeofConstraints.validate(grammar);

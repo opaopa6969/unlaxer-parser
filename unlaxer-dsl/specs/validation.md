@@ -119,6 +119,16 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 | `E-PRECEDENCE-DUPLICATE` | 同一ルールに `@precedence` が複数回宣言されている |
 | `E-PRECEDENCE-MIXED-ASSOC` | 同一優先度レベルで左結合と右結合が混在している |
 | `E-PRECEDENCE-ORDER` | 演算子ルールの参照先が適切な優先度順序になっていない |
+| `E-PRECEDENCE-OVERFLOW` | `@precedence(level=...)` が `2147483647` を超える |
+
+`level` の数字列は構文層で受理し、Java / Java-host Rust / native Rust の検証・生成で
+上限を検査する。`0` と `2147483647` は有効、先頭ゼロは値を変えず、任意長の
+範囲外の値も未処理例外や構文エラーではなく `E-PRECEDENCE-OVERFLOW` とする。
+メッセージは `precedence level exceeds 2147483647 at CP start..end`。
+範囲は元ソースの `@precedence` の `@` から閉じ `)` の直後までの 0 始まり半開 CP 範囲で、
+外側の trivia は含めず、内部の trivia は含める。非 BMP 文字は 1 CP と数える。
+未使用ルールも検査し、Java の公開 AST の `int level` は維持する。
+位置を持たない Java AST の overflow sentinel（`Integer.MIN_VALUE`）は CP 範囲なしで診断する。
 
 ### ANNOTATION エラー
 
@@ -152,6 +162,13 @@ Java、Java-host Rust、native Rust の validator / generator に共通し、
 未使用ルールやゼロ回反復の内側も検証する。Java の AST を直接構築して origin がない場合は
 CP 位置を付けず、Rust は AST に明示された span を使う。
 既存の Java の int 境界 API と開放上限の表現は維持する。
+
+逆順と overflow が併存するときも同じ走査で診断する。ルール宣言順に、各本体を
+左から右の深さ優先・親から子の順で検査し、同じ量指定子では overflow を逆順より先に判定する。
+Java validator はこの順の一覧、各 generator / Rust lowering は最初の診断を返す。
+逆順の生成診断は `E-BOUNDED-INVALID: rule NAME has BoundedRepeatElement with min=N, max=M`。
+量指定子の検査は precedence overflow の検査より先に行う。
+共通 oracle は [precedence-overflow/corpus.json](../../conformance/precedence-overflow/corpus.json)（#802）。
 
 ---
 

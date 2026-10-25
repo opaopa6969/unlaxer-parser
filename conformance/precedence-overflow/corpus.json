@@ -1,0 +1,233 @@
+[
+  {
+    "name": "precedence-zero",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=0) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": []
+  },
+  {
+    "name": "precedence-max",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=2147483647) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": []
+  },
+  {
+    "name": "precedence-leading-zero-max",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=000000000000000000000000000000000000000000000000000000000000000000000000000000002147483647) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": []
+  },
+  {
+    "name": "precedence-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=2147483648) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": [
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 120..149"
+      }
+    ]
+  },
+  {
+    "name": "precedence-u32-max",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=4294967295) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": [
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 120..149"
+      }
+    ]
+  },
+  {
+    "name": "precedence-huge",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": [
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 120..239"
+      }
+    ]
+  },
+  {
+    "name": "precedence-leading-zero-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=000000000000000000000000000000000000000000000000000000000000000000000000000000002147483648) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": [
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 120..229"
+      }
+    ]
+  },
+  {
+    "name": "precedence-trivia",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence( // 😀\r\n level = 2147483648 // end\r\n ) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": [
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 120..169"
+      }
+    ]
+  },
+  {
+    "name": "precedence-same-value-later",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none // 😀 same AST value at a different location\r\n@root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=2147483648) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": [
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 165..194"
+      }
+    ]
+  },
+  {
+    "name": "precedence-unused",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Root) R ::= 'x'; @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=2147483648) Unused ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": [
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 146..175"
+      }
+    ]
+  },
+  {
+    "name": "bounded-reversed-before-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= 'x'{9,2} 'y'{2147483648};  }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule R has BoundedRepeatElement with min=9, max=2"
+      },
+      {
+        "code": "E-BOUNDED-OVERFLOW",
+        "message": "repetition bound exceeds 2147483647 at CP 98..113"
+      }
+    ]
+  },
+  {
+    "name": "bounded-overflow-before-reversed",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= 'y'{2147483648} 'x'{9,2};  }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-OVERFLOW",
+        "message": "repetition bound exceeds 2147483647 at CP 89..104"
+      },
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule R has BoundedRepeatElement with min=9, max=2"
+      }
+    ]
+  },
+  {
+    "name": "bounded-alternatives",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= 'x'{9,2} | 'y'{2147483648};  }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule R has BoundedRepeatElement with min=9, max=2"
+      },
+      {
+        "code": "E-BOUNDED-OVERFLOW",
+        "message": "repetition bound exceeds 2147483647 at CP 100..115"
+      }
+    ]
+  },
+  {
+    "name": "bounded-across-rules",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= 'x'{9,2}; Other ::= 'y'{2147483648}; }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule R has BoundedRepeatElement with min=9, max=2"
+      },
+      {
+        "code": "E-BOUNDED-OVERFLOW",
+        "message": "repetition bound exceeds 2147483647 at CP 109..124"
+      }
+    ]
+  },
+  {
+    "name": "bounded-unused-reversed",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= 'r'; Unused ::= 'x'{9,2}; Other ::= 'y'{2147483648}; }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule Unused has BoundedRepeatElement with min=9, max=2"
+      },
+      {
+        "code": "E-BOUNDED-OVERFLOW",
+        "message": "repetition bound exceeds 2147483647 at CP 125..140"
+      }
+    ]
+  },
+  {
+    "name": "bounded-zero-parent",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= ('x'{9,2}){0} 'y'{2147483648};  }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule R has BoundedRepeatElement with min=9, max=2"
+      },
+      {
+        "code": "E-BOUNDED-OVERFLOW",
+        "message": "repetition bound exceeds 2147483647 at CP 103..118"
+      }
+    ]
+  },
+  {
+    "name": "bounded-outer-reversed",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= ('y'{2147483648}){9,2};  }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule R has BoundedRepeatElement with min=9, max=2"
+      },
+      {
+        "code": "E-BOUNDED-OVERFLOW",
+        "message": "repetition bound exceeds 2147483647 at CP 90..105"
+      }
+    ]
+  },
+  {
+    "name": "bounded-outer-overflow",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= ('x'{9,2}){2147483648};  }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-OVERFLOW",
+        "message": "repetition bound exceeds 2147483647 at CP 89..111"
+      },
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule R has BoundedRepeatElement with min=9, max=2"
+      }
+    ]
+  },
+  {
+    "name": "bounded-overflow-and-reversed-same-node",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= 'y'{2147483648,2};  }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-OVERFLOW",
+        "message": "repetition bound exceeds 2147483647 at CP 89..106"
+      }
+    ]
+  },
+  {
+    "name": "precedence-with-bounded-invalid",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=2147483648) R ::= Atom @left { '+' @op Atom @right }; Atom ::= 'x'{9,2}; }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule Atom has BoundedRepeatElement with min=9, max=2"
+      },
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 120..149"
+      }
+    ]
+  },
+  {
+    "name": "bounded-reversed-alone",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= 'x'{9,2};  }",
+    "issues": [
+      {
+        "code": "E-BOUNDED-INVALID",
+        "message": "rule R has BoundedRepeatElement with min=9, max=2"
+      }
+    ]
+  }
+]
