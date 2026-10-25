@@ -1,0 +1,6 @@
+grammar ChainReset {
+    @package: chainreset
+    @whitespace: none
+    @root @mapping(Node, params=[name]) @scopeTree(mode=dynamic) @declares(symbol=name)
+    Root ::= 'a' 'z' @name;
+}
