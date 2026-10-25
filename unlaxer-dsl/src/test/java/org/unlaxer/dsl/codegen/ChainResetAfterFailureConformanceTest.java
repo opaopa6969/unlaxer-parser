@@ -36,7 +36,14 @@ public class ChainResetAfterFailureConformanceTest {
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
 
     private static final List<String> GRAMMARS = List.of(
-            "grammar.ubnf", "local-trivia.ubnf", "named-trivia.ubnf", "lexical-context.ubnf");
+            "grammar.ubnf", "local-trivia.ubnf", "named-trivia.ubnf", "lexical-context.ubnf",
+            "scope-effects.ubnf", "backref.ubnf");
+
+    /** Rust rule-level failure hits for three calls; Java has 2 except lexical context (0). */
+    private static int rustFailureHits(String file) {
+        // Rust CaptureEquality (@backref) is not memo-safe, so the rule is never cached.
+        return file.equals("backref.ubnf") ? 0 : 2;
+    }
 
     private GrammarDecl grammar(String file) throws Exception {
         return UBNFMapper.parse(Files.readString(repo.resolve(
@@ -126,6 +133,24 @@ public class ChainResetAfterFailureConformanceTest {
         }
     }
 
+    /** Commit and Label call their child in the owner's transaction, as a rule reference does. */
+    @Test public void raisingWrappersKeepTheFailedChainPolicy() {
+        for (var memo : Memoization.values()) for (String kind : List.of("commit", "label")) {
+            Parser chain = new Chain(new WordParser("a"), new WordParser("z"));
+            Parser parser = kind.equals("commit") ? new Commit(chain) : new Label("L", chain);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource("ab"),
+                    ParseOptions.withMemoization(memo))) {
+                assertTrue(new MatchOnly(new WordParser("a")).parse(context).isSucceeded());
+                context.getCurrent().setResetMatchedWithConsumed(true);
+                assertTrue(kind, parser.parse(context).isFailed());
+                assertFalse(kind, context.getCurrent().isResetMatchedWithConsumed());
+                assertTrue(kind, follower("lookahead").parse(context).isSucceeded());
+                assertEquals(kind, 0, context.position());
+                assertEquals(kind, 2, context.matchedPosition());
+            }
+        }
+    }
+
     @Test public void bothRustHostsMatchSharedFailureAndFollowerOracle() throws Exception {
         if (!Boolean.getBoolean("rustConformance"))
             System.out.println("[assumption] ChainResetAfterFailureConformanceTest requires -DrustConformance=true");
@@ -153,10 +178,11 @@ public class ChainResetAfterFailureConformanceTest {
                         #[path = "%s/mod.rs"] mod generated;
                         #[path = "%s"] mod oracle;
                         fn main() {
-                            oracle::check(generated::parser::rules());
-                            oracle::check(generated::parser::mapping_grammar().unwrap().to_vec());
+                            oracle::check_with_failure_hits(generated::parser::rules(), %d);
+                            oracle::check_with_failure_hits(generated::parser::mapping_grammar().unwrap().to_vec(), %d);
                         }
-                        """.formatted(host, repo.resolve("rust/unlaxer-runtime/tests/support/chain_reset_after_failure.rs")));
+                        """.formatted(host, repo.resolve("rust/unlaxer-runtime/tests/support/chain_reset_after_failure.rs"),
+                        rustFailureHits(file), rustFailureHits(file)));
                 run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + runtime,
                         main.toString(), "-o", binary.toString()));
                 run(List.of(binary.toString()));

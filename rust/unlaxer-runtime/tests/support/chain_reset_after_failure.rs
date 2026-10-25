@@ -1,8 +1,13 @@
 use unlaxer_runtime::*;
 
 pub fn check(grammar: Vec<Rule>) {
+    check_with_failure_hits(grammar, 2);
+}
+
+/// `failure_hits`: SAFE_FAILURES hits for three calls of a rule that the runtime may memoize.
+pub fn check_with_failure_hits(grammar: Vec<Rule>, failure_hits: usize) {
     check_boundaries(&grammar);
-    check_memo_replay(&grammar);
+    check_memo_replay(&grammar, failure_hits);
     let grammar = share_grammar(grammar);
     for row in include_str!("../../../../conformance/chain-reset-after-failure/cases.tsv")
         .lines()
@@ -100,7 +105,7 @@ fn retry_generated_chain(context: &mut ParseContext<'_>) -> ParseResult {
     .parse(context)
 }
 
-fn check_memo_replay(grammar: &[Rule]) {
+fn check_memo_replay(grammar: &[Rule], failure_hits: usize) {
     let mut rules = grammar.to_vec();
     let root = rules.len();
     rules.push(Rule {
@@ -128,7 +133,11 @@ fn check_memo_replay(grammar: &[Rule]) {
             assert_eq!((context.position(), context.matched_position()), (0, 2));
             assert_eq!(
                 context.memoized_failure_hits(),
-                if memo == Memoization::Off { 0 } else { 2 }
+                if memo == Memoization::Off {
+                    0
+                } else {
+                    failure_hits
+                }
             );
         }
     }

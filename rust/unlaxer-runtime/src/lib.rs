@@ -3092,15 +3092,19 @@ impl<'a> ParseContext<'a> {
     fn memoized_rule(&mut self, id: usize, depth: usize) -> Option<usize> {
         // Java's Chain disables matched-cursor reset before memo lookup. expression()
         // does the same for every Chain counterpart, but waiting until a miss gives
-        // (!Num 'x') | Num two different keys (#794). Metadata and lexical policy
-        // scopes add no parser frame (#809).
+        // (!Num 'x') | Num two different keys (#794). Metadata, lexical policy scopes,
+        // rule effects, back-reference checks and COMMIT/LABEL add no parser frame (#809).
         // Rule/expression depth guards stay intact.
         let parent_reset = self.match_cursor_policy.reset;
         let mut expression = &self.rules[id].expression;
         while let Expr::MetadataCapture(_, child)
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. }
-        | Expr::LexicalContextScope { child, .. } = expression
+        | Expr::LexicalContextScope { child, .. }
+        | Expr::RuleEffects { child, .. }
+        | Expr::CaptureEquality { child, .. }
+        | Expr::Commit { child, .. }
+        | Expr::Label { child, .. } = expression
         {
             expression = child;
         }
@@ -3748,9 +3752,15 @@ impl<'a> ParseContext<'a> {
                             | Expr::TriviaScope { .. }
                             | Expr::LexicalTriviaScope { .. }
                             | Expr::LexicalContextScope { .. }
+                            | Expr::RuleEffects { .. }
+                            | Expr::CaptureEquality { .. }
+                            | Expr::Commit { .. }
+                            | Expr::Label { .. }
                     )
                 {
-                    // Rule references and lexical policies add no Java transaction.
+                    // Rule references, lexical policies, rule effects (@scopeTree /
+                    // @declares), @backref and Java Commit / Label call their child in the
+                    // owner's transaction: none of them begins a Java transaction.
                     self.match_cursor_policy.reset = failed_reset;
                 }
                 if self.token_mode.is_some()

@@ -33,8 +33,11 @@ NonOrdered の transaction を明示し、その内側で4種の matched reader 
 - Chain 相当の式（Sequence / Number / Identifier / Quoted / CodeStart / CodeEnd / Capture /
   CaptureBoundary / InputCaptureBoundary）は通常の構文失敗後にも false を残す。
   native の rule 参照は Java の parser 呼出を覆う新しい transaction ではないため、その policy を伝える。
-  MetadataCapture、rule ごとの TriviaScope / LexicalTriviaScope / LexicalContextScope も透過する。
-  これらは Java の parser owner を追加しないため、lookup 前の Chain 正規化でも同じように透過する。
+  MetadataCapture、rule ごとの TriviaScope / LexicalTriviaScope / LexicalContextScope、
+  rule 単位の `@scopeTree` / `@declares`（RuleEffects）と `@backref`（CaptureEquality）、
+  Java の `Commit` / `Label` に当たる COMMIT / LABEL も透過する。どれも子を owner の transaction の
+  まま呼び、Java の parser owner を追加しないため、lookup 前の Chain 正規化でも同じように透過する。
+  rule 単位の NamePredicate / NameResolutionScope は Java でも `begin` する（frame を持つ）ので対象外。
 - failure memo は既存の終端 cursor/policy payload を通常経路でも保存・再生する。
   新しい entry field・cache・allocation は足さない。alias rule の実 hit も Rust 単体テストで確認する。
 - Choice / NonOrdered / CatchLabels の失敗候補は owner の reset を戻す。
@@ -44,13 +47,17 @@ NonOrdered の transaction を明示し、その内側で4種の matched reader 
 - `cases.tsv` は10行。両 memo × 3診断設定 × 初期 reset true/false で、成否、両 cursor、最遠失敗 CP、
   reset、診断ケースの候補 `x` を比較する。DETAILED_ON_FAILURE の低水準入口は診断 CP0 のまま。
 - `ChainResetAfterFailureConformanceTest` は生成 Java と両 host の生成 Rust を compile/実行する。
-  通常・rule-local 空白・名前付き空白・lexical context の4文法で、Rust は通常 grammar と mapping grammar の両方を使う。生成 Root を同一 session で3回呼び、初期 reset が
+  通常・rule-local 空白・名前付き空白・lexical context・`@scopeTree`/`@declares`・`@backref` の6文法で、
+  Rust は通常 grammar と mapping grammar の両方を使う。生成 Root を同一 session で3回呼び、初期 reset が
   true/false のどちらでも false と後続 parser の成功を保つことを両言語で確認する。
-  通常・rule-local 空白・名前付き空白は両言語で2回の failure hit。lexical context の Java は
-  `Lexing.withContext` が入退場ごとに state epoch を更新するので0回、Rust は2回となる既存の会計差を明示し、
-  成否・cursor・診断・reset の期待値は共通に保つ。
+  通常・rule-local 空白・名前付き空白・`@scopeTree`/`@declares` は両言語で2回の failure hit。lexical context の Java は
+  `Lexing.withContext` が入退場ごとに state epoch を更新するので0回、Rust は2回となる。
+  `@backref` は Rust の CaptureEquality が memo 対象外なので Java 2回・Rust 0回となる。
+  この2つは既存の会計差として明示し、成否・cursor・診断・reset の期待値は共通に保つ。
   Choice / NonOrdered 候補の隔離と外側 rollback も
-  両言語で比較する。Rust workspace の integration test も同じ oracle を読む。
+  両言語で比較する。手組みの `Commit(Chain)` / `Label(Chain)` の失敗後に false が残り後続先読みが成功することも
+  両言語で確認する（`raisingWrappersKeepTheFailedChainPolicy` と `raising_wrappers_keep_the_failed_chain_policy`）。
+  Rust workspace の integration test も同じ oracle を読む。
 - 既存の `memoized_rule_leaves_the_unmemoized_cursor_policy` は Sequence / Number / Identifier の
   成功・失敗、通常/Classic、true/false の key 合流と実 hit を検証し、失敗後 false を明示的に確認する。
   `native_failure_memo_replays_policy_through_rule_references` は alias の実 failure hit と policy を比較する。
