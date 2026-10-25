@@ -1,0 +1,354 @@
+[
+  {
+    "name": "LookaheadGroupFails",
+    "issue": "#793",
+    "grammar": "grammar LookaheadGroupFails { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH ( 'x' 'q' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadChoiceFails",
+    "issue": "#793",
+    "grammar": "grammar LookaheadChoiceFails { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH ( 'x' 'q' | 'x' 'r' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadNestedGroupFails",
+    "issue": "#793",
+    "grammar": "grammar LookaheadNestedGroupFails { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH ( ( 'x' 'q' ) 'r' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadUnicodeGroupFails",
+    "issue": "#793",
+    "grammar": "grammar LookaheadUnicodeGroupFails { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('😀\\r\\nyz')  @root @mapping(Root) R0 ::= 'a' AH ( ( '😀' 'q' ) 'r' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "a😀\r\nyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          6
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadGroupSucceeds",
+    "issue": "#793",
+    "grammar": "grammar LookaheadGroupSucceeds { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH ( 'x' 'y' ) 'q' ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          3
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadChoiceSucceeds",
+    "issue": "#793",
+    "grammar": "grammar LookaheadChoiceSucceeds { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH ( 'x' | 'y' ) 'q' ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          2
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadOptionalGroup",
+    "issue": "#793",
+    "grammar": "grammar LookaheadOptionalGroup { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH [ 'x' 'q' ] 'r' ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadRepeatGroup",
+    "issue": "#793",
+    "grammar": "grammar LookaheadRepeatGroup { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH { 'x' 'q' } 'r' ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadNegativeTokenFails",
+    "issue": "#793",
+    "grammar": "grammar LookaheadNegativeTokenFails { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') token NEXT = NEGATIVE_LOOKAHEAD('yz') @root @mapping(Root) R0 ::= 'a' AH ( 'x' NEXT ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadGroupReadsLookahead",
+    "issue": "#793",
+    "grammar": "grammar LookaheadGroupReadsLookahead { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') token NEXT = LOOKAHEAD('yz') @root @mapping(Root) R0 ::= 'a' AH ( 'x' NEXT 'y' 'z' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {}
+        }
+      }
+    ]
+  },
+  {
+    "name": "LookaheadGroupReadsNegative",
+    "issue": "#793",
+    "grammar": "grammar LookaheadGroupReadsNegative { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') token NEXT = NEGATIVE_LOOKAHEAD('q') @root @mapping(Root) R0 ::= 'a' AH ( 'x' NEXT 'y' 'z' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {}
+        }
+      }
+    ]
+  },
+  {
+    "name": "LookaheadGroupReadsUntil",
+    "issue": "#793",
+    "grammar": "grammar LookaheadGroupReadsUntil { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') token NEXT = UNTIL('y') @root @mapping(Root) R0 ::= 'a' AH ( 'x' NEXT ) ; }",
+    "cases": [
+      {
+        "id": "matched-prefix",
+        "input": "axyz",
+        "prefix": [
+          true,
+          2,
+          3
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          2
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadGroupReadsEmpty",
+    "issue": "#793",
+    "grammar": "grammar LookaheadGroupReadsEmpty { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') token NEXT = EMPTY @root @mapping(Root) R0 ::= 'a' AH ( 'x' NEXT ) ; }",
+    "cases": [
+      {
+        "id": "matched-prefix",
+        "input": "axyz",
+        "prefix": [
+          true,
+          2,
+          3
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          2
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadGroupFartherFailure",
+    "issue": "#793",
+    "grammar": "grammar LookaheadGroupFartherFailure { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH ( 'x' 'y' 'z' 'b' 'q' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyzbu",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadGroupFailureMemo",
+    "issue": "#793",
+    "grammar": "grammar LookaheadGroupFailureMemo { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH R1 'w' | 'a' AH R1 'v' ;  R1 ::= ( 'x' 'q' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ],
+        "memoHitsAtLeast": [
+          1,
+          0
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadGroupSuccessMemo",
+    "issue": "#793",
+    "grammar": "grammar LookaheadGroupSuccessMemo { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH R1 'w' | 'a' AH R1 'v' ;  R1 ::= ( 'x' 'q' | 'x' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ],
+        "memoHitsAtLeast": [
+          0,
+          1
+        ]
+      }
+    ]
+  }
+]

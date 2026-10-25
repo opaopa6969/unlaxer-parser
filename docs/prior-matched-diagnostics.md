@@ -161,8 +161,14 @@ max(consumed, matched) で、R1 が失敗するとその frame が失敗候補�
 `a  xy` に当てたとき Rust だけ拒否する。成功した rule の開始も候補にしない
 （`R0 ::= 'a' LOOKAHEAD('  xy') R1 'w' ; R1 ::= ['q']` の `a  xy` は両版で syntax CP3）。
 
-**対象外（未対応、[#793](https://github.com/opaopa6969/unlaxer-parser/issues/793)）**: rule でない入れ子の式（group・選択）の frame の開始は記録しない。
-`R0 ::= 'a' LOOKAHEAD('xyz') ( 'x' 'q' )` の `axyz` は Java が syntax CP4、Rust が CP2 のまま。
+**group・選択への拡張（#793）**: rule でない入れ子の式も、失敗した `Sequence` / `Choice` /
+`PredictiveChoice` の checkpoint を復元した直後に開始を候補にする。`R0 ::= 'a' LOOKAHEAD('xyz')
+( 'x' 'q' )` の `axyz` は両版で syntax CP4、prefix は `[false, 0, 0]` になる。
+選択・入れ子 group も同じ規則。成功した式には追加の記録をせず、否定先読み内の候補は既存の
+投機診断の rollback に従う。既存 checkpoint の cursor を使うため保存領域・割当を増やさず、
+追加処理は Detailed の失敗経路だけに置く。
+[共通 corpus](../spec-corpus/lookahead-group-frame/README.md) の16文法16入力を
+`LookaheadGroupFrameConformanceTest` が Java と両 Rust host の6設定で照合する。
 
 **期待候補の境界**: Java の `registerFailureCandidate` は失敗した parser の子を深さ2まで
 展開するため、`CommentLookahead` は Java `['z']` / Rust `[]`、`ConsumeAfterLookahead` は
@@ -186,7 +192,7 @@ frame の候補が入る**。このため記録順序だけでは、grammar と�
 異なる frontier 間では再評価し、同じ入口内では従来どおり再利用する。
 
 **費用**: Detailed の `leave_rule_frame` に既存の失敗分岐があり、その中から cold path の
-`fail_rule_frame` を呼ぶ。成功した rule と deferred pass に追加の分岐・割当はない。
+`fail_parser_frame` を呼ぶ。成功した rule と deferred pass に追加の分岐・割当はない。
 memo 有効時のキーに1 bitを設定する演算は増えるが、分岐・割当・キーのサイズは増やさない。
 
 **検証**: 共通 corpus の `spec-corpus/global-comment/corpus.json`（`#753` の 25 文法 37 入力）を

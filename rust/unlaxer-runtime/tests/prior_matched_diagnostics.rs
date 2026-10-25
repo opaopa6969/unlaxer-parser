@@ -195,6 +195,68 @@ fn a_failed_rule_records_its_start_at_the_matched_reach() {
 }
 
 #[test]
+fn a_failed_group_records_its_start_at_the_matched_reach() {
+    failed_expression_frame(Expr::sequence([Expr::literal("x"), Expr::literal("q")]));
+}
+
+#[test]
+fn a_failed_choice_records_its_start_at_the_matched_reach() {
+    failed_expression_frame(Expr::Choice(vec![
+        Expr::sequence([Expr::literal("x"), Expr::literal("q")]),
+        Expr::sequence([Expr::literal("x"), Expr::literal("r")]),
+    ]));
+}
+
+#[test]
+fn a_failed_nested_group_records_its_start_at_the_matched_reach() {
+    failed_expression_frame(Expr::sequence([
+        Expr::sequence([Expr::literal("x"), Expr::literal("q")]),
+        Expr::literal("r"),
+    ]));
+}
+
+fn failed_expression_frame(body: Expr) {
+    let rules = vec![unlaxer_runtime::Rule {
+        name: "R0",
+        expression: Expr::sequence([
+            Expr::literal("a"),
+            Expr::JavaLookahead {
+                pattern: "xyz",
+                positive: true,
+            },
+            body,
+        ]),
+    }];
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        for diagnostics in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            let options = options(memo, diagnostics);
+            let failure =
+                unlaxer_runtime::parse_detailed_with_options(&rules, 0, false, "axyz", options)
+                    .unwrap_err();
+            assert_eq!((failure.kind, failure.offset), ("syntax", 4));
+            let mut context = ParseContext::with_options("axyz", options);
+            assert!(context.parse_grammar(rules.clone(), 0, false).is_err());
+            assert_eq!((context.position(), context.matched_position()), (0, 0));
+            // The direct expression API still measures source failures, not Java frames.
+            let mut native = ParseContext::with_options("axyz", options);
+            assert!(native.parse(&rules[0].expression).is_err());
+            assert_eq!(
+                native.failure().offset,
+                if diagnostics == Diagnostics::DetailedOnFailure {
+                    0
+                } else {
+                    2
+                }
+            );
+        }
+    }
+}
+
+#[test]
 fn failed_rule_frames_respect_assertion_speculation() {
     for row in include_str!("../../../conformance/prior-matched-diagnostics/rule-frames.tsv")
         .lines()
