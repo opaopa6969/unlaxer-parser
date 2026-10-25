@@ -29,7 +29,20 @@ jobs:
       - name: Install the locked TypeScript 5.9.3 compiler without package scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: unlaxer-dsl/ubnf-vscode
+      - name: Prepare required tests (external-language-providers)
+        run: python3 scripts/verify-optin-tests.py external-language-providers --prepare
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=ProviderProtocolTest,ExternalProviderConformanceTest,LSPDiagnosticConformanceTest,SemanticDiagnosticConformanceTest,PlaygroundCommandTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Verify required tests (external-language-providers)
+        id: verify-external-language-providers
+        if: success()
+        run: python3 scripts/verify-optin-tests.py external-language-providers
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.verify-external-language-providers.outcome != 'skipped' }}
+        with:
+          name: optin-external-language-providers
+          path: |
+            target/optin-evidence/external-language-providers/
+          if-no-files-found: error
       - run: cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-runtime --test provider_protocol
       - uses: actions/upload-artifact@v4
         with:

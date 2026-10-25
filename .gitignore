@@ -15,3 +15,6 @@ mcp/classpath.txt
 
 # Pinned UBNF artifacts are local; commit ubnf.json and ubnf.lock.json.
 .ubnf-cache/
+
+# CI checkout of the pinned Tiny Catalog grammar.
+/tiny-catalog/
