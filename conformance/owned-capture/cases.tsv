@@ -49,3 +49,5 @@ field-repeat-preserve-double	7878	field-repeat-preserve	matchOnly	false	true	0	2
 field-repeat-preserve-empty	~	field-repeat-preserve	matchOnly	false	true	0	0	~	INPUT	0	0	~	0	0	1
 field-failure-reset-single	78	field-failure-reset	matchOnly	false	true	0	1	78	INPUT	0	1	78	0	1	1
 field-failure-reset-double	7878	field-failure-reset	matchOnly	false	true	0	2	7878	INPUT	0	2	7878	0	2	1
+metadata-choice-reset-single	78	metadata-choice-reset	matchOnly	false	true	0	1	7878	PROJECTED	0	2	7878	0	2	1
+metadata-match-reset-single	78	metadata-match-reset	consumed	false	true	0	1	7878	PROJECTED	0	2	7878	0	2	1

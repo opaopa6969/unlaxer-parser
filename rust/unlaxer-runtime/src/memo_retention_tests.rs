@@ -148,6 +148,23 @@ fn only_complete_buckets_are_freed_and_late_insertions_are_not_retained() {
     assert!(memo.probe(0, &key).is_some());
 }
 
+/// Writes the shared budget oracle's observations to the file named by `variable` (#789).
+///
+/// The Java conformance tests set the variable. Rows are written as one file after the
+/// oracle completes, so libtest's progress output on stdout can never interleave with them.
+fn write_budget_evidence(variable: &str, rows: &[String]) {
+    let Some(path) = std::env::var_os(variable) else {
+        return;
+    };
+    let mut text = String::from("id\tmode\treset\tmemo\tdiagnostics\tentries\tcharge\n");
+    for row in rows {
+        assert!(!row.contains('\n'), "{row}");
+        text.push_str(row);
+        text.push('\n');
+    }
+    std::fs::write(path, text).unwrap();
+}
+
 fn budget_failure(context: &mut ParseContext<'_>) {
     let start = (context.position(), context.matched_position());
     assert!(context.parse(&Expr::Rule(0)).is_err());
@@ -188,6 +205,7 @@ fn failure_budget_shared_oracle_bounds_epochs_and_preserves_real_hits() {
         }),
     ];
     let mut count = 0;
+    let mut evidence = Vec::with_capacity(600);
     for row in rows
         .lines()
         .filter(|r| !r.starts_with('#') && !r.is_empty())
@@ -333,12 +351,12 @@ fn failure_budget_shared_oracle_bounds_epochs_and_preserves_real_hits() {
                         );
                         assert_eq!((c.position(), c.matched_position()), (0, 0));
                         assert_eq!(c.source(), input);
-                        println!(
-                            "BUDGET\t{}\t{mode:?}\t{reset}\t{memo:?}\t{diagnostics:?}\t{}\t{}",
+                        evidence.push(format!(
+                            "{}\t{mode:?}\t{reset}\t{memo:?}\t{diagnostics:?}\t{}\t{}",
                             f[0],
                             c.failure_memo_entries(),
                             c.failure_memo_retained_bytes()
-                        );
+                        ));
                         count += 1;
                     }
                 }
@@ -346,6 +364,7 @@ fn failure_budget_shared_oracle_bounds_epochs_and_preserves_real_hits() {
         }
     }
     assert_eq!(count, 600);
+    write_budget_evidence("UNLAXER_TEST_FAILURE_BUDGET_EVIDENCE", &evidence);
 }
 
 #[test]
@@ -560,6 +579,7 @@ fn success_budget_shared_oracle_bounds_epochs_and_preserves_real_hits() {
         }),
     ];
     let mut count = 0;
+    let mut evidence = Vec::with_capacity(600);
     for row in rows
         .lines()
         .filter(|r| !r.starts_with('#') && !r.is_empty())
@@ -708,12 +728,12 @@ fn success_budget_shared_oracle_bounds_epochs_and_preserves_real_hits() {
                         );
                         assert_eq!((c.position(), c.matched_position()), (0, 0));
                         assert_eq!(c.source(), input);
-                        println!(
-                            "SUCCESS_BUDGET\t{}\t{mode:?}\t{reset}\t{memo:?}\t{diagnostics:?}\t{}\t{}",
+                        evidence.push(format!(
+                            "{}\t{mode:?}\t{reset}\t{memo:?}\t{diagnostics:?}\t{}\t{}",
                             f[0],
                             c.success_memo_entries(),
                             c.success_memo_retained_bytes()
-                        );
+                        ));
                         count += 1;
                     }
                 }
@@ -721,6 +741,7 @@ fn success_budget_shared_oracle_bounds_epochs_and_preserves_real_hits() {
         }
     }
     assert_eq!(count, 600);
+    write_budget_evidence("UNLAXER_TEST_SUCCESS_BUDGET_EVIDENCE", &evidence);
 }
 
 fn success_budget_sample() -> (FailureMemoKey, Rc<SuccessMemo>) {
@@ -904,6 +925,8 @@ fn failure_budget_shared_configuration_in_fresh_processes() {
             "--nocapture",
         ]);
         child.env("UNLAXER_TEST_FAILURE_MEMO_EXPECTED", row[2..].join(","));
+        // The child runs one exact test, but must never touch the parent's evidence file.
+        child.env_remove("UNLAXER_TEST_FAILURE_BUDGET_EVIDENCE");
         for field in ["ENTRIES", "BYTES", "ENTRY_BYTES"] {
             let name = format!("UNLAXER_FAILURE_MEMO_MAX_{field}");
             if let Some(value) = &raw {
