@@ -59,6 +59,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.unlaxer.dsl.bootstrap.UBNFAST;
 import org.unlaxer.dsl.bootstrap.generated.UBNFLanguageServer;
+import org.unlaxer.dsl.codegen.GenerationWarnings;
+import org.unlaxer.dsl.codegen.GlobalComment;
 import org.unlaxer.dsl.codegen.GrammarValidator;
 import org.unlaxer.dsl.tooling.AuthoringCatalog;
 
@@ -229,11 +231,22 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
 
     private void collectValidationDiagnostics(
             String content, List<UBNFAST.GrammarDecl> grammars, DocumentIndex index) {
+        // Collect once per document, as the CLI does; the editor's parse spares a reparse (#798).
+        for (var warning : GenerationWarnings.collect(index.editor.snapshot)) {
+            Range range = warning.span().map(span -> UbnfEditorIndex.rangeOf(content,
+                content.offsetByCodePoints(0, span.start()), content.offsetByCodePoints(0, span.end())))
+                .orElseGet(() -> new Range(new Position(0, 0), new Position(0, 1)));
+            var diagnostic = new Diagnostic(range, warning.line(), DiagnosticSeverity.Warning, "ubnf-generator");
+            diagnostic.setCode(warning.code());
+            index.validation.add(diagnostic);
+        }
         for (UBNFAST.GrammarDecl grammar : grammars) {
             List<GrammarValidator.ValidationIssue> issues =
                 new ArrayList<>(GrammarValidator.validate(grammar));
             issues.addAll(GrammarValidator.detectLeftRecursionIssues(grammar));
             for (GrammarValidator.ValidationIssue issue : issues) {
+                // The validator API keeps this warning; the collector above supplies its source span.
+                if (GlobalComment.IGNORED.equals(issue.code())) continue;
                 if (grammar.rules().isEmpty() && grammar.tokens().stream().allMatch(token -> token instanceof UBNFAST.TokenDecl.Declarative)
                         && "W-GENERAL-NO-ROOT".equals(issue.code())) continue; // Token libraries intentionally have no entry rule.
                 Diagnostic diagnostic = new Diagnostic();

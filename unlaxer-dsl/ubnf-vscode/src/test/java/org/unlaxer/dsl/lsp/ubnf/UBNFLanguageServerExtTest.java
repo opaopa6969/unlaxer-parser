@@ -5,8 +5,17 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.gson.JsonParser;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.CodeActionContext;
@@ -17,6 +26,7 @@ import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionParams;
 import org.eclipse.lsp4j.DefinitionParams;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.DocumentSymbolParams;
@@ -47,6 +57,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.junit.Before;
 import org.junit.Test;
+import org.unlaxer.dsl.codegen.GenerationWarnings;
 
 /**
  * UBNFLanguageServerExt のリッチ機能のテスト。
@@ -194,8 +205,7 @@ public class UBNFLanguageServerExtTest {
 
     @Test
     public void validatorReportsCommentIgnoredNextToJavaStyleAsWarning() {
-        // #748 / #777: the flag CLI reads this from GenerationWarnings; the editor keeps it.
-        List<Diagnostic> diagnostics = server.validationDiagnostics("""
+        String content = """
             grammar G {
               @package: org.example
               @whitespace: javaStyle
@@ -203,11 +213,123 @@ public class UBNFLanguageServerExtTest {
               @root
               Root ::= 'a' ;
             }
-            """);
-        assertEquals(diagnostics.toString(), 1, diagnostics.stream()
-            .filter(d -> "W-COMMENT-IGNORED".equals(d.getCode().getLeft())
-                && d.getSeverity() == org.eclipse.lsp4j.DiagnosticSeverity.Warning)
-            .count());
+            """;
+        assertGenerationWarnings(content, List.of("W-COMMENT-IGNORED"),
+            List.of(new Range(new Position(3, 2), new Position(3, 25))));
+    }
+
+    @Test
+    public void ignoredAnnotationMatchesCliWarningAndRange() {
+        String content = """
+            grammar G {
+              @package: org.example
+              @root
+              @custom
+              Root ::= 'a';
+            }
+            """;
+        assertGenerationWarnings(content, List.of("W-ANNOTATION-IGNORED"),
+            List.of(new Range(new Position(3, 2), new Position(3, 9))));
+    }
+
+    @Test
+    public void generationWarningsUseUtf16RangesOnceAcrossGrammars() {
+        // Supplementary characters before both spans and inside a setting distinguish CP from UTF-16.
+        String content = """
+            // 😀
+            grammar First {
+              @whitespace: javaStyle
+              @comment: { line: '😀' }
+              @root @doc('😀') @custom Root ::= 'a';
+            }
+            grammar Second {
+              @whitespace: javaStyle
+              @comment: { line: '#' }
+              @root @custom Root ::= 'b';
+            }
+            """;
+        for (String newline : List.of("\n", "\r\n")) {
+            assertGenerationWarnings(content.replace("\n", newline),
+                List.of("W-COMMENT-IGNORED", "W-ANNOTATION-IGNORED",
+                    "W-COMMENT-IGNORED", "W-ANNOTATION-IGNORED"),
+                List.of(new Range(new Position(3, 2), new Position(3, 26)),
+                    new Range(new Position(4, 19), new Position(4, 26)),
+                    new Range(new Position(8, 2), new Position(8, 25)),
+                    new Range(new Position(9, 8), new Position(9, 15))));
+        }
+    }
+
+    @Test
+    public void generationWarningsMatchTheCliStderrOverTheSharedCorpus() throws Exception {
+        // The oracle is the CLI itself: `generate --target rust` prints one `warning: CP s..e: ...`
+        // line per generation warning (#715, #777). The editor must show those lines, at those spans.
+        Path corpus = Path.of("../../spec-corpus").toAbsolutePath().normalize();
+        var rows = JsonParser.parseString(Files.readString(corpus.resolve("generation-warnings/corpus.json"))).getAsJsonArray();
+        rows.addAll(JsonParser.parseString(Files.readString(corpus.resolve("global-comment/ignored.json"))).getAsJsonArray());
+        var run = Class.forName("org.unlaxer.dsl.CodegenMain")
+            .getDeclaredMethod("run", String[].class, PrintStream.class, PrintStream.class);
+        run.setAccessible(true);
+        Path work = Files.createTempDirectory("lsp-generation-warnings");
+        var cpLine = Pattern.compile("warning: CP (\\d+)\\.\\.(\\d+): (W-[A-Z-]+): .*");
+        int checked = 0;
+        for (int index = 0; index < rows.size(); index++) {
+            String grammarText = rows.get(index).getAsJsonObject().get("grammar").getAsString();
+            for (String newline : List.of("\n", "\r\n")) {
+                String content = grammarText.replace("\n", newline), name = index + (newline.length() == 2 ? "-crlf" : "");
+                Path grammar = work.resolve(name + ".ubnf");
+                Files.writeString(grammar, content);
+                var err = new ByteArrayOutputStream();
+                Object code = run.invoke(null, new String[] {"generate", "--target", "rust", "--grammar", grammar.toString(),
+                    "--output", work.resolve(name).toString()}, new PrintStream(OutputStream.nullOutputStream()),
+                    new PrintStream(err, true, StandardCharsets.UTF_8));
+                assertEquals(name + " " + err, 0, code);
+                List<String> cli = err.toString(StandardCharsets.UTF_8).lines().toList();
+                var diagnostics = server.validationDiagnostics(content);
+                var generated = diagnostics.stream().filter(d -> "ubnf-generator".equals(d.getSource())).toList();
+                assertEquals(name, cli, generated.stream().map(Diagnostic::getMessage).toList());
+                for (int i = 0; i < cli.size(); i++) {
+                    Matcher line = cpLine.matcher(cli.get(i));
+                    assertTrue(cli.get(i), line.matches());
+                    assertEquals(name, line.group(3), generated.get(i).getCode().getLeft());
+                    assertEquals(name + " " + cli.get(i), new Range(cpPosition(content, Integer.parseInt(line.group(1))),
+                        cpPosition(content, Integer.parseInt(line.group(2)))), generated.get(i).getRange());
+                    checked++;
+                }
+                // Each CLI warning is shown once: no validator row repeats a generation-warning code.
+                assertEquals(name + " " + diagnostics, 0, diagnostics.stream().filter(d -> !"ubnf-generator".equals(d.getSource())
+                    && cli.stream().anyMatch(l -> l.contains(": " + d.getCode().getLeft() + ": "))).count());
+            }
+        }
+        assertTrue("corpus warnings checked: " + checked, checked >= 2 * 14);
+    }
+
+    /** LSP position of a code-point offset, counted independently of the server's helpers. */
+    private static Position cpPosition(String text, int codePoints) {
+        int line = 0, character = 0, offset = 0;
+        for (int seen = 0; seen < codePoints; seen++) {
+            int c = text.codePointAt(offset);
+            offset += Character.charCount(c);
+            if (c == '\n') { line++; character = 0; } else character += Character.charCount(c);
+        }
+        return new Position(line, character);
+    }
+
+    private void assertGenerationWarnings(String content, List<String> codes, List<Range> ranges) {
+        var warnings = GenerationWarnings.collect(content);
+        assertEquals(codes, warnings.stream().map(GenerationWarnings.Warning::code).toList());
+        var diagnostics = server.validationDiagnostics(content);
+        // Exact counts include validator rows: duplicate comment warnings must fail this assertion.
+        assertEquals(diagnostics.toString(), warnings.size(), diagnostics.size());
+        for (int i = 0; i < warnings.size(); i++) {
+            var warning = warnings.get(i);
+            var diagnostic = diagnostics.get(i);
+            assertEquals(warning.code(), diagnostic.getCode().getLeft());
+            assertEquals(DiagnosticSeverity.Warning, diagnostic.getSeverity());
+            assertEquals(warning.code(), ranges.get(i), diagnostic.getRange());
+            assertEquals("ubnf-generator", diagnostic.getSource());
+            // The flag CLI's message and the Rust CLIs' stderr use this canonical line.
+            assertEquals(warning.line(), diagnostic.getMessage());
+        }
     }
 
     @Test

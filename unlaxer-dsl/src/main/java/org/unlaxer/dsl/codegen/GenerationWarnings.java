@@ -51,6 +51,21 @@ public final class GenerationWarnings {
         } catch (RuntimeException invalid) {
             return List.of();
         }
+        return warnings(before);
+    }
+
+    /**
+     * {@link #collect(String)} of {@code parsed.source()}, given the generators' parse of it
+     * ({@link UBNFMapper#parseWithSource}), for a caller that already holds it (the UBNF LSP, #798).
+     * The source is parsed again only when it can name {@code @autoCommit}: without that annotation
+     * the rewrite leaves the tree as written.
+     */
+    public static List<Warning> collect(UBNFSourceSnapshot parsed) {
+        if (!parsed.source().contains(AutoCommit.ANNOTATION)) return warnings(parsed);
+        return collect(parsed.source());
+    }
+
+    private static List<Warning> warnings(UBNFSourceSnapshot before) {
         var out = new ArrayList<Warning>();
         for (GrammarDecl grammar : before.ast().grammars()) {
             var found = new ArrayList<Warning>();

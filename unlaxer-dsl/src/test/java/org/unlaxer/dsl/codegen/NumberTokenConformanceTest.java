@@ -106,16 +106,20 @@ public class NumberTokenConformanceTest {
                         #[path = "%s/mod.rs"] mod generated;
                         #[path = "%s"] mod diagnostics;
                         fn main() {
-                            diagnostics::check(|shape| {
-                                let generated = generated::parser::rules();
-                                assert_eq!(generated[0].name, "Root");
-                                assert_eq!(generated[1].name, "Num");
-                                if shape == "%s" { generated } else {
-                                    let mut rules = diagnostics::rules(shape);
-                                    rules[1].expression = generated[1].expression.clone();
-                                    rules
-                                }
-                            }, false, |context| context.failure().expected);
+                            for mapping in [false, true] {
+                                diagnostics::check(|shape| {
+                                    let generated = if mapping {
+                                        generated::parser::mapping_grammar().unwrap().to_vec()
+                                    } else { generated::parser::rules() };
+                                    assert_eq!(generated[0].name, "Root");
+                                    assert_eq!(generated[1].name, "Num");
+                                    if shape == "%s" { generated } else {
+                                        let mut rules = diagnostics::rules(shape);
+                                        rules[1].expression = generated[1].expression.clone();
+                                        rules
+                                    }
+                                }, false, |context| context.failure().expected);
+                            }
                         }
                         """.formatted(host, repo.resolve("rust/unlaxer-runtime/tests/support/number_token_diagnostics.rs"), shape[0]));
                 run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + runtime,

@@ -355,3 +355,7 @@ bare	65	OFF	false	0	0	0	SignParser,DigitParser,OneOrMore,'.',Chain,NumberParser	
 bare	65	SAFE_FAILURES	false	0	0	0	SignParser,DigitParser,OneOrMore,'.',Chain,NumberParser	~
 bare	efbc92	OFF	false	0	0	0	SignParser,DigitParser,OneOrMore,'.',Chain,NumberParser	~
 bare	efbc92	SAFE_FAILURES	false	0	0	0	SignParser,DigitParser,OneOrMore,'.',Chain,NumberParser	~
+failure-memo	2d	OFF	false	0	0	1	DigitParser,OneOrMore,'.',Chain	Root@0>Num@0@1/0
+failure-memo	2d	SAFE_FAILURES	false	0	0	1	DigitParser,negative lookahead,OneOrMore,'.',Chain	Root@0>Num@0@1/0
+failure-memo	2b	OFF	false	0	0	1	DigitParser,OneOrMore,'.',Chain	Root@0>Num@0@1/0
+failure-memo	2b	SAFE_FAILURES	false	0	0	1	DigitParser,negative lookahead,OneOrMore,'.',Chain	Root@0>Num@0@1/0
