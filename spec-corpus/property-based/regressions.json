@@ -1,5 +1,105 @@
 [
   {
+    "id": "number-internal-failures-terminal",
+    "issue": "#752",
+    "note": "Number の後に必須の失敗が続かない形。内部失敗の正確な候補順序は conformance/number-token/diagnostics.tsv と NumberTokenConformanceTest で別途検証する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(N0) R0 ::= R1 ; R1 ::= NUM ; }",
+    "inputs": [
+      "2a",
+      "2",
+      "1,2e,a",
+      "1e1e",
+      "2e",
+      "2e+",
+      "2.",
+      "2.5",
+      ".5",
+      "2e1",
+      "2e+1",
+      "2e😀"
+    ]
+  },
+  {
+    "id": "number-internal-failures-optional",
+    "issue": "#752",
+    "note": "Number の後に必須の失敗が続かない形。内部失敗の正確な候補順序は conformance/number-token/diagnostics.tsv と NumberTokenConformanceTest で別途検証する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(N0) R0 ::= [R1] ; R1 ::= NUM ; }",
+    "inputs": [
+      "2a",
+      "2",
+      "1,2e,a",
+      "1e1e",
+      "2e",
+      "2e+",
+      "2.",
+      "2.5",
+      ".5",
+      "2e1",
+      "2e+1",
+      "2e😀"
+    ]
+  },
+  {
+    "id": "number-internal-failures-choice-last",
+    "issue": "#752",
+    "note": "Number の後に必須の失敗が続かない形。内部失敗の正確な候補順序は conformance/number-token/diagnostics.tsv と NumberTokenConformanceTest で別途検証する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(N0) R0 ::= 'x' | R1 ; R1 ::= NUM ; }",
+    "inputs": [
+      "2a",
+      "2",
+      "1,2e,a",
+      "1e1e",
+      "2e",
+      "2e+",
+      "2.",
+      "2.5",
+      ".5",
+      "2e1",
+      "2e+1",
+      "2e😀"
+    ]
+  },
+  {
+    "id": "number-internal-failures-after-optional",
+    "issue": "#752",
+    "note": "Number の後に必須の失敗が続かない形。内部失敗の正確な候補順序は conformance/number-token/diagnostics.tsv と NumberTokenConformanceTest で別途検証する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(N0) R0 ::= ['x'] R1 ; R1 ::= NUM ; }",
+    "inputs": [
+      "2a",
+      "2",
+      "1,2e,a",
+      "1e1e",
+      "2e",
+      "2e+",
+      "2.",
+      "2.5",
+      ".5",
+      "2e1",
+      "2e+1",
+      "2e😀"
+    ]
+  },
+  {
+    "id": "number-internal-failures-success-tail",
+    "issue": "#752",
+    "note": "Number の後に必須の失敗が続かない形。内部失敗の正確な候補順序は conformance/number-token/diagnostics.tsv と NumberTokenConformanceTest で別途検証する。",
+    "grammar": "grammar Pbt { @package: pbt.corpus @whitespace: none token NUM = org.unlaxer.parser.elementary.NumberParser @root @mapping(N0) R0 ::= R1 ['e'] ; R1 ::= NUM ; }",
+    "inputs": [
+      "2a",
+      "2",
+      "1,2e,a",
+      "1e1e",
+      "2e",
+      "2e+",
+      "2.",
+      "2.5",
+      ".5",
+      "2e1",
+      "2e+1",
+      "2e😀"
+    ]
+  },
+  {
     "id": "owned-capture-field-rule-choice-lookahead",
     "issue": "#729",
     "note": "@f の consumed collector は先読みの Parsed 原文を外側の CAPTURE へ渡さない。入力 x で w は空文字列、context の consumed は CP0、全入力解析は trailing_input CP0。",
