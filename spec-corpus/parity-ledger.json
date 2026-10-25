@@ -327,7 +327,7 @@
         713,
         331
       ],
-      "observation": "empty-literal の javaDiagnostic 51 件と error-elements の10件は引用符、trivia/RootParser 等の補助候補、trailing-input の farthest 表示を個別に固定する。受理・主要失敗位置の共通条件は維持する。空候補が不可視になる不具合は #750（PR #773）で修正済み。evolution の javaOffset/rustOffset 8件は現在すべて等しい。global-comment の expectedHints 10件はJavaのrule子parser由来の候補とRustの末端候補（frameだけが最遠なら空）を固定する。種別・CP位置とhost内の設定非依存は共通条件。",
+      "observation": "empty-literal の javaDiagnostic 112 件と error-elements の10件は引用符、trivia/RootParser 等の補助候補、trailing-input の farthest 表示を個別に固定する。受理・主要失敗位置の共通条件は維持する。空候補が不可視になる不具合は #750（PR #773）で修正済み。evolution の javaOffset/rustOffset 8件は現在すべて等しい。global-comment の expectedHints 10件はJavaのrule子parser由来の候補とRustの末端候補（frameだけが最遠なら空）を固定する。種別・CP位置とhost内の設定非依存は共通条件。",
       "evidence": [
         "docs/empty-literal.md",
         "docs/error-elements.md",
@@ -571,20 +571,6 @@
         "docs/root-choice-cst.md",
         "docs/empty-literal.md",
         "unlaxer-common/doc/ja/tinycalc-internal/04-core-datamodel.md"
-      ]
-    },
-    {
-      "id": "lexical-invert",
-      "category": "unresolved",
-      "title": "非空 lexical literal の Classic 反転幅",
-      "hosts": "Java / Rust（Java-host・native）",
-      "issues": [
-        768,
-        716
-      ],
-      "observation": "tokenStream/lexicalContextで非空literalを反転するとJava幅0、Rust幅1。empty-literal corpusは宣言的tokenで交絡を避けるため、この成功を解消の証拠にしない。",
-      "evidence": [
-        "docs/empty-literal.md"
       ]
     },
     {
@@ -1314,7 +1300,7 @@
     {
       "path": "spec-corpus/empty-literal/corpus.json",
       "fields": {
-        "javaDiagnostic": 51
+        "javaDiagnostic": 112
       },
       "entries": [
         "diagnostic-display"

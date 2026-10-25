@@ -147,7 +147,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
                 FirstSet::EMPTY
             }
         }
-        Expr::Literal(text) => text
+        Expr::Literal(text) | Expr::JavaLiteral(text) => text
             .chars()
             .next()
             .map_or(FirstSet::NULLABLE, FirstSet::of_char),

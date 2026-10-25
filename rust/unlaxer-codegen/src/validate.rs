@@ -697,7 +697,7 @@ fn name_requirement(id: &str, version: &str) -> Result<(), GenerateError> {
 
 fn enum_body_literals<'a>(expression: &'a Expression, out: &mut Vec<&'a str>) -> bool {
     match expression {
-        Expression::Literal(text) => {
+        Expression::Literal(text) | Expression::LexicalLiteral(text) => {
             out.push(text);
             true
         }
