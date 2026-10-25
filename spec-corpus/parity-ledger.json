@@ -294,6 +294,10 @@
     "794": {
       "state": "OPEN",
       "title": "parity: SAFE_FAILURES で負の先読み内の Num failure memo を Java は再生し、Rust は再評価する（negative lookahead の候補差）"
+    },
+    "802": {
+      "state": "OPEN",
+      "title": "parity: @precedence の level overflow と、逆順境界＋overflow の診断順が Java と Rust で違う（#783 後続）"
     }
   },
   "entries": [
@@ -735,6 +739,22 @@
         "conformance/bounded-overflow/corpus.json",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/BoundedOverflowConformanceTest.java",
         "rust/unlaxer-generator/tests/bounded_overflow.rs",
+        "unlaxer-dsl/specs/validation.md"
+      ]
+    },
+    {
+      "id": "precedence-overflow",
+      "category": "contract",
+      "title": "@precedence level overflow と量指定子診断順の契約",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        802
+      ],
+      "observation": "Java / Java-host Rust / native Rust は構文層で範囲外の level を受理し、検証・生成で E-PRECEDENCE-OVERFLOW と @precedence 全体の元ソース CP 範囲を報告する。sentinel は順序・結合性の比較、Parser IR export、BNF 変換に出さない。逆順境界と量指定子 overflow は Java の宣言順・左から右・親から子の 1 回の走査で E-BOUNDED-INVALID / E-BOUNDED-OVERFLOW を報告する。Java は validator の全診断、各生成器と Rust は最初の診断を共通 fixture で検証。#802 はレビュー・merge 後に close。",
+      "evidence": [
+        "conformance/precedence-overflow/corpus.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/PrecedenceOverflowConformanceTest.java",
+        "rust/unlaxer-generator/tests/precedence_overflow.rs",
         "unlaxer-dsl/specs/validation.md"
       ]
     },

@@ -912,14 +912,20 @@ public class UBNFMapper {
     }
 
     PrecedenceAnnotation toPrecedenceAnnotation(Token token) {
-        return bind(mapPrecedenceAnnotation(token), token);
+        var annotation = bind(mapPrecedenceAnnotation(token), token);
+        if (PrecedenceLevels.overflow(annotation)) {
+            var positions = sourceSnapshot != null ? sourceSnapshot
+                : new UBNFSourceSnapshot.Builder(token.source.root().toString());
+            PrecedenceLevels.remember(annotation, positions.tokenSpan(token).orElseThrow());
+        }
+        return annotation;
     }
 
     private PrecedenceAnnotation mapPrecedenceAnnotation(Token token) {
         List<Token> numberTokens = findDescendants(token, UBNFParsers.UnsignedIntegerParser.class);
         int level = numberTokens.isEmpty()
             ? 0
-            : Integer.parseInt(numberTokens.get(0).source.toString().trim());
+            : BoundedQuantifiers.bound(numberTokens.get(0).source.toString().trim());
         return new PrecedenceAnnotation(level);
     }
 

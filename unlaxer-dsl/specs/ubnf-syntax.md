@@ -1004,6 +1004,7 @@ ErrorElement    ::= 'ERROR' '(' STRING ')'
 `INTEGER` の表現範囲は Java の 32bit 符号付き整数（`int`）とする。`{2147483648}` の
 ように範囲外の値は構文層では拒否せず、バリデーション層で `E-BOUNDED-OVERFLOW` として
 拒否する（層の扱い一般については [validation.md](validation.md) の「スコープ」節を参照）。
+`@precedence(level=2147483648)` も同様に構文層で受理し、`E-PRECEDENCE-OVERFLOW` として拒否する。
 
 ---
 

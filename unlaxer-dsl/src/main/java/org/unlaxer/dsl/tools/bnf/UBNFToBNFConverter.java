@@ -63,6 +63,8 @@ public final class UBNFToBNFConverter {
             org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
             // Never print the internal overflow value as a repetition count (#783).
             org.unlaxer.dsl.bootstrap.BoundedQuantifiers.requireNoOverflow(grammar);
+            // Likewise for the @precedence level sentinel (#802).
+            org.unlaxer.dsl.bootstrap.PrecedenceLevels.requireNoOverflow(grammar);
             convertGrammarDecl(grammar, builder, context);
 
             if (false == (i == grammars.size() - 1)) {

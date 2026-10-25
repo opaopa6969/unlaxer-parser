@@ -25,6 +25,7 @@ public class MapperGenerator implements CodeGenerator {
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         NestedCaptures.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        org.unlaxer.dsl.bootstrap.PrecedenceLevels.requireNoOverflow(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         CommonFieldSchema.build(grammar);
         EnumSchema.validate(grammar);

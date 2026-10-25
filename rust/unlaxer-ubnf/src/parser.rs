@@ -120,17 +120,6 @@ impl Parser<'_> {
         crate::codepoint_escapes::decode(&self.source[span.byte_start..span.byte_end])
             .map_err(|error| self.invalid(span, error))
     }
-    fn integer(&mut self) -> Result<u32> {
-        if let Kind::Number(value) = &self.current().kind {
-            let number = value
-                .parse::<i32>()
-                .map_err(|_| self.invalid(self.current().span, "integer exceeds 2147483647"))?;
-            self.pos += 1;
-            Ok(number as u32)
-        } else {
-            Err(self.error("expected unsigned ASCII integer"))
-        }
-    }
     // Syntax accepts every ASCII digit run; validation owns the signed-32-bit limit.
     fn repeat_bound(&mut self) -> Result<u32> {
         if let Kind::Number(value) = &self.current().kind {
@@ -787,7 +776,8 @@ impl Parser<'_> {
             "precedence" => {
                 self.expect('(')?;
                 self.named_arg("level")?;
-                let level = self.integer()? as i32;
+                // MAX+1 becomes i32::MIN: transport overflow to semantic validation.
+                let level = self.repeat_bound()? as i32;
                 self.expect(')')?;
                 AnnotationKind::Precedence { level }
             }

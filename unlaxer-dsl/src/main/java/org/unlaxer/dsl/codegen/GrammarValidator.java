@@ -958,7 +958,10 @@ public final class GrammarValidator {
                 "E-PRECEDENCE-DUPLICATE");
         }
         for (PrecedenceAnnotation p : precedenceAnnotations) {
-            if (p.level() < 0) {
+            if (org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(p)) {
+                addRuleError(errors, rule.name(), org.unlaxer.dsl.bootstrap.PrecedenceLevels.message(p),
+                    "Use a level between 0 and 2147483647.", org.unlaxer.dsl.bootstrap.PrecedenceLevels.CODE);
+            } else if (p.level() < 0) {
                 addRuleError(errors, rule.name(),
                     "rule " + rule.name() + " has invalid @precedence level: " + p.level(),
                     "Use a non-negative integer (e.g. @precedence(level=10)).",
@@ -1057,7 +1060,8 @@ public final class GrammarValidator {
 
         for (RuleDecl rule : grammar.rules()) {
             Integer precedence = findPrecedenceLevel(rule);
-            if (precedence == null || !hasAssoc(rule)) {
+            // E-PRECEDENCE-OVERFLOW owns an out-of-range level; never compare the sentinel (#802).
+            if (precedence == null || org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(precedence) || !hasAssoc(rule)) {
                 continue;
             }
             Set<String> refs = collectReferencedRuleNames(rule.body());
@@ -1070,7 +1074,7 @@ public final class GrammarValidator {
                     continue;
                 }
                 Integer refPrecedence = findPrecedenceLevel(refRule);
-                if (refPrecedence == null) {
+                if (refPrecedence == null || org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(refPrecedence)) {
                     continue;
                 }
                 if (refPrecedence <= precedence) {
@@ -1099,6 +1103,9 @@ public final class GrammarValidator {
                         + "Assoc but has no @precedence",
                     "Add @precedence(level=...) to this operator rule.",
                     "E-ASSOC-NO-PRECEDENCE");
+                continue;
+            }
+            if (org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(level)) {
                 continue;
             }
             String existing = assocByLevel.get(level);
@@ -1139,7 +1146,7 @@ public final class GrammarValidator {
     }
 
     /** Validate repeat definitions even when the repeated child will never execute. */
-    static void requireValidBoundedRepeatElements(GrammarDecl grammar) {
+    public static void requireValidBoundedRepeatElements(GrammarDecl grammar) {
         var errors = new ArrayList<ValidationIssue>();
         validateBoundedRepeatElements(grammar, errors);
         if (!errors.isEmpty()) {
