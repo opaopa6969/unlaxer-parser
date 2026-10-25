@@ -147,6 +147,8 @@
       "org.unlaxer.dsl.codegen.EmptyLiteralConformanceTest": ["javaGeneratedParsersMatchTheSharedOracle", "bothRustFrontendsMatchTheSharedOracle"],
       "org.unlaxer.dsl.MultiGrammarConformanceTest": ["javaArtifactsCompileParseMapAndEvaluateTheSharedCorpus", "bothRustHostsCompileAndExecuteEveryGrammarIncludingProtocols", "rejectionOriginsAndNoPartialOutputAgree", "nestedOutputPreflightAndDriftNeverTouchEarlierArtifacts", "playgroundDoesNotSilentlySelectTheFirstGrammar", "impactRemainsExplicitlySingleGrammar", "sameNameInDifferentJavaPackagesCompilesAndExecutes", "javaCollisionReportsAndManifestsUseJavaClassNames", "javaHostAcceptsCallerOwnedSymlinkAncestors", "importedCollisionAndLateErrorsKeepOriginalGrammarLocations", "singleJavaGrammarEmitterFailureWritesNoFiles", "invalidProgrammaticGrammarNameIsADiagnostic", "ioFailureDoesNotPublishRootIndexAndNamesFailedPath"],
       "org.unlaxer.dsl.codegen.GlobalCommentConformanceTest": ["javaRejectsInvalidSettingsWithCodeSubjectAndSpan", "nativeGeneratorRejectsInvalidSettingsLikeJava", "javaStyleKeepsIgnoredSettingsAsWarnings", "nativeGeneratorGeneratesIgnoredSettingsAsJavaStyle"],
+      "org.unlaxer.parser.elementary.NumberTokenOracleTest": ["oracleFileIsWhatJavaObserves", "numberParserMatchesTheSharedOracle", "internalFailureDiagnosticsMatchTheSharedOracle"],
+      "org.unlaxer.dsl.codegen.NumberTokenConformanceTest": ["generatedJavaMatchesTheDiagnosticOracle", "bothRustHostsMatchTheDiagnosticOracle"],
       "org.unlaxer.dsl.codegen.BoundedOverflowConformanceTest": ["javaAndJavaHostRustMatchTheSharedOracle", "nativeValidatorAndGeneratorRunTheSameFixtures"]
     }
   },
