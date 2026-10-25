@@ -130,6 +130,7 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 | `E-ANNOTATION-DECLARES-CAPTURE` | `@declares(symbol=...)` の対象captureが同じルール本体に存在しない |
 | `E-ANNOTATION-BACKREF-CAPTURE` | scopeの有無によらず`@backref(name=...)` の対象captureが同じルール本体に存在しない |
 | `W-ANNOTATION-IGNORED`（WARNING） | 生成器が使わない Simple annotation（`@nestedCaptures` / `@autoCommit` 以外）。生成は続ける。`GrammarValidator` ではなく、CLI の検証報告が生成の警告（`GenerationWarnings`）から位置付きで載せる（[契約](../../docs/simple-annotations.md)、#715） |
+| `W-COMMENT-IGNORED`（WARNING） | 全体の `@whitespace: javaStyle` と併記した `@comment` が `line: '//'` 1つ以外の形・重複（subject `comment`）。生成は javaStyle 単独と同じ。`GrammarValidator`（UBNF LSP の診断）が返し、CLI の検証報告は生成の警告（`GenerationWarnings`）の位置付きの行だけを載せる（[契約](../../docs/rule-trivia.md#global-comment712)、#748 / #777） |
 
 ### BOUNDED エラー（量指定子 `{n}` / `{n,m}` / `{n,}`）
 

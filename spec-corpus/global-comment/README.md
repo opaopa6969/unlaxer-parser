@@ -3,6 +3,8 @@
 `corpus.json` は文法・入力・独立期待値、`invalid.json` は拒否する設定の code・subject・code point span、
 `ignored.json` は全体の `@whitespace: javaStyle` と併記したために拒否せず `W-COMMENT-IGNORED` を出す
 設定の code・subject・code point span と、生成物が一致すべき javaStyle 単独の文法（`baseline`）。
+`generationWarnings` は #777 の共通収集 API と3経路の CLI の code・grammar・rule・span・message・line。
+Java / Rust の generation-warnings テストも全8例を読み、strict の失敗と無出力を確かめる。
 契約は [trivia 契約の global `@comment`](../../docs/rule-trivia.md#global-comment712)。
 
 `GlobalCommentConformanceTest`（`RuleTriviaConformanceTest` の共通 harness）が Java と
