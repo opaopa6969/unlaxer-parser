@@ -688,7 +688,7 @@
     },
     {
       "id": "number-internal-failures",
-      "category": "unresolved",
+      "category": "contract",
       "title": "Numberの内部失敗と負の先読み診断",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
@@ -696,7 +696,7 @@
         752,
         717
       ],
-      "observation": "#717 CLOSED の不完全指数と #752 CLOSED の符号・小数・指数の内部失敗（負の先読みの hint、成功 memo の再生を含む）は共通oracleで一致。SAFE_FAILURES で負の先読み内で失敗した Num を後で同じ位置から呼ぶと、Java は failure memo を再生して negative lookahead を候補に含め、Rust は memo key が rule の深さを含むので再評価して含めない差が #794 に残る。表示 hint の無い rule の class 名 fallback と、失敗した Chain の子 hint 展開は host 固有の候補で、oracle は比べない。PBT known-differences=[]から差ゼロとは推論しない。",
+      "observation": "#717 CLOSED の不完全指数と #752 CLOSED の符号・小数・指数の内部失敗（負の先読みの hint、成功 memo の再生を含む）は共通oracleで一致。#794 の (!Num x) | Num に符号だけを与える failure memo も、両言語で negative lookahead を含む同じ候補を再生する。差の原因は同じ rule 深さでの reset policy で、Rust の Number / Sequence rule を Java の Chain と同じ lookup 前の false に揃えた。rule 深さの key と資源検査は維持し、異なる rule 深さ全般で同じ hit は保証しない。表示 hint の無い rule の class 名 fallback と失敗した Chain の子 hint 展開は host 固有の候補で、oracle は比べない。PBT known-differences=[]から差ゼロとは推論しない。#794 は PR merge 前のため OPEN。",
       "evidence": [
         "conformance/number-token/cases.tsv",
         "conformance/number-token/diagnostics.tsv",

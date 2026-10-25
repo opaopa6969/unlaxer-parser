@@ -6,6 +6,9 @@ pub fn rules(shape: &str) -> Vec<Rule> {
     let body = match shape {
         "number" | "bare" => number,
         "not" => number.not_ahead().then(Expr::literal("x")),
+        "failure-memo" => {
+            Expr::choice([number.clone().not_ahead().then(Expr::literal("x")), number])
+        }
         "optional" => number.optional_java(),
         "choice" => Expr::choice([Expr::literal("x"), number]),
         "after-optional" => Expr::literal("x").optional_java().then(number),
@@ -66,6 +69,13 @@ pub fn check(
             };
             if c[0] == "memo" && memo == Memoization::SafeFailures {
                 assert!(context.memoized_success_hits() > 0, "{row}");
+            }
+            if c[0] == "failure-memo" && mode != Diagnostics::DetailedOnFailure {
+                assert_eq!(
+                    context.memoized_failure_hits(),
+                    usize::from(memo == Memoization::SafeFailures),
+                    "{row}/{mode:?}"
+                );
             }
             let failure = context.failure();
             let stack = context

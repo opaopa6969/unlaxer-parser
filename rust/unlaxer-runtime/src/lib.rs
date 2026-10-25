@@ -3070,6 +3070,17 @@ impl<'a> ParseContext<'a> {
 
     #[inline(never)]
     fn memoized_rule(&mut self, id: usize, depth: usize) -> Option<usize> {
+        // Java's Chain disables matched-cursor reset before memo lookup. Sequence
+        // and Number do the same in expression(), but waiting until a miss gives
+        // (!Num 'x') | Num two different keys (#794). Metadata adds no parser frame.
+        // Preserve the policy on hits too; rule/expression depth guards stay intact.
+        let mut expression = &self.rules[id].expression;
+        while let Expr::MetadataCapture(_, child) = expression {
+            expression = child;
+        }
+        if matches!(expression, Expr::Sequence(_) | Expr::Number) {
+            self.match_cursor_policy.reset = false;
+        }
         let key = FailureMemoKey::new(
             id,
             self.position,
@@ -7086,9 +7097,14 @@ mod tests {
 
         assert!(context.rule(0, 0).is_none());
 
+        // Sequence stores the same reset=false key that Java's Chain looks up.
+        let key = FailureMemoKey::new(0, 0, 0, false, 0).with_match_policy(MatchCursorPolicy {
+            reset: false,
+            non_ordered: false,
+        });
         let outer = context
             .failure_memo
-            .get(0, &FailureMemoKey::new(0, 0, 0, false, 0))
+            .get(0, &key)
             .expect("outer failure was memoized");
         assert_eq!(outer.farthest, Some(0));
         assert_eq!(
@@ -7520,7 +7536,10 @@ mod pure_success_memo_tests {
         let mut context = context("ab", Expr::literal("a").then(Expr::literal("b")));
         context.token_mode = Some(token::ParseMode::default());
         let key = FailureMemoKey::new(0, 0, 0, false, 0)
-            .with_match_policy(context.match_cursor_policy)
+            .with_match_policy(MatchCursorPolicy {
+                reset: false,
+                non_ordered: false,
+            })
             .with_token_mode(context.token_mode);
         let checkpoint = context.checkpoint();
         assert!(context.rule(0, 0).is_some());
@@ -7828,6 +7847,9 @@ fn number_internal_failure_recording_order_matches_java() {
         let body = match shape {
             "number" | "bare" => number,
             "not" => number.not_ahead().then(Expr::literal("x")),
+            "failure-memo" => {
+                Expr::choice([number.clone().not_ahead().then(Expr::literal("x")), number])
+            }
             "optional" => number.optional_java(),
             "choice" => Expr::choice([Expr::literal("x"), number]),
             "after-optional" => Expr::literal("x").optional_java().then(number),

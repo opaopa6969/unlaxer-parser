@@ -25,6 +25,17 @@ mvn -B -o -pl unlaxer-common -am test -Dtest=NumberTokenOracleTest \
   `memo` は同じ Num を正の先読みで2回、負の先読みで1回呼ぶ。
   memo OFF は最後の評価時の `negative lookahead` を含み、SAFE_FAILURES は正の先読みで保存した候補を再生するため含まない。
   この Java 自体の memo による違いも各設定の oracle で固定し、実際の成功 memo hit を両言語で確認する。
+- `failure-memo` は `Root ::= (!Num 'x') | Num`、`Num ::= NUMBER` に `-` / `+` を与える (#794)。
+  OFF の候補は `DigitParser, OneOrMore, '.', Chain`、SAFE_FAILURES は先読み内の失敗 memo を再生し、
+  `DigitParser` の直後に `negative lookahead` を含む。両言語とも拒否・consumed/matched CP0・最遠 CP1・
+  stack `Root@0>Num@0@1/0`。候補の内部順序と公開集合、および Detailed / Auto の実 failure hit を固定する。
+  Java の key は parser identity・consumed/matched・TokenKind・invert・stateVersion・reset policy。
+  深さを key に含めず、保存時より深い再生を lookup で拒否する。Chain は lookup **前**に reset policy を false にする。
+  Rust のこの再現例では先読み内外の rule 深さは同じで、旧 key の差は reset bit（false / true）だった。
+  Number / Sequence rule（生成 Num の Chain を含む）は式の評価時と同じ false を lookup 前にも設定し、
+  hit 時にもその副作用を保つ。parser frame を加えない MetadataCapture を透過し、mapping 用の生成 rule も検証する。
+  rule 深さを含む key・expression 深さの再生検査・他の parser の reset/nonOrdered key は変更しない。
+  異なる rule 深さ全般で Java と同じ hit を保証するものではない。
 - 低水準 API の Auto は Detailed。DetailedOnFailure は記録せず、最遠位置0・空候補・stack無し。
   full-input API の Auto / DetailedOnFailure は失敗時に Detailed で再解析する。
   Number の入口で記録の有無を一度だけ決める。その成功パスでは新しい診断名の割当や記録を行わず、内部テストで確認する。
@@ -38,9 +49,6 @@ mvn -B -o -pl unlaxer-common -am test -Dtest=NumberTokenOracleTest \
   PBT も host 間では期待候補を比べない（[docs/property-based-testing.md](../../docs/property-based-testing.md)）。
   #752 のレビューでは、Number を使う16形・36入力と、7文字種の長さ4までの全入力（7形）を両 host で比べた。
   この3種類の一般差を除くと、Rust に余分な候補は無く、共通する候補の順序も一致した。
-- SAFE_FAILURES で、負の先読みの中で失敗した Num を後で同じ位置から呼ぶ形（`(!Num 'x') | Num` に `-`）では、
-  Java が failure memo を再生して `negative lookahead` を含める。Rust の failure memo の key は rule の深さを含むので、
-  memo は hit せず再評価になり、`negative lookahead` を含めない（#794）。
 
 ## 性能
 
