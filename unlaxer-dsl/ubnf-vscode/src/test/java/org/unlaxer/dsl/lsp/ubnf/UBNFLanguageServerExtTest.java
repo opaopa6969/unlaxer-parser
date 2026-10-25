@@ -5,8 +5,17 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.gson.JsonParser;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.CodeActionContext;
@@ -248,6 +257,61 @@ public class UBNFLanguageServerExtTest {
                     new Range(new Position(8, 2), new Position(8, 25)),
                     new Range(new Position(9, 8), new Position(9, 15))));
         }
+    }
+
+    @Test
+    public void generationWarningsMatchTheCliStderrOverTheSharedCorpus() throws Exception {
+        // The oracle is the CLI itself: `generate --target rust` prints one `warning: CP s..e: ...`
+        // line per generation warning (#715, #777). The editor must show those lines, at those spans.
+        Path corpus = Path.of("../../spec-corpus").toAbsolutePath().normalize();
+        var rows = JsonParser.parseString(Files.readString(corpus.resolve("generation-warnings/corpus.json"))).getAsJsonArray();
+        rows.addAll(JsonParser.parseString(Files.readString(corpus.resolve("global-comment/ignored.json"))).getAsJsonArray());
+        var run = Class.forName("org.unlaxer.dsl.CodegenMain")
+            .getDeclaredMethod("run", String[].class, PrintStream.class, PrintStream.class);
+        run.setAccessible(true);
+        Path work = Files.createTempDirectory("lsp-generation-warnings");
+        var cpLine = Pattern.compile("warning: CP (\\d+)\\.\\.(\\d+): (W-[A-Z-]+): .*");
+        int checked = 0;
+        for (int index = 0; index < rows.size(); index++) {
+            String grammarText = rows.get(index).getAsJsonObject().get("grammar").getAsString();
+            for (String newline : List.of("\n", "\r\n")) {
+                String content = grammarText.replace("\n", newline), name = index + (newline.length() == 2 ? "-crlf" : "");
+                Path grammar = work.resolve(name + ".ubnf");
+                Files.writeString(grammar, content);
+                var err = new ByteArrayOutputStream();
+                Object code = run.invoke(null, new String[] {"generate", "--target", "rust", "--grammar", grammar.toString(),
+                    "--output", work.resolve(name).toString()}, new PrintStream(OutputStream.nullOutputStream()),
+                    new PrintStream(err, true, StandardCharsets.UTF_8));
+                assertEquals(name + " " + err, 0, code);
+                List<String> cli = err.toString(StandardCharsets.UTF_8).lines().toList();
+                var diagnostics = server.validationDiagnostics(content);
+                var generated = diagnostics.stream().filter(d -> "ubnf-generator".equals(d.getSource())).toList();
+                assertEquals(name, cli, generated.stream().map(Diagnostic::getMessage).toList());
+                for (int i = 0; i < cli.size(); i++) {
+                    Matcher line = cpLine.matcher(cli.get(i));
+                    assertTrue(cli.get(i), line.matches());
+                    assertEquals(name, line.group(3), generated.get(i).getCode().getLeft());
+                    assertEquals(name + " " + cli.get(i), new Range(cpPosition(content, Integer.parseInt(line.group(1))),
+                        cpPosition(content, Integer.parseInt(line.group(2)))), generated.get(i).getRange());
+                    checked++;
+                }
+                // Each CLI warning is shown once: no validator row repeats a generation-warning code.
+                assertEquals(name + " " + diagnostics, 0, diagnostics.stream().filter(d -> !"ubnf-generator".equals(d.getSource())
+                    && cli.stream().anyMatch(l -> l.contains(": " + d.getCode().getLeft() + ": "))).count());
+            }
+        }
+        assertTrue("corpus warnings checked: " + checked, checked >= 2 * 14);
+    }
+
+    /** LSP position of a code-point offset, counted independently of the server's helpers. */
+    private static Position cpPosition(String text, int codePoints) {
+        int line = 0, character = 0, offset = 0;
+        for (int seen = 0; seen < codePoints; seen++) {
+            int c = text.codePointAt(offset);
+            offset += Character.charCount(c);
+            if (c == '\n') { line++; character = 0; } else character += Character.charCount(c);
+        }
+        return new Position(line, character);
     }
 
     private void assertGenerationWarnings(String content, List<String> codes, List<Range> ranges) {

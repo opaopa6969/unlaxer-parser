@@ -231,8 +231,8 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
 
     private void collectValidationDiagnostics(
             String content, List<UBNFAST.GrammarDecl> grammars, DocumentIndex index) {
-        // Collect once from the original source, as the CLI does (before annotation rewrites).
-        for (var warning : GenerationWarnings.collect(content)) {
+        // Collect once per document, as the CLI does; the editor's parse spares a reparse (#798).
+        for (var warning : GenerationWarnings.collect(index.editor.snapshot)) {
             Range range = warning.span().map(span -> UbnfEditorIndex.rangeOf(content,
                 content.offsetByCodePoints(0, span.start()), content.offsetByCodePoints(0, span.end())))
                 .orElseGet(() -> new Range(new Position(0, 0), new Position(0, 1)));

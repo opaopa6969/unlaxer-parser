@@ -47,6 +47,10 @@ public class GenerationWarningsConformanceTest {
                 out.add(value);
             }
             assertEquals(row.get("name").getAsString(), row.get("warnings"), out);
+            // The UBNF LSP passes its own parse (#798): the same warnings, @autoCommit included.
+            String source = row.get("grammar").getAsString();
+            assertEquals(row.get("name").getAsString() + " from the parse", GenerationWarnings.collect(source),
+                GenerationWarnings.collect(org.unlaxer.dsl.bootstrap.UBNFMapper.parseWithSource(source)));
         }
         assertEquals(List.of(), GenerationWarnings.collect("grammar G { @custom(x) R ::= 'x'; }"));
     }
