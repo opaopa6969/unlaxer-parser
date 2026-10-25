@@ -47,6 +47,25 @@ public class PropertyBasedParityTest {
         return value == null || value.isBlank() ? fallback : Long.parseLong(value.strip());
     }
 
+    /** #754: compile both targets and compare success/failure, CST and AST in all 12 modes. */
+    @Test(timeout = 300_000)
+    public void deeplyGroupedRecursiveHelpersAgreeAcrossTargets() throws Exception {
+        assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        var cases = new ArrayList<ParityHarness.Case>();
+        for (int depth : List.of(84, 85, 121, 122)) {
+            cases.add(new ParityHarness.Case("recursive-depth-" + depth,
+                org.unlaxer.dsl.NestingLimitGrammars.recursivePlus(depth),
+                List.of("aa", "naaa", "aynaa", "a", "b", ""), Map.of("corpus", 1), null));
+        }
+        var stats = new ParityHarness.Stats();
+        var findings = new ParityHarness(repo, temporary.getRoot().toPath()).evaluate(cases, stats);
+        Files.write(Path.of("target/recursive-generation-depth.jsonl"), stats.evidence);
+        assertTrue(findings.toString(), findings.isEmpty());
+        assertEquals("all grammars accepted", 0, stats.rejected);
+        assertEquals("all inputs observed", 24, stats.inputs);
+        assertEquals("success cases exercise the recursive branch", 12, stats.accepted);
+    }
+
     @Test
     public void generatorIsDeterministicBoundedAndValid() {
         for (long seed = 1; seed <= 1_000; seed++) {

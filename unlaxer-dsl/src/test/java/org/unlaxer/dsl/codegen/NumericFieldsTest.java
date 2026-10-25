@@ -39,14 +39,22 @@ public class NumericFieldsTest {
         assertTrue(fields + " fields", integers >= 8 && fields > integers);
     }
 
-    /** Numeric refinement does not need the AST fixed point, including past its depth limit. */
+    /** Numeric refinement does not need the AST fixed point, on either side of its depth limit (#754, #758). */
     @Test public void recursiveShapeLimitDoesNotAffectTheNativeCaptureRule() {
-        GrammarDecl grammar = UBNFMapper.parse(NestingLimitGrammars.recursivePlusWithNumber(86)).grammars().get(0);
-        RuleDecl root = grammar.rules().get(0);
-        var error = assertThrows(IllegalArgumentException.class, () -> new ASTGenerator().inferType(grammar, root, "n"));
-        assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256", error.getMessage());
-        assertTrue(NumericFields.isInteger(grammar, root, "n"));
-        assertFalse(NumericFields.isInteger(grammar, root, "x"));
+        for (int depth : List.of(86, 122, 126, 127)) {
+            GrammarDecl grammar = UBNFMapper.parse(NestingLimitGrammars.recursivePlusWithNumber(depth)).grammars().get(0);
+            RuleDecl root = grammar.rules().get(0);
+            if (depth <= 126) {
+                // #754: the previous fallback case now succeeds in ordinary Java inference.
+                assertEquals("int", new ASTGenerator().inferType(grammar, root, "n"));
+            } else {
+                var error = assertThrows(IllegalArgumentException.class,
+                    () -> new ASTGenerator().inferType(grammar, root, "n"));
+                assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256", error.getMessage());
+            }
+            assertTrue(NumericFields.isInteger(grammar, root, "n"));
+            assertFalse(NumericFields.isInteger(grammar, root, "x"));
+        }
     }
 
     /** #758: the Java AST guard stays in place, but Rust integer refinement avoids that work. */

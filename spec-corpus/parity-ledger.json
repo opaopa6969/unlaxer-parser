@@ -416,7 +416,7 @@
         516,
         741
       ],
-      "observation": "Java は parser frame 1024、Rust は rule 256/expression 1024。UBNF frontend は Java が形により126〜168括弧、native は127括弧。#741 CLOSED はこの差の契約化と境界テストによる。lowering の深さ256とは別。未解決の Java生成深さ・作業量は後述の #754/#758 に残す。",
+      "observation": "Java は parser frame 1024、Rust は rule 256/expression 1024。UBNF frontend は Java が形により126〜168括弧、native は127括弧。#741 CLOSED はこの差の契約化と境界テストによる。lowering の深さ256とは別。Java生成深さの契約は後述の #754、未解決の作業量は #758 に残す。",
       "evidence": [
         "docs/java-parser-limits.md",
         "rust/unlaxer-ubnf/src/lib.rs",
@@ -653,17 +653,20 @@
     },
     {
       "id": "java-generation-depth",
-      "category": "unresolved",
+      "category": "contract",
       "title": "Java target の再帰shape深さ",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         754,
         740
       ],
-      "observation": "#740 CLOSED でRust両hostのlowered IR解析は揃ったが、Java targetのAST型推論は深い再帰helperをE-RECURSIVE-SHAPEで拒否する。残差はOPEN #754。",
+      "observation": "#754で単一選択肢のchoiceを追加深さから除外し、Rust preferred_planも同じ計数にした。再帰helperの84〜122括弧はJava生成とRust両hostで受理し、生成parserの成否・CST・ASTが一致する。資源上限256は維持し、この形のJava生成は126段まで、127段でE-RECURSIVE-SHAPE。Rust生成はlowered IRの122/123段を維持する。target別の上限は契約で、作業量の残差は#758。",
       "evidence": [
         "docs/java-parser-limits.md",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/RustNativeGeneratorTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/propertybased/PropertyBasedParityTest.java",
+        "rust/unlaxer-generator/src/preferred_plan.rs"
       ]
     },
     {
