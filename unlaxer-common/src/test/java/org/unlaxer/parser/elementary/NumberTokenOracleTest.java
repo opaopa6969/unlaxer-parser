@@ -127,7 +127,7 @@ public class NumberTokenOracleTest {
     }
 
     private static final Path DIAGNOSTICS = Path.of("../conformance/number-token/diagnostics.tsv");
-    private static final List<String> SHAPES = List.of("number", "not", "optional", "choice", "after-optional", "tail", "memo", "bare");
+    private static final List<String> SHAPES = List.of("number", "not", "optional", "choice", "after-optional", "tail", "memo", "bare", "failure-memo");
     private static final List<String> DIAGNOSTIC_INPUTS = List.of(
             "2a", "2", "1,2e,a", "1e1e", "2e", "2e+", "2E-", "2.", "2.a", "2.5", ".5", ".5e",
             "-2", "+2.5E-3", "2e1", "2e+1", "2e+1a", "2e😀", "2́", "42é", "2e\r\n");
@@ -146,6 +146,8 @@ public class NumberTokenOracleTest {
         Parser body = switch (shape) {
             case "number" -> number;
             case "not" -> new Chain(new PegLookahead(number, false), new WordParser("x"));
+            case "failure-memo" -> new Choice(
+                    new Chain(new PegLookahead(number, false), new WordParser("x")), number);
             case "optional" -> new Optional(number);
             case "choice" -> new Choice(new WordParser("x"), number);
             case "after-optional" -> new Chain(new Optional(new WordParser("x")), number);
@@ -163,6 +165,9 @@ public class NumberTokenOracleTest {
             boolean success = diagnosticParser(shape).parse(context).isSucceeded();
             if (shape.equals("memo") && options.memoization() == Memoization.SAFE_FAILURES)
                 assertTrue("exercise successful memo replay", context.getPackratMemoTable().successHits() > 0);
+            if (shape.equals("failure-memo") && options.memoization() == Memoization.SAFE_FAILURES)
+                assertEquals("failure replay", 1,
+                        context.getPackratMemoTable().failureHits());
             var diagnostic = context.getParseFailureDiagnostics();
             String expected = String.join(",", diagnostic.getExpectedParsers());
             String stack = context.getRuleStack().map(value -> value.frames().stream()
@@ -174,6 +179,7 @@ public class NumberTokenOracleTest {
     }
 
     private static List<String> diagnosticInputs(String shape) {
+        if (shape.equals("failure-memo")) return List.of("-", "+");
         var inputs = new ArrayList<>(DIAGNOSTIC_INPUTS);
         if (shape.equals("bare")) inputs.addAll(List.of("", "-", "-a", "+.a", ".", ".a", "a", "e", "２"));
         return inputs;
