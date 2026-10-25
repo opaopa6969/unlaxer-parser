@@ -59,6 +59,7 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        org.unlaxer.dsl.bootstrap.BoundedQuantifiers.requireNoOverflow(grammar);
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         org.unlaxer.dsl.codegen.NestedCaptures.requireValid(grammar);
         org.unlaxer.dsl.codegen.RaisingOperators.requireValid(grammar);

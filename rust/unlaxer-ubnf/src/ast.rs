@@ -304,7 +304,7 @@ pub enum ElementKind {
     Optional(RuleBody),
     Repeat(RuleBody),
     OneOrMore(Box<AtomicElement>),
-    /// None is the open upper bound; values are restricted to Java's i32 domain.
+    /// None is the open upper bound; values above i32::MAX are rejected by validation.
     BoundedRepeat {
         element: Box<AtomicElement>,
         min: u32,
