@@ -107,6 +107,26 @@ helper の `( )+` 85 / 86 段、`( )?`・`( )*` 63 / 64 段）でも、両 host 
 成功する段で projection があり、拒否する段で無いことを確かめる。`( )`・`[ ]`・`{ }` はこの形では
 native frontend が受理する最後の 127 段まで projection を保つ。
 
+Rust native generator は **debug build・2 MiB の呼出元 thread stack** で検証する（#805）。
+CLI の main stack を `ulimit -s 2048` にした場合も同じで、追加の worker thread や
+`RUST_MIN_STACK` の指定は不要。mapped 再帰の横に置いた `H ::= [[…'a' M…]]` では
+`[ ]`・`{ }`・`( )`・`( )+` の 127 段まで生成できる。`( )?`・`( )*` は 84 段まで生成し、
+85〜127 段では両 Rust host とも既存の `structural analysis depth exceeds 256` を返す。
+いずれも native の 128 段は frontend の `UBNF nesting limit exceeded` になり、出力を作らない。
+preferred projection の既存の境界（上記の 63 / 64、85 / 86 段）も維持する。
+
+元の stack overflow は IR のソース出力関数 `unlaxer_codegen::expression` が debug build で
+約 10 KiB の書式化用 frame を各 IR 段に保持していたためで、通常出力と preferred 出力に共通する。
+子の出力を先に完成させ、書式化を非再帰・非 inline の関数に分離して、再帰 frame を小さくした。
+さらに、拒否対象の深い `( )?`・`( )*` は lowering の enum 構築 frame を group ごとにも保持していたので、
+IR の wrapper を増やさない group は小さな frame から直接その本体へ進む。
+frontend・構造解析・preferred 解析の上限や出力テンプレートは変えない。
+この保証は生成器の文法入力に対するもので、任意の巨大な手製 IR や 2 MiB 未満の stack は対象外。
+`RustNativeGeneratorTest.nativeGenerationFitsTwoMegabyteStack` は同じ入力を Java host でも生成し、
+成功する 58 文法の全 5 ファイル（290 ファイル）を byte 比較する。構造上限の 14 文法と
+frontend 上限の 6 文法も、panic / abort ではなく診断・終了 code 3・出力なしになることを固定する。
+Rust の `nesting_limits.rs` でも明示した 2 MiB thread で同じ境界を検証する。
+
 Rust 生成の整数 field の判定は、両 host とも `numeric_fields.rs` と同じ「mapping を共有する、
 `@skip` でない全規則の対象 capture がすべて数値 token」の規則を直接使う（#758）。`@typeof` の制約に使う
 capture も同じで、mapping の field はその判定結果に従い、mapping にない capture は自分の規則の capture だけで判定する。lowered IR が既に

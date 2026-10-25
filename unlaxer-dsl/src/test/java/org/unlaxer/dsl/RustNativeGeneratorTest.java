@@ -321,6 +321,56 @@ public class RustNativeGeneratorTest {
         Files.write(Path.of("target/rust-recursive-nesting-limits.tsv"), report, StandardCharsets.UTF_8);
     }
 
+    /** #805: debug CLI on a 2 MiB main stack, using Java's existing byte oracle. */
+    @Test public void nativeGenerationFitsTwoMegabyteStack() throws Exception {
+        assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        assumeTrue("requires bash ulimit", Files.isExecutable(Path.of("/bin/bash")));
+        assertEquals(0, command(List.of("cargo", "build", "--locked", "--manifest-path",
+            repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
+        // Positional arguments keep file names out of shell source. PATH remains empty.
+        var generator = List.of("/bin/bash", "-c", "set -e; ulimit -c 0; ulimit -s 2048; exec \"$@\"",
+            "stack-805", repo.resolve("rust/target/debug/unlaxer").toString());
+        var report = new ArrayList<>(List.of("case\tfiles_identical\tpreferred"));
+        for (String[] wrapper : List.of(new String[] {"[", "]", "127", "bracket"},
+                new String[] {"(", ")?", "63", "optional"}, new String[] {"(", ")", "127", "group"},
+                new String[] {"(", ")+", "85", "plus"}, new String[] {"(", ")*", "63", "star"},
+                new String[] {"{", "}", "127", "brace"})) {
+            for (int depth : List.of(0, 62, 63, 64, 84, 85, 86, 93, 94, 95, 126, 127)) {
+                if (wrapper[2].equals("63") && depth > 84) {
+                    String source = recursiveNestedHelper(depth, wrapper[0], wrapper[1], true);
+                    var parsed = UBNFMapper.parse(source).grammars().get(0);
+                    assertEquals("Rust subset: structural analysis depth exceeds 256",
+                        assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(parsed)).getMessage());
+                    Path grammar = temporary.newFile().toPath();
+                    Files.writeString(grammar, source);
+                    Path output = temporary.getRoot().toPath().resolve("rejected-" + wrapper[3] + "-" + depth);
+                    var args = new ArrayList<>(generator);
+                    args.addAll(List.of("generate", "--grammar", grammar.toString(), "--output", output.toString()));
+                    var rejected = command(args, true);
+                    assertEquals(rejected.output(), 3, rejected.code());
+                    assertEquals("structural analysis depth exceeds 256", rejected.output().strip());
+                    assertFalse("no artifacts after a resource limit", Files.exists(output));
+                    report.add("small-stack-" + wrapper[3] + "-" + depth + "\t0\tstructural analysis depth exceeds 256");
+                    continue;
+                }
+                assertGeneratedBytes(generator, "small-stack-" + wrapper[3] + "-" + depth,
+                    recursiveNestedHelper(depth, wrapper[0], wrapper[1], true),
+                    depth <= Integer.parseInt(wrapper[2]), report);
+            }
+            Path grammar = temporary.newFile().toPath();
+            Files.writeString(grammar, recursiveNestedHelper(128, wrapper[0], wrapper[1], true));
+            Path output = temporary.getRoot().toPath().resolve("rejected-" + wrapper[3]);
+            var args = new ArrayList<>(generator);
+            args.addAll(List.of("generate", "--grammar", grammar.toString(), "--output", output.toString()));
+            var rejected = command(args, true);
+            assertEquals(rejected.output(), 3, rejected.code());
+            assertTrue(rejected.output(), rejected.output().strip().endsWith("UBNF nesting limit exceeded"));
+            assertFalse("no artifacts after a resource limit", Files.exists(output));
+            report.add("small-stack-" + wrapper[3] + "-128\t0\tUBNF nesting limit exceeded");
+        }
+        Files.write(Path.of("target/rust-native-small-stack.tsv"), report, StandardCharsets.UTF_8);
+    }
+
     private static String workHelper(boolean textRecursive) {
         var source = new StringBuilder("grammar Pbt { @package: pbt.corpus @root @mapping(N0, params=[x"
             + (textRecursive ? ", g]) R0 ::= (NM2 NM2) @g T 'x' C0 @x" : "]) R0 ::= 'x' C0 @x"));
@@ -398,11 +448,16 @@ public class RustNativeGeneratorTest {
     }
 
     private void assertGeneratedBytes(Path binary, String name, String source, boolean preferred, List<String> report) throws Exception {
+        assertGeneratedBytes(List.of(binary.toString()), name, source, preferred, report);
+    }
+
+    private void assertGeneratedBytes(List<String> generator, String name, String source, boolean preferred, List<String> report) throws Exception {
         Path grammar = temporary.newFile(name + ".ubnf").toPath();
         Files.writeString(grammar, source);
         Path output = temporary.getRoot().toPath().resolve(name);
-        var generated = command(List.of(binary.toString(), "generate", "--grammar", grammar.toString(),
-            "--output", output.toString()), true);
+        var args = new ArrayList<>(generator);
+        args.addAll(List.of("generate", "--grammar", grammar.toString(), "--output", output.toString()));
+        var generated = command(args, true);
         assertEquals(name + "\n" + generated.output(), 0, generated.code());
         var expected = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
         assertEquals(name, 5, expected.size());

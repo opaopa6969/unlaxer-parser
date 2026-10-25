@@ -21,7 +21,7 @@
       "org.unlaxer.dsl.bootstrap.UbnfSpecCorpusTest": ["corpusKeepsItsShapeAndDoesNotGuessWhereTheSpecIsSilent", "everyCitationResolvesToARealHeadingAndSentenceInTheSpec", "javaBootstrapAgreesWithEverySpecDerivedExpectation"],
       "org.unlaxer.dsl.codegen.NumericCaptureRuntimeTest": ["scalarKeepsIntApiAndRejectsNonIntegerSpellingsAndOverflow", "rustMapsTheSameCheckedIntegersAndRetainsOriginalSource", "optionalAndRepeatedNumbersAreBoxedAndActuallyMapped", "digitTokenSupportsPrimitiveAndBoxedCaptures", "numericCaptureAbsentFromAChoiceBranchIsOptionalRatherThanZero"],
       "org.unlaxer.dsl.RustNativeEmitterTest": ["nativeEmitterMatchesJavaByteForByte"],
-      "org.unlaxer.dsl.RustNativeGeneratorTest": ["nativeFrontendLoweringAndEmissionMatchTheSupportedCorpus", "preferredShapeLimitsMatchJavaWithoutEagerFixedPoint", "preferredShapeLimitsMatchJavaWithMappedRecursion", "recursiveNestingLimitsMatchJavaHost"],
+      "org.unlaxer.dsl.RustNativeGeneratorTest": ["nativeFrontendLoweringAndEmissionMatchTheSupportedCorpus", "preferredShapeLimitsMatchJavaWithoutEagerFixedPoint", "preferredShapeLimitsMatchJavaWithMappedRecursion", "recursiveNestingLimitsMatchJavaHost", "nativeGenerationFitsTwoMegabyteStack"],
       "org.unlaxer.dsl.codegen.RuleTriviaConformanceTest": ["ruleTriviaPoliciesPreserveCursorsAcceptanceAstAndSpans"],
       "org.unlaxer.dsl.codegen.ScopeStoreConformanceTest": ["transactionsRestoreScopeStateAndBothCursors"],
       "org.unlaxer.dsl.codegen.ScopeAnnotationConformanceTest": ["generatedScopeEffectsPreserveMetadataEventsAstAndRollback"],
