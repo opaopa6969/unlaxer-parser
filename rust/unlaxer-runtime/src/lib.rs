@@ -1716,6 +1716,11 @@ pub struct ParseContext<'a> {
     // public entry decides; expression entries (parse, parse_with_token_mode,
     // parse_token) clear it for their duration. Not applied in a token-stream session.
     grammar_frontier: bool,
+    // Java Number's empty-display terminals inherit the enclosing negative PEG assertion's hint.
+    number_negative_hint: bool,
+    // Expected-name ids of NumberName, interned on first use (u32::MAX = not yet), so a
+    // detailed Number records its internal failures without hashing their names (#752).
+    number_names: [u32; NUMBER_NAMES.len()],
     match_cursor_policy: MatchCursorPolicy,
     bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
@@ -2154,6 +2159,8 @@ impl<'a> ParseContext<'a> {
             classic_max_reached: None,
             classic_failure_seen: false,
             grammar_frontier: false,
+            number_negative_hint: false,
+            number_names: [u32::MAX; NUMBER_NAMES.len()],
             match_cursor_policy: MatchCursorPolicy::default(),
             whitespace: false,
             line_comments: false,
@@ -2862,6 +2869,31 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
+        if let Some(position) = self.failure_frontier(position) {
+            let expected = self.expected_names.intern(expected);
+            self.record_failure(position, expected);
+        }
+    }
+
+    /// [`Self::fail_at`] for a Java Number internal parser, without hashing its name.
+    fn fail_number_at(&mut self, position: usize, name: NumberName) {
+        if let Some(position) = self.failure_frontier(position) {
+            let expected = match self.number_names[name as usize] {
+                u32::MAX => {
+                    let id = self.expected_names.intern(NUMBER_NAMES[name as usize]);
+                    self.number_names[name as usize] = id;
+                    id
+                }
+                id => id,
+            };
+            self.record_failure(position, expected);
+        }
+    }
+
+    /// The position a failure at `position` is recorded at, or `None` when it cannot
+    /// contribute a name.
+    #[inline]
+    fn failure_frontier(&mut self, position: usize) -> Option<usize> {
         // The successful Classic watermark is only a fallback when neither entry
         // has failed. Native PEG failures must also select the real failure frontier.
         if self.options.diagnostics == Diagnostics::Detailed {
@@ -2871,7 +2903,7 @@ impl<'a> ParseContext<'a> {
             }
         }
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
-            return;
+            return None;
         }
         let position = self.frontier(position);
         // Failures behind both farthest positions cannot contribute a name.
@@ -2881,9 +2913,12 @@ impl<'a> ParseContext<'a> {
                 .last()
                 .is_none_or(|frame| frame.farthest.is_some_and(|farthest| position < farthest))
         {
-            return;
+            return None;
         }
-        let expected = self.expected_names.intern(expected);
+        Some(position)
+    }
+
+    fn record_failure(&mut self, position: usize, expected: u32) {
         self.note_failure_reach(position);
         if let Some(diagnostic) = self.diagnostic_frames.last_mut() {
             diagnostic.record(position, expected);
@@ -4625,7 +4660,11 @@ impl<'a> ParseContext<'a> {
                 if previous.is_some() {
                     self.token_mode = Some(token::ParseMode::default());
                 }
+                let previous_hint = self.number_negative_hint;
+                self.number_negative_hint |=
+                    !*positive && self.options.diagnostics == Diagnostics::Detailed;
                 let matched = self.expression(child, depth).is_some();
+                self.number_negative_hint = previous_hint;
                 self.token_mode = previous;
                 self.restore(checkpoint);
                 // A committed or labeled child failure fails either polarity and keeps
@@ -5457,18 +5496,35 @@ impl<'a> ParseContext<'a> {
 
     // Matches Java NumberParser: optional sign, decimal, optional complete exponent.
     fn number(&mut self) -> bool {
+        if self.options.diagnostics == Diagnostics::Detailed {
+            self.number_with_diagnostics::<true>()
+        } else {
+            self.number_with_diagnostics::<false>()
+        }
+    }
+
+    // Select once per token: the deferred success path keeps the original scanner without
+    // a diagnostic-mode branch at every sign, digit run and optional exponent.
+    fn number_with_diagnostics<const RECORD: bool>(&mut self) -> bool {
         let start = self.position;
-        self.sign();
-        let before = self.digits();
+        self.sign::<RECORD>();
+        let mantissa = self.position;
+        let before = self.digits::<RECORD>();
         let mut after = false;
         if self.input.as_bytes().get(self.position) == Some(&b'.') {
             let point = self.position;
             self.position += 1;
             self.trace_atom("PointParser", point);
-            after = self.digits();
+            after = self.digits::<RECORD>();
+        } else if RECORD {
+            self.fail_number_at(self.position, NumberName::Point);
         }
         if !before && !after {
-            self.fail("number");
+            if RECORD {
+                // Failed Choice/Number frames start before the point/digit probes.
+                self.fail_number_at(mantissa, NumberName::Chain);
+                self.fail_number_at(start, NumberName::Number);
+            }
             self.position = start;
             return false;
         }
@@ -5482,23 +5538,34 @@ impl<'a> ParseContext<'a> {
         {
             self.position += 1;
             self.trace_atom("EParser", exponent);
-            self.sign();
-            if !self.digits() {
-                // Java's ExponentParser fails here, after the marker and an optional sign,
-                // and that failure is the reach the diagnostic reports (#717). The token
-                // still accepts only the mantissa.
-                self.fail("number");
+            self.sign::<RECORD>();
+            if !self.digits::<RECORD>() {
+                // Keep the digit/sign failures, but accept only the mantissa (#717/#752).
                 self.position = exponent;
                 trace.restore(self.token_trace.as_mut());
                 self.trace_atom("Optional", exponent);
             }
         } else {
+            if RECORD {
+                self.number_failure(NumberName::E);
+                self.number_failure(NumberName::Exponent);
+            }
             self.trace_atom("Optional", exponent);
         }
         true
     }
 
-    fn sign(&mut self) {
+    // These parsers have no Java display hint. Their failed frames contribute their
+    // class name, followed by the nearest enclosing terminal hint (PegLookahead).
+    // As in Java, successful memo replay keeps the hint recorded by the first call.
+    fn number_failure(&mut self, name: NumberName) {
+        self.fail_number_at(self.position, name);
+        if self.number_negative_hint {
+            self.fail_number_at(self.position, NumberName::NegativeLookahead);
+        }
+    }
+
+    fn sign<const RECORD: bool>(&mut self) {
         let start = self.position;
         if self
             .input
@@ -5509,11 +5576,14 @@ impl<'a> ParseContext<'a> {
             self.position += 1;
             self.trace_atom("SignParser", start);
         } else {
+            if RECORD {
+                self.number_failure(NumberName::Sign);
+            }
             self.trace_atom("Optional", start);
         }
     }
 
-    fn digits(&mut self) -> bool {
+    fn digits<const RECORD: bool>(&mut self) -> bool {
         let start = self.position;
         while self
             .input
@@ -5525,9 +5595,44 @@ impl<'a> ParseContext<'a> {
             self.position += 1;
             self.trace_atom("DigitParser", digit);
         }
+        // DetailedOnFailure (including the successful Auto full-input pass) must not
+        // intern names or allocate diagnostic records. Java skips these same failures.
+        if RECORD {
+            self.number_failure(NumberName::Digit);
+            if self.position == start {
+                self.number_failure(NumberName::OneOrMore);
+            }
+        }
         self.position > start
     }
 }
+
+/// The failures a detailed Java `NumberParser` records, as `ParseContext::number_names` slots.
+#[derive(Clone, Copy)]
+enum NumberName {
+    Sign,
+    Digit,
+    OneOrMore,
+    Point,
+    E,
+    Exponent,
+    Chain,
+    Number,
+    NegativeLookahead,
+}
+
+/// Java display text (or class name) per [`NumberName`]; Rust stores literals unquoted.
+const NUMBER_NAMES: [&str; 9] = [
+    "SignParser",
+    "DigitParser",
+    "OneOrMore",
+    ".",
+    "EParser",
+    "ExponentParser",
+    "Chain",
+    "NumberParser",
+    "negative lookahead",
+];
 
 /// Whether every custom parser in the grammar permits deferred diagnostics.
 ///
@@ -7660,5 +7765,105 @@ mod classic_mode_scan_tests {
             rules.push(rule("Last", Expr::literal("Z")));
             assert!(!requires_classic_mode(&Expr::Rule(0), &rules));
         });
+    }
+}
+
+#[test]
+fn number_internal_failure_recording_order_matches_java() {
+    // Public ParseError.expected remains sorted; check the retained order before presentation.
+    // The same Java oracle drives the public API and generated-host tests.
+    for row in include_str!("../../../conformance/number-token/diagnostics.tsv")
+        .lines()
+        .filter(|row| !row.starts_with('#'))
+    {
+        let c: Vec<_> = row.split('\t').collect();
+        let bytes = if c[1] == "~" {
+            vec![]
+        } else {
+            (0..c[1].len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&c[1][i..i + 2], 16).unwrap())
+                .collect()
+        };
+        let input = String::from_utf8(bytes).unwrap();
+        let memo = if c[2] == "OFF" {
+            Memoization::Off
+        } else {
+            Memoization::SafeFailures
+        };
+        for mode in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            let mut context = ParseContext::with_options(
+                &input,
+                ParseOptions::with_memoization(memo).with_diagnostics(mode),
+            );
+            if c[0] == "bare" {
+                let _ = context.parse(&Expr::Number);
+            } else {
+                let _ = context.parse_grammar(rules(c[0]), 0, false);
+            }
+            let expected = if mode == Diagnostics::DetailedOnFailure {
+                vec![]
+            } else {
+                c[7].split(',')
+                    .map(|name| name.trim_matches('\''))
+                    .collect()
+            };
+            assert_eq!(
+                context
+                    .expected
+                    .iter()
+                    .map(|&id| context.expected_names.name(id))
+                    .collect::<Vec<_>>(),
+                expected,
+                "{row}/{mode:?}"
+            );
+        }
+    }
+    fn rules(shape: &str) -> Vec<Rule> {
+        let number = Expr::Rule(1);
+        let body = match shape {
+            "number" | "bare" => number,
+            "not" => number.not_ahead().then(Expr::literal("x")),
+            "optional" => number.optional_java(),
+            "choice" => Expr::choice([Expr::literal("x"), number]),
+            "after-optional" => Expr::literal("x").optional_java().then(number),
+            "tail" => number.then(Expr::literal("e").optional_java()),
+            "memo" => number
+                .clone()
+                .ahead()
+                .then(number.clone().ahead())
+                .then(number.not_ahead()),
+            _ => panic!("{shape}"),
+        };
+        vec![
+            Rule {
+                name: "Root",
+                expression: body,
+            },
+            Rule {
+                name: "Num",
+                expression: Expr::Number,
+            },
+        ]
+    }
+}
+
+#[test]
+fn number_deferred_success_does_not_allocate_diagnostic_names() {
+    for input in ["2", "2.", ".5", "+2.5E-3", "2e", "2e+"] {
+        let mut context = ParseContext::with_options(
+            input,
+            ParseOptions::default().with_diagnostics(Diagnostics::DetailedOnFailure),
+        );
+        assert!(context.parse(&Expr::Number).is_ok());
+        assert!(context.expected_names.first.is_none());
+        assert_eq!(context.expected_names.remaining.capacity(), 0);
+        assert_eq!(context.expected_names.ids.capacity(), 0);
+        assert_eq!(context.expected.capacity(), 0);
+        assert_eq!(context.diagnostic_frames.capacity(), 0);
     }
 }

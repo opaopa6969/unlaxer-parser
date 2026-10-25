@@ -244,7 +244,7 @@
       "title": "Rust の診断表示で空の期待候補 '' が見えない（LSP message と ParseError の Display）"
     },
     "752": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: Rust native Number が不完全な指数以外の Java 内部失敗を記録しない（負の先読みで診断位置が異なる）"
     },
     "753": {
@@ -290,6 +290,10 @@
     "793": {
       "state": "OPEN",
       "title": "parity: 正の LOOKAHEAD の後の group・選択が失敗したとき、frame の開始が Rust の失敗位置に入らない（#753 後続）"
+    },
+    "794": {
+      "state": "OPEN",
+      "title": "parity: SAFE_FAILURES で負の先読み内の Num failure memo を Java は再生し、Rust は再評価する（negative lookahead の候補差）"
     }
   },
   "entries": [
@@ -682,12 +686,15 @@
       "title": "Numberの内部失敗と負の先読み診断",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
+        794,
         752,
         717
       ],
-      "observation": "#717 CLOSED の不完全指数の診断は共通oracleで修正済み。ただし符号・小数等の内部失敗が負の先読みへ残る差は #752 に残る。PBT known-differences=[]から差ゼロとは推論しない。",
+      "observation": "#717 CLOSED の不完全指数と #752 CLOSED の符号・小数・指数の内部失敗（負の先読みの hint、成功 memo の再生を含む）は共通oracleで一致。SAFE_FAILURES で負の先読み内で失敗した Num を後で同じ位置から呼ぶと、Java は failure memo を再生して negative lookahead を候補に含め、Rust は memo key が rule の深さを含むので再評価して含めない差が #794 に残る。表示 hint の無い rule の class 名 fallback と、失敗した Chain の子 hint 展開は host 固有の候補で、oracle は比べない。PBT known-differences=[]から差ゼロとは推論しない。",
       "evidence": [
         "conformance/number-token/cases.tsv",
+        "conformance/number-token/diagnostics.tsv",
+        "conformance/number-token/README.md",
         "rust/FULL-SPEC.md"
       ]
     },
