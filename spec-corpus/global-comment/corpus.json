@@ -947,5 +947,813 @@
         ]
       }
     ]
+  },
+  {
+    "name": "CommentLookahead",
+    "issue": "#753",
+    "grammar": "grammar CommentLookahead { @package: org.example.ruletrivia @comment: { line: '//' }  token AH = LOOKAHEAD('//c\\nxy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ;  R1 ::= 'z' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a//c\nxy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          7
+        ],
+        "expectedHints": {
+          "java": [
+            "'z'"
+          ],
+          "rust": []
+        }
+      },
+      {
+        "id": "suffix",
+        "input": "a//c\nxy!",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          7
+        ],
+        "expectedHints": {
+          "java": [
+            "'z'"
+          ],
+          "rust": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "CommentNoneLookahead",
+    "issue": "#753",
+    "grammar": "grammar CommentNoneLookahead { @package: org.example.ruletrivia @whitespace: none @comment: { line: '//' }  token AH = LOOKAHEAD('//c\\nxy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ;  R1 ::= 'z' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a//c\nxy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          7
+        ]
+      },
+      {
+        "id": "suffix",
+        "input": "a//c\nxy!",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          7
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommentCrlfLookahead",
+    "issue": "#753",
+    "grammar": "grammar CommentCrlfLookahead { @package: org.example.ruletrivia @comment: { line: '//' }  token AH = LOOKAHEAD('//😀\\r\\nxy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ;  R1 ::= 'z' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a//😀\r\nxy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          8
+        ]
+      },
+      {
+        "id": "suffix",
+        "input": "a//😀\r\nxy!",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          8
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JavaStyleLookahead",
+    "issue": "#753",
+    "grammar": "grammar JavaStyleLookahead { @package: org.example.ruletrivia @whitespace: javaStyle  token AH = LOOKAHEAD('  xy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ;  R1 ::= 'z' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a  xy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      },
+      {
+        "id": "suffix",
+        "input": "a  xy!",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JavaStyleRepeatedLookahead",
+    "issue": "#753",
+    "grammar": "grammar JavaStyleRepeatedLookahead { @package: org.example.ruletrivia @whitespace: javaStyle  token AH = LOOKAHEAD(' /*b*/ //c\\n \\txy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ;  R1 ::= R2 | R3 ; R2 ::= 'z' ; R3 ::= 'w' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a /*b*/ //c\n \txy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          16
+        ]
+      },
+      {
+        "id": "suffix",
+        "input": "a /*b*/ //c\n \txy!",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          16
+        ]
+      }
+    ]
+  },
+  {
+    "name": "RuleWhitespaceLookahead",
+    "issue": "#753",
+    "grammar": "grammar RuleWhitespaceLookahead { @package: org.example.ruletrivia @whitespace: none  token AH = LOOKAHEAD('  xy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ; @whitespace R1 ::= 'z' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a  xy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      },
+      {
+        "id": "suffix",
+        "input": "a  xy!",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "name": "NamedWhitespaceLookahead",
+    "issue": "#753",
+    "grammar": "grammar NamedWhitespaceLookahead { @package: org.example.ruletrivia @ubnf: v2 @whitespace: GAP token GAP ::= ' ';  token AH = LOOKAHEAD('  xy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ;  R1 ::= 'z' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a  xy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      },
+      {
+        "id": "suffix",
+        "input": "a  xy!",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "name": "NamedRuleWhitespaceLookahead",
+    "issue": "#753",
+    "grammar": "grammar NamedRuleWhitespaceLookahead { @package: org.example.ruletrivia @ubnf: v2 @whitespace: none token GAP ::= ' ';  token AH = LOOKAHEAD('  xy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ; @whitespace(GAP) R1 ::= 'z' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a  xy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      },
+      {
+        "id": "suffix",
+        "input": "a  xy!",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommentPrefixLookahead",
+    "issue": "#753",
+    "grammar": "grammar CommentPrefixLookahead { @package: org.example.ruletrivia @comment: { line: '//' }  token AH = LOOKAHEAD('//c\\nxy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ;  R1 ::= [ 'z' ] ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a//c\nxy",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          4
+        ]
+      },
+      {
+        "id": "suffix",
+        "input": "a//c\nxy!",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JavaStyleLookaheadAfterTrivia",
+    "issue": "#753",
+    "grammar": "grammar JavaStyleLookaheadAfterTrivia { @package: org.example.ruletrivia @whitespace: javaStyle  token AH = LOOKAHEAD('  xy') token AH2 = LOOKAHEAD('xy') @root @mapping(Root, params=[head]) @whitespace(none) R0 ::= 'a' @head AH R1 ;  R1 ::= AH2 'x' 'y' ; }",
+    "cases": [
+      {
+        "id": "accepted",
+        "input": "a  xy",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "a"
+          }
+        }
+      },
+      {
+        "id": "suffix",
+        "input": "a  xyz",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JavaStyleNegativeAfterTrivia",
+    "issue": "#753",
+    "grammar": "grammar JavaStyleNegativeAfterTrivia { @package: org.example.ruletrivia @whitespace: javaStyle  token AH = LOOKAHEAD('  xy') token NX = NEGATIVE_LOOKAHEAD('x') @root @mapping(Root, params=[head]) @whitespace(none) R0 ::= 'a' @head AH R1 ;  R1 ::= NX 'x' 'y' | 'x' 'y' 'w' ; }",
+    "cases": [
+      {
+        "id": "rejected",
+        "input": "a  xy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ]
+      },
+      {
+        "id": "accepted",
+        "input": "a  xyw",
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "head": "a"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "JavaStyleUntilAfterTrivia",
+    "issue": "#753",
+    "grammar": "grammar JavaStyleUntilAfterTrivia { @package: org.example.ruletrivia @whitespace: javaStyle  token AH = LOOKAHEAD('  xy') token U = UNTIL('x') @root @mapping(Root, params=[head]) @whitespace(none) R0 ::= 'a' @head AH R1 ;  R1 ::= U 'x' 'y' ; }",
+    "cases": [
+      {
+        "id": "accepted",
+        "input": "a  xy",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "a"
+          }
+        }
+      },
+      {
+        "id": "suffix",
+        "input": "a  xyz",
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "trailing_input",
+          5
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommentLookaheadAfterTrivia",
+    "issue": "#753",
+    "grammar": "grammar CommentLookaheadAfterTrivia { @package: org.example.ruletrivia @comment: { line: '//' }  token AH = LOOKAHEAD('//c\\nxy') token AH2 = LOOKAHEAD('xy') @root @mapping(Root, params=[head]) @whitespace(none) R0 ::= 'a' @head AH R1 ;  R1 ::= AH2 '\\n' 'x' 'y' ; }",
+    "cases": [
+      {
+        "id": "accepted",
+        "input": "a//c\nxy",
+        "prefix": [
+          true,
+          7,
+          7
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            7
+          ],
+          "fields": {
+            "head": "a"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "JavaStyleLookaheadRuleSucceeds",
+    "issue": "#753",
+    "grammar": "grammar JavaStyleLookaheadRuleSucceeds { @package: org.example.ruletrivia @whitespace: javaStyle  token AH = LOOKAHEAD('  xy') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 'w' ;  R1 ::= [ 'q' ] ; }",
+    "cases": [
+      {
+        "id": "after-rule",
+        "input": "a  xy",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          3
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JavaStyleConsumeAfterTrivia",
+    "issue": "#753",
+    "grammar": "grammar JavaStyleConsumeAfterTrivia { @package: org.example.ruletrivia @whitespace: javaStyle  token AH = LOOKAHEAD('  xyz') @root @mapping(Root) @whitespace(none) R0 ::= 'a' AH R1 ;  R1 ::= 'x' 'q' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "a  xyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          6
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ConsumeAfterLookahead",
+    "issue": "#753",
+    "grammar": "grammar ConsumeAfterLookahead { @package: org.example.ruletrivia @whitespace: none  token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH R1 ;  R1 ::= 'x' 'q' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ],
+        "expectedHints": {
+          "java": [
+            "'q'",
+            "'x'"
+          ],
+          "rust": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "ConsumeAfterLookaheadChoice",
+    "issue": "#753",
+    "grammar": "grammar ConsumeAfterLookaheadChoice { @package: org.example.ruletrivia @whitespace: none  token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH R1 ;  R1 ::= 'x' 'q' | 'x' 'r' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ConsumeAfterLookaheadMemo",
+    "issue": "#753",
+    "grammar": "grammar ConsumeAfterLookaheadMemo { @package: org.example.ruletrivia @whitespace: none  token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH R1 'w' | 'a' AH R1 'v' ;  R1 ::= R2 ;  R2 ::= 'x' 'q' ; }",
+    "cases": [
+      {
+        "id": "reach",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ],
+        "memoHitsAtLeast": [
+          1,
+          0
+        ],
+        "expectedHints": {
+          "java": [
+            "'q'",
+            "'x'"
+          ],
+          "rust": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "LookaheadChoiceFallbackFails",
+    "issue": "#753",
+    "grammar": "grammar LookaheadChoiceFallbackFails { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH R1 'v' ; R1 ::= R2 | 'x' ; R2 ::= 'x' 'q' ; }",
+    "cases": [
+      {
+        "id": "review",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ],
+        "expectedHints": {
+          "java": [
+            "'q'",
+            "'x'"
+          ],
+          "rust": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "LookaheadChoiceFallbackSucceeds",
+    "issue": "#753",
+    "grammar": "grammar LookaheadChoiceFallbackSucceeds { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH R1 'y' 'z' ; R1 ::= R2 | 'x' ; R2 ::= 'x' 'q' ; }",
+    "cases": [
+      {
+        "id": "review",
+        "input": "axyz",
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "accepted": true,
+        "ast": {
+          "type": "Root",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {}
+        }
+      }
+    ]
+  },
+  {
+    "name": "LookaheadRepeatLastFailure",
+    "issue": "#753",
+    "grammar": "grammar LookaheadRepeatLastFailure { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH { R1 } 'w' ; R1 ::= 'x' 'q' ; }",
+    "cases": [
+      {
+        "id": "review",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ],
+        "expectedHints": {
+          "java": [
+            "'q'",
+            "'w'",
+            "'x'"
+          ],
+          "rust": [
+            "w"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "LookaheadOptionalRuleFailure",
+    "issue": "#753",
+    "grammar": "grammar LookaheadOptionalRuleFailure { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH [ R1 ] 'w' ; R1 ::= 'x' 'q' ; }",
+    "cases": [
+      {
+        "id": "review",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ],
+        "expectedHints": {
+          "java": [
+            "'q'",
+            "'w'",
+            "'x'"
+          ],
+          "rust": [
+            "w"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "LookaheadSuccessMemo",
+    "issue": "#753",
+    "grammar": "grammar LookaheadSuccessMemo { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH R1 'w' | 'a' AH R1 'v' ; R1 ::= R2 | 'x' ; R2 ::= 'x' 'q' ; }",
+    "cases": [
+      {
+        "id": "review",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ],
+        "memoHitsAtLeast": [
+          0,
+          1
+        ],
+        "expectedHints": {
+          "java": [
+            "'q'",
+            "'x'"
+          ],
+          "rust": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "LookaheadRuleSameFrontier",
+    "issue": "#753",
+    "grammar": "grammar LookaheadRuleSameFrontier { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH R1 ; R1 ::= 'x' 'y' 'z' 'q' ; }",
+    "cases": [
+      {
+        "id": "review",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ],
+        "expectedHints": {
+          "java": [
+            "'q'",
+            "'x'",
+            "'y'",
+            "'z'"
+          ],
+          "rust": [
+            "q"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "LookaheadRuleFartherFailure",
+    "issue": "#753",
+    "grammar": "grammar LookaheadRuleFartherFailure { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') @root @mapping(Root) R0 ::= 'a' AH R1 ; R1 ::= 'x' 'y' 'z' 'b' 'q' ; }",
+    "cases": [
+      {
+        "id": "review",
+        "input": "axyzbu",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          5
+        ],
+        "expectedHints": {
+          "java": [
+            "'q'"
+          ],
+          "rust": [
+            "q"
+          ]
+        }
+      }
+    ]
   }
 ]

@@ -1,0 +1,15 @@
+# #753: input axyz; root = a LOOKAHEAD(xyz) wrapper(R1) x v. R1 fails on x q,
+# or succeeds via the second branch (R2 | x), with R2 = x q. Every root fails.
+# Not bodies: x Not(y) fails; x Not(q) y succeeds, followed by x v.
+# Optional last columns assert actual failure/success memo hits in each enabled policy.
+# id	body	wrapper	offset	failure_hits	success_hits
+failed-rule	failure	plain	4
+failed-positive	failure	positive	4
+successful-negative	failure	negative	2
+successful-positive	fallback	positive	2
+failed-negative	fallback	negative	4
+failed-match-only	failure	match-only	4
+not-fails-in-rule	not-failure	plain	4
+not-succeeds-in-rule	not-success	plain	3
+success-memo-discard	fallback	positive-twice	2	0	1
+failure-memo-discard	failure	negative-twice	2	1	0
