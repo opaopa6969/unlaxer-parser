@@ -202,6 +202,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         Expr::OwnedCapture(_, child)
         | Expr::CaptureScope(child)
         | Expr::Capture(_, child)
+        | Expr::MetadataCapture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
         | Expr::InputCaptureBoundary(_, child)

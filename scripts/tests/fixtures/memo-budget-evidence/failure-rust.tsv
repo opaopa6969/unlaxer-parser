@@ -1,0 +1,601 @@
+id	mode	reset	memo	diagnostics	entries	charge
+same-state	None	false	Off	Auto	0	0
+same-state	None	false	SafeFailures	Auto	1	289
+same-state	None	false	Off	Detailed	0	0
+same-state	None	false	SafeFailures	Detailed	1	289
+same-state	None	false	Off	DetailedOnFailure	0	0
+same-state	None	false	SafeFailures	DetailedOnFailure	1	256
+same-state	None	true	Off	Auto	0	0
+same-state	None	true	SafeFailures	Auto	1	289
+same-state	None	true	Off	Detailed	0	0
+same-state	None	true	SafeFailures	Detailed	1	289
+same-state	None	true	Off	DetailedOnFailure	0	0
+same-state	None	true	SafeFailures	DetailedOnFailure	1	256
+same-state	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+same-state	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	1	289
+same-state	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+same-state	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	1	289
+same-state	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+same-state	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	1	256
+same-state	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+same-state	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	1	289
+same-state	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+same-state	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	1	289
+same-state	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+same-state	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	1	256
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	1	289
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	1	289
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	1	256
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	1	289
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	1	289
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+same-state	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	1	256
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	1	289
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	1	289
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	1	256
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	1	289
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	1	289
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+same-state	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	1	256
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	1	289
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	1	289
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	1	256
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	1	289
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	1	289
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+same-state	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	1	256
+new-state-storm	None	false	Off	Auto	0	0
+new-state-storm	None	false	SafeFailures	Auto	4	1156
+new-state-storm	None	false	Off	Detailed	0	0
+new-state-storm	None	false	SafeFailures	Detailed	4	1156
+new-state-storm	None	false	Off	DetailedOnFailure	0	0
+new-state-storm	None	false	SafeFailures	DetailedOnFailure	4	1024
+new-state-storm	None	true	Off	Auto	0	0
+new-state-storm	None	true	SafeFailures	Auto	4	1156
+new-state-storm	None	true	Off	Detailed	0	0
+new-state-storm	None	true	SafeFailures	Detailed	4	1156
+new-state-storm	None	true	Off	DetailedOnFailure	0	0
+new-state-storm	None	true	SafeFailures	DetailedOnFailure	4	1024
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	4	1156
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	4	1156
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	4	1024
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	4	1156
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	4	1156
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+new-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	4	1024
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	4	1156
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	4	1156
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	4	1024
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	4	1156
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	4	1156
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+new-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	4	1024
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	4	1156
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	4	1156
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	4	1024
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	4	1156
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	4	1156
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+new-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	4	1024
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	4	1156
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	4	1156
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	4	1024
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	4	1156
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	4	1156
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+new-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	None	false	Off	Auto	0	0
+rollback-state-storm	None	false	SafeFailures	Auto	4	1156
+rollback-state-storm	None	false	Off	Detailed	0	0
+rollback-state-storm	None	false	SafeFailures	Detailed	4	1156
+rollback-state-storm	None	false	Off	DetailedOnFailure	0	0
+rollback-state-storm	None	false	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	None	true	Off	Auto	0	0
+rollback-state-storm	None	true	SafeFailures	Auto	4	1156
+rollback-state-storm	None	true	Off	Detailed	0	0
+rollback-state-storm	None	true	SafeFailures	Detailed	4	1156
+rollback-state-storm	None	true	Off	DetailedOnFailure	0	0
+rollback-state-storm	None	true	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	4	1156
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	4	1156
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	4	1156
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	4	1156
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+rollback-state-storm	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	4	1156
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	4	1156
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	4	1156
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	4	1156
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+rollback-state-storm	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	4	1156
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	4	1156
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	4	1156
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	4	1156
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	4	1156
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	4	1156
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	4	1024
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	4	1156
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	4	1156
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+rollback-state-storm	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	4	1024
+entry-zero	None	false	Off	Auto	0	0
+entry-zero	None	false	SafeFailures	Auto	0	0
+entry-zero	None	false	Off	Detailed	0	0
+entry-zero	None	false	SafeFailures	Detailed	0	0
+entry-zero	None	false	Off	DetailedOnFailure	0	0
+entry-zero	None	false	SafeFailures	DetailedOnFailure	0	0
+entry-zero	None	true	Off	Auto	0	0
+entry-zero	None	true	SafeFailures	Auto	0	0
+entry-zero	None	true	Off	Detailed	0	0
+entry-zero	None	true	SafeFailures	Detailed	0	0
+entry-zero	None	true	Off	DetailedOnFailure	0	0
+entry-zero	None	true	SafeFailures	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+entry-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+total-zero	None	false	Off	Auto	0	0
+total-zero	None	false	SafeFailures	Auto	0	0
+total-zero	None	false	Off	Detailed	0	0
+total-zero	None	false	SafeFailures	Detailed	0	0
+total-zero	None	false	Off	DetailedOnFailure	0	0
+total-zero	None	false	SafeFailures	DetailedOnFailure	0	0
+total-zero	None	true	Off	Auto	0	0
+total-zero	None	true	SafeFailures	Auto	0	0
+total-zero	None	true	Off	Detailed	0	0
+total-zero	None	true	SafeFailures	Detailed	0	0
+total-zero	None	true	Off	DetailedOnFailure	0	0
+total-zero	None	true	SafeFailures	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+total-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+single-zero	None	false	Off	Auto	0	0
+single-zero	None	false	SafeFailures	Auto	0	0
+single-zero	None	false	Off	Detailed	0	0
+single-zero	None	false	SafeFailures	Detailed	0	0
+single-zero	None	false	Off	DetailedOnFailure	0	0
+single-zero	None	false	SafeFailures	DetailedOnFailure	0	0
+single-zero	None	true	Off	Auto	0	0
+single-zero	None	true	SafeFailures	Auto	0	0
+single-zero	None	true	Off	Detailed	0	0
+single-zero	None	true	SafeFailures	Detailed	0	0
+single-zero	None	true	Off	DetailedOnFailure	0	0
+single-zero	None	true	SafeFailures	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+single-zero	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+evict-and-resave	None	false	Off	Auto	0	0
+evict-and-resave	None	false	SafeFailures	Auto	1	289
+evict-and-resave	None	false	Off	Detailed	0	0
+evict-and-resave	None	false	SafeFailures	Detailed	1	289
+evict-and-resave	None	false	Off	DetailedOnFailure	0	0
+evict-and-resave	None	false	SafeFailures	DetailedOnFailure	1	256
+evict-and-resave	None	true	Off	Auto	0	0
+evict-and-resave	None	true	SafeFailures	Auto	1	289
+evict-and-resave	None	true	Off	Detailed	0	0
+evict-and-resave	None	true	SafeFailures	Detailed	1	289
+evict-and-resave	None	true	Off	DetailedOnFailure	0	0
+evict-and-resave	None	true	SafeFailures	DetailedOnFailure	1	256
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	1	289
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	1	289
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	1	256
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	1	289
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	1	289
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+evict-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	1	256
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	1	289
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	1	289
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	1	256
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	1	289
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	1	289
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+evict-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	1	256
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	1	289
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	1	289
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	1	256
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	1	289
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	1	289
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	1	256
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	1	289
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	1	289
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	1	256
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	1	289
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	1	289
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+evict-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	1	256
+underrun-and-resave	None	false	Off	Auto	0	0
+underrun-and-resave	None	false	SafeFailures	Auto	2	583
+underrun-and-resave	None	false	Off	Detailed	0	0
+underrun-and-resave	None	false	SafeFailures	Detailed	2	583
+underrun-and-resave	None	false	Off	DetailedOnFailure	0	0
+underrun-and-resave	None	false	SafeFailures	DetailedOnFailure	2	512
+underrun-and-resave	None	true	Off	Auto	0	0
+underrun-and-resave	None	true	SafeFailures	Auto	2	583
+underrun-and-resave	None	true	Off	Detailed	0	0
+underrun-and-resave	None	true	SafeFailures	Detailed	2	583
+underrun-and-resave	None	true	Off	DetailedOnFailure	0	0
+underrun-and-resave	None	true	SafeFailures	DetailedOnFailure	2	512
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	2	660
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	2	660
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	2	512
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	2	660
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	2	660
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+underrun-and-resave	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	2	512
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	2	660
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	2	660
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	2	512
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	2	660
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	2	660
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+underrun-and-resave	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	2	512
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	2	660
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	2	660
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	2	512
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	2	660
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	2	660
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	2	512
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	2	660
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	2	660
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	2	512
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	2	660
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	2	660
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+underrun-and-resave	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	2	512
+total-small	None	false	Off	Auto	0	0
+total-small	None	false	SafeFailures	Auto	0	0
+total-small	None	false	Off	Detailed	0	0
+total-small	None	false	SafeFailures	Detailed	0	0
+total-small	None	false	Off	DetailedOnFailure	0	0
+total-small	None	false	SafeFailures	DetailedOnFailure	0	0
+total-small	None	true	Off	Auto	0	0
+total-small	None	true	SafeFailures	Auto	0	0
+total-small	None	true	Off	Detailed	0	0
+total-small	None	true	SafeFailures	Detailed	0	0
+total-small	None	true	Off	DetailedOnFailure	0	0
+total-small	None	true	SafeFailures	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+total-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+single-small	None	false	Off	Auto	0	0
+single-small	None	false	SafeFailures	Auto	0	0
+single-small	None	false	Off	Detailed	0	0
+single-small	None	false	SafeFailures	Detailed	0	0
+single-small	None	false	Off	DetailedOnFailure	0	0
+single-small	None	false	SafeFailures	DetailedOnFailure	0	0
+single-small	None	true	Off	Auto	0	0
+single-small	None	true	SafeFailures	Auto	0	0
+single-small	None	true	Off	Detailed	0	0
+single-small	None	true	SafeFailures	Detailed	0	0
+single-small	None	true	Off	DetailedOnFailure	0	0
+single-small	None	true	SafeFailures	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Auto	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Auto	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	false	Off	Detailed	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	Detailed	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	false	Off	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Auto	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Auto	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	true	Off	Detailed	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	Detailed	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	true	Off	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: Consumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Auto	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	Detailed	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Auto	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	Detailed	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: MatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Auto	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Auto	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	Detailed	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	Detailed	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	Off	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Auto	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Auto	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	Detailed	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	Detailed	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	Off	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: VirtualConsumed, invert: false })	true	SafeFailures	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Auto	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Auto	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	Detailed	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	Detailed	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	Off	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	false	SafeFailures	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Auto	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Auto	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	Detailed	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	Detailed	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	Off	DetailedOnFailure	0	0
+single-small	Some(ParseMode { kind: VirtualMatchOnly, invert: false })	true	SafeFailures	DetailedOnFailure	0	0

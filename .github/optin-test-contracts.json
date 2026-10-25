@@ -1,0 +1,342 @@
+{
+  "cross-language": {
+    "description": "maven.yml / rust: Java21・Rust1.85 共通適合性、frontend、意味・位置・IDE、token stream 計測の実行。実 Tiny Portability は downstream が担当する。性能判定は追加しない。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true", "tokenStreamBench": "true", "tinyexpression.grammar": null},
+    "required": {
+      "org.unlaxer.dsl.RustBackendTest": ["generationIsDeterministicAndExhaustive", "generatedParserSharesOneGrammarWithoutBreakingRulesSnapshotApi", "generatedMapperDispatchesToBoundedRuleFunctions", "unsupportedFeaturesAreRejectedBeforeEmission", "memoSafeTokenIsValidatedAndIsANoopForBuiltInRustExpressions", "zeroWidthTokensCannotCreateUnboundedLoopsOrLeftRecursion", "invalidUnicodeTextIsRejectedBeforeRustEmission", "lexicalBindingsUseAnExplicitAllowlistAndEofStaysNullable", "tinyExpressionStringLiteralUsesDoubleThenSingleQuotedChoice", "tinyExpressionCodeFencesUseExactAtomicBindings", "cardinalityReachesAstAndSemantics", "sharedMappingsAreDeduplicatedButTheirSchemasMustAgree", "mixedValuesKeepTextBranchesAndCardinalityInGeneratedApis", "sharedMappingsJoinKindsBeforeRewritingAllCaptureSites", "nestedMixedChoicesAndSemanticSequencesAreRetained", "mixedUncapturedChoicesDoNotChangeExistingArtifacts", "sharedAssocSchemasValidateLocallyBeforePromotion", "rightAssocSyntheticChoiceDoesNotBecomeATextValueBranch", "literalTextCannotEnableInternalPreferredCaptures", "leftAssocMetadataDoesNotRewriteTheGrammarAndInvalidShapesAreRejected", "rightAssocRewritesOnlyCanonicalRecursionAndPreservesVectorSchema", "cliValidatesOperatorMetadataBeforeCreatingArtifacts", "cliAcceptsRightAssocAndRejectsConflictingMetadataBeforeOutput", "cliChecksDriftAndProtectsHandwrittenFiles", "explicitRustWhitespaceNoneRemainsAcceptedByTheCli", "recursiveShapesShareTheStructuralAnalysisDepth", "recursiveShapesKeepThePreviousJavaAcceptance"],
+      "org.unlaxer.dsl.codegen.RustConformanceTest": ["primitiveTokensPreserveCapturesAndCodePointSpans", "semanticCardinalityRustOracle", "semanticCardinalityJavaOracle", "semanticCardinalityJavaAndRustAgree", "lexicalTokensPreserveRawTextAndCodePointSpans", "mixedValueFixturesPreserveJavaObjectFieldsAndValues", "delimitedMixedFixturesPreserveJavaWholeCaptureText", "mixedTextAndNodesPreserveCardinalityValuesCursorsAndSpans", "delimitedMixedValuesPreserveCaptureTextAndNodeBoundaries", "sharedMixedMappingsAreExecutableInBothDeclarationOrders", "rightAssociativeRecursionPreservesValuesCursorsAndAllSpans", "sharedLeftAssociativeVariantsPreserveOperatorsEvaluationAndSpans", "capturePlacementAndTransparentCollectionsAreExecutable", "cardinalityPreservesOptionalListsSpansAndEvaluation", "diagnosticEdgeCasesAgreeAcrossBackends", "sameGrammarPreservesAstSpansResultsAndEvolutionObligations"],
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"],
+      "org.unlaxer.dsl.codegen.RustUbnfSourceConformanceTest": ["everyNodeHasTheSameCodepointSpanAndOriginalText"],
+      "org.unlaxer.dsl.RustPortabilityConformanceTest": ["inventoriesAndCliExitCodesAgreeWithoutWritingGeneratedFiles", "tokenAdapterRegistryDiagnosticsAgreeWithSourcePositions"],
+      "org.unlaxer.dsl.codegen.TokenAdapterConformanceTest": ["customBindingsCompileAndPreserveCursorsCapturesSpansAndRollback"],
+      "org.unlaxer.dsl.codegen.JavaTokenBindingConformanceTest": ["explicitFinalAdapterIsRejectedBeforeReturningSource", "simpleFinalAliasIsRejectedBeforeReturningSource", "javaValidationAvailabilityAndRealAliasBehaviorFollowTheMatrix", "javaCliRejectsKnownFinalsBeforeWritingAnyArtifacts", "bothRustHostsRunRegardlessOfOptionalJavaClassAvailability"],
+      "org.unlaxer.parser.elementary.UnicodeIgnoreCaseWordParserTest": ["everyScalarMatchesOfficialUnicode17SimpleMappings", "sharedOriginalTextSpansRollbackLookaheadAndFirstSets", "legacyFirstSetsCannotExcludeInverseCaseEquivalents", "invertedAndMatchOnlyKeepWordParserCursorContract", "derivedWordsKeepPinnedSemanticsAndMalformedUtf16DoesNotMatch", "longWordsScanOnce"],
+      "org.unlaxer.dsl.codegen.CaseInsensitiveConformanceTest": ["generatedJavaMatchesIndependentOracle", "emptyCiIsRejectedEvenWhenUnused", "documentedLegacyJdkDeltaIsExplicit", "bothRustFrontendsCompileAndMatchIndependentOracle"],
+      "org.unlaxer.source.GraphemeTest": ["officialUnicode17Suite", "independentCoordinatesStrictInteriorsRoundingAndSnapshotIdentity", "sharedParserCursorSpanRollbackAndLookaheadOracle", "longClustersAndRepeatedParsingDoNotRescanPrefixes", "lspAndMalformedUtf16RemainSeparateContracts"],
+      "org.unlaxer.dsl.codegen.GraphemeConformanceTest": ["generatedJavaPreservesTextAndCodePointSpans", "bothRustHostsCompileAndMatchTheIndependentOracle"],
+      "org.unlaxer.dsl.codegen.ParseBindingsConformanceTest": ["dictionariesComposeWithGeneratedParsers"],
+      "org.unlaxer.dsl.codegen.DeclarativeTokenConformanceTest": ["authoringCatalogExamplesAgreeInJavaAndRust", "playgroundCatalogExamplesAgreeInJavaAndWasm", "learningScenariosAgreeInJavaRustAndBrowserWasm", "metaGrammarGeneratesAPlaygroundThatReadsItself", "illustratedGuideEmbedsExactExampleFiles", "illustratedGuideExamplesAgreeInJavaAndRust", "lexicalModulesHaveIndependentNamesCapturesAndPaths", "generatedProgramsPreserveCursorsCapturesSpansAndRollback"],
+      "org.unlaxer.dsl.ApiImpactConformanceTest": ["reportsLocationsAndRealCompilerObligationsAgree"],
+      "org.unlaxer.dsl.bootstrap.UbnfSpecCorpusTest": ["corpusKeepsItsShapeAndDoesNotGuessWhereTheSpecIsSilent", "everyCitationResolvesToARealHeadingAndSentenceInTheSpec", "javaBootstrapAgreesWithEverySpecDerivedExpectation"],
+      "org.unlaxer.dsl.codegen.NumericCaptureRuntimeTest": ["scalarKeepsIntApiAndRejectsNonIntegerSpellingsAndOverflow", "rustMapsTheSameCheckedIntegersAndRetainsOriginalSource", "optionalAndRepeatedNumbersAreBoxedAndActuallyMapped", "digitTokenSupportsPrimitiveAndBoxedCaptures", "numericCaptureAbsentFromAChoiceBranchIsOptionalRatherThanZero"],
+      "org.unlaxer.dsl.RustNativeEmitterTest": ["nativeEmitterMatchesJavaByteForByte"],
+      "org.unlaxer.dsl.RustNativeGeneratorTest": ["nativeFrontendLoweringAndEmissionMatchTheSupportedCorpus", "preferredShapeLimitsMatchJavaWithoutEagerFixedPoint", "preferredShapeLimitsMatchJavaWithMappedRecursion", "recursiveNestingLimitsMatchJavaHost"],
+      "org.unlaxer.dsl.codegen.RuleTriviaConformanceTest": ["ruleTriviaPoliciesPreserveCursorsAcceptanceAstAndSpans"],
+      "org.unlaxer.dsl.codegen.ScopeStoreConformanceTest": ["transactionsRestoreScopeStateAndBothCursors"],
+      "org.unlaxer.dsl.codegen.ScopeAnnotationConformanceTest": ["generatedScopeEffectsPreserveMetadataEventsAstAndRollback"],
+      "org.unlaxer.dsl.codegen.NestedCaptureConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality"],
+      "org.unlaxer.dsl.codegen.RustCatalogConformanceTest": ["fixturesHaveValidSyntaxAndIndependentlyDecodedContexts", "javaFrontendPreservesContextAndSortedLocalCapturesInIr", "catalogRequiresACaptureInItsOwnRule", "duplicateCatalogMetadataIsRejectedInsteadOfChoosingOneContext", "grammarWithoutCatalogKeepsAllFiveCommittedFilesUnchanged", "bothFrontendsEmitIdenticalExecutableCatalogMetadata", "realTinyGrammarAdvancesPastCatalogToTheSameGenerationFrontier"],
+      "org.unlaxer.dsl.codegen.SkipMappingConformanceTest": ["generatedJavaAndRustRespectSkipProjectionAndSyntax"],
+      "org.unlaxer.dsl.codegen.CaptureEqualityConformanceTest": ["captureEqualityPreservesSyntaxAstAndTransactionalDiagnostics"],
+      "org.unlaxer.dsl.codegen.ErrorElementConformanceTest": ["errorsRespectSharedContractAndNativeDiagnostics"],
+      "org.unlaxer.dsl.codegen.RecoveryConformanceTest": ["generatedRecoveryPreservesRegionsStateAndMappingBoundary"],
+      "org.unlaxer.dsl.semantic.SemanticModelConformanceTest": ["javaMatchesIndependentOracles", "immutableModelOwnsItsInputCollections", "rustMatchesTheSameIndependentOracles"],
+      "org.unlaxer.dsl.semantic.ProjectSymbolIndexConformanceTest": ["javaMatchesIndependentOracles", "inputCollectionsAndSnapshotsAreOwned", "rustMatchesTheSameIndependentOracles"],
+      "org.unlaxer.dsl.semantic.EditorParseResultConformanceTest": ["javaMatchesIndependentEditorOracles", "rustMatchesTheSameIndependentEditorOracles", "completeAndFailedResultsMayOmitSemanticMetadata", "resultOwnsDefectAndCallCollections"],
+      "org.unlaxer.dsl.semantic.EditorPipelineConformanceTest": ["generatedCstRetainsOriginalTypedContext"],
+      "org.unlaxer.editor.EditorCstTest": ["insertedScalarOnlyExposesOriginalCaptureText", "coincidentCapturesHaveDeterministicNameOrder", "syntaxAndSearchLimitRemainDistinct"],
+      "org.unlaxer.dsl.semantic.SemanticModelUbnfTest": ["generatedJavaAndNativeRustDriveTypedCompletion"],
+      "org.unlaxer.dsl.codegen.TokenStreamConformanceTest": ["javaModesPreserveAuthoredOracles", "lexicalLiteralSnapshotsSurviveLaterMappingAndFailure", "unsupportedProfilesAreExplicit", "rustAndNativeFrontendMatchAllModes", "reportMeasuredWorkAndAllocation"],
+      "org.unlaxer.dsl.semantic.TypeSystemConformanceTest": ["javaMatchesIndependentOracles", "malformedShapesAndInputMutationAreRejected", "deeplyNestedRelationsReturnALimit", "rustMatchesSameIndependentOracles"],
+      "org.unlaxer.dsl.semantic.CallInferenceConformanceTest": ["javaMatchesIndependentOracles", "rustMatchesSameIndependentOracles"],
+      "org.unlaxer.dsl.semantic.SemanticQueriesConformanceTest": ["javaMatchesIndependentEditAndCancellationOracles", "javaRejectsExpiredContextAndReentrantMutation", "rustMatchesSameIndependentOracles", "capacityAndLongEditSequenceStayBounded", "cancellationFromAnotherThreadDiscardsStagedChildren", "rejectedUpdatesAndCapacityLimitsPreserveTheSnapshot"],
+      "org.unlaxer.dsl.semantic.SemanticQueryEditsTest": ["incrementalMatchesFreshIndependentSemanticSnapshots", "rustMatchesEveryEditAndFreshRebuild"],
+      "org.unlaxer.dsl.codegen.PackageResolverConformanceTest": ["packageResolutionFailuresMatchAcrossJavaAndNativeRust", "documentSizeLimitUsesUtf8Bytes", "failedTransitiveVerificationCannotPublishAParent", "lockedGenerationNeverConnectsToArtifactOrigin"],
+      "org.unlaxer.dsl.codegen.HttpsPackageConformanceTest": ["secureExplicitFetchAndPinnedOfflineGenerationMatch"],
+      "org.unlaxer.dsl.codegen.VocabularyOriginsConformanceTest": ["sourceIdentityAndScalarRangesMatchAcrossHosts"],
+      "org.unlaxer.dsl.semantic.SemanticRulesConformanceTest": ["generatedCstAndRulesDriveBothRuntimes", "invalidSchemasAreRejectedBeforeExecution"],
+      "org.unlaxer.dsl.codegen.SemanticDiagnosticConformanceTest": ["semanticDiagnosticsUseOwnedDocumentsAndExactVersions"],
+      "org.unlaxer.dsl.codegen.ClassicLspProtocolConformanceTest": ["generatedServersShareIndependentPositionsAndVersionTransactions"],
+      "org.unlaxer.dsl.codegen.ClassicSemanticTokensConformanceTest": ["generatedJavaAndRustFullProvidersShareTheWireOracle"],
+      "org.unlaxer.dsl.codegen.LSPQueryConsumerTest": ["actualProviderCompletionsUseHostSnapshotAndUtf16"],
+      "org.unlaxer.dsl.codegen.LSPNonBmpOffsetTest": ["codePointOffsetToStringOffsetSkipsOverSurrogatePairs", "offsetToPositionCountsUtf16UnitsLikeTheLspSpec", "parseFailureAfterNonBmpReportsAUtf16Offset"],
+      "org.unlaxer.dsl.codegen.LSPProfileInitializationTest": ["generatedServerNegotiatesProfilesAndRejectsInvalidSettings"],
+      "org.unlaxer.dsl.semantic.PreprocessingConformanceTest": ["generatedSemanticPipelinePreservesOriginalFilesAndConditionalStates"],
+      "org.unlaxer.dsl.codegen.UniqueLongestConformanceTest": ["uniqueLongestChoicesPreserveIndependentOracles"],
+      "org.unlaxer.dsl.codegen.NameSnapshotConformanceTest": ["immutableNamesAndFatalUnknownAgreeAcrossHosts"],
+      "org.unlaxer.dsl.codegen.NamePredicateConformanceTest": ["namePredicatesPreserveIndependentOracles"],
+      "org.unlaxer.dsl.codegen.ContextualLexingConformanceTest": ["javaModesPreserveAuthoredOracles", "rustAndNativeFrontendMatchAllModes", "invalidGoalsHaveIndependentSourceDiagnostics", "lookaheadAndIndependentGrammarRestoreLexicalState"],
+      "org.unlaxer.dsl.codegen.CodePointEscapeConformanceTest": ["legacyEscapesAndUnrelatedConstructorsKeepTheirValues", "unknownSupplementaryEscapePreservesItsRawValue", "programmaticFormatTwoRangeRejectsTheSurrogateInterval", "malformedEscapesAgreeOnCodesAndUnicodeSourcePositions"],
+      "org.unlaxer.dsl.codegen.ClassicDapProtocolConformanceTest": ["generatedJavaAndRustShareStrictTypedAstInspection"],
+      "org.unlaxer.dsl.codegen.ClassicTokenDapProtocolConformanceTest": ["generatedTokenDapUsesRealBoundedTerminalTrace"],
+      "org.unlaxer.dsl.codegen.TokenTraceConformanceTest": ["detachedVirtualSourceUsesTheSharedAnchorAndTextOracle", "independentJavaAndRustCommittedTerminalOracle"],
+      "org.unlaxer.parser.combinator.NonOrderedParityTest": ["failedCandidateCannotConsumeInputOrLeakOwnedState", "tokenKindsInversionAndRepeatedIdentityKeepTheirContracts", "safeFailureMemoReplaysTheCandidateTransactions", "recursiveCandidateResourceAbortIsStickyAndClosesTransactions", "successfulChainChangesThePolicyForFollowingCandidates", "sharedGreedyOrderNullableSpansAndDiagnostics"],
+      "org.unlaxer.dsl.codegen.NonOrderedStateTest": ["sharedScopeCaptureStateAndRecoveryRollback"],
+      "org.unlaxer.dsl.codegen.ClassicLspLifecycleConformanceTest": ["generatedServersEnforceInitializationWithoutExecutingRejectedCallbacks"],
+      "org.unlaxer.dsl.codegen.ClassicLspDiagnosticsConformanceTest": ["generatedServersSelectFarthestSyntaxFailure"],
+      "org.unlaxer.dsl.codegen.EnumConformanceTest": ["generatedJavaMatchesIndependentOracle", "invalidEnumsAreRejectedBeforeEmission", "bothRustFrontendsCompileAndMatchIndependentOracle", "deepEnumAliasesHaveABoundedGeneratorDiagnostic"],
+      "org.unlaxer.parser.combinator.PegLookaheadTest": ["sharedIndependentOracle", "rawCallbackStateAndProgressAreSpeculative", "exceptionsRestoreOpenChildFramesAndLeaveTheContextReusable", "recoveryDoesNotEscapeTheAssertion", "resourceExhaustionIsNeverAFalseNegativeSuccess", "explicitPolarityIsIndependentOfClassicConsumeAndInvertArguments", "portableMetadataOnExistingTokensIsRestored"],
+      "org.unlaxer.dsl.codegen.PegLookaheadStateTest": ["sharedStateOracle"],
+      "org.unlaxer.dsl.codegen.ClassicLspKeywordConformanceTest": ["generatedKeywordLiteralsRetainTheirActualCharacters"],
+      "org.unlaxer.dsl.codegen.DapLauncherLifecycleConformanceTest": ["generatedJavaAndRustCompleteTheirOwnedTransports", "librarySessionsPreserveCallerStreamsIncludingDelayedDisconnect", "libraryTransportFailuresAndStalledDisconnectAreBounded", "delayedResponseWriteFailureDoesNotRetainHalfOpenReader", "asynchronousReverseRequestRemainsFullDuplex", "ownedStdioMainReportsBrokenOutputAndExitsWithOpenInput"],
+      "org.unlaxer.dsl.codegen.MixedEnumConformanceTest": ["javaMixedEnumValuesRetainIdentityAndOccurrences", "bothRustHostsExecuteMixedEnumOracle", "javaTypeofUsesUnderlyingEnumIdentity", "wideningEnumFieldsIsVisibleToImpactConsumers"],
+      "org.unlaxer.dsl.codegen.IncrementalCacheConformanceTest": ["snapshotsMatchFreshGeneratedCstAstDiagnosticsAndRecovery", "generatedJavaLspSharesReuseAndInvalidationOracle", "externalParserStateIsNotImplicitlyCached"],
+      "org.unlaxer.dsl.codegen.CommonFieldConformanceTest": ["javaTypedAccessorsAndFailures", "bothHostsCompileAndEvaluate"],
+      "org.unlaxer.dsl.codegen.NumericCaptureConformanceTest": ["javaTypedMappingAndFailureSnapshots", "bothHostsCompileEvaluateAndReject"],
+      "org.unlaxer.context.GeneralTokenPropagationTest": ["classicOuterTriviaPreservesCollectedSources", "sharedIndependentOracleFixesBothCursorsAndBothTokenViews", "atomicTriviaOraclePreservesLexicalSourceAndCursors", "sharedStateOracleRestoresOwnedValuesWithoutDiscardingMatchResults", "sameRuleRetryReplaysTheMatchModeWithoutAliasingItsTree"],
+      "org.unlaxer.dsl.GeneralLexicalPropagationTest": ["lexicalAtomsPreserveKindsAndUseEmptyInverseAssertions", "namedTriviaCollectionUsesAtomicLexicalInversion"],
+      "org.unlaxer.dsl.GeneralTokenPropagationStateTest": ["sharedStateOracleRestoresLexicalScopesDeclarationsReferencesAndDiagnostics"],
+      "org.unlaxer.dsl.codegen.EvaluationConformanceTest": ["javaEvaluationOracle", "nativeAndJavaRustHostsExecuteOracle", "invalidAutomaticShapesAreRejectedByBothHosts"],
+      "org.unlaxer.dsl.impact.ApiImpactOverloadTest": ["overloadAdditionRemovalAndReorderingKeepEveryMethod", "parameterChangePairsOnlyTheUnambiguousRemainder", "nameReturnTypeAndRequirementChangesDoNotLoseTheOtherOverload", "javaRejectsTrueDuplicateSignaturesIncludingErasureAndVarargs"],
+      "org.unlaxer.dsl.codegen.TypeofConformanceTest": ["javaCompileMapAndEvaluateAgainstIndependentValuesAndFailureSpans", "bothRustHostsEmitIdenticalCompilableMappingTimeChecks", "bothHostsRejectUnknownOrUnboundConstraintsBeforeGeneration"],
+      "org.unlaxer.context.ObserverFailureTest": ["resourceAbortInsideAnObserverPreservesTheSameFatalBoundary", "observerErrorIsPreservedWithoutRegisteredState", "listenerChangesApplyToTheNextNotificationWithoutInvalidatingTheCurrentDispatch", "publicTransactionsHaveTheirOwnBoundaryWithoutParseNotifications", "parseInsideAnExistingTransactionRestoresItsOwnEntryThenCloseUnwindsTheOwner", "sharedFailureOracleRestoresTheOutermostPublishedBoundary", "nestedSelfListenersUseTheOutermostStateCheckpoint", "swallowingAnObserverExceptionCannotResumePublication", "commitObserverCannotPublishItsFailedParse"],
+      "org.unlaxer.dsl.runtime.ObserverScopeStateTest": ["sharedFailureOracleRestoresScopesDeclarationsReferencesAndDiagnostics"],
+      "org.unlaxer.dsl.codegen.RecursiveHelperConformanceTest": ["javaCompileMapAndEvaluateAgainstIndependentValuesAndFailureSpans", "bothRustHostsEmitIdenticalCompilableRecursiveHelpers"],
+      "org.unlaxer.dsl.codegen.PreferredAstConformanceTest": ["javaSnapshots", "bothHostsSnapshots"],
+      "org.unlaxer.dsl.codegen.FamilyProjectionConformanceTest": ["javaRejectsInvalidFamiliesBeforeEmission", "nativeRejectsSameInvalidFamiliesBeforeEmission", "javaSnapshots", "bothHostsSnapshots"],
+      "org.unlaxer.dsl.codegen.LeftRecursionConformanceTest": ["javaRejectsCyclesBeforeGenerationAndRunsConsumingRecursion", "bothRustHostsRejectSameCyclesAndCompileAndRunValidGrammar", "sourceAnalysisHasControlledDepthOnSmallThreadStack"],
+      "org.unlaxer.context.OwnedCaptureTest": ["lookaheadCollectorsKeepEmptyCommittedSource", "sharedIndependentOracle", "sharedOwnedStateAndExceptionalCleanup", "valuesOwnTheirTextAndSurviveLaterParsesAndContextClose", "observerFailureRestoresOwnedBindingsAndInvalidatesContext", "committedTerminalTraceKeepsReplayPositionsAndDiscardsFailedBranches", "recoveredFailureDoesNotLeakBindingAndOuterRollbackDiscardsRecoveryCst", "failedReplayHasTheSharedNameAndCodePointDiagnostic", "recursiveGeneralCaptureWrappersStopAtTheBudgetOnTwoMibStack"],
+      "org.unlaxer.dsl.codegen.AssociativeProjectionConformanceTest": ["javaRejectsInvalidAssociativeShapesBeforeEmission", "nativeRejectsSameInvalidAssociativeShapesBeforeEmission", "bothHostsDapWalkSyntheticLeaves", "javaSnapshots", "bothHostsSnapshots"],
+      "org.unlaxer.dsl.codegen.AssociativeDelimiterConformanceTest": ["bothHostsRejectOtherShapesBeforeEmission", "javaSnapshots", "bothHostsSnapshots"],
+      "org.unlaxer.dsl.codegen.AssociativeNullableDelimiterConformanceTest": ["bothHostsRejectOtherShapesBeforeEmission", "javaSnapshots", "bothHostsSnapshots"],
+      "org.unlaxer.dsl.codegen.AtomicTriviaConformanceTest": ["ruleTriviaPoliciesPreserveCursorsAcceptanceAstAndSpans"],
+      "org.unlaxer.context.ZeroRepeatBoundaryTest": ["maximumZeroDoesNotAttemptItsMatchingChild", "publicTerminatorAndLazyFormsSkipEvaluationAndFirstSetResolution", "sharedBoundedZeroOracleSkipsChildrenTerminatorsAndRetainsBothCursors", "explicitZeroChecksCannotSwallowResourceFailureOnAStandardStack", "sharedHistoricalZeroAndEofOraclePreservesModesStoppersAndDiagnostics", "zeroSuccessMemoHitPreservesTheAdvancedMatchedCursor"],
+      "org.unlaxer.dsl.codegen.ZeroRepeatGenerationTest": ["everyJavaGenerationEntryRejectsInvalidBoundsIncludingDeadChildren", "nativeRustRejectsTheSameInvalidDefinitionsBeforeEmittingFiles"],
+      "org.unlaxer.dsl.codegen.RegexRetirementConformanceTest": ["directAstAndEveryJavaGeneratorRejectTheRemovedAdapter", "bothFrontendsRejectAtTheSameScalarAndBytePositionBeforeGeneration", "replacementConsumersCompileAndPreserveValuesPositionsAndRollback"],
+      "org.unlaxer.context.CaptureBoundaryTest": ["independentNestedBoundaryOracle", "ownedCaptureLookaheadFailureAndSnapshotLifetime", "malformedAndOversizedSnapshotsAreBounded", "nestedBoundariesUseExistingParseLimit", "memoizedFailuresLeaveNoBoundaryAndPreserveDiagnostics", "inputBoundaryFailureResetAndOuterRollbackMatchSharedOracle"],
+      "org.unlaxer.context.NullableRepeatStateTest": ["nullableSuccessCountsOnceAndFailureRestoresStateAcrossAllModes", "nullableOuterRepeatCannotConvertResourceFailureIntoZeroMatches"],
+      "org.unlaxer.dsl.codegen.NullableRepeatConformanceTest": ["javaGeneratedNullableRepetitionsMatchIndependentOracle", "bothRustHostsGenerateAndRunTheSameNullableRepetitionOracle"],
+      "org.unlaxer.context.NullableSeparationStateTest": ["nullableTailCountsOnceAndRollsBackFailedSeparatorOrItemAcrossAllModes", "enclosingBoundsRollbackRetryAndScopePreserveOwnedBindings", "emptyNonemptyAndUnboundOwnedReplayComposeAsItemAndSeparator", "firstItemSeparatorAndTailItemCannotSwallowStickyResourceAbort"],
+      "org.unlaxer.dsl.codegen.NullableSeparationConformanceTest": ["javaGeneratedNullableSeparationsMatchIndependentOracle", "bothRustHostsGenerateAndRunTheSameNullableSeparationOracle"],
+      "org.unlaxer.context.MemoResetPolicyTest": ["legacyPositionKeyConstructorKeepsTheDefaultPolicy", "javaFailureCacheSeparatesResetPolicies", "javaSuccessCacheSeparatesResetPolicies", "rustExistingResetKeyAndIndependentSessionsAgreeWithTheOracle"],
+      "org.unlaxer.context.MemoEvictionTest": ["sharedJavaRustRetentionCorpus", "evictionKeepsEveryHitWhileTheEntryCountPlateaus", "aProbeBelowTheWatermarkWidensTheWindowInsteadOfLosingTheRest", "anInputShorterThanTheWindowIsNeverEvicted"],
+      "org.unlaxer.context.MemoResourceDepthTest": ["warmResultsNeverSkipResourceGuardsAndShallowerRetriesStillHit"],
+      "org.unlaxer.dsl.codegen.TypedNestedSchemaTest": ["recursiveSchemaIsImmutableAndRejectsUnsupportedPublicShapes"],
+      "org.unlaxer.dsl.codegen.TypedNestedCaptureConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality", "apiImpactReportsActualRecursiveTypesOnBothHosts", "mappingFailuresAndParseRollbackKeepLaterConsumersUsable", "preparatoryDepthCountsLogicalChoiceBodiesOnBothHosts", "unsupportedShapesFailBeforeEmissionWithSourceOrigins"],
+      "org.unlaxer.context.PureSuccessRollbackTest": ["sharedOracleReplaysSuccessAndDoesNotRetainPortableIdsOrCallerMutation"],
+      "org.unlaxer.dsl.codegen.PureSuccessMemoizationConformanceTest": ["generatedJavaMatchesIndependentOracle", "bothRustFrontendsCompileAndMatchIndependentOracle", "generatedStatefulFailuresPreserveTypedValuesDiagnosticsAndRealHits", "generatedClassicRetriesKeepTypedCapturesInBothRustHosts"],
+      "org.unlaxer.dsl.codegen.VersionedFailureMemoizationConformanceTest": ["javaStateEpochsRollbackAndWriteOnlyEventsMatchTheSharedOracle", "javaEpochOverflowFailsInsteadOfReusingAnEarlierVersion", "rustStateEpochsUseTheSameIndependentFixture"],
+      "org.unlaxer.context.SafeSuccessMemoizationTest": ["allFiveEntryPointsReplayTreesParsedRangesAndDiagnosticsLikeOff", "snapshotIsIndependentOfReturnedTokenMutationsAndParentPointers", "successfulFrameReplaysInnerFailuresWithoutEarlierSiblingPollution", "replayKeepsEnclosingFailureTransactionTraceBalancedWithoutDuplicateHooks", "descendantChoiceSelectionsReplayAndRollbackWithTheTokenTree", "listenersAndTheirUnmarkedAncestorsAreAlwaysEvaluated", "subclassOverrideDoesNotInheritEitherSafetyProof", "tokenKindInvertFlagMatchedPositionAndStateVersionSeparateSuccessKeys", "matchedOnlyAndEmptySuccessesKeepIndependentCursors", "trialRecordingMatchesOffAndDisablesEvenExistingSuccesses", "zeroWidthConsumedSuccessResetsAnAdvancedMatchedCursorJustLikeOff"],
+      "org.unlaxer.context.ResourcePublicationTest": ["sharedResourceAbortRestoresThePublicEntryAndOuterManualOwner", "swallowedResourceFailureCannotRepublishCallbackSuccess", "swallowedLimitInsideObserverPreservesTheFirstObserverCause"],
+      "org.unlaxer.dsl.codegen.NestedMappedCaptureConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality", "apiImpactReportsActualRecursiveTypesOnBothHosts", "mappingFailuresAndParseRollbackKeepLaterConsumersUsable", "unsupportedShapesFailBeforeEmissionWithSourceOrigins"],
+      "org.unlaxer.context.ClassicMemoizationConformanceTest": ["javaRealHitsPreserveTheSharedSourceCursorCstAndRollbackOracle", "javaModeInvertAndResetKeysAreDistinctAndSameKeysActuallyHit", "rustRealHitsUseTheSameIndependentOracle"],
+      "org.unlaxer.dsl.codegen.OwnedCaptureConformanceTest": ["javaGeneratedOwnedCapturesMatchIndependentOracle", "bothRustHostsGenerateAndRunTheSameOwnedCaptureOracle"],
+      "org.unlaxer.dsl.codegen.OwnedCaptureSyntaxTest": ["generalOwnedCallsAreParsedAsDedicatedOwnedSyntax", "triviaBeforeParenthesisPreservesExistingReferencesAndGroups", "bothJavaGenerationTargetsRetainTheGeneralOwnedOperations", "malformedCallsCannotFallbackToAnOrdinaryReferenceAndGroup", "authoringViewsRetainOwnedOperatorsAndBindingNames"],
+      "org.unlaxer.dsl.codegen.NestedSharedFieldConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality", "apiImpactReportsActualRecursiveTypesOnBothHosts", "mappingFailuresAndParseRollbackKeepLaterConsumersUsable", "nestedFamilyAccessorsUseTheActualRecursiveFieldTypes", "portabilityAgreesWithSupportedSchemasAndLocatedFailures", "unsupportedShapesFailBeforeEmissionWithSourceOrigins"],
+      "org.unlaxer.mapper.MappingGuardTest": ["rejectsNullAndCyclesBeforeWalkingRecursively", "permitsFlatteningButRejectsForeignFilteredEdges", "checksFilteredGraphsOfHiddenOriginalNodes", "depthBoundaryAndFailureDoNotLeakBetweenCalls", "sharedDagUsesActualWorkAndBoundedText", "nonContainingLookaheadAndDetachedSourcesRemainLegal", "flattenedTreeValidationHasLinearWorkWithoutIncreasingLimits", "sharedDagShortcutsAndSameSpanForeignNodesKeepTheirBoundary", "exactNodeAndEdgeLimitsAcceptThenRejectOneMore", "tokenIdentityDoesNotCollapseEqualValuesAndUtf8BudgetIsExact", "recoveryDetectionIncludesHiddenSharedOriginalNodes"],
+      "org.unlaxer.dsl.codegen.PublicMapperCstConformanceTest": ["javaSnapshots", "bothHostsSnapshots", "compositionShapesAndResourcePathsMatchBothHosts"],
+      "org.unlaxer.context.OrdinaryParserExceptionTest": ["ordinaryErrorsRestorePublicationAndRegisteredStateThenAllowRetry", "terminalErrorIdentityAndCloseArePreserved", "invalidRootBeforeParsingPreservesExplicitTransaction", "entryPolicyAndTransparentCallbacksRestoreBeforeRetry", "suggestionCallbackFailureDoesNotPublishEmptyToken"],
+      "org.unlaxer.context.OrdinaryExceptionOracleTest": ["sharedControlFlowAndRegisteredEffectsSurviveIndependentRetry"],
+      "org.unlaxer.context.PriorMatchedDiagnosticsTest": ["failureAfterAPositiveLookaheadTokenIsAtTheMatchedReach", "positiveTokenThenPegAssertionUsesTheClassicMatchedFrontier", "aSharedGrammarCallStartsBothCursorsAtTheConsumedPosition", "matchingClassicAndTransactionalEntriesShareTheFrontier", "pegThenClassicKeepsRealFailuresAndDiscardsSuccessfulSpeculation"],
+      "org.unlaxer.dsl.codegen.OrdinaryParserExceptionConformanceTest": ["javaSnapshots", "bothHostsSnapshots"],
+      "org.unlaxer.context.NestedSeparatedBoundaryTest": ["sharedSeparatorValuesStateAndRollbackOracle", "resourceAbortAcrossEverySeparatedPositionRemainsStickyAndRestoresPublication", "opaqueSeparatorDoesNotDestroyGeneralProjectedOrGeneratedSnapshots", "memoSuccessReplaysOpaqueSeparatorAndCopiesOriginalBoundaries", "separatedFailureResetSameContextFallbackAndOuterRollbackMatchSharedOracle", "separatorSnapshotVisitDepthLimitsAndOpaqueMapperValidationMatchSharedOracle"],
+      "org.unlaxer.dsl.codegen.NestedSeparatedCaptureConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality", "apiImpactReportsActualRecursiveTypesOnBothHosts", "mappingFailuresAndParseRollbackKeepLaterConsumersUsable", "preparatoryDepthCountsLogicalChoiceBodiesOnBothHosts", "unsupportedShapesFailBeforeEmissionWithSourceOrigins"],
+      "org.unlaxer.dsl.codegen.NestedMixedValueConformanceTest": ["javaSnapshots", "bothHostsSnapshots", "schemasDescribeSumVariantsAndRecursiveChanges", "unsupportedShapesAndReservedNamesFailWithOrigins", "mixedMaterializationRespectsRequestedTextBudget"],
+      "org.unlaxer.dsl.codegen.NestedSeparatedMappedCaptureConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality", "apiImpactReportsActualRecursiveTypesOnBothHosts", "mappingFailuresAndParseRollbackKeepLaterConsumersUsable", "unsupportedShapesFailBeforeEmissionWithSourceOrigins"],
+      "org.unlaxer.context.FailureMemoBudgetTest": ["replacementUnlinksOldPayloadAndCountsOnlyRetainedEntries", "byteCapacityAndExtremePositionSafelyMissBeforeIndexAllocation", "payloadChargeCoversCapacityStacksAndNamesWithoutInvokingParsers", "restoredDiagnosticRetainsItsTrialCapacityChargeWithoutCopying", "invalidConfigurationUsesDefaultsAndZeroIsAnExplicitDisable"],
+      "org.unlaxer.context.FailureMemoBudgetConformanceTest": ["javaFiniteBudgetsPreserveTheIndependentEpochAndCursorOracle", "rustFiniteBudgetsUseTheSameIndependentOracle"],
+      "org.unlaxer.context.SuccessMemoBudgetTest": ["finiteEntrySingleAndTotalBudgetsReturnSafeMissesBeforeCopy", "replacementEvictionAndPublicEntryReuseReleaseCountsAndLinks", "opaqueAndMalformedPublicTreesMissWithoutCallingDeepCopyOrSource", "cyclicAndSubclassTokensCannotAbortAnOtherwiseSuccessfulParse", "shallowMetadataMapsAreIsolatedAndRelatedValuesKeepTheirExistingContract", "threeThousandDeepTreesCopyAndReplayOnOneMiBStack", "deferredCopyUsesTheCapturedProjectionParserAndMetadataValues", "visibleSourceTextIsChargedEvenWhenItsImmutableSourceIsShared", "invalidAndExtremeSuccessSettingsDoNotAllocateOrDisableFailureBudgets"],
+      "org.unlaxer.context.SuccessMemoBudgetConformanceTest": ["javaSuccessBudgetsPreserveTheIndependentEpochAndSnapshotOracle", "rustSuccessBudgetsUseTheSameIndependentOracle"],
+      "org.unlaxer.dsl.codegen.ParserScalingSmokeTest": ["generatedParserCountersStayLinearPerByte", "scalingOracleRejectsInjectedQuadraticWorkAndAllocation", "ubnfBootstrapCountersStayLinearPerByte"],
+      "org.unlaxer.dsl.codegen.MemoScalingConformanceTest": ["bothRustHostsPreserveTheScalingFixtureWithinFiniteBudgets"],
+      "org.unlaxer.dsl.codegen.OwnedNestedCaptureConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality", "apiImpactReportsActualRecursiveTypesOnBothHosts", "mappingFailuresAndParseRollbackKeepLaterConsumersUsable", "ownedWrappersPreserveNestedRejectionsAndTraversalLimits", "unsupportedShapesFailBeforeEmissionWithSourceOrigins"],
+      "org.unlaxer.dsl.codegen.NestedTypeofConformanceTest": ["javaCompileMapAndEvaluateAgainstIndependentValuesAndFailureSpans", "bothRustHostsEmitIdenticalCompilableMappingTimeChecks", "bothHostsRejectUnknownOrUnboundConstraintsBeforeGeneration", "nestedSchemaIncludesPublicShapesAndHidesComparisonLocals"],
+      "org.unlaxer.dsl.codegen.NestedAutoEvalConformanceTest": ["javaEvaluationAndRetainedPreferredSnapshotsMatchIndependentOracle", "bothRustHostsEvaluateTheSameNestedAndRetainedSnapshots"],
+      "org.unlaxer.dsl.codegen.NestedAliasCaptureConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality", "aliasExpansionSharesTheSchemaDepthLimit", "apiImpactReportsActualRecursiveTypesOnBothHosts", "choicesOutsideCapturesKeepTheirExistingLowering", "mappingFailuresAndParseRollbackKeepLaterConsumersUsable", "sharedMultiElementHelpersValidateInLinearTime", "unsupportedShapesFailBeforeEmissionWithSourceOrigins"],
+      "org.unlaxer.context.FailureMemoConfigurationTest": ["sharedConfigurationFixtureUsesFreshProcesses"],
+      "org.unlaxer.dsl.codegen.ParameterizedRuleConformanceTest": ["javaFrontendExpandsToTheHandWrittenGrammarAndKeepsSourceSpans", "theInlineNestingLimitBoundsNestedChainsOnASmallStack", "grammarsWithoutDefinitionsKeepTheirPreviousParse", "javaGeneratedParsersEqualTheHandExpansionAndMatchExpectedValues", "bothRustHostsEmitTheHandExpansionAndRunExpectedValues"],
+      "org.unlaxer.dsl.codegen.CallByValueConformanceTest": ["javaFrontendExpandsToTheHandWrittenCaptureGrammar", "valueUsesKeepTheirSourceOrigins", "theElementLimitCountsTheCaptureWrappersExactly", "valueChainsStopAtTheInlineNestingLimitOnASmallStack", "valueUsesDoNotMultiplyArgumentSize", "capturesOutsideValueScopesAreAccepted", "reorderingDeclarationsDoesNotChangeTheResult", "valueScopeAnalysisStaysLinearOnAWideFan", "generatedCaptureNamesCannotBeWritten", "javaGeneratedParsersEqualTheHandWrittenGrammarAndMatchExpectedValues", "bothRustHostsEmitTheHandWrittenGrammarAndRunExpectedValues"],
+      "org.unlaxer.dsl.codegen.propertybased.PropertyBasedParityTest": ["generatorIsDeterministicBoundedAndValid", "knownDifferenceConditionOnlyMatchesTheTrackedShape", "generatedGrammarsAgreeAcrossHostsConfigurationsAndInvariants"],
+      "org.unlaxer.parser.combinator.CutLabeledFailureTest": ["sharedIndependentOracle", "sharedStateOracle", "aRaisedFailureDoesNotLeakIntoTheNextParse", "anIgnoredRaisedFailureDoesNotTurnALaterOrdinaryFailureIntoACut", "aSharedGrammarCallDoesNotLeakAnInnerCut", "classicNotDoesNotCatchARaisedFailure", "commitStopsFurtherAlternatives", "constructorsRejectMalformedOperators"],
+      "org.unlaxer.context.RuleStackTest": ["sharedIndependentOracle", "aRaisedStackDoesNotLeakIntoALaterParse", "successfulParsesReportNoStackButUnconsumedInputDoes", "namesComeFromTheOverrideOrFallBackToTheClass", "ruleNamesDefaultToTheGeneratedClassName", "stacksAreBoundedAndCarryOriginalOffsets"],
+      "org.unlaxer.dsl.codegen.RuleStackLspConformanceTest": ["generatedServersReportTheRuleStack"],
+      "org.unlaxer.dsl.codegen.RaisingOperatorConformanceTest": ["syntaxIsParsedAsTheThreeOperators", "validatorRejectsWithSourcePositions", "javaGeneratedParsersMatchIndependentOracle", "bothRustHostsGenerateAndRunTheSameOracle", "deeplyNestedCatchGeneratesInLinearSpaceOnBothHosts", "lspDiagnosticsCarryTheLabeledMessage"],
+      "org.unlaxer.dsl.codegen.AutoCommitConformanceTest": ["lintReportsTheCorpusPositions", "skippedAnnotationsAreWarnedAbout", "findingsTakeTheTreeBeforeTheRewrite", "rewrittenElementsKeepTheirSourceSpans", "rewriteEqualsTheHandWrittenCommits", "javaParsersMatchTheOracleAndTheUnannotatedGrammar", "bothRustHostsMatchTheOracleAndTheUnannotatedGrammar"],
+      "org.unlaxer.dsl.codegen.propertybased.AutoCommitWhitespaceFuzzTest": ["annotatedGrammarsAcceptTheSameInputsWithTheSameTreesInJava", "annotatedGrammarsAgreeOnBothRustHostsAndTheLint"],
+      "org.unlaxer.dsl.codegen.EmptyLiteralConformanceTest": ["javaGeneratedParsersMatchTheSharedOracle", "bothRustFrontendsMatchTheSharedOracle"],
+      "org.unlaxer.dsl.MultiGrammarConformanceTest": ["javaArtifactsCompileParseMapAndEvaluateTheSharedCorpus", "bothRustHostsCompileAndExecuteEveryGrammarIncludingProtocols", "rejectionOriginsAndNoPartialOutputAgree", "nestedOutputPreflightAndDriftNeverTouchEarlierArtifacts", "playgroundDoesNotSilentlySelectTheFirstGrammar", "impactRemainsExplicitlySingleGrammar", "sameNameInDifferentJavaPackagesCompilesAndExecutes", "javaCollisionReportsAndManifestsUseJavaClassNames", "javaHostAcceptsCallerOwnedSymlinkAncestors", "importedCollisionAndLateErrorsKeepOriginalGrammarLocations", "singleJavaGrammarEmitterFailureWritesNoFiles", "invalidProgrammaticGrammarNameIsADiagnostic", "ioFailureDoesNotPublishRootIndexAndNamesFailedPath"],
+      "org.unlaxer.dsl.codegen.GlobalCommentConformanceTest": ["javaRejectsInvalidSettingsWithCodeSubjectAndSpan", "nativeGeneratorRejectsInvalidSettingsLikeJava", "javaStyleKeepsIgnoredSettingsAsWarnings", "nativeGeneratorGeneratesIgnoredSettingsAsJavaStyle"],
+      "org.unlaxer.dsl.GenerationWarningsConformanceTest": ["libraryMatchesTheSharedCorpus", "javaHostRustCliPrintsTheLinesAndFailsWhenStrict", "javaFlagCliReportsEveryWarningAndFailsWhenStrict"],
+      "org.unlaxer.dsl.SimpleAnnotationConformanceTest": ["warningsMatchTheSharedCorpus", "everyJavaConsumerGeneratesIgnoredAnnotationsAsAbsent", "suggestionsFollowTheDocumentedDistance", "parserIrKeepsTheNameAsMetadata", "rejectedFormsFailInEveryJavaConsumer", "cliWarnsAndStrictOrFailOnWarningFails"],
+      "org.unlaxer.dsl.CodegenRunnerTest": ["testHasErrorRowsDetectsNonWarningSeverity", "testHasWarningRowsDetectsWarningSeverity", "testExecuteUsesInjectedFileSystemPort"]
+    }
+  },
+  "tiny-catalog": {
+    "description": "maven.yml / rust: downstream と同じ固定 Tiny 7d7bd1cbfab1bd9548ba53c73cc50502f0437c67 の実文法。Portability と別の証跡。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true", "tinyexpression.grammar": null},
+    "required": {
+      "org.unlaxer.dsl.codegen.RustCatalogConformanceTest": ["fixturesHaveValidSyntaxAndIndependentlyDecodedContexts", "javaFrontendPreservesContextAndSortedLocalCapturesInIr", "catalogRequiresACaptureInItsOwnRule", "duplicateCatalogMetadataIsRejectedInsteadOfChoosingOneContext", "grammarWithoutCatalogKeepsAllFiveCommittedFilesUnchanged", "bothFrontendsEmitIdenticalExecutableCatalogMetadata", "realTinyGrammarAdvancesPastCatalogToTheSameGenerationFrontier"]
+    }
+  },
+  "jdk17-parity": {
+    "description": "maven.yml / build-jdk17: 明示した Unicode/frontend opt-in のみ。通常 package の opt-in skip と公開履歴は対象外。",
+    "reports": ["unlaxer-common-jdk17/target/surefire-reports", "unlaxer-dsl-jdk17/target/surefire-reports"],
+    "properties": {"rustConformance": "true"},
+    "required": {
+      "org.unlaxer.parser.elementary.UnicodeIgnoreCaseWordParserTest": ["everyScalarMatchesOfficialUnicode17SimpleMappings", "sharedOriginalTextSpansRollbackLookaheadAndFirstSets", "legacyFirstSetsCannotExcludeInverseCaseEquivalents", "invertedAndMatchOnlyKeepWordParserCursorContract", "derivedWordsKeepPinnedSemanticsAndMalformedUtf16DoesNotMatch", "longWordsScanOnce"],
+      "org.unlaxer.dsl.codegen.CaseInsensitiveConformanceTest": ["generatedJavaMatchesIndependentOracle", "emptyCiIsRejectedEvenWhenUnused", "documentedLegacyJdkDeltaIsExplicit", "bothRustFrontendsCompileAndMatchIndependentOracle"],
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"]
+    }
+  },
+  "downstream-tokens": {
+    "description": "maven.yml / downstream: 固定 Tiny の実クラス、両 Rust generator、Classic の意味と位置。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true", "tinyexpression.classes": null},
+    "required": {
+      "org.unlaxer.dsl.codegen.TinyStringTokenConformanceTest": ["realTinyParserJavaRustAndNativeFrontendsShareOneCorpus", "registeredAdapterPreservesTheRealTinyStringContract"],
+      "org.unlaxer.dsl.codegen.TinyCodeFenceConformanceTest": ["realTinyParsersJavaRustAndNativeFrontendsShareOneCorpus", "registeredAdaptersPreserveTheRealTinyCodeFenceContract"],
+      "org.unlaxer.dsl.codegen.TinyClassicModeConformanceTest": ["chainFailureResetAndOuterRollbackAgreeWithPinnedParsers", "pinnedParsersShareClassicModesAndPositions"]
+    }
+  },
+  "downstream-portability": {
+    "description": "maven.yml / downstream: 実 Tiny 文法と注入した拒否条件。Catalog の補完には数えない。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true", "tinyexpression.grammar": null},
+    "required": {
+      "org.unlaxer.dsl.RustPortabilityConformanceTest": ["inventoriesAndCliExitCodesAgreeWithoutWritingGeneratedFiles", "realTinyGrammarPassesAndItsExplicitlyInjectedGapsAreAllReported", "tokenAdapterRegistryDiagnosticsAgreeWithSourcePositions"]
+    }
+  },
+  "assertion-contracts": {
+    "all_reports": true,
+    "description": "assertion-contracts.yml: 必須メソッドと、契約外を含む全 XML の成功を検査。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true"},
+    "required": {
+      "org.unlaxer.dsl.codegen.AssertionContractConformanceTest": ["existingPositiveContractsHaveExplicitIndependentOracles", "realFullInputEntryPointsRetryFailedAssertionsWithBackendNativeDiagnostics"],
+      "org.unlaxer.combinator.MatchOnlyTest": ["testSingle", "testMultiple", "testWithNot"],
+      "org.unlaxer.parser.combinator.NotTest": ["testNotSucceedsWhenChildFails", "testNotFailsWhenChildSucceeds", "testNotDoesNotConsumeInput", "testNotBlocksChainWhenMatched", "testNotOnEmptyInput", "testNotWithDigit", "testNotWithDigitFailsOnNumber"],
+      "org.unlaxer.context.TransactionalStateTest": ["duplicateRegistrationDoesNotDuplicateSnapshotsOrCopyUnownedObjects", "snapshotPrecedesBeginAndRestoreFollowsRollbackNotification"],
+      "org.unlaxer.context.MemoDiagnosticFrameTest": ["localFrameDoesNotCaptureEarlierSiblingDiagnostic", "nestedFramesMergeIntoTheOuterFrameOnSuccessAndFailurePops", "offAndUnsafeRulesDoNotAllocateDiagnosticFrames", "successfulNegativeLookaheadDoesNotPolluteOuterMemoFrame", "memoHitRebasesLocalStackWithoutRevivingSuccessfulLookaheadParent"],
+      "org.unlaxer.context.DetailedOnFailureTest": ["optionsPreserveIndependentPoliciesAndValueSemantics", "directParsesKeepTokenTreesCursorsAndMemoHitsForAllInputOutcomes", "parserAndTransactionListenersKeepIdenticalCallbacksIncludingCommit", "memoHitsReplayTransactionalStateAndKeepKeysWithoutDiagnostics", "populatedMemoDiagnosticReplayIsInertInDeferredContext", "explicitTrialsRemainAvailableButFailureDiagnosticsStayEmpty", "legacyMemoizationEffectorPreservesDiagnosticsPolicy", "trialRecordsAreIdenticalWithoutParseFrames", "deeplyNestedMemoFramesReplayAfterTheFrameArrayGrows"],
+      "org.unlaxer.parser.PackratMemoizationTest": ["memoizationPreservesParseResults", "failureOnlyMemoizationPreservesTokenTree", "memoizationCollapsesExponentialBacktracking"],
+      "org.unlaxer.dsl.runtime.ScopeStoreTransactionTest": ["unusedScopeStoreDoesNotCreateTransactionSnapshots", "scopeStoreSnapshotsOncePerFrameBeforeItsFirstMutation", "mutationsAdvanceVersionAndRollbackRestoresTheSnapshot", "failedChoiceAndRepeatAttemptsDoNotPublishCommittedChildState", "positiveAndNegativeLookaheadRestoreStateButKeepTheirCursorContract", "childDeclarationsAreVisibleUntilTheWholeLookaheadFinishes", "rollbackListenerCanInitializeStateAndThrowWithoutLeavingMutations", "successfulNegativeLookaheadRestoresItsOwnLazyCommitListenerState", "lazyInitializationAndNestedCommitAreRevertedByOuterRollback", "poppedScopesOverwritesAndClearedDiagnosticsReturnOnRollback", "contextsRemainIndependentAndCommittedStatePersists"],
+      "org.unlaxer.dsl.codegen.JavaDetailedOnFailureRuntimeTest": ["autoGeneratedGrammarMatchesDeferredAstTokenTreesAndDiagnostics", "autoUnmarkedCustomParserKeepsDetailedSinglePass", "autoMarkedCustomParserDefersAndRetriesFailures", "generatedDiagnoseRetriesSyntaxAndTrailingFailuresWithIdenticalDiagnostics", "generatedParseRetriesOnlyParseFailuresAndKeepsAstAndExceptionMessages", "directGeneratedParserKeepsCapturesAndScopesWithoutRetry"],
+      "org.unlaxer.dsl.codegen.ScopeStoreConformanceTest": ["transactionsRestoreScopeStateAndBothCursors"],
+      "org.unlaxer.dsl.codegen.ScopeAnnotationConformanceTest": ["generatedScopeEffectsPreserveMetadataEventsAstAndRollback"],
+      "org.unlaxer.dsl.codegen.NestedCaptureConformanceTest": ["nestedCapturesKeepCompletionOrderAndSemanticCardinality"],
+      "org.unlaxer.dsl.codegen.CaptureEqualityConformanceTest": ["captureEqualityPreservesSyntaxAstAndTransactionalDiagnostics"],
+      "org.unlaxer.dsl.codegen.TokenAdapterConformanceTest": ["customBindingsCompileAndPreserveCursorsCapturesSpansAndRollback"],
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"],
+      "org.unlaxer.dsl.codegen.SharedLanguageCallConformanceTest": ["generatedAdaptersRetainOwnedChildrenAndRollbackOnBothHosts"]
+    }
+  },
+  "language-profiles": {
+    "description": "language-profiles.yml: 名前を挙げた Java/Rust 共通検証の全メソッド。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true"},
+    "required": {
+      "org.unlaxer.source.LanguageProfileSelectionTest": ["sharedSelectionAndCapabilityFixtures"],
+      "org.unlaxer.dsl.codegen.LSPProfileInitializationTest": ["generatedServerNegotiatesProfilesAndRejectsInvalidSettings"],
+      "org.unlaxer.dsl.codegen.LSPCompileVerificationTest": ["testLanguageServerCompiles", "testLauncherCompiles"],
+      "org.unlaxer.dsl.codegen.LSPNonBmpOffsetTest": ["codePointOffsetToStringOffsetSkipsOverSurrogatePairs", "offsetToPositionCountsUtf16UnitsLikeTheLspSpec", "parseFailureAfterNonBmpReportsAUtf16Offset"],
+      "org.unlaxer.dsl.codegen.PackagedLanguageProfileConformanceTest": ["bundledPackagesGenerateIdenticallyWithoutRuntimeResolution", "packageRootCanUsePinnedTokenDependencies", "profilePackageAndCacheFailuresRejectBeforeOutput", "lockedPackagesExposeEntriesToParentRegistries"],
+      "org.unlaxer.dsl.codegen.LanguageProfileConformanceTest": ["profilesRequirePinnedIdentityAndExplicitCapabilities", "generatedBothHostsMatchSourceProfilesAndOfficialParsers"],
+      "org.unlaxer.dsl.codegen.LanguageProfileEditReplayConformanceTest": ["persistentThreeProfileSessionsRejectAllHistoricalBindings"],
+      "org.unlaxer.dsl.LanguageProfileCommandTest": ["fixedProfileCliAndInvalidChoiceHaveExplicitResults", "profileGenerationRejectsEmptyAndMismatchedEntryGrammars", "packageSelectorRequiresManifestAndSupportsVerifiedCheck"],
+      "org.unlaxer.dsl.PlaygroundCommandTest": ["newProjectAndCheckAreDeterministicAndNeverOverwrite", "unsupportedHostBindingAndInvalidOptionsCreateNothing", "symlinkAncestorsAreRejectedBeforeAnyWrite"],
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"]
+    }
+  },
+  "language-queries": {
+    "description": "language-queries.yml: 名前を挙げた Java/Rust 共通検証の全メソッド。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true"},
+    "required": {
+      "org.unlaxer.dsl.semantic.LanguageQueriesTest": ["sharedSemanticQueriesMapOnlyTheirOwningDocument", "staleContextResponsesAndForeignEditsAreRejected", "cursorMappingRejectsDeletedTransformedAndDuplicateOrigins", "typedDiagnosticsPreserveMetadataAndOwningSnapshots"],
+      "org.unlaxer.source.LanguageProfileSelectionTest": ["sharedSelectionAndCapabilityFixtures"],
+      "org.unlaxer.dsl.codegen.LSPQueryConsumerTest": ["actualProviderCompletionsUseHostSnapshotAndUtf16"],
+      "org.unlaxer.dsl.codegen.LSPProfileInitializationTest": ["generatedServerNegotiatesProfilesAndRejectsInvalidSettings"],
+      "org.unlaxer.dsl.codegen.LSPCompileVerificationTest": ["testLanguageServerCompiles", "testLauncherCompiles"],
+      "org.unlaxer.dsl.codegen.LSPNonBmpOffsetTest": ["codePointOffsetToStringOffsetSkipsOverSurrogatePairs", "offsetToPositionCountsUtf16UnitsLikeTheLspSpec", "parseFailureAfterNonBmpReportsAUtf16Offset"],
+      "org.unlaxer.dsl.codegen.PlaygroundQueryConformanceTest": ["generatedRegistryAndProvidersExecuteInWasm"],
+      "org.unlaxer.dsl.PlaygroundCommandTest": ["newProjectAndCheckAreDeterministicAndNeverOverwrite", "unsupportedHostBindingAndInvalidOptionsCreateNothing", "symlinkAncestorsAreRejectedBeforeAnyWrite"]
+    }
+  },
+  "external-language-providers": {
+    "description": "external-language-providers.yml: 名前を挙げた Java/Rust 共通検証の全メソッド。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true"},
+    "required": {
+      "org.unlaxer.source.ProviderProtocolTest": ["sharedMalformedProtocolCases", "diagnosticProjectionRejectsStaleSnapshot", "processFailureStatesAndNoExecutionGate"],
+      "org.unlaxer.dsl.provider.ExternalProviderConformanceTest": ["realJavaTypescriptRustAdaptersMatchBothHosts"],
+      "org.unlaxer.dsl.codegen.LSPDiagnosticConformanceTest": ["realCompilerDiagnosticsUseOwnedDocumentsAndExactVersions"],
+      "org.unlaxer.dsl.codegen.SemanticDiagnosticConformanceTest": ["semanticDiagnosticsUseOwnedDocumentsAndExactVersions"],
+      "org.unlaxer.dsl.PlaygroundCommandTest": ["newProjectAndCheckAreDeterministicAndNeverOverwrite", "unsupportedHostBindingAndInvalidOptionsCreateNothing", "symlinkAncestorsAreRejectedBeforeAnyWrite"]
+    }
+  },
+  "shared-language-calls": {
+    "description": "shared-language-calls.yml: 名前を挙げた Java/Rust 共通検証の全メソッド。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true"},
+    "required": {
+      "org.unlaxer.dsl.codegen.SharedLanguageCallConformanceTest": ["generatedAdaptersRetainOwnedChildrenAndRollbackOnBothHosts"],
+      "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest": ["nativeFrontendMatchesJavaSyntax", "frontendNestingLimitsAreTheDocumentedContract"]
+    }
+  },
+  "embedded-grammars": {
+    "description": "embedded-grammars.yml: 名前を挙げた Java/Rust 共通検証の全メソッド。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true"},
+    "required": {
+      "org.unlaxer.source.EmbeddedLanguagesTest": ["rejectStaleIdentityOverlappingAndUnboundedProviderResults", "partialAndUnavailableStatesAndExactRegistryIdentityAreRetained"],
+      "org.unlaxer.dsl.codegen.EmbeddedGrammarConformanceTest": ["generatedJavaParsersCreateThreeLayerRegionsFromSharedCorpus", "generatedEditorRegionsFollowOriginalSnapshotEdits", "nativeAndJavaRustEmissionMatchAndExecuteTheSameIndependentCorpus", "generatedPlaygroundUsesActualPartialRegionRegistry", "malformedDeclarationsAreRejectedByBothJavaGenerationPaths"],
+      "org.unlaxer.dsl.PlaygroundCommandTest": ["newProjectAndCheckAreDeterministicAndNeverOverwrite", "unsupportedHostBindingAndInvalidOptionsCreateNothing", "symlinkAncestorsAreRejectedBeforeAnyWrite"]
+    }
+  },
+  "analysis-pipeline": {
+    "description": "analysis-pipeline.yml: 名前を挙げた Java/Rust 共通検証の全メソッド。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {"rustConformance": "true"},
+    "required": {
+      "org.unlaxer.dsl.semantic.PreprocessingConformanceTest": ["generatedSemanticPipelinePreservesOriginalFilesAndConditionalStates"]
+    }
+  },
+  "source-maps": {
+    "description": "source-maps.yml: 名前を挙げた Java/Rust 共通検証の全メソッド。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {},
+    "required": {
+      "org.unlaxer.source.SourceMapsTest": ["sharedMaps", "sharedPositions", "compositionAndMultipleOrigins", "composedAliasesAreNotEditable", "nestedDispatchAndSourcePreservingEdits", "actualParserCallbackIsBoundedAndSiblingFailureIsIsolated", "malformedRegionTreesFail", "emptyCopyAnchorsComposeAndDoNotInventAmbiguousPositions", "sharedPartialEofOwnership", "emptyPartialRegionForwardsCompletionAndInsertionAtHostEof", "explicitEnclosureBoundariesAreIndependentAndValidated"],
+      "org.unlaxer.PositionResolverBoundaryTest": ["sharedCursorAndSnapshotBoundaries", "lineSlicesKeepFinalSingleCharacterAndReconstructInput", "resolverKeepsInvalidAndSurrogateInteriorPositionsAbsent"],
+      "org.unlaxer.source.DocumentSnapshotInverseTest": ["sharedScalarBoundariesAndInvalidInteriors", "ordinaryDocumentEndAndInvalidOffsets"],
+      "org.unlaxer.source.GraphemeTest": ["officialUnicode17Suite", "independentCoordinatesStrictInteriorsRoundingAndSnapshotIdentity", "sharedParserCursorSpanRollbackAndLookaheadOracle", "longClustersAndRepeatedParsingDoNotRescanPrefixes", "lspAndMalformedUtf16RemainSeparateContracts"]
+    }
+  },
+  "source-edits": {
+    "description": "source-edits.yml: 名前を挙げた Java/Rust 共通検証の全メソッド。",
+    "reports": ["unlaxer-common/target/surefire-reports", "unlaxer-dsl/target/surefire-reports"],
+    "properties": {},
+    "required": {
+      "org.unlaxer.source.SourceEditsTest": ["sharedSourcePreservingOperations", "mapsChildPlanToHostAndRejectsStaleOrConflictingEdits", "invalidOwnershipAndPartialInputAreExplicit", "sharedEditProviderMapsNestedRegionsAndPreservesPartialText"],
+      "org.unlaxer.dsl.semantic.ProjectRenameTest": ["commonIdentityRenamePreservesShadowingStringsAndOtherModules", "staleIncompleteInvalidAndImportedRenamesAreRejected", "capturingAnotherBindingAndChangedSourceAreRejected", "sharedImportAndAliasRenamesUseDifferentIdentities"],
+      "org.unlaxer.dsl.PlaygroundCommandTest": ["newProjectAndCheckAreDeterministicAndNeverOverwrite", "unsupportedHostBindingAndInvalidOptionsCreateNothing", "symlinkAncestorsAreRejectedBeforeAnyWrite"]
+    }
+  },
+  "downstream-p4-smoke": {
+    "description": "maven.yml / downstream: p4-smoke profile (420757a8ab94ae1bed6dbd7cea2743efb8840bbd) の意味/IDE oracle。",
+    "reports": ["target/surefire-reports"],
+    "properties": {},
+    "required": {
+      "org.unlaxer.tinyexpression.evaluator.ast.P4TypedAstEvaluatorTest": ["testLiteralNumber", "testBinaryArithmetic", "testMixedArithmeticWithNestedMathFunctionFromParsedAst", "testMixedArithmeticWithLeadingMathFunctionFromParsedAst", "testIfExprWithLenFunctionFromParsedAst", "testIfExprWithInMethodFromParsedAst", "testIfExprWithVariableInMethodFromParsedAst", "testIfExprWithInDayTimeRangeFromParsedAst", "testIfExprWithNestedSliceFromParsedAst", "testBlockCommentedIfExprFromParsedAst", "testVariableInBinaryExpr", "testVariableRefExprNumber", "testVariableRefExprString", "testVariableRefExprBoolean", "testVariableRefExprWithEmptyMappedNameUsesSourceSnippet", "testComparisonGreaterThan", "testComparisonEqual", "testBooleanExprLiteral", "testBooleanExprWithComparison", "testIfExprThenBranch", "testIfExprElseBranch", "testParsedIfExprWithMathFunctionComparisonUsesSourceAwareChildren", "testParsedIfExprWithMixedBooleanConditionUsesSourceAwareChildren", "testParsedIfExprWithBooleanEqualityUsesSourceAwareChildren", "testStandaloneIsPresentUsesSourceAwareVariableName", "testParsedIfExprWithNestedIfElseBranchUsesSourceAwareChildren", "testStringConcatExprLiteral", "testIfExprWithGroupedStringComparison", "testIfExprWithReverseSliceStringComparison", "testIfExprWithStepOnlySliceStringComparison", "testSliceReverseAndStepOnAstPath", "testNumberMatchExpr", "testExpressionExprUnwrap", "testIntType", "testToUpperCaseDotMethod", "testToLowerCaseDotMethod", "testTrimDotMethod", "testLengthDotMethod", "testSliceStartEnd", "testSliceStartOnly", "testSliceEndOnly", "testSliceWithStep", "testSliceReverse", "testSliceNegativeIndices", "testSliceEmptyResult"],
+      "org.unlaxer.tinyexpression.evaluator.ast.AstEvaluatorParityCorpusTest": ["testCuratedParityCorpusAvoidsJavaCodeFallback"],
+      "org.unlaxer.tinyexpression.evaluator.ast.AstEvaluatorBackendParityTest": ["testNumberExpressionsMatchJavaCodeBackend", "testGeneratedAstPrefersTopLevelExpressionOverDeclarationSetter", "testAstEvaluatorRejectsWrongPreferredIfRootFallback", "testContextfulIfExpressionsMatchJavaCodeBackend", "testValueExpressionsMatchJavaCodeBackendOnComplexNonNumberCases"],
+      "org.unlaxer.tinyexpression.evaluator.ast.ThreeExecutionBackendParityTest": ["testLegacyAstAndDslJavaCodeBackendsMatchOnSupportedCorpus", "testLegacyAstAndDslJavaCodeBackendsMatchOnRegressionCorpus"],
+      "org.unlaxer.tinyexpression.p4.P4BackendParityTest": ["testSixBackendParityOnNumberArithmetic", "testP4ParserUsedTrueForP4ParseableArithmetic", "testP4ParserUsedTrueForMatchFormulas", "testP4ParserUsedTrueForCommentPrefixedStructuredFormulas", "testP4ParserUsedTrueForQuotedAndSlicedStringIfFormulas", "testP4ParserUsedTrueForBooleanEqualityAndInMethodIfFormulas", "testP4ParserUsedTrueForContextfulIfFormulas", "testP4BackendsParityForBooleanEqualityAndInMethodIfFormulas", "testP4BackendsParityForStandaloneIsPresentFormula", "testP4BackendsParityForContextfulIfFormulas", "testP4HandlesDirectMatchVariableWithoutHint", "testP4RejectsDirectMatchVariableWithMismatchedHint", "testP4ExactParseAcceptsHintedDirectMatchVariable", "testP4HandlesParenthesizedDirectMatchVariableWithoutHint", "testP4ExactParseRejectsDirectMatchMethodInvocation", "testP4RejectsOldSyntax", "testAllSixBackendsParityOnParenthesizedArithmetic", "testExecutionBackendAliasResolution", "testMatchExpressionParityAcrossSixBackends"],
+      "org.unlaxer.tinyexpression.p4.P4PreferredAstMapperPrecedenceTest": ["matchExpressionWithNumberPreferredType", "matchExpressionWithStringPreferredType", "matchExpressionWithBooleanPreferredType", "typedCandidatesDoNotTryOtherMatchFamilies", "candidateOrderDependsOnResultTypeNotSourceShape", "ternaryExpressionAlsoMapsToIfExpr", "sinFunctionPicksSinExpr", "isPresentFunctionPicksIsPresentExpr", "inTimeRangeFunctionPicksInTimeRangeExpr", "dotMethodToUpperCasePicksToUpperCaseDotExpr", "sliceExpressionPicksSliceExpr", "nullFormulaReturnsEmptyList", "emptyFormulaReturnsEmptyList"],
+      "org.unlaxer.tinyexpression.p4.ubnfc.UbnfcParityTest": ["classicAndUbnfcReturnTheSameParsedAstForEveryFormula", "everySpanIsACodePointRangeForNonBmpInputInBothEngines"],
+      "org.unlaxer.tinyexpression.p4.ubnfc.P4SingleRecognitionProjectionTest": ["typedProjectionMatchesExplicitSubtreeStructureAndEveryOwnedSpan", "bothJavaEnginesKeepTheSharedRootAndTypedFailureContract", "identifierAlphabetAndIllegalUnicodeTailAreNotBroadened", "completeDocumentBranchesKeepOneDeclarationSetAndOwnedExpressionPositions", "losingFormulaBranchesRollBackScopesReferencesAndCommittedCst"],
+      "org.unlaxer.tinyexpression.p4.P4ProjectionTextReaderTest": ["readsForwardReverseRepeatedUnicodeAndEofSpans"],
+      "org.unlaxer.tinyexpression.loader.P4EngineModeMatrixTest": ["everyFormulaEvaluatesUnderTheSelectedEngine", "generatedJavaIsIdenticalAcrossEngines", "unknownEngineValuesFailFast"]
+    }
+  },
+  "downstream-ide-smoke": {
+    "description": "maven.yml / downstream: p4-smoke profile (7d7bd1cbfab1bd9548ba53c73cc50502f0437c67) の意味/IDE oracle。",
+    "reports": ["target/surefire-reports"],
+    "properties": {},
+    "required": {
+      "org.unlaxer.tinyexpression.lsp.p4.TinyExpressionP4LanguageServerExtTest": ["extendedJavaBlockUsesItsOwnFenceWidth", "formulaInfoMetadataDetectionCoversEveryPart", "formulaInfoReportsUnknownBackendWithStructuredData", "tinyExpressionSyntaxDiagnosticsExposeStructuredRepairData", "variableDescriptionIsOptionalInGeneratedGrammar", "testDiagnosticsTE011", "testStrictMatchTypingAllowsBareVariable", "testStrictMatchTypingAllowsHintedVariable", "testHoverShowsPreferredMatchAstRoot", "testStrictMatchTypingAllowsParenthesizedBareVariable", "testStrictMatchTypingDiagnosticForDirectMethodInvocation", "testStrictMatchTypingDiagnosticUsesUtf16RangeAfterNonBmpPrefix", "testCompletion", "testCompletionDollarTrigger", "testCompletionFunctionSnippet", "testCompletionIncludesGrammarOnlyValuesAndInternalKeyword", "testCompletionBlockKeywordSnippet", "testCompletionTriggerCharactersIncludeDollar", "testQuickFixTE006InsertSemicolon", "testQuickFixTE004InsertCloseParen", "testQuickFixTE005InsertCloseBrace", "testQuickFixTE002PrefixDollar", "testTE022FlagsUnknownVariableWhenCatalogConfigured", "testTE022SilentWhenNoCatalogConfigured", "testRichCatalogCompletionPreservesEntryFields", "testHoverShowsVariableSetValue", "testExtractSetValueLiteral", "testExtractSetValueIfNotExists", "testExtractSetValueAbsent", "testFormatting", "testDefinition", "testLinkedEditingRange", "nonBmpCharacterDoesNotShiftScopeDiagnosticColumn", "nonBmpCharacterInStringLiteralDoesNotShiftSyntaxDiagnosticColumn", "undefinedSymbolScopeDiagnosticIsPublishedExactlyOnce"],
+      "org.unlaxer.tinyexpression.lsp.p4.TinyExpressionP4VocabularyConformanceTest": ["everyGrammarWordIsCompletedOrExplicitlyOmitted", "syntheticGrammarAdditionIsReportedAsMissing", "intentionalDifferencesAlwaysCarryAReason"]
+    }
+  },
+  "downstream-node-alias": {
+    "description": "maven.yml / downstream: 固定 Tiny の生成 Node alias、source snapshot、owned slice。",
+    "reports": ["target/surefire-reports"],
+    "properties": {"tinyexpression.expected.mapper.snapshot": "true", "tinyexpression.expected.mapper.nodeAlias": "true"},
+    "required": {
+      "org.unlaxer.tinyexpression.p4.P4SourceMappingTest": ["mapOnceMapsOnlyOnceAndDispatchesTheEntryPoint", "mapOnceFallsBackToExistingSelectorsAndLegacyMapping", "mapOnceFailuresNeverRetryLegacyMapping", "realMapOnceMatchesPerCandidateRootSelections", "realMapOnceMatchesPerCandidateAlternateSelections", "mapOnceRootFailureKeepsCandidateAndDefaultExceptionBehavior", "legacyCapabilityFallsBackOnlyWhenSelectorIsAbsent", "newCapabilityRetainsSnapshotAcrossLaterMappingAndRejectsEqualUnownedNodes", "newApiFailuresAreNotHiddenByLegacyFallback", "alternateEntryUsesOnlyTheExplicitSubtreeSelector", "publishedCompatibilityCopiesLiveSpansBeforeLaterMappings", "publishedCompatibilityNormalizesMixedUnicodeOffsets", "lexicalAndOwnedTextDoNotEvaluateOrStringifyNodes", "malformedSpansAreExplicitErrors", "commentStrippingPreservesUnicodeCodePointCoordinates", "realGeneratedMapperUsesItsDeclaredCapabilityAndActualParserInput", "realSnapshotsRemainOwnedAfterConcurrentRootAndAlternateMappings", "documentFamilyReselectionKeepsOuterAndExpressionSourceSpans", "strictMatchDiagnosticsUseOwnedUnicodeSafeSpans"],
+      "org.unlaxer.tinyexpression.evaluator.ast.P4OwnedSliceSourceTest": ["stringIndicesKeepIntegerLiteralContractAndFailureClasses", "nodeIndicesUseOwnedLexicalTextWithoutEvaluatingExpressions", "suppliedOwnedNodeSpanPreservesSignAndCodePointCoordinatesOnBothGenerators", "sliceValuesKeepUtf16AndZeroStepSemantics", "parsedAliasIndicesRetainTheirEntireLexicalExpression", "allThreeParsedIndicesUseTheDeclaredGeneratedContract", "parsedNonIntegerAndOverflowIndicesKeepFailureClassesInEveryPosition", "detailedProbeAndCalculatorRetainParseResultUntilLaterEvaluation", "formulaAndMethodScopesKeepTheSameOwnedSource"]
+    }
+  }
+}

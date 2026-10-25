@@ -236,6 +236,7 @@ pub fn grammar_is_snapshot_cacheable(rules: &[crate::Rule]) -> bool {
             | Expr::UniqueLongestChoice(children) => pending.extend(children),
             Expr::PredictiveChoice { alternatives, .. } => pending.extend(alternatives),
             Expr::Capture(_, child)
+            | Expr::MetadataCapture(_, child)
             | Expr::TextValue(child)
             | Expr::ValueBoundary(child)
             | Expr::Optional(child)
