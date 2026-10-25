@@ -448,8 +448,12 @@ public final class RustGrammarLowering {
         return new Field(name, shape.kind(), shape.cardinality(), shape.enumName());
     }
     private static boolean integerConstraint(GrammarDecl grammar, RuleDecl rule, String name) {
-        String type = org.unlaxer.dsl.codegen.TypeofConstraints.valueType(grammar, rule, name);
-        return type.equals("int") || type.equals("Optional<Integer>") || type.equals("List<Integer>");
+        if (org.unlaxer.dsl.codegen.NestedCaptures.enabled(rule)) {
+            String type = org.unlaxer.dsl.codegen.TypeofConstraints.valueType(grammar, rule, name);
+            return type.equals("int") || type.equals("Optional<Integer>") || type.equals("List<Integer>");
+        }
+        // Same capture rule as numeric_fields.rs, without Java's whole-grammar AST inference (#758).
+        return org.unlaxer.dsl.codegen.NumericFields.isConstraintInteger(grammar, rule, name);
     }
 
     private Field boundConstraintField(Field field, Mapping mapping, RuleDecl sourceRule) {

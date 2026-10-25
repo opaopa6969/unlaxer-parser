@@ -1,0 +1,143 @@
+{
+  "valid": [
+    {
+      "name": "independent",
+      "source": "// 😀 各 grammar の同名 rule / token は独立\ngrammar Alpha {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= '😀';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\ngrammar Beta {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= 'β';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\n",
+      "cases": [
+        {
+          "grammar": "Alpha",
+          "module": "grammar_alpha",
+          "input": "😀",
+          "value": "😀!",
+          "span": [
+            0,
+            1
+          ]
+        },
+        {
+          "grammar": "Beta",
+          "module": "grammar_beta",
+          "input": "β",
+          "value": "β!",
+          "span": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "reserved-and-three",
+      "source": "grammar Alpha {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= '😀';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\ngrammar Beta {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= 'β';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\ngrammar self {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= 'x';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\n",
+      "cases": [
+        {
+          "grammar": "Alpha",
+          "module": "grammar_alpha",
+          "input": "😀",
+          "value": "😀!",
+          "span": [
+            0,
+            1
+          ]
+        },
+        {
+          "grammar": "Beta",
+          "module": "grammar_beta",
+          "input": "β",
+          "value": "β!",
+          "span": [
+            0,
+            1
+          ]
+        },
+        {
+          "grammar": "self",
+          "module": "grammar_self",
+          "input": "x",
+          "value": "x!",
+          "span": [
+            0,
+            1
+          ]
+        }
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "name": "later-missing-capture",
+      "source": "// 😀 source CP\ngrammar Alpha {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= '😀';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\ngrammar Beta {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= 'β';\n  token END = EOF\n  @root @mapping(Value,params=[absent]) Root ::= T @text END;\n}\n",
+      "structure": "failed",
+      "diagnostics": [
+        {
+          "code": "P-STRUCTURE",
+          "subject": "Rust structural constraints",
+          "span": {
+            "start": 175,
+            "end": 335
+          }
+        }
+      ]
+    },
+    {
+      "name": "cross-grammar-reference",
+      "source": "// 😀 source CP\ngrammar Alpha {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= '😀';\n  token END = EOF\n  Private ::= T;\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\ngrammar Beta {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= 'β';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= Private @text END;\n}\n",
+      "structure": "failed",
+      "diagnostics": [
+        {
+          "code": "P-STRUCTURE",
+          "subject": "Rust structural constraints",
+          "span": {
+            "start": 192,
+            "end": 356
+          }
+        }
+      ]
+    },
+    {
+      "name": "case-collision",
+      "source": "// 😀 source CP\ngrammar Alpha {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= '😀';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\ngrammar ALPHA {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= 'β';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\n",
+      "structure": "blocked",
+      "diagnostics": [
+        {
+          "code": "P-OUTPUT-COLLISION",
+          "subject": "grammar_alpha",
+          "span": {
+            "start": 175,
+            "end": 334
+          }
+        }
+      ]
+    },
+    {
+      "name": "duplicate-name",
+      "source": "// 😀 source CP\ngrammar Alpha {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= '😀';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\ngrammar Alpha {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= 'β';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\n",
+      "structure": "blocked",
+      "diagnostics": [
+        {
+          "code": "P-OUTPUT-COLLISION",
+          "subject": "grammar_alpha",
+          "span": {
+            "start": 175,
+            "end": 334
+          }
+        }
+      ]
+    },
+    {
+      "name": "later-eval-shape",
+      "source": "// 😀 source CP\ngrammar Alpha {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= '😀';\n  token END = EOF\n  @root @mapping(Value,params=[text]) Root ::= T @text END;\n}\ngrammar Beta {\n  @ubnf: v2\n  @package: org.example.multiple\n  token T ::= 'β';\n  token END = EOF\n  @root @eval(kind='binary_arithmetic') @mapping(Value,params=[text]) Root ::= T @text END;\n}\n",
+      "structure": "failed",
+      "diagnostics": [
+        {
+          "code": "P-STRUCTURE",
+          "subject": "Rust structural constraints",
+          "span": {
+            "start": 175,
+            "end": 365
+          }
+        }
+      ]
+    }
+  ]
+}

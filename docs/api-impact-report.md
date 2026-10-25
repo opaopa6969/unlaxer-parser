@@ -1,5 +1,9 @@
 # 文法進化と生成 AST / 評価 API の影響レポート
 
+複数 grammar ファイルは生成・check に対応するが、`impact` schemaVersion 1 は単一 grammar の
+比較 API を維持する。複数を直接渡すと `I-SCHEMA`（終了3）。各 grammar を単独ファイルで比較し、
+module の追加・削除・配置変更は別途確認する。[複数 grammar の配置契約](multiple-grammars.md)。
+
 追跡: #159、親 #111。対象は生成 AST と評価 API の source-level schema である。
 解析意味論、全 public API、binary/ABI 互換性、外部 provider の互換性を保証するものではない。
 `ok: true` は schema 比較成功であり、生成物や利用者コードがコンパイルできる保証でもない。

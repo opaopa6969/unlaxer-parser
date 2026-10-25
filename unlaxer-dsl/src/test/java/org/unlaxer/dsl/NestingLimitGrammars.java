@@ -75,8 +75,18 @@ public final class NestingLimitGrammars {
 
     /** Exceeds the work, not the depth, of the Java AST type inference beside a numeric capture. */
     public static String numericBesideAnalysisWork(int fillers) {
+        return besideAnalysisWork(" @root @mapping(R,params=[n,x]) R0 ::= NUM @n T @x;", fillers);
+    }
+
+    /** #758: the same work beside {@code @typeof} on a published ({@code m}) and an unpublished ({@code k}) number. */
+    public static String typeofBesideAnalysisWork(int fillers) {
+        return besideAnalysisWork(" @root @mapping(R,params=[n,m,x]) R0 ::= NUM @n '=' @typeof(n) NUM @m"
+            + " ',' @typeof(n) NUM @k T @x;", fillers);
+    }
+
+    private static String besideAnalysisWork(String root, int fillers) {
         var source = new StringBuilder("grammar G { token NUM = org.unlaxer.parser.elementary.NumberParser\n"
-            + " @root @mapping(R,params=[n,x]) R0 ::= NUM @n T @x; T ::= 'n' T | 'a' M; @mapping(M) M ::= 'm';\n");
+            + root + " T ::= 'n' T | 'a' M; @mapping(M) M ::= 'm';\n");
         for (int i = 0; i < 80; i++) source.append("C").append(i).append(" ::= ").append(i == 79 ? "M" : "C" + (i + 1)).append(";\n");
         for (int i = 0; i < fillers; i++) source.append("F").append(i).append(" ::= ").append("'a' ".repeat(20)).append(";\n");
         return source.append("}\n").toString();

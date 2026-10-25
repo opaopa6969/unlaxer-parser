@@ -34,6 +34,33 @@ public final class RustBackend {
             new GeneratedFile("evaluator.rs", RustEvalEmitter.apply(grammar, ir, evaluator(ir))));
     }
 
+    /** Whole-file API: validate and emit in memory before the caller writes any artifacts. */
+    public List<GeneratedFile> generateFile(org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file,
+                                           boolean lsp, boolean dap) {
+        return generateFile(file, lsp, dap, null);
+    }
+
+    public List<GeneratedFile> generateFile(org.unlaxer.dsl.bootstrap.UBNFAST.UBNFFile file,
+            boolean lsp, boolean dap, org.unlaxer.dsl.bootstrap.UBNFSourceSnapshot snapshot) {
+        org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, snapshot);
+        if (file.grammars().size() == 1) return generateWithProtocols(file.grammars().get(0), lsp, dap);
+        var files = new ArrayList<GeneratedFile>();
+        var index = new StringBuilder(HEADER);
+        for (int ordinal = 0; ordinal < file.grammars().size(); ordinal++) {
+            var grammar = file.grammars().get(ordinal);
+            String module = org.unlaxer.dsl.codegen.GrammarFileLayout.moduleName(grammar);
+            index.append("pub mod ").append(module).append(";\n");
+            try {
+                for (var artifact : generateWithProtocols(grammar, lsp, dap))
+                    files.add(new GeneratedFile(module + "/" + artifact.relativePath(), artifact.content()));
+            } catch (RuntimeException error) {
+                throw org.unlaxer.dsl.codegen.GrammarFileLayout.failure(file, ordinal, snapshot, error);
+            }
+        }
+        files.add(new GeneratedFile("mod.rs", index.toString()));
+        return List.copyOf(files);
+    }
+
     /** Opt-in stdio LSP module, leaving ordinary generation unchanged. */
     public List<GeneratedFile> generateWithLsp(GrammarDecl grammar) {
         var ir = RustGrammarLowering.lower(grammar);
@@ -483,7 +510,8 @@ public final class RustBackend {
                 + caught.labels().stream().map(RustBackend::quote).collect(java.util.stream.Collectors.joining(", ")) + "])";
         }
         if (expression instanceof Capture capture) {
-            return "Expr::Capture(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
+            // Reserved synthetic names are classified at generation time, never on the parse hot path.
+            return "Expr::" + (capture.name().startsWith("#preferred-") ? "MetadataCapture" : "Capture") + "(" + quote(capture.name()) + ", Box::new(" + expression(capture.expression()) + "))";
         }
         if (expression instanceof TextValue text) {
             return expression(text.child()) + ".text_value()";
@@ -510,7 +538,7 @@ public final class RustBackend {
         if (expression instanceof Separated separated) {
             String child = expression(separated.child()), separator = expression(separated.separator());
             if (PreferredAstEmitter.containsDepth(separated.child()))
-                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::Capture(\"#preferred-extra:2\", Box::new(" + child + "))]).repeat_java(0, None)])";
+                return "Expr::sequence([" + child + ", Expr::sequence([" + separator + ", Expr::MetadataCapture(\"#preferred-extra:2\", Box::new(" + child + "))]).repeat_java(0, None)])";
             return child + ".separated_by_java(" + separator + ")";
         }
         throw new IllegalStateException("unhandled " + expression);
