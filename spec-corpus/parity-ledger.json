@@ -244,7 +244,7 @@
       "title": "Rust の診断表示で空の期待候補 '' が見えない（LSP message と ParseError の Display）"
     },
     "752": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: Rust native Number が不完全な指数以外の Java 内部失敗を記録しない（負の先読みで診断位置が異なる）"
     },
     "753": {
@@ -290,6 +290,10 @@
     "793": {
       "state": "OPEN",
       "title": "parity: 正の LOOKAHEAD の後の group・選択が失敗したとき、frame の開始が Rust の失敗位置に入らない（#753 後続）"
+    },
+    "794": {
+      "state": "OPEN",
+      "title": "parity: SAFE_FAILURES で負の先読み内の Num failure memo を Java は再生し、Rust は再評価する（negative lookahead の候補差）"
     }
   },
   "entries": [
@@ -412,7 +416,7 @@
         516,
         741
       ],
-      "observation": "Java は parser frame 1024、Rust は rule 256/expression 1024。UBNF frontend は Java が形により126〜168括弧、native は127括弧。#741 CLOSED はこの差の契約化と境界テストによる。lowering の深さ256とは別。未解決の Java生成深さ・作業量は後述の #754/#758 に残す。",
+      "observation": "Java は parser frame 1024、Rust は rule 256/expression 1024。UBNF frontend は Java が形により126〜168括弧、native は127括弧。#741 CLOSED はこの差の契約化と境界テストによる。lowering の深さ256とは別。Java生成深さの契約は後述の #754、未解決の作業量は #758 に残す。",
       "evidence": [
         "docs/java-parser-limits.md",
         "rust/unlaxer-ubnf/src/lib.rs",
@@ -554,16 +558,19 @@
     },
     {
       "id": "choice-root-cst",
-      "category": "unresolved",
-      "title": "choice root の CST node 欠落",
+      "category": "contract",
+      "title": "choice の返却 Parsed と commit 済み CST の区別",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         767
       ],
-      "observation": "CaptureRollback / Labeled / AutoCommit で Java はroot ruleを残さずRustは残す。javaCst 3件で吸収される現在の差であり、#713が閉じても解消していない。",
+      "observation": "Java 3.3.0 の Choice は選択枝の Parsed を返す一方、context に root rule を commit し、生成 mapper もその root を要求する。Rust Tree / Classic の CST はこの commit 済み木と共通。異なる対象を比べていたテストを訂正し、javaCst 3件を削除。root・非root・spanを共通oracleで検証する。Java の返却 Parsed（入れ子のchoice ruleも外れる）とRust ParseMatch/TreeのAPI差は契約として残し、利用者向けにroot-choice-cstとunlaxer-commonのデータモデル文書へ書く。CST欠落ではない。",
       "evidence": [
         "spec-corpus/empty-literal/corpus.json",
-        "docs/empty-literal.md"
+        "spec-corpus/root-choice-cst/corpus.json",
+        "docs/root-choice-cst.md",
+        "docs/empty-literal.md",
+        "unlaxer-common/doc/ja/tinycalc-internal/04-core-datamodel.md"
       ]
     },
     {
@@ -575,14 +582,17 @@
         712,
         777
       ],
-      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。残りは、javaStyle併記時のW-COMMENT-IGNOREDをnative CLIへ出す経路（#777）。triviaの後で失敗するruleの診断位置（#753）は、失敗したruleのframeの開始をRustも失敗位置に記録して解消した（PR #791）。trivia後のmatched cursorはJavaのtransaction cursorのまま。期待候補はbackend固有（Javaの子parser展開とRustの末端候補の差）で、種別・位置の一致と区別してcorpusに固定。",
+      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。javaStyle併記時のW-COMMENT-IGNOREDは#777で共通収集APIと3経路のCLIに統合し、code・message・CP span、strictの終了コード5と無出力、生成物不変を共通fixtureで固定した。triviaの後で失敗するruleの診断位置（#753）は、失敗したruleのframeの開始をRustも失敗位置に記録して解消した（PR #791）。trivia後のmatched cursorはJavaのtransaction cursorのまま。期待候補はbackend固有（Javaの子parser展開とRustの末端候補の差）で、種別・位置の一致と区別してcorpusに固定。",
       "evidence": [
         "docs/rule-trivia.md",
         "spec-corpus/global-comment/README.md",
         "docs/prior-matched-diagnostics.md",
         "rust/unlaxer-runtime/src/lib.rs",
         "rust/unlaxer-runtime/src/rule_stack.rs",
-        "conformance/prior-matched-diagnostics/rule-frames.tsv"
+        "conformance/prior-matched-diagnostics/rule-frames.tsv",
+        "spec-corpus/generation-warnings/corpus.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/GenerationWarningsConformanceTest.java",
+        "rust/unlaxer-generator/tests/generation_warnings.rs"
       ]
     },
     {
@@ -629,17 +639,20 @@
     },
     {
       "id": "java-generation-depth",
-      "category": "unresolved",
+      "category": "contract",
       "title": "Java target の再帰shape深さ",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         754,
         740
       ],
-      "observation": "#740 CLOSED でRust両hostのlowered IR解析は揃ったが、Java targetのAST型推論は深い再帰helperをE-RECURSIVE-SHAPEで拒否する。残差はOPEN #754。",
+      "observation": "#754で単一選択肢のchoiceを追加深さから除外し、Rust preferred_planも同じ計数にした。再帰helperの84〜122括弧はJava生成とRust両hostで受理し、生成parserの成否・CST・ASTが一致する。資源上限256は維持し、この形のJava生成は126段まで、127段でE-RECURSIVE-SHAPE。Rust生成はlowered IRの122/123段を維持する。target別の上限は契約で、作業量の残差は#758。",
       "evidence": [
         "docs/java-parser-limits.md",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/RustNativeGeneratorTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/propertybased/PropertyBasedParityTest.java",
+        "rust/unlaxer-generator/src/preferred_plan.rs"
       ]
     },
     {
@@ -665,12 +678,15 @@
       "title": "Numberの内部失敗と負の先読み診断",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
+        794,
         752,
         717
       ],
-      "observation": "#717 CLOSED の不完全指数の診断は共通oracleで修正済み。ただし符号・小数等の内部失敗が負の先読みへ残る差は #752 に残る。PBT known-differences=[]から差ゼロとは推論しない。",
+      "observation": "#717 CLOSED の不完全指数と #752 CLOSED の符号・小数・指数の内部失敗（負の先読みの hint、成功 memo の再生を含む）は共通oracleで一致。SAFE_FAILURES で負の先読み内で失敗した Num を後で同じ位置から呼ぶと、Java は failure memo を再生して negative lookahead を候補に含め、Rust は memo key が rule の深さを含むので再評価して含めない差が #794 に残る。表示 hint の無い rule の class 名 fallback と、失敗した Chain の子 hint 展開は host 固有の候補で、oracle は比べない。PBT known-differences=[]から差ゼロとは推論しない。",
       "evidence": [
         "conformance/number-token/cases.tsv",
+        "conformance/number-token/diagnostics.tsv",
+        "conformance/number-token/README.md",
         "rust/FULL-SPEC.md"
       ]
     },
@@ -1081,7 +1097,7 @@
         463,
         571
       ],
-      "observation": "補助CSTのJava class名とRust node/trace labelはhost固有。portable metadataはstringと同一parseの安定IDを共通化し、Java任意Object identity/raw mapの自動移植は行わない。Java observerでmemoが無効になる観測は別probeで検証する。root rule欠落の #767 を補助wrapperの差として許可しない。",
+      "observation": "補助CSTのJava class名とRust node/trace labelはhost固有。portable metadataはstringと同一parseの安定IDを共通化し、Java任意Object identity/raw mapの自動移植は行わない。Java observerでmemoが無効になる観測は別probeで検証する。choice root の #767 は返却Parsedとcommit済みCSTの区別（choice-root-cst）であり、補助wrapperの差として扱わない。",
       "evidence": [
         "docs/portable-token-metadata.md",
         "docs/token-trace.md",
@@ -1279,12 +1295,10 @@
     {
       "path": "spec-corpus/empty-literal/corpus.json",
       "fields": {
-        "javaCst": 3,
         "javaDiagnostic": 112
       },
       "entries": [
-        "diagnostic-display",
-        "choice-root-cst"
+        "diagnostic-display"
       ]
     },
     {

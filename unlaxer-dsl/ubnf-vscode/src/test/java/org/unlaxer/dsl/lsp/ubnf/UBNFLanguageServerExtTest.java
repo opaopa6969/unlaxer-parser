@@ -193,6 +193,24 @@ public class UBNFLanguageServerExtTest {
     }
 
     @Test
+    public void validatorReportsCommentIgnoredNextToJavaStyleAsWarning() {
+        // #748 / #777: the flag CLI reads this from GenerationWarnings; the editor keeps it.
+        List<Diagnostic> diagnostics = server.validationDiagnostics("""
+            grammar G {
+              @package: org.example
+              @whitespace: javaStyle
+              @comment: { line: '#' }
+              @root
+              Root ::= 'a' ;
+            }
+            """);
+        assertEquals(diagnostics.toString(), 1, diagnostics.stream()
+            .filter(d -> "W-COMMENT-IGNORED".equals(d.getCode().getLeft())
+                && d.getSeverity() == org.eclipse.lsp4j.DiagnosticSeverity.Warning)
+            .count());
+    }
+
+    @Test
     public void validGrammarHasNoErrors() {
         List<Diagnostic> diagnostics = server.validationDiagnostics(VALID_UBNF);
         assertTrue("expected no validator issues, got: " + diagnostics,

@@ -11,7 +11,18 @@ fn corpus() -> Vec<Value> {
         "{}/../../spec-corpus/generation-warnings/corpus.json",
         env!("CARGO_MANIFEST_DIR")
     );
-    serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    let mut rows: Vec<Value> =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let ignored: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../spec-corpus/global-comment/ignored.json"
+    ))
+    .unwrap();
+    for mut row in ignored {
+        row["name"] = format!("global-comment-{}", row["name"].as_str().unwrap()).into();
+        row["warnings"] = row["generationWarnings"].clone();
+        rows.push(row);
+    }
+    rows
 }
 
 fn lines(row: &Value) -> String {
@@ -26,7 +37,13 @@ fn lines(row: &Value) -> String {
 
 #[test]
 fn library_matches_the_shared_corpus() {
-    for row in corpus() {
+    let mut rows = corpus();
+    let ordering: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../spec-corpus/generation-warnings/ordering.json"
+    ))
+    .unwrap();
+    rows.extend(ordering);
+    for row in rows {
         let found: Vec<Value> = warnings::collect(row["grammar"].as_str().unwrap())
             .iter()
             .map(|w| {

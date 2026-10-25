@@ -19,6 +19,12 @@ import org.unlaxer.context.ParseContext;
 import org.unlaxer.context.ParseOptions;
 import org.unlaxer.parser.Parser;
 import org.unlaxer.parser.combinator.Chain;
+import org.unlaxer.context.SafeSuccessMemoizable;
+import org.unlaxer.parser.GrammarRule;
+import org.unlaxer.parser.combinator.Choice;
+import org.unlaxer.parser.combinator.Optional;
+import org.unlaxer.parser.combinator.PegLookahead;
+import java.util.stream.Collectors;
 
 /**
  * The Java side of the shared Number token oracle (#717). Rust reads the same rows in
@@ -118,5 +124,84 @@ public class NumberTokenOracleTest {
             }
         }
         assertTrue(String.join("\n", failures), failures.isEmpty());
+    }
+
+    private static final Path DIAGNOSTICS = Path.of("../conformance/number-token/diagnostics.tsv");
+    private static final List<String> SHAPES = List.of("number", "not", "optional", "choice", "after-optional", "tail", "memo", "bare");
+    private static final List<String> DIAGNOSTIC_INPUTS = List.of(
+            "2a", "2", "1,2e,a", "1e1e", "2e", "2e+", "2E-", "2.", "2.a", "2.5", ".5", ".5e",
+            "-2", "+2.5E-3", "2e1", "2e+1", "2e+1a", "2e😀", "2́", "42é", "2e\r\n");
+
+    private static final class NumberRule extends Chain implements GrammarRule,
+            SafeSuccessMemoizable {
+        private static final long serialVersionUID = 1L;
+        private final String rule;
+        NumberRule(String rule, Parser... children) { super(children); this.rule = rule; }
+        @Override public String grammarRuleName() { return rule; }
+    }
+
+    private static Parser diagnosticParser(String shape) {
+        if (shape.equals("bare")) return new NumberParser();
+        Parser number = new NumberRule("Num", new NumberParser());
+        Parser body = switch (shape) {
+            case "number" -> number;
+            case "not" -> new Chain(new PegLookahead(number, false), new WordParser("x"));
+            case "optional" -> new Optional(number);
+            case "choice" -> new Choice(new WordParser("x"), number);
+            case "after-optional" -> new Chain(new Optional(new WordParser("x")), number);
+            case "tail" -> new Chain(number, new Optional(new WordParser("e")));
+            case "memo" -> new Chain(new PegLookahead(number, true),
+                    new PegLookahead(number, true),
+                    new PegLookahead(number, false));
+            default -> throw new IllegalArgumentException(shape);
+        };
+        return new NumberRule("Root", body);
+    }
+
+    private static String diagnosticObservation(String shape, String input, ParseOptions options) {
+        try (var context = ParseContext.withOptions(StringSource.createRootSource(input), options)) {
+            boolean success = diagnosticParser(shape).parse(context).isSucceeded();
+            if (shape.equals("memo") && options.memoization() == Memoization.SAFE_FAILURES)
+                assertTrue("exercise successful memo replay", context.getPackratMemoTable().successHits() > 0);
+            var diagnostic = context.getParseFailureDiagnostics();
+            String expected = String.join(",", diagnostic.getExpectedParsers());
+            String stack = context.getRuleStack().map(value -> value.frames().stream()
+                    .map(frame -> frame.rule() + "@" + frame.start())
+                    .collect(Collectors.joining(">")) + "@" + value.offset() + "/" + value.omitted()).orElse("~");
+            return success + "\t" + context.getConsumedPosition().value() + "\t" + context.getMatchedPosition().value()
+                    + "\t" + diagnostic.getFarthestOffset() + "\t" + (expected.isEmpty() ? "~" : expected) + "\t" + stack;
+        }
+    }
+
+    private static List<String> diagnosticInputs(String shape) {
+        var inputs = new ArrayList<>(DIAGNOSTIC_INPUTS);
+        if (shape.equals("bare")) inputs.addAll(List.of("", "-", "-a", "+.a", ".", ".a", "a", "e", "２"));
+        return inputs;
+    }
+
+    @Test public void internalFailureDiagnosticsMatchTheSharedOracle() throws Exception {
+        var rows = new ArrayList<String>();
+        for (String shape : SHAPES) for (String input : diagnosticInputs(shape)) for (var memo : Memoization.values()) {
+            var detailed = ParseOptions.withMemoization(memo).withDiagnostics(ParseOptions.Diagnostics.DETAILED);
+            String observation = diagnosticObservation(shape, input, detailed);
+            rows.add(shape + "\t" + (input.isEmpty() ? "~" : HexFormat.of().formatHex(input.getBytes(StandardCharsets.UTF_8)))
+                    + "\t" + memo + "\t" + observation);
+            for (var mode : ParseOptions.Diagnostics.values()) {
+                String expected = observation;
+                if (mode == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) {
+                    String[] columns = observation.split("\t");
+                    expected = String.join("\t", columns[0], columns[1], columns[2], "0", "~", "~");
+                }
+                assertEquals(shape + "/" + input + "/" + memo + "/" + mode, expected,
+                        diagnosticObservation(shape, input, ParseOptions.withMemoization(memo).withDiagnostics(mode)));
+            }
+        }
+        if (Boolean.getBoolean("number.oracle.write")) {
+            Files.writeString(DIAGNOSTICS, "# Java NumberParser internal failures (#752). Generated by NumberTokenOracleTest.\n"
+                    + "# DETAILED observations; AUTO agrees. Direct DETAILED_ON_FAILURE has 0/~/~ diagnostics.\n"
+                    + "# shape\tinputHex\tmemo\tsuccess\tconsumedCP\tmatchedCP\tfailureCP\texpectedParsers\truleStack\n"
+                    + String.join("\n", rows) + "\n");
+        }
+        assertEquals(rows, Files.readAllLines(DIAGNOSTICS).stream().filter(row -> !row.startsWith("#")).toList());
     }
 }

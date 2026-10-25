@@ -32,7 +32,7 @@
     "name":"CaptureRollback",
     "grammar":"grammar CaptureRollback { @package: org.example.emptyliteral @root @mapping(Root, params=[value, other]) Root ::= 'a' @value '' | 'a' @other; }",
     "cases":[
-      {"id":"failed-capture-rolled-back","input":"a","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,1],"fields":{"value":null,"other":"a"}},"cst":"Root[0,1)","javaCst":""},
+      {"id":"failed-capture-rolled-back","input":"a","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,1],"fields":{"value":null,"other":"a"}},"cst":"Root[0,1)","cstModes":["Root[0,1)","Root[0,1)","Root[0,1)"]},
       {"id":"no-alternative","input":"b","prefix":[false,0,0],"classic":[[false,0,0],[true,1,1],[false,0,0],[true,0,1]],"diagnostic":{"kind":"syntax","offset":0,"expected":["a"],"farthestOffset":0,"farthestExpected":["a"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["''","'a'"],"farthestOffset":0,"farthestExpected":["''","'a'"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
       {"id":"trailing-after-rollback","input":"aa","prefix":[true,1,1],"classic":[[true,1,1],[false,0,0],[true,0,1],[false,0,0]],"diagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":1,"farthestExpected":["","end of input"]},"javaDiagnostic":{"kind":"trailing_input","offset":1,"expected":["end of input"],"farthestOffset":1,"farthestExpected":["''"]},"ruleStack":[null,null],"ast":null,"cst":null}
     ]
@@ -145,7 +145,7 @@
     "name":"Labeled",
     "grammar":"grammar Labeled { @package: org.example.emptyliteral @root @mapping(Root, params=[value]) Root ::= CATCH('a' @value LABEL(L, ''), 'a' @value 'b', L) | 'c' @value LABEL(M, ''); }",
     "cases":[
-      {"id":"caught-then-alternative","input":"ab","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}},"cst":"Root[0,2)","javaCst":""},
+      {"id":"caught-then-alternative","input":"ab","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"a"}},"cst":"Root[0,2)","cstModes":["Root[0,2)","Root[0,2)","Root[0,2)"]},
       {"id":"caught-alternative-fails","input":"a😀","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":1,"expected":["","b"],"farthestOffset":1,"farthestExpected":["","b"]},"javaDiagnostic":{"kind":"syntax","offset":1,"expected":["''","'b'"],"farthestOffset":1,"farthestExpected":["''","'b'"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
       {"id":"uncaught-label","input":"c","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"label","offset":1,"expected":["M"],"farthestOffset":1,"farthestExpected":["M"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
       {"id":"body-fails-ordinarily","input":"x","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":0,"expected":["a","c"],"farthestOffset":0,"farthestExpected":["a","c"]},"javaDiagnostic":{"kind":"syntax","offset":0,"expected":["'a'","'c'","RootParser"],"farthestOffset":0,"farthestExpected":["'a'","'c'","RootParser"]},"ruleStack":["0:Root@0|0",null],"ast":null,"cst":null},
@@ -169,7 +169,7 @@
     "cases":[
       {"id":"empty-after-commit","input":"an","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"syntax","offset":2,"expected":[""],"farthestOffset":2,"farthestExpected":[""]},"javaDiagnostic":{"kind":"syntax","offset":2,"expected":["''"],"farthestOffset":2,"farthestExpected":["''"]},"ruleStack":["2:Root@0|0",null],"ast":null,"cst":null},
       {"id":"committed-name","input":"ax","prefix":[false,0,0],"classic":[[false,0,0],[true,2,2],[false,0,0],[true,0,2]],"diagnostic":{"kind":"commit","offset":1,"expected":["unexpected input"],"farthestOffset":1,"farthestExpected":["unexpected input"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null},
-      {"id":"accepted","input":"bn","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"n"}},"cst":"Root[0,2){Name[1,2)}","javaCst":"Name[1,2)"},
+      {"id":"accepted","input":"bn","prefix":[true,2,2],"classic":[[true,2,2],[false,0,0],[true,0,2],[false,0,0]],"diagnostic":null,"ruleStack":[null,null],"ast":{"type":"Root","span":[0,2],"fields":{"value":"n"}},"cst":"Root[0,2){Name[1,2)}","cstModes":["Root[0,2){Name[1,2)}","Root[0,2){Name[1,2)}","Root[0,2){Name[1,2)}"]},
       {"id":"committed-at-eof","input":"b","prefix":[false,0,0],"classic":[[false,0,0],[false,0,0],[false,0,0],[false,0,0]],"diagnostic":{"kind":"commit","offset":1,"expected":["unexpected input"],"farthestOffset":1,"farthestExpected":["unexpected input"]},"ruleStack":["1:Root@0|0",null],"ast":null,"cst":null}
     ]
   },

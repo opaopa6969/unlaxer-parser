@@ -51,6 +51,7 @@ import org.unlaxer.parser.Parser;
 public class EmptyLiteralConformanceTest {
     private static final String PACKAGE = "org.example.emptyliteral";
     private static final List<String> KEYS = List.of("prefix", "classic", "diagnostic", "ruleStack", "ast", "cst", "classicCst", "classicFailure");
+    private static final List<String> CST_KEYS = List.of("cst", "cstModes");
 
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
@@ -99,8 +100,8 @@ public class EmptyLiteralConformanceTest {
                 for (JsonElement caseElement : fixture.getAsJsonArray("cases")) {
                     JsonObject row = caseElement.getAsJsonObject();
                     String input = row.get("input").getAsString();
-                    JsonObject actual = javaObservation(parser, parsers, rules, mapper, input, row);
-                    compare(name + "/" + row.get("id").getAsString() + " Java", row, true, actual, mismatches);
+                    JsonObject actual = javaObservation(parser, parsers, rules, mapper, input, row, fixture.has("cstOnly"));
+                    compare(name + "/" + row.get("id").getAsString() + " Java", row, true, fixture.has("cstOnly"), actual, mismatches);
                     report.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input") + "\t" + actual);
                 }
             }
@@ -153,7 +154,8 @@ public class EmptyLiteralConformanceTest {
             List<List<String>> hosts = new ArrayList<>();
             for (String host : List.of("generated", "native-generated")) {
                 Path main = directory.resolve(host + "-main.rs");
-                Files.writeString(main, rustProbe().replace("mod generated;",
+                Files.writeString(main, rustProbe().replace("const CST_ONLY: bool = false;",
+                    "const CST_ONLY: bool = " + fixture.has("cstOnly") + ";").replace("mod generated;",
                     "#[path = \"" + host + "/mod.rs\"] mod generated;"));
                 Path binary = directory.resolve(host + "-probe");
                 success(run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + runtime,
@@ -173,9 +175,9 @@ public class EmptyLiteralConformanceTest {
             for (int i = 0; i < cases.size(); i++) {
                 JsonObject row = cases.get(i).getAsJsonObject();
                 String label = name + "/" + row.get("id").getAsString();
-                compare(label + " Java-host Rust", row, false,
+                compare(label + " Java-host Rust", row, false, fixture.has("cstOnly"),
                     JsonParser.parseString(hosts.get(0).get(i)).getAsJsonObject(), mismatches);
-                compare(label + " native-host Rust", row, false,
+                compare(label + " native-host Rust", row, false, fixture.has("cstOnly"),
                     JsonParser.parseString(hosts.get(1).get(i)).getAsJsonObject(), mismatches);
                 report.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input") + "\t"
                     + hosts.get(0).get(i) + "\t" + hosts.get(1).get(i));
@@ -376,16 +378,27 @@ public class EmptyLiteralConformanceTest {
     }
 
     private JsonArray corpus() throws Exception {
-        return JsonParser.parseString(Files.readString(repo.resolve("spec-corpus/empty-literal/corpus.json")))
+        JsonArray fixtures = JsonParser.parseString(Files.readString(repo.resolve("spec-corpus/empty-literal/corpus.json")))
             .getAsJsonArray();
+        fixtures.addAll(JsonParser.parseString(Files.readString(repo.resolve("spec-corpus/root-choice-cst/corpus.json")))
+            .getAsJsonArray());
+        return fixtures;
     }
 
-    /** A host-specific key records an existing display difference; it never relaxes the shared one. */
-    private void compare(String label, JsonObject row, boolean java, JsonObject actual, List<String> mismatches) {
+    /** Only diagnostic display has a host-specific oracle; CST must use the shared contract (#767). */
+    private void compare(String label, JsonObject row, boolean java, boolean cstOnly, JsonObject actual, List<String> mismatches) {
         if (actual.has("variance")) mismatches.add(label + " memo/diagnostics variance: " + actual.get("variance"));
-        for (String key : KEYS) {
+        // A host-specific key other than the diagnostic display would otherwise be ignored silently.
+        for (String field : row.keySet()) {
+            assertTrue(label + " must not override the shared oracle with " + field,
+                false == (field.startsWith("java") || field.startsWith("rust"))
+                    || field.equals("javaDiagnostic") || field.equals("rustDiagnostic"));
+        }
+        var keys = new ArrayList<>(cstOnly ? CST_KEYS : KEYS);
+        if (!cstOnly && row.has("cstModes")) keys.add("cstModes");
+        for (String key : keys) {
             String override = (java ? "java" : "rust") + Character.toUpperCase(key.charAt(0)) + key.substring(1);
-            JsonElement expected = row.has(override) ? row.get(override) : row.get(key);
+            JsonElement expected = key.equals("diagnostic") && row.has(override) ? row.get(override) : row.get(key);
             if (expected == null && (key.equals("classicCst") || key.equals("classicFailure"))) continue;
             if (expected == null) {
                 mismatches.add(label + " missing oracle " + key + "; actual " + actual.get(key));
@@ -396,18 +409,22 @@ public class EmptyLiteralConformanceTest {
     }
 
     private JsonObject javaObservation(Parser parser, Class<?> parsers, Set<String> rules, Class<?> mapper,
-            String input, JsonObject row) throws Exception {
+            String input, JsonObject row, boolean cstOnly) throws Exception {
         var result = new JsonObject();
         var variance = new ArrayList<String>();
         JsonArray prefix = null;
         JsonArray classic = null;
         JsonArray classicCst = null;
         JsonArray classicFailure = null;
+        JsonArray cstModes = null;
         for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES)) {
             ParseOptions options = ParseOptions.withMemoization(memo);
             JsonArray memoPrefix;
+            var memoCstModes = new JsonArray();
             try (var context = ParseContext.withOptions(StringSource.createRootSource(input), options)) {
-                memoPrefix = cursors(parser.parse(context).isSucceeded(), context);
+                var parsed = parser.parse(context);
+                memoPrefix = cursors(parsed.isSucceeded(), context);
+                memoCstModes.add(committedCst(context, parser, parsed, parsers, rules));
             }
             var memoClassic = new JsonArray();
             var memoCst = new JsonArray();
@@ -429,6 +446,14 @@ public class EmptyLiteralConformanceTest {
                             ? new JsonPrimitive(String.join(",", cst(parsed.getRootToken(), parsers, rules))) : JsonNull.INSTANCE);
                         memoFailure.add(parsed.isSucceeded() ? JsonNull.INSTANCE
                             : new JsonPrimitive(context.getParseFailureDiagnostics().getFarthestOffset()));
+                        // cstModes is the committed CST from the start of input; a classicStart prefix commits its own tokens.
+                        if (!invert && row.has("classicStart")) {
+                            try (var fresh = ParseContext.withOptions(StringSource.createRootSource(input), options)) {
+                                memoCstModes.add(committedCst(fresh, parser, parser.parse(fresh, kind, false), parsers, rules));
+                            }
+                        } else if (!invert) {
+                            memoCstModes.add(committedCst(context, parser, parsed, parsers, rules));
+                        }
                     }
                 }
             }
@@ -437,8 +462,10 @@ public class EmptyLiteralConformanceTest {
                 classic = memoClassic;
                 classicCst = memoCst;
                 classicFailure = memoFailure;
+                cstModes = memoCstModes;
             } else if (false == prefix.equals(memoPrefix) || false == classic.equals(memoClassic)
-                    || false == classicCst.equals(memoCst) || false == classicFailure.equals(memoFailure)) {
+                    || false == classicCst.equals(memoCst) || false == classicFailure.equals(memoFailure)
+                    || false == cstModes.equals(memoCstModes)) {
                 variance.add("memo " + memo + " cursors " + memoPrefix + " " + memoClassic);
             }
         }
@@ -446,6 +473,7 @@ public class EmptyLiteralConformanceTest {
         result.add("classic", classic);
         result.add("classicCst", classicCst);
         result.add("classicFailure", classicFailure);
+        result.add("cstModes", cstModes);
         // Rule stacks (#703) exist only under DETAILED: the failed and the unconsumed-input stack.
         JsonArray ruleStack = null;
         for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES)) {
@@ -475,17 +503,32 @@ public class EmptyLiteralConformanceTest {
         JsonElement ast = JsonNull.INSTANCE;
         JsonElement cst = JsonNull.INSTANCE;
         if (diagnostic.isJsonNull()) {
-            Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
-            ast = canonical(mapped.getClass().getMethod("ast").invoke(mapped), mapped);
+            if (!cstOnly) {
+                Object mapped = mapper.getMethod("parseWithSourceMap", String.class).invoke(null, input);
+                ast = canonical(mapped.getClass().getMethod("ast").invoke(mapped), mapped);
+            }
             try (var context = new ParseContext(StringSource.createRootSource(input))) {
-                List<String> nodes = cst(parser.parse(context).getRootToken(), parsers, rules);
-                cst = new JsonPrimitive(String.join(",", nodes));
+                var parsed = parser.parse(context);
+                cst = committedCst(context, parser, parsed, parsers, rules);
             }
         }
         result.add("ast", ast);
         result.add("cst", cst);
         if (false == variance.isEmpty()) result.addProperty("variance", String.join("; ", variance));
         return result;
+    }
+
+    /** The generated mapper also retains this committed root, not Choice's returned child Parsed. */
+    private static JsonElement committedCst(ParseContext context, Parser parser, org.unlaxer.Parsed parsed,
+            Class<?> parsers, Set<String> rules) {
+        if (!parsed.isSucceeded()) return JsonNull.INSTANCE;
+        assertEquals("one committed grammar root", 1, context.getCurrent().getTokens().size());
+        Token root = context.getCurrent().getTokens().get(0);
+        assertSame("the grammar rule owns the committed CST", parser, root.parser);
+        if (parser instanceof org.unlaxer.parser.combinator.ChoiceInterface) {
+            assertNotSame("Choice deliberately returns its selected child's Parsed", root, parsed.getRootToken());
+        }
+        return new JsonPrimitive(String.join(",", cst(root, parsers, rules)));
     }
 
     /** {@code offset:Root@0>Item@1|omitted}, or JSON null without a stack. */
@@ -580,6 +623,7 @@ public class EmptyLiteralConformanceTest {
     private static String rustProbe() {
         return """
             mod generated;
+            const CST_ONLY: bool = false;
             use std::io::{self, BufRead};
             use unlaxer_runtime::token::TokenKind;
             use unlaxer_runtime::{json_string, Diagnostics, Memoization, ParseContext, ParseOptions, Tree};
@@ -609,6 +653,17 @@ public class EmptyLiteralConformanceTest {
                     None => out.extend(children),
                 }
             }
+            fn context_cst(context: &ParseContext<'_>, result: &unlaxer_runtime::ParseResult) -> String {
+                match result {
+                    Ok(matched) => {
+                        let tree = context.tree(matched.root_node().expect("one committed grammar root")).unwrap();
+                        let mut nodes = Vec::new();
+                        cst(&tree, tree.root, &mut nodes);
+                        json_string(&nodes.join(","))
+                    }
+                    Err(_) => "null".to_owned(),
+                }
+            }
             fn main() {
                 let memos = [Memoization::Off, Memoization::SafeFailures];
                 let modes = [(TokenKind::Consumed, false), (TokenKind::Consumed, true),
@@ -624,11 +679,13 @@ public class EmptyLiteralConformanceTest {
                     let input = String::from_utf8(bytes).unwrap();
                     let mut variance = Vec::new();
                     let mut cursor_results: Option<(String, String, String, String)> = None;
+                    let mut cst_modes: Option<String> = None;
                     for memo in memos {
                         let options = ParseOptions::with_memoization(memo);
                         let mut context = ParseContext::with_options(&input, options);
-                        let ok = generated::parser::parse_context(&mut context).is_ok();
-                        let prefix = cursors(ok, &context);
+                        let parsed = generated::parser::parse_context(&mut context);
+                        let prefix = cursors(parsed.is_ok(), &context);
+                        let mut mode_csts = vec![context_cst(&context, &parsed)];
                         let mut classic_cst = Vec::new();
                         let mut classic_failure = Vec::new();
                         let classic = modes.iter().map(|&(kind, invert)| {
@@ -640,6 +697,14 @@ public class EmptyLiteralConformanceTest {
                                 context.parse_with_token_mode(&unlaxer_runtime::Expr::Any, TokenKind::MatchOnly, false).unwrap();
                             }
                             let parsed = context.parse_with_token_mode(&generated::parser::GeneratedParser, kind, invert);
+                            // cstModes is the committed CST from the start of input, as in the Java probe.
+                            if !invert && (consumed, matched) != (0, 0) {
+                                let mut fresh = ParseContext::with_options(&input, options);
+                                let fresh_parsed = fresh.parse_with_token_mode(&generated::parser::GeneratedParser, kind, false);
+                                mode_csts.push(context_cst(&fresh, &fresh_parsed));
+                            } else if !invert {
+                                mode_csts.push(context_cst(&context, &parsed));
+                            }
                             let mut nodes = Vec::new();
                             match &parsed {
                                 Ok(parsed) => {
@@ -655,6 +720,12 @@ public class EmptyLiteralConformanceTest {
                             }
                             cursors(parsed.is_ok(), &context)
                         }).collect::<Vec<_>>().join(",");
+                        let modes = format!("[{}]", mode_csts.join(","));
+                        match &cst_modes {
+                            None => cst_modes = Some(modes),
+                            Some(first) if *first != modes => variance.push(format!("memo {:?} CST {}", memo, modes)),
+                            Some(_) => {}
+                        }
                         match &cursor_results {
                             None => cursor_results = Some((prefix, classic, classic_cst.join(","), classic_failure.join(","))),
                             Some((p, c, t, f)) if *p != prefix || *c != classic
@@ -693,7 +764,7 @@ public class EmptyLiteralConformanceTest {
                     }
                     let (ast, cst_text) = match generated::parser::parse_tree_detailed(&input) {
                         Ok(tree) => {
-                            let ast = generated::mapper::map(&tree).unwrap().canonical_json();
+                            let ast = if CST_ONLY { "null".to_owned() } else { generated::mapper::map(&tree).unwrap().canonical_json() };
                             let mut nodes = Vec::new();
                             cst(&tree, tree.root, &mut nodes);
                             (ast, json_string(&nodes.join(",")))
@@ -703,8 +774,8 @@ public class EmptyLiteralConformanceTest {
                     let (prefix, classic, classic_cst, classic_failure) = cursor_results.unwrap();
                     let variance = if variance.is_empty() { String::new() }
                         else { format!(",\\"variance\\":{}", json_string(&variance.join("; "))) };
-                    println!("{{\\"prefix\\":{},\\"classic\\":[{}],\\"classicCst\\":[{}],\\"classicFailure\\":[{}],\\"diagnostic\\":{},\\"ruleStack\\":{},\\"ast\\":{},\\"cst\\":{}{}}}",
-                        prefix, classic, classic_cst, classic_failure, diagnostic.unwrap(), rule_stack.unwrap(), ast, cst_text, variance);
+                    println!("{{\\"prefix\\":{},\\"classic\\":[{}],\\"classicCst\\":[{}],\\"classicFailure\\":[{}],\\"diagnostic\\":{},\\"ruleStack\\":{},\\"ast\\":{},\\"cst\\":{},\\"cstModes\\":{}{}}}",
+                        prefix, classic, classic_cst, classic_failure, diagnostic.unwrap(), rule_stack.unwrap(), ast, cst_text, cst_modes.unwrap(), variance);
                 }
             }
             """;
