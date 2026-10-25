@@ -292,8 +292,12 @@
       "title": "parity: 正の LOOKAHEAD の後の group・選択が失敗したとき、frame の開始が Rust の失敗位置に入らない（#753 後続）"
     },
     "794": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: SAFE_FAILURES で負の先読み内の Num failure memo を Java は再生し、Rust は再評価する（negative lookahead の候補差）"
+    },
+    "809": {
+      "state": "OPEN",
+      "title": "parity: 通常の経路で失敗した Chain の後の owner reset を Java と揃える"
     }
   },
   "entries": [
@@ -700,12 +704,31 @@
         752,
         717
       ],
-      "observation": "#717 CLOSED の不完全指数と #752 CLOSED の符号・小数・指数の内部失敗（負の先読みの hint、成功 memo の再生を含む）は共通oracleで一致。#794 の (!Num x) | Num に符号だけを与える failure memo も、両言語で negative lookahead を含む同じ候補を再生する。差の原因は同じ rule 深さでの reset policy で、Rust の Chain に当たる rule（Sequence・Number など）を Java の Chain と同じ lookup 前の false に揃え、失敗後の reset は memo OFF と同じに保つ。rule 深さの key と資源検査は維持し、異なる rule 深さ全般で同じ hit は保証しない。表示 hint の無い rule の class 名 fallback と失敗した Chain の子 hint 展開は host 固有の候補で、oracle は比べない。PBT known-differences=[]から差ゼロとは推論しない。#794 は PR merge 前のため OPEN。",
+      "observation": "#717 CLOSED の不完全指数と #752 CLOSED の符号・小数・指数の内部失敗（負の先読みの hint、成功 memo の再生を含む）は共通oracleで一致。#794 の (!Num x) | Num に符号だけを与える failure memo も、両言語で negative lookahead を含む同じ候補を再生する。差の原因は同じ rule 深さでの reset policy で、Rust の Chain に当たる rule（Sequence・Number など）を Java の Chain と同じ lookup 前の false に揃え、失敗後の reset は memo OFF と同じに保つ。rule 深さの key と資源検査は維持し、異なる rule 深さ全般で同じ hit は保証しない。表示 hint の無い rule の class 名 fallback と失敗した Chain の子 hint 展開は host 固有の候補で、oracle は比べない。PBT known-differences=[]から差ゼロとは推論しない。#794 は CLOSED。後続 #809 の通常 Chain 失敗後の owner reset は chain-failure-owner-reset に分離。",
       "evidence": [
         "conformance/number-token/cases.tsv",
         "conformance/number-token/diagnostics.tsv",
         "conformance/number-token/README.md",
         "rust/FULL-SPEC.md"
+      ]
+    },
+    {
+      "id": "chain-failure-owner-reset",
+      "category": "contract",
+      "title": "通常 Chain 失敗後の owner reset と後続 parser",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        809,
+        794
+      ],
+      "observation": "通常経路で失敗した Chain の owner reset=false を Rust でも保持する。ab の先読み後に生成 Root(a z) が失敗し、NonOrdered 内の LOOKAHEAD(b) を呼ぶと、旧 Rust は拒否 CP0/1、Java は成功 CP0/2。NEGATIVE_LOOKAHEAD / UNTIL / EMPTY・診断 CP・Unicode を共通 corpus で比較し、memo OFF と SAFE_FAILURES、両 Rust 生成 host・mapping grammar を検証する。通常・rule-local 空白・名前付き空白・lexical context の4文法で、透過 wrapper の lookup 正規化と失敗 policy 伝播も照合する。失敗 memo の実 hit と alias policy 再生、Choice / NonOrdered 候補隔離・明示 transaction rollback を固定。lexical context の反復呼出は Java Lexing.withContext が毎回 state epoch を更新するため failure hit 0、Rust は2となる既存の会計差を持つが、構文結果・cursor・診断・reset の期待値は共通。読み取り経路を README に列挙。resource failure の全復元、明示 transaction を持つ ParseContext::parse の契約と #197 の性能凍結は維持する。#809 は PR merge 前のため OPEN。",
+      "evidence": [
+        "conformance/chain-reset-after-failure/README.md",
+        "conformance/chain-reset-after-failure/cases.tsv",
+        "conformance/chain-reset-after-failure/grammar.ubnf",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ChainResetAfterFailureConformanceTest.java",
+        "rust/unlaxer-runtime/tests/chain_reset_after_failure.rs",
+        "rust/unlaxer-runtime/src/lib.rs"
       ]
     },
     {

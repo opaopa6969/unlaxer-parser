@@ -1,0 +1,8 @@
+grammar ChainReset {
+    @package: chainreset
+    @ubnf: v2
+    @whitespace: GAP
+    token GAP ::= ' ';
+    @root @mapping(Node)
+    Root ::= 'a' 'z';
+}

@@ -1,0 +1,12 @@
+# #809: first LOOKAHEAD(prefix), then failing generated Root, then the named follower.
+# id	input	prefix	follower	success	consumedCP	matchedCP	failureCP
+lookahead	ab	a	lookahead	true	0	2	1
+negative	ab	a	negative	true	0	1	1
+until	ab	a	until	true	0	2	1
+empty	ab	a	empty	true	0	2	1
+diagnostic	ab	a	diagnostic	false	0	1	2
+unicode-lookahead	a😀b	a😀	lookahead	true	0	3	2
+unicode-negative	a😀b	a😀	negative	true	0	2	2
+unicode-until	a😀b	a😀	until	true	0	3	2
+unicode-empty	a😀b	a😀	empty	true	0	3	2
+unicode-diagnostic	a😀b	a😀	diagnostic	false	0	2	3
