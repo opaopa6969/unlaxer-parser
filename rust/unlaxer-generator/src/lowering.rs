@@ -1366,6 +1366,18 @@ impl Lowering<'_> {
     }
 
     fn atomic(&self, atom: &ast::AtomicElement) -> Result<Expression> {
+        // A group adds no IR wrapper. Keep it out of the large enum-construction
+        // frame below: `( ... )?` / `( ... )*` otherwise retain that frame twice
+        // per source level and overflow before structural validation (#805).
+        if let ElementKind::Group(body) = &atom.kind {
+            self.body(body)
+        } else {
+            self.atomic_inner(atom)
+        }
+    }
+
+    #[inline(never)]
+    fn atomic_inner(&self, atom: &ast::AtomicElement) -> Result<Expression> {
         Ok(match &atom.kind {
             // Java emits WordParser(""), which never matches, unless lexical
             // literals are enabled; then its literal parser accepts zero width.

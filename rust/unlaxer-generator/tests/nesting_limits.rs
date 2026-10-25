@@ -168,3 +168,203 @@ fn numeric_refinement_does_not_need_the_ast_shape_fixed_point() {
         }
     }
 }
+
+// Same mapped recursion and helper as RustNativeGeneratorTest.recursiveNestedHelper.
+fn helper_beside_mapped_recursion(depth: usize, open: &str, close: &str) -> String {
+    format!(
+        "grammar Pbt {{ @package: pbt.corpus @root @mapping(N0, params=[x]) \
+         R0 ::= (M M) @x T H; T ::= 'n' T M | 'a'; H ::= {}'a' M{}; \
+         @mapping(NM) M ::= 'm'; }}",
+        open.repeat(depth),
+        close.repeat(depth)
+    )
+}
+
+#[test]
+fn generation_fits_two_megabyte_stack_through_frontend_limit() {
+    // Pin the default Rust thread stack even when RUST_MIN_STACK is set by the host.
+    std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(|| {
+            for (open, close, preferred_limit) in [
+                ("[", "]", 127),
+                ("(", ")?", 63),
+                ("(", ")", 127),
+                ("(", ")+", 85),
+                ("(", ")*", 63),
+                ("{", "}", 127),
+            ] {
+                for depth in [0, 62, 63, 64, 84, 85, 86, 93, 94, 95, 126, 127] {
+                    if preferred_limit == 63 && depth > 84 {
+                        assert_eq!(
+                            outcome(&helper_beside_mapped_recursion(depth, open, close))
+                                .unwrap_err(),
+                            "structural analysis depth exceeds 256",
+                            "{close} {depth}"
+                        );
+                        continue;
+                    }
+                    let files = unlaxer_generator::generate(&helper_beside_mapped_recursion(
+                        depth, open, close,
+                    ))
+                    .unwrap_or_else(|error| panic!("{open} {depth}: {error}"));
+                    assert_eq!(files.len(), 5);
+                    let parser = &files
+                        .iter()
+                        .find(|f| f.relative_path == "parser.rs")
+                        .unwrap()
+                        .content;
+                    assert_eq!(
+                        parser.contains("Some(__preferred_cst::grammar())"),
+                        depth <= preferred_limit,
+                        "{open} {depth}"
+                    );
+                }
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+#[test]
+fn excessive_nesting_reports_limits_on_two_megabyte_stack() {
+    std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(|| {
+            for (open, close) in [
+                ("[", "]"),
+                ("(", ")?"),
+                ("(", ")"),
+                ("(", ")+"),
+                ("(", ")*"),
+                ("{", "}"),
+            ] {
+                let error = outcome(&helper_beside_mapped_recursion(128, open, close)).unwrap_err();
+                assert!(
+                    error.ends_with("UBNF nesting limit exceeded"),
+                    "{open}: {error}"
+                );
+            }
+            assert_eq!(
+                outcome(&recursive_plus(123)).unwrap_err(),
+                "structural analysis depth exceeds 256"
+            );
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
+// Builtin and parameterized calls take their own frontend path, which kept larger frames
+// than groups and overflowed a 2 MiB debug stack from about 104 levels (#805).
+fn call_beside_mapped_recursion(
+    depth: usize,
+    open: impl Fn(usize) -> String,
+    close: &str,
+    rules: &str,
+    head: &str,
+) -> String {
+    format!(
+        "grammar Pbt {{ @package: pbt.corpus @root @mapping(N0, params=[x]) \
+         R0 ::= (M M) @x T H; T ::= 'n' T M | 'a'; {rules}H ::= {head}{}'a' M{}; \
+         @mapping(NM) M ::= 'm'; }}",
+        (0..depth).map(open).collect::<String>(),
+        close.repeat(depth)
+    )
+}
+
+#[test]
+fn builtin_and_parameterized_calls_fit_two_megabyte_stack() {
+    std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(|| {
+            // (form, opening of level i, closing, extra rules, prefix in H, deepest accepted,
+            // diagnostic one level deeper)
+            type Case = (
+                &'static str,
+                fn(usize) -> String,
+                &'static str,
+                &'static str,
+                &'static str,
+                usize,
+                &'static str,
+            );
+            let cases: [Case; 6] = [
+                (
+                    "CAPTURE",
+                    |i| format!("CAPTURE(c{i}, "),
+                    ")",
+                    "",
+                    "",
+                    127,
+                    "UBNF nesting limit exceeded",
+                ),
+                (
+                    "CAPTURE_SCOPE",
+                    |_| "CAPTURE_SCOPE(".into(),
+                    ")",
+                    "",
+                    "",
+                    127,
+                    "UBNF nesting limit exceeded",
+                ),
+                (
+                    "COMMIT",
+                    |_| "COMMIT(".into(),
+                    ")",
+                    "",
+                    "",
+                    127,
+                    "UBNF nesting limit exceeded",
+                ),
+                (
+                    "LABEL",
+                    |_| "LABEL(L, ".into(),
+                    ")",
+                    "",
+                    "",
+                    127,
+                    "UBNF nesting limit exceeded",
+                ),
+                (
+                    "CATCH",
+                    |_| "CATCH(".into(),
+                    ", 'z', L)",
+                    "",
+                    "LABEL(L, 'q') ",
+                    84,
+                    "structural analysis depth exceeds 256",
+                ),
+                (
+                    "P",
+                    |_| "P(".into(),
+                    ")",
+                    "P(x) ::= x 'p'; ",
+                    "",
+                    126,
+                    "E-PARAM-LIMIT: expansion of rule P nests 129 levels; the limit is 128",
+                ),
+            ];
+            for (name, open, close, rules, head, accepted, rejection) in cases {
+                let source = |depth| call_beside_mapped_recursion(depth, open, close, rules, head);
+                let files = unlaxer_generator::generate(&source(accepted))
+                    .unwrap_or_else(|error| panic!("{name} {accepted}: {error}"));
+                assert_eq!(files.len(), 5, "{name}");
+                let error = outcome(&source(accepted + 1)).unwrap_err();
+                assert!(
+                    error.ends_with(rejection),
+                    "{name} {}: {error}",
+                    accepted + 1
+                );
+                let error = outcome(&source(128)).unwrap_err();
+                assert!(
+                    error.ends_with("UBNF nesting limit exceeded"),
+                    "{name} 128: {error}"
+                );
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
