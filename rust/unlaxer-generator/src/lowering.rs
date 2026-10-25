@@ -84,6 +84,19 @@ impl FixedShape {
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     crate::bounded::validate(grammar)?;
+    for rule in &grammar.rules {
+        for annotation in &rule.annotations {
+            if matches!(
+                annotation.kind,
+                AnnotationKind::Precedence { level: i32::MIN }
+            ) {
+                return Err(format!(
+                    "E-PRECEDENCE-OVERFLOW: precedence level exceeds 2147483647 at CP {}..{}",
+                    annotation.span.codepoint_start, annotation.span.codepoint_end
+                ));
+            }
+        }
+    }
     for token in &grammar.tokens {
         if matches!(&token.kind, TokenKind::Regex { .. })
             || matches!(&token.kind, TokenKind::Simple { parser_class }
@@ -1363,6 +1376,13 @@ impl Lowering<'_> {
             {
                 Expression::EmptyWordToken
             }
+            ElementKind::Terminal(text)
+                if !text.is_empty()
+                    && (crate::token_stream::enabled(self.grammar)
+                        || crate::lexical_contexts::enabled(self.grammar)) =>
+            {
+                Expression::LexicalLiteral(text.clone())
+            }
             ElementKind::Terminal(text) => Expression::Literal(text.clone()),
             ElementKind::RuleRef { namespace, name } => {
                 if namespace.is_some() {
@@ -1414,18 +1434,13 @@ impl Lowering<'_> {
                 min: 1,
                 max: None,
             },
-            ElementKind::BoundedRepeat { element, min, max } => {
-                if max.is_some_and(|max| max < *min) {
-                    return Err("invalid repetition bounds".into());
-                }
-                Expression::Repeat {
-                    child: Box::new(self.repeated_atom(element)?),
-                    min: *min as usize,
-                    max: max
-                        .filter(|value| *value != i32::MAX as u32)
-                        .map(|value| value as usize),
-                }
-            }
+            ElementKind::BoundedRepeat { element, min, max } => Expression::Repeat {
+                child: Box::new(self.repeated_atom(element)?),
+                min: *min as usize,
+                max: max
+                    .filter(|value| *value != i32::MAX as u32)
+                    .map(|value| value as usize),
+            },
             ElementKind::Separated { element, separator } => Expression::Separated {
                 child: Box::new(self.atomic(element)?),
                 separator: Box::new(self.atomic(separator)?),
@@ -1448,7 +1463,12 @@ impl Lowering<'_> {
                     body.alternatives[0].elements[0].element.kind,
                     ElementKind::RuleRef { .. }
                 ) || (!only_reference
-                    && matches!(bare, Expression::Literal(_) | Expression::EmptyWordToken))
+                    && matches!(
+                        bare,
+                        Expression::Literal(_)
+                            | Expression::LexicalLiteral(_)
+                            | Expression::EmptyWordToken
+                    ))
                 {
                     return Ok(child.clone());
                 }
@@ -1462,7 +1482,10 @@ impl Lowering<'_> {
         Ok(
             if matches!(
                 child,
-                Expression::Choice(_) | Expression::Literal(_) | Expression::EmptyWordToken
+                Expression::Choice(_)
+                    | Expression::Literal(_)
+                    | Expression::LexicalLiteral(_)
+                    | Expression::EmptyWordToken
             ) {
                 Expression::Delimited(Box::new(child))
             } else if matches!(atom.kind, ElementKind::RuleRef { .. })
@@ -1935,7 +1958,9 @@ impl Lowering<'_> {
             return Predictor::Any;
         }
         match expression {
-            Expression::Literal(value) if !value.is_empty() => Predictor::Literal(value.clone()),
+            Expression::Literal(value) | Expression::LexicalLiteral(value) if !value.is_empty() => {
+                Predictor::Literal(value.clone())
+            }
             Expression::NumberToken => Predictor::Number,
             Expression::IdentifierToken => Predictor::Identifier,
             Expression::QuotedToken(quote) => Predictor::Quoted(*quote),
@@ -2435,7 +2460,7 @@ fn assoc_skeleton(expression: &Expression) -> Vec<&Expression> {
 
 fn assoc_delimiter(expression: &Expression) -> bool {
     match expression {
-        Expression::Literal(_) | Expression::EmptyWordToken => true,
+        Expression::Literal(_) | Expression::LexicalLiteral(_) | Expression::EmptyWordToken => true,
         Expression::OptionalExpr(child)
         | Expression::Repeat {
             child,
@@ -2449,11 +2474,16 @@ fn assoc_delimiter(expression: &Expression) -> bool {
 // Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
 fn literal_delimiter_body(expression: &Expression) -> bool {
     match expression {
-        Expression::Literal(_) | Expression::EmptyWordToken => true,
+        Expression::Literal(_) | Expression::LexicalLiteral(_) | Expression::EmptyWordToken => true,
         Expression::Sequence(elements) => {
             !elements.is_empty()
                 && elements.iter().all(|element| {
-                    matches!(element, Expression::Literal(_) | Expression::EmptyWordToken)
+                    matches!(
+                        element,
+                        Expression::Literal(_)
+                            | Expression::LexicalLiteral(_)
+                            | Expression::EmptyWordToken
+                    )
                 })
         }
         _ => false,

@@ -29,7 +29,7 @@ public class ZeroRepeatGenerationTest {
                 assertTrue(row + " " + error, error.getMessage().contains("E-BOUNDED-INVALID"));
             }
             var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(grammar));
-            assertTrue(row + " " + error, error.getMessage().contains("invalid repetition bounds"));
+            assertTrue(row + " " + error, error.getMessage().contains("E-BOUNDED-INVALID"));
         }
     }
     @Test public void nativeRustRejectsTheSameInvalidDefinitionsBeforeEmittingFiles() throws Exception {
@@ -42,7 +42,7 @@ public class ZeroRepeatGenerationTest {
             Files.writeString(input, row.get("grammar").getAsString());
             var result = run(List.of(ROOT.resolve("rust/target/debug/unlaxer").toString(), "generate", "--grammar", input.toString(), "--output", output.toString()));
             assertNotEquals(row + " " + result.output(), 0, result.status());
-            assertTrue(row + " " + result.output(), result.output().contains("invalid repetition bounds"));
+            assertTrue(row + " " + result.output(), result.output().contains("E-BOUNDED-INVALID"));
             assertFalse(Files.exists(output.resolve("parser.rs")));
         }
     }

@@ -309,7 +309,7 @@ pub fn literal_completions(grammar: &SharedGrammar) -> Vec<&'static str> {
     fn visit(expression: &crate::Expr, result: &mut Vec<&'static str>) {
         use crate::Expr::*;
         match expression {
-            Literal(value) => result.push(value),
+            Literal(value) | JavaLiteral(value) => result.push(value),
             Lexical(_, expression) => lexical(expression, result),
             Sequence(children)
             | NonOrdered(children)

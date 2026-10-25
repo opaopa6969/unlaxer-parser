@@ -34,6 +34,8 @@ public final class GrammarToParserIrExporter {
         if (sourceId == null || sourceId.isBlank()) {
             throw new IllegalArgumentException("sourceId must not be blank");
         }
+        // The IR payload carries the level verbatim; reject the overflow sentinel first (#802).
+        org.unlaxer.dsl.bootstrap.PrecedenceLevels.requireNoOverflow(grammars);
 
         List<Object> nodes = new ArrayList<>();
         List<Object> annotations = new ArrayList<>();

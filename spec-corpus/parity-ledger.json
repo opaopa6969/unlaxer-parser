@@ -295,6 +295,10 @@
       "state": "CLOSED",
       "title": "parity: SAFE_FAILURES で負の先読み内の Num failure memo を Java は再生し、Rust は再評価する（negative lookahead の候補差）"
     },
+    "802": {
+      "state": "OPEN",
+      "title": "parity: @precedence の level overflow と、逆順境界＋overflow の診断順が Java と Rust で違う（#783 後続）"
+    },
     "809": {
       "state": "OPEN",
       "title": "parity: 通常の経路で失敗した Chain の後の owner reset を Java と揃える"
@@ -331,7 +335,7 @@
         713,
         331
       ],
-      "observation": "empty-literal の javaDiagnostic 51 件と error-elements の10件は引用符、trivia/RootParser 等の補助候補、trailing-input の farthest 表示を個別に固定する。受理・主要失敗位置の共通条件は維持する。空候補が不可視になる不具合は #750（PR #773）で修正済み。evolution の javaOffset/rustOffset 8件は現在すべて等しい。global-comment の expectedHints 10件はJavaのrule子parser由来の候補とRustの末端候補（frameだけが最遠なら空）を固定する。種別・CP位置とhost内の設定非依存は共通条件。",
+      "observation": "empty-literal の javaDiagnostic 112 件と error-elements の10件は引用符、trivia/RootParser 等の補助候補、trailing-input の farthest 表示を個別に固定する。受理・主要失敗位置の共通条件は維持する。空候補が不可視になる不具合は #750（PR #773）で修正済み。evolution の javaOffset/rustOffset 8件は現在すべて等しい。global-comment の expectedHints 10件はJavaのrule子parser由来の候補とRustの末端候補（frameだけが最遠なら空）を固定する。種別・CP位置とhost内の設定非依存は共通条件。",
       "evidence": [
         "docs/empty-literal.md",
         "docs/error-elements.md",
@@ -578,20 +582,6 @@
       ]
     },
     {
-      "id": "lexical-invert",
-      "category": "unresolved",
-      "title": "非空 lexical literal の Classic 反転幅",
-      "hosts": "Java / Rust（Java-host・native）",
-      "issues": [
-        768,
-        716
-      ],
-      "observation": "tokenStream/lexicalContextで非空literalを反転するとJava幅0、Rust幅1。empty-literal corpusは宣言的tokenで交絡を避けるため、この成功を解消の証拠にしない。",
-      "evidence": [
-        "docs/empty-literal.md"
-      ]
-    },
-    {
       "id": "global-comment",
       "category": "unresolved",
       "title": "global @comment の生成差",
@@ -772,6 +762,22 @@
         "conformance/bounded-overflow/corpus.json",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/BoundedOverflowConformanceTest.java",
         "rust/unlaxer-generator/tests/bounded_overflow.rs",
+        "unlaxer-dsl/specs/validation.md"
+      ]
+    },
+    {
+      "id": "precedence-overflow",
+      "category": "contract",
+      "title": "@precedence level overflow と量指定子診断順の契約",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        802
+      ],
+      "observation": "Java / Java-host Rust / native Rust は構文層で範囲外の level を受理し、検証・生成で E-PRECEDENCE-OVERFLOW と @precedence 全体の元ソース CP 範囲を報告する。sentinel は順序・結合性の比較、Parser IR export、BNF 変換に出さない。逆順境界と量指定子 overflow は Java の宣言順・左から右・親から子の 1 回の走査で E-BOUNDED-INVALID / E-BOUNDED-OVERFLOW を報告する。Java は validator の全診断、各生成器と Rust は最初の診断を共通 fixture で検証。#802 はレビュー・merge 後に close。",
+      "evidence": [
+        "conformance/precedence-overflow/corpus.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/PrecedenceOverflowConformanceTest.java",
+        "rust/unlaxer-generator/tests/precedence_overflow.rs",
         "unlaxer-dsl/specs/validation.md"
       ]
     },
@@ -1337,7 +1343,7 @@
     {
       "path": "spec-corpus/empty-literal/corpus.json",
       "fields": {
-        "javaDiagnostic": 51
+        "javaDiagnostic": 112
       },
       "entries": [
         "diagnostic-display"

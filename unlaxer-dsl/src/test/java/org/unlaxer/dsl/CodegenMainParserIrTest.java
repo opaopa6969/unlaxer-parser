@@ -131,6 +131,26 @@ public class CodegenMainParserIrTest {
     }
 
     @Test
+    public void testExportParserIrRejectsPrecedenceOverflowInsteadOfExportingTheSentinel() throws Exception {
+        // #802: the mapper transports the overflow; the IR must not carry level=-2147483648.
+        String source = "grammar G { @root @leftAssoc @precedence(level=2147483648) R ::= 'x'; }";
+        Path grammarFile = Files.createTempFile("codegen-main-export-parser-ir-precedence", ".ubnf");
+        Path exportFile = Files.createTempFile("codegen-main-export-parser-ir-precedence-out", ".json");
+        Files.writeString(grammarFile, source);
+        Files.writeString(exportFile, "");
+
+        RunResult result = runCodegen(
+            "--grammar", grammarFile.toString(),
+            "--export-parser-ir", exportFile.toString()
+        );
+
+        assertEquals(CodegenMain.EXIT_VALIDATION_ERROR, result.exitCode());
+        assertEquals("E-PARSER-IR-EXPORT: E-PRECEDENCE-OVERFLOW: precedence level exceeds 2147483647 at CP 29..58",
+            result.err().strip());
+        assertEquals("", Files.readString(exportFile));
+    }
+
+    @Test
     public void testValidateParserIrReturnsOkForValidFixture() throws Exception {
         String payload = Files.readString(Path.of("src/test/resources/schema/parser-ir/valid-minimal.json"));
         Path parserIrFile = Files.createTempFile("codegen-main-parser-ir-valid", ".json");

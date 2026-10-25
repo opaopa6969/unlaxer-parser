@@ -78,3 +78,18 @@ fn generated_enum_corpus_is_rejected_at_the_lesson_compile_boundary() {
         }
     }
 }
+
+#[test]
+fn token_stream_literals_stay_inside_the_teaching_subset() {
+    // #768 lowers nonempty token-stream literals to `LexicalLiteral`; the lesson engine must
+    // keep accepting them instead of reporting the grammar as unsupported.
+    let grammar = LessonGrammar::compile(
+        "grammar Demo { @ubnf: v2 @tokenStream: enabled @root @mapping(Root) Root ::= 'ab' ''; }",
+    )
+    .unwrap();
+    let accepted = grammar.analyze("ab");
+    assert!(accepted.contains(r#""ok":true"#), "{accepted}");
+    assert!(accepted.contains(r#""span":[0,2]"#), "{accepted}");
+    let rejected = grammar.analyze("ax");
+    assert!(rejected.contains(r#""ok":false"#), "{rejected}");
+}

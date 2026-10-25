@@ -34,6 +34,17 @@ public class UBNFToBNFConverterTest {
         assertEquals("E-BOUNDED-OVERFLOW: repetition bound exceeds 2147483647 at CP 34..51", error.getMessage());
     }
 
+    @Test public void precedenceOverflowIsRejectedInsteadOfPrintedAsANegativeLevel() {
+        UBNFAST.UBNFFile grammar=UBNFMapper.parse("grammar G { @leftAssoc @precedence(level=2147483648) R ::= 'x'; }");
+        for (boolean keepAnnotations : new boolean[] {true, false}) {
+            IllegalArgumentException error=assertThrows(IllegalArgumentException.class,
+                () -> UBNFToBNFConverter.convert(grammar,keepAnnotations));
+            assertEquals("E-PRECEDENCE-OVERFLOW: precedence level exceeds 2147483647 at CP 23..52", error.getMessage());
+        }
+        assertTrue(UBNFToBNFConverter.convert(UBNFMapper.parse(
+            "grammar G { @leftAssoc @precedence(level=2147483647) R ::= 'x'; }"),true).contains("@precedence(level=2147483647)"));
+    }
+
     /**
      * UBNF ファイルを読み込んで EBNF に変換し、
      * アノテーション除外（デフォルト動作）で期待される構文が含まれていることを検証。
