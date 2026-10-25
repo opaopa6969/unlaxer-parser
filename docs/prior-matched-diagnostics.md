@@ -162,12 +162,14 @@ max(consumed, matched) で、R1 が失敗するとその frame が失敗候補�
 （`R0 ::= 'a' LOOKAHEAD('  xy') R1 'w' ; R1 ::= ['q']` の `a  xy` は両版で syntax CP3）。
 
 **group・選択への拡張（#793）**: rule でない入れ子の式も、失敗した `Sequence` / `Choice` /
-`PredictiveChoice` の checkpoint を復元した直後に開始を候補にする。`R0 ::= 'a' LOOKAHEAD('xyz')
+`PredictiveChoice` / 反復（`Repeat` / `JavaRepeat`）の checkpoint を復元した直後に開始を
+候補にする。回数指定の反復（`'x'{2}`）は Java の `Repeat` frame で、前の反復が消費した後に
+下限へ届かず失敗するため、group と同じく frame の開始が候補になる。`R0 ::= 'a' LOOKAHEAD('xyz')
 ( 'x' 'q' )` の `axyz` は両版で syntax CP4、prefix は `[false, 0, 0]` になる。
 選択・入れ子 group も同じ規則。成功した式には追加の記録をせず、否定先読み内の候補は既存の
 投機診断の rollback に従う。既存 checkpoint の cursor を使うため保存領域・割当を増やさず、
 追加処理は Detailed の失敗経路だけに置く。
-[共通 corpus](../spec-corpus/lookahead-group-frame/README.md) の16文法16入力を
+[共通 corpus](../spec-corpus/lookahead-group-frame/README.md) の19文法19入力を
 `LookaheadGroupFrameConformanceTest` が Java と両 Rust host の6設定で照合する。
 
 **期待候補の境界**: Java の `registerFailureCandidate` は失敗した parser の子を深さ2まで

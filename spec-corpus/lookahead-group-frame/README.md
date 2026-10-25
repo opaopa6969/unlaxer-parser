@@ -1,6 +1,6 @@
 # LOOKAHEAD の後に失敗する group・選択（#793）
 
-`corpus.json` の16文法16入力は、Java の parse frame の規則から独立に求めた期待値を固定する。
+`corpus.json` の19文法19入力は、Java の parse frame の規則から独立に求めた期待値を固定する。
 `LookaheadGroupFrameConformanceTest` は既存の `AtomicTriviaConformanceTest` harness を使い、
 Java と Java-host / native Rust を別々に生成・compile・実行する。診断種別・code point 位置、
 prefix の consumed / matched cursor、成功時の AST と span を memo OFF/ON ×
@@ -23,6 +23,13 @@ matched CP4 なので、後続 group の開始は CP4。`'x'` の消費で両 cu
   候補にならない。後続 `q` の失敗は、それぞれ消費後の CP3 / CP2。
 - `LookaheadOptionalGroup` / `LookaheadRepeatGroup`: 任意・反復の子が失敗し、
   続く `r` が CP4 に候補を残す既存の挙動を保持する。
+- `LookaheadBoundedRepeatFails` / `LookaheadBoundedGroupRepeatFails`: 回数指定の反復
+  （`'x'{2}`・`( 'x' 'y' ){2}`）は Java の `Repeat` frame で、最初の反復が消費した後に
+  下限に届かず失敗する。frame の開始 CP4 が候補になり、syntax CP4。group の frame だけを
+  記録する実装では CP2 / CP3 になる。
+- `LookaheadJavaStyleGroupFails`: `@whitespace: javaStyle` で group の中の trivia が
+  matched cursor を下げる。`ax y z` の先読み到達 CP6 が group の開始になり、`q` が
+  CP5 で失敗しても syntax CP6。
 - `LookaheadNegativeTokenFails`: `x` の消費後 CP2 から `NEGATIVE_LOOKAHEAD('yz')` が
   失敗する。group の開始を候補に加えて syntax CP4 になる。
 - `LookaheadGroupReads*`: group の中で `x` を消費した後は matched CP2 から
@@ -35,7 +42,7 @@ matched CP4 なので、後続 group の開始は CP4。`'x'` の消費で両 cu
   持つ R1 を同じ位置で再試行する。失敗 memo / 成功 memo の実 hit を全診断方針で
   要求し、再生後も syntax CP4 と rollback 後の両 cursor を保持する。
 
-Rust の修正は失敗した `Sequence` / `Choice` / `PredictiveChoice` の既存 checkpoint を
+Rust の修正は失敗した `Sequence` / `Choice` / `PredictiveChoice` / 反復の既存 checkpoint を
 復元した後に開始を記録する。成功経路の保存領域・割当を追加せず、matched cursor 自体は
 変えない。Classic token mode、token-stream session、直接の式入口の frontier は既存規則に従う。
 

@@ -617,7 +617,7 @@
       "issues": [
         793
       ],
-      "observation": "#793でRustのgroup・選択（Sequence / Choice / PredictiveChoice）が失敗したとき、既存checkpointから復元したmax(consumed, matched)を失敗候補に加える。Javaのparse frameと同じく、axyzのgroup・選択・入れ子groupはsyntax CP4、prefixは[false,0,0]。共通corpusの16文法16入力をJavaとRust両生成経路でmemo OFF/ON × 3診断方針に照合する。成功した式の開始は候補にせず、matched cursorとtoken-streamの規則は維持。候補文字列はbackend固有。issueはmerge前のOPEN。",
+      "observation": "#793でRustのgroup・選択・回数指定の反復（Sequence / Choice / PredictiveChoice / Repeat）が失敗したとき、既存checkpointから復元したmax(consumed, matched)を失敗候補に加える。Javaのparse frameと同じく、axyzのgroup・選択・入れ子groupはsyntax CP4、prefixは[false,0,0]。共通corpusの19文法19入力をJavaとRust両生成経路でmemo OFF/ON × 3診断方針に照合する。成功した式の開始は候補にせず、matched cursorとtoken-streamの規則は維持。候補文字列はbackend固有。issueはmerge前のOPEN。",
       "evidence": [
         "docs/prior-matched-diagnostics.md",
         "spec-corpus/lookahead-group-frame/README.md",

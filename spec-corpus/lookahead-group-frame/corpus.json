@@ -168,6 +168,69 @@
     ]
   },
   {
+    "name": "LookaheadBoundedRepeatFails",
+    "issue": "#793",
+    "grammar": "grammar LookaheadBoundedRepeatFails { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH 'x'{2} ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadBoundedGroupRepeatFails",
+    "issue": "#793",
+    "grammar": "grammar LookaheadBoundedGroupRepeatFails { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz')  @root @mapping(Root) R0 ::= 'a' AH ( 'x' 'y' ){2} ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "axyz",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          4
+        ]
+      }
+    ]
+  },
+  {
+    "name": "LookaheadJavaStyleGroupFails",
+    "issue": "#793",
+    "grammar": "grammar LookaheadJavaStyleGroupFails { @package: org.example.ruletrivia @whitespace: javaStyle token AH = LOOKAHEAD('x y z')  @root @mapping(Root) R0 ::= 'a' AH ( 'x' 'y' 'q' ) ; }",
+    "cases": [
+      {
+        "id": "frame",
+        "input": "ax y z",
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "accepted": false,
+        "diagnostic": [
+          "syntax",
+          6
+        ]
+      }
+    ]
+  },
+  {
     "name": "LookaheadNegativeTokenFails",
     "issue": "#793",
     "grammar": "grammar LookaheadNegativeTokenFails { @package: org.example.ruletrivia @whitespace: none token AH = LOOKAHEAD('xyz') token NEXT = NEGATIVE_LOOKAHEAD('yz') @root @mapping(Root) R0 ::= 'a' AH ( 'x' NEXT ) ; }",

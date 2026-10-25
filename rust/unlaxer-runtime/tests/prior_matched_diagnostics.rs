@@ -215,6 +215,11 @@ fn a_failed_nested_group_records_its_start_at_the_matched_reach() {
     ]));
 }
 
+#[test]
+fn a_failed_bounded_repeat_records_its_start_at_the_matched_reach() {
+    failed_expression_frame(Expr::literal("x").repeat_java(2, Some(2)));
+}
+
 fn failed_expression_frame(body: Expr) {
     let rules = vec![unlaxer_runtime::Rule {
         name: "R0",

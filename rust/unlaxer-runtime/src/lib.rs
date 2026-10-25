@@ -3684,12 +3684,18 @@ impl<'a> ParseContext<'a> {
             self.restore(checkpoint);
             if self.resource_failure.is_none() {
                 // Group/choice parsers have frames even without a rule invocation (#793).
-                // Reuse the restored cursors; successful expressions and the deferred pass
-                // need no frame bookkeeping. Classic records its frames below.
+                // A bounded repeat (`'x'{2}`) is a Java Repeat frame that fails after its
+                // earlier iterations consumed. Reuse the restored cursors; successful
+                // expressions and the deferred pass need no frame bookkeeping. Classic
+                // records its frames below.
                 if self.options.diagnostics == Diagnostics::Detailed
                     && matches!(
                         expression,
-                        Expr::Sequence(_) | Expr::Choice(_) | Expr::PredictiveChoice { .. }
+                        Expr::Sequence(_)
+                            | Expr::Choice(_)
+                            | Expr::PredictiveChoice { .. }
+                            | Expr::Repeat { .. }
+                            | Expr::JavaRepeat { .. }
                     )
                 {
                     self.fail_parser_frame();
