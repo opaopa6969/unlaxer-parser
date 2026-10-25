@@ -69,8 +69,12 @@ public final class RecursiveSemanticShapes {
         checkDepth(depth);
         if (body instanceof ChoiceBody choice) {
             Shape result = null;
+            // A singleton choice is AST bookkeeping, not another nested expression (#754).
+            // Still visit/count it as work; only a real choice adds a level. Keep this
+            // convention in sync with rust/unlaxer-generator/src/preferred_plan.rs.
+            int alternativeDepth = depth + (choice.alternatives().size() == 1 ? 0 : 1);
             for (var alternative : choice.alternatives()) {
-                Shape candidate = body(alternative, state, depth + 1);
+                Shape candidate = body(alternative, state, alternativeDepth);
                 if (candidate != null) result = result == null ? candidate : join(result, candidate, false);
             }
             return result;

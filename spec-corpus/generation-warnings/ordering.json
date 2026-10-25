@@ -1,0 +1,31 @@
+[
+  {
+    "name": "comment-grammar-order",
+    "note": "grammar はソース順、その中は span 順。名前の辞書順にはしない（#777）",
+    "grammar": "// 😀 code-point spans\ngrammar Zed {\n @package: org.example.ignored\n @whitespace: javaStyle\n @comment: { line: '#' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}\n// 😀 code-point spans\ngrammar Alpha {\n @package: org.example.alpha\n @whitespace: javaStyle\n @comment: { line: '#' }\n @root @mapping(Root, params=[value])\n Root ::= 'a' @value 'b';\n}",
+    "warnings": [
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Zed",
+        "rule": "comment",
+        "span": [
+          92,
+          115
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 92..115: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
+      },
+      {
+        "code": "W-COMMENT-IGNORED",
+        "grammar": "Alpha",
+        "rule": "comment",
+        "span": [
+          274,
+          297
+        ],
+        "message": "W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle",
+        "line": "warning: CP 274..297: W-COMMENT-IGNORED: comment: @comment has no effect with @whitespace: javaStyle"
+      }
+    ]
+  }
+]

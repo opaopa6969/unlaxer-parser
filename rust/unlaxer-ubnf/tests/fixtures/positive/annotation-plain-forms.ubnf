@@ -1,0 +1,13 @@
+// 😀 #715: forms that Java reads as its catch-all '@' IDENTIFIER (a Simple annotation):
+// trivia between '@' and a keyword, and an argument keyword without its '('.
+grammar PlainForms {
+    @ root @ leftAssoc @
+    skip @ // comment
+    enum @ whitespace @ namePredicate @ nestedCaptures
+    @mapping @eval @interleave @lexicalContext @backref @scopeTree
+    @declares @catalog @precedence @doc @recovery @commonField
+    Plain ::= 'x';
+
+    @root @mapping (Root) @whitespace (javaStyle) @leftAssoc@skip
+    Root ::= 'x';
+}

@@ -536,17 +536,39 @@ class PublishedConsumerTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.temp, True)
         bin_dir = self.temp / 'bin'
         bin_dir.mkdir()
+        # STUB_SEQUENCE: one "<status> [<exit>]" line per call, taken in order.
         curl = bin_dir / 'curl'
         curl.write_text('#!/bin/sh\n'
                         'printf "%s\\n" "$*" >> "$STUB_LOG"\n'
+                        'if [ -n "$STUB_SEQUENCE" ]; then\n'
+                        '  line=$(head -n 1 "$STUB_SEQUENCE"); sed -i 1d "$STUB_SEQUENCE"\n'
+                        '  set -- $line; printf %s "$1"; exit "${2:-0}"\n'
+                        'fi\n'
                         'printf %s "$STUB_STATUS"\n'
                         'exit "${STUB_EXIT:-0}"\n')
         curl.chmod(0o755)
+        # MVN_OUTPUT: what a failing Maven prints; without it Maven must not run.
         mvn = bin_dir / 'mvn'
-        mvn.write_text('#!/bin/sh\necho "mvn must not run" >&2; exit 99\n')
+        mvn.write_text('#!/bin/sh\n'
+                       'echo run >> "$MVN_LOG"\n'
+                       'if [ -z "$MVN_OUTPUT" ]; then echo "mvn must not run" >&2; exit 99; fi\n'
+                       'printf "%s\\n" "$MVN_OUTPUT"; exit 1\n')
         mvn.chmod(0o755)
+        sleep = bin_dir / 'sleep'
+        sleep.write_text('#!/bin/sh\nprintf "%s\\n" "$1" >> "$SLEEP_LOG"\n')
+        sleep.chmod(0o755)
         self.env = dict(os.environ, PATH=f'{bin_dir}:{os.environ["PATH"]}', STUB_LOG=str(self.temp / 'curl.log'),
+                        MVN_LOG=str(self.temp / 'mvn.log'), SLEEP_LOG=str(self.temp / 'sleep.log'),
                         UNLAXER_MAVEN_REPOSITORY=str(self.temp / 'job'), RUNNER_TEMP=str(self.temp))
+
+    def sequence(self, *lines):
+        path = self.temp / 'sequence'
+        path.write_text(''.join(f'{line}\n' for line in lines))
+        return str(path)
+
+    def calls(self, name):
+        path = self.temp / name
+        return path.read_text().splitlines() if path.exists() else []
 
     def check(self, **stub):
         env = dict(self.env, **stub)
@@ -565,6 +587,44 @@ class PublishedConsumerTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0, stub)
             self.assertIn('cannot tell whether', result.stderr, stub)
             self.assertNotIn('is not on Central', result.stdout, stub)
+
+    def test_retries_a_rate_limit_with_growing_delays_until_central_answers(self):
+        result = self.check(STUB_SEQUENCE=self.sequence('429', '000 28', '404'))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('is not on Central', result.stdout)
+        self.assertEqual(self.calls('sleep.log'), ['20', '40'])
+        self.assertEqual(len(self.calls('curl.log')), 3)
+
+    def test_gives_up_on_an_unreachable_central_after_bounded_attempts(self):
+        result = self.check(STUB_STATUS='429')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('cannot tell whether', result.stderr)
+        self.assertEqual(self.calls('sleep.log'), ['20', '40', '80', '160'])
+        self.assertEqual(len(self.calls('curl.log')), 5)
+
+    def test_an_answer_from_central_is_not_retried(self):
+        for status in ['403', '404', '401']:
+            (self.temp / 'curl.log').unlink(missing_ok=True)
+            self.check(STUB_STATUS=status)
+            self.assertEqual(len(self.calls('curl.log')), 1, status)
+        self.assertEqual(self.calls('sleep.log'), [])
+
+    def test_retries_maven_only_when_it_did_not_reach_central(self):
+        unreachable = ('[ERROR] Failed to read artifact descriptor for org.unlaxer:unlaxer-common:jar:9.9.9: '
+                       'status code: 429, reason phrase: Too Many Requests (429)')
+        result = self.check(STUB_STATUS='200', MVN_OUTPUT=unreachable)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(self.calls('mvn.log')), 5)
+        self.assertEqual(self.calls('sleep.log'), ['20', '40', '80', '160'])
+        for answer in ['[ERROR] Could not find artifact org.unlaxer:unlaxer-common:jar:9.9.9 in central',
+                       '[ERROR] Could not transfer artifact org.unlaxer:unlaxer-common:jar:9.9.9 from/to central: '
+                       'Checksum validation failed, expected abc but is def; status code: 503']:
+            for name in ['mvn.log', 'sleep.log']:
+                (self.temp / name).unlink(missing_ok=True)
+            result = self.check(STUB_STATUS='200', MVN_OUTPUT=answer)
+            self.assertNotEqual(result.returncode, 0, answer)
+            self.assertEqual(len(self.calls('mvn.log')), 1, answer)
+            self.assertEqual(self.calls('sleep.log'), [], answer)
 
 
 if __name__ == '__main__':

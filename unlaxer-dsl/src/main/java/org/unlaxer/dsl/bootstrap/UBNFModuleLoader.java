@@ -35,13 +35,35 @@ public final class UBNFModuleLoader {
         return resolve(file, path, new UBNFPackageResolver(path, reader));
     }
 
+    /** CLI diagnostics retain the root source location even when linking replaces declarations. */
+    public static UBNFFile resolve(UBNFSourceSnapshot snapshot, Path path, SourceReader reader) throws IOException {
+        return resolve(snapshot.ast(), path, new UBNFPackageResolver(path, reader), snapshot);
+    }
+
     /** Explicit root selection; imported modules still export declarative tokens only. */
     public static UBNFFile resolve(UBNFFile file, Path path, UBNFPackageResolver packages) throws IOException {
+        return resolve(file, path, packages, null);
+    }
+
+    private static UBNFFile resolve(UBNFFile file, Path path, UBNFPackageResolver packages,
+            UBNFSourceSnapshot snapshot) throws IOException {
         var loader = new UBNFModuleLoader(packages);
         path = path.toAbsolutePath().normalize();
         loader.stack.add(path);
         var grammars = new ArrayList<GrammarDecl>();
-        for (var grammar : file.grammars()) grammars.add(loader.link(grammar, path));
+        for (var grammar : file.grammars()) {
+            String location = snapshot == null ? "" : snapshot.spanOf(grammar)
+                .map(span -> " [" + span.start() + "," + span.end() + ")").orElse("");
+            try {
+                grammars.add(loader.link(grammar, path));
+            } catch (IllegalArgumentException error) {
+                if (file.grammars().size() == 1 || snapshot == null) throw error;
+                throw new IllegalArgumentException("grammar " + grammar.name() + location + ": " + error.getMessage(), error);
+            } catch (IOException error) {
+                if (file.grammars().size() == 1 || snapshot == null) throw error;
+                throw new IOException("grammar " + grammar.name() + location + ": " + error.getMessage(), error);
+            }
+        }
         return new UBNFFile(grammars);
     }
 
@@ -173,7 +195,7 @@ public final class UBNFModuleLoader {
         if (value instanceof OneOrMoreElement repeat)
             return new OneOrMoreElement(atom(repeat.body(), imported, tokens, used, synthetic));
         if (value instanceof BoundedRepeatElement repeat)
-            return new BoundedRepeatElement(atom(repeat.body(), imported, tokens, used, synthetic), repeat.min(), repeat.max());
+            return BoundedQuantifiers.copy(new BoundedRepeatElement(atom(repeat.body(), imported, tokens, used, synthetic), repeat.min(), repeat.max()), repeat);
         if (value instanceof SeparatedElement separated)
             return new SeparatedElement(atom(separated.element(), imported, tokens, used, synthetic),
                 atom(separated.separator(), imported, tokens, used, synthetic));

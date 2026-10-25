@@ -6,7 +6,7 @@ use std::process::ExitCode;
 use unlaxer_codegen::GeneratedFile;
 
 const HELP: &str =
-    "Usage: unlaxer profile --file <profile.tsv>\n       unlaxer generate [--target rust] --grammar <file.ubnf> --output <module-directory> [--check] [--lsp] [--dap]\n       unlaxer playground (--grammar <file.ubnf> | --profile <profile.tsv> | --package <id> --manifest <ubnf.json>) --output <new-directory> [--check]\n       unlaxer check --target rust --grammar <file.ubnf> [--format json]\n       unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
+    "Usage: unlaxer profile --file <profile.tsv>\n       unlaxer generate [--target rust] --grammar <file.ubnf> --output <module-directory> [--check] [--lsp] [--dap] [--strict | --fail-on warning]\n       unlaxer playground (--grammar <file.ubnf> | --profile <profile.tsv> | --package <id> --manifest <ubnf.json>) --output <new-directory> [--check]\n       unlaxer check --target rust --grammar <file.ubnf> [--format json]\n       unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
 const CHECK_HELP: &str = "Usage: unlaxer check --target rust --grammar <file.ubnf> [--format json]";
 const IMPACT_HELP: &str =
     "Usage: unlaxer impact --target rust --before <old.ubnf> --after <new.ubnf> [--format json]";
@@ -174,11 +174,27 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     let mut lsp = false;
     let mut dap = false;
     let mut explicit_target = false;
+    let mut strict = false;
     let mut cursor = 1;
     while cursor < args.len() {
         let option = args[cursor]
             .to_str()
             .ok_or((2, "invalid option encoding".into()))?;
+        // Warnings fail generation (#715); `--fail-on warning` is the Java CLI's spelling.
+        if option == "--strict" || option == "--fail-on" {
+            if strict {
+                return Err((2, "duplicate --strict / --fail-on".into()));
+            }
+            if option == "--fail-on" {
+                if args.get(cursor + 1).and_then(|value| value.to_str()) != Some("warning") {
+                    return Err((2, "--fail-on accepts only warning".into()));
+                }
+                cursor += 1;
+            }
+            strict = true;
+            cursor += 1;
+            continue;
+        }
         if option == "--dap" {
             if dap {
                 return Err((2, "duplicate --dap".into()));
@@ -233,13 +249,21 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
         return Err((2, "grammar and output paths must not be empty".into()));
     }
     // Keep I/O exit status separate from grammar/link errors for the entry file.
-    fs::read_to_string(&grammar).map_err(io_error)?;
+    let source = fs::read_to_string(&grammar).map_err(io_error)?;
     let files = (if lsp || dap {
         unlaxer_generator::generate_file_with_protocols(&grammar, lsp, dap)
     } else {
         unlaxer_generator::generate_file(&grammar)
     })
     .map_err(|message| (3, message))?;
+    // Errors come first; under --strict a warning fails before anything is written.
+    let warnings = unlaxer_generator::warnings::report(
+        &unlaxer_generator::warnings::collect(&source),
+        strict,
+    )?;
+    if !warnings.is_empty() {
+        eprintln!("{warnings}");
+    }
     write_artifacts(&output, &files, check).map_err(io_error)?;
     Ok(format!(
         "{} {} Rust module files in {}",
@@ -397,10 +421,14 @@ fn reject_symlink_ancestors(path: &Path) -> io::Result<()> {
             }
             Ok(_) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error),
+            Err(error) => return Err(path_error(&normalized, error)),
         }
     }
     Ok(())
+}
+
+fn path_error(path: &Path, error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), format!("{}: {error}", path.display()))
 }
 
 fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::Result<()> {
@@ -408,6 +436,15 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
     // Preflight every artifact. Unsupported input and handwritten files cause no writes.
     for file in files {
         let destination = output.join(&file.relative_path);
+        reject_symlink_ancestors(&destination)?;
+        for parent in destination.ancestors().skip(1) {
+            if parent.exists() && !parent.is_dir() {
+                return Err(invalid(format!(
+                    "refusing non-directory {}",
+                    parent.display()
+                )));
+            }
+        }
         match fs::symlink_metadata(&destination) {
             Ok(metadata) => {
                 if metadata.file_type().is_symlink() || !metadata.is_file() {
@@ -416,7 +453,8 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
                         destination.display()
                     )));
                 }
-                let previous = fs::read_to_string(&destination)?;
+                let previous =
+                    fs::read_to_string(&destination).map_err(|e| path_error(&destination, e))?;
                 if check {
                     if previous != file.content {
                         return Err(invalid(format!(
@@ -432,21 +470,25 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
                 }
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound && !check => {}
-            Err(error) => return Err(error),
+            Err(error) => return Err(path_error(&destination, error)),
         }
     }
     if check {
         return Ok(());
     }
-    fs::create_dir_all(output)?;
+    fs::create_dir_all(output).map_err(|e| path_error(output, e))?;
     // Per-file replacement avoids truncation on a failed write and does not follow a
     // destination symlink introduced after preflight. This is not a directory transaction.
     for (i, file) in files.iter().enumerate() {
+        let destination = output.join(&file.relative_path);
+        fs::create_dir_all(destination.parent().unwrap())
+            .map_err(|e| path_error(&destination, e))?;
         let temporary = output.join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
         let mut handle = OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(&temporary)?;
+            .open(&temporary)
+            .map_err(|e| path_error(&destination, path_error(&temporary, e)))?;
         let result = (|| {
             handle.write_all(file.content.as_bytes())?;
             handle.sync_all()?;
@@ -456,7 +498,57 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
         if result.is_err() {
             let _ = fs::remove_file(&temporary);
         }
-        result?;
+        result.map_err(|e| path_error(&destination, e))?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod artifact_tests {
+    use super::*;
+    struct Scratch(PathBuf);
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn failed_child_write_preserves_the_root_index_and_names_the_path() {
+        let output =
+            std::env::temp_dir().join(format!("unlaxer-index-last-{}", std::process::id()));
+        fs::create_dir(&output).unwrap();
+        let _cleanup = Scratch(output.clone());
+        let source = "grammar A { @root @mapping(Value,params=[text]) Root ::= 'a' @text; } grammar B { @root @mapping(Value,params=[text]) Root ::= 'b' @text; }";
+        let files = unlaxer_generator::generate(source).unwrap();
+        assert_eq!(files.last().unwrap().relative_path, "mod.rs");
+        // Exclusive temp creation fails at the second artifact, after one child write.
+        let blocked = output.join(format!(".unlaxer-{}-1.tmp", std::process::id()));
+        fs::write(&blocked, "occupied").unwrap();
+        for existing in [false, true] {
+            if existing {
+                fs::write(
+                    output.join("mod.rs"),
+                    "// Generated by unlaxer RustBackend. old index",
+                )
+                .unwrap();
+            }
+            let error = write_artifacts(&output, &files, false).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(&output.join("grammar_a/ast.rs").display().to_string()),
+                "{error}"
+            );
+            assert!(output.join("grammar_a/mod.rs").is_file());
+            if existing {
+                assert_eq!(
+                    fs::read_to_string(output.join("mod.rs")).unwrap(),
+                    "// Generated by unlaxer RustBackend. old index"
+                );
+            } else {
+                assert!(!output.join("mod.rs").exists());
+            }
+        }
+    }
 }

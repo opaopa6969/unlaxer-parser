@@ -211,6 +211,10 @@ impl ParseContext<'_> {
     /// the enclosing invocation, which was active as well.
     pub(crate) fn leave_rule_frame(&mut self, failed: bool) {
         if failed {
+            // The body (or memo replay) restored the cursors. Record this entry's
+            // frame after freezing its body diagnostic. Reuse the existing failure
+            // branch; successful rules and deferred diagnostics do no extra work.
+            self.fail_parser_frame();
             if let Some(reach) = self.rule_stacks.active.last().and_then(|frame| frame.reach) {
                 self.offer_rule_candidate(reach);
             }

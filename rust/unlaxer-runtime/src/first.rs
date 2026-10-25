@@ -147,7 +147,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
                 FirstSet::EMPTY
             }
         }
-        Expr::Literal(text) => text
+        Expr::Literal(text) | Expr::JavaLiteral(text) => text
             .chars()
             .next()
             .map_or(FirstSet::NULLABLE, FirstSet::of_char),
@@ -202,6 +202,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         Expr::OwnedCapture(_, child)
         | Expr::CaptureScope(child)
         | Expr::Capture(_, child)
+        | Expr::MetadataCapture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
         | Expr::InputCaptureBoundary(_, child)
@@ -209,7 +210,14 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. } => of(child, rules),
         Expr::LexicalTriviaScope { .. } | Expr::LexicalContextScope { .. } => FirstSet::UNKNOWN,
-        Expr::TriviaScope { child, whitespace } => {
+        // Comment-only trivia may start with `/`; never exclude a candidate under it.
+        Expr::TriviaScope {
+            line_comments: true,
+            ..
+        } => FirstSet::UNKNOWN,
+        Expr::TriviaScope {
+            child, whitespace, ..
+        } => {
             let mut set = of(child, rules);
             set.trivia = match (set.trivia, whitespace) {
                 (Trivia::Dynamic, true) => Trivia::Always,

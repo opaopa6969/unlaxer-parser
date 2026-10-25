@@ -30,6 +30,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.unlaxer.context.ParseContext;
+import org.unlaxer.context.Memoization;
+import org.unlaxer.context.ParseOptions;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFMapper;
 import org.unlaxer.dsl.codegen.CodeGenerator.GeneratedSource;
@@ -60,7 +62,7 @@ public class RuleTriviaConformanceTest {
 
         JsonArray corpus = JsonParser.parseString(Files.readString(fixtureCorpus())).getAsJsonArray();
         var report = new ArrayList<>(List.of(
-            "fixture\tcase\tinput_json\texpected_prefix\tjava_prefix\texpected_ast\tjava_ast\trust"));
+            "fixture\tcase\tinput_json\texpected_prefix\tjava_prefix\texpected_ast\tjava_ast\trust\tjava_diagnostic"));
         var nativeReport = new ArrayList<>(report);
 
         int fixtureIndex = 0;
@@ -137,15 +139,25 @@ public class RuleTriviaConformanceTest {
                     JsonObject rust = JsonParser.parseString(rustLines.get(i)).getAsJsonObject();
                     JsonObject nativeRust = JsonParser.parseString(nativeRustLines.get(i)).getAsJsonObject();
 
-                    JsonArray javaPrefix = prefix(parser, input);
+                    JsonArray javaPrefix = prefix(parser, input, row);
                     assertEquals(context + " independent prefix cursor oracle", row.get("prefix"), javaPrefix);
                     assertEquals(context + " Java/Rust prefix cursor parity", javaPrefix, rust.get("prefix"));
                     assertEquals(context + " native-host independent prefix cursor oracle",
                         row.get("prefix"), nativeRust.get("prefix"));
+                    if (row.has("memoHitsAtLeast")) {
+                        for (int hit = 0; hit < 2; hit++) assertTrue(context + " Rust actual memo hits",
+                            rust.getAsJsonArray("memoHits").get(hit).getAsInt()
+                                >= row.getAsJsonArray("memoHitsAtLeast").get(hit).getAsInt());
+                    }
 
                     boolean accepted = row.get("accepted").getAsBoolean();
                     Optional<?> diagnostic =
                         (Optional<?>) mapper.getMethod("diagnose", String.class).invoke(null, input);
+                    for (var memo : Memoization.values()) for (var policy : ParseOptions.Diagnostics.values()) {
+                        Optional<?> configured = (Optional<?>) mapper.getMethod("diagnose", String.class, ParseOptions.class)
+                            .invoke(null, input, ParseOptions.withMemoization(memo).withDiagnostics(policy));
+                        assertEquals(context + " Java diagnostic " + memo + "/" + policy, diagnostic, configured);
+                    }
                     assertEquals(context + " Java full-input acceptance", accepted, diagnostic.isEmpty());
                     assertEquals(context + " Rust full-input acceptance", accepted,
                         !rust.get("ast").isJsonNull());
@@ -161,6 +173,16 @@ public class RuleTriviaConformanceTest {
                         assertEquals(context + " Java/Rust diagnostic category/location", javaDiagnostic, rust.get("diagnostic"));
                         assertEquals(context + " native-host independent diagnostic category/location",
                             row.get("diagnostic"), nativeRust.get("diagnostic"));
+                        if (row.has("expectedHints")) {
+                            JsonObject hints = row.getAsJsonObject("expectedHints");
+                            assertEquals(context + " Java native hints", hints.get("java"),
+                                new com.google.gson.Gson().toJsonTree(
+                                    failure.getClass().getMethod("expected").invoke(failure)));
+                            var rustHints = new JsonArray();
+                            for (var hex : rust.getAsJsonArray("expectedHex")) rustHints.add(new String(
+                                HexFormat.of().parseHex(hex.getAsString()), StandardCharsets.UTF_8));
+                            assertEquals(context + " Rust native hints", hints.get("rust"), rustHints);
+                        }
                     }
                     JsonElement expected = JsonNull.INSTANCE;
                     JsonElement javaAst = JsonNull.INSTANCE;
@@ -188,18 +210,18 @@ public class RuleTriviaConformanceTest {
                     }
                     report.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input")
                         + "\t" + row.get("prefix") + "\t" + javaPrefix + "\t" + expected + "\t"
-                        + javaAst + "\t" + rust);
+                        + javaAst + "\t" + rust + "\t" + diagnostic);
                     nativeReport.add(name + "\t" + row.get("id").getAsString() + "\t" + row.get("input")
                         + "\t" + row.get("prefix") + "\t" + javaPrefix + "\t" + expected + "\t"
-                        + javaAst + "\t" + nativeRust);
+                        + javaAst + "\t" + nativeRust + "\t" + diagnostic);
                 }
             }
         }
 
         Path target = Path.of("target");
         Files.createDirectories(target);
-        Files.write(target.resolve("rust-rule-trivia.tsv"), report, StandardCharsets.UTF_8);
-        Files.write(target.resolve("rust-rule-trivia-native.tsv"), nativeReport, StandardCharsets.UTF_8);
+        Files.write(target.resolve(reportName() + ".tsv"), report, StandardCharsets.UTF_8);
+        Files.write(target.resolve(reportName() + "-native.tsv"), nativeReport, StandardCharsets.UTF_8);
     }
 
     private URLClassLoader compileJava(GrammarDecl grammar) throws Exception {
@@ -230,18 +252,25 @@ public class RuleTriviaConformanceTest {
         return new URLClassLoader(new URL[]{output.toUri().toURL()}, getClass().getClassLoader());
     }
 
-    private JsonArray prefix(Parser parser, String input) throws Exception {
+    private JsonArray prefix(Parser parser, String input, JsonObject row) throws Exception {
         JsonArray expected = null;
-        for (boolean memo : new boolean[]{false, true}) {
+        for (var memo : Memoization.values()) for (var policy : ParseOptions.Diagnostics.values()) {
             var result = new JsonArray();
-            try (var context = new ParseContext(org.unlaxer.StringSource.createRootSource(input))) {
-                if (memo) context.enableMemoize();
+            try (var context = ParseContext.withOptions(org.unlaxer.StringSource.createRootSource(input),
+                    ParseOptions.withMemoization(memo).withDiagnostics(policy))) {
                 result.add(parser.parse(context).isSucceeded());
                 result.add(context.getConsumedPosition().value());
                 result.add(context.getMatchedPosition().value());
+                if (row.has("memoHitsAtLeast") && memo == Memoization.SAFE_FAILURES) {
+                    var hits = row.getAsJsonArray("memoHitsAtLeast");
+                    assertTrue(input + " Java failure memo hit " + policy,
+                        context.getPackratMemoTable().failureHits() >= hits.get(0).getAsInt());
+                    assertTrue(input + " Java success memo hit " + policy,
+                        context.getPackratMemoTable().successHits() >= hits.get(1).getAsInt());
+                }
             }
             if (expected == null) expected = result;
-            else assertEquals("Java memo OFF/ON prefix parity: " + input, expected, result);
+            else assertEquals("Java prefix " + memo + "/" + policy + ": " + input, expected, result);
         }
         return expected;
     }
@@ -292,8 +321,26 @@ public class RuleTriviaConformanceTest {
                     let memo_ok = generated::parser::parse_context(&mut memo_context).is_ok();
                     assert_eq!((prefix_ok, context.position(), context.matched_position()),
                         (memo_ok, memo_context.position(), memo_context.matched_position()));
-                    print!(r#"{{\"prefix\":[{},{},{}],\"ast\":"#,
-                        prefix_ok, context.position(), context.matched_position());
+                    let mut hits = [usize::MAX; 2];
+                    for memo in [unlaxer_runtime::Memoization::Off, unlaxer_runtime::Memoization::SafeFailures] {
+                        for policy in [unlaxer_runtime::Diagnostics::Detailed,
+                            unlaxer_runtime::Diagnostics::DetailedOnFailure, unlaxer_runtime::Diagnostics::Auto] {
+                            let configured = unlaxer_runtime::ParseOptions::with_memoization(memo).with_diagnostics(policy);
+                            let mut probe = unlaxer_runtime::ParseContext::with_options(&input, configured);
+                            let ok = generated::parser::parse_context(&mut probe).is_ok();
+                            if memo == unlaxer_runtime::Memoization::SafeFailures {
+                                hits[0] = hits[0].min(probe.memoized_failure_hits());
+                                hits[1] = hits[1].min(probe.memoized_success_hits());
+                            }
+                            assert_eq!((prefix_ok, context.position(), context.matched_position()),
+                                (ok, probe.position(), probe.matched_position()), "prefix: {memo:?}/{policy:?}: {input}");
+                            assert_eq!(generated::parser::parse_tree_detailed(&input).err(),
+                                generated::parser::parse_tree_detailed_with_options(&input, configured).err(),
+                                "diagnostic: {memo:?}/{policy:?}: {input}");
+                        }
+                    }
+                    print!(r#"{{\"prefix\":[{},{},{}],\"memoHits\":{:?},\"ast\":"#,
+                        prefix_ok, context.position(), context.matched_position(), hits);
                     match generated::parser::parse_tree_detailed(&input) {
                         Ok(tree) => {
                             let ast = generated::mapper::map(&tree).unwrap();
@@ -306,6 +353,9 @@ public class RuleTriviaConformanceTest {
                         Err(error) => {
                             assert_eq!(error, generated::parser::parse_tree_detailed_with_options(&input, options).unwrap_err());
                             print!(r#"null,\"diagnostic\":[\"{}\",{}]"#, error.kind, error.offset);
+                            let hints: Vec<String> = error.expected.iter().map(|hint|
+                                hint.as_bytes().iter().map(|byte| format!("{byte:02x}")).collect()).collect();
+                            print!(r#",\"expectedHex\":{:?}"#, hints);
                         }
                     }
                     println!("}}");
@@ -315,6 +365,9 @@ public class RuleTriviaConformanceTest {
     }
 
     protected boolean explicitClassicMapping() { return false; }
+
+    /** Base name of the required CI artifacts written under {@code target/}. */
+    protected String reportName() { return "rust-rule-trivia"; }
 
     protected Path fixtureCorpus() {
         return repo.resolve("unlaxer-dsl/src/test/resources/rule-trivia/corpus.json");

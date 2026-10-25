@@ -119,7 +119,9 @@ span は注釈 `@autoCommit` の位置）を返す。`reason` は次のどれか
 | `unreachable` | root からたどれない |
 
 解析できたが候補が無い規則は警告しない（なぜ無いかは lint の位置で確かめる）。frontend の構文解析は
-警告を出さずに注釈を取り除くので、警告は lint の API から得る。
+警告を出さずに注釈を取り除くので、警告は lint の API か、生成の警告（`GenerationWarnings.collect` /
+`unlaxer_generator::warnings::collect`）から得る。生成の CLI はこれを表示し、`--strict` / `--fail-on warning`
+では失敗する（#715、[契約](simple-annotations.md#生成の警告を-cli-まで届ける)）。
 
 ## 条件
 
@@ -153,8 +155,8 @@ FIRST 集合は runtime の `FirstSet` と同じ表現で持つ。ASCII（0〜12
 次のどれかに当たる文法は解析しない（lint は空、挿入しない）。
 
 - 設定が `@package` `@ubnf` `@memoSafeToken` `@feature` `@whitespace: none` `@whitespace: javaStyle`
-  以外を含む。`@comment`（#712 が入るまで Java と Rust で動きが違う）、宣言的 token を空白にする
-  `@whitespace: 名前`、トークン列の文法（`@tokenStream`）、埋め込み、token adapter / contract は
+  以外を含む。`@comment`（Java と Rust の意味は #712 で揃ったが、解析への組み込みは #745）、
+  宣言的 token を空白にする `@whitespace: 名前`、トークン列の文法（`@tokenStream`）、埋め込み、token adapter / contract は
   トークン境界の位置を変えるので対象外。javaStyle の綴りは、両端の ASCII 空白（空白・tab・改行・
   `\v`・`\f`）を除いて ASCII の大文字小文字を区別せずに比べる。両 generator はこれより広く trim し、
   大文字小文字を区別せずに比べるので、ここで javaStyle と判定した文法は両 host とも javaStyle で生成する。
@@ -349,7 +351,8 @@ FIRST が T₀ と交わる終端記号・token は unknown にする。素の�
 
 ### まだ対象にしないもの
 
-- `@comment`：Java と Rust で読み飛ばす範囲が違う（#712）。#712 の後に別 issue にする。
+- `@comment`：読み飛ばす範囲は #712 で Java と Rust の両生成経路で揃った（[trivia 契約](rule-trivia.md#global-comment712)）。
+  ただし T₀ と命題への組み込みはまだで、`W-AUTO-COMMIT-SKIPPED`（reason=grammar）のまま。#745 で扱う。
 - `@whitespace: 名前`（宣言的 token の空白）：T₀ を token ごとに求める必要がある。`@whitespace`
   の値として組み込みの javaStyle だけを対象にした。
 - 規則の `@whitespace` / `@interleave`、`@lexicalContext`、`@tokenStream`、埋め込み、token adapter /
@@ -448,7 +451,7 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ub
 ## 制限事項
 
 - 空白を自動で挟む文法のうち、解析するのは文法全体の `@whitespace: javaStyle` だけである。`@comment`
-  （#712 の後に別 issue）、宣言的 token の空白（`@whitespace: 名前`）、規則の `@whitespace` /
+  （#745）、宣言的 token の空白（`@whitespace: 名前`）、規則の `@whitespace` /
   `@interleave` は解析しない。
 - javaStyle の文法では、空白か `/` で始まり得る終端記号・token（`'/'`、`' '`、`ANY`、`NEGATION`、
   XID 識別子（`XID_IDENTIFIER`。FIRST を全体で近似しているため）、空白を含む `CHAR_RANGE` など）は
@@ -467,10 +470,13 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ub
 - 判定は保守的で、意味を変えない位置でも報告しないことがある（例: corpus の
   `separated-trailing`）。
 - 解析の対象外の文法（`@comment`・宣言的 token の空白などのある文法）、不透明な規則、到達できない規則では、frontend は注釈を
-  警告なしに取り除く。警告 `W-AUTO-COMMIT-SKIPPED` は lint の API（`lintWarnings` /
-  `lint_warnings`）から得る。解析できたが候補が無い規則は警告しない。
+  取り除く。警告 `W-AUTO-COMMIT-SKIPPED` は lint の API（`lintWarnings` /
+  `lint_warnings`）と、生成の警告（`GenerationWarnings` / `warnings::collect`）から得る。生成の CLI
+  （native `unlaxer generate`、Java-host `generate --target rust`、Java の flag CLI）も表示し、
+  `--strict` / `--fail-on warning` では失敗する（#715、[契約](simple-annotations.md#生成の警告を-cli-まで届ける)）。
+  解析できたが候補が無い規則は警告しない。生成に作用しない Simple annotation を持つ規則も opaque になる。
 - lint（すべての規則を調べる）は、候補ごとに文脈を root までたどるので、大きな文法では規則数の
   2 乗に近い時間がかかり得る。frontend の書き換えは注釈を付けた規則だけを調べる。
-- lint の CLI は無い。Java / Rust の API から呼ぶ。
+- lint（`I-AUTO-COMMIT`）の CLI は無い。Java / Rust の API から呼ぶ。`W-AUTO-COMMIT-SKIPPED` は生成の CLI に出る（#715）。
 - `COMMIT` を含む文法は #700 のとおり snapshot 全体の incremental cache の対象外なので、
   `@autoCommit` で `COMMIT` が入った文法も対象外になる。

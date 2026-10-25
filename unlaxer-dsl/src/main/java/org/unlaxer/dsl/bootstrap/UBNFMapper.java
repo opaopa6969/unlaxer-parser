@@ -912,14 +912,20 @@ public class UBNFMapper {
     }
 
     PrecedenceAnnotation toPrecedenceAnnotation(Token token) {
-        return bind(mapPrecedenceAnnotation(token), token);
+        var annotation = bind(mapPrecedenceAnnotation(token), token);
+        if (PrecedenceLevels.overflow(annotation)) {
+            var positions = sourceSnapshot != null ? sourceSnapshot
+                : new UBNFSourceSnapshot.Builder(token.source.root().toString());
+            PrecedenceLevels.remember(annotation, positions.tokenSpan(token).orElseThrow());
+        }
+        return annotation;
     }
 
     private PrecedenceAnnotation mapPrecedenceAnnotation(Token token) {
         List<Token> numberTokens = findDescendants(token, UBNFParsers.UnsignedIntegerParser.class);
         int level = numberTokens.isEmpty()
             ? 0
-            : Integer.parseInt(numberTokens.get(0).source.toString().trim());
+            : BoundedQuantifiers.bound(numberTokens.get(0).source.toString().trim());
         return new PrecedenceAnnotation(level);
     }
 
@@ -1082,7 +1088,7 @@ public class UBNFMapper {
                     : new OptionalElement(wrapElementInSequenceBody(baseElement));
             extend(element, baseElement, postfixTokens.get(0));
         } else if (!boundedTokens.isEmpty()) {
-            element = parseBoundedRepeat(boundedTokens.get(0), baseElement);
+            element = parseBoundedRepeat(boundedTokens.get(0), baseElement, baseAtomicTokens.get(0));
         } else if (!separatedTokens.isEmpty()) {
             List<Token> sepAtomicTokens = findDescendants(
                 separatedTokens.get(0), UBNFParsers.AtomicElementParser.class);
@@ -1115,7 +1121,7 @@ public class UBNFMapper {
      * Parses a BoundedQuantifierParser token and wraps baseElement in a BoundedRepeatElement.
      * Handles: {n}  {n,m}  {n,}
      */
-    private BoundedRepeatElement parseBoundedRepeat(Token boundedToken, AtomicElement baseElement) {
+    private BoundedRepeatElement parseBoundedRepeat(Token boundedToken, AtomicElement baseElement, Token baseToken) {
         // Collect all DigitParser groups in the bounded token.
         // BoundedQuantifierParser structure: '{' OneOrMore(Digit) [CommaParser [OneOrMore(Digit)?]] '}'
         // We extract the digit runs as strings by scanning children.
@@ -1126,14 +1132,23 @@ public class UBNFMapper {
         int min, max;
         if (commaIdx < 0) {
             // {n}
-            min = Integer.parseInt(inner.trim());
+            min = BoundedQuantifiers.bound(inner.trim());
             max = min;
         } else {
-            min = Integer.parseInt(inner.substring(0, commaIdx).trim());
+            min = BoundedQuantifiers.bound(inner.substring(0, commaIdx).trim());
             String maxStr = inner.substring(commaIdx + 1).trim();
-            max = maxStr.isEmpty() ? BoundedRepeatElement.UNBOUNDED : Integer.parseInt(maxStr);
+            max = maxStr.isEmpty() ? BoundedRepeatElement.UNBOUNDED : BoundedQuantifiers.bound(maxStr);
         }
-        return extend(new BoundedRepeatElement(baseElement, min, max), baseElement, boundedToken);
+        var repeat = extend(new BoundedRepeatElement(baseElement, min, max), baseElement, boundedToken);
+        if (BoundedQuantifiers.overflow(repeat)) {
+            // Only invalid bounds need extra origins on the position-free parse path.
+            var positions = sourceSnapshot != null ? sourceSnapshot
+                : new UBNFSourceSnapshot.Builder(boundedToken.source.root().toString());
+            var span = positions.tokenSpan(baseToken).orElseThrow()
+                .through(positions.tokenSpan(boundedToken).orElseThrow());
+            BoundedQuantifiers.remember(repeat, span);
+        }
+        return repeat;
     }
 
     Optional<String> findCaptureNameInAnnotatedElement(Token token) {
@@ -1367,7 +1382,7 @@ public class UBNFMapper {
         // BoundedQuantifier suffix
         List<Token> boundedTokens = findDescendants(token, UBNFParsers.BoundedQuantifierParser.class);
         if (false == boundedTokens.isEmpty()) {
-            return parseBoundedRepeat(boundedTokens.get(0), base);
+            return parseBoundedRepeat(boundedTokens.get(0), base, refTokens.get(0));
         }
 
         // SeparatedBy suffix

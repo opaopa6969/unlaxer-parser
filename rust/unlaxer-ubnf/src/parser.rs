@@ -120,13 +120,15 @@ impl Parser<'_> {
         crate::codepoint_escapes::decode(&self.source[span.byte_start..span.byte_end])
             .map_err(|error| self.invalid(span, error))
     }
-    fn integer(&mut self) -> Result<u32> {
+    // Syntax accepts every ASCII digit run; validation owns the signed-32-bit limit.
+    fn repeat_bound(&mut self) -> Result<u32> {
         if let Kind::Number(value) = &self.current().kind {
             let number = value
-                .parse::<i32>()
-                .map_err(|_| self.invalid(self.current().span, "integer exceeds 2147483647"))?;
+                .parse::<u32>()
+                .unwrap_or(u32::MAX)
+                .min(i32::MAX as u32 + 1);
             self.pos += 1;
-            Ok(number as u32)
+            Ok(number)
         } else {
             Err(self.error("expected unsigned ASCII integer"))
         }
@@ -607,8 +609,29 @@ impl Parser<'_> {
     fn annotation(&mut self) -> Result<Annotation> {
         let start = self.current().span;
         self.expect('@')?;
+        // Java's annotation keywords are single words (`@leftAssoc`, `@mapping(`), while its
+        // catch-all is `'@' IDENTIFIER` with ordinary trivia between: `@ leftAssoc` and an
+        // argument keyword without its `(` are Simple annotations there (#715).
+        let spaced = self.current().span.byte_start != self.previous().byte_end;
         let name = self.identifier()?;
+        let bare = !self.is('(')
+            && matches!(
+                name.as_str(),
+                "mapping"
+                    | "eval"
+                    | "lexicalContext"
+                    | "interleave"
+                    | "backref"
+                    | "scopeTree"
+                    | "declares"
+                    | "catalog"
+                    | "precedence"
+                    | "doc"
+                    | "recovery"
+                    | "commonField"
+            );
         let kind = match name.as_str() {
+            _ if spaced || bare => self.simple_annotation(start, name)?,
             "root" => AnnotationKind::Root,
             "leftAssoc" => AnnotationKind::LeftAssoc,
             "rightAssoc" => AnnotationKind::RightAssoc,
@@ -753,7 +776,8 @@ impl Parser<'_> {
             "precedence" => {
                 self.expect('(')?;
                 self.named_arg("level")?;
-                let level = self.integer()? as i32;
+                // MAX+1 becomes i32::MIN: transport overflow to semantic validation.
+                let level = self.repeat_bound()? as i32;
                 self.expect(')')?;
                 AnnotationKind::Precedence { level }
             }
@@ -798,22 +822,23 @@ impl Parser<'_> {
                 self.expect(')')?;
                 AnnotationKind::CommonField { fields }
             }
-            _ => {
-                if self.is('(') {
-                    return Err(diagnostic(
-                        self.source,
-                        self.span_from(start),
-                        DiagnosticKind::UnsupportedSyntax,
-                        format!("unknown parameterized annotation @{name}"),
-                    ));
-                }
-                AnnotationKind::Simple { name }
-            }
+            _ => self.simple_annotation(start, name)?,
         };
         Ok(Spanned {
             kind,
             span: self.span_from(start),
         })
+    }
+    fn simple_annotation(&self, start: Span, name: String) -> Result<AnnotationKind> {
+        if self.is('(') {
+            return Err(diagnostic(
+                self.source,
+                self.span_from(start),
+                DiagnosticKind::UnsupportedSyntax,
+                format!("unknown parameterized annotation @{name}"),
+            ));
+        }
+        Ok(AnnotationKind::Simple { name })
     }
     fn body(&mut self) -> Result<RuleBody> {
         if self.depth >= MAX_NESTING {
@@ -855,20 +880,50 @@ impl Parser<'_> {
             span: self.span_from(start),
         })
     }
+    // Only `atomic` recurses. The prefix, postfix and capture parsing run in their own
+    // frames, so a debug build keeps one small frame per level and reaches the nesting
+    // limit within a 2 MiB stack (#805).
     fn element(&mut self) -> Result<AnnotatedElement> {
         let start = self.current().span;
-        let mut typeof_span = None;
-        let typeof_constraint = if self.annotation_is("typeof") {
-            self.pos += 2;
-            self.expect('(')?;
-            let name = self.identifier()?;
-            self.expect(')')?;
-            typeof_span = Some(self.span_from(start));
-            Some(name)
+        let prefix = self.typeof_prefix(start)?;
+        let element = self.atomic()?;
+        // The postfix operators below are alternatives of one token, so testing '%'
+        // first keeps the original precedence.
+        let element = if self.eat('%') {
+            let separator = self.atomic()?;
+            self.separated(element, separator)
         } else {
-            None
+            self.postfix(element)?
         };
-        let mut element = self.atomic()?;
+        self.annotated(start, prefix, element)
+    }
+
+    #[inline(never)]
+    fn typeof_prefix(&mut self, start: Span) -> Result<(Option<String>, Option<Span>)> {
+        if !self.annotation_is("typeof") {
+            return Ok((None, None));
+        }
+        self.pos += 2;
+        self.expect('(')?;
+        let name = self.identifier()?;
+        self.expect(')')?;
+        Ok((Some(name), Some(self.span_from(start))))
+    }
+
+    #[inline(never)]
+    fn separated(&self, element: AtomicElement, separator: AtomicElement) -> AtomicElement {
+        let element_start = element.span;
+        Spanned {
+            kind: ElementKind::Separated {
+                element: Box::new(element),
+                separator: Box::new(separator),
+            },
+            span: self.span_from(element_start),
+        }
+    }
+
+    #[inline(never)]
+    fn postfix(&mut self, mut element: AtomicElement) -> Result<AtomicElement> {
         let element_start = element.span;
         if self.eat('+') {
             element = Spanned {
@@ -909,12 +964,12 @@ impl Parser<'_> {
                 .is_some_and(|t| matches!(t.kind, Kind::Number(_)))
         {
             self.pos += 1;
-            let min = self.integer()?;
+            let min = self.repeat_bound()?;
             let max = if self.eat(',') {
                 if self.is('}') {
                     None
                 } else {
-                    Some(self.integer()?)
+                    Some(self.repeat_bound()?)
                 }
             } else {
                 Some(min)
@@ -928,16 +983,17 @@ impl Parser<'_> {
                 },
                 span: self.span_from(element_start),
             };
-        } else if self.eat('%') {
-            let separator = self.atomic()?;
-            element = Spanned {
-                kind: ElementKind::Separated {
-                    element: Box::new(element),
-                    separator: Box::new(separator),
-                },
-                span: self.span_from(element_start),
-            };
         }
+        Ok(element)
+    }
+
+    #[inline(never)]
+    fn annotated(
+        &mut self,
+        start: Span,
+        (typeof_constraint, typeof_span): (Option<String>, Option<Span>),
+        element: AtomicElement,
+    ) -> Result<AnnotatedElement> {
         // @typeof belongs to the next element, not to a capture named "typeof".
         let mut capture_span = None;
         let capture = if self.is('@')
@@ -978,55 +1034,78 @@ impl Parser<'_> {
     }
 
     // Builtin calls stay out of the recursive atomic() frame, so deep nesting reaches
-    // the nesting-limit diagnostic instead of the thread's stack limit.
+    // the nesting-limit diagnostic instead of the thread's stack limit. Each operation
+    // parses in its own frame and the arms share one result, so the frame kept per
+    // nesting level stays small in debug builds (#805).
     #[inline(never)]
-    fn builtin_call(&mut self) -> Result<ElementKind> {
+    fn builtin_call(&mut self) -> Result<AtomicElement> {
+        let start = self.current().span;
         let operation = self.identifier()?;
         self.expect('(')?;
         let kind = match operation.as_str() {
-            "CAPTURE" => {
-                let name = self.identifier()?;
-                self.expect(',')?;
-                ElementKind::OwnedCapture {
-                    name,
-                    body: self.body()?,
-                }
-            }
-            "SAME_AS" => ElementKind::Replay {
-                name: self.identifier()?,
-            },
-            "CAPTURE_SCOPE" => ElementKind::CaptureScope(self.body()?),
-            "COMMIT" => {
-                let body = self.body()?;
-                let message = if self.eat(',') {
-                    Some(self.quoted()?)
-                } else {
-                    None
-                };
-                ElementKind::Commit { body, message }
-            }
-            "LABEL" => {
-                let label = self.identifier()?;
-                self.expect(',')?;
-                ElementKind::Label {
-                    label,
-                    body: self.body()?,
-                }
-            }
-            "CATCH" => {
-                let body = self.body()?;
-                self.expect(',')?;
-                let alternative = self.body()?;
-                let mut labels = Vec::new();
-                while self.eat(',') {
-                    labels.push(self.identifier()?);
-                }
-                crate::ast::catch_element(body, alternative, labels)
-            }
+            "CAPTURE" => self.owned_capture_call(),
+            "SAME_AS" => self.replay_call(),
+            "CAPTURE_SCOPE" => self.body().map(ElementKind::CaptureScope),
+            "COMMIT" => self.commit_call(),
+            "LABEL" => self.label_call(),
+            "CATCH" => self.catch_call(),
             _ => unreachable!(),
-        };
+        }?;
         self.expect(')')?;
-        Ok(kind)
+        Ok(Spanned {
+            kind,
+            span: self.span_from(start),
+        })
+    }
+
+    #[inline(never)]
+    fn owned_capture_call(&mut self) -> Result<ElementKind> {
+        let name = self.identifier()?;
+        self.expect(',')?;
+        Ok(ElementKind::OwnedCapture {
+            name,
+            body: self.body()?,
+        })
+    }
+
+    #[inline(never)]
+    fn replay_call(&mut self) -> Result<ElementKind> {
+        Ok(ElementKind::Replay {
+            name: self.identifier()?,
+        })
+    }
+
+    #[inline(never)]
+    fn commit_call(&mut self) -> Result<ElementKind> {
+        let body = self.body()?;
+        let message = if self.eat(',') {
+            Some(self.quoted()?)
+        } else {
+            None
+        };
+        Ok(ElementKind::Commit { body, message })
+    }
+
+    #[inline(never)]
+    fn label_call(&mut self) -> Result<ElementKind> {
+        let label = self.identifier()?;
+        self.expect(',')?;
+        Ok(ElementKind::Label {
+            label,
+            body: self.body()?,
+        })
+    }
+
+    #[inline(never)]
+    fn catch_call(&mut self) -> Result<ElementKind> {
+        let body = self.body()?;
+        self.expect(',')?;
+        let alternative = self.body()?;
+        let mut labels = Vec::new();
+        while self.eat(',') {
+            labels.push(self.identifier()?);
+        }
+        Ok(crate::ast::catch_element(body, alternative, labels))
     }
 
     /// `Name(` where Name has a `Name(params) ::=` definition in this file. Builtin
@@ -1070,31 +1149,52 @@ impl Parser<'_> {
         })
     }
 
+    // Recursive forms leave this frame before any leaf parsing (#805).
     fn atomic(&mut self) -> Result<AtomicElement> {
         if self.at_parameterized_call() {
             return self.parameterized_call();
         }
-        let start = self.current().span;
-        let owned_call = matches!(&self.current().kind, Kind::Identifier(name)
+        if self.at_builtin_call() {
+            return self.builtin_call();
+        }
+        if matches!(self.current().kind, Kind::Symbol('(' | '[' | '{')) {
+            return self.bracketed();
+        }
+        self.leaf()
+    }
+
+    #[inline(never)]
+    fn at_builtin_call(&self) -> bool {
+        matches!(&self.current().kind, Kind::Identifier(name)
             if matches!(name.as_str(), "CAPTURE" | "SAME_AS" | "CAPTURE_SCOPE" | "COMMIT" | "LABEL" | "CATCH"))
             && self.tokens.get(self.pos + 1).is_some_and(|t| {
                 t.kind == Kind::Symbol('(') && self.current().span.byte_end == t.span.byte_start
-            });
-        let kind = if owned_call {
-            self.builtin_call()?
-        } else if self.eat('(') {
-            let body = self.body()?;
-            self.expect(')')?;
-            ElementKind::Group(body)
+            })
+    }
+
+    #[inline(never)]
+    fn bracketed(&mut self) -> Result<AtomicElement> {
+        let start = self.current().span;
+        let (close, kind): (char, fn(RuleBody) -> ElementKind) = if self.eat('(') {
+            (')', ElementKind::Group)
         } else if self.eat('[') {
-            let body = self.body()?;
-            self.expect(']')?;
-            ElementKind::Optional(body)
-        } else if self.eat('{') {
-            let body = self.body()?;
-            self.expect('}')?;
-            ElementKind::Repeat(body)
-        } else if matches!(self.current().kind, Kind::Quoted(_)) {
+            (']', ElementKind::Optional)
+        } else {
+            self.expect('{')?;
+            ('}', ElementKind::Repeat)
+        };
+        let body = self.body()?;
+        self.expect(close)?;
+        Ok(Spanned {
+            kind: kind(body),
+            span: self.span_from(start),
+        })
+    }
+
+    #[inline(never)]
+    fn leaf(&mut self) -> Result<AtomicElement> {
+        let start = self.current().span;
+        let kind = if matches!(self.current().kind, Kind::Quoted(_)) {
             ElementKind::Terminal(self.quoted()?)
         } else if self.word_is("ERROR")
             && self

@@ -176,8 +176,16 @@ pub fn check_ast(file: &UbnfFile) -> Report {
     let mut inventory = Inventory {
         diagnostics: Vec::new(),
     };
-    if file.grammars.len() != 1 {
+    if file.grammars.is_empty() {
         inventory.add("P-GRAMMAR-COUNT", "expected one grammar", file.span);
+    }
+    for grammar in &file.grammars {
+        if !crate::grammar_files::valid_name(grammar) {
+            inventory.add("P-GRAMMAR-NAME", &grammar.name, grammar.span);
+        }
+    }
+    for (grammar, module) in crate::grammar_files::collisions(file) {
+        inventory.add("P-OUTPUT-COLLISION", module, grammar.span);
     }
     for grammar in &file.grammars {
         inventory.grammar(grammar);
@@ -263,6 +271,9 @@ impl Inventory {
         for problem in crate::raising::problems(grammar) {
             self.add(problem.code, problem.subject, problem.span);
         }
+        for issue in crate::global_comment::problems(grammar) {
+            self.add(issue.code, issue.subject, issue.span);
+        }
         for import in &grammar.imports {
             self.add("P-IMPORT", &import.path, import.span);
         }
@@ -282,7 +293,8 @@ impl Inventory {
                             | "tokenProgressContractsV1"
                             | "declarativeTokensV1"
                     ) => {}
-                ("tokenAdapter" | "tokenContract" | "embedded", _) => {}
+                // @comment has its own E-COMMENT-* diagnostics, including the block form check.
+                ("tokenAdapter" | "tokenContract" | "embedded" | "comment", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
                     if !named_whitespace(grammar, value) {
                         self.add("P-WHITESPACE", value, setting.value_span);
@@ -374,11 +386,9 @@ impl Inventory {
             AnnotationKind::Eval { .. } => {}
             AnnotationKind::Doc { .. } | AnnotationKind::Recovery { .. } => {}
             AnnotationKind::Skip => {}
-            AnnotationKind::Simple { name } => {
-                if name != "nestedCaptures" {
-                    self.add("P-ANNOTATION", name, span);
-                }
-            }
+            // Generated as if absent, like Java; `simple_annotations::warnings` reports the
+            // ignored ones as W-ANNOTATION-IGNORED (#715), so P-ANNOTATION is no longer issued.
+            AnnotationKind::Simple { .. } => {}
             AnnotationKind::CommonField { .. } => {}
             AnnotationKind::Enum => {}
         }

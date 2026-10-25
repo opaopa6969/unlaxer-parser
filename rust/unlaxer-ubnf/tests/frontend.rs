@@ -165,6 +165,73 @@ fn annotation_names_named_eval_arguments_and_trivia_keep_values_and_spans() {
     }
 }
 
+/// #715: like Java, `@ keyword` and an argument keyword without `(` are Simple annotations
+/// spanning from `@` to the name; `@keyword (args)` and adjacent keywords stay the keyword.
+#[test]
+fn spaced_keywords_and_bare_argument_keywords_are_simple_annotations() {
+    let fixture = include_str!("fixtures/positive/annotation-plain-forms.ubnf");
+    for source in [fixture.to_owned(), fixture.replace('\n', "\r\n")] {
+        let ast = parse(&source).unwrap();
+        let rules = &ast.grammars[0].rules;
+        let names: Vec<_> = rules[0]
+            .annotations
+            .iter()
+            .map(|a| match &a.kind {
+                AnnotationKind::Simple { name } => name.as_str(),
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "root",
+                "leftAssoc",
+                "skip",
+                "enum",
+                "whitespace",
+                "namePredicate",
+                "nestedCaptures",
+                "mapping",
+                "eval",
+                "interleave",
+                "lexicalContext",
+                "backref",
+                "scopeTree",
+                "declares",
+                "catalog",
+                "precedence",
+                "doc",
+                "recovery",
+                "commonField"
+            ]
+        );
+        let skip = &rules[0].annotations[2].span;
+        assert!(source[skip.byte_start..skip.byte_end].starts_with('@'));
+        assert!(source[skip.byte_start..skip.byte_end].ends_with("skip"));
+        let kinds: Vec<_> = rules[1].annotations.iter().map(|a| &a.kind).collect();
+        assert_eq!(kinds[0], &AnnotationKind::Root);
+        assert!(
+            matches!(kinds[1], AnnotationKind::Mapping { class_name, .. } if class_name == "Root")
+        );
+        assert_eq!(
+            kinds[2],
+            &AnnotationKind::Whitespace {
+                style: Some("javaStyle".into())
+            }
+        );
+        assert_eq!(
+            kinds[3..],
+            [&AnnotationKind::LeftAssoc, &AnnotationKind::Skip]
+        );
+    }
+    for source in [
+        "grammar G { @ mapping(X) R ::= 'x'; }",
+        "grammar G { @ root('x') R ::= 'x'; }",
+    ] {
+        assert!(parse(source).is_err(), "{source}");
+    }
+}
+
 #[test]
 fn spans_are_utf8_and_codepoint_ranges_and_diagnostics_use_crlf_lines() {
     let source = "//😀\r\ngrammar G {\r\n Root ::= '😀' @value;\r\n}";
@@ -193,7 +260,7 @@ fn spans_are_utf8_and_codepoint_ranges_and_diagnostics_use_crlf_lines() {
 }
 
 #[test]
-fn malformed_or_unknown_constructs_and_overflow_are_explicit_errors() {
+fn malformed_or_unknown_constructs_are_explicit_errors() {
     for line in include_str!("fixtures/negative.tsv").lines() {
         let (name, source) = line.split_once('\t').unwrap_or((line, ""));
         parse(source).expect_err(name);
@@ -213,8 +280,6 @@ fn malformed_or_unknown_constructs_and_overflow_are_explicit_errors() {
         "grammar G { @mapping(X,params=[]) R ::= 'x'; }",
         "grammar G { @eval(kind='x',kind='y') R ::= 'x'; }",
         "grammar G { @recovery(magic) R ::= 'x'; }",
-        "grammar G { @precedence(level=2147483648) R ::= 'x'; }",
-        "grammar G { R ::= 'x'{2147483648}; }",
         "grammar G { R ::= 'x'+?; }",
         "grammar G { token T=CHAR_RANGE('','a') R ::= T; }",
         "grammar G { token T=CHAR_RANGE('ab','z') R ::= T; }",

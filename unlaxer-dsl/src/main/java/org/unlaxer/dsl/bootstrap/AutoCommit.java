@@ -111,6 +111,16 @@ public final class AutoCommit {
     }
 
     /**
+     * Whether {@code @autoCommit} analyses this grammar: it has an {@code @autoCommit} rule (pass the
+     * tree of {@link #parseBeforeAutoCommit}) and is inside the analysed subset. Its other rules then
+     * take part in the analysis unless an annotation makes them opaque (#715). The native
+     * {@code auto_commit::analyses} is the same predicate.
+     */
+    public static boolean analyses(GrammarDecl grammar) {
+        return grammar.rules().stream().anyMatch(AutoCommit::annotated) && Analysis.create(grammar) != null;
+    }
+
+    /**
      * One warning per {@code @autoCommit} that cannot insert anything, in rule order. Pass the tree
      * of {@link #parseBeforeAutoCommit}: the rewritten tree no longer has the annotation.
      */
@@ -315,7 +325,7 @@ public final class AutoCommit {
                 if (inner != repeat.body()) result = new OneOrMoreElement(inner);
             } else if (element instanceof BoundedRepeatElement repeat) {
                 AtomicElement inner = element(repeat.body());
-                if (inner != repeat.body()) result = new BoundedRepeatElement(inner, repeat.min(), repeat.max());
+                if (inner != repeat.body()) result = BoundedQuantifiers.copy(new BoundedRepeatElement(inner, repeat.min(), repeat.max()), repeat);
             } else if (element instanceof SeparatedElement separated) {
                 AtomicElement item = element(separated.element());
                 AtomicElement separator = element(separated.separator());

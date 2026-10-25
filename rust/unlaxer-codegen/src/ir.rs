@@ -182,6 +182,8 @@ pub enum Expression {
     /// A word. `Literal("")` is Java's lexical `LiteralParser("")`, used only in
     /// token-stream or lexical-context grammars: zero-width success.
     Literal(String),
+    /// Nonempty Java Lexing.LiteralParser; Classic inversion is a zero-width assertion.
+    LexicalLiteral(String),
     /// UBNF `''` as Java `WordParser("")`: never matches; expects the empty word.
     EmptyWordToken,
     /// Always fails without consuming input; the message is an expected hint.
@@ -251,6 +253,8 @@ pub enum Expression {
     TriviaScope {
         child: Box<Expression>,
         java_whitespace: bool,
+        /// Only the Java `CPPComment` form of a global `@comment` (#712).
+        line_comments: bool,
     },
 }
 

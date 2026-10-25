@@ -700,6 +700,28 @@ impl ParseContext<'_> {
                     full && (raw.starts_with(word) != mode.invert),
                 )
             }
+            Expr::JavaLiteral(word) => {
+                let end = match &mut self.lexing {
+                    Some(session) => {
+                        session.match_at(word, true, None, start, self.lexical_context.as_ref())
+                    }
+                    None => match &self.lexical_context {
+                        Some(goal) => {
+                            super::lexing::match_goal(self.input, start, word, true, goal)
+                        }
+                        None => raw.starts_with(word).then_some(start + word.len()),
+                    },
+                };
+                (
+                    "LiteralParser",
+                    if mode.invert {
+                        start
+                    } else {
+                        end.unwrap_or(start)
+                    },
+                    end.is_some() != mode.invert,
+                )
+            }
             Expr::CaseInsensitive(word) => {
                 let mut input = raw.chars();
                 let mut end = start;
@@ -856,7 +878,9 @@ impl ParseContext<'_> {
                 self.fail_at(
                     at,
                     match expression {
-                        Expr::Literal(word) | Expr::CaseInsensitive(word) => word,
+                        Expr::Literal(word)
+                        | Expr::JavaLiteral(word)
+                        | Expr::CaseInsensitive(word) => word,
                         Expr::JavaEmptyWord | Expr::JavaEmptyLiteral => "",
                         Expr::LongCodeBlock => "long code block",
                         _ => "character",
@@ -875,7 +899,10 @@ impl ParseContext<'_> {
             end: self.code_point(end),
         };
         if mode.kind.is_consumed()
-            && !(matches!(expression, Expr::Lexical(_, _) | Expr::JavaEmptyLiteral) && start == end)
+            && !(matches!(
+                expression,
+                Expr::Lexical(_, _) | Expr::JavaLiteral(_) | Expr::JavaEmptyLiteral
+            ) && start == end)
         {
             let target = self.position().checked_add(span.end - span.start)?;
             self.position = *self.byte_offsets.get(target)?;
@@ -1168,12 +1195,15 @@ impl ParseContext<'_> {
         owner_start: usize,
         depth: usize,
     ) -> Option<()> {
-        if self.token_mode.is_none() || !self.whitespace && self.lexical_trivia.is_none() {
+        if self.token_mode.is_none()
+            || !self.whitespace && self.lexical_trivia.is_none() && !self.line_comments
+        {
             self.skip();
             return Some(());
         }
         let start = self.position;
         let definition = self.lexical_trivia.clone();
+        let line_comments = self.line_comments;
         // Java generated delimiters own their lexical program. They do not run
         // through the surrounding contextual lexer or recursively delimit themselves.
         let previous_context = self.lexical_context.take();
@@ -1184,6 +1214,8 @@ impl ParseContext<'_> {
                     &Expr::Lexical("Whitespace", definition).repeat_java(0, None),
                     depth,
                 )
+            } else if line_comments {
+                context.expression(classic_line_comments(), depth)
             } else {
                 context.expression(classic_whitespace(), depth)
             }
@@ -1309,6 +1341,30 @@ impl ParseContext<'_> {
         result.nodes.append(&mut child.nodes);
         result.captures.append(&mut child.captures);
     }
+    /// CST edge of a preferred metadata capture. Classic collection later keeps only
+    /// nodes of the current kind and drops a capture whose nodes all disappear, so
+    /// record the already collected nodes as the former `Capture` did. The fragment
+    /// itself stays uncollected: metadata must not change evaluation (#788).
+    pub(crate) fn metadata_capture_nodes(&self, fragment: &Fragment) -> Vec<usize> {
+        match self.token_mode {
+            Some(mode)
+                if fragment.source.as_deref().is_some_and(|source| {
+                    source.classic
+                        && source.kind != mode.kind
+                        && source.text.is_none()
+                        && !source.generated
+                }) =>
+            {
+                fragment
+                    .nodes
+                    .iter()
+                    .copied()
+                    .filter(|&index| self.token_kind_at(index) == mode.kind)
+                    .collect()
+            }
+            _ => fragment.nodes.clone(),
+        }
+    }
     pub(crate) fn collect_classic_fragment(
         &self,
         mut fragment: Fragment,
@@ -1388,14 +1444,11 @@ impl ParseContext<'_> {
         label: &'static str,
     ) -> Fragment {
         // Java Choice は選択した子の Parsed を返す。CST の収集値で上書きしない。
-        let selected_source = (self.track_owned_source
-            && matches!(label, "Choice" | "LongestChoice" | "UniqueLongestChoice"))
-        .then(|| {
-            fragment
-                .parsed_source()
-                .map(|source| Box::new(source.clone()))
-        })
-        .flatten();
+        let selected_source = fragment
+            .parsed_source()
+            .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
+            .filter(|_| matches!(label, "Choice" | "LongestChoice" | "UniqueLongestChoice"))
+            .map(|source| Box::new(source.clone()));
         let mut original = fragment.nodes.clone();
         // Java Choice publishes the selected child's Parsed object, while the
         // committed CST still contains the Choice collector.
@@ -1528,6 +1581,13 @@ fn classic_whitespace() -> &'static Expr {
             ]),
         ])
         .repeat_java(0, None)
+    })
+}
+/// Java `ZeroOrMore(CPPComment)` of a global `@comment` (#712).
+fn classic_line_comments() -> &'static Expr {
+    static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
+    VALUE.get_or_init(|| {
+        Expr::sequence([Expr::literal("//"), Expr::Custom(classic_line_body)]).repeat_java(0, None)
     })
 }
 fn classic_line_body(context: &mut ParseContext<'_>) -> ParseResult {

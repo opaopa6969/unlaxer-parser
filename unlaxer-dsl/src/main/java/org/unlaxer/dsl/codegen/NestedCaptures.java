@@ -254,7 +254,7 @@ public final class NestedCaptures {
         if (element instanceof OptionalElement e) return new OptionalElement(expandSingle(grammar,e.body()));
         if (element instanceof RepeatElement e) return new RepeatElement(expandSingle(grammar,e.body()));
         if (element instanceof OneOrMoreElement e) return new OneOrMoreElement(expandAliases(grammar,e.body()));
-        if (element instanceof BoundedRepeatElement e) return new BoundedRepeatElement(expandAliases(grammar,e.body()),e.min(),e.max());
+        if (element instanceof BoundedRepeatElement e) return org.unlaxer.dsl.bootstrap.BoundedQuantifiers.copy(new BoundedRepeatElement(expandAliases(grammar,e.body()),e.min(),e.max()),e);
         if (element instanceof SeparatedElement e) return new SeparatedElement(expandAliases(grammar,e.element()),e.separator());
         return element;
     }

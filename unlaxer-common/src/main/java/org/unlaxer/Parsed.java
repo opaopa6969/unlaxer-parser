@@ -87,4 +87,9 @@ public class Parsed extends Committed{
 	public String getMessage() {
 		return status.name() + ":" + (message == null ? "" : message);
 	}
+
+	/** The message given to {@link #setMessage(String)}, or null; {@link #getMessage()} prefixes the status. */
+	public String getRawMessage() {
+		return message;
+	}
 }

@@ -3,6 +3,9 @@ on:
   push:
     branches: [master]
   pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   embedded-grammars:
     runs-on: [unlaxer-parser-ci, Linux, X64]
@@ -21,7 +24,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Prepare required tests (embedded-grammars)
+        run: python3 scripts/verify-optin-tests.py embedded-grammars --prepare
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=EmbeddedLanguagesTest,EmbeddedGrammarConformanceTest,PlaygroundCommandTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Verify required tests (embedded-grammars)
+        id: verify-embedded-grammars
+        if: success()
+        run: python3 scripts/verify-optin-tests.py embedded-grammars
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.verify-embedded-grammars.outcome != 'skipped' }}
+        with:
+          name: optin-embedded-grammars
+          path: |
+            target/optin-evidence/embedded-grammars/
+          if-no-files-found: error
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test embedded
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-generator --test embedded --test playground
       - name: Browser language-region editing

@@ -1,7 +1,6 @@
 package org.unlaxer.dsl.codegen;
 
 import org.unlaxer.dsl.bootstrap.UBNFAST.AtomicElement;
-import org.unlaxer.dsl.bootstrap.UBNFAST.BlockSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.GrammarDecl;
 import org.unlaxer.dsl.bootstrap.UBNFAST.StringSettingValue;
 import org.unlaxer.dsl.bootstrap.UBNFAST.RootAnnotation;
@@ -54,6 +53,8 @@ public class ParserGenerator implements CodeGenerator {
         final Map<String, CaptureBindingPlan> captureBindings = new LinkedHashMap<>();
         final Map<String, String> namedWhitespaceByRule = new LinkedHashMap<>();
         final Map<String, Boolean> useDelimitedChainByRule = new LinkedHashMap<>();
+        /** Rules inheriting a global {@code @comment} without global javaStyle (#712). */
+        final Set<String> lineCommentRules = new LinkedHashSet<>();
         final Map<String, Boolean> safeFailureMemoByRule = new LinkedHashMap<>();
         final Map<String, Boolean> safeSuccessMemoByRule = new LinkedHashMap<>();
         boolean hasDelimitedChain = false;
@@ -73,6 +74,7 @@ public class ParserGenerator implements CodeGenerator {
             this.grammar = grammar;
             NestedCaptures.requireValid(grammar);
             TokenStreamGrammar.requireValid(grammar);
+            GlobalComment.requireValid(grammar);
             LexicalContexts.requireValid(grammar);
             NamePredicates.requireValid(grammar);
             this.tokenStream = TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar);
@@ -186,6 +188,7 @@ public class ParserGenerator implements CodeGenerator {
     public GeneratedSource generate(GrammarDecl grammar) {
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        org.unlaxer.dsl.bootstrap.PrecedenceLevels.requireNoOverflow(grammar);
         LeftRecursionAnalysis.requireValid(grammar);
         RaisingOperators.requireValid(grammar);
         TypeofConstraints.validate(grammar);
@@ -294,6 +297,7 @@ public class ParserGenerator implements CodeGenerator {
             sb.append(generateDelimitorClass(ctx));
             sb.append(generateDelimitedChainClass(ctx));
         }
+        if (!ctx.lineCommentRules.isEmpty()) sb.append(generateLineCommentChainClass(ctx));
 
         sb.append(generateNamedWhitespaceClasses(ctx));
 
@@ -348,9 +352,8 @@ public class ParserGenerator implements CodeGenerator {
             .anyMatch(s -> "whitespace".equals(s.key()) && s.value() instanceof StringSettingValue value
                 && "javaStyle".equalsIgnoreCase(value.value().trim()));
 
-        boolean hasGlobalComment = grammar.settings().stream()
-            .anyMatch(s -> "comment".equals(s.key()) && s.value() instanceof BlockSettingValue bv
-                && bv.entries().stream().anyMatch(kv -> "line".equals(kv.key())));
+        // With javaStyle the comment setting adds nothing; otherwise it is the inherited default.
+        boolean lineComments = GlobalComment.lineComments(grammar);
 
         boolean anyRuleRequestsDelimited = grammar.rules().stream()
             .map(ParserRuleEmitter::getRuleWhitespaceStyle)
@@ -359,30 +362,27 @@ public class ParserGenerator implements CodeGenerator {
             .map(ParserRuleEmitter::getRuleInterleaveProfile)
             .anyMatch(profile -> "javastyle".equals(profile) || "commentsandspaces".equals(profile));
 
-        ctx.hasDelimitedChain = hasGlobalWhitespace || hasGlobalComment
-            || anyRuleRequestsDelimited || anyRuleInterleaveDelimited;
+        ctx.hasDelimitedChain = hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveDelimited;
 
-        if (ctx.hasDelimitedChain && (hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveDelimited)) {
+        if (ctx.hasDelimitedChain) {
             ctx.delimitorClasses.add(ctx.spaceParserClass);
-        }
-        if (hasGlobalComment || hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveDelimited) {
-            ctx.needsCPPComment = true;
             ctx.delimitorClasses.add("CPPComment.class");
-        }
-        if (hasGlobalWhitespace || anyRuleRequestsDelimited || anyRuleInterleaveDelimited) {
-            ctx.needsBlockComment = true;
             ctx.delimitorClasses.add("BlockComment.class");
+            ctx.needsBlockComment = true;
         }
+        ctx.needsCPPComment = ctx.hasDelimitedChain || lineComments;
 
         for (RuleDecl rule : grammar.rules()) {
             String style = ParserRuleEmitter.getRuleWhitespaceStyle(rule); // null => inherit global
             String interleaveProfile = ParserRuleEmitter.getRuleInterleaveProfile(rule);
             boolean useDelimited = style == null
-                ? (hasGlobalWhitespace || hasGlobalComment
+                ? (hasGlobalWhitespace
                     || "javastyle".equals(interleaveProfile)
                     || "commentsandspaces".equals(interleaveProfile))
                 : !"none".equals(style);
             ctx.useDelimitedChainByRule.put(rule.name(), useDelimited);
+            // A rule-local setting elsewhere must not widen this rule's inherited comment-only policy.
+            if (lineComments && style == null && interleaveProfile == null) ctx.lineCommentRules.add(rule.name());
         }
 
         String globalStyle = grammar.settings().stream().filter(s -> s.key().equals("whitespace"))
@@ -656,6 +656,40 @@ public class ParserGenerator implements CodeGenerator {
         sb.append("        public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }\n");
         sb.append("    }\n\n");
 
+        return sb.toString();
+    }
+
+    /** Delimiter of rules inheriting a global {@code @comment} without global javaStyle (#712). */
+    private String generateLineCommentChainClass(GenContext ctx) {
+        String delimiter = ctx.grammarName + "LineCommentDelimitor";
+        StringBuilder sb = new StringBuilder();
+        sb.append("    // --- Base Chain (Global @comment) ---\n");
+        sb.append("    public static class ").append(delimiter)
+            .append(" extends LazyZeroOrMore implements org.unlaxer.context.DiagnosticsAgnostic, org.unlaxer.context.SafeSuccessMemoizable {\n");
+        sb.append("        private static final long serialVersionUID = 1L;\n");
+        sb.append("        @Override\n");
+        sb.append("        public Supplier<Parser> getLazyParser() {\n");
+        sb.append("            return new SupplierBoundCache<>(() -> Parser.get(CPPComment.class));\n");
+        sb.append("        }\n");
+        sb.append("        @Override\n");
+        sb.append("        public java.util.Optional<Parser> getLazyTerminatorParser() { return java.util.Optional.empty(); }\n");
+        sb.append("    }\n");
+        sb.append("    public static abstract class ").append(ctx.grammarName)
+            .append("LineCommentLazyChain extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {\n");
+        sb.append("        private static final long serialVersionUID = 1L;\n");
+        sb.append("        private static final Parser SPACE = space();\n");
+        sb.append("        private static Parser space() { Parser p = new ").append(delimiter)
+            .append("(); p.addTag(NodeKind.notNode.getTag()); return p; }\n");
+        sb.append("        @Override\n");
+        sb.append("        public void prepareChildren(Parsers c) {\n");
+        sb.append("            if (!c.isEmpty()) return;\n");
+        sb.append("            c.add(SPACE);\n");
+        sb.append("            for (Parser p : getLazyParsers()) { c.add(p); c.add(SPACE); }\n");
+        sb.append("        }\n");
+        sb.append("        public abstract Parsers getLazyParsers();\n");
+        sb.append("        @Override\n");
+        sb.append("        public java.util.Optional<RecursiveMode> getNotAstNodeSpecifier() { return java.util.Optional.empty(); }\n");
+        sb.append("    }\n\n");
         return sb.toString();
     }
 

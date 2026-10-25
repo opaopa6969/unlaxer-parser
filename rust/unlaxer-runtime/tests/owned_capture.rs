@@ -80,8 +80,23 @@ fn scenario(
     name: &str,
     k: TokenKind,
     inv: bool,
+    metadata: Option<&'static str>,
 ) -> ParseResult {
+    let annotate = |child| match metadata {
+        Some(name) => Expr::MetadataCapture(name, Box::new(child)),
+        None => child,
+    };
     match name {
+        "metadata-choice-reset" | "metadata-match-reset" => {
+            c.set_reset_matched_with_consumed(true);
+            let repeat = w("x").match_only().repeat_java(0, Some(2));
+            let child = if name == "metadata-choice-reset" {
+                annotate(Expr::choice([repeat]))
+            } else {
+                annotate(repeat).match_only()
+            };
+            return c.parse_with_token_mode(&cap(child), k, inv);
+        }
         "input" => parse(c, roots, cap(w("a"))),
         "unicode" => parse(c, roots, cap(w("😀"))),
         "combining" => parse(c, roots, cap(w("e\u{301}"))),
@@ -164,6 +179,26 @@ fn scenario(
                 false,
             );
         }
+        "field-repeat-reset" | "field-repeat-preserve" => {
+            c.set_reset_matched_with_consumed(name == "field-repeat-reset");
+            return c.parse_with_token_mode(
+                &cap(w("x").match_only().repeat_java(0, Some(2)).capture("f")),
+                k,
+                inv,
+            );
+        }
+        "field-failure-reset" => {
+            c.set_reset_matched_with_consumed(true);
+            // Java の失敗した LazyChain は begin 前に外側へ設定した reset=false を残す。
+            assert!(c
+                .parse_with_token_mode(&w("y").capture("f"), TokenKind::Consumed, false)
+                .is_err());
+            return c.parse_with_token_mode(
+                &cap(w("x").match_only().repeat_java(0, Some(2))),
+                k,
+                inv,
+            );
+        }
         "match-only" => {
             parse(c, roots, cap(w("a")));
             return c.parse_with_token_mode(&cap(w("b")).match_only(), k, inv);
@@ -202,6 +237,16 @@ fn kind(s: &str) -> TokenKind {
 }
 #[test]
 fn shared_independent_oracle() {
+    for metadata in [
+        None,
+        Some("#preferred-schema:0"),
+        Some("#preferred-depth:1"),
+        Some("#preferred-extra:2"),
+    ] {
+        check_independent_oracle(metadata);
+    }
+}
+fn check_independent_oracle(metadata: Option<&'static str>) {
     let rows = include_str!("../../../conformance/owned-capture/cases.tsv");
     let mut failures = Vec::new();
     for memo in [Memoization::Off, Memoization::SafeFailures] {
@@ -221,11 +266,18 @@ fn shared_independent_oracle() {
                     ParseOptions::with_memoization(memo).with_diagnostics(diagnostic),
                 );
                 let mut roots = Vec::new();
-                let result = scenario(&mut c, &mut roots, e[2], kind(e[3]), e[4] == "true");
+                let result = scenario(
+                    &mut c,
+                    &mut roots,
+                    e[2],
+                    kind(e[3]),
+                    e[4] == "true",
+                    metadata,
+                );
                 if let Ok(matched) = &result {
                     roots.extend(matched.nodes.iter().copied());
                 }
-                let label = format!("{}/{memo:?}/{diagnostic:?}", e[0]);
+                let label = format!("{}/{memo:?}/{diagnostic:?}/{metadata:?}", e[0]);
                 let mut check = |actual: String, expected: &str| {
                     if actual != expected {
                         failures.push(format!("{label}: actual {actual:?}, expected {expected:?}"));
@@ -496,7 +548,14 @@ fn committed_terminal_trace_keeps_replay_positions_and_discards_failed_branches(
             let options = ParseOptions::with_memoization(memo)
                 .with_token_trace(unlaxer_runtime::token_trace::Limits::default());
             let mut c = ParseContext::with_options(&input, options);
-            let _ = scenario(&mut c, &mut Vec::new(), e[1], TokenKind::Consumed, false);
+            let _ = scenario(
+                &mut c,
+                &mut Vec::new(),
+                e[1],
+                TokenKind::Consumed,
+                false,
+                None,
+            );
             let actual = c
                 .token_trace()
                 .unwrap()
@@ -581,8 +640,15 @@ fn failed_replay_has_the_shared_name_and_code_point_diagnostic() {
                     &input,
                     ParseOptions::with_memoization(memo).with_diagnostics(diagnostic),
                 );
-                let error = scenario(&mut c, &mut Vec::new(), e[1], kind(e[2]), e[3] == "true")
-                    .unwrap_err();
+                let error = scenario(
+                    &mut c,
+                    &mut Vec::new(),
+                    e[1],
+                    kind(e[2]),
+                    e[3] == "true",
+                    None,
+                )
+                .unwrap_err();
                 let deferred = diagnostic == Diagnostics::DetailedOnFailure;
                 assert_eq!(
                     error.offset,
@@ -727,6 +793,8 @@ fn classic_field_capture_uses_committed_source_for_choice_and_rule() {
             (Expr::Rule(1), Expr::choice([ahead_x(), w("q")])),
             (Expr::choice([ahead_x(), w("q")]), Expr::Empty),
             (Expr::Rule(1), ahead_x()),
+            // Java の `@f` は直接の先読みも consumed の collector で包む（#742）。
+            (ahead_x(), Expr::Empty),
         ] {
             let rules = [
                 Rule {
@@ -881,6 +949,122 @@ fn field_capture_blocks_parsed_source_before_owned_capture_and_success_memo() {
                         assert!(
                             context.memoized_success_hits() > 0,
                             "classic={classic}, variant={variant}, tail={consume_tail}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn classic_field_capture_collects_direct_lookahead_before_owned_capture() {
+    use unlaxer_runtime::{parse_detailed_with_options, Rule};
+
+    // Java の `@f` は LazyChain の collector。consumed では match-only の先読みを集めない（#742）。
+    let rules = [Rule {
+        name: "R0",
+        expression: Expr::sequence([ahead_x().capture("f").capture_owned("w"), Expr::Replay("w")]),
+    }];
+    for memo in [Memoization::Off, Memoization::SafeFailures] {
+        let options = ParseOptions::with_memoization(memo);
+        let mut context = ParseContext::with_options("x", options);
+        context.parse_grammar(rules.to_vec(), 0, false).unwrap();
+        assert_eq!(context.captured_text("w"), Some(""));
+        assert_eq!((context.position(), context.matched_position()), (0, 0));
+        let error = parse_detailed_with_options(&rules, 0, false, "x", options).unwrap_err();
+        assert_eq!((error.kind, error.offset), ("trailing_input", 0));
+    }
+}
+
+#[test]
+fn field_capture_rejects_non_input_parsed_source_at_every_entry() {
+    use unlaxer_runtime::{
+        parse_detailed_shared_with_rule_stack, parse_detailed_with_options, Rule,
+    };
+
+    fn projected(c: &mut ParseContext<'_>) -> ParseResult {
+        let id = c
+            .add_token_node(
+                unlaxer_runtime::TOKEN_LEAF_RULE,
+                TokenKind::VirtualConsumed,
+                TokenSource::Projected {
+                    span: Span { start: 1, end: 3 },
+                    text: std::sync::Arc::from("bb"),
+                },
+            )
+            .unwrap();
+        assert!(c.advance(1));
+        Ok(ParseMatch {
+            span: Span { start: 1, end: 3 },
+            nodes: vec![id.index()],
+            captures: vec![],
+        })
+    }
+
+    for (callback, input, offset) in [
+        (
+            generated as fn(&mut ParseContext<'_>) -> ParseResult,
+            "x",
+            0,
+        ),
+        (projected, "abx", 1),
+    ] {
+        for memo in [Memoization::Off, Memoization::SafeFailures] {
+            for diagnostics in [
+                Diagnostics::Auto,
+                Diagnostics::Detailed,
+                Diagnostics::DetailedOnFailure,
+            ] {
+                let options = ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+                for child in [
+                    Expr::Custom(callback),
+                    Expr::choice([Expr::Custom(callback), w("q")]),
+                    Expr::Rule(1),
+                ] {
+                    for shape in ["plain", "owned", "classic"] {
+                        let field = child.clone().capture("f");
+                        let expression = match shape {
+                            "owned" => Expr::sequence([
+                                field.capture_owned("w"),
+                                Expr::Replay("w"),
+                                w("x"),
+                            ]),
+                            // owned capture なしでも MatchOnly で Classic 経路になる形。
+                            "classic" => Expr::sequence([field, w("x").match_only(), w("x")]),
+                            _ => Expr::sequence([field, w("x")]),
+                        };
+                        let rules = [
+                            Rule {
+                                name: "Root",
+                                expression,
+                            },
+                            Rule {
+                                name: "H",
+                                expression: Expr::choice([Expr::Custom(callback), w("q")]),
+                            },
+                        ];
+                        let error = parse_detailed_with_options(&rules, 0, false, input, options)
+                            .unwrap_err();
+                        assert_eq!((error.kind, error.offset), ("syntax", offset));
+                        let mut context = ParseContext::with_options(input, options);
+                        let error = context.parse_grammar(rules.to_vec(), 0, false).unwrap_err();
+                        assert_eq!((context.position(), context.matched_position()), (0, 0));
+                        assert_eq!(context.captured_text("w"), None);
+                        if diagnostics == Diagnostics::Detailed {
+                            assert_eq!(error.offset, offset);
+                        }
+                        let error = parse_detailed_shared_with_rule_stack(
+                            &std::sync::Arc::from(rules),
+                            0,
+                            false,
+                            input,
+                            options,
+                        )
+                        .unwrap_err();
+                        assert_eq!(
+                            (error.diagnostic.kind, error.diagnostic.offset),
+                            ("syntax", offset)
                         );
                     }
                 }

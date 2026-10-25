@@ -3,6 +3,9 @@ on:
   push:
     branches: [master]
   pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   source-edits:
     runs-on: [unlaxer-parser-ci, Linux, X64]
@@ -18,6 +21,19 @@ jobs:
       - uses: ./.github/actions/maven-job-repository
       - name: Rust toolchain を既定を変更せずに準備
         run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
+      - name: Prepare required tests (source-edits)
+        run: python3 scripts/verify-optin-tests.py source-edits --prepare
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=SourceEditsTest,ProjectRenameTest,PlaygroundCommandTest -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Verify required tests (source-edits)
+        id: verify-source-edits
+        if: success()
+        run: python3 scripts/verify-optin-tests.py source-edits
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.verify-source-edits.outcome != 'skipped' }}
+        with:
+          name: optin-source-edits
+          path: |
+            target/optin-evidence/source-edits/
+          if-no-files-found: error
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-runtime --test source_edits
       - run: cargo test --manifest-path rust/Cargo.toml -p unlaxer-generator --test playground

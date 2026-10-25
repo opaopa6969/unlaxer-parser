@@ -30,7 +30,7 @@ entry state. Java also rejects negative runtime bounds by ordinary parse failure
 Rust bounds use `usize`. UBNF frontends retain their syntax-stage acceptance of
 reversed bounds. Generation rejects these definitions, including unused rules
 and invalid children nested under a zero count. Java validation reports
-`E-BOUNDED-INVALID`; both Rust generation hosts report invalid repetition bounds.
+`E-BOUNDED-INVALID`; both Rust generation hosts report the same code and message (#802).
 
 Source left-recursion analysis ignores a zero-count child's leading edges,
 while continuing to examine reachable following elements. Thus

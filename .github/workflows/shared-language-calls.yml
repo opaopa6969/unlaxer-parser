@@ -3,6 +3,9 @@ on:
   push:
     branches: [master]
   pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   shared-language-calls:
     runs-on: [unlaxer-parser-ci, Linux, X64]
@@ -18,9 +21,22 @@ jobs:
       - uses: ./.github/actions/maven-job-repository
       - name: Rust toolchain を既定を変更せずに準備
         run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
+      - name: Prepare required tests (shared-language-calls)
+        run: python3 scripts/verify-optin-tests.py shared-language-calls --prepare
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=SharedLanguageCallConformanceTest,RustUbnfFrontendConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
         env:
           CARGO_INCREMENTAL: '0'
+      - name: Verify required tests (shared-language-calls)
+        id: verify-shared-language-calls
+        if: success()
+        run: python3 scripts/verify-optin-tests.py shared-language-calls
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.verify-shared-language-calls.outcome != 'skipped' }}
+        with:
+          name: optin-shared-language-calls
+          path: |
+            target/optin-evidence/shared-language-calls/
+          if-no-files-found: error
       - run: test -s unlaxer-dsl/target/shared-language-calls.tsv
       - uses: actions/upload-artifact@v4
         with:

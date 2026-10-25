@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /** Located in the DSL module to include semantic ScopeStore in the runtime oracle. */
@@ -48,6 +49,7 @@ public class FailureMemoBudgetConformanceTest {
 
     @Test
     public void javaFiniteBudgetsPreserveTheIndependentEpochAndCursorOracle() throws Exception {
+        Files.deleteIfExists(Path.of("target/failure-memo-budget-java.tsv"));
         var report =
                 new ArrayList<>(List.of("id\tmode\treset\tmemo\tdiagnostics\tentries\tcharge"));
         for (String row :
@@ -199,10 +201,17 @@ public class FailureMemoBudgetConformanceTest {
 
     @Test
     public void rustFiniteBudgetsUseTheSameIndependentOracle() throws Exception {
+        // Invalidate the previous run before an assumption, compiler error, or timeout.
+        Path evidence = Path.of("target/failure-memo-budget-rust.tsv").toAbsolutePath();
+        Path log = Path.of("target/failure-memo-budget-rust.log");
+        Files.deleteIfExists(evidence);
+        Files.deleteIfExists(log);
         if (!Boolean.getBoolean("rustConformance"))
             System.out.println("[assumption] requires -DrustConformance=true and rustc");
         assumeTrue(Boolean.getBoolean("rustConformance"));
-        Path dir = Files.createTempDirectory("failure-budget-runtime");
+        Path dir =
+                Files.createTempDirectory(Path.of("target"), "failure-budget-runtime")
+                        .toAbsolutePath();
         try {
             Path binary = dir.resolve("runtime-tests");
             run(
@@ -212,10 +221,23 @@ public class FailureMemoBudgetConformanceTest {
                             "--test",
                             repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(),
                             "-o",
-                            binary.toString()));
-            Files.writeString(
-                    Path.of("target/failure-memo-budget-rust.log"),
-                    run(List.of(binary.toString(), "failure_budget_", "--nocapture")));
+                            binary.toString()),
+                    Map.of(),
+                    log);
+            run(List.of(binary.toString(), "failure_budget_"), Map.of(), log);
+            // Keep the full suite and the isolated oracle from master. Only publish the
+            // staged TSV after both processes succeed; stdout remains diagnostic evidence.
+            Path staged = dir.resolve("evidence.tsv");
+            run(
+                    List.of(
+                            binary.toString(),
+                            "--exact",
+                            "memo_retention_tests::failure_budget_shared_oracle_bounds_epochs_and_preserves_real_hits",
+                            "--nocapture"),
+                    Map.of("UNLAXER_TEST_FAILURE_BUDGET_EVIDENCE", staged.toString()),
+                    log);
+            assertEquals(601, Files.readAllLines(staged).size());
+            Files.move(staged, evidence, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
         } finally {
             try (var paths = Files.walk(dir)) {
                 for (var p : paths.sorted(java.util.Comparator.reverseOrder()).toList())
@@ -224,21 +246,28 @@ public class FailureMemoBudgetConformanceTest {
         }
     }
 
-    private String run(List<String> command) throws Exception {
-        Path log = Files.createTempFile("failure-budget-command", ".log");
+    private void run(List<String> command, Map<String, String> environment, Path log) throws Exception {
+        Files.writeString(
+                log,
+                "\n$ " + String.join(" ", command) + "\n",
+                java.nio.file.StandardOpenOption.CREATE,
+                java.nio.file.StandardOpenOption.APPEND);
+        var builder = new ProcessBuilder(command);
+        builder.environment().remove("UNLAXER_TEST_FAILURE_BUDGET_EVIDENCE");
+        builder.environment().remove("UNLAXER_TEST_SUCCESS_BUDGET_EVIDENCE");
+        builder.environment().putAll(environment);
         var p =
-                new ProcessBuilder(command)
-                        .redirectErrorStream(true)
-                        .redirectOutput(log.toFile())
+                builder.redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()))
                         .start();
         try {
             assertTrue(command.toString(), p.waitFor(60, TimeUnit.SECONDS));
-            String text = Files.readString(log);
-            assertEquals(text, 0, p.exitValue());
-            return text;
+            assertEquals(Files.readString(log), 0, p.exitValue());
         } finally {
-            if (p.isAlive()) p.destroyForcibly();
-            Files.delete(log);
+            if (p.isAlive()) {
+                p.destroyForcibly();
+                assertTrue("process did not terminate: " + command, p.waitFor(10, TimeUnit.SECONDS));
+            }
         }
     }
 }

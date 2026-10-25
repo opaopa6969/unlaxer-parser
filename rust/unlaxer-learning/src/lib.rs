@@ -48,6 +48,8 @@ fn expression(e: &Expression) -> Result<Expr> {
     Ok(match e {
         Literal(text) if text.is_empty() => Expr::JavaEmptyLiteral,
         Literal(text) => Expr::Literal(intern(text)),
+        // #768: a token-stream literal keeps Java's Lexing.LiteralParser identity.
+        LexicalLiteral(text) => Expr::JavaLiteral(intern(text)),
         EmptyWordToken => Expr::JavaEmptyWord,
         LexicalToken { name, expression: e } => Expr::Lexical(intern(name), lexical(e)?),
         Reference(id) => Expr::Rule(*id),
@@ -57,7 +59,8 @@ fn expression(e: &Expression) -> Result<Expr> {
         OptionalExpr(child) => expression(child)?.optional_java(),
         Repeat { child, min, max } => expression(child)?.repeat_java(*min, *max),
         Delimited(child) => Expr::Sequence(vec![expression(child)?]),
-        TriviaScope { child, java_whitespace } => expression(child)?.trivia_scope(*java_whitespace),
+        TriviaScope { child, line_comments: true, .. } => expression(child)?.line_comment_scope(),
+        TriviaScope { child, java_whitespace, .. } => expression(child)?.trivia_scope(*java_whitespace),
         TextValue(child) => expression(child)?.text_value(),
         ValueBoundary(child) => expression(child)?.value_boundary(),
         CharRangeToken { min, max } => Expr::CharRange(*min, *max),

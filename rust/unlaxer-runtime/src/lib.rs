@@ -100,6 +100,8 @@ pub enum Expr {
     /// An atomic token compiled from a declarative UBNF lexical expression.
     Lexical(&'static str, lexical::LexicalExpression),
     Literal(&'static str),
+    /// Java Lexing.LiteralParser: inverted lexical mismatch succeeds without consuming.
+    JavaLiteral(&'static str),
     /// Unicode 17.0.0 simple lower(upper(cp)) equality, preserving original text.
     /// No normalization, locale tailoring, or multi-scalar folding. Empty words fail.
     CaseInsensitive(&'static str),
@@ -135,6 +137,8 @@ pub enum Expr {
         predictors: Vec<Predictor>,
     },
     Capture(&'static str, Box<Expr>),
+    /// CST-only annotation: no binding, source collection, or cursor-policy boundary.
+    MetadataCapture(&'static str, Box<Expr>),
     /// Read outer bindings, discard local captures on exit without discarding child results.
     CaptureScope(Box<Expr>),
     /// General owned binding, separate from AST field captures. CST-transparent.
@@ -192,6 +196,8 @@ pub enum Expr {
     TriviaScope {
         child: Box<Expr>,
         whitespace: bool,
+        /// Java `CPPComment` only (`//` up to CR / LF / EOF), a global `@comment` (#712).
+        line_comments: bool,
     },
     Optional(Box<Expr>),
     /// Java Occurs retains a failed direct consuming atom's match-cursor reset.
@@ -449,6 +455,15 @@ impl Expr {
         Self::TriviaScope {
             child: Box::new(self),
             whitespace,
+            line_comments: false,
+        }
+    }
+    /// Sequence boundaries skip only Java `CPPComment`s; line terminators stay significant.
+    pub fn line_comment_scope(self) -> Self {
+        Self::TriviaScope {
+            child: Box::new(self),
+            whitespace: false,
+            line_comments: true,
         }
     }
     pub fn rule_effects(self, effects: RuleEffects) -> Self {
@@ -741,13 +756,29 @@ pub struct ParseError {
     pub expected: Vec<String>,
 }
 
+/// Human-readable expected candidates (#750): the empty literal `''` (Java's `WordParser("")`)
+/// is shown as `''`, as Java displays it; the stored value stays `""`. Other candidates as is.
+pub fn display_expected(expected: &[String], separator: &str) -> String {
+    expected
+        .iter()
+        .map(|candidate| {
+            if candidate.is_empty() {
+                "''"
+            } else {
+                candidate.as_str()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(separator)
+}
+
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "at code point {}: expected {}",
             self.offset,
-            self.expected.join(", ")
+            display_expected(&self.expected, ", ")
         )
     }
 }
@@ -789,7 +820,7 @@ impl std::fmt::Display for ParseDiagnostic {
             "{} at code point {}: expected {}",
             self.kind,
             self.offset,
-            self.expected.join(", ")
+            display_expected(&self.expected, ", ")
         )
     }
 }
@@ -826,7 +857,7 @@ struct Fragment {
 
 #[derive(Debug, Clone)]
 struct FragmentSource {
-    // owned capture のときだけ保持する、commit 済み原文と異なる Parsed 原文。
+    // owned capture の値と @f の入力由来検査に使う、commit 済み原文と異なる Parsed 原文。
     parsed_source: Option<Box<FragmentSource>>,
     span: Span,
     kind: token::TokenKind,
@@ -1294,6 +1325,18 @@ impl FailureMemoKey {
         self.depth_and_modes |= usize::from(enabled) << 15;
         self
     }
+    /// The comment-only trivia of a global `@comment` (#712) is a policy of its own: a rule's
+    /// result under it is not its result with whitespace on or off, for failures and successes.
+    fn with_line_comments(mut self, enabled: bool) -> Self {
+        self.depth_and_modes |= usize::from(enabled) << 16;
+        self
+    }
+    /// Grammar and explicit native expression entries can share rules and cursors,
+    /// but retain different failure frontiers, including inside successful memos.
+    fn with_grammar_frontier(mut self, enabled: bool) -> Self {
+        self.depth_and_modes |= usize::from(enabled) << 17;
+        self
+    }
     fn with_match_policy(mut self, policy: MatchCursorPolicy) -> Self {
         self.depth_and_modes = (self.depth_and_modes & !6)
             | (usize::from(policy.reset) << 2)
@@ -1640,6 +1683,25 @@ struct MatchCursorPolicy {
     reset: bool,
     non_ordered: bool,
 }
+/// Java Chain implementations, which set `resetMatchedWithConsumed=false` on their owner
+/// before the memo lookup and their own transaction. These built-in lexical parsers are
+/// Chain implementations in Java too.
+#[inline(always)]
+fn java_chain_disables_owner_reset(expression: &Expr) -> bool {
+    matches!(
+        expression,
+        Expr::Sequence(_)
+            | Expr::Number
+            | Expr::Identifier
+            | Expr::Quoted(_)
+            | Expr::CodeStart
+            | Expr::CodeEnd
+            | Expr::Capture(_, _)
+            | Expr::CaptureBoundary(_, _)
+            | Expr::InputCaptureBoundary(_, _)
+    )
+}
+
 impl Default for MatchCursorPolicy {
     fn default() -> Self {
         Self {
@@ -1675,6 +1737,11 @@ pub struct ParseContext<'a> {
     // public entry decides; expression entries (parse, parse_with_token_mode,
     // parse_token) clear it for their duration. Not applied in a token-stream session.
     grammar_frontier: bool,
+    // Java Number's empty-display terminals inherit the enclosing negative PEG assertion's hint.
+    number_negative_hint: bool,
+    // Expected-name ids of NumberName, interned on first use (u32::MAX = not yet), so a
+    // detailed Number records its internal failures without hashing their names (#752).
+    number_names: [u32; NUMBER_NAMES.len()],
     match_cursor_policy: MatchCursorPolicy,
     bindings: BTreeMap<String, Vec<String>>,
     input: &'a str,
@@ -1685,6 +1752,7 @@ pub struct ParseContext<'a> {
     token_stream_scope: bool,
     rules: Arc<[Rule]>,
     whitespace: bool,
+    line_comments: bool,
     lexical_trivia: Option<lexical::LexicalExpression>,
     lexical_context: Option<Arc<[lexing::Terminal]>>,
     position: usize,
@@ -2112,8 +2180,11 @@ impl<'a> ParseContext<'a> {
             classic_max_reached: None,
             classic_failure_seen: false,
             grammar_frontier: false,
+            number_negative_hint: false,
+            number_names: [u32::MAX; NUMBER_NAMES.len()],
             match_cursor_policy: MatchCursorPolicy::default(),
             whitespace: false,
+            line_comments: false,
             lexical_trivia: None,
             lexical_context: None,
             position: 0,
@@ -2563,6 +2634,7 @@ impl<'a> ParseContext<'a> {
         let previous_rules = std::mem::replace(&mut self.rules, Arc::clone(grammar));
         self.track_owned_source |= shared_grammar_needs_owned_source(&self.rules);
         let previous_whitespace = std::mem::replace(&mut self.whitespace, whitespace);
+        let previous_line_comments = std::mem::take(&mut self.line_comments);
         let safe_rules = if self.options.memoization == Memoization::SafeFailures {
             memo_safe_rules(grammar)
         } else {
@@ -2592,6 +2664,7 @@ impl<'a> ParseContext<'a> {
             self.lexing = previous_lexing;
         }
         self.whitespace = previous_whitespace;
+        self.line_comments = previous_line_comments;
         self.lexical_trivia = previous_definition;
         self.memo_safe_rules = previous_safe_rules;
         self.success_memo_safe_rules = previous_success_safe_rules;
@@ -2609,10 +2682,21 @@ impl<'a> ParseContext<'a> {
         whitespace: bool,
         operation: impl FnOnce(&mut Self) -> T,
     ) -> T {
+        self.with_trivia_policy(whitespace, false, operation)
+    }
+
+    fn with_trivia_policy<T>(
+        &mut self,
+        whitespace: bool,
+        line_comments: bool,
+        operation: impl FnOnce(&mut Self) -> T,
+    ) -> T {
         let previous_definition = self.lexical_trivia.take();
         let previous = std::mem::replace(&mut self.whitespace, whitespace);
+        let previous_line_comments = std::mem::replace(&mut self.line_comments, line_comments);
         let result = operation(self);
         self.whitespace = previous;
+        self.line_comments = previous_line_comments;
         self.lexical_trivia = previous_definition;
         result
     }
@@ -2806,6 +2890,31 @@ impl<'a> ParseContext<'a> {
     }
 
     fn fail_at(&mut self, position: usize, expected: &str) {
+        if let Some(position) = self.failure_frontier(position) {
+            let expected = self.expected_names.intern(expected);
+            self.record_failure(position, expected);
+        }
+    }
+
+    /// [`Self::fail_at`] for a Java Number internal parser, without hashing its name.
+    fn fail_number_at(&mut self, position: usize, name: NumberName) {
+        if let Some(position) = self.failure_frontier(position) {
+            let expected = match self.number_names[name as usize] {
+                u32::MAX => {
+                    let id = self.expected_names.intern(NUMBER_NAMES[name as usize]);
+                    self.number_names[name as usize] = id;
+                    id
+                }
+                id => id,
+            };
+            self.record_failure(position, expected);
+        }
+    }
+
+    /// The position a failure at `position` is recorded at, or `None` when it cannot
+    /// contribute a name.
+    #[inline]
+    fn failure_frontier(&mut self, position: usize) -> Option<usize> {
         // The successful Classic watermark is only a fallback when neither entry
         // has failed. Native PEG failures must also select the real failure frontier.
         if self.options.diagnostics == Diagnostics::Detailed {
@@ -2815,7 +2924,7 @@ impl<'a> ParseContext<'a> {
             }
         }
         if self.options.diagnostics == Diagnostics::DetailedOnFailure {
-            return;
+            return None;
         }
         let position = self.frontier(position);
         // Failures behind both farthest positions cannot contribute a name.
@@ -2825,9 +2934,12 @@ impl<'a> ParseContext<'a> {
                 .last()
                 .is_none_or(|frame| frame.farthest.is_some_and(|farthest| position < farthest))
         {
-            return;
+            return None;
         }
-        let expected = self.expected_names.intern(expected);
+        Some(position)
+    }
+
+    fn record_failure(&mut self, position: usize, expected: u32) {
         self.note_failure_reach(position);
         if let Some(diagnostic) = self.diagnostic_frames.last_mut() {
             diagnostic.record(position, expected);
@@ -2940,6 +3052,25 @@ impl<'a> ParseContext<'a> {
         result
     }
 
+    /// Java registers a failed parser's `ParseFrame` as a failure candidate at its start,
+    /// max(consumed, matched) (#753, #793). A failure site inside only sees the live
+    /// matched cursor, which trivia or consumption lowers below a preceding LOOKAHEAD's
+    /// reach. Call after restoring the entry checkpoint to record its start. It adds no expected
+    /// name, which keeps memo replay and re-execution equal when a failure inside already
+    /// reached the start. The matched cursor is not raised: LOOKAHEAD / UNTIL / EMPTY read
+    /// it as Java's transaction cursor. Classic token mode records its failed frames itself,
+    /// and the frontier keeps the consumed position in a token-stream session (#734).
+    #[cold]
+    #[inline(never)]
+    fn fail_parser_frame(&mut self) {
+        if self.token_mode.is_none()
+            && self.resource_failure.is_none()
+            && self.frontier(self.position) > self.position
+        {
+            self.fail_without_expected();
+        }
+    }
+
     // A no-cache recursive rule must not retain the large memo snapshot/key
     // frame. In particular name-resolution rules still reach their depth guard
     // on the default 2 MiB thread stack after the state-version key was added.
@@ -2960,6 +3091,18 @@ impl<'a> ParseContext<'a> {
 
     #[inline(never)]
     fn memoized_rule(&mut self, id: usize, depth: usize) -> Option<usize> {
+        // Java's Chain disables matched-cursor reset before memo lookup. expression()
+        // does the same for every Chain counterpart, but waiting until a miss gives
+        // (!Num 'x') | Num two different keys (#794). Metadata adds no parser frame.
+        // Rule/expression depth guards stay intact.
+        let parent_reset = self.match_cursor_policy.reset;
+        let mut expression = &self.rules[id].expression;
+        while let Expr::MetadataCapture(_, child) = expression {
+            expression = child;
+        }
+        if java_chain_disables_owner_reset(expression) {
+            self.match_cursor_policy.reset = false;
+        }
         let key = FailureMemoKey::new(
             id,
             self.position,
@@ -2970,9 +3113,15 @@ impl<'a> ParseContext<'a> {
         .with_match_policy(self.match_cursor_policy)
         .with_token_mode(self.token_mode)
         .with_owned_source(self.track_owned_source)
+        .with_line_comments(self.line_comments)
+        .with_grammar_frontier(self.grammar_frontier)
         .with_state_version(self.scopes.memo_version().expect("memo version checked"));
         let position = self.code_point(self.position);
         if let Some(result) = self.probe_rule_memo(position, &key) {
+            if result.is_none() && self.token_mode.is_none() {
+                // A replayed failure leaves the policy as the evaluation below does.
+                self.match_cursor_policy.reset = parent_reset;
+            }
             return result;
         }
         let success = self.token_trace.is_none();
@@ -2998,6 +3147,11 @@ impl<'a> ParseContext<'a> {
         };
         let result = self.execute_rule(id, depth);
         self.finish_rule_memo(call, result);
+        // Without memo the failed Chain restores its owner's policy outside Classic token
+        // mode, and on a resource failure (expression()); keep memo transparent there.
+        if result.is_none() && (self.token_mode.is_none() || self.resource_failure.is_some()) {
+            self.match_cursor_policy.reset = parent_reset;
+        }
         result
     }
 
@@ -3260,14 +3414,10 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
         // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
-        self.rule_result_source = self
-            .track_owned_source
-            .then(|| {
-                fragment
-                    .parsed_source()
-                    .map(|source| Box::new(source.clone()))
-            })
-            .flatten();
+        self.rule_result_source = fragment
+            .parsed_source()
+            .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
+            .map(|source| Box::new(source.clone()));
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
         let classic = fragment
             .source
@@ -3303,22 +3453,17 @@ impl<'a> ParseContext<'a> {
         // another one, so anything still pending here was caught.
         self.raised = None;
         self.expression_depth += 1;
+        // Metadata has no Java parser/transaction counterpart. In particular, a failed
+        // child must retain its own cursor policy exactly as without this wrapper.
+        if let Expr::MetadataCapture(name, child) = expression {
+            return self.expression_metadata_capture(name, child, depth);
+        }
         let checkpoint = self.checkpoint();
         let parent_policy = self.match_cursor_policy;
         // Chain sets the policy before beginning its own transaction, so a successful
         // Sequence changes the policy for following siblings in the same owner.
         // These built-in lexical parsers are also Chain implementations in Java.
-        if matches!(
-            expression,
-            Expr::Sequence(_)
-                | Expr::Number
-                | Expr::Identifier
-                | Expr::Quoted(_)
-                | Expr::CodeStart
-                | Expr::CodeEnd
-                | Expr::CaptureBoundary(_, _)
-                | Expr::InputCaptureBoundary(_, _)
-        ) {
+        if java_chain_disables_owner_reset(expression) {
             self.match_cursor_policy.reset = false;
         }
         let java_transaction = matches!(
@@ -3374,16 +3519,21 @@ impl<'a> ParseContext<'a> {
             Expr::Rule(rule) => self.rule(*rule, depth).map(|id| Fragment {
                 nodes: vec![id],
                 captures: Vec::new(),
-                source: self.tokens.values.get(&id).map(|value| {
-                    Box::new(FragmentSource {
-                        parsed_source: None,
-                        span: self.nodes[id].span,
-                        kind: value.kind,
-                        classic: value.classic,
-                        generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                        text: value.source.owned_shared().map(Box::new),
+                source: self
+                    .tokens
+                    .values
+                    .get(&id)
+                    .map(|value| {
+                        Box::new(FragmentSource {
+                            parsed_source: self.rule_result_source.take(),
+                            span: self.nodes[id].span,
+                            kind: value.kind,
+                            classic: value.classic,
+                            generated: matches!(value.source, token::TokenSource::Generated { .. }),
+                            text: value.source.owned_shared().map(Box::new),
+                        })
                     })
-                }),
+                    .or_else(|| self.rule_result_source.take()),
             }),
             Expr::LexicalContextScope { child, terminals } => {
                 self.expression_with_lexical_context(child, terminals, depth)
@@ -3391,9 +3541,13 @@ impl<'a> ParseContext<'a> {
             Expr::LexicalTriviaScope { child, definition } => {
                 self.expression_with_lexical_trivia(child, definition, depth)
             }
-            Expr::TriviaScope { child, whitespace } => {
-                self.with_trivia(*whitespace, |context| context.expression(child, depth))
-            }
+            Expr::TriviaScope {
+                child,
+                whitespace,
+                line_comments,
+            } => self.with_trivia_policy(*whitespace, *line_comments, |context| {
+                context.expression(child, depth)
+            }),
             Expr::Sequence(elements) => self.sequence(elements, depth),
             Expr::NonOrdered(children) => self.non_ordered(children, depth),
             Expr::Choice(alternatives) => self.ordered_choice(alternatives.iter(), depth),
@@ -3541,7 +3695,7 @@ impl<'a> ParseContext<'a> {
         };
         if result.is_none() {
             // A failed consuming Java leaf calls consume(0), which resets the matched cursor.
-            // Java LiteralParser("") (JavaEmptyLiteral) never does, so it is not listed.
+            // Java Lexing.LiteralParser (JavaLiteral / JavaEmptyLiteral) never does.
             let leaf_reset = self.token_mode.is_some_and(|mode| mode.kind.is_consumed())
                 && matches!(
                     expression,
@@ -3560,6 +3714,23 @@ impl<'a> ParseContext<'a> {
             let failed_matched = self.matched_position;
             self.restore(checkpoint);
             if self.resource_failure.is_none() {
+                // Group/choice parsers have frames even without a rule invocation (#793).
+                // A bounded repeat (`'x'{2}`) is a Java Repeat frame that fails after its
+                // earlier iterations consumed. Reuse the restored cursors; successful
+                // expressions and the deferred pass need no frame bookkeeping. Classic
+                // records its frames below.
+                if self.options.diagnostics == Diagnostics::Detailed
+                    && matches!(
+                        expression,
+                        Expr::Sequence(_)
+                            | Expr::Choice(_)
+                            | Expr::PredictiveChoice { .. }
+                            | Expr::Repeat { .. }
+                            | Expr::JavaRepeat { .. }
+                    )
+                {
+                    self.fail_parser_frame();
+                }
                 if leaf_reset {
                     self.matched_position = self.position;
                 } else if transparent {
@@ -3568,19 +3739,7 @@ impl<'a> ParseContext<'a> {
                 // Java Chain sets this on its owner before beginning the local
                 // transaction, so syntax failure retains it until an enclosing
                 // transaction rolls back. Resource failures keep full rollback.
-                if self.token_mode.is_some()
-                    && matches!(
-                        expression,
-                        Expr::Sequence(_)
-                            | Expr::Number
-                            | Expr::Identifier
-                            | Expr::Quoted(_)
-                            | Expr::CodeStart
-                            | Expr::CodeEnd
-                            | Expr::CaptureBoundary(_, _)
-                            | Expr::InputCaptureBoundary(_, _)
-                    )
-                {
+                if self.token_mode.is_some() && java_chain_disables_owner_reset(expression) {
                     self.match_cursor_policy.reset = false;
                 }
                 if self.token_mode.is_some()
@@ -3660,8 +3819,10 @@ impl<'a> ParseContext<'a> {
     ) -> Option<Fragment> {
         let previous = self.lexical_trivia.replace(definition.clone());
         let previous_whitespace = std::mem::replace(&mut self.whitespace, false);
+        let previous_line_comments = std::mem::take(&mut self.line_comments);
         let result = self.expression(child, depth);
         self.whitespace = previous_whitespace;
+        self.line_comments = previous_line_comments;
         self.lexical_trivia = previous;
         result
     }
@@ -3937,7 +4098,7 @@ impl<'a> ParseContext<'a> {
                     None
                 }
             }
-            Expr::Literal(literal) => {
+            Expr::Literal(literal) | Expr::JavaLiteral(literal) => {
                 let end = match &mut self.lexing {
                     Some(session) => session.match_at(
                         literal,
@@ -4085,7 +4246,10 @@ impl<'a> ParseContext<'a> {
                 unreachable!("combinators are dispatched by expression")
             }
 
-            Expr::Capture(_, _) | Expr::OwnedCapture(_, _) | Expr::CaptureScope(_) => {
+            Expr::Capture(_, _)
+            | Expr::MetadataCapture(_, _)
+            | Expr::OwnedCapture(_, _)
+            | Expr::CaptureScope(_) => {
                 unreachable!("recursive expression dispatched by expression")
             }
             Expr::RuleEffects { .. } => {
@@ -4147,12 +4311,15 @@ impl<'a> ParseContext<'a> {
                                 .get(index)
                                 .is_some_and(|info| info.classic)
                         });
-                    let source = classic.then(|| {
+                    // 原文の由来は Classic の収集モードとは独立して保持する。
+                    let non_input = info
+                        .is_some_and(|info| !matches!(info.source, token::TokenSource::Input(_)));
+                    let source = (classic || non_input).then(|| {
                         Box::new(FragmentSource {
                             parsed_source: None,
                             span: matched.span,
                             kind: info.map_or(self.token_mode().kind, |info| info.kind),
-                            classic: true,
+                            classic,
                             generated: info.is_some_and(|info| {
                                 matches!(info.source, token::TokenSource::Generated { .. })
                             }),
@@ -4528,7 +4695,11 @@ impl<'a> ParseContext<'a> {
                 if previous.is_some() {
                     self.token_mode = Some(token::ParseMode::default());
                 }
+                let previous_hint = self.number_negative_hint;
+                self.number_negative_hint |=
+                    !*positive && self.options.diagnostics == Diagnostics::Detailed;
                 let matched = self.expression(child, depth).is_some();
+                self.number_negative_hint = previous_hint;
                 self.token_mode = previous;
                 self.restore(checkpoint);
                 // A committed or labeled child failure fails either polarity and keeps
@@ -4561,6 +4732,26 @@ impl<'a> ParseContext<'a> {
     }
 
     #[inline(never)]
+    fn expression_metadata_capture(
+        &mut self,
+        name: &'static str,
+        child: &Expr,
+        depth: usize,
+    ) -> Option<Fragment> {
+        let start = self.position;
+        let result = self.expression(child, depth);
+        self.expression_depth -= 1;
+        let mut fragment = result?;
+        let nodes = self.metadata_capture_nodes(&fragment);
+        fragment.captures.push(Capture {
+            name,
+            span: self.span(start),
+            nodes,
+        });
+        Some(fragment)
+    }
+
+    #[inline(never)]
     fn expression_capture(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
         let (name, child, owned) = match expression {
             Expr::Capture(name, child) => (*name, child.as_ref(), false),
@@ -4584,6 +4775,25 @@ impl<'a> ParseContext<'a> {
         anchor: usize,
         owned: bool,
     ) -> Option<Fragment> {
+        // Java は Choice/rule が返した Parsed を、@f の収集より先に検査する。
+        if !owned
+            && fragment
+                .parsed_source()
+                .is_some_and(|source| source.text.is_some() || source.generated)
+        {
+            self.fail("AST field capture requires original input source; use capture_owned for general replay");
+            return None;
+        }
+        if !owned && self.token_mode.is_some() {
+            // Java の @f は LazyChain なので、現在の kind の子だけを収集する。
+            // 直接の LOOKAHEAD（match-only）は consumed の @f では幅0になる（#742）。
+            let kind = self.token_mode().kind;
+            if fragment.source.as_deref().is_some_and(|source| {
+                source.classic && source.kind != kind && source.text.is_none() && !source.generated
+            }) {
+                fragment = self.collect_classic_fragment(fragment, kind);
+            }
+        }
         let source = if owned {
             fragment.parsed_source()
         } else {
@@ -4599,14 +4809,6 @@ impl<'a> ParseContext<'a> {
         );
         if !owned {
             // Keep the existing AST field contract and its input-only metadata.
-            if fragment
-                .source
-                .as_deref()
-                .is_some_and(|source| source.text.is_some() || source.generated)
-            {
-                self.fail("AST field capture requires original input source; use capture_owned for general replay");
-                return None;
-            }
             self.captures.push(name, span);
             fragment.captures.push(Capture {
                 name,
@@ -4614,9 +4816,7 @@ impl<'a> ParseContext<'a> {
                 nodes: fragment.nodes.clone(),
             });
             // @f は consumed の収集境界。外側の owned capture へ Parsed 原文を渡さない。
-            if self.track_owned_source {
-                fragment.clear_parsed_source();
-            }
+            fragment.clear_parsed_source();
             if fragment
                 .source
                 .as_deref()
@@ -4626,7 +4826,7 @@ impl<'a> ParseContext<'a> {
             }
             return Some(fragment);
         }
-        let source = match source.filter(|source| source.classic) {
+        let source = match source {
             Some(source) if source.generated => token::TokenSource::Generated {
                 anchor: source.span.start,
                 text: source
@@ -4762,6 +4962,14 @@ impl<'a> ParseContext<'a> {
             | Expr::InputCaptureBoundary(_, child) => {
                 let start = self.position;
                 let mut fragment = self.expression(child, depth)?;
+                if matches!(expression, Expr::InputCaptureBoundary(_, _))
+                    && fragment
+                        .parsed_source()
+                        .is_some_and(|source| source.text.is_some() || source.generated)
+                {
+                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
+                    return None;
+                }
                 if self.track_owned_source {
                     fragment.clear_parsed_source();
                 }
@@ -4772,15 +4980,6 @@ impl<'a> ParseContext<'a> {
                     .is_some_and(|source| !source.classic)
                 {
                     fragment.source = None;
-                }
-                if matches!(expression, Expr::InputCaptureBoundary(_, _))
-                    && fragment
-                        .source
-                        .as_deref()
-                        .is_some_and(|source| source.text.is_some() || source.generated)
-                {
-                    self.fail("AST field capture requires original input source; use capture_owned for general replay");
-                    return None;
                 }
                 if let Expr::CaptureBoundary(kind, _) | Expr::InputCaptureBoundary(kind, _) =
                     expression
@@ -5112,7 +5311,7 @@ impl<'a> ParseContext<'a> {
         let Some(table) = &self.first_sets else {
             return false;
         };
-        if self.token_mode.is_some() || self.lexical_trivia.is_some() {
+        if self.token_mode.is_some() || self.lexical_trivia.is_some() || self.line_comments {
             return false;
         }
         if first::of(candidate, table).may_start(&self.input[self.position..], self.whitespace) {
@@ -5143,6 +5342,13 @@ impl<'a> ParseContext<'a> {
                 position = end;
             }
             return &raw[position..];
+        }
+        if self.line_comments {
+            let mut rest = raw;
+            while let Some(comment) = rest.strip_prefix("//") {
+                rest = &comment[comment.find(['\r', '\n']).unwrap_or(comment.len())..];
+            }
+            return rest;
         }
         if !self.whitespace {
             return raw;
@@ -5215,6 +5421,10 @@ impl<'a> ParseContext<'a> {
             }
             return;
         }
+        if self.line_comments {
+            self.skip_line_comments();
+            return;
+        }
         if !self.whitespace {
             return;
         }
@@ -5252,6 +5462,22 @@ impl<'a> ParseContext<'a> {
         }
     }
 
+    /// Java `ZeroOrMore(CPPComment)`: `//` and the rest of the line are consumed, while the
+    /// `MatchOnly` line terminator (CRLF, CR, LF or EOF) still advances the matched cursor.
+    fn skip_line_comments(&mut self) {
+        while self.input[self.position..].starts_with("//") {
+            let body = &self.input[self.position + 2..];
+            self.position += 2 + body.find(['\r', '\n']).unwrap_or(body.len());
+            let rest = &self.input[self.position..];
+            self.matched_position = self.position
+                + if rest.starts_with("\r\n") {
+                    2
+                } else {
+                    usize::from(rest.starts_with(['\r', '\n']))
+                };
+        }
+    }
+
     // Java AbstractTokenParser calls consume(0) on a failed consuming atom. Occurs
     // does not wrap that attempt in a child transaction, whereas chain/rule/capture
     // children roll themselves back. Keep this effect confined to UBNF occurrences.
@@ -5276,7 +5502,8 @@ impl<'a> ParseContext<'a> {
         if self.token_mode.is_some_and(|mode| !mode.kind.is_consumed()) {
             return;
         }
-        if let Expr::TextValue(child)
+        if let Expr::MetadataCapture(_, child)
+        | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
         | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
@@ -5304,18 +5531,35 @@ impl<'a> ParseContext<'a> {
 
     // Matches Java NumberParser: optional sign, decimal, optional complete exponent.
     fn number(&mut self) -> bool {
+        if self.options.diagnostics == Diagnostics::Detailed {
+            self.number_with_diagnostics::<true>()
+        } else {
+            self.number_with_diagnostics::<false>()
+        }
+    }
+
+    // Select once per token: the deferred success path keeps the original scanner without
+    // a diagnostic-mode branch at every sign, digit run and optional exponent.
+    fn number_with_diagnostics<const RECORD: bool>(&mut self) -> bool {
         let start = self.position;
-        self.sign();
-        let before = self.digits();
+        self.sign::<RECORD>();
+        let mantissa = self.position;
+        let before = self.digits::<RECORD>();
         let mut after = false;
         if self.input.as_bytes().get(self.position) == Some(&b'.') {
             let point = self.position;
             self.position += 1;
             self.trace_atom("PointParser", point);
-            after = self.digits();
+            after = self.digits::<RECORD>();
+        } else if RECORD {
+            self.fail_number_at(self.position, NumberName::Point);
         }
         if !before && !after {
-            self.fail("number");
+            if RECORD {
+                // Failed Choice/Number frames start before the point/digit probes.
+                self.fail_number_at(mantissa, NumberName::Chain);
+                self.fail_number_at(start, NumberName::Number);
+            }
             self.position = start;
             return false;
         }
@@ -5329,23 +5573,34 @@ impl<'a> ParseContext<'a> {
         {
             self.position += 1;
             self.trace_atom("EParser", exponent);
-            self.sign();
-            if !self.digits() {
-                // Java's ExponentParser fails here, after the marker and an optional sign,
-                // and that failure is the reach the diagnostic reports (#717). The token
-                // still accepts only the mantissa.
-                self.fail("number");
+            self.sign::<RECORD>();
+            if !self.digits::<RECORD>() {
+                // Keep the digit/sign failures, but accept only the mantissa (#717/#752).
                 self.position = exponent;
                 trace.restore(self.token_trace.as_mut());
                 self.trace_atom("Optional", exponent);
             }
         } else {
+            if RECORD {
+                self.number_failure(NumberName::E);
+                self.number_failure(NumberName::Exponent);
+            }
             self.trace_atom("Optional", exponent);
         }
         true
     }
 
-    fn sign(&mut self) {
+    // These parsers have no Java display hint. Their failed frames contribute their
+    // class name, followed by the nearest enclosing terminal hint (PegLookahead).
+    // As in Java, successful memo replay keeps the hint recorded by the first call.
+    fn number_failure(&mut self, name: NumberName) {
+        self.fail_number_at(self.position, name);
+        if self.number_negative_hint {
+            self.fail_number_at(self.position, NumberName::NegativeLookahead);
+        }
+    }
+
+    fn sign<const RECORD: bool>(&mut self) {
         let start = self.position;
         if self
             .input
@@ -5356,11 +5611,14 @@ impl<'a> ParseContext<'a> {
             self.position += 1;
             self.trace_atom("SignParser", start);
         } else {
+            if RECORD {
+                self.number_failure(NumberName::Sign);
+            }
             self.trace_atom("Optional", start);
         }
     }
 
-    fn digits(&mut self) -> bool {
+    fn digits<const RECORD: bool>(&mut self) -> bool {
         let start = self.position;
         while self
             .input
@@ -5372,9 +5630,44 @@ impl<'a> ParseContext<'a> {
             self.position += 1;
             self.trace_atom("DigitParser", digit);
         }
+        // DetailedOnFailure (including the successful Auto full-input pass) must not
+        // intern names or allocate diagnostic records. Java skips these same failures.
+        if RECORD {
+            self.number_failure(NumberName::Digit);
+            if self.position == start {
+                self.number_failure(NumberName::OneOrMore);
+            }
+        }
         self.position > start
     }
 }
+
+/// The failures a detailed Java `NumberParser` records, as `ParseContext::number_names` slots.
+#[derive(Clone, Copy)]
+enum NumberName {
+    Sign,
+    Digit,
+    OneOrMore,
+    Point,
+    E,
+    Exponent,
+    Chain,
+    Number,
+    NegativeLookahead,
+}
+
+/// Java display text (or class name) per [`NumberName`]; Rust stores literals unquoted.
+const NUMBER_NAMES: [&str; 9] = [
+    "SignParser",
+    "DigitParser",
+    "OneOrMore",
+    ".",
+    "EParser",
+    "ExponentParser",
+    "Chain",
+    "NumberParser",
+    "negative lookahead",
+];
 
 /// Whether every custom parser in the grammar permits deferred diagnostics.
 ///
@@ -5413,6 +5706,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::OwnedCapture(_, child)
         | Expr::CaptureScope(child)
         | Expr::Capture(_, child)
+        | Expr::MetadataCapture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
         | Expr::InputCaptureBoundary(_, child)
@@ -5441,6 +5735,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         }
         Expr::Lexical(_, _)
         | Expr::Literal(_)
+        | Expr::JavaLiteral(_)
         | Expr::CaseInsensitive(_)
         | Expr::Number
         | Expr::Identifier
@@ -5552,6 +5847,7 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             | Expr::StopInvert(child)
             | Expr::StopConsume(child)
             | Expr::Capture(_, child)
+            | Expr::MetadataCapture(_, child)
             | Expr::TextValue(child)
             | Expr::CaptureBoundary(_, child)
             | Expr::InputCaptureBoundary(_, child)
@@ -5580,6 +5876,7 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             }
             Expr::Lexical(_, _)
             | Expr::Literal(_)
+            | Expr::JavaLiteral(_)
             | Expr::CaseInsensitive(_)
             | Expr::Number
             | Expr::Identifier
@@ -5683,6 +5980,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::StopInvert(child)
         | Expr::StopConsume(child)
         | Expr::Capture(_, child)
+        | Expr::MetadataCapture(_, child)
         | Expr::TextValue(child)
         | Expr::CaptureBoundary(_, child)
         | Expr::InputCaptureBoundary(_, child)
@@ -5708,6 +6006,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         }
         Expr::Lexical(_, _)
         | Expr::Literal(_)
+        | Expr::JavaLiteral(_)
         | Expr::CaseInsensitive(_)
         | Expr::Number
         | Expr::Identifier
@@ -6825,9 +7124,14 @@ mod tests {
 
         assert!(context.rule(0, 0).is_none());
 
+        // Sequence stores the same reset=false key that Java's Chain looks up.
+        let key = FailureMemoKey::new(0, 0, 0, false, 0).with_match_policy(MatchCursorPolicy {
+            reset: false,
+            non_ordered: false,
+        });
         let outer = context
             .failure_memo
-            .get(0, &FailureMemoKey::new(0, 0, 0, false, 0))
+            .get(0, &key)
             .expect("outer failure was memoized");
         assert_eq!(outer.farthest, Some(0));
         assert_eq!(
@@ -6850,6 +7154,69 @@ mod tests {
                 ],
             }
         );
+    }
+
+    // #794 normalizes reset before the memo lookup, but a failed rule must still leave the
+    // owner's cursor policy as the unmemoized evaluation does (memo transparency).
+    #[test]
+    fn memoized_rule_leaves_the_unmemoized_cursor_policy() {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "sequence",
+                expression: Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("b")]),
+            },
+            Rule {
+                name: "number",
+                expression: Expr::Number,
+            },
+            Rule {
+                name: "identifier",
+                expression: Expr::Identifier,
+            },
+        ]);
+        for (input, rule) in [("ax", 0), ("ab", 0), ("-", 1), ("1", 1), ("-", 2), ("a", 2)] {
+            for token_mode in [None, Some(token::ParseMode::default())] {
+                let observe = |memoization| {
+                    let mut context = ParseContext::with_options(
+                        input,
+                        ParseOptions::with_memoization(memoization),
+                    );
+                    context.rules = Arc::clone(&grammar);
+                    context.memo_safe_rules = memo_safe_rules(&grammar);
+                    context.token_mode = token_mode;
+                    // The third call starts after a sibling Chain set reset=false; Java's
+                    // Chain uses the same key for it, so it also replays.
+                    let observed = [true, true, false]
+                        .into_iter()
+                        .map(|reset| {
+                            context.position = 0;
+                            context.matched_position = 0;
+                            context.match_cursor_policy = MatchCursorPolicy {
+                                reset,
+                                non_ordered: false,
+                            };
+                            let result = context.rule(rule, 0).is_some();
+                            let policy = context.match_cursor_policy;
+                            (
+                                result,
+                                context.position,
+                                context.matched_position,
+                                policy.reset,
+                                policy.non_ordered,
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    let hits = context.memoized_failure_hits() + context.memoized_success_hits();
+                    (observed, hits)
+                };
+                let (off, _) = observe(Memoization::Off);
+                let (memo, hits) = observe(Memoization::SafeFailures);
+                assert_eq!(memo, off, "{input}/{rule}/{token_mode:?}");
+                if !off[0].0 {
+                    assert_eq!(hits, 2, "{input}/{rule}/{token_mode:?}");
+                }
+            }
+        }
     }
 
     #[test]
@@ -7102,6 +7469,7 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
                 ..
             } => scan.children(children),
             Expr::Capture(_, child)
+            | Expr::MetadataCapture(_, child)
             | Expr::TextValue(child)
             | Expr::CaptureBoundary(_, child)
             | Expr::InputCaptureBoundary(_, child)
@@ -7258,7 +7626,10 @@ mod pure_success_memo_tests {
         let mut context = context("ab", Expr::literal("a").then(Expr::literal("b")));
         context.token_mode = Some(token::ParseMode::default());
         let key = FailureMemoKey::new(0, 0, 0, false, 0)
-            .with_match_policy(context.match_cursor_policy)
+            .with_match_policy(MatchCursorPolicy {
+                reset: false,
+                non_ordered: false,
+            })
             .with_token_mode(context.token_mode);
         let checkpoint = context.checkpoint();
         assert!(context.rule(0, 0).is_some());
@@ -7503,5 +7874,108 @@ mod classic_mode_scan_tests {
             rules.push(rule("Last", Expr::literal("Z")));
             assert!(!requires_classic_mode(&Expr::Rule(0), &rules));
         });
+    }
+}
+
+#[test]
+fn number_internal_failure_recording_order_matches_java() {
+    // Public ParseError.expected remains sorted; check the retained order before presentation.
+    // The same Java oracle drives the public API and generated-host tests.
+    for row in include_str!("../../../conformance/number-token/diagnostics.tsv")
+        .lines()
+        .filter(|row| !row.starts_with('#'))
+    {
+        let c: Vec<_> = row.split('\t').collect();
+        let bytes = if c[1] == "~" {
+            vec![]
+        } else {
+            (0..c[1].len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&c[1][i..i + 2], 16).unwrap())
+                .collect()
+        };
+        let input = String::from_utf8(bytes).unwrap();
+        let memo = if c[2] == "OFF" {
+            Memoization::Off
+        } else {
+            Memoization::SafeFailures
+        };
+        for mode in [
+            Diagnostics::Auto,
+            Diagnostics::Detailed,
+            Diagnostics::DetailedOnFailure,
+        ] {
+            let mut context = ParseContext::with_options(
+                &input,
+                ParseOptions::with_memoization(memo).with_diagnostics(mode),
+            );
+            if c[0] == "bare" {
+                let _ = context.parse(&Expr::Number);
+            } else {
+                let _ = context.parse_grammar(rules(c[0]), 0, false);
+            }
+            let expected = if mode == Diagnostics::DetailedOnFailure {
+                vec![]
+            } else {
+                c[7].split(',')
+                    .map(|name| name.trim_matches('\''))
+                    .collect()
+            };
+            assert_eq!(
+                context
+                    .expected
+                    .iter()
+                    .map(|&id| context.expected_names.name(id))
+                    .collect::<Vec<_>>(),
+                expected,
+                "{row}/{mode:?}"
+            );
+        }
+    }
+    fn rules(shape: &str) -> Vec<Rule> {
+        let number = Expr::Rule(1);
+        let body = match shape {
+            "number" | "bare" => number,
+            "not" => number.not_ahead().then(Expr::literal("x")),
+            "failure-memo" => {
+                Expr::choice([number.clone().not_ahead().then(Expr::literal("x")), number])
+            }
+            "optional" => number.optional_java(),
+            "choice" => Expr::choice([Expr::literal("x"), number]),
+            "after-optional" => Expr::literal("x").optional_java().then(number),
+            "tail" => number.then(Expr::literal("e").optional_java()),
+            "memo" => number
+                .clone()
+                .ahead()
+                .then(number.clone().ahead())
+                .then(number.not_ahead()),
+            _ => panic!("{shape}"),
+        };
+        vec![
+            Rule {
+                name: "Root",
+                expression: body,
+            },
+            Rule {
+                name: "Num",
+                expression: Expr::Number,
+            },
+        ]
+    }
+}
+
+#[test]
+fn number_deferred_success_does_not_allocate_diagnostic_names() {
+    for input in ["2", "2.", ".5", "+2.5E-3", "2e", "2e+"] {
+        let mut context = ParseContext::with_options(
+            input,
+            ParseOptions::default().with_diagnostics(Diagnostics::DetailedOnFailure),
+        );
+        assert!(context.parse(&Expr::Number).is_ok());
+        assert!(context.expected_names.first.is_none());
+        assert_eq!(context.expected_names.remaining.capacity(), 0);
+        assert_eq!(context.expected_names.ids.capacity(), 0);
+        assert_eq!(context.expected.capacity(), 0);
+        assert_eq!(context.diagnostic_frames.capacity(), 0);
     }
 }

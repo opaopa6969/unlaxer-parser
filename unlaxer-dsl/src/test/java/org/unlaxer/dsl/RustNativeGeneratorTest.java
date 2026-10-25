@@ -124,7 +124,7 @@ public class RustNativeGeneratorTest {
             assertGeneratedBytes(binary, "text-recursive-plus-" + depth,
                 recursiveNestedHelper(depth, "(", ")+", false), report);
         }
-        // 固定点そのものの Java 側境界も確認。Rust の対応テストは preferred_plan.rs。
+        // #737 の旧境界は両側とも受理し、preferred projection を保持する (#754)。
         for (String[] wrapper : List.of(new String[] {"(", ")", "84"},
                 new String[] {"(", ")+", "63"}, new String[] {"(", ")?", "50"},
                 new String[] {"(", ")*", "50"}, new String[] {"[", "]", "84"},
@@ -134,12 +134,7 @@ public class RustNativeGeneratorTest {
                 String source = nestedHelper(depth, wrapper[0], wrapper[1]);
                 var grammar = UBNFMapper.parse(source).grammars().get(0);
                 var shapes = new RecursiveSemanticShapes(grammar, true);
-                if (depth == limit) {
-                    assertEquals("#node", shapes.rule("H").kind());
-                } else {
-                    var error = assertThrows(IllegalArgumentException.class, () -> shapes.rule("H"));
-                    assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256", error.getMessage());
-                }
+                assertEquals("#node", shapes.rule("H").kind());
                 assertGeneratedBytes(binary, "boundary-" + report.size(), source, report);
             }
         }
@@ -169,10 +164,85 @@ public class RustNativeGeneratorTest {
             int limit = Integer.parseInt(wrapper[2]);
             for (int depth = limit; depth <= limit + 1; depth++) {
                 assertGeneratedBytes(binary, "mapped-recursive-" + wrapper[3] + "-" + depth,
-                    recursiveNestedHelper(depth, wrapper[0], wrapper[1], true), depth == limit, report);
+                    recursiveNestedHelper(depth, wrapper[0], wrapper[1], true), true, report);
+            }
+        }
+        // #754 review: the new boundary, where generation still succeeds but the projection flips.
+        // Java-target generation succeeds exactly when both Rust hosts keep the projection.
+        for (String[] wrapper : List.of(new String[] {"(", ")+", "85", "plus"},
+                new String[] {"(", ")?", "63", "optional"}, new String[] {"(", ")*", "63", "star"},
+                new String[] {"(", ")", "127", "paren"}, new String[] {"[", "]", "127", "bracket"},
+                new String[] {"{", "}", "127", "brace"})) {
+            int limit = Integer.parseInt(wrapper[2]);
+            // Plain groups keep the projection up to the native frontend's last accepted depth.
+            int last = limit == 127 ? limit : limit + 1;
+            for (int depth = limit; depth <= last; depth++) {
+                String source = recursiveNestedHelper(depth, wrapper[0], wrapper[1], true);
+                assertGeneratedBytes(binary, "mapped-recursive-new-" + wrapper[3] + "-" + depth,
+                    source, depth == limit, report);
+                var grammar = UBNFMapper.parse(source).grammars().get(0);
+                var shapes = new RecursiveSemanticShapes(grammar, true);
+                if (depth == limit) {
+                    assertEquals("#node", shapes.rule("H").kind());
+                    new org.unlaxer.dsl.codegen.ParserGenerator().generate(grammar);
+                    new org.unlaxer.dsl.codegen.MapperGenerator().generate(grammar);
+                } else {
+                    assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256",
+                        assertThrows(IllegalArgumentException.class, () -> shapes.rule("H")).getMessage());
+                    // ( )+ reaches the left-recursion analysis limit first; Java generation fails either way.
+                    assertThrows(IllegalArgumentException.class,
+                        () -> new org.unlaxer.dsl.codegen.ParserGenerator().generate(grammar));
+                }
             }
         }
         Files.write(Path.of("target/rust-preferred-recursive-shape-limits.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    /** #754: a singleton choice consumes work, but adds no expression depth. */
+    @Test public void semanticShapeDepthStillRejectsDeepExpressions() {
+        // Real choices inside and outside the groups leave the native frontend below 128 body levels.
+        // These same seven boundaries are checked in preferred_plan.rs.
+        for (String[] wrapper : List.of(new String[] {"(", ")", "126"},
+                new String[] {"(", ")+", "84"}, new String[] {"(", ")?", "63"},
+                new String[] {"(", ")*", "63"}, new String[] {"[", "]", "126"},
+                new String[] {"{", "}", "126"}, new String[] {"('b' | ", ")", "84"})) {
+            int limit = Integer.parseInt(wrapper[2]);
+            for (int depth = limit; depth <= limit + 1; depth++) {
+                var grammar = UBNFMapper.parse(nestedHelper(depth, wrapper[0], wrapper[1])
+                    .replace("'a' M", "'a' M | 'b'")
+                    .replace("; @mapping(NM)", " | 'c'; @mapping(NM)")).grammars().get(0);
+                var shapes = new RecursiveSemanticShapes(grammar, true);
+                if (depth == limit) assertEquals("#join", shapes.rule("H").kind());
+                else assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256",
+                    assertThrows(IllegalArgumentException.class, () -> shapes.rule("H")).getMessage());
+            }
+        }
+    }
+
+    @Test public void javaGenerationDepthIsBoundedOnAColdOneMegabyteStack() throws Exception {
+        var result = command(List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+            "-Xss1m", "-Xint", "-cp", System.getProperty("java.class.path"),
+            RustNativeGeneratorTest.class.getName()), false);
+        assertEquals(result.output(), 0, result.code());
+        assertTrue(result.output(), result.output().contains("java-generation-depth: accepted=126 rejected=127"));
+    }
+
+    /** Separate cold VM: the semantic traversal and fixed point share a bounded native stack. */
+    public static void main(String[] args) {
+        var generators = List.of(new org.unlaxer.dsl.codegen.ParserGenerator(),
+            new org.unlaxer.dsl.codegen.ASTGenerator(), new org.unlaxer.dsl.codegen.MapperGenerator());
+        for (int depth : List.of(84, 85, 121, 122, 126, 127)) {
+            var grammar = UBNFMapper.parse(NestingLimitGrammars.recursivePlus(depth)).grammars().get(0);
+            for (var generator : generators) {
+                if (depth <= 126) generator.generate(grammar);
+                else assertEquals("E-RECURSIVE-SHAPE: expression depth exceeds 256",
+                    assertThrows(IllegalArgumentException.class, () -> generator.generate(grammar)).getMessage());
+            }
+        }
+        // Include the caller's rule-reference traversal beneath the fixed-point traversal (#740).
+        var combined = UBNFMapper.parse(NestingLimitGrammars.chainBesideNestedRecursion(82, 126)).grammars().get(0);
+        for (var generator : generators) generator.generate(combined);
+        System.out.println("java-generation-depth: accepted=126 rejected=127");
     }
 
     /**
@@ -208,10 +278,18 @@ public class RustNativeGeneratorTest {
                 }
                 if (depth <= NestingLimitGrammars.LOWERED) {
                     assertNull(name, javaError);
+                    // #754: Java-target generation must accept every grammar accepted by Rust.
+                    var javaGrammar = UBNFMapper.parse(source).grammars().get(0);
+                    new org.unlaxer.dsl.codegen.ParserGenerator().generate(javaGrammar);
+                    new org.unlaxer.dsl.codegen.ASTGenerator().generate(javaGrammar);
+                    new org.unlaxer.dsl.codegen.MapperGenerator().generate(javaGrammar);
                     assertEquals(name + "\n" + nativeRun.output(), 0, nativeRun.code());
                     assertEquals(name, 5, expected.size());
                     for (var file : expected) assertArrayEquals(name + " / " + file.relativePath(),
                         file.content().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(output.resolve(file.relativePath())));
+                    assertTrue(name + ": preferred projection", expected.stream()
+                        .filter(file -> file.relativePath().equals("parser.rs"))
+                        .anyMatch(file -> file.content().contains("Some(__preferred_cst::grammar())")));
                     report.add(name + "\taccepted\taccepted");
                     continue;
                 }
@@ -241,6 +319,56 @@ public class RustNativeGeneratorTest {
             report.add(name + "\taccepted\taccepted");
         }
         Files.write(Path.of("target/rust-recursive-nesting-limits.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    /** #805: debug CLI on a 2 MiB main stack, using Java's existing byte oracle. */
+    @Test public void nativeGenerationFitsTwoMegabyteStack() throws Exception {
+        assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        assumeTrue("requires bash ulimit", Files.isExecutable(Path.of("/bin/bash")));
+        assertEquals(0, command(List.of("cargo", "build", "--locked", "--manifest-path",
+            repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
+        // Positional arguments keep file names out of shell source. PATH remains empty.
+        var generator = List.of("/bin/bash", "-c", "set -e; ulimit -c 0; ulimit -s 2048; exec \"$@\"",
+            "stack-805", repo.resolve("rust/target/debug/unlaxer").toString());
+        var report = new ArrayList<>(List.of("case\tfiles_identical\tpreferred"));
+        for (String[] wrapper : List.of(new String[] {"[", "]", "127", "bracket"},
+                new String[] {"(", ")?", "63", "optional"}, new String[] {"(", ")", "127", "group"},
+                new String[] {"(", ")+", "85", "plus"}, new String[] {"(", ")*", "63", "star"},
+                new String[] {"{", "}", "127", "brace"})) {
+            for (int depth : List.of(0, 62, 63, 64, 84, 85, 86, 93, 94, 95, 126, 127)) {
+                if (wrapper[2].equals("63") && depth > 84) {
+                    String source = recursiveNestedHelper(depth, wrapper[0], wrapper[1], true);
+                    var parsed = UBNFMapper.parse(source).grammars().get(0);
+                    assertEquals("Rust subset: structural analysis depth exceeds 256",
+                        assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(parsed)).getMessage());
+                    Path grammar = temporary.newFile().toPath();
+                    Files.writeString(grammar, source);
+                    Path output = temporary.getRoot().toPath().resolve("rejected-" + wrapper[3] + "-" + depth);
+                    var args = new ArrayList<>(generator);
+                    args.addAll(List.of("generate", "--grammar", grammar.toString(), "--output", output.toString()));
+                    var rejected = command(args, true);
+                    assertEquals(rejected.output(), 3, rejected.code());
+                    assertEquals("structural analysis depth exceeds 256", rejected.output().strip());
+                    assertFalse("no artifacts after a resource limit", Files.exists(output));
+                    report.add("small-stack-" + wrapper[3] + "-" + depth + "\t0\tstructural analysis depth exceeds 256");
+                    continue;
+                }
+                assertGeneratedBytes(generator, "small-stack-" + wrapper[3] + "-" + depth,
+                    recursiveNestedHelper(depth, wrapper[0], wrapper[1], true),
+                    depth <= Integer.parseInt(wrapper[2]), report);
+            }
+            Path grammar = temporary.newFile().toPath();
+            Files.writeString(grammar, recursiveNestedHelper(128, wrapper[0], wrapper[1], true));
+            Path output = temporary.getRoot().toPath().resolve("rejected-" + wrapper[3]);
+            var args = new ArrayList<>(generator);
+            args.addAll(List.of("generate", "--grammar", grammar.toString(), "--output", output.toString()));
+            var rejected = command(args, true);
+            assertEquals(rejected.output(), 3, rejected.code());
+            assertTrue(rejected.output(), rejected.output().strip().endsWith("UBNF nesting limit exceeded"));
+            assertFalse("no artifacts after a resource limit", Files.exists(output));
+            report.add("small-stack-" + wrapper[3] + "-128\t0\tUBNF nesting limit exceeded");
+        }
+        Files.write(Path.of("target/rust-native-small-stack.tsv"), report, StandardCharsets.UTF_8);
     }
 
     private static String workHelper(boolean textRecursive) {
@@ -275,12 +403,61 @@ public class RustNativeGeneratorTest {
         assertGeneratedBytes(binary, name, source, true, report);
     }
 
+    /** #758: irrelevant rules must not make integer refinement run Java's AST fixed point. */
+    @Test public void numericAnalysisWorkMatchesNative() throws Exception {
+        assumeTrue("enable with -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        assertEquals(0, command(List.of("cargo", "build", "--locked", "--manifest-path",
+            repo.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), false).code());
+        Path binary = repo.resolve("rust/target/debug/unlaxer");
+        var report = new ArrayList<>(List.of("case\toutcome\tfiles_identical"));
+        assertAnalysisWorkMatchesNative(binary, "numeric-work-", NestingLimitGrammars::numericBesideAnalysisWork, report);
+        // @typeof refines its captures with the same rule, so it must not run the AST fixed point either.
+        assertAnalysisWorkMatchesNative(binary, "typeof-work-", NestingLimitGrammars::typeofBesideAnalysisWork, report);
+        Files.write(Path.of("target/rust-numeric-analysis-work.tsv"), report, StandardCharsets.UTF_8);
+    }
+
+    private void assertAnalysisWorkMatchesNative(Path binary, String prefix,
+            java.util.function.IntFunction<String> grammars, List<String> report) throws Exception {
+        for (int fillers : List.of(0, 500, 550, 560, 575, 580, 600, 700)) {
+            String name = prefix + fillers;
+            String source = grammars.apply(fillers);
+            Path grammar = temporary.newFile(name + ".ubnf").toPath();
+            Files.writeString(grammar, source);
+            Path output = temporary.getRoot().toPath().resolve(name);
+            var nativeRun = command(List.of(binary.toString(), "generate", "--grammar", grammar.toString(),
+                "--output", output.toString()), true);
+            var parsed = UBNFMapper.parse(source).grammars().get(0);
+            if (fillers >= 580) {
+                // The shared lowered-IR work limit still rejects genuinely excessive analysis.
+                var error = assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(parsed));
+                assertEquals("E-RECURSIVE-SHAPE: analysis work exceeds 1000000", error.getMessage());
+                assertNotEquals(name, 0, nativeRun.code());
+                assertEquals(name, error.getMessage(), nativeRun.output().strip());
+                report.add(name + "\trejected\t0");
+                continue;
+            }
+            assertEquals(name + "\n" + nativeRun.output(), 0, nativeRun.code());
+            var expected = new RustBackend().generate(parsed);
+            assertEquals(name, 5, expected.size());
+            for (var file : expected) assertArrayEquals(name + " / " + file.relativePath(),
+                file.content().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(output.resolve(file.relativePath())));
+            String ast = Files.readString(output.resolve("ast.rs"));
+            assertTrue(name + "\n" + ast, ast.contains("r#n: i32"));
+            report.add(name + "\taccepted\t5");
+        }
+    }
+
     private void assertGeneratedBytes(Path binary, String name, String source, boolean preferred, List<String> report) throws Exception {
+        assertGeneratedBytes(List.of(binary.toString()), name, source, preferred, report);
+    }
+
+    private void assertGeneratedBytes(List<String> generator, String name, String source, boolean preferred, List<String> report) throws Exception {
         Path grammar = temporary.newFile(name + ".ubnf").toPath();
         Files.writeString(grammar, source);
         Path output = temporary.getRoot().toPath().resolve(name);
-        var generated = command(List.of(binary.toString(), "generate", "--grammar", grammar.toString(),
-            "--output", output.toString()), true);
+        var args = new ArrayList<>(generator);
+        args.addAll(List.of("generate", "--grammar", grammar.toString(), "--output", output.toString()));
+        var generated = command(args, true);
         assertEquals(name + "\n" + generated.output(), 0, generated.code());
         var expected = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0));
         assertEquals(name, 5, expected.size());

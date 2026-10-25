@@ -119,6 +119,19 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 | `E-PRECEDENCE-DUPLICATE` | 同一ルールに `@precedence` が複数回宣言されている |
 | `E-PRECEDENCE-MIXED-ASSOC` | 同一優先度レベルで左結合と右結合が混在している |
 | `E-PRECEDENCE-ORDER` | 演算子ルールの参照先が適切な優先度順序になっていない |
+| `E-PRECEDENCE-OVERFLOW` | `@precedence(level=...)` が `2147483647` を超える |
+
+`level` の数字列は構文層で受理し、Java / Java-host Rust / native Rust の検証・生成で
+上限を検査する。`0` と `2147483647` は有効、先頭ゼロは値を変えず、任意長の
+範囲外の値も未処理例外や構文エラーではなく `E-PRECEDENCE-OVERFLOW` とする。
+メッセージは `precedence level exceeds 2147483647 at CP start..end`。
+範囲は元ソースの `@precedence` の `@` から閉じ `)` の直後までの 0 始まり半開 CP 範囲で、
+外側の trivia は含めず、内部の trivia は含める。非 BMP 文字は 1 CP と数える。
+未使用ルールも検査し、Java の公開 AST の `int level` は維持する。
+位置を持たない Java AST の overflow sentinel（`Integer.MIN_VALUE`）は CP 範囲なしで診断する。
+overflow した level は `E-PRECEDENCE-ORDER` / `E-PRECEDENCE-MIXED-ASSOC` の比較に使わない
+（sentinel 同士や sentinel と通常値を比べた二次診断を出さない）。Parser IR export
+（`--export-parser-ir`、終了コード 3）と BNF 変換も sentinel を出力せず `E-PRECEDENCE-OVERFLOW` で拒否する。
 
 ### ANNOTATION エラー
 
@@ -129,6 +142,8 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 | `E-ANNOTATION-SCOPETREE-MODE` | `@scopeTree` の `mode` が不正な値 |
 | `E-ANNOTATION-DECLARES-CAPTURE` | `@declares(symbol=...)` の対象captureが同じルール本体に存在しない |
 | `E-ANNOTATION-BACKREF-CAPTURE` | scopeの有無によらず`@backref(name=...)` の対象captureが同じルール本体に存在しない |
+| `W-ANNOTATION-IGNORED`（WARNING） | 生成器が使わない Simple annotation（`@nestedCaptures` / `@autoCommit` 以外）。生成は続ける。`GrammarValidator` ではなく、CLI の検証報告が生成の警告（`GenerationWarnings`）から位置付きで載せる（[契約](../../docs/simple-annotations.md)、#715） |
+| `W-COMMENT-IGNORED`（WARNING） | 全体の `@whitespace: javaStyle` と併記した `@comment` が `line: '//'` 1つ以外の形・重複（subject `comment`）。生成は javaStyle 単独と同じ。`GrammarValidator`（UBNF LSP の診断）が返し、CLI の検証報告は生成の警告（`GenerationWarnings`）の位置付きの行だけを載せる（[契約](../../docs/rule-trivia.md#global-comment712)、#748 / #777） |
 
 ### BOUNDED エラー（量指定子 `{n}` / `{n,m}` / `{n,}`）
 
@@ -139,6 +154,24 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 
 `ubnf-syntax.md` の `Quantifier` production は構文としては `min > max` や範囲外の
 整数値を制約しないが、この2つはバリデーション層で拒否する。
+
+`E-BOUNDED-OVERFLOW` は `{n}` / `{n,m}` / `{n,}` の明示された各境界に適用する。
+`2147483647` は受理し、`2147483648` 以上（任意長の数字列を含む）は拒否する。
+先頭のゼロは値を変えず、省略された上限は overflow としない。
+ソースから解析した反復の診断には、元ソースの反復式全体（被反復要素から量指定子の
+閉じ `}` まで。外側の空白・capture suffix は除く）の 0 始まり半開 CP 範囲を
+`at CP start..end` として含める。非 BMP 文字は 1 CP と数える。
+Java、Java-host Rust、native Rust の validator / generator に共通し、
+未使用ルールやゼロ回反復の内側も検証する。Java の AST を直接構築して origin がない場合は
+CP 位置を付けず、Rust は AST に明示された span を使う。
+既存の Java の int 境界 API と開放上限の表現は維持する。
+
+逆順と overflow が併存するときも同じ走査で診断する。ルール宣言順に、各本体を
+左から右の深さ優先・親から子の順で検査し、同じ量指定子では overflow を逆順より先に判定する。
+Java validator はこの順の一覧、各 generator / Rust lowering は最初の診断を返す。
+逆順の生成診断は `E-BOUNDED-INVALID: rule NAME has BoundedRepeatElement with min=N, max=M`。
+量指定子の検査は precedence overflow の検査より先に行う。
+共通 oracle は [precedence-overflow/corpus.json](../../conformance/precedence-overflow/corpus.json)（#802）。
 
 ---
 
@@ -161,6 +194,7 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 ## 変更履歴
 
 - 2026-03-01: 初版作成
+- 2026-10-24: `W-ANNOTATION-IGNORED` を追加（#715）
 - 2026-09-24: エラーコード名を `GrammarValidator` の実装に合わせて訂正
   （`E-MAPPING-EXTRA-CAPTURE` → `E-MAPPING-UNLISTED-CAPTURE`、
   `E-ASSOC-WITHOUT-PRECEDENCE` → `E-ASSOC-NO-PRECEDENCE`、

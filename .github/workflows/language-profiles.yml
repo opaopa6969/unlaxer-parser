@@ -3,6 +3,9 @@ on:
   push:
     branches: [master]
   pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   language-profiles:
     runs-on: [unlaxer-parser-ci, Linux, X64]
@@ -26,7 +29,20 @@ jobs:
       - run: python3 scripts/language-profile-corpus.py --check
       - run: python3 scripts/language-profile-packages.py --check
       - run: python3 scripts/language-profile-edit-replay.py --check
+      - name: Prepare required tests (language-profiles)
+        run: python3 scripts/verify-optin-tests.py language-profiles --prepare
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=LanguageProfileSelectionTest,LSPProfileInitializationTest,LSPCompileVerificationTest,LSPNonBmpOffsetTest,PackagedLanguageProfileConformanceTest,LanguageProfileConformanceTest,LanguageProfileEditReplayConformanceTest,LanguageProfileCommandTest,PlaygroundCommandTest,RustUbnfFrontendConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Verify required tests (language-profiles)
+        id: verify-language-profiles
+        if: success()
+        run: python3 scripts/verify-optin-tests.py language-profiles
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.verify-language-profiles.outcome != 'skipped' }}
+        with:
+          name: optin-language-profiles
+          path: |
+            target/optin-evidence/language-profiles/
+          if-no-files-found: error
       - run: test -s unlaxer-dsl/target/language-profile-edit-replay.tsv
       - run: test -s unlaxer-dsl/target/language-profile-package-entries.tsv
       - run: cargo test --locked --manifest-path rust/Cargo.toml -p unlaxer-runtime --test language_profile

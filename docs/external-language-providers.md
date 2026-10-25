@@ -117,7 +117,7 @@ it without skips. `cases.json` supplies 22 independent source/position/result ca
 a generated annotation-processor sentinel adds the 23rd. Both hosts invoke the same
 three actual adapters, compare full observations and write the report to
 `unlaxer-dsl/target/external-provider-conformance.tsv`. Protocol fixtures contain 31
-accepted/rejected frames; transport fixtures exercise four distinct failure states.
+accepted/rejected frames.
 
 Commands are argument arrays, with no shell:
 
@@ -129,6 +129,48 @@ The TypeScript installation is already locked by `unlaxer-dsl/ubnf-vscode/packag
 No production dependency is added to the Rust runtime. Process invocation is a native
 host capability; a browser/WASM editor requires an explicit native bridge and cannot
 claim that the compiler is installed merely because these modules are bundled.
+
+## Transport deadline regression (#721)
+
+Java's `ProviderProtocolTest` and Rust's `provider_protocol` read the same 13 rows
+in `protocol/transport.tsv`: case, mode, expected status, deadline (ms), delay before
+reading input (ms), and delay before responding (ms). The rows cover `OK` and three
+failure statuses: `UNAVAILABLE`, `FAILED`, and `TIMEOUT`. The separate user-code
+execution gate still requires `UNSUPPORTED`.
+
+Ordinary rejection rows use a 5000ms deadline and strictly require `FAILED` for
+nonzero exit or oversized stdout/stderr, and `UNAVAILABLE` for spawn failure.
+Four rows delay input reading or the response by 500ms before nonzero exit or
+oversized stdout, so reverting every row to 200ms fails. This controls one path
+where delay exhausts the budget; it does not reproduce every source of shared-host
+load. Ordinary rejection latency is logged but has no elapsed-time assertion:
+these tests check rejection status, not whether rejection is slow.
+
+Exactly 4 MiB of stdout containing a valid `OK` response, and exactly 4 MiB of
+stderr alongside a valid `OK` stdout response, must both be accepted. The
+oversized-stderr row also sends valid stdout and exits successfully; its extra
+stderr byte must produce `FAILED`. Removing the transport limit therefore yields
+`OK` for this row even if malformed-response decoding errors are mapped to
+`FAILED`. This distinguishes the transport limit from protocol rejection.
+
+The three intentional timeout rows sleep for 30 seconds before reading input,
+before responding, or without responding. They retain a 200ms deadline and
+strictly require `TIMEOUT`. Total invocation time must be at least 200ms and below
+a fixed 10 seconds. The upper bound is chosen relative to the fixture's 30-second
+sleep, not as a multiple of the deadline: it gives shared-host scheduling ample
+headroom while detecting a host that ignores the deadline and waits for the
+fixture. It does **not** detect an implementation that extends the deadline but
+still returns within 10 seconds, and arbitrary scheduler stalls can still exceed
+this test bound. Case, expected/actual status, deadline and elapsed time are logged.
+
+Production code, defaults and deadline scope are unchanged. Both hosts start the
+deadline after successfully spawning the command; it covers input writes, stdout /
+stderr reads and waiting for the child to exit. Frame encoding and OS spawn are
+outside it. The fixture's startup delay models Python readiness after spawn.
+Response decoding and cleanup have no separate deadline, and are included in the
+observed total invocation time. Existing malformed-frame rejection and the
+user-code execution gate remain covered. Cleanup retains the Java descendant
+termination and Rust direct-child kill-and-wait contracts.
 
 ## Consumer integration and limits
 

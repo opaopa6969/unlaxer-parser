@@ -11,7 +11,7 @@ pub fn generate(ir: &GrammarIr, name: &str) -> GeneratedFile {
 fn collect(expression: &Expression, keywords: &mut Vec<String>) {
     use Expression::*;
     match expression {
-        Literal(text) => {
+        Literal(text) | LexicalLiteral(text) => {
             if !text.is_empty() && !keywords.contains(text) {
                 keywords.push(text.clone());
             }

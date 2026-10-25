@@ -59,6 +59,8 @@ public final class RustGrammarLowering {
     private void leaveAnalysis() { analysisDepth--; }
 
     public static GrammarIR lower(GrammarDecl grammar) {
+        org.unlaxer.dsl.codegen.GrammarValidator.requireValidBoundedRepeatElements(grammar);
+        org.unlaxer.dsl.bootstrap.PrecedenceLevels.requireNoOverflow(grammar);
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         org.unlaxer.dsl.codegen.NestedCaptures.requireValid(grammar);
         org.unlaxer.dsl.codegen.RaisingOperators.requireValid(grammar);
@@ -77,12 +79,15 @@ public final class RustGrammarLowering {
         org.unlaxer.dsl.codegen.LexicalContexts.requireValid(grammar);
         org.unlaxer.dsl.codegen.NamePredicates.requireValid(grammar);
         var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
+        org.unlaxer.dsl.codegen.TokenStreamGrammar.requireValid(grammar);
+        org.unlaxer.dsl.codegen.GlobalComment.requireValid(grammar);
+        boolean lineComments = org.unlaxer.dsl.codegen.GlobalComment.lineComments(grammar);
         boolean whitespace = false;
         String globalStyle = "none";
         Set<String> settings = new HashSet<>();
         Set<String> memoSafeTokens = new HashSet<>();
         for (var setting : grammar.settings()) {
-            if (Set.of("tokenAdapter", "tokenContract", "embedded", "embedding").contains(setting.key())) continue;
+            if (Set.of("tokenAdapter", "tokenContract", "embedded", "embedding", "comment").contains(setting.key())) continue;
             if (setting.key().equals("feature")) {
                 if (!org.unlaxer.dsl.bootstrap.UBNFFeatures.validate(grammar).isEmpty()) throw unsupported("invalid feature");
                 continue;
@@ -121,7 +126,6 @@ public final class RustGrammarLowering {
                 throw unsupported("setting " + setting.key());
             }
         }
-        org.unlaxer.dsl.codegen.TokenStreamGrammar.requireValid(grammar);
         for (var token : grammar.tokens()) {
             Expression value = token instanceof TokenDecl.Declarative
                 ? new LexicalToken(token.name(), lexical.get(token.name())) : token(token);
@@ -229,7 +233,9 @@ public final class RustGrammarLowering {
                 } else if (annotation instanceof CatalogAnnotation value) {
                     if (catalog != null) throw unsupported("duplicate @catalog on " + rule.name());
                     catalog = value.context();
-                } else if (annotation instanceof SimpleAnnotation a && a.name().equals("nestedCaptures")) {
+                } else if (annotation instanceof SimpleAnnotation) {
+                    // Retained metadata, generated as if absent like Java; reported as
+                    // W-ANNOTATION-IGNORED by SimpleAnnotations.warnings (#715).
                 } else throw unsupported("annotation " + annotation + " on " + rule.name());
             }
             comparisons.add(hasScope ? null : backref);
@@ -390,8 +396,9 @@ public final class RustGrammarLowering {
                 .orElse(grammar.rules().get(i).annotations().stream().anyMatch(InterleaveAnnotation.class::isInstance) ? "javaStyle" : globalStyle);
             var definition = org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, lexical);
             if (definition != null) expression = new LexicalTriviaScope(expression, definition);
-            else if (hasLocalTrivia || !globalStyle.equalsIgnoreCase("none") && !globalStyle.equalsIgnoreCase("javaStyle"))
-                expression = new TriviaScope(expression, ruleWhitespace.get(i));
+            else if (hasLocalTrivia || lineComments || !globalStyle.equalsIgnoreCase("none") && !globalStyle.equalsIgnoreCase("javaStyle"))
+                expression = new TriviaScope(expression, ruleWhitespace.get(i), lineComments && grammar.rules().get(i).annotations().stream()
+                    .noneMatch(a -> a instanceof WhitespaceAnnotation || a instanceof InterleaveAnnotation));
             for (var annotation : grammar.rules().get(i).annotations()) if (annotation instanceof LexicalContextAnnotation context)
                 expression = new LexicalContextScope(expression, org.unlaxer.dsl.codegen.LexicalContexts.terminals(grammar, context));
             if (ruleEffects.get(i) != null) expression = new RuleEffects(expression, ruleEffects.get(i));
@@ -443,8 +450,12 @@ public final class RustGrammarLowering {
         return new Field(name, shape.kind(), shape.cardinality(), shape.enumName());
     }
     private static boolean integerConstraint(GrammarDecl grammar, RuleDecl rule, String name) {
-        String type = org.unlaxer.dsl.codegen.TypeofConstraints.valueType(grammar, rule, name);
-        return type.equals("int") || type.equals("Optional<Integer>") || type.equals("List<Integer>");
+        if (org.unlaxer.dsl.codegen.NestedCaptures.enabled(rule)) {
+            String type = org.unlaxer.dsl.codegen.TypeofConstraints.valueType(grammar, rule, name);
+            return type.equals("int") || type.equals("Optional<Integer>") || type.equals("List<Integer>");
+        }
+        // Same capture rule as numeric_fields.rs, without Java's whole-grammar AST inference (#758).
+        return org.unlaxer.dsl.codegen.NumericFields.isConstraintInteger(grammar, rule, name);
     }
 
     private Field boundConstraintField(Field field, Mapping mapping, RuleDecl sourceRule) {
@@ -586,7 +597,7 @@ public final class RustGrammarLowering {
     }
 
     private static boolean assocDelimiter(Expression expression) {
-        if (expression instanceof Literal || expression instanceof EmptyWordToken) return true;
+        if (expression instanceof Literal || expression instanceof LexicalLiteral || expression instanceof EmptyWordToken) return true;
         if (expression instanceof OptionalExpr optional) return literalDelimiterBody(optional.child());
         if (expression instanceof Repeat repeat)
             return repeat.min() == 0 && repeat.max() == null && literalDelimiterBody(repeat.child());
@@ -595,10 +606,10 @@ public final class RustGrammarLowering {
 
     // Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
     private static boolean literalDelimiterBody(Expression expression) {
-        if (expression instanceof Literal || expression instanceof EmptyWordToken) return true;
+        if (expression instanceof Literal || expression instanceof LexicalLiteral || expression instanceof EmptyWordToken) return true;
         return expression instanceof Sequence sequence && !sequence.elements().isEmpty()
             && sequence.elements().stream().allMatch(element ->
-                element instanceof Literal || element instanceof EmptyWordToken);
+                element instanceof Literal || element instanceof LexicalLiteral || element instanceof EmptyWordToken);
     }
 
     private void checkLeftAssoc(int rule, Mapping mapping) {
@@ -696,6 +707,10 @@ public final class RustGrammarLowering {
             // literals are enabled; then its literal parser accepts zero width.
             if (terminal.value().isEmpty() && !org.unlaxer.dsl.codegen.TokenStreamGrammar.enabled(grammar)
                 && !org.unlaxer.dsl.codegen.LexicalContexts.enabled(grammar)) return new EmptyWordToken();
+            if (!terminal.value().isEmpty() && (org.unlaxer.dsl.codegen.TokenStreamGrammar.enabled(grammar)
+                || org.unlaxer.dsl.codegen.LexicalContexts.enabled(grammar))) {
+                return new LexicalLiteral(scalarText(terminal.value()));
+            }
             return new Literal(scalarText(terminal.value()));
         }
         if (element instanceof ErrorElement error) {
@@ -734,7 +749,6 @@ public final class RustGrammarLowering {
             return new Repeat(repeatedAtom(repeat.body()), 1, null);
         }
         if (element instanceof BoundedRepeatElement repeat) {
-            if (repeat.min() < 0 || repeat.max() < repeat.min()) throw unsupported("invalid repetition bounds");
             return new Repeat(repeatedAtom(repeat.body()), repeat.min(),
                 repeat.max() == BoundedRepeatElement.UNBOUNDED ? null : repeat.max());
         }
@@ -754,7 +768,7 @@ public final class RustGrammarLowering {
                 ? choice.alternatives().get(0) : body;
             if (sourceBody instanceof SequenceBody source && source.elements().size() == 1
                 && source.elements().get(0).element() instanceof RuleRefElement) return child;
-            if (!onlyReference && (bare instanceof Literal || bare instanceof EmptyWordToken)) return child;
+            if (!onlyReference && (bare instanceof Literal || bare instanceof LexicalLiteral || bare instanceof EmptyWordToken)) return child;
         }
         return lowered;
     }
@@ -762,7 +776,7 @@ public final class RustGrammarLowering {
     private Expression repeatedAtom(AtomicElement atom) {
         Expression child = atomic(atom);
         // Java wraps repeated choices/literals in a DelimitedChain outside their capture site.
-        if (child instanceof Choice || child instanceof Literal || child instanceof EmptyWordToken) return new Delimited(child);
+        if (child instanceof Choice || child instanceof Literal || child instanceof LexicalLiteral || child instanceof EmptyWordToken) return new Delimited(child);
         return atom instanceof RuleRefElement || child instanceof Sequence
             ? child : new Sequence(List.of(child));
     }
@@ -815,6 +829,7 @@ public final class RustGrammarLowering {
         // A failing hint must still be tried so it can contribute its expected candidate.
         if (expression instanceof ErrorExpected ignored) return new AnyPredictor();
         if (nullable(expression)) return new AnyPredictor();
+        if (expression instanceof LexicalLiteral literal) return new LiteralPredictor(literal.text());
         if (expression instanceof Literal literal && !literal.text().isEmpty()) {
             return new LiteralPredictor(literal.text());
         }

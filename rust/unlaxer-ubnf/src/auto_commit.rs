@@ -118,6 +118,13 @@ pub fn lint_warnings(source: &str) -> Result<Vec<Warning>, crate::Diagnostic> {
     Ok(file.grammars.iter().flat_map(warnings).collect())
 }
 
+/// Whether `@autoCommit` analyses this grammar: it has an `@autoCommit` rule (pass the tree of
+/// [`parse_before_auto_commit`]) and is inside the analysed subset. Its other rules then take
+/// part in the analysis unless an annotation makes them opaque (#715).
+pub fn analyses(grammar: &GrammarDecl) -> bool {
+    grammar.rules.iter().any(annotated) && Analysis::new(grammar).is_some()
+}
+
 /// One warning per `@autoCommit` that cannot insert anything, in rule order. Pass the tree of
 /// [`parse_before_auto_commit`]: the rewritten tree no longer has the annotation.
 pub fn warnings(grammar: &GrammarDecl) -> Vec<Warning> {

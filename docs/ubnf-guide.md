@@ -288,11 +288,23 @@ Inserts implicit whitespace skipping between rule elements. Supported styles:
 
 ### `@comment: { line: '//' }`
 
-Inserts implicit comment skipping. The block form accepts a `line` key:
+Inserts implicit `//` line-comment skipping into rules that inherit the grammar default.
+The only accepted form is one `@comment` setting whose block holds exactly `line: '//'`:
 
 ```ubnf
 @comment: { line: '//' }
 ```
+
+With `@whitespace: javaStyle` it adds nothing (javaStyle already skips line comments).
+Without global whitespace (or with `none`) inheriting rules skip only `//` up to, not
+including, CR / LF / EOF: line terminators, spaces and block comments stay significant, which
+suits line-oriented grammars that match newlines explicitly. Rule-level `@whitespace(...)` and
+`@interleave` keep their own policy. Other forms, duplicates and the combination with a named
+global whitespace token are rejected with `E-COMMENT-SETTING` / `E-COMMENT-WHITESPACE`,
+except next to `@whitespace: javaStyle`: there 3.3.0 generated them as javaStyle alone, so they
+are still accepted, generate the same code and are reported as the warning `W-COMMENT-IGNORED`.
+Java, Java-hosted Rust and native Rust generation behave the same; see
+[the trivia contract](rule-trivia.md#global-comment712).
 
 ### `@enum`
 
@@ -423,6 +435,18 @@ An element-level annotation written **inside** a rule body (not on the rule). It
 ```ubnf
 Assignment ::= IDENTIFIER @name @typeof(value) '=' Expression @value ;
 ```
+
+### Other names (`@name`)
+
+Any other `@name` before a rule is a *Simple annotation*: it is kept as metadata (syntax tree, parser IR)
+and no generator uses it. Only `@nestedCaptures` and `@autoCommit` have an effect. One interaction
+remains: `@autoCommit` leaves a rule with such an annotation out of its analysis, so in a grammar that
+uses `@autoCommit` the annotation can change where commits are inserted (the warning says so). Every other one is reported as the warning `W-ANNOTATION-IGNORED` at the annotation,
+with the nearest known name when there is one (`@leftassoc` → `did you mean @leftAssoc?`), and
+`--strict` / `--fail-on warning` turn it into a failure. A known name written with a space after `@`
+(`@ leftAssoc`) or, for an annotation with arguments, without its `(` (`@mapping`) is such a Simple
+annotation too. `@name(args)` with an unknown name is a syntax error. See
+[Simple annotations](simple-annotations.md) (#715).
 
 ---
 

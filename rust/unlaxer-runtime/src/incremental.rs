@@ -236,6 +236,7 @@ pub fn grammar_is_snapshot_cacheable(rules: &[crate::Rule]) -> bool {
             | Expr::UniqueLongestChoice(children) => pending.extend(children),
             Expr::PredictiveChoice { alternatives, .. } => pending.extend(alternatives),
             Expr::Capture(_, child)
+            | Expr::MetadataCapture(_, child)
             | Expr::TextValue(child)
             | Expr::ValueBoundary(child)
             | Expr::Optional(child)
@@ -253,6 +254,7 @@ pub fn grammar_is_snapshot_cacheable(rules: &[crate::Rule]) -> bool {
             | Expr::LexicalContextScope { child, .. } => pending.push(child),
             Expr::Lexical(_, _)
             | Expr::Literal(_)
+            | Expr::JavaLiteral(_)
             | Expr::CaseInsensitive(_)
             | Expr::Number
             | Expr::Identifier

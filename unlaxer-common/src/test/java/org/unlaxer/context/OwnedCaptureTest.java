@@ -20,6 +20,15 @@ public class OwnedCaptureTest {
     private static Parser w(String text) { return new WordParser(text); }
     private static Parser cap(Parser child) { return new NamedCapture("value", child); }
     private static Parser replay() { return new ReplayParser("value"); }
+    /** 生成された @f (__CaptureSite) と同じ LazyChain の収集境界。 */
+    private static Parser field(Parser child) {
+        return new LazyChain() {
+            private static final long serialVersionUID = 1L;
+            @Override public org.unlaxer.parser.Parsers getLazyParsers() {
+                return new org.unlaxer.parser.Parsers(child);
+            }
+        };
+    }
     private static void parse(ParseContext c, Parser p) { assertTrue(p.parse(c).isSucceeded()); }
     private static Parser generated() {
         return new NoneChildParser() {
@@ -66,6 +75,21 @@ public class OwnedCaptureTest {
             case "scope-failure":
                 parse(c, cap(w("a")));
                 return new CaptureScope(new Chain(cap(w("b")), w("z"))).parse(c);
+            // Preferred metadata has no Java parser counterpart: use the ordinary expression.
+            case "metadata-choice-reset":
+                c.getCurrent().setResetMatchedWithConsumed(true);
+                return cap(new Choice(new Repeat(new MatchOnly(w("x")), 0, 2))).parse(c, kind, invert);
+            case "metadata-match-reset":
+                c.getCurrent().setResetMatchedWithConsumed(true);
+                return cap(new MatchOnly(new Repeat(new MatchOnly(w("x")), 0, 2))).parse(c, kind, invert);
+            case "field-repeat-reset", "field-repeat-preserve":
+                c.getCurrent().setResetMatchedWithConsumed(name.equals("field-repeat-reset"));
+                return cap(field(new Repeat(new MatchOnly(w("x")), 0, 2))).parse(c, kind, invert);
+            case "field-failure-reset":
+                c.getCurrent().setResetMatchedWithConsumed(true);
+                // 失敗した LazyChain も、begin 前に外側へ設定した reset=false を残す。
+                assertTrue(field(w("y")).parse(c).isFailed());
+                return cap(new Repeat(new MatchOnly(w("x")), 0, 2)).parse(c, kind, invert);
             case "match-only": parse(c, cap(w("a"))); return new MatchOnly(cap(w("b"))).parse(c);
             case "match-new": return new MatchOnly(cap(w("a"))).parse(c);
             case "peg": return new PegLookahead(cap(w("a"))).parse(c);

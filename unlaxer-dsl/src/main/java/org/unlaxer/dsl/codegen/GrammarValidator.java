@@ -143,6 +143,17 @@ public final class GrammarValidator {
         for (var issue : TokenStreamGrammar.problems(grammar)) {
             errors.add(new ValidationIssue(issue.code(), issue.subject(), "Use the supported @tokenStream:enabled profile."));
         }
+        for (var issue : GlobalComment.problems(grammar)) {
+            errors.add(new ValidationIssue(issue.code(), issue.subject(), issue.code().equals("E-COMMENT-SETTING")
+                ? "Use a single @comment: { line: '//' } setting."
+                : "Put line comments into the named whitespace token, or use @whitespace: javaStyle."));
+        }
+        // Kept for the API (#748). The flag CLI (#777) and the UBNF LSP (#798) report
+        // W-COMMENT-IGNORED once, from GenerationWarnings with its source span, and drop this row.
+        for (var issue : GlobalComment.warnings(grammar)) {
+            errors.add(new ValidationIssue(issue.code(), issue.subject(),
+                "@whitespace: javaStyle already skips // comments; remove this @comment setting."));
+        }
         try { LexicalContexts.requireValid(grammar); }
         catch (IllegalArgumentException error) {
             String code = error.getMessage().startsWith("E-LEXICAL-CONTEXT-") ? error.getMessage().split(":",2)[0] : "E-LEXICAL-CONTEXT";
@@ -947,7 +958,10 @@ public final class GrammarValidator {
                 "E-PRECEDENCE-DUPLICATE");
         }
         for (PrecedenceAnnotation p : precedenceAnnotations) {
-            if (p.level() < 0) {
+            if (org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(p)) {
+                addRuleError(errors, rule.name(), org.unlaxer.dsl.bootstrap.PrecedenceLevels.message(p),
+                    "Use a level between 0 and 2147483647.", org.unlaxer.dsl.bootstrap.PrecedenceLevels.CODE);
+            } else if (p.level() < 0) {
                 addRuleError(errors, rule.name(),
                     "rule " + rule.name() + " has invalid @precedence level: " + p.level(),
                     "Use a non-negative integer (e.g. @precedence(level=10)).",
@@ -1046,7 +1060,8 @@ public final class GrammarValidator {
 
         for (RuleDecl rule : grammar.rules()) {
             Integer precedence = findPrecedenceLevel(rule);
-            if (precedence == null || !hasAssoc(rule)) {
+            // E-PRECEDENCE-OVERFLOW owns an out-of-range level; never compare the sentinel (#802).
+            if (precedence == null || org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(precedence) || !hasAssoc(rule)) {
                 continue;
             }
             Set<String> refs = collectReferencedRuleNames(rule.body());
@@ -1059,7 +1074,7 @@ public final class GrammarValidator {
                     continue;
                 }
                 Integer refPrecedence = findPrecedenceLevel(refRule);
-                if (refPrecedence == null) {
+                if (refPrecedence == null || org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(refPrecedence)) {
                     continue;
                 }
                 if (refPrecedence <= precedence) {
@@ -1088,6 +1103,9 @@ public final class GrammarValidator {
                         + "Assoc but has no @precedence",
                     "Add @precedence(level=...) to this operator rule.",
                     "E-ASSOC-NO-PRECEDENCE");
+                continue;
+            }
+            if (org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(level)) {
                 continue;
             }
             String existing = assocByLevel.get(level);
@@ -1128,7 +1146,7 @@ public final class GrammarValidator {
     }
 
     /** Validate repeat definitions even when the repeated child will never execute. */
-    static void requireValidBoundedRepeatElements(GrammarDecl grammar) {
+    public static void requireValidBoundedRepeatElements(GrammarDecl grammar) {
         var errors = new ArrayList<ValidationIssue>();
         validateBoundedRepeatElements(grammar, errors);
         if (!errors.isEmpty()) {
@@ -1140,7 +1158,11 @@ public final class GrammarValidator {
     private static void validateBoundedRepeatElements(GrammarDecl grammar, List<ValidationIssue> errors) {
         for (RuleDecl rule : grammar.rules()) {
             collectBoundedElements(rule.body()).forEach(bounded -> {
-                if (bounded.min() < 0 || bounded.max() < bounded.min()) {
+                if (org.unlaxer.dsl.bootstrap.BoundedQuantifiers.overflow(bounded)) {
+                    addRuleError(errors, rule.name(),
+                        org.unlaxer.dsl.bootstrap.BoundedQuantifiers.message(bounded),
+                        "Use bounds between 0 and 2147483647.", "E-BOUNDED-OVERFLOW");
+                } else if (bounded.min() < 0 || bounded.max() < bounded.min()) {
                     addRuleError(errors, rule.name(),
                         "rule " + rule.name() + " has BoundedRepeatElement with min=" + bounded.min()
                             + ", max=" + bounded.max(),

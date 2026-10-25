@@ -83,6 +83,20 @@ impl FixedShape {
 }
 
 pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
+    crate::bounded::validate(grammar)?;
+    for rule in &grammar.rules {
+        for annotation in &rule.annotations {
+            if matches!(
+                annotation.kind,
+                AnnotationKind::Precedence { level: i32::MIN }
+            ) {
+                return Err(format!(
+                    "E-PRECEDENCE-OVERFLOW: precedence level exceeds 2147483647 at CP {}..{}",
+                    annotation.span.codepoint_start, annotation.span.codepoint_end
+                ));
+            }
+        }
+    }
     for token in &grammar.tokens {
         if matches!(&token.kind, TokenKind::Regex { .. })
             || matches!(&token.kind, TokenKind::Simple { parser_class }
@@ -370,6 +384,10 @@ impl Lowering<'_> {
         if let Some(issue) = crate::token_stream::problems(self.grammar).first() {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
+        if let Some(issue) = crate::global_comment::problems(self.grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
+        let line_comments = crate::global_comment::line_comments(self.grammar);
         let whitespace_definitions = lexical.clone();
         let mut whitespace = false;
         let mut global_style = "none".to_owned();
@@ -378,7 +396,7 @@ impl Lowering<'_> {
         for setting in &self.grammar.settings {
             if matches!(
                 setting.key.as_str(),
-                "tokenAdapter" | "tokenContract" | "embedded" | "embedding"
+                "tokenAdapter" | "tokenContract" | "embedded" | "embedding" | "comment"
             ) {
                 continue;
             }
@@ -460,6 +478,7 @@ impl Lowering<'_> {
         });
         let mut rule_effects = Vec::new();
         let mut rule_whitespace = Vec::new();
+        let mut rule_line_comments = Vec::new();
         let mut has_local_trivia = false;
         let mut methods = HashMap::new();
         let mut associativity_by_level = HashMap::new();
@@ -622,10 +641,9 @@ impl Lowering<'_> {
                     | AnnotationKind::Enum
                     | AnnotationKind::Eval { .. }
                     | AnnotationKind::CommonField { .. } => {}
-                    AnnotationKind::Simple { name } if name == "nestedCaptures" => {}
-                    other => {
-                        return Err(format!("unsupported annotation {other:?} on {}", rule.name))
-                    }
+                    // Retained metadata, generated as if absent like Java; reported as
+                    // W-ANNOTATION-IGNORED by `simple_annotations::warnings` (#715).
+                    AnnotationKind::Simple { .. } => {}
                 }
             }
             rule_effects.push(effects);
@@ -670,6 +688,8 @@ impl Lowering<'_> {
             self.recoveries.push(recovery);
             has_local_trivia |= local_whitespace.is_some() || interleave;
             rule_whitespace.push(local_whitespace.unwrap_or(whitespace || interleave));
+            // A rule-local setting elsewhere must not widen this rule's inherited policy.
+            rule_line_comments.push(line_comments && local_whitespace.is_none() && !interleave);
             if associativity.is_some() != precedence.is_some() {
                 return Err(format!(
                     "associativity and @precedence must occur together on {}",
@@ -1111,10 +1131,12 @@ impl Lowering<'_> {
                     child: Box::new(rule.body.clone()),
                     definition: definition.clone(),
                 };
-            } else if has_local_trivia || whitespace_style(&global_style).is_err() {
+            } else if has_local_trivia || line_comments || whitespace_style(&global_style).is_err()
+            {
                 rule.body = Expression::TriviaScope {
                     child: Box::new(rule.body.clone()),
                     java_whitespace: rule_whitespace[i],
+                    line_comments: rule_line_comments[i],
                 };
             }
             for annotation in &self.grammar.rules[i].annotations {
@@ -1344,6 +1366,18 @@ impl Lowering<'_> {
     }
 
     fn atomic(&self, atom: &ast::AtomicElement) -> Result<Expression> {
+        // A group adds no IR wrapper. Keep it out of the large enum-construction
+        // frame below: `( ... )?` / `( ... )*` otherwise retain that frame twice
+        // per source level and overflow before structural validation (#805).
+        if let ElementKind::Group(body) = &atom.kind {
+            self.body(body)
+        } else {
+            self.atomic_inner(atom)
+        }
+    }
+
+    #[inline(never)]
+    fn atomic_inner(&self, atom: &ast::AtomicElement) -> Result<Expression> {
         Ok(match &atom.kind {
             // Java emits WordParser(""), which never matches, unless lexical
             // literals are enabled; then its literal parser accepts zero width.
@@ -1353,6 +1387,13 @@ impl Lowering<'_> {
                     && !crate::lexical_contexts::enabled(self.grammar) =>
             {
                 Expression::EmptyWordToken
+            }
+            ElementKind::Terminal(text)
+                if !text.is_empty()
+                    && (crate::token_stream::enabled(self.grammar)
+                        || crate::lexical_contexts::enabled(self.grammar)) =>
+            {
+                Expression::LexicalLiteral(text.clone())
             }
             ElementKind::Terminal(text) => Expression::Literal(text.clone()),
             ElementKind::RuleRef { namespace, name } => {
@@ -1405,18 +1446,13 @@ impl Lowering<'_> {
                 min: 1,
                 max: None,
             },
-            ElementKind::BoundedRepeat { element, min, max } => {
-                if max.is_some_and(|max| max < *min) {
-                    return Err("invalid repetition bounds".into());
-                }
-                Expression::Repeat {
-                    child: Box::new(self.repeated_atom(element)?),
-                    min: *min as usize,
-                    max: max
-                        .filter(|value| *value != i32::MAX as u32)
-                        .map(|value| value as usize),
-                }
-            }
+            ElementKind::BoundedRepeat { element, min, max } => Expression::Repeat {
+                child: Box::new(self.repeated_atom(element)?),
+                min: *min as usize,
+                max: max
+                    .filter(|value| *value != i32::MAX as u32)
+                    .map(|value| value as usize),
+            },
             ElementKind::Separated { element, separator } => Expression::Separated {
                 child: Box::new(self.atomic(element)?),
                 separator: Box::new(self.atomic(separator)?),
@@ -1439,7 +1475,12 @@ impl Lowering<'_> {
                     body.alternatives[0].elements[0].element.kind,
                     ElementKind::RuleRef { .. }
                 ) || (!only_reference
-                    && matches!(bare, Expression::Literal(_) | Expression::EmptyWordToken))
+                    && matches!(
+                        bare,
+                        Expression::Literal(_)
+                            | Expression::LexicalLiteral(_)
+                            | Expression::EmptyWordToken
+                    ))
                 {
                     return Ok(child.clone());
                 }
@@ -1453,7 +1494,10 @@ impl Lowering<'_> {
         Ok(
             if matches!(
                 child,
-                Expression::Choice(_) | Expression::Literal(_) | Expression::EmptyWordToken
+                Expression::Choice(_)
+                    | Expression::Literal(_)
+                    | Expression::LexicalLiteral(_)
+                    | Expression::EmptyWordToken
             ) {
                 Expression::Delimited(Box::new(child))
             } else if matches!(atom.kind, ElementKind::RuleRef { .. })
@@ -1926,7 +1970,9 @@ impl Lowering<'_> {
             return Predictor::Any;
         }
         match expression {
-            Expression::Literal(value) if !value.is_empty() => Predictor::Literal(value.clone()),
+            Expression::Literal(value) | Expression::LexicalLiteral(value) if !value.is_empty() => {
+                Predictor::Literal(value.clone())
+            }
             Expression::NumberToken => Predictor::Number,
             Expression::IdentifierToken => Predictor::Identifier,
             Expression::QuotedToken(quote) => Predictor::Quoted(*quote),
@@ -2426,7 +2472,7 @@ fn assoc_skeleton(expression: &Expression) -> Vec<&Expression> {
 
 fn assoc_delimiter(expression: &Expression) -> bool {
     match expression {
-        Expression::Literal(_) | Expression::EmptyWordToken => true,
+        Expression::Literal(_) | Expression::LexicalLiteral(_) | Expression::EmptyWordToken => true,
         Expression::OptionalExpr(child)
         | Expression::Repeat {
             child,
@@ -2440,11 +2486,16 @@ fn assoc_delimiter(expression: &Expression) -> bool {
 // Only one Optional/Repeat around a literal sequence: no recursive semantic inference.
 fn literal_delimiter_body(expression: &Expression) -> bool {
     match expression {
-        Expression::Literal(_) | Expression::EmptyWordToken => true,
+        Expression::Literal(_) | Expression::LexicalLiteral(_) | Expression::EmptyWordToken => true,
         Expression::Sequence(elements) => {
             !elements.is_empty()
                 && elements.iter().all(|element| {
-                    matches!(element, Expression::Literal(_) | Expression::EmptyWordToken)
+                    matches!(
+                        element,
+                        Expression::Literal(_)
+                            | Expression::LexicalLiteral(_)
+                            | Expression::EmptyWordToken
+                    )
                 })
         }
         _ => false,

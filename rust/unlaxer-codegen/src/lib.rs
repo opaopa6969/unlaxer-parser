@@ -479,31 +479,115 @@ fn parser(ir: &GrammarIr) -> String {
     out
 }
 
+// Keep formatting temporaries out of recursive frames (#805). In debug builds the
+// formatter needs about 10 KiB, so retaining it at every IR level overflows a
+// 2 MiB stack before the frontend's nesting limit. Finish children first and
+// enter the non-recursive formatter only after their frames have returned.
 fn expression(expr: &Expression) -> String {
     use Expression::*;
     match expr {
-        Recovery { child, mode, tokens, message } => format!(
+        Capture {
+            expression: child, ..
+        }
+        | OptionalExpr(child)
+        | Delimited(child)
+        | TextValue(child)
+        | ValueBoundary(child)
+        | OwnedCapture { child, .. }
+        | CaptureScope(child)
+        | Commit { child, .. }
+        | Label { child, .. }
+        | CaptureBoundary { child, .. }
+        | Repeat { child, .. }
+        | RuleEffects { child, .. }
+        | CaptureEquality { child, .. }
+        | Recovery { child, .. }
+        | TriviaScope { child, .. }
+        | LexicalTriviaScope { child, .. }
+        | LexicalContextScope { child, .. }
+        | NamePredicate { child, .. }
+        | NameResolutionScope { child, .. } => {
+            let child = expression(child);
+            format_expression(expr, &child, "")
+        }
+        Sequence(items)
+        | Choice(items)
+        | LongestChoice(items)
+        | UniqueLongestChoice(items)
+        | PredictiveChoice {
+            alternatives: items,
+            ..
+        } => {
+            let children = expressions(items);
+            format_expression(expr, &children, "")
+        }
+        Separated { child, separator } => {
+            let child = expression(child);
+            let separator = expression(separator);
+            format_expression(expr, &child, &separator)
+        }
+        CatchLabels {
+            child, alternative, ..
+        } => {
+            let child = expression(child);
+            let alternative = expression(alternative);
+            format_expression(expr, &child, &alternative)
+        }
+        Literal(_)
+        | EmptyWordToken
+        | ErrorExpected(_)
+        | NumberToken
+        | IdentifierToken
+        | GraphemeToken
+        | QuotedToken(_)
+        | CodeStartToken
+        | CodeEndToken
+        | LongCodeBlockToken
+        | LexicalToken { .. }
+        | CustomToken(_)
+        | AnyToken
+        | EofToken
+        | EmptyToken
+        | CaseInsensitiveToken(_)
+        | CharRangeToken { .. }
+        | ExceptToken(_)
+        | UntilToken(_)
+        | LookaheadToken { .. }
+        | Reference(_)
+        | Replay(_) => format_expression(expr, "", ""),
+    }
+}
+
+// Inlining this into `expression` would put the large frame back on the
+// recursive path. `rendered` is the child (or joined list of children);
+// `other` is the second operand of Separated / CatchLabels.
+#[inline(never)]
+fn format_expression(expr: &Expression, rendered: &str, other: &str) -> String {
+    use Expression::*;
+    match expr {
+        Recovery { child: _, mode, tokens, message } => format!(
             "Expr::Recovery {{ child: Box::new({}), mode: unlaxer_runtime::RecoveryMode::{mode:?}, tokens: vec![{}], message: {} }}",
-            expression(child), tokens.iter().map(|token| quote(token)).collect::<Vec<_>>().join(", "), quote(message)),
-        RuleEffects { child, effects } => {
+            rendered, tokens.iter().map(|token| quote(token)).collect::<Vec<_>>().join(", "), quote(message)),
+        RuleEffects { child: _, effects } => {
             let scope = effects.scope_mode.map_or_else(
                 || "None".into(),
                 |mode| format!("Some(unlaxer_runtime::ScopeMode::{mode:?})"),
             );
             let declares = effects.declares.as_ref().map_or_else(|| "None".into(), |decl| format!("Some(unlaxer_runtime::Declaration {{ symbol_capture: {}, description: {} }})", quote(&decl.symbol_capture), option_text(decl.description.as_deref())));
-            format!("{}.rule_effects(unlaxer_runtime::RuleEffects {{ scope_mode: {scope}, declares: {declares}, backref: {} }})", expression(child), option_text(effects.backref.as_deref()))
+            format!("{}.rule_effects(unlaxer_runtime::RuleEffects {{ scope_mode: {scope}, declares: {declares}, backref: {} }})", rendered, option_text(effects.backref.as_deref()))
         }
-        NamePredicate { child, snapshot, version, capture, kind } => format!("Expr::NamePredicate {{ child: Box::new({}), snapshot: {}, version: {}, capture: {}, kind: {} }}", expression(child), quote(snapshot), quote(version), quote(capture), quote(kind)),
-        NameResolutionScope { child, requirements } => format!("Expr::NameResolutionScope {{ child: Box::new({}), requirements: vec![{}] }}", expression(child), requirements.iter().map(|(id,version)|format!("unlaxer_runtime::names::Requirement::new({}, {}).expect(\"validated name requirement\")",quote(id),quote(version))).collect::<Vec<_>>().join(", ")),
-        CaptureEquality { child, name } => {
+        NamePredicate { child: _, snapshot, version, capture, kind } => format!("Expr::NamePredicate {{ child: Box::new({}), snapshot: {}, version: {}, capture: {}, kind: {} }}", rendered, quote(snapshot), quote(version), quote(capture), quote(kind)),
+        NameResolutionScope { child: _, requirements } => format!("Expr::NameResolutionScope {{ child: Box::new({}), requirements: vec![{}] }}", rendered, requirements.iter().map(|(id,version)|format!("unlaxer_runtime::names::Requirement::new({}, {}).expect(\"validated name requirement\")",quote(id),quote(version))).collect::<Vec<_>>().join(", ")),
+        CaptureEquality { child: _, name } => {
             format!(
                 "Expr::compare_captures({}, {})",
                 quote(name),
-                expression(child)
+                rendered
             )
         }
         Literal(s) if s.is_empty() => "Expr::JavaEmptyLiteral".into(),
         Literal(s) => format!("Expr::Literal({})", quote(s)),
+        LexicalLiteral(s) => format!("Expr::JavaLiteral({})", quote(s)),
         EmptyWordToken => "Expr::JavaEmptyWord".into(),
         ErrorExpected(message) => format!("Expr::Error({})", quote(message)),
         NumberToken => "Expr::Number".into(),
@@ -538,81 +622,88 @@ fn expression(expr: &Expression) -> String {
             quote(pattern)
         ),
         Reference(id) => format!("Expr::Rule({id})"),
-        Sequence(items) => format!("Expr::Sequence(vec![{}])", expressions(items)),
-        Delimited(child) => format!("Expr::Sequence(vec![{}])", expression(child)),
-        TextValue(child) => format!("{}.text_value()", expression(child)),
-        ValueBoundary(child) => format!("{}.value_boundary()", expression(child)),
-        CaptureBoundary { kind, child } => format!("Expr::{}(unlaxer_runtime::capture_tree::Kind::{kind:?}, Box::new({}))", if *kind == crate::ir::BoundaryKind::Separator { "CaptureBoundary" } else { "InputCaptureBoundary" }, expression(child)),
-        LexicalContextScope { child, terminals } => format!(
-            "{}.lexical_context_scope(vec![{}])", expression(child),
+        Sequence(_) => format!("Expr::Sequence(vec![{}])", rendered),
+        Delimited(_) => format!("Expr::Sequence(vec![{}])", rendered),
+        TextValue(_) => format!("{}.text_value()", rendered),
+        ValueBoundary(_) => format!("{}.value_boundary()", rendered),
+        CaptureBoundary { kind, child: _ } => format!("Expr::{}(unlaxer_runtime::capture_tree::Kind::{kind:?}, Box::new({}))", if *kind == crate::ir::BoundaryKind::Separator { "CaptureBoundary" } else { "InputCaptureBoundary" }, rendered),
+        LexicalContextScope { child: _, terminals } => format!(
+            "{}.lexical_context_scope(vec![{}])", rendered,
             terminals.iter().map(|(name, literal, definition)| format!(
                 "unlaxer_runtime::lexing::Terminal {{ name: {}, literal: {}, expression: {} }}",
                 quote(name), literal, lexical_expression(definition))).collect::<Vec<_>>().join(", ")
         ),
-        LexicalTriviaScope { child, definition } => format!(
+        LexicalTriviaScope { child: _, definition } => format!(
             "{}.lexical_trivia_scope({})",
-            expression(child),
+            rendered,
             lexical_expression(definition)
         ),
         TriviaScope {
-            child,
+            child: _,
+            line_comments: true,
+            ..
+        } => format!("{}.line_comment_scope()", rendered),
+        TriviaScope {
+            child: _,
             java_whitespace,
+            line_comments: false,
         } => {
-            format!("{}.trivia_scope({java_whitespace})", expression(child))
+            format!("{}.trivia_scope({java_whitespace})", rendered)
         }
-        Choice(items) => format!("Expr::Choice(vec![{}])", expressions(items)),
-        UniqueLongestChoice(items) => format!("Expr::UniqueLongestChoice(vec![{}])", expressions(items)),
-        LongestChoice(items) => format!("Expr::LongestChoice(vec![{}])", expressions(items)),
+        Choice(_) => format!("Expr::Choice(vec![{}])", rendered),
+        UniqueLongestChoice(_) => format!("Expr::UniqueLongestChoice(vec![{}])", rendered),
+        LongestChoice(_) => format!("Expr::LongestChoice(vec![{}])", rendered),
         PredictiveChoice {
-            alternatives,
+            alternatives: _,
             predictors,
         } => format!(
             "Expr::PredictiveChoice {{ alternatives: vec![{}], predictors: vec![{}] }}",
-            expressions(alternatives),
+            rendered,
             predictors
                 .iter()
                 .map(predictor)
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
-        OwnedCapture { name, child } => format!("Expr::OwnedCapture({}, Box::new({}))", quote(name), expression(child)),
+        OwnedCapture { name, child: _ } => format!("Expr::OwnedCapture({}, Box::new({}))", quote(name), rendered),
         Replay(name) => format!("Expr::Replay({})", quote(name)),
-        CaptureScope(child) => format!("Expr::CaptureScope(Box::new({}))", expression(child)),
-        Commit { child, message } => match message {
-            Some(message) => format!("{}.commit_with({})", expression(child), quote(message)),
-            None => format!("{}.commit()", expression(child)),
+        CaptureScope(_) => format!("Expr::CaptureScope(Box::new({}))", rendered),
+        Commit { child: _, message } => match message {
+            Some(message) => format!("{}.commit_with({})", rendered, quote(message)),
+            None => format!("{}.commit()", rendered),
         },
-        Label { label, child } => format!("{}.label({})", expression(child), quote(label)),
+        Label { label, child: _ } => format!("{}.label({})", rendered, quote(label)),
         CatchLabels {
-            child,
-            alternative,
+            child: _,
+            alternative: _,
             labels,
         } => format!(
             "{}.catch_labels({}, [{}])",
-            expression(child),
-            expression(alternative),
+            rendered,
+            other,
             labels.iter().map(|label| quote(label)).collect::<Vec<_>>().join(", ")
         ),
         Capture {
             name,
-            expression: child,
+            expression: _,
         } => format!(
-            "Expr::Capture({}, Box::new({}))",
+            "Expr::{}({}, Box::new({}))",
+            if name.starts_with("#preferred-") { "MetadataCapture" } else { "Capture" },
             quote(name),
-            expression(child)
+            rendered
         ),
-        OptionalExpr(child) => format!("{}.optional_java()", expression(child)),
-        Repeat { child, min, max } => format!(
+        OptionalExpr(_) => format!("{}.optional_java()", rendered),
+        Repeat { child: _, min, max } => format!(
             "{}.repeat_java({min}, {})",
-            expression(child),
+            rendered,
             max.map_or_else(|| "None".into(), |max| format!("Some({max})"))
         ),
-        Separated { child, separator } => {
+        Separated { child, .. } => {
             let metadata = preferred::contains_depth(child);
-            let child = expression(child);
-            let separator = expression(separator);
+            let child = rendered;
+            let separator = other;
             if metadata {
-                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::Capture({}, Box::new({child}))]).repeat_java(0, None)])",quote(preferred::EXTRA))
+                format!("Expr::sequence([{child}, Expr::sequence([{separator}, Expr::MetadataCapture({}, Box::new({child}))]).repeat_java(0, None)])",quote(preferred::EXTRA))
             } else {
                 format!("{child}.separated_by_java({separator})")
             }
