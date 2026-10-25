@@ -129,6 +129,9 @@ style の比較は trim 後、大文字小文字を区別しない。rule の引
 外側の trivia は含めず、内部の trivia は含める。非 BMP 文字は 1 CP と数える。
 未使用ルールも検査し、Java の公開 AST の `int level` は維持する。
 位置を持たない Java AST の overflow sentinel（`Integer.MIN_VALUE`）は CP 範囲なしで診断する。
+overflow した level は `E-PRECEDENCE-ORDER` / `E-PRECEDENCE-MIXED-ASSOC` の比較に使わない
+（sentinel 同士や sentinel と通常値を比べた二次診断を出さない）。Parser IR export
+（`--export-parser-ir`、終了コード 3）と BNF 変換も sentinel を出力せず `E-PRECEDENCE-OVERFLOW` で拒否する。
 
 ### ANNOTATION エラー
 

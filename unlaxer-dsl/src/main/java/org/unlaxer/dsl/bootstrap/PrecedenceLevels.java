@@ -29,7 +29,19 @@ public final class PrecedenceLevels {
     }
 
     public static boolean overflow(PrecedenceAnnotation annotation) {
-        return annotation.level() == Integer.MIN_VALUE;
+        return overflow(annotation.level());
+    }
+
+    /** The transported overflow sentinel; it must never be compared as a real level. */
+    public static boolean overflow(int level) {
+        return level == Integer.MIN_VALUE;
+    }
+
+    /** Never print the internal sentinel as a level (exports, BNF, generated metadata). */
+    public static void requireNoOverflow(java.util.List<GrammarDecl> grammars) {
+        for (var grammar : grammars) {
+            if (grammar != null) requireNoOverflow(grammar);
+        }
     }
 
     private static void clean() {

@@ -1060,7 +1060,8 @@ public final class GrammarValidator {
 
         for (RuleDecl rule : grammar.rules()) {
             Integer precedence = findPrecedenceLevel(rule);
-            if (precedence == null || !hasAssoc(rule)) {
+            // E-PRECEDENCE-OVERFLOW owns an out-of-range level; never compare the sentinel (#802).
+            if (precedence == null || org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(precedence) || !hasAssoc(rule)) {
                 continue;
             }
             Set<String> refs = collectReferencedRuleNames(rule.body());
@@ -1073,7 +1074,7 @@ public final class GrammarValidator {
                     continue;
                 }
                 Integer refPrecedence = findPrecedenceLevel(refRule);
-                if (refPrecedence == null) {
+                if (refPrecedence == null || org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(refPrecedence)) {
                     continue;
                 }
                 if (refPrecedence <= precedence) {
@@ -1102,6 +1103,9 @@ public final class GrammarValidator {
                         + "Assoc but has no @precedence",
                     "Add @precedence(level=...) to this operator rule.",
                     "E-ASSOC-NO-PRECEDENCE");
+                continue;
+            }
+            if (org.unlaxer.dsl.bootstrap.PrecedenceLevels.overflow(level)) {
                 continue;
             }
             String existing = assocByLevel.get(level);

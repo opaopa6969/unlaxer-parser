@@ -85,6 +85,30 @@
     ]
   },
   {
+    "name": "precedence-overflow-referenced-by-order-check",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=10) R ::= M @left { '+' @op M @right }; @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=2147483648) M ::= Atom @left { '*' @op Atom @right }; Atom ::= 'x'; }",
+    "issues": [
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 230..259"
+      }
+    ]
+  },
+  {
+    "name": "precedence-overflow-equal-sentinels-mixed-assoc",
+    "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Binary, params=[left,op,right]) @leftAssoc @precedence(level=2147483648) R ::= M @left { '+' @op M @right }; @mapping(Binary, params=[left,op,right]) @rightAssoc @precedence(level=2147483649) M ::= Atom @left { '*' @op M @right }; Atom ::= 'x'; }",
+    "issues": [
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 120..149"
+      },
+      {
+        "code": "E-PRECEDENCE-OVERFLOW",
+        "message": "precedence level exceeds 2147483647 at CP 239..268"
+      }
+    ]
+  },
+  {
     "name": "bounded-reversed-before-overflow",
     "grammar": "// 😀\r\ngrammar G { @package: precedenceprobe @whitespace: none @root @mapping(Node) R ::= 'x'{9,2} 'y'{2147483648};  }",
     "issues": [
