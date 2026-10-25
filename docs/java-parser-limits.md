@@ -121,11 +121,23 @@ preferred projection の既存の境界（上記の 63 / 64、85 / 86 段）も�
 さらに、拒否対象の深い `( )?`・`( )*` は lowering の enum 構築 frame を group ごとにも保持していたので、
 IR の wrapper を増やさない group は小さな frame から直接その本体へ進む。
 frontend・構造解析・preferred 解析の上限や出力テンプレートは変えない。
+
+上の修正の後は、127 段の括弧で最も stack を使うのは frontend の構文解析（debug で約 1.8 MiB）だった。
+さらに `CAPTURE(…)`・`CAPTURE_SCOPE(…)`・`COMMIT(…)`・`LABEL(…)`・`CATCH(…)` の入れ子は 1 段あたりの
+frame がより大きく、104 段から、引数付き規則の呼出し `P(P(…))` は 126 段で frontend が stack overflow
+していた。frontend の `element` / `atomic` も、再帰するのは子の解析だけにし、接頭辞・後置演算子・capture・
+葉の解析と builtin の各演算をそれぞれ別の非 inline 関数に分けた（1 段あたり約 14 KiB / 20 KiB から
+約 7 KiB / 8 KiB）。受理する文法・診断・AST は変えない。mapped 再帰の横の helper で、これらの builtin は
+127 段（`CATCH` は 84 段まで生成し 85 段で構造解析の上限）、`P(…)` は 126 段（127 段は既存の `E-PARAM-LIMIT`）まで
+2 MiB で生成でき、128 段は frontend の `UBNF nesting limit exceeded` になる。
+選択肢・`%`・`{n,m}`・規則参照の長い列（3000 規則）・宣言的 token の入れ子（既存の `lexical expansion exceeds 128`
+まで）・`--lsp --dap` 付きの生成も、同じ 2 MiB の debug CLI で panic / abort しないことを確かめた。
 この保証は生成器の文法入力に対するもので、任意の巨大な手製 IR や 2 MiB 未満の stack は対象外。
 `RustNativeGeneratorTest.nativeGenerationFitsTwoMegabyteStack` は同じ入力を Java host でも生成し、
 成功する 58 文法の全 5 ファイル（290 ファイル）を byte 比較する。構造上限の 14 文法と
 frontend 上限の 6 文法も、panic / abort ではなく診断・終了 code 3・出力なしになることを固定する。
-Rust の `nesting_limits.rs` でも明示した 2 MiB thread で同じ境界を検証する。
+Rust の `nesting_limits.rs` でも明示した 2 MiB thread で同じ境界を検証し、builtin と引数付き規則の
+境界は `builtin_and_parameterized_calls_fit_two_megabyte_stack` で固定する。
 
 Rust 生成の整数 field の判定は、両 host とも `numeric_fields.rs` と同じ「mapping を共有する、
 `@skip` でない全規則の対象 capture がすべて数値 token」の規則を直接使う（#758）。`@typeof` の制約に使う
