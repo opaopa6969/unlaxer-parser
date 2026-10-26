@@ -1095,6 +1095,24 @@
       ]
     },
     {
+      "id": "terminated-repeat",
+      "category": "contract",
+      "title": "任意terminator付き反復の Rust 表現",
+      "hosts": "Java Classic / Rust runtime（Classic・通常入口）",
+      "issues": [
+        846,
+        716
+      ],
+      "observation": "Java の ChildOccursWithTerminator / Lazy* / Optional / ZeroOrOne / Repeat#newWithTerminator / WildCardStringTerminatorParser は Rust `Expr::repeat_java_until(terminator, min, max)` へ移し、terminated-repeat corpus（732行・所有状態24行）で受理・両cursor・原tokenとkind別CST・失敗CP・capture/user state・rollbackを両言語で比較する。意図した差は表現だけ: Class/Supplier/Lazy・Name・ASTNodeKind は Expr 値と Rule 名（#845）、Rust には token stack がなく常に1、Classic label は比較しない、Rule を terminator にした場合は Java の parser class による二重収集を写さない。新しい式は memo 不安全・snapshot cache 非承認（#184）。既存 JavaUntil の Classic CST で終端 Choice が1段浅かった差はこの変更で解消した。",
+      "evidence": [
+        "conformance/terminated-repeat/README.md",
+        "conformance/terminated-repeat/cases.tsv",
+        "conformance/terminated-repeat/state.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/TerminatedRepeatParityTest.java",
+        "rust/unlaxer-runtime/tests/terminated_repeat.rs"
+      ]
+    },
+    {
       "id": "catalog-resolver",
       "category": "unsupported",
       "title": "catalogからresolverへの自動接続",

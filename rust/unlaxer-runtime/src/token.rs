@@ -1126,7 +1126,10 @@ impl ParseContext<'_> {
     }
     #[inline(never)]
     fn classic_until(&mut self, terminator: &'static str, depth: usize) -> Option<Fragment> {
-        self.classic_until_parser(&Expr::Literal(terminator).match_only(), "Choice", depth)
+        // WildCardStringTerminatorParser(String...) terminates on Choice(MatchOnly(word)):
+        // the Choice token and Occurs' commit of that CollectingParser both stay in the CST.
+        let terminator = Expr::choice([Expr::Literal(terminator).match_only()]);
+        self.classic_until_parser(&terminator, "Choice", depth)
     }
     #[inline(never)]
     fn classic_until_parser(
