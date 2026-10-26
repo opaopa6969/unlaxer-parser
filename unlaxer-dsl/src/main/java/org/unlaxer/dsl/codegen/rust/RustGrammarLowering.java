@@ -120,7 +120,8 @@ public final class RustGrammarLowering {
             case "E-ANNOTATION-DUPLICATE-INTERLEAVE" -> detail = "duplicate @interleave on " + issue.rule();
             case "E-ANNOTATION-DUPLICATE-SCOPETREE" -> detail = "duplicate @scopeTree on " + issue.rule();
             case "E-LONGEST-CHOICE-SHAPE" -> detail = "@longestChoice requires multiple alternatives on " + issue.rule();
-            case "E-ASSOC-NO-MAPPING", "E-RIGHTASSOC-NONCANONICAL" -> {
+            case "E-ASSOC-NO-MAPPING", "E-ASSOC-MAPPING-PARAM", "E-ASSOC-MISSING-CAPTURE", "E-ASSOC-NO-REPEAT",
+                 "E-RIGHTASSOC-NONCANONICAL" -> {
                 boolean right = rule.annotations().stream().anyMatch(RightAssocAnnotation.class::isInstance);
                 detail = right ? "@rightAssoc requires left { op Self } with scalar base and params=[left, op, right] on " + issue.rule()
                     : "@leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on " + issue.rule();

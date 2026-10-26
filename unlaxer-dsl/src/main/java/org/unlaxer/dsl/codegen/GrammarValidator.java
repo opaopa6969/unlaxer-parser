@@ -296,8 +296,8 @@ public final class GrammarValidator {
                 var mapping = rule.annotations().stream().filter(MappingAnnotation.class::isInstance)
                     .map(MappingAnnotation.class::cast).reduce((first, second) -> second).orElse(null);
                 validateAssoc(rule, mapping, left, right, assoc);
-                if (!assoc.isEmpty() && Set.of("E-ASSOC-NO-MAPPING", "E-RIGHTASSOC-NONCANONICAL")
-                        .contains(assoc.get(0).code())) errors.add(assoc.get(0));
+                // Every first assoc error, so a later declaration code cannot contradict it.
+                if (!assoc.isEmpty()) errors.add(assoc.get(0));
             }
             int longest = (int) rule.annotations().stream().filter(LongestChoiceAnnotation.class::isInstance).count();
             int predictive = (int) rule.annotations().stream().filter(PredictiveChoiceAnnotation.class::isInstance).count();
@@ -322,7 +322,8 @@ public final class GrammarValidator {
             "E-ANNOTATION-INTERLEAVE-PROFILE", "E-ANNOTATION-SCOPETREE-MODE",
             "E-ASSOC-NO-PRECEDENCE", "E-RULE-UNDEFINED",
             "E-ANNOTATION-DUPLICATE-INTERLEAVE", "E-ANNOTATION-DUPLICATE-SCOPETREE",
-            "E-ASSOC-NO-MAPPING", "E-RIGHTASSOC-NONCANONICAL", "E-LONGEST-CHOICE-SHAPE");
+            "E-ASSOC-NO-MAPPING", "E-RIGHTASSOC-NONCANONICAL", "E-LONGEST-CHOICE-SHAPE",
+            "E-ASSOC-MAPPING-PARAM", "E-ASSOC-MISSING-CAPTURE", "E-ASSOC-NO-REPEAT");
         // A choice-profile error occurs before precedence in Java. Let the existing
         // lowering path report it, preserving its established explanation/code.
         return errors.stream().filter(issue -> codes.contains(issue.code())

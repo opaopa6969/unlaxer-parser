@@ -196,5 +196,50 @@
     "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='op', kind='type') @mapping(R, params=[left,op,right]) @rightAssoc @precedence(level=1) R ::= 'x' @left { '+' @op 'y' @right }; }",
     "code": "E-NAME-PREDICATE-CONFLICT",
     "rootRule": "R"
+  },
+  {
+    "name": "assoc-mapping-param-before-longest-shape",
+    "source": "grammar G { @mapping(R) @leftAssoc @precedence(level=1) @longestChoice R ::= 'x'; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R"
+  },
+  {
+    "name": "assoc-mapping-param-before-duplicate-interleave",
+    "source": "grammar G { @mapping(R) @leftAssoc @precedence(level=1) @interleave(profile=javaStyle) @interleave(profile=javaStyle) R ::= 'x'; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R"
+  },
+  {
+    "name": "assoc-mapping-param-before-qualified-reference",
+    "source": "grammar G { @mapping(R) @leftAssoc @precedence(level=1) R ::= 'x' ns.Missing; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R"
+  },
+  {
+    "name": "assoc-mapping-param-before-undefined",
+    "source": "grammar G { @mapping(R) @leftAssoc @precedence(level=1) R ::= 'x' Missing; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R",
+    "detail": "@leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on R"
+  },
+  {
+    "name": "rightassoc-mapping-param-single",
+    "source": "grammar G { @mapping(R, params=[left,op]) @rightAssoc @precedence(level=1) R ::= 'x' @left { '+' @op 'y' }; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R",
+    "detail": "@rightAssoc requires left { op Self } with scalar base and params=[left, op, right] on R"
+  },
+  {
+    "name": "assoc-no-repeat-before-duplicate-scopetree",
+    "source": "grammar G { @mapping(R, params=[left,op,right]) @leftAssoc @precedence(level=1) @scopeTree(mode=lexical) @scopeTree(mode=lexical) R ::= 'x' @left 'y' @op 'z' @right; }",
+    "code": "E-ASSOC-NO-REPEAT",
+    "rootRule": "R",
+    "detail": "@leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on R"
+  },
+  {
+    "name": "name-predicate-before-assoc-mapping-param",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='op', kind='type') @mapping(R, params=[op]) @leftAssoc @precedence(level=1) R ::= 'x' @op; }",
+    "code": "E-NAME-PREDICATE-CONFLICT",
+    "rootRule": "R"
   }
 ]

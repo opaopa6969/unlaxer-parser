@@ -132,24 +132,26 @@ fn validate_declarations(
         // Keep #835's missing/duplicate-precedence priority; otherwise validateAssoc runs
         // before choice profiles, precedence and references in Java.
         if (left || right) && precedence_count == 1 {
-            let code = if mapping.is_none() {
-                Some("E-ASSOC-NO-MAPPING")
-            } else if right {
-                let mut captures = HashSet::new();
-                collect_capture_names(&rule.body, &mut captures);
-                let params = mapping.unwrap();
-                // These checks precede NONCANONICAL in Java's validateAssoc.
-                if ["left", "op", "right"].iter().all(|name| {
-                    params.iter().any(|param| param == name) && captures.contains(*name)
-                }) && contains_declared_repeat(&rule.body)
-                    && !canonical_right_assoc(rule)
+            let mut captures = HashSet::new();
+            collect_capture_names(&rule.body, &mut captures);
+            let required = ["left", "op", "right"];
+            // The first error of Java's validateAssoc, in its order. Returning a later
+            // declaration code here would contradict the Java validator.
+            let code = match mapping {
+                None => Some("E-ASSOC-NO-MAPPING"),
+                Some(params)
+                    if required
+                        .iter()
+                        .any(|name| !params.iter().any(|param| param == name)) =>
                 {
-                    Some("E-RIGHTASSOC-NONCANONICAL")
-                } else {
-                    None
+                    Some("E-ASSOC-MAPPING-PARAM")
                 }
-            } else {
-                None
+                _ if required.iter().any(|name| !captures.contains(*name)) => {
+                    Some("E-ASSOC-MISSING-CAPTURE")
+                }
+                _ if !contains_declared_repeat(&rule.body) => Some("E-ASSOC-NO-REPEAT"),
+                _ if right && !canonical_right_assoc(rule) => Some("E-RIGHTASSOC-NONCANONICAL"),
+                _ => None,
             };
             if let Some(code) = code {
                 let detail = if right {
@@ -709,11 +711,13 @@ impl Lowering<'_> {
             // Preserve the existing root-projection explanation when it fails;
             // otherwise use the assoc explanation, still before undefined refs.
             Err(error) if error.starts_with("E-ASSOC-NO-MAPPING:") => Some(error),
-            // Java validates name predicates before mapping params and right-assoc shape.
+            // Java validates name predicates before mapping params and assoc shape.
             // Native needs lowered bodies for that check, so retain the diagnostic
             // until then instead of letting the new preflight mask it.
             Err(error)
                 if (error.starts_with("E-MAPPING-")
+                    || error.starts_with("E-ASSOC-MAPPING-PARAM:")
+                    || error.starts_with("E-ASSOC-NO-REPEAT:")
                     || error.starts_with("E-RIGHTASSOC-NONCANONICAL:"))
                     && self.grammar.rules.iter().any(|rule| {
                         rule.annotations
