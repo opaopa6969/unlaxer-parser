@@ -16,7 +16,7 @@
     "host別corpusの値の一致/差と未対応の意味分類は人が監査する。検査は新しいファイル/キー/出現数と台帳参照の欠落を落とすが、任意の新規skip条件や文書の意味を自動分類しない。",
     "2026-10-26 #784: 条件付き除外の宣言・元corpus・実行記録を照合する検査を追加。共通scopeの新規case/driver削除はmutation検査で検知する。root/診断優先順位に跨る16件の差は#833/#834/#835へ分離し、性能作業は行わない。",
     "2026-10-27 #833/#834/#835: spec corpusの診断差16件を両Rust hostで修正し契約へ移した（issueは本PRのmerge待ちでOPEN）。#784の実行先・独立期待値を維持し、rootあり/なしと複数不正の順序を追加検証する。 前提の#784（PR #836）・#825（PR #831）はmerge済み/CLOSEDを確認した。",
-    "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全338宣言とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。"
+    "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。"
   ],
   "issues": {
     "111": {
@@ -410,6 +410,10 @@
     "854": {
       "state": "OPEN",
       "title": "parity: ParseContext・解析結果・metadataの公開API利用経路を共通corpusで固定する"
+    },
+    "856": {
+      "state": "OPEN",
+      "title": "parity: 失敗診断・ParseOptions・RuleStack・RaisedFailureの公開APIを共通corpusで固定する"
     }
   },
   "entries": [
@@ -1078,9 +1082,10 @@
         851,
         852,
         853,
-        854
+        854,
+        856
       ],
-      "observation": "2026-10-27、origin/master 5a4e51620dc245186f683cded7c6a191398a9550 の公開338宣言（型258・static80）を構文木で列挙し、Rust経路と根拠を全API対応表へ記録した。対応済み32、対応あり・全API共通検証なし168、未対応の動作60、言語固有78。名指し12項目は個別判定し、残る構築/参照・terminator・選択再利用・行境界・字句・補完・CST/tag・旧replay・combinator・contextの実装と共通corpusは10本の子issueで追跡する。第1段は全API parity完了ではなく、#716/#111はopenを維持する。",
+      "observation": "2026-10-27、origin/master 5a4e51620dc245186f683cded7c6a191398a9550 の公開441宣言（型330・static111）を構文木で列挙し、Rust経路と根拠を全API対応表へ記録した。対応済み41、対応あり・全API共通検証なし233、未対応の動作58、言語固有109。名指し12項目は個別判定し、残る構築/参照・terminator・選択再利用・行境界・字句・補完・CST/tag・旧replay・combinator・context・失敗診断の実装と共通corpusは11本の子issueで追跡する。第1段は全API parity完了ではなく、#716/#111はopenを維持する。",
       "evidence": [
         "docs/java-api-rust-parity.md",
         "docs/java-api-rust-parity.json",

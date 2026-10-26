@@ -77,6 +77,51 @@ class Hidden { public static class Leaked {} }
             self.assertIn('未登録の公開 API: org.unlaxer.parser.newpackage.Added\n', errors)
             self.assertIn('未登録の公開 API: org.unlaxer.parser.newpackage.Added#create()', errors)
 
+    def test_added_type_in_context_related_packages_fails_until_registered(self):
+        # ParseContext の interface・診断・snapshot・reducer・listener は package 全体を走査する（#716 第1段レビュー）。
+        for package in ('context', 'capture', 'reducer', 'listener'):
+            with self.subTest(package=package), tempfile.TemporaryDirectory(prefix='java-api-') as temporary:
+                root = Path(temporary)
+                directory = root / api.JAVA / package
+                directory.mkdir(parents=True)
+                path = directory / 'AddedProbe.java'
+                path.write_text(f'package org.unlaxer.{package}; public interface AddedProbe {{}}')
+                self.assertIn(path, api.source_paths(root))
+                errors = self.errors(actual=self.actual + api.inventory(root, [path]))
+                self.assertIn(f'未登録の公開 API: org.unlaxer.{package}.AddedProbe', errors)
+
+    def test_failure_diagnostics_and_parse_context_interfaces_are_inventoried(self):
+        ids = {row['id'] for row in self.actual}
+        for name in ('context.ParseOptions', 'context.ParseFailureDiagnostics', 'context.RuleStack',
+                     'context.RaisedFailure', 'context.Transaction', 'context.ParseContextBase',
+                     'context.PortableTokenMetadata', 'capture.CaptureSnapshot', 'reducer.CommittedReducer',
+                     'listener.ParserListenerContainer'):
+            self.assertIn('org.unlaxer.' + name, ids)
+
+    def test_evidence_line_pointing_at_blank_or_brace_fails(self):
+        data = copy.deepcopy(self.data)
+        lines = (api.ROOT / 'rust/unlaxer-runtime/src/lib.rs').read_text().splitlines()
+        blank = next(number for number, text in enumerate(lines, 1) if text.strip() == '}')
+        data['assessments']['owned-capture']['code'] = [f'rust/unlaxer-runtime/src/lib.rs#L{blank}']
+        self.assertIn('根拠行が空行または括弧だけ', self.errors(data))
+
+    def test_line_start_parsers_cite_the_declarative_bol_bof_route(self):
+        # 名前の不一致で未対応と断定しない: UBNF/Rust の BOL・BOF は両 host の共通 corpus を持つ。
+        for name, op in (('start-of-line', 'Op::BOL'), ('start-of-source', 'Op::BOF')):
+            entry = self.data['assessments'][name]
+            self.assertEqual('uncorroborated', entry['status'])
+            self.assertIn('spec-corpus/declarative-tokens/runtime.json', entry['fixtures'])
+            location = next(c for c in entry['code'] if c.startswith('rust/unlaxer-runtime/src/lexical.rs#L'))
+            line = int(location.rpartition('#L')[2])
+            self.assertIn(op, (api.ROOT / 'rust/unlaxer-runtime/src/lexical.rs').read_text().splitlines()[line - 1])
+
+    def test_every_unverified_row_belongs_to_a_registered_child_issue(self):
+        followups = {entry['number'] for entry in self.data['followups'].values()}
+        for name, entry in self.data['assessments'].items():
+            if entry['status'] != 'verified':
+                with self.subTest(assessment=name):
+                    self.assertTrue(set(entry['issues']) & followups)
+
     def test_deleted_registration_and_deleted_declaration_fail(self):
         data = copy.deepcopy(self.data)
         removed = data['apis'].pop()

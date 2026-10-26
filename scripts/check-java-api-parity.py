@@ -15,20 +15,23 @@ DOCUMENT = "docs/java-api-rust-parity.md"
 JAVA = "unlaxer-common/src/main/java/org/unlaxer"
 # parser 全階層に加え、構築・探索・tag・解析結果・context の公開境界を含める。
 RELATED = ("Name", "Parsed", "Token", "TokenKind", "TokenList", "TokenPredicators",
-           "TransactionElement", "CapturedValue")
-CONTEXT = ("ParseContext", "TransactionalState", "MutationAwareTransactionalState")
+           "TransactionElement", "CapturedValue", "Committed", "TypedToken", "TokenEffecterWithMatcher")
+# ParseContext の実装 interface・options・失敗診断・capture snapshot・reducer・listener は
+# 個別ファイル名で選ばず package 全体を走査し、新しい公開型の追加も検出する。
+PACKAGES = ("parser", "context", "capture", "reducer", "listener")
+BLANK_LINES = {"", "{", "}", "},", ")", ");", "*/", "/**"}
 STATUSES = {"verified": "対応済み（記載した共通契約）", "uncorroborated": "対応あり・全API共通検証なし",
             "missing": "未対応（記載した動作）", "language-specific": "言語固有（移植境界あり）"}
 
 
 def source_paths(root):
     base = root / JAVA
-    paths = set((base / "parser").rglob("*.java"))
+    paths = set()
+    for package in PACKAGES:
+        paths.update((base / package).rglob("*.java"))
     paths.update(base.glob("Parser*.java"))
     paths.update(base.glob("*Tag*.java"))
     paths.update(base / (name + ".java") for name in RELATED)
-    paths.update(base / "context" / (name + ".java") for name in CONTEXT)
-    paths.add(base / "reducer/TagBasedReducer.java")
     return sorted(paths)
 
 
@@ -98,6 +101,9 @@ def validate(root, data, actual):
                     errors.append("根拠ファイルがない: " + location)
                 elif anchor and (not anchor.isdigit() or not 1 <= int(anchor) <= len(target.read_text().splitlines())):
                     errors.append("根拠行番号が不正: " + location)
+                elif anchor and target.read_text().splitlines()[int(anchor) - 1].strip() in BLANK_LINES:
+                    # 行番号のずれで空行・閉じ括弧を指す根拠は、宣言を確かめていない。
+                    errors.append("根拠行が空行または括弧だけ: " + location)
     if not re.fullmatch(r"[0-9a-f]{40}", data.get("revision", "")):
         errors.append("基準 revision が不正")
     return errors
