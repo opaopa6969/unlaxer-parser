@@ -3763,9 +3763,12 @@ impl<'a> ParseContext<'a> {
                         | Expr::CaptureEquality { .. }
                         | Expr::Commit { .. }
                         | Expr::Label { .. }
+                        | Expr::StopConsume(_)
+                        | Expr::StopInvert(_)
                 ) {
                     // Rule references, lexical policies, rule effects (@scopeTree /
-                    // @declares), @backref and Java Commit / Label call their child in the
+                    // @declares), @backref, Java Commit / Label and the Classic
+                    // Do-consume / InvertMatch propagation stoppers call their child in the
                     // owner's transaction in normal and Classic token modes: none
                     // of them begins a Java transaction (#814).
                     self.match_cursor_policy.reset = failed_reset;

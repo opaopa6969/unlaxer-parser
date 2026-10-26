@@ -22,7 +22,7 @@ Java は成功、consumed CP0 / matched CP2、旧 Rust は失敗、CP0 / CP1。
 | 診断位置 | `startParse` の frame 開始、子の失敗と `endParse` | `frame_start` / `frontier` / `fail_rule_frame` / `fail_at` | reset を直接読むのでなく、上記で決まる matched と consumed を読む。先読みが成功するかと、その後の失敗位置・候補が変わる |
 | owner の破棄・復元 | Choice / NonOrdered の候補 rollback、明示 transaction rollback、`ParseContext` の例外/資源中断時 publication 復元 | candidate の reset 復元、`restore` / `transaction`、resource failure | Chain の変更はその owner だけ。候補や外側の明示 transaction が rollback すれば元の値に戻る |
 | name frame の開始・終了 | `NameResolutionScope` / `NamePredicateParser` は `begin` → `commit` / `rollback` | 両式を `java_transaction` として扱う | 開始時に true なら matched を consumed へ戻す。子の Chain が false にしても成否どちらでも親の reset を復元する (#814) |
-| Classic の rule 参照・透過 wrapper | 生成 `RootParser` の `parse(context, TokenKind.consumed, false)` → `LazyChain` / `ChainInterface.parse` | `parse_with_token_mode(Expr::Rule)` と生成 rule body | 参照自体の frame はない。Chain が owner に残す false を通常経路と同じく伝える (#814) |
+| Classic の rule 参照・透過 wrapper | 生成 `RootParser` の `parse(context, TokenKind.consumed, false)` → `LazyChain` / `ChainInterface.parse`、`DoConsume` / `InvertMatch` の `PropagationStopper` | `parse_with_token_mode(Expr::Rule)` と生成 rule body、`StopConsume` / `StopInvert` | 参照自体の frame はない。Chain が owner に残す false を通常経路と同じく伝える (#814) |
 | 公開 getter | `TransactionElement.isResetMatchedWithConsumed` | `ParseContext.reset_matched_with_consumed` | 同じ context を使う caller も値を観測できる |
 
 通常の Rust は全ての Java frame を作るわけではなく、直接の `JavaLookahead` / `JavaEmpty` では
@@ -67,9 +67,9 @@ NonOrdered の transaction を明示し、その内側で4種の matched reader 
 
 ## name frame と Classic の実測 (#814)
 
-`owner-reset.tsv` は生成 Java の実行で確認した38行。名前用の3文法と既存の6文法を使い、
+`owner-reset.tsv` は生成 Java の実行で確認した42行。名前用の4文法と既存の6文法を使い、
 `NameScopeTokenModeResetConformanceTest` が memo OFF / SAFE_FAILURES × 診断3設定で比較する。
-Java は228観測、Rust は通常 / mapping grammar × Java-host / native の912観測。
+Java は252観測、Rust は通常 / mapping grammar × Java-host / native の1008観測。
 両 host の生成物は一致を確認してから、それぞれを compile・実行する。
 失敗ケースは同じ session で3回呼び、毎回同じ結果・reset・cursor であることも検査する。
 Classic の通常 Chain rule では SAFE_FAILURES の実 failure hit 2回を両言語で確認する。
@@ -87,6 +87,9 @@ CP は consumed / matched。各ケースは最初に `LOOKAHEAD('a')` を実行�
 `name-scope-lookahead.ubnf` は consuming leaf に隠されない frame 開始の検査で、
 `Root ::= Ahead` を初期 reset=true で呼ぶと、開始時に matched が CP1 → CP0 へ戻り、
 `LOOKAHEAD('a')` が成功する。false なら CP1 から読んで失敗する。
+`name-predicate-lookahead.ubnf`（`Root ::= Ahead 'a' @name`）は同じ検査を predicate の frame で行う。
+`predicate-entry-*` は外側 scope の開始後に matched を CP1 へ進めてから predicate を呼ぶので、
+scope の開始時復元に隠されない。true なら CP1/1 で成功し後続は CP1/2、false なら失敗する。
 
 ### 実際の生成位置と参照先
 
@@ -108,14 +111,22 @@ CP は consumed / matched。各ケースは最初に `LOOKAHEAD('a')` を実行�
   corpus の `classic-rule` は実 rule 参照、`classic-body` は生成された式そのものを呼び、
   `Expr::Rule` の伝播に隠されない透過 wrapper の伝播も検査する。
   元から直接の Sequence は一致し、透過 wrapper の条件 `self.token_mode.is_none() &&` が差を生んでいた。
+- 手組みの Classic `StopConsume` / `StopInvert` は Java の `DoConsumePropagationStopper` /
+  `InvertMatchPropagationStopper` に当たり、`startParse` / `endParse` だけで `begin` しない。
+  Java は consumed / matchOnly、初期 reset true / false、memo OFF / SAFE_FAILURES のどれでも
+  失敗後 reset=false・CP0/1、後続は成功 CP0/2。旧 Rust は初期 true で reset=true に戻していたので、
+  透過 wrapper に加えた。Java の `propagationStoppersKeepTheFailedChainPolicy` と Rust の
+  `classic_propagation_stoppers_retain_failed_chain_policy` が同じ観測行を固定し、Rust は rule 参照経由の
+  failure memo hit（2回）も確認する。生成文法はこの2式を出さないため、`owner-reset.tsv` には入れない。
 
 ### mutation
 
 `java_transaction` から `NameResolutionScope` / `NamePredicate` を個別に外す、
 Classic の透過条件に `self.token_mode.is_none() &&` を戻す、
-name scope の開始時 matched 復元を外す、の4変異を個別に実行する。
+name scope / name predicate の開始時 matched 復元を個別に外す、の5変異を個別に実行する。
 どれも Rust の `name_scope_token_mode_reset` と生成両 host の conformance が失敗する。
-新しいテストクラスの2メソッドを Cross-language CI と `.github/optin-test-contracts.json` に登録する。
+透過 wrapper から `StopConsume` / `StopInvert` を外す変異は Rust の `name_scope_token_mode_reset` が検出する。
+新しいテストクラスの3メソッドを Cross-language CI と `.github/optin-test-contracts.json` に登録する。
 
 性能は #197 の凍結に従う。変更は失敗の復元・再生、候補境界の bool 保存/失敗時復元、
 SAFE_FAILURES の既存 lookup 正規化における透過 wrapper の確認、name frame の既存 policy 保存/復元に限定する。

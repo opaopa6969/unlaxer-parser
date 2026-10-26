@@ -165,6 +165,38 @@ public class NameScopeTokenModeResetConformanceTest {
         assertObservations("both generated Rust hosts", expected, actual);
     }
 
+    /**
+     * Classic propagation stoppers parse their child without beginning a transaction, so a
+     * failed Chain leaves the owner at false. Rust's
+     * {@code classic_propagation_stoppers_retain_failed_chain_policy} asserts the same line.
+     */
+    @Test public void propagationStoppersKeepTheFailedChainPolicy() {
+        for (var memo : Memoization.values()) for (String stopper : List.of("consume", "invert"))
+            for (TokenKind kind : List.of(TokenKind.consumed, TokenKind.matchOnly))
+                for (boolean initial : List.of(true, false)) {
+                    Parser chain = new Chain(new WordParser("a"), new WordParser("z"));
+                    Parser parser = stopper.equals("consume")
+                            ? new DoConsumePropagationStopper(chain) : new InvertMatchPropagationStopper(chain);
+                    String label = stopper + "/" + kind + "/" + initial + "/" + memo;
+                    try (var context = ParseContext.withOptions(StringSource.createRootSource("ab"),
+                            ParseOptions.withMemoization(memo))) {
+                        assertTrue(new MatchOnly(new WordParser("a")).parse(context).isSucceeded());
+                        String before = null;
+                        for (int attempt = 0; attempt < 3; attempt++) {
+                            context.getCurrent().setResetMatchedWithConsumed(initial);
+                            boolean success = parser.parse(context, kind, false).isSucceeded();
+                            String observed = success + "\t" + context.getCurrent().isResetMatchedWithConsumed()
+                                    + "\t" + context.position() + "\t" + context.matchedPosition();
+                            if (before != null) assertEquals(label + "/retry", before, observed);
+                            before = observed;
+                        }
+                        boolean follower = new NonOrdered(new MatchOnly(new WordParser("b"))).parse(context).isSucceeded();
+                        assertEquals(label, "false\tfalse\t0\t1\ttrue\t0\t2", before + "\t" + follower
+                                + "\t" + context.position() + "\t" + context.matchedPosition());
+                    }
+                }
+    }
+
     private static void assertObservations(String label, List<String> expected, List<String> actual) {
         assertEquals(label + " observation count", expected.size(), actual.size());
         for (int i = 0; i < expected.size(); i++)

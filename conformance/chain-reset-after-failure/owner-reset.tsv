@@ -37,3 +37,7 @@ backref-classic-body-true	backref.ubnf	classic-body	ab	a	type	true	false	false	0
 backref-classic-body-false	backref.ubnf	classic-body	ab	a	type	false	false	false	0	1	true	0	2
 scope-entry-true	name-scope-lookahead.ubnf	scope	ab	a	type	true	true	true	0	1	false	0	1
 scope-entry-false	name-scope-lookahead.ubnf	scope	ab	a	type	false	false	false	0	1	true	0	2
+predicate-entry-true	name-predicate-lookahead.ubnf	predicate	ab	a	type	true	true	true	1	1	true	1	2
+predicate-entry-false	name-predicate-lookahead.ubnf	predicate	ab	a	type	false	false	false	0	1	true	0	2
+nested-entry-true	name-predicate-lookahead.ubnf	scope	ab	a	type	true	true	true	1	1	true	1	2
+nested-entry-false	name-predicate-lookahead.ubnf	scope	ab	a	type	false	false	false	0	1	true	0	2
