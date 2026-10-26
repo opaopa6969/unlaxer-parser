@@ -1,0 +1,12 @@
+grammar ValueReset {
+    @package: valuereset
+    @whitespace: none
+    @root @mapping(Node, params=[value])
+    Root ::= Helper @value;
+    Helper ::= 'a' 'z' Mixed;
+    @whitespace(none)
+    Wrapped ::= 'a' 'z' Mixed;
+    Mixed ::= Leaf | 't';
+    @mapping(Leaf)
+    Leaf ::= 'l';
+}

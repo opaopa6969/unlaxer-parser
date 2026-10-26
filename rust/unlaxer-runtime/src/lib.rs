@@ -1703,6 +1703,28 @@ fn java_chain_disables_owner_reset(expression: &Expr) -> bool {
     )
 }
 
+/// Projection-only wrappers and wrappers that share their child's Java owner.
+/// Keep memo-key normalization and failure propagation on the same list;
+/// MetadataCapture is dispatched early.
+#[inline(always)]
+fn java_owner_transparent_child(expression: &Expr) -> Option<&Expr> {
+    match expression {
+        Expr::MetadataCapture(_, child)
+        | Expr::TriviaScope { child, .. }
+        | Expr::LexicalTriviaScope { child, .. }
+        | Expr::LexicalContextScope { child, .. }
+        | Expr::RuleEffects { child, .. }
+        | Expr::CaptureEquality { child, .. }
+        | Expr::Commit { child, .. }
+        | Expr::Label { child, .. }
+        | Expr::StopConsume(child)
+        | Expr::StopInvert(child)
+        | Expr::TextValue(child)
+        | Expr::ValueBoundary(child) => Some(child),
+        _ => None,
+    }
+}
+
 impl Default for MatchCursorPolicy {
     fn default() -> Self {
         Self {
@@ -3099,15 +3121,7 @@ impl<'a> ParseContext<'a> {
         // Rule/expression depth guards stay intact.
         let parent_reset = self.match_cursor_policy.reset;
         let mut expression = &self.rules[id].expression;
-        while let Expr::MetadataCapture(_, child)
-        | Expr::TriviaScope { child, .. }
-        | Expr::LexicalTriviaScope { child, .. }
-        | Expr::LexicalContextScope { child, .. }
-        | Expr::RuleEffects { child, .. }
-        | Expr::CaptureEquality { child, .. }
-        | Expr::Commit { child, .. }
-        | Expr::Label { child, .. } = expression
-        {
+        while let Some(child) = java_owner_transparent_child(expression) {
             expression = child;
         }
         if java_chain_disables_owner_reset(expression) {
@@ -3753,24 +3767,11 @@ impl<'a> ParseContext<'a> {
                 // transaction rolls back. Resource failures keep full rollback.
                 if java_chain_disables_owner_reset(expression) {
                     self.match_cursor_policy.reset = false;
-                } else if matches!(
-                    expression,
-                    Expr::Rule(_)
-                        | Expr::TriviaScope { .. }
-                        | Expr::LexicalTriviaScope { .. }
-                        | Expr::LexicalContextScope { .. }
-                        | Expr::RuleEffects { .. }
-                        | Expr::CaptureEquality { .. }
-                        | Expr::Commit { .. }
-                        | Expr::Label { .. }
-                        | Expr::StopConsume(_)
-                        | Expr::StopInvert(_)
-                ) {
-                    // Rule references, lexical policies, rule effects (@scopeTree /
-                    // @declares), @backref, Java Commit / Label and the Classic
-                    // Do-consume / InvertMatch propagation stoppers call their child in the
-                    // owner's transaction in normal and Classic token modes: none
-                    // of them begins a Java transaction (#814).
+                } else if matches!(expression, Expr::Rule(_))
+                    || java_owner_transparent_child(expression).is_some()
+                {
+                    // Rule references and projection/policy wrappers retain the child's
+                    // owner reset in normal and Classic modes (#809 / #814 / #820).
                     self.match_cursor_policy.reset = failed_reset;
                 }
                 if self.token_mode.is_some()
