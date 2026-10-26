@@ -2,6 +2,7 @@ grammar NestedBoundary {
     @package: nestedboundary
     @whitespace: none
     token N = NumberParser
+    token B = LOOKAHEAD('b')
     @root @nestedCaptures @mapping(TextNode)
     Root ::= ('a' 'z' | 'q') | N;
     @nestedCaptures @mapping(IntegerNode)
@@ -16,4 +17,14 @@ grammar NestedBoundary {
     Single ::= (('a' 'z' | 'q') | N);
     @nestedCaptures @mapping(SingleIntegerNode)
     SingleInteger ::= ((N | N) | 't');
+    @nestedCaptures @mapping(AheadNode)
+    Ahead ::= (B | 'q') | N;
+    @nestedCaptures @mapping(AheadTokenNode)
+    AheadToken ::= B | N;
+    @nestedCaptures @mapping(LongestNode) @longestChoice
+    Longest ::= ('a' 'z' | 'q') | N;
+    @nestedCaptures @mapping(UniqueNode) @uniqueLongestChoice
+    Unique ::= ('a' 'z' | 'q') | N;
+    @nestedCaptures @mapping(PredictiveNode) @predictiveChoice
+    Predictive ::= ('a' 'z' | 'q') | N;
 }

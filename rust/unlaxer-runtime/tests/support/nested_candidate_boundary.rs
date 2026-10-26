@@ -154,7 +154,13 @@ pub fn report_control(mut rules: Vec<Rule>) {
                 **child = Expr::Sequence(vec![original]);
                 1
             }
-            Expr::Choice(children) => children
+            Expr::Choice(children)
+            | Expr::LongestChoice(children)
+            | Expr::UniqueLongestChoice(children)
+            | Expr::PredictiveChoice {
+                alternatives: children,
+                ..
+            } => children
                 .iter_mut()
                 .map(|child| add_chain(child, true))
                 .sum(),
@@ -167,7 +173,18 @@ pub fn report_control(mut rules: Vec<Rule>) {
         }
     }
     for rule in &mut rules {
-        if matches!(rule.name, "Root" | "Integer" | "Single" | "SingleInteger") {
+        if matches!(
+            rule.name,
+            "Root"
+                | "Integer"
+                | "Single"
+                | "SingleInteger"
+                | "Ahead"
+                | "AheadToken"
+                | "Longest"
+                | "Unique"
+                | "Predictive"
+        ) {
             assert_eq!(add_chain(&mut rule.expression, false), 2, "{}", rule.name);
         }
     }

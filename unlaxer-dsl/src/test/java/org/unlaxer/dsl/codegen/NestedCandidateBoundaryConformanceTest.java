@@ -57,12 +57,12 @@ public class NestedCandidateBoundaryConformanceTest {
         for (String row : Files.readAllLines(corpus.resolve("nested-boundary-differences.tsv"))) {
             if (row.startsWith("#") || row.isBlank()) continue;
             String[] diff = row.split("\t");
-            assertEquals(11, diff.length);
+            assertEquals(13, diff.length);
             String key = String.join("\t", java.util.Arrays.copyOf(diff, 5));
             assertTrue("duplicate difference " + key, seen.add(key));
             String[] expected = rows.get(key);
             assertNotNull(key, expected);
-            int[] columns = {9, 10, 16};
+            int[] columns = {9, 10, 11, 16};
             for (int i = 0; i < columns.length; i++) {
                 assertEquals(key + "/Java column " + columns[i], expected[columns[i]], diff[5 + 2 * i]);
                 expected[columns[i]] = diff[6 + 2 * i];
@@ -95,6 +95,23 @@ public class NestedCandidateBoundaryConformanceTest {
                     assertEquals(2, context.matchedPosition());
                 }
             }
+        }
+        // Matched-cursor readers inside the candidate and the Choice profiles keep the same frame.
+        record Frame(String rule, Class<?> parser, Class<?> child) {}
+        for (Frame frame : List.of(new Frame("Ahead", LazyChoice.class, LazyChoice.class),
+                new Frame("AheadToken", LazyChoice.class, MatchOnly.class),
+                new Frame("Longest", LazyLongestChoice.class, LazyChoice.class),
+                new Frame("Unique", LazyUniqueLongestChoice.class, LazyChoice.class),
+                new Frame("Predictive", LazyPredictiveChoice.class, LazyChoice.class))) {
+            Parser parser = (Parser) loader.loadClass("nestedboundary.NestedBoundaryParsers$" + frame.rule() + "Parser")
+                    .getConstructor().newInstance();
+            assertTrue(frame.rule(), frame.parser().isInstance(parser));
+            assertEquals(frame.rule(), 2, parser.getChildren().size());
+            for (Parser candidate : parser.getChildren()) {
+                assertEquals(frame.rule(), "__CaptureSite", candidate.getClass().getSimpleName());
+                assertTrue(frame.rule(), candidate instanceof LazyChain);
+            }
+            assertTrue(frame.rule(), frame.child().isInstance(parser.getChildren().get(0).getChildren().get(0)));
         }
         for (String rule : List.of("Single", "SingleInteger")) {
             Parser parser = (Parser) loader.loadClass("nestedboundary.NestedBoundaryParsers$" + rule + "Parser")
