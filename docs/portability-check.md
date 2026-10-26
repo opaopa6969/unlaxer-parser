@@ -184,7 +184,8 @@ precedence 欠如、未定義参照の順に検証し、root 欠如より先に�
 警告で、対象エラーを遮らない。lowering / generator の説明には Java と同じ `E-*:` が付くが、
 上の段階順と JSON の code・span・終了コードは変わらない。通常構造エラーは引き続き
 `P-STRUCTURE`、不正 whitespace/profile など inventory が検出するものは従来の `blocked` 診断となる。
-対象診断の詳細と複数エラーの共通入力は [spec corpus の実行契約](../spec-corpus/execution/README.md) を参照。
+#843 の重複注釈・結合性・longestChoice形状・importなし修飾参照も同じ段階で検査し、
+元のcheck JSONを14入力のLF/CRLFで固定する。対象診断の詳細と複数エラーの共通入力は [spec corpus の実行契約](../spec-corpus/execution/README.md) を参照。
 
 構造エラーがあれば `structure: failed`、終了コードは 3。
 複数 grammar の診断は既存どおり span の start、end、code、subject の順で並べ、
@@ -220,14 +221,14 @@ LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・
 同じ code/subject の root 出現と null 出現、作り直された rule/element/@lexicalContext、解決失敗と成功を固定する。
 非 BMP 文字を含む9ケースを LF/CRLF で読み、両 host の JSON 全体を固定期待値（配列順・件数・CP 範囲を含む）と照合し、
 `target/rust-portability-imports.tsv` に18ケースの証拠を残す。native の workspace test も同じ fixture を使う。
-`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む78ケースを
+`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む92ケースを
 LF/CRLF で検証する。enum・eval・embedding・typeof・未定義参照・IR 検証のエラー、
 前段の syntax/module/inventory、bounded/precedence/nested、二規則の schema エラー、
 複数 grammar の順序、既存 commonField corpus の型・cardinality、共有 mapping の不一致が
 後の field・leaf・規則の schema エラーより先に `P-STRUCTURE` になることも固定する。
 annotation・capture・再帰を持つ正常な enum alias も受理し、別の eval エラーを隠さないことを確認する。
 両 host の JSON 全体と終了コードを比較し、`target/rust-portability-structure-priority.tsv`
-に156ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
+に184ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
 native CLI は `PATH=''` で実行し、入力・手書きファイルが変更されないことも確認する。
 

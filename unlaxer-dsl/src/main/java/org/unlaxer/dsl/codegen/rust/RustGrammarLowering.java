@@ -37,6 +37,7 @@ public final class RustGrammarLowering {
     private final Set<Integer> nullableRules = new HashSet<>();
     private int analysisDepth;
     private boolean nestedRule;
+    private String deferredAssocError;
     /** Solved recursive rule shapes, without and with enum nodes; null until the first revisit. */
     private final Shape[][] recursiveShapes = new Shape[2][];
     /** The Empty state of lowering.rs FixedShape; null is Unknown, any other shape is a Value. */
@@ -116,14 +117,38 @@ public final class RustGrammarLowering {
                 .filter(InterleaveAnnotation.class::isInstance).map(InterleaveAnnotation.class::cast).findFirst().orElseThrow().profile();
             case "E-ANNOTATION-SCOPETREE-MODE" -> detail = "scopeTree mode " + rule.annotations().stream()
                 .filter(ScopeTreeAnnotation.class::isInstance).map(ScopeTreeAnnotation.class::cast).findFirst().orElseThrow().mode();
+            case "E-ANNOTATION-DUPLICATE-INTERLEAVE" -> detail = "duplicate @interleave on " + issue.rule();
+            case "E-ANNOTATION-DUPLICATE-SCOPETREE" -> detail = "duplicate @scopeTree on " + issue.rule();
+            case "E-LONGEST-CHOICE-SHAPE" -> detail = "@longestChoice requires multiple alternatives on " + issue.rule();
+            case "E-ASSOC-NO-MAPPING", "E-RIGHTASSOC-NONCANONICAL" -> {
+                boolean right = rule.annotations().stream().anyMatch(RightAssocAnnotation.class::isInstance);
+                detail = right ? "@rightAssoc requires left { op Self } with scalar base and params=[left, op, right] on " + issue.rule()
+                    : "@leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on " + issue.rule();
+            }
             case "E-RULE-UNDEFINED" -> detail = issue.message();
             default -> throw new IllegalStateException("unhandled declaration diagnostic " + issue.code());
+        }
+        if (issue.code().equals("E-ASSOC-NO-MAPPING")) {
+            // Root projection can fail before assoc rewriting; preserve that explanation.
+            deferredAssocError = issue.code() + ": Rust subset: " + detail;
+            return;
         }
         // Keep the host label in the explanation, with the stable code first like other E-* errors.
         throw new IllegalArgumentException(issue.code() + ": Rust subset: " + detail);
     }
 
     private GrammarIR run() {
+        try {
+            return runWithDeclarations();
+        } catch (IllegalArgumentException error) {
+            if (deferredAssocError == null) throw error;
+            if (error.getMessage().equals("Rust subset: root must resolve to exactly one AST node"))
+                throw new IllegalArgumentException("E-ASSOC-NO-MAPPING: " + error.getMessage());
+            throw new IllegalArgumentException(deferredAssocError);
+        }
+    }
+
+    private GrammarIR runWithDeclarations() {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
         org.unlaxer.dsl.codegen.LexicalContexts.requireValid(grammar);
         org.unlaxer.dsl.codegen.NamePredicates.requireValid(grammar);
