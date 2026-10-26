@@ -49,11 +49,21 @@ public class SpecCorpusExecutionConformanceTest {
                 String cp = cpSuffix(row);
                 assertTrue(id, selected.stream().allMatch(issue -> issue.message().endsWith(cp)));
             }
-            record(receipts, "java-validate", row, original, 1);
+            var validatorObserved = new JsonArray();
+            for (var issue : issues) {
+                var observedIssue = new JsonObject();
+                observedIssue.addProperty("code", issue.code());
+                observedIssue.addProperty("severity", issue.severity());
+                observedIssue.addProperty("message", issue.message());
+                validatorObserved.add(observedIssue);
+            }
+            record(receipts, "java-validate", row, original, 1, validatorObserved);
             int checks = 0;
+            var hostObserved = new JsonArray();
             for (String message : List.of(
                     assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(grammar)).getMessage(),
                     assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(grammar)).getMessage())) {
+                hostObserved.add(message);
                 if (row.has("difference")) {
                     var difference = row.getAsJsonObject("difference");
                     assertTrue(id, difference.get("issue").getAsInt() > 0);
@@ -64,7 +74,7 @@ public class SpecCorpusExecutionConformanceTest {
                 checks++;
             }
             assertEquals(id, 2, checks);
-            record(receipts, "java-host-validate", row, original, checks);
+            record(receipts, "java-host-validate", row, original, checks, hostObserved);
         }
         receipts.addAll(nativeReceipts("validate"));
         verifyAndWrite("validate", receipts, report);
@@ -91,6 +101,7 @@ public class SpecCorpusExecutionConformanceTest {
             // Java は原文そのものの named entry を実行する。Rust の @root 追加と比較する。
             var generatedParser = new ParserGenerator().generate(grammar);
             int checks = 0;
+            var javaObserved = new JsonArray();
             try (var loader = compileJava(generatedParser)) {
                 Class<?> entry = loader.loadClass(generatedParser.packageName() + "." + generatedParser.className()
                     + "$" + row.get("entry").getAsString() + "Parser");
@@ -103,6 +114,20 @@ public class SpecCorpusExecutionConformanceTest {
                         prefix.add(parser.parse(context).isSucceeded());
                         prefix.add(context.getConsumedPosition().value());
                         prefix.add(context.getMatchedPosition().value());
+                        var observedSample = new JsonObject();
+                        observedSample.add("input", sample.get("input"));
+                        observedSample.add("prefix", prefix);
+                        var failure = context.getParseFailureDiagnostics();
+                        if (prefix.get(0).getAsBoolean() || failure == null) observedSample.add("diagnostic", JsonNull.INSTANCE);
+                        else {
+                            var observedDiagnostic = new JsonObject();
+                            var expectedTokens = new JsonArray();
+                            failure.getExpectedTokens().stream().sorted().forEach(expectedTokens::add);
+                            observedDiagnostic.add("expected", expectedTokens);
+                            observedDiagnostic.addProperty("offset", failure.getFarthestOffset());
+                            observedSample.add("diagnostic", observedDiagnostic);
+                        }
+                        javaObserved.add(observedSample);
                         assertEquals(id + ": " + sample, sample.get("prefix"), prefix);
                         if (sample.has("hint")) {
                             var diagnostic = context.getParseFailureDiagnostics();
@@ -115,7 +140,7 @@ public class SpecCorpusExecutionConformanceTest {
                 }
             }
             assertEquals(id, row.getAsJsonArray("samples").size(), checks);
-            record(receipts, "java-runtime", row, original, checks);
+            record(receipts, "java-runtime", row, original, checks, javaObserved);
             String needle = " " + row.get("entry").getAsString() + " ::=";
             assertEquals(id, 1, source.split(java.util.regex.Pattern.quote(needle), -1).length - 1);
             String rootAnnotation = row.get("add_root").getAsBoolean() ? " @root" : "";
@@ -129,9 +154,21 @@ public class SpecCorpusExecutionConformanceTest {
             run(List.of("rustc", "--edition=2021", "--extern", "unlaxer_runtime=" + runtime,
                 directory.resolve("main.rs").toString(), "-o", binary.toString()));
             checks = 0;
+            var hostObserved = new JsonArray();
             for (var raw : row.getAsJsonArray("samples")) {
                 var sample = raw.getAsJsonObject();
                 var actual = JsonParser.parseString(run(List.of(binary.toString(), sample.get("input").getAsString()))).getAsJsonObject();
+                var observedSample = new JsonObject();
+                observedSample.add("input", sample.get("input"));
+                observedSample.add("prefix", actual.get("prefix"));
+                if (actual.get("diagnostic").isJsonNull()) observedSample.add("diagnostic", JsonNull.INSTANCE);
+                else {
+                    var observedDiagnostic = new JsonObject();
+                    observedDiagnostic.add("expected", actual.getAsJsonObject("diagnostic").get("expected"));
+                    observedDiagnostic.add("offset", actual.getAsJsonObject("diagnostic").get("offset"));
+                    observedSample.add("diagnostic", observedDiagnostic);
+                }
+                hostObserved.add(observedSample);
                 assertEquals(id + ": " + sample, sample.get("prefix"), actual.get("prefix"));
                 if (sample.has("hint")) {
                     var diagnostic = actual.getAsJsonObject("diagnostic");
@@ -141,7 +178,7 @@ public class SpecCorpusExecutionConformanceTest {
                 checks++;
             }
             assertEquals(id, row.getAsJsonArray("samples").size(), checks);
-            record(receipts, "java-host-runtime", row, original, checks);
+            record(receipts, "java-host-runtime", row, original, checks, hostObserved);
         }
         receipts.addAll(nativeReceipts("runtime"));
         verifyAndWrite("runtime", receipts, report);
@@ -174,12 +211,15 @@ public class SpecCorpusExecutionConformanceTest {
         assertEquals(output, SpecCorpusExecutions.rows(scope).size(), result.size());
         return result;
     }
-    private static void record(JsonArray receipts, String driver, JsonObject row, JsonObject original, int checks) {
+    /** 観測値も記録し、driver 自身の照合とは別に Python 検査が独立期待値で判定し直す。 */
+    private static void record(JsonArray receipts, String driver, JsonObject row, JsonObject original, int checks,
+            JsonArray observed) {
         var result = new JsonObject();
         result.addProperty("driver", driver);
         result.add("id", row.get("id"));
         result.add("input", original.get("input"));
         result.addProperty("checks", checks);
+        result.add("observed", observed);
         receipts.add(result);
     }
     private static void verifyAndWrite(String scope, JsonArray receipts, Path report) throws Exception {

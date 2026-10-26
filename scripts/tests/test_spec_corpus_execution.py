@@ -30,7 +30,27 @@ class SpecCorpusExecutionTest(unittest.TestCase):
             original = next(c for c in execution.read(self.root / execution.CORPUS / row["file"])["cases"] if c["id"] == row["id"])
             for driver in row["drivers"]:
                 checks = len(row["samples"]) if row["scope"] == "runtime" else (1 if driver == "java-validate" else 2)
-                self.receipts.append(dict(driver=driver, id=row["id"], input=original["input"], checks=checks))
+                self.receipts.append(dict(driver=driver, id=row["id"], input=original["input"], checks=checks,
+                                          observed=self.observed(row, original, driver)))
+
+    @staticmethod
+    def observed(row, original, driver):
+        """独立期待値どおりに振る舞う driver の観測値。"""
+        code = original["expectation"].get("code")
+        suffix = f" at CP {row['cp'][0]}..{row['cp'][1]}" if "cp" in row else ""
+        if driver == "java-validate":
+            return [dict(code="E-OTHER", severity="WARNING", message="x"),
+                    dict(code=code, severity="ERROR", message=f"{code}: x{suffix}")]
+        if row["scope"] == "validate":
+            if "difference" in row:
+                return [row["difference"]["native" if driver == "native-validate" else "java-host"]] * 2
+            return [f"{code}: x{suffix}"] * 2
+        return [dict(input=sample["input"], prefix=sample["prefix"],
+                     diagnostic=dict(expected=["x", sample["hint"]], offset=sample["hint_cp"]) if "hint" in sample else None)
+                for sample in row["samples"]]
+
+    def receipt(self, driver, case_id):
+        return next(r for r in self.receipts if r["driver"] == driver and r["id"] == case_id)
 
     def save(self, path, value):
         (self.root / path).write_text(json.dumps(value), encoding="utf-8")
@@ -99,3 +119,32 @@ class SpecCorpusExecutionTest(unittest.TestCase):
         path = self.root / next(iter(execution.FRONTENDS))
         path.write_text(path.read_text().replace('delegated_ids("validate")', 'Default::default()'))
         self.assertIn("frontend が共通の実行先宣言を読んでいない", self.errors())
+
+    def test_driver_that_always_reports_success_is_judged_again(self):
+        """driver の照合を常に true にしても、記録した観測値を独立期待値で判定し直す。"""
+        mutations = {
+            ("native-validate", "quantifier/reversed-bounds"): lambda r: r["observed"].__setitem__(0, "E-BOUNDED-WRONG: x"),
+            ("java-host-validate", "quantifier/huge-bound"): lambda r: r["observed"].__setitem__(1, "E-BOUNDED-OVERFLOW: x at CP 0..1"),
+            ("java-validate", "quantifier/reversed-bounds"): lambda r: r["observed"].pop(),
+            ("native-validate", "annotation/assoc-both"): lambda r: r["observed"].__setitem__(0, "E-ASSOC-BOTH: fixed"),
+            ("native-runtime", "separator/expansion"): lambda r: r["observed"][3]["prefix"].__setitem__(1, 3),
+            ("java-runtime", "error/hint-is-last-alternative"): lambda r: r["observed"][0].__setitem__("diagnostic", None),
+            ("java-host-runtime", "char-range/inclusive-bounds"): lambda r: r["observed"].pop(),
+            ("native-runtime", "char-range/inclusive-bounds"): lambda r: r.pop("observed"),
+        }
+        for (driver, case_id), mutate in mutations.items():
+            with self.subTest(driver=driver, id=case_id):
+                receipts = copy.deepcopy(self.receipts)
+                mutate(next(r for r in receipts if r["driver"] == driver and r["id"] == case_id))
+                self.assertIn(f"実行記録の観測値が独立期待値と不一致: ('{driver}', '{case_id}')", self.errors(receipts))
+
+    def test_known_difference_cannot_be_added_without_listing_it_in_the_ledger(self):
+        row = next(r for r in self.data["cases"] if r["id"] == "quantifier/reversed-bounds")
+        row["difference"] = dict(ledger="spec-validation-annotation", issue=835, native="E-X", **{"java-host": "E-X"})
+        self.assertIn("台帳 spec-validation-annotation の列挙 ID と manifest の既知差が不一致", self.errors())
+
+    def test_resolved_known_differences_cannot_leave_the_ledger_entry_unresolved(self):
+        for row in self.data["cases"]:
+            if row.get("difference", {}).get("ledger") == "spec-validation-root":
+                del row["difference"]
+        self.assertIn("既知差の無い未修正項目が台帳に残る: spec-validation-root", self.errors())

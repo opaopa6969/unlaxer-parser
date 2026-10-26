@@ -1367,7 +1367,7 @@
       "issues": [
         835
       ],
-      "observation": "元のspec corpus 7件でJavaは仕様のE-*診断を返すが両Rust hostは異なる診断で拒否する。各ID、独立期待値の参照、host別の完全一致の旧診断はexecution/manifest.jsonに記録する。未実行ではなく実行して既知差を検証し、修正・別の退行が起きたらテストが落ちる。",
+      "observation": "元のspec corpus 7件（`annotation/precedence-duplicate`、`annotation/precedence-without-assoc`、`annotation/assoc-without-precedence`、`annotation/assoc-both`、`annotation/interleave-bad-profile`、`annotation/scopetree-bad-mode`、`spec-contradiction/minilang-leftassoc`）でJavaは仕様のE-*診断を返すが両Rust hostは異なる診断で拒否する。各ID、独立期待値の参照、host別の完全一致の旧診断はexecution/manifest.jsonに記録する。未実行ではなく実行して既知差を検証し、修正・別の退行が起きたらテストが落ちる。",
       "evidence": [
         "spec-corpus/execution/manifest.json",
         "spec-corpus/execution/README.md",
@@ -1383,7 +1383,7 @@
       "issues": [
         834
       ],
-      "observation": "元のspec corpus 5件でJavaは仕様のE-*診断を返すが両Rust hostは異なる診断で拒否する。各ID、独立期待値の参照、host別の完全一致の旧診断はexecution/manifest.jsonに記録する。未実行ではなく実行して既知差を検証し、修正・別の退行が起きたらテストが落ちる。",
+      "observation": "元のspec corpus 5件（`annotation/whitespace-bad-style`、`annotation/whitespace-rule-duplicate`、`setting/whitespace-bad-style`、`setting/whitespace-duplicate`、`setting/whitespace-block-value`）でJavaは仕様のE-*診断を返すが両Rust hostは異なる診断で拒否する。各ID、独立期待値の参照、host別の完全一致の旧診断はexecution/manifest.jsonに記録する。未実行ではなく実行して既知差を検証し、修正・別の退行が起きたらテストが落ちる。",
       "evidence": [
         "spec-corpus/execution/manifest.json",
         "spec-corpus/execution/README.md",
@@ -1399,7 +1399,7 @@
       "issues": [
         833
       ],
-      "observation": "元のspec corpus 4件でJavaは仕様のE-*診断を返すが両Rust hostは異なる診断で拒否する。各ID、独立期待値の参照、host別の完全一致の旧診断はexecution/manifest.jsonに記録する。未実行ではなく実行して既知差を検証し、修正・別の退行が起きたらテストが落ちる。",
+      "observation": "元のspec corpus 4件（`annotation/mapping-missing-capture`、`annotation/mapping-extra-capture`、`annotation/mapping-duplicate-param`、`error/element-needs-string`）でJavaは仕様のE-*診断を返すが両Rust hostは異なる診断で拒否する。各ID、独立期待値の参照、host別の完全一致の旧診断はexecution/manifest.jsonに記録する。未実行ではなく実行して既知差を検証し、修正・別の退行が起きたらテストが落ちる。",
       "evidence": [
         "spec-corpus/execution/manifest.json",
         "spec-corpus/execution/README.md",

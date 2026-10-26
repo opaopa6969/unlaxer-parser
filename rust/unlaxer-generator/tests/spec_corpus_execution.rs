@@ -75,10 +75,12 @@ fn rows(scope: &str) -> Vec<(Value, Value)> {
         .collect()
 }
 
-fn receipt(scope: &str, row: &Value, original: &Value, checks: usize) {
+/// 観測値も記録し、driver 自身の照合とは別に Python 検査が独立期待値で判定し直す。
+fn receipt(scope: &str, row: &Value, original: &Value, checks: usize, observed: Vec<Value>) {
+    assert_eq!(checks, observed.len(), "照合数と観測数が一致しない");
     println!(
         "SPEC-CORPUS {}",
-        json!({"driver":format!("native-{scope}"), "id":row["id"], "input":original["input"], "checks":checks})
+        json!({"driver":format!("native-{scope}"), "id":row["id"], "input":original["input"], "checks":checks, "observed":observed})
     );
 }
 
@@ -94,10 +96,12 @@ fn validate_corpus_on_native() {
         let file =
             unlaxer_ubnf::parse(source).unwrap_or_else(|e| panic!("{id}: 構文では受理する: {e}"));
         let mut checks = 0;
+        let mut observed = Vec::new();
         for message in [
             unlaxer_generator::lowering::lower(&file.grammars[0]).unwrap_err(),
             unlaxer_generator::generate(source).unwrap_err(),
         ] {
+            observed.push(json!(message));
             if let Some(difference) = row.get("difference") {
                 assert!(difference["issue"].as_u64().unwrap() > 0);
                 assert_eq!(
@@ -119,7 +123,7 @@ fn validate_corpus_on_native() {
         }
         assert_eq!(checks, 2, "{id}: lowering と generate の両方が必要");
         assert!(executed.insert(id));
-        receipt("validate", row, original, checks);
+        receipt("validate", row, original, checks, observed);
     }
     assert_eq!(executed.len(), rows.len());
 }
@@ -206,11 +210,22 @@ fn runtime_corpus_on_native() {
         let samples = row["samples"].as_array().unwrap();
         assert!(!samples.is_empty(), "{id}");
         let mut checks = 0;
+        let mut observed = Vec::new();
         for sample in samples {
             let actual: Value = serde_json::from_str(&run(
                 Command::new(&binary).arg(sample["input"].as_str().unwrap())
             ))
             .unwrap();
+            let diagnostic = &actual["diagnostic"];
+            observed.push(json!({
+                "input": sample["input"],
+                "prefix": actual["prefix"],
+                "diagnostic": if diagnostic.is_null() {
+                    Value::Null
+                } else {
+                    json!({"expected": diagnostic["expected"], "offset": diagnostic["offset"]})
+                },
+            }));
             assert_eq!(actual["prefix"], sample["prefix"], "{id}: {sample}");
             if let Some(hint) = sample.get("hint") {
                 assert!(
@@ -226,7 +241,7 @@ fn runtime_corpus_on_native() {
         }
         assert_eq!(checks, samples.len(), "{id}: 入力の実行漏れ");
         assert!(executed.insert(id));
-        receipt("runtime", row, original, checks);
+        receipt("runtime", row, original, checks, observed);
     }
     assert_eq!(executed.len(), rows.len());
 }
