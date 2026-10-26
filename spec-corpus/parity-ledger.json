@@ -14,7 +14,8 @@
     "2026-10-26の再監査で、2026-10-24〜26にmergeされたPR（#766/#772/#778/#785/#787/#791/#796/#797/#799/#800/#801/#803/#804/#806/#807/#808/#810/#813）とissueの状態を反映した。未修正の差だったglobal-comment / multi-grammar / simple-annotation / capture-generated-source / capture-resetは、対応issueがすべてCLOSEDで、両言語の挙動を共通corpusとテストで固定したため契約へ移した。OPENのまま残る追跡issueは#111・#716・#784と、両Rust hostのcheck構造診断を追跡する#825（本変更で回帰修正、merge待ち）。import診断の#776はPR #824でmerge済み。",
     "catalog/corpus.jsonのGsonが許していた単引用符escapeを同じ復号値の標準JSONへ訂正した。JSONの不正構文を黙って走査から除外しない。",
     "host別corpusの値の一致/差と未対応の意味分類は人が監査する。検査は新しいファイル/キー/出現数と台帳参照の欠落を落とすが、任意の新規skip条件や文書の意味を自動分類しない。",
-    "2026-10-26 #784: 条件付き除外の宣言・元corpus・実行記録を照合する検査を追加。共通scopeの新規case/driver削除はmutation検査で検知する。root/診断優先順位に跨る16件の差は#833/#834/#835へ分離し、性能作業は行わない。"
+    "2026-10-26 #784: 条件付き除外の宣言・元corpus・実行記録を照合する検査を追加。共通scopeの新規case/driver削除はmutation検査で検知する。root/診断優先順位に跨る16件の差は#833/#834/#835へ分離し、性能作業は行わない。",
+    "2026-10-27 #833/#834/#835: spec corpusの診断差16件を両Rust hostで修正し契約へ移した（issueは本PRのmerge待ちでOPEN）。#784の実行先・独立期待値を維持し、rootあり/なしと複数不正の順序を追加検証する。 前提の#784（PR #836）・#825（PR #831）はmerge済み/CLOSEDを確認した。"
   ],
   "issues": {
     "111": {
@@ -298,7 +299,7 @@
       "title": "parity: 量指定子 overflow が Java/Rust とも E-BOUNDED-OVERFLOW に到達しない"
     },
     "784": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "test(parity): spec corpus の validate/runtime 条件付き除外を両言語の実行先へ結ぶ"
     },
     "788": {
@@ -338,7 +339,7 @@
       "title": "nested mixed 候補の非 Chain 子と __CaptureSite の owner reset 内部差"
     },
     "825": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "check: @eval と @commonField の構造エラーが同居すると code と位置が変わる"
     },
     "826": {
@@ -423,7 +424,7 @@
         593,
         825
       ],
-      "observation": "nativeError/nativeMessage/javaGeneratorError は構造検証の fail-first 順序・説明文を区別する。例: family cyclic-sum の Java generator は E-LEFT-RECURSION、schema validator は E-COMMONFIELD-MISMATCH。受理してよい差ではなく、両経路の拒否を固定する。公開 check の共通診断契約とは区別する。 #825では公開checkをJava-hostの優先順位に揃える。syntax/module/inventoryで前段が失敗したら構造検証しない。grammarごとにbounded/precedence/nested検証がcommonField schemaに先行し、schemaエラーはeval/enum/embedding/通常lowering/IR検証より先に問題ruleのCP spanで返す。schemaの宣言順と複数grammarの診断順を固定し、単一エラーとJSON schemaVersion 1は維持する。共通structure-priority.jsonの71ケースをLF/CRLFでJSON全体・終了コードに照合する。issue #825はレビュー・merge待ち。",
+      "observation": "nativeError/nativeMessage/javaGeneratorError は構造検証の fail-first 順序・説明文を区別する。例: family cyclic-sum の Java generator は E-LEFT-RECURSION、schema validator は E-COMMONFIELD-MISMATCH。受理してよい差ではなく、両経路の拒否を固定する。公開 check の共通診断契約とは区別する。 #825では公開checkをJava-hostの優先順位に揃える。syntax/module/inventoryで前段が失敗したら構造検証しない。grammarごとにbounded/precedence/nested検証がcommonField schemaに先行し、schemaエラーはeval/enum/embedding/通常lowering/IR検証より先に問題ruleのCP spanで返す。schemaの宣言順と複数grammarの診断順を固定し、単一エラーとJSON schemaVersion 1は維持する。共通structure-priority.jsonの78ケースをLF/CRLFでJSON全体・終了コードに照合する。issue #825はPR #831でmerge済み/CLOSED。#833/#834/#835のroot有無・参照・mappingとcommonField競合の7入力も同じ公開check契約で検証する。",
       "evidence": [
         "docs/portability-check.md",
         "spec-corpus/associative-projection/invalid-cases.json",
@@ -1006,7 +1007,7 @@
         784,
         719
       ],
-      "observation": "validate 18件とruntime 3件の除外・実行先はexecution/manifest.jsonで管理する。全driverが原本を読み独立期待値と照合し、nativeは照合後の実行記録をJavaへ返す。CIは全63組のID・原文・照合数を検査し、driver削除や未実行を検出する。量指定子2件はコード（overflowはCPも）が一致する。残る16件の診断差は#833/#834/#835で追跡し、仕様期待値とhost別旧診断の両方を検査する。#784は本PRのmerge後にcloseする。",
+      "observation": "validate 18件とruntime 3件の除外・実行先はexecution/manifest.jsonで管理する。全driverが原本を読み独立期待値と照合し、nativeは照合後の実行記録をJavaへ返す。CIは全63組のID・原文・照合数を検査し、driver削除や未実行を検出する。全18件の診断コード（overflowは元CPも）が独立期待値に一致する。#833/#834/#835の16件の既知差は解消し、manifestの旧診断による許可は削除した。",
       "evidence": [
         "rust/unlaxer-ubnf/tests/spec_corpus.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/bootstrap/UbnfSpecCorpusTest.java",
@@ -1406,50 +1407,53 @@
     },
     {
       "id": "spec-validation-annotation",
-      "category": "unresolved",
-      "title": "結合性・precedence・profile 診断の不一致",
+      "category": "contract",
+      "title": "結合性・precedence・profile 診断の一致",
       "hosts": "Java GrammarValidator / Rust native・Java-host lowering/generator",
       "issues": [
         835
       ],
-      "observation": "元のspec corpus 7件（`annotation/precedence-duplicate`、`annotation/precedence-without-assoc`、`annotation/assoc-without-precedence`、`annotation/assoc-both`、`annotation/interleave-bad-profile`、`annotation/scopetree-bad-mode`、`spec-contradiction/minilang-leftassoc`）でJavaは仕様のE-*診断を返すが両Rust hostは異なる診断で拒否する。各ID、独立期待値の参照、host別の完全一致の旧診断はexecution/manifest.jsonに記録する。未実行ではなく実行して既知差を検証し、修正・別の退行が起きたらテストが落ちる。",
+      "observation": "元のspec corpus 7件（`annotation/precedence-duplicate`、`annotation/precedence-without-assoc`、`annotation/assoc-without-precedence`、`annotation/assoc-both`、`annotation/interleave-bad-profile`、`annotation/scopetree-bad-mode`、`spec-contradiction/minilang-leftassoc`）を原文のままJava validator・両Rust hostのlowering/generatorへ渡し、独立のE-*期待値に一致させる（#833/#834/#835、merge待ち）。global whitespace、宣言順の規則診断、結合性整合、未定義参照の順でroot欠如より前に判定する。量指定子の元CP範囲、#825の先行構造診断、checkのJSON契約を保持する。",
       "evidence": [
         "spec-corpus/execution/manifest.json",
         "spec-corpus/execution/README.md",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SpecCorpusExecutionConformanceTest.java",
-        "rust/unlaxer-generator/tests/spec_corpus_execution.rs"
+        "rust/unlaxer-generator/tests/spec_corpus_execution.rs",
+        "spec-corpus/execution/diagnostic-priority.json"
       ]
     },
     {
       "id": "spec-validation-whitespace",
-      "category": "unresolved",
-      "title": "whitespace 診断コードの不一致",
+      "category": "contract",
+      "title": "whitespace 診断コードの一致",
       "hosts": "Java GrammarValidator / Rust native・Java-host lowering/generator",
       "issues": [
         834
       ],
-      "observation": "元のspec corpus 5件（`annotation/whitespace-bad-style`、`annotation/whitespace-rule-duplicate`、`setting/whitespace-bad-style`、`setting/whitespace-duplicate`、`setting/whitespace-block-value`）でJavaは仕様のE-*診断を返すが両Rust hostは異なる診断で拒否する。各ID、独立期待値の参照、host別の完全一致の旧診断はexecution/manifest.jsonに記録する。未実行ではなく実行して既知差を検証し、修正・別の退行が起きたらテストが落ちる。",
+      "observation": "元のspec corpus 5件（`annotation/whitespace-bad-style`、`annotation/whitespace-rule-duplicate`、`setting/whitespace-bad-style`、`setting/whitespace-duplicate`、`setting/whitespace-block-value`）を原文のままJava validator・両Rust hostのlowering/generatorへ渡し、独立のE-*期待値に一致させる（#833/#834/#835、merge待ち）。global whitespace、宣言順の規則診断、結合性整合、未定義参照の順でroot欠如より前に判定する。量指定子の元CP範囲、#825の先行構造診断、checkのJSON契約を保持する。",
       "evidence": [
         "spec-corpus/execution/manifest.json",
         "spec-corpus/execution/README.md",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SpecCorpusExecutionConformanceTest.java",
-        "rust/unlaxer-generator/tests/spec_corpus_execution.rs"
+        "rust/unlaxer-generator/tests/spec_corpus_execution.rs",
+        "spec-corpus/execution/diagnostic-priority.json"
       ]
     },
     {
       "id": "spec-validation-root",
-      "category": "unresolved",
-      "title": "root 前提による参照・mapping 診断の欠落",
+      "category": "contract",
+      "title": "root 前提による参照・mapping 診断の検証順序",
       "hosts": "Java GrammarValidator / Rust native・Java-host lowering/generator",
       "issues": [
         833
       ],
-      "observation": "元のspec corpus 4件（`annotation/mapping-missing-capture`、`annotation/mapping-extra-capture`、`annotation/mapping-duplicate-param`、`error/element-needs-string`）でJavaは仕様のE-*診断を返すが両Rust hostは異なる診断で拒否する。各ID、独立期待値の参照、host別の完全一致の旧診断はexecution/manifest.jsonに記録する。未実行ではなく実行して既知差を検証し、修正・別の退行が起きたらテストが落ちる。",
+      "observation": "元のspec corpus 4件（`annotation/mapping-missing-capture`、`annotation/mapping-extra-capture`、`annotation/mapping-duplicate-param`、`error/element-needs-string`）を原文のままJava validator・両Rust hostのlowering/generatorへ渡し、独立のE-*期待値に一致させる（#833/#834/#835、merge待ち）。global whitespace、宣言順の規則診断、結合性整合、未定義参照の順でroot欠如より前に判定する。量指定子の元CP範囲、#825の先行構造診断、checkのJSON契約を保持する。",
       "evidence": [
         "spec-corpus/execution/manifest.json",
         "spec-corpus/execution/README.md",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SpecCorpusExecutionConformanceTest.java",
-        "rust/unlaxer-generator/tests/spec_corpus_execution.rs"
+        "rust/unlaxer-generator/tests/spec_corpus_execution.rs",
+        "spec-corpus/execution/diagnostic-priority.json"
       ]
     }
   ],
@@ -1936,12 +1940,10 @@
         "host=java": 2,
         "host=java-host": 2,
         "host=native": 2,
-        "java-host": 16,
         "java-host-runtime": 1,
         "java-host-validate": 1,
         "java-runtime": 1,
         "java-validate": 1,
-        "native": 16,
         "native-runtime": 1,
         "native-validate": 1
       },

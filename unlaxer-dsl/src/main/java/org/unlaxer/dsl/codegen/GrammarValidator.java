@@ -264,6 +264,61 @@ public final class GrammarValidator {
         return List.copyOf(errors);
     }
 
+    /**
+     * Declaration diagnostics shared with Rust lowering (#833-#835). This is the
+     * syntax-only subset that must precede Rust's root requirement; it deliberately
+     * does not rerun schema/shape analyses or change their earlier priority (#825).
+     * Keep the order identical to validate(): global, per-rule, consistency, refs.
+     */
+    public static List<ValidationIssue> validateRustDeclarations(GrammarDecl grammar) {
+        var errors = new ArrayList<ValidationIssue>();
+        validateGlobalWhitespace(grammar, errors);
+        for (var rule : grammar.rules()) {
+            var whitespace = rule.annotations().stream().filter(WhitespaceAnnotation.class::isInstance)
+                .map(WhitespaceAnnotation.class::cast).toList();
+            for (var annotation : whitespace) validateRuleWhitespace(grammar, rule, annotation, errors);
+            if (whitespace.size() > 1) addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " has duplicate @whitespace annotations",
+                "Keep a single @whitespace annotation.", "E-WHITESPACE-RULE-DUPLICATE");
+            rule.annotations().stream().filter(MappingAnnotation.class::isInstance)
+                .map(MappingAnnotation.class::cast).reduce((first, second) -> second)
+                .ifPresent(mapping -> validateMapping(rule, mapping, errors));
+            boolean left = rule.annotations().stream().anyMatch(LeftAssocAnnotation.class::isInstance);
+            boolean right = rule.annotations().stream().anyMatch(RightAssocAnnotation.class::isInstance);
+            if (left && right) addRuleError(errors, rule.name(),
+                "rule " + rule.name() + " cannot use both @leftAssoc and @rightAssoc",
+                "Keep exactly one associativity annotation per rule.", "E-ASSOC-BOTH");
+            int longest = (int) rule.annotations().stream().filter(LongestChoiceAnnotation.class::isInstance).count();
+            int predictive = (int) rule.annotations().stream().filter(PredictiveChoiceAnnotation.class::isInstance).count();
+            int unique = (int) rule.annotations().stream().filter(UniqueLongestChoiceAnnotation.class::isInstance).count();
+            validateUniqueLongestChoice(rule, left || right || longest > 0 || predictive > 0, unique, errors);
+            validateLongestChoice(rule, left, right, longest, errors);
+            validatePredictiveChoice(rule, left, right, longest, predictive, errors);
+            validatePrecedence(rule, left, right, rule.annotations().stream()
+                .filter(PrecedenceAnnotation.class::isInstance).map(PrecedenceAnnotation.class::cast).toList(), errors);
+            validateAdvancedAnnotations(rule,
+                rule.annotations().stream().filter(InterleaveAnnotation.class::isInstance).map(InterleaveAnnotation.class::cast).toList(),
+                List.of(),
+                rule.annotations().stream().filter(ScopeTreeAnnotation.class::isInstance).map(ScopeTreeAnnotation.class::cast).toList(), errors);
+        }
+        validateAssociativityConsistency(grammar, errors);
+        validateUndefinedRuleRefs(grammar, errors, true);
+        // Other declaration/shape errors retain their existing lowering paths.
+        var codes = Set.of("E-WHITESPACE-GLOBAL-DUPLICATE", "E-WHITESPACE-GLOBAL-STYLE",
+            "E-WHITESPACE-RULE-STYLE", "E-WHITESPACE-RULE-DUPLICATE",
+            "E-MAPPING-DUPLICATE-PARAM", "E-MAPPING-MISSING-CAPTURE", "E-MAPPING-UNLISTED-CAPTURE",
+            "E-ASSOC-BOTH", "E-PRECEDENCE-DUPLICATE", "E-PRECEDENCE-NO-ASSOC",
+            "E-ANNOTATION-INTERLEAVE-PROFILE", "E-ANNOTATION-SCOPETREE-MODE",
+            "E-ASSOC-NO-PRECEDENCE", "E-RULE-UNDEFINED");
+        // A choice-profile error occurs before precedence in Java. Let the existing
+        // lowering path report it, preserving its established explanation/code.
+        return errors.stream().filter(issue -> codes.contains(issue.code())
+                || issue.code().startsWith("E-LONGEST-CHOICE-")
+                || issue.code().startsWith("E-PREDICTIVE-CHOICE-")
+                || issue.code().startsWith("E-UNIQUE-LONGEST-"))
+            .findFirst().filter(issue -> codes.contains(issue.code())).stream().toList();
+    }
+
     private static void validateUniqueLongestChoice(RuleDecl rule, boolean conflict, int count,
             List<ValidationIssue> errors) {
         if (count == 0) return;
@@ -1434,6 +1489,10 @@ public final class GrammarValidator {
      * the closest known name using Levenshtein distance.
      */
     private static void validateUndefinedRuleRefs(GrammarDecl grammar, List<ValidationIssue> errors) {
+        validateUndefinedRuleRefs(grammar, errors, false);
+    }
+
+    private static void validateUndefinedRuleRefs(GrammarDecl grammar, List<ValidationIssue> errors, boolean rustDescription) {
         Set<String> definedNames = new LinkedHashSet<>();
         for (RuleDecl rule : grammar.rules()) {
             definedNames.add(rule.name());
@@ -1455,6 +1514,10 @@ public final class GrammarValidator {
                 if (dot > 0 && importAliases.contains(refName.substring(0, dot))) {
                     continue;
                 }
+                // Rust keeps its own qualified-reference rejection, like native lowering.
+                if (rustDescription && dot > 0) {
+                    continue;
+                }
                 if (false == definedNames.contains(refName)) {
                     String suggestion = suggestSimilarName(refName, definedNames);
                     String hint;
@@ -1464,7 +1527,7 @@ public final class GrammarValidator {
                         hint = "Define a rule or token named '" + refName + "'.";
                     }
                     addRuleError(errors, rule.name(),
-                        "rule " + rule.name() + " references undefined rule or token '"
+                        rustDescription ? "unknown reference " + refName : "rule " + rule.name() + " references undefined rule or token '"
                             + refName + "'",
                         hint,
                         "E-RULE-UNDEFINED");
