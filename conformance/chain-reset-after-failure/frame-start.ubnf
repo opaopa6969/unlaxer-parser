@@ -1,0 +1,23 @@
+grammar FrameStart {
+    @package: framestart
+    @whitespace: none
+    token N = NumberParser
+    token B = LOOKAHEAD('b')
+    token NB = NEGATIVE_LOOKAHEAD('b')
+    @root @mapping(TextNode)
+    Root ::= (B | 'q') | N;
+    PlainTok ::= B | N;
+    PlainGroup ::= (B | 'q') | 'r';
+    PlainSeq ::= B;
+    Negative ::= NB | 'q';
+    @longestChoice Longest ::= B | 'q';
+    @uniqueLongestChoice Unique ::= B | 'q';
+    @predictiveChoice Predictive ::= B | 'q';
+    OptionalRoot ::= [PlainTok];
+    RepeatRoot ::= {PlainTok};
+    Separated ::= PlainTok % ',';
+    @mapping(CapturedNode, params=[value]) Captured ::= PlainTok @value;
+    Committed ::= COMMIT(PlainTok);
+    Labeled ::= LABEL(L, PlainTok);
+    @nestedCaptures @mapping(NestedNode) Nested ::= (B | 'q') | N;
+}

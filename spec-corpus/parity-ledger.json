@@ -325,7 +325,7 @@
       "title": "parity: ValueBoundary / TextValue の rule 本体が失敗した後の owner reset を Java と照合する（#814 後続）"
     },
     "823": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "nested mixed 候補の非 Chain 子と __CaptureSite の owner reset 内部差"
     },
     "826": {
@@ -803,7 +803,7 @@
         823,
         829
       ],
-      "observation": "生成 Java の __CaptureSite は LazyChain、Rust の nested TextValue / ValueBoundary は透過。子が Choice の候補を単独で呼ぶと ab・先行 LOOKAHEAD(a)・初期 reset=true で Java は失敗後 false、Rust は true。後続 NonOrdered(LOOKAHEAD(b)) も成功/失敗に分かれる。lowering の単一候補省略では Text/Integer の mixed 境界を生成できず、候補は Choice 内に残る。75入力経路×通常/Classic×初期reset×memo2×診断3のJava1800観測を両Rust host・通常/mapping grammarで比較。候補内の先読み（(B | 'q') | N、B | N）と@longestChoice / @uniqueLongestChoice / @predictiveChoiceも実行し、3 profileの復元を外す変異は追加行で検出する。外部からの成否・両cursor・reset・後続成否は一致。nested候補だけにSequenceを付ける対照は、候補単独の差を消す一方、外部観測全項目を変えない。runtime/IRは変更せず内部差を記録する。通常の呼出で先読み後に直接呼ぶ経路の成否差はnestedなしでも出る別の差で#829に分離。診断位置とmemo hitの別の残差は#826/#827と別項目で追跡し、全面一致を主張しない。",
+      "observation": "生成 Java の __CaptureSite は LazyChain、Rust の nested TextValue / ValueBoundary は透過。子が Choice の候補を単独で呼ぶと ab・先行 LOOKAHEAD(a)・初期 reset=true で Java は失敗後 false、Rust は true。後続 NonOrdered(LOOKAHEAD(b)) も成功/失敗に分かれる。lowering の単一候補省略では Text/Integer の mixed 境界を生成できず、候補は Choice 内に残る。75入力経路×通常/Classic×初期reset×memo2×診断3のJava1800観測を両Rust host・通常/mapping grammarで比較。候補内の先読み（(B | 'q') | N、B | N）と@longestChoice / @uniqueLongestChoice / @predictiveChoiceも実行し、3 profileの復元を外す変異は追加行で検出する。外部からの成否・両cursor・reset・後続成否は一致。nested候補だけにSequenceを付ける対照は、候補単独の差を消す一方、外部観測全項目を変えない。PR #828ではruntime/IRを変更せず内部差を記録した。通常の呼出で先読み後に直接呼ぶ経路の成否差はnestedなしでも出る別の差で#829に分離し、同issueで通常のframe開始を修正した。診断位置とmemo hitの別の残差は#826/#827と別項目で追跡し、全面一致を主張しない。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/nested-boundary.ubnf",
@@ -820,9 +820,10 @@
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         826,
-        823
+        823,
+        829
       ],
-      "observation": "nested-boundary-differences.tsv にJava実測oracleからの4列差分を全行キー付きで明示。Root成功入力azb・先行a・通常・初期falseの最遠CPはJava2/Rust0。IntegerをNonOrdered内でab・先行a・初期falseにより失敗させるとCP1/0。成功後のNonOrdered(LOOKAHEAD(b))→NonOrdered(LOOKAHEAD(x))でJavaの最終matched CPにRustの診断が届かない例もある。両host・通常/mapping・memo/診断設定を検証し、nested候補のChain対照でも変化しない。#823のowner resetとは分離して#826で追跡する。",
+      "observation": "nested-boundary-differences.tsv にJava実測oracleからの4列差分を全行キー付きで明示。Root成功入力azb・先行a・通常・初期falseの最遠CPはJava2/Rust0。IntegerをNonOrdered内でab・先行a・初期falseにより失敗させるとCP1/0。成功後のNonOrdered(LOOKAHEAD(b))→NonOrdered(LOOKAHEAD(x))でJavaの最終matched CPにRustの診断が届かない例もある。両host・通常/mapping・memo/診断設定を検証し、nested候補のChain対照でも変化しない。#823のowner resetとは分離して#826で追跡する。 #829のframe-start corpusでも同じ診断記録の差を全行キー付きで固定。nested既存corpusのLongest-partial/Unique-partialの通常・初期true・AUTO/DETAILEDの8行は、候補開始のresetによりRust診断CP1→0となりJava CP0と一致する。後続診断CP3/2の差は残る。成否/cursor/resetとChain対照の一致は維持。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/nested-boundary.ubnf",
@@ -830,7 +831,10 @@
         "conformance/chain-reset-after-failure/nested-boundary.tsv",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NestedCandidateBoundaryConformanceTest.java",
         "rust/unlaxer-runtime/tests/support/nested_candidate_boundary.rs",
-        "conformance/chain-reset-after-failure/nested-boundary-differences.tsv"
+        "conformance/chain-reset-after-failure/nested-boundary-differences.tsv",
+        "conformance/chain-reset-after-failure/frame-start-differences.tsv",
+        "conformance/chain-reset-after-failure/frame-start.tsv",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/FrameStartMatchedResetConformanceTest.java"
       ]
     },
     {
@@ -840,9 +844,10 @@
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         827,
-        823
+        823,
+        829
       ],
-      "observation": "Integer ::= (N | N) | t をab・先行LOOKAHEAD(a)で同一contextから3回呼ぶとSAFE_FAILURESでJava failure hit0/Rust2。Java生成rule/group/__CaptureSiteの安全markerとRustのrule単位cache対象が異なり、候補のChain対照でも差は変わらない。Rootのtext groupはJavaでも安全markerがあり多くの経路で2だが、空入力やMatchOnly経由は0/2。Longest/Uniqueのtext・途中失敗では1回の呼出でJava success hit1/Rust0。両hostと通常/mapping grammarで生のhit数を固定し、成否/cursor/resetを除外しない。意図した契約として採用するかの判断を含め#827で追跡する。",
+      "observation": "Integer ::= (N | N) | t をab・先行LOOKAHEAD(a)で同一contextから3回呼ぶとSAFE_FAILURESでJava failure hit0/Rust2。Java生成rule/group/__CaptureSiteの安全markerとRustのrule単位cache対象が異なり、候補のChain対照でも差は変わらない。Rootのtext groupはJavaでも安全markerがあり多くの経路で2だが、空入力やMatchOnly経由は0/2。Longest/Uniqueのtext・途中失敗では1回の呼出でJava success hit1/Rust0。両hostと通常/mapping grammarで生のhit数を固定し、成否/cursor/resetを除外しない。意図した契約として採用するかの判断を含め#827で追跡する。 #829のframe-start corpusでもPlainTok等のfailure hit Java0/Rust2、外側Longestのsuccess hit Java1/Rust0を全行キー付きで固定する。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/nested-boundary.ubnf",
@@ -850,23 +855,31 @@
         "conformance/chain-reset-after-failure/nested-boundary.tsv",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NestedCandidateBoundaryConformanceTest.java",
         "rust/unlaxer-runtime/tests/support/nested_candidate_boundary.rs",
-        "conformance/chain-reset-after-failure/nested-boundary-differences.tsv"
+        "conformance/chain-reset-after-failure/nested-boundary-differences.tsv",
+        "conformance/chain-reset-after-failure/frame-start-differences.tsv",
+        "conformance/chain-reset-after-failure/frame-start.tsv",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/FrameStartMatchedResetConformanceTest.java"
       ]
     },
     {
       "id": "frame-start-matched-reset",
-      "category": "unresolved",
-      "title": "通常の呼出の frame 開始時の matched 巻き戻し",
+      "category": "contract",
+      "title": "通常の呼出も含む frame 開始時の matched 巻き戻し（#829 修正）",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         829,
         823
       ],
-      "observation": "Javaはすべてのframeのbeginでowner reset=trueならmatchedをconsumedへ戻す。Rustのjava_transaction開始の巻き戻しはtoken mode/NonOrdered内とNonOrdered/MatchOnly/InvertMatch/name frameに限る。abで先にLOOKAHEAD(a)を成功させ、reset=trueのまま生成Choice rule（B = LOOKAHEAD('b')を候補に持つ(B | 'q') | N、B | N、nestedなしの同形）を通常に呼ぶとJava失敗CP0/1、Rust成功CP0/2。Classic、NonOrdered/MatchOnly内、初期reset=falseは一致。@nestedCapturesの有無と候補のChain対照で変わらず、#823の境界差ではない。生成grammarの内側だけではChoice/Repeatの子がSequenceに包まれるため到達例を確認していない。通常経路のframe開始はホットパスで、#197の凍結中は未修正。",
+      "observation": "JavaのTransaction.begin → createNew → ParserCursor(cursor, reset)に合わせ、Rustの通常呼出もowner reset=trueならmatchedをconsumedへ戻す。Chainはbegin前にfalse、回数0/不正boundsの反復はbeginPreservingMatchedを維持する。Choice/PredictiveChoiceとLongest/Uniqueの候補開始も同じ規則。abにLOOKAHEAD(a)後、Root/PlainTok/PlainGroup/Choice(PlainSeq,fallback)は旧Rustの成功CP0/2からJavaと同じ失敗CP0/1へ変わる。PlainSeqは成功CP0/2を維持。96経路×通常/Classic×初期reset×memo2×診断3のJava実測2304行と、両Rust host×通常/mappingの9216行を比較。成否・両cursor・reset・後続成否は全行共通。診断とmemo hitの582行の残差はframe-start-differences.tsvと#826/#827で追跡し、全面一致を主張しない。新しい確保やcacheは追加せず、#197に従い既存Rust benchmarkの修正前後各3回の中央値で退行のみ検査。#829はmerge待ち。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "docs/nonordered-runtime.md",
-        "rust/unlaxer-runtime/src/lib.rs"
+        "rust/unlaxer-runtime/src/lib.rs",
+        "conformance/chain-reset-after-failure/frame-start.ubnf",
+        "conformance/chain-reset-after-failure/frame-start-inputs.tsv",
+        "conformance/chain-reset-after-failure/frame-start.tsv",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/FrameStartMatchedResetConformanceTest.java",
+        "rust/unlaxer-runtime/tests/support/frame_start_matched_reset.rs"
       ]
     },
     {
@@ -1344,6 +1357,23 @@
   "corpora": [
     {
       "path": "conformance/chain-reset-after-failure/nested-boundary-differences.tsv",
+      "fields": {
+        "javaDiagnosticCP": 1,
+        "javaFailureHits": 1,
+        "javaFollowerDiagnosticCP": 1,
+        "javaSuccessHits": 1,
+        "rustDiagnosticCP": 1,
+        "rustFailureHits": 1,
+        "rustFollowerDiagnosticCP": 1,
+        "rustSuccessHits": 1
+      },
+      "entries": [
+        "nested-boundary-diagnostics",
+        "nested-boundary-memo-accounting"
+      ]
+    },
+    {
+      "path": "conformance/chain-reset-after-failure/frame-start-differences.tsv",
       "fields": {
         "javaDiagnosticCP": 1,
         "javaFailureHits": 1,

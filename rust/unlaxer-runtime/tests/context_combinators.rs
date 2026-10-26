@@ -485,6 +485,11 @@ fn ubnf_predicates_advance_only_the_match_cursor_and_rollback_both() {
     let mut context = ParseContext::new("😀ab");
     context.parse(&java_ahead("😀")).unwrap();
     assert_eq!((context.position(), context.matched_position()), (0, 1));
+    // A fresh Java frame starts at consumed while owner reset is true (#829).
+    assert!(context.parse(&java_ahead("a")).is_err());
+    assert_eq!((context.position(), context.matched_position()), (0, 1));
+    // Explicitly preserve matched to exercise successive predicates and rollback.
+    context.set_reset_matched_with_consumed(false);
     context.parse(&java_ahead("a")).unwrap();
     assert_eq!((context.position(), context.matched_position()), (0, 2));
     let failed = java_ahead("b")
@@ -607,7 +612,13 @@ fn ubnf_until_and_empty_patterns_preserve_java_contract_without_changing_peg() {
     let mut context = ParseContext::new("a#");
     context.parse(&java_ahead("a")).unwrap();
     context.parse(&Expr::JavaUntil("#")).unwrap();
-    assert_eq!((context.position(), context.matched_position()), (0, 2));
+    // Java Occurs.parse(context, consumed, false) starts a resetting frame.
+    assert_eq!((context.position(), context.matched_position()), (1, 2));
+    let mut preserved = ParseContext::new("a#");
+    preserved.parse(&java_ahead("a")).unwrap();
+    preserved.set_reset_matched_with_consumed(false);
+    preserved.parse(&Expr::JavaUntil("#")).unwrap();
+    assert_eq!((preserved.position(), preserved.matched_position()), (0, 2));
 }
 
 #[test]
