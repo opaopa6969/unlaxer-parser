@@ -300,9 +300,10 @@ grammar UBNF {
   SeparatedBy ::= '%' AtomicElement ;
 
   // 有界量化子: {n} {n,m} {n,}
+  // トークン間は通常の UBNF 空白と // 行コメントを許す。数字の途中では許さない。
   BoundedQuantifier ::= '{' Digits [ ',' [ Digits ] ] '}' ;
 
-  Digits ::= DIGIT { DIGIT } ;
+  Digits ::= UNSIGNED_INTEGER ;
 
   // 基本要素
   // RepeatElement を BoundedQuantifier より先に配置して '{' の曖昧性を回避

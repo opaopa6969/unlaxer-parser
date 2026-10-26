@@ -73,6 +73,7 @@ public class RustUbnfFrontendConformanceTest {
             assertTrue(path + " " + nativeResult, nativeResult.has("ast"));
             JsonElement java = canonical(UBNFMapper.parse(source));
             assertEquals(path.toString(), java, nativeResult.get("ast"));
+            assertEquals(path.toString(), java, canonical(UBNFMapper.parseWithSource(source).ast()));
             report.add(path.getFileName() + "\tequal\t" + java + "\t" + nativeResult);
         }
         for (String line : Files.readAllLines(crate.resolve("tests/fixtures/negative.tsv"))) {

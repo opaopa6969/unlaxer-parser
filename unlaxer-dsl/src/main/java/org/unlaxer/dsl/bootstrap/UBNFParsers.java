@@ -206,7 +206,8 @@ public class UBNFParsers {
     /**
      * BoundedQuantifier: '{' digits [',' digits?] '}'
      * Matches:  {2}   {1,3}   {2,}
-     * Note: no whitespace is allowed inside {}.
+     * UBNF whitespace (SPACE, TAB, LF, CR, VT, FF) and // line comments are allowed
+     * between tokens inside {}; each ASCII digit run must remain contiguous.
      */
     public static class BoundedQuantifierParser extends UBNFLazyChain {
         private static final long serialVersionUID = 1L;
@@ -217,7 +218,7 @@ public class UBNFParsers {
                 Parser.get(LeftBraceParser.class),
                 new OneOrMore(DigitParser.class),   // min digits
                 new org.unlaxer.parser.combinator.Optional(
-                    new LazyChain() {
+                    new UBNFLazyChain() {
                         private static final long serialVersionUID = 1L;
 
                         @Override
