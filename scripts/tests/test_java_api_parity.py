@@ -267,6 +267,72 @@ class Hidden { public static class Leaked {} }
             self.assertEqual(documents[api.DATA], (root / api.DATA).read_text())
             self.assertEqual(documents[api.DOCUMENT], (root / api.DOCUMENT).read_text())
 
+    def test_remap_reports_unverifiable_evidence_instead_of_skipping_it(self):
+        # 読み飛ばすと、残りの根拠だけ付け替えた JSON を書き戻してしまう（#859 査読）。
+        for label, evidence, message in (
+                ('unanchored', 'rust/unlaxer-runtime/src/lib.rs#L1', '行の根拠に anchor がない'),
+                ('malformed', {'location': 'rust/unlaxer-runtime/src/lib.rs#L1'}, '根拠 anchor の形式が不正'),
+                ('blank', {'location': 'rust/unlaxer-runtime/src/lib.rs#L1', 'anchor': '}'}, '根拠 anchor の形式が不正'),
+                ('outside', {'location': '../outside.rs#L1', 'anchor': 'fn outside'}, '根拠ファイルがない'),
+                ('absolute', {'location': str(SCRIPT) + '#L1', 'anchor': '#!/usr/bin/env python3'}, '根拠ファイルがない')):
+            with self.subTest(case=label):
+                data = copy.deepcopy(self.data)
+                data['assessments']['owned-capture']['code'] = [evidence]
+                remapped, _, failures = api.remap(api.ROOT, data)
+                self.assertTrue(any(message in failure for failure in failures), failures)
+                self.assertEqual(data, remapped)
+
+    def test_cli_remap_leaves_both_files_byte_identical_when_any_check_fails(self):
+        # 付け替えられる行ずれと、付け替えとは別の検査失敗が同時にあっても、JSON だけを書き換えない。
+        source = (api.ROOT / self.RUNTIME).read_text()
+        original = json.loads((api.ROOT / api.DATA).read_text())
+
+        def other_evidence(data):
+            return next((entry[key], index) for entry in data['assessments'].values() for key in api.EVIDENCE
+                        for index, evidence in enumerate(entry.get(key, []))
+                        if type(evidence) is dict and self.RUNTIME not in evidence['location'])
+
+        def unanchored(data):
+            evidences, index = other_evidence(data)
+            evidences[index] = evidences[index]['location']
+
+        def malformed(data):
+            evidences, index = other_evidence(data)
+            evidences[index] = {'location': evidences[index]['location']}
+
+        def blank(data):
+            evidences, index = other_evidence(data)
+            evidences[index] = dict(evidences[index], anchor='}')
+
+        def schema(data):
+            data['schema_version'] = 1
+
+        def inventory(data):
+            data['apis'].pop(0)
+
+        for label, mutate, message, options in (
+                ('unanchored', unanchored, '行の根拠に anchor がない', ['--write-doc']),
+                ('malformed', malformed, '根拠 anchor の形式が不正', ['--write-doc']),
+                ('blank', blank, '根拠 anchor の形式が不正', ['--write-doc']),
+                ('schema', schema, 'schema_version は 2 が必要', ['--write-doc']),
+                ('inventory', inventory, '未登録の公開 API', ['--write-doc']),
+                # --write-doc なしの付け替えは、Markdown のリンクが古いままになるので書かない。
+                ('stale-document', None, 'Markdown が JSON/ソースと不一致', [])):
+            with self.subTest(case=label), tempfile.TemporaryDirectory(prefix='java-api-') as temporary:
+                data = copy.deepcopy(original)
+                if mutate:
+                    mutate(data)
+                files = {api.DATA: api.dump(data).encode(), api.DOCUMENT: (api.ROOT / api.DOCUMENT).read_bytes()}
+                root = self.overlay(temporary, {self.RUNTIME: '// inserted\n' + source,
+                                                **{path: text.decode() for path, text in files.items()}})
+                result = subprocess.run([sys.executable, str(SCRIPT), '--root', str(root), '--remap', *options],
+                                        capture_output=True, text=True, timeout=90)
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn(message, result.stderr)
+                self.assertNotIn('根拠行を付け替え', result.stderr)
+                for path, content in files.items():
+                    self.assertEqual(content, (root / path).read_bytes(), path)
+
     def test_every_unverified_row_belongs_to_a_registered_child_issue(self):
         followups = {entry['number'] for entry in self.data['followups'].values()}
         for name, entry in self.data['assessments'].items():

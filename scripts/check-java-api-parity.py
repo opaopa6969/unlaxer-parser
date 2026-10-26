@@ -92,10 +92,20 @@ def resolve(lines, anchor, scope=None):
     return hits[0]
 
 
+def evidence_file(root, location):
+    """根拠の参照先ファイル。root の外・存在しないファイルは読み込む前に None を返す。"""
+    path = Path(location.partition("#")[0])
+    if path.is_absolute() or ".." in path.parts or not (root / path).is_file():
+        return None
+    return root / path
+
+
 def locate(root, entry):
     """行根拠 {location, anchor[, scope]} の現在の行番号を返す。"""
-    path = entry["location"].partition("#L")[0]
-    return resolve((root / path).read_text().splitlines(), entry["anchor"], entry.get("scope"))
+    target = evidence_file(root, entry["location"])
+    if target is None:
+        raise ValueError("根拠ファイルがない")
+    return resolve(target.read_text().splitlines(), entry["anchor"], entry.get("scope"))
 
 
 def well_formed(entry):
@@ -113,7 +123,14 @@ def remap(root, data):
     for assessment in data["assessments"].values():
         for key in EVIDENCE:
             for entry in assessment.get(key, []):
-                if type(entry) is not dict or not well_formed(entry):
+                if type(entry) is str and "#" not in entry:
+                    continue  # ファイル単位の根拠は行番号を持たない。
+                if type(entry) is not dict:
+                    # 形式の古い・壊れた根拠を読み飛ばすと、残りだけ付け替えて書き戻してしまう。
+                    errors.append(f"行の根拠に anchor がない: {entry}")
+                    continue
+                if not well_formed(entry):
+                    errors.append(f"根拠 anchor の形式が不正: {entry.get('location')}")
                     continue
                 path, _, line = entry["location"].partition("#L")
                 try:
@@ -188,10 +205,8 @@ def validate(root, data, actual):
         for key in EVIDENCE:
             for entry in assessment.get(key, []):
                 location = entry.get("location", "") if type(entry) is dict else str(entry)
-                path = location.partition("#")[0]
-                target = root / path
-                if Path(path).is_absolute() or ".." in Path(path).parts or not target.is_file():
-                    errors.append("根拠ファイルがない: " + location)
+                if type(location) is not str or evidence_file(root, location) is None:
+                    errors.append(f"根拠ファイルがない: {location}")
                 elif type(entry) is not dict:
                     if "#" in location:
                         # 行番号だけの根拠は、参照先の行挿入・削除で別の宣言へ黙ってずれる（#859）。
@@ -233,7 +248,7 @@ def render(data, actual):
              "新しい公開型・static overload、削除、signature 変更は実ソースとの集合比較で失敗する。",
              "line は現行ソースから表示し、宣言の移動だけでは API 変更としない。根拠は監査時のコード・既存テストであり、今回それらを再実行したという意味ではない。",
              "行を指す根拠は location と anchor（その行の先頭の宣言文字列。識別子の途中では切らない）を持ち、anchor がファイル内、scope があればその宣言の字下げブロック内で一意に一致する行を指していなければ失敗する。",
-             "参照先の行の挿入・削除でずれたら --remap が anchor から行番号だけを付け替える。anchor が見つからない・複数行に一致する根拠が一つでもあれば何も書き換えず失敗し、宣言の改名・削除は人が再監査する。", "",
+             "参照先の行の挿入・削除でずれたら --remap が anchor から行番号だけを付け替える。付け替え後の全検査（anchor が見つからない・複数行に一致する・形式が不正な根拠、schema、公開 API の一致）が一つでも失敗すれば JSON も Markdown も書き換えず失敗し、宣言の改名・削除は人が再監査する。", "",
              "## 状態と追跡", "", "| 状態 | API 行数 |", "|---|---:|"]
     for status, label in STATUSES.items():
         lines.append(f"| {label} | {counts[status]} |")
@@ -287,30 +302,28 @@ def main():
             print(json.dumps(actual, ensure_ascii=False, indent=2))
             return 0
         data = json.loads((args.root / DATA).read_text())
+        changes = []
         if args.remap:
             data, changes, errors = remap(args.root, data)
             if errors:
                 for error in errors:
                     print(error, file=sys.stderr)
                 return 1
-            for change in changes:
-                print("根拠行を付け替え: " + change, file=sys.stderr)
-            if changes:
-                (args.root / DATA).write_text(dump(data), encoding="utf-8")
+        # 付け替え後のデータを全項目検査し、通ったときだけ書く。失敗時は JSON も Markdown も変えない。
         errors = validate(args.root, data, actual)
+        document = render(data, actual) if not errors else None
+        if document is not None and not args.write_doc and (args.root / DOCUMENT).read_text() != document:
+            errors.append("Markdown が JSON/ソースと不一致。--write-doc で再生成する")
         if errors:
             for error in errors:
                 print(error, file=sys.stderr)
             return 1
-        document = render(data, actual)
+        for change in changes:
+            print("根拠行を付け替え: " + change, file=sys.stderr)
+        if changes:
+            (args.root / DATA).write_text(dump(data), encoding="utf-8")
         if args.write_doc:
             (args.root / DOCUMENT).write_text(document, encoding="utf-8")
-        elif not errors and (args.root / DOCUMENT).read_text() != document:
-            errors.append("Markdown が JSON/ソースと不一致。--write-doc で再生成する")
-        for error in errors:
-            print(error, file=sys.stderr)
-        if errors:
-            return 1
         print(f"Java API 対応表: {len(actual)} 宣言を確認")
         return 0
     except (ValueError, KeyError, OSError, subprocess.SubprocessError) as error:
