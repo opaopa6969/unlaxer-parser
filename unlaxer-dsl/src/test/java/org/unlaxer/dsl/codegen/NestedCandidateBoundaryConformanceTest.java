@@ -65,13 +65,7 @@ public class NestedCandidateBoundaryConformanceTest {
             int[] columns = {9, 10, 11, 16};
             for (int i = 0; i < columns.length; i++) {
                 assertEquals(key + "/Java column " + columns[i], expected[columns[i]], diff[5 + 2 * i]);
-                // Keep #826's difference inventory unchanged. #838 now requires the Java
-                // value for these frame-start diagnostics, not either of two accepted values.
-                boolean frameStartAligned = diff[2].equals("true") && (columns[i] == 16
-                        || columns[i] == 9 && diff[1].equals("false") && java.util.Set.of(
-                                "Integer-nonordered-failure", "Ahead-nonordered-failure",
-                                "AheadToken-nonordered-failure").contains(diff[0]));
-                if (!frameStartAligned) expected[columns[i]] = diff[6 + 2 * i];
+                expected[columns[i]] = diff[6 + 2 * i];
             }
         }
         return rows.values().stream().map(cells -> String.join("\t", cells)).toList();
