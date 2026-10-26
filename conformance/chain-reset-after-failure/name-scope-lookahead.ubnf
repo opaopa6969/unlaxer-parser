@@ -1,0 +1,10 @@
+grammar NameReset {
+    @ubnf: v2
+    @package: namereset
+    @whitespace: none
+    token Ahead = LOOKAHEAD('a')
+    @root @mapping(Node)
+    Root ::= Ahead;
+    @namePredicate(snapshot='names', version='v1', name='name', kind='type')
+    Probe ::= 'a' @name Ahead;
+}
