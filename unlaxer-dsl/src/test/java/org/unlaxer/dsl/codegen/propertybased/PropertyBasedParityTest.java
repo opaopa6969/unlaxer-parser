@@ -90,6 +90,77 @@ public class PropertyBasedParityTest {
     }
 
     @Test
+    public void legacyCiGenerationKeepsItsFingerprint() throws Exception {
+        // Captured from origin/master ead93369 before #770, including reserve inputs and
+        // rejected variants. Calling the new mode must not consume the legacy random stream.
+        var digest = java.security.MessageDigest.getInstance("SHA-256");
+        for (long seed = CI_FIRST_SEED; seed < CI_FIRST_SEED + CI_GRAMMARS; seed++) {
+            new GrammarGenerator(seed, GrammarGenerator.Limits.CI).featureCombinations();
+            var generator = new GrammarGenerator(seed, GrammarGenerator.Limits.CI);
+            var model = generator.grammar();
+            String value = model.render("Pbt", "pbt.generated") + "\n" + generator.inputs(model, DERIVATIONS, MUTATIONS)
+                    + "\n" + generator.reserve(model, RESERVE_DERIVATIONS, 2) + "\n";
+            if (seed % LEFT_RECURSION_EVERY == 0)
+                value += GrammarGenerator.leftRecursive(model).render("Pbt", "pbt.generated");
+            digest.update(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        assertEquals("255fc856fa481e558ad2635bfe3c8abf7c0831fce2f90a54a46cbc11f0a5eadc",
+                java.util.HexFormat.of().formatHex(digest.digest()));
+    }
+
+    @Test
+    public void featureCombinationsAreDeterministicBoundedAndCovered() {
+        var counts = new LinkedHashMap<String, Integer>();
+        int rejected = 0, inserted = 0, nullablePrefixes = 0;
+        var comments = new java.util.HashSet<String>();
+        for (long seed = CI_FIRST_SEED; seed < CI_FIRST_SEED + CI_GRAMMARS; seed++) {
+            var cases = new GrammarGenerator(seed, GrammarGenerator.Limits.CI).featureCombinations();
+            assertEquals("seed " + seed, cases, new GrammarGenerator(seed, GrammarGenerator.Limits.CI).featureCombinations());
+            for (var c : cases) {
+                String text = c.grammar();
+                var grammar = org.unlaxer.dsl.bootstrap.UBNFMapper.parse(text).grammars().get(0);
+                assertTrue(c.id(), grammar.rules().size() <= GrammarGenerator.Limits.CI.maxRules());
+                assertTrue(c.id(), c.inputs().size() <= 22);
+                assertTrue(c.id(), c.inputs().stream().allMatch(s -> s.codePointCount(0, s.length()) <= 64));
+                var raising = org.unlaxer.dsl.codegen.RaisingOperators.problems(grammar);
+                if (c.expectedRejection() != null) {
+                    assertTrue(c.id(), raising.stream().anyMatch(p -> p.code().equals(c.expectedRejection())));
+                    rejected++;
+                    continue;
+                }
+                assertTrue(c.id() + raising, raising.isEmpty());
+                c.features().forEach((key, n) -> counts.merge(key, n, Integer::sum));
+                // Check the rendered combinations as well as aggregate feature counts.
+                if (text.contains("Bind(=arg)")) {
+                    assertTrue(text, text.contains("Bind(R2)") && text.contains("CAPTURE(w, Bind(R2))")
+                            && text.contains("LOOKAHEAD(") && text.contains("SAME_AS(w)"));
+                }
+                if (text.contains("@comment:")) comments.add(text.contains("javaStyle") ? "javaStyle"
+                        : text.contains("@whitespace: none") ? "none" : "comment");
+                if (text.contains("@autoCommit")) {
+                    int commits = org.unlaxer.dsl.bootstrap.AutoCommit.lint(text).stream()
+                            .filter(org.unlaxer.dsl.bootstrap.AutoCommit.Finding::inserted).mapToInt(f -> f.commits().size()).sum();
+                    boolean nullablePrefix = text.contains("['k'] R2");
+                    assertEquals(c.id(), nullablePrefix ? 1 : 2, commits);
+                    inserted += commits;
+                    if (nullablePrefix) nullablePrefixes++;
+                }
+            }
+        }
+        for (String family : List.of("value-owned-lookahead-memo", "comment-frontier-stack",
+                "autoCommit-nullable-raising", "commit-label-catch"))
+            assertEquals(family, Integer.valueOf(6), counts.get("combination:" + family));
+        for (String syntax : List.of("(=arg)", "CAPTURE(", "SAME_AS(", "LOOKAHEAD(", "@comment:",
+                "@autoCommit", "COMMIT(", "LABEL(", "CATCH("))
+            assertTrue("missing rendered syntax: " + syntax, counts.getOrDefault("syntax:" + syntax, 0) >= 6);
+        assertEquals(java.util.Set.of("javaStyle", "none", "comment"), comments);
+        assertEquals(6, rejected);
+        assertEquals(9, inserted);
+        assertEquals(3, nullablePrefixes);
+        System.out.println("[pbt] combination coverage " + counts + " inserted=" + inserted + " raisingRejections=" + rejected);
+    }
+
+    @Test
     public void knownDifferenceConditionOnlyMatchesTheTrackedShape() {
         // #706: syntax failures on both sides, Java offset after the Rust offset.
         assertTrue(KnownDifferences.javaSyntaxOffsetAfterRust(
@@ -190,6 +261,11 @@ public class PropertyBasedParityTest {
             if (seed % LEFT_RECURSION_EVERY == 0)
                 cases.add(ParityHarness.Case.rejected(id + "-left-recursive", GrammarGenerator.leftRecursive(model), "E-LEFT-RECURSION"));
         }
+        // Separate mode and Random instances: preserve every legacy grammar/input/reserve draw.
+        var combinations = new ArrayList<ParityHarness.Case>();
+        for (long seed = first; seed < first + grammars; seed++)
+            combinations.addAll(new GrammarGenerator(seed, GrammarGenerator.Limits.CI).featureCombinations());
+        cases.addAll(combinations);
         var gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
         Files.createDirectories(Path.of("target"));
         var raw = new ArrayList<JsonObject>();
@@ -226,9 +302,12 @@ public class PropertyBasedParityTest {
             var finding = (ParityHarness.Finding) p[0];
             var entry = (JsonObject) p[2];
             GrammarModel model = models.get(finding.caseId());
-            if (model != null && finding.input() != null && !Boolean.getBoolean("pbt.noShrink")
+            var source = (ParityHarness.Case) p[1];
+            if ((model != null || finding.caseId().startsWith("combination-"))
+                    && finding.input() != null && !Boolean.getBoolean("pbt.noShrink")
                     && shrunk < shrinkLimit && System.nanoTime() < shrinkDeadline) {
-                entry = new Shrinker(harness, known, shrinkDeadline).shrink(finding, model, entry);
+                var shrinker = new Shrinker(harness, known, shrinkDeadline);
+                entry = model == null ? shrinker.shrink(finding, source, entry) : shrinker.shrink(finding, model, entry);
                 shrunk++;
             } else entry.addProperty("shrunk", false);
             reported.add(entry);
@@ -245,14 +324,62 @@ public class PropertyBasedParityTest {
         assertTrue("both hosts must exercise success memo replay", stats.javaSuccessHits > 0 && stats.rustSuccessHits > 0);
         assertTrue("both hosts must exercise failure memo replay", stats.javaFailureHits > 0 && stats.rustFailureHits > 0);
         assertTrue("known differences that excluded nothing are stale or too narrow: " + known.unused(), known.unused().isEmpty());
+        assertCombinationPaths(combinations, stats);
         if (grammars >= MIN_COVERAGE_GRAMMARS) {
-            assertTrue("most generated grammars must be accepted", stats.rejected * 4 <= stats.grammars);
-            assertTrue("left-recursive variants must be rejected by both frontends", stats.rejectedAsExpected >= grammars / LEFT_RECURSION_EVERY);
+            assertTrue("most legacy grammars must be accepted", stats.rejected * 4 <= stats.grammars - combinations.size());
+            assertEquals("all left-recursive and raising variants must be rejected by both frontends",
+                    cases.stream().filter(c -> c.expectedRejection() != null).count(), (long) stats.rejectedAsExpected);
             // Corpus inputs do not count: generated inputs alone must reach accepted parses (AST, CST).
-            assertTrue("generated inputs must be accepted in at least " + MIN_ACCEPTING_SEEDS_PERCENT + "% of the seeds: "
-                            + stats.generatedAcceptingCases + "/" + grammars,
-                    stats.generatedAcceptingCases * 100 >= (long) grammars * MIN_ACCEPTING_SEEDS_PERCENT);
+            long legacyAccepting = stats.evidence.stream().map(s -> JsonParser.parseString(s).getAsJsonObject())
+                    .filter(r -> r.get("case").getAsString().matches("seed-\\d+") && r.has("java")
+                            && r.getAsJsonObject("java").get("diag").isJsonNull())
+                    .map(r -> r.get("case").getAsString()).distinct().count();
+            assertTrue("generated inputs must be accepted in at least " + MIN_ACCEPTING_SEEDS_PERCENT + "% of the legacy seeds: "
+                            + legacyAccepting + "/" + grammars,
+                    legacyAccepting * 100 >= (long) grammars * MIN_ACCEPTING_SEEDS_PERCENT);
         }
+    }
+
+    private static void assertCombinationPaths(List<ParityHarness.Case> combinations, ParityHarness.Stats stats) {
+        var rows = stats.evidence.stream().map(s -> JsonParser.parseString(s).getAsJsonObject()).toList();
+        for (var c : combinations) {
+            if (c.expectedRejection() != null) continue;
+            if (c.id().endsWith("value-owned-lookahead-memo")) {
+                long[] hits = stats.memoHits.getOrDefault(c.id(), new long[4]);
+                assertTrue(c.id() + " must replay success/failure memo on both hosts: " + java.util.Arrays.toString(hits),
+                        hits[0] > 0 && hits[1] > 0 && hits[2] > 0 && hits[3] > 0);
+            }
+            var observed = rows.stream().filter(r -> r.get("case").getAsString().equals(c.id()) && r.has("java")).toList();
+            for (String host : List.of("java", "rust")) {
+                assertTrue(c.id() + " must accept on " + host, observed.stream()
+                        .anyMatch(r -> r.getAsJsonObject(host).get("diag").isJsonNull()));
+                assertTrue(c.id() + " must fail on " + host, observed.stream()
+                        .anyMatch(r -> !r.getAsJsonObject(host).get("diag").isJsonNull()));
+                if (c.id().endsWith("value-owned-lookahead-memo"))
+                    assertTrue(c.id() + " must publish the owned value on " + host, observed.stream()
+                            .anyMatch(r -> r.getAsJsonObject(host).get("diag").isJsonNull()
+                                    && !r.getAsJsonObject(host).getAsJsonObject("owned").get("w").isJsonNull()));
+                if (c.id().endsWith("autoCommit-nullable-raising") || c.id().endsWith("commit-label-catch"))
+                    assertTrue(c.id() + " must reach a committed failure on " + host,
+                            observed.stream().anyMatch(r -> diagnosticKind(r, host).equals("commit")));
+                if (c.id().endsWith("commit-label-catch")) {
+                    assertTrue(c.id() + " must reach an uncaught label on " + host,
+                            observed.stream().anyMatch(r -> diagnosticKind(r, host).equals("label")));
+                    assertTrue(c.id() + " must accept the caught-label alternative on " + host,
+                            observed.stream().anyMatch(r -> r.get("input").getAsString().startsWith("q")
+                                    && r.getAsJsonObject(host).get("diag").isJsonNull()));
+                }
+                if (c.id().endsWith("comment-frontier-stack"))
+                    assertTrue(c.id() + " must fail after a comment with a nested rule stack on " + host,
+                            observed.stream().anyMatch(r -> r.get("input").getAsString().contains("//")
+                                    && r.getAsJsonObject(host).get("stack").getAsString().contains(">R2@")));
+            }
+        }
+    }
+
+    private static String diagnosticKind(JsonObject row, String host) {
+        var diag = row.getAsJsonObject(host).get("diag");
+        return diag.isJsonNull() ? "" : diag.getAsJsonObject().get("kind").getAsString();
     }
 
     private static ParityHarness.Case caseOf(List<ParityHarness.Case> cases, String id) {

@@ -242,7 +242,7 @@
       "title": "parity: UBNF の入れ子上限が Rust frontend は 128 段、Java は約 199 段で異なる"
     },
     "745": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "feat: @autoCommit を @comment のある文法にも広げる（#712・#728 後続）"
     },
     "750": {
@@ -668,10 +668,12 @@
         753,
         798
       ],
-      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。javaStyle併記時のW-COMMENT-IGNOREDは#777（PR #796）で共通収集API（GenerationWarnings.collect / warnings::collect）と3経路のCLIに統合し、code・message・CP span、--strict / --fail-on warningの終了コード5と無出力、javaStyle単独との生成物byte一致を共通fixture（generation-warnings 8例、global-comment/ignored.json 8例）で固定した。GrammarValidatorは従来どおりWARNINGを返す。UBNF LSPはJavaだけにあり、#798（PR #806）でCLIと同じ位置・messageで1回だけ表示する。triviaの後で失敗するruleの診断位置（#753）は、失敗したruleのframeの開始をRustも失敗位置に記録して解消した（PR #791）。trivia後のmatched cursorはJavaのtransaction cursorのまま。#745でautoCommitもjavaStyle併記・comment単独・none併記に対応し、開始集合とMatchOnly終端の消費位置の証明をdocs/auto-commit.mdに記載した。共通auto-commit corpusでJava・両Rust hostの挿入と失敗位置、差分fuzzで受理集合を固定する。期待候補はbackend固有（Javaの子parser展開とRustの末端候補の差）で、種別・位置の一致と区別してcorpusに固定。",
+      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。javaStyle併記時のW-COMMENT-IGNOREDは#777（PR #796）で共通収集API（GenerationWarnings.collect / warnings::collect）と3経路のCLIに統合し、code・message・CP span、--strict / --fail-on warningの終了コード5と無出力、javaStyle単独との生成物byte一致を共通fixture（generation-warnings 8例、global-comment/ignored.json 8例）で固定した。GrammarValidatorは従来どおりWARNINGを返す。UBNF LSPはJavaだけにあり、#798（PR #806）でCLIと同じ位置・messageで1回だけ表示する。triviaの後で失敗するruleの診断位置（#753）は、失敗したruleのframeの開始をRustも失敗位置に記録して解消した（PR #791）。trivia後のmatched cursorはJavaのtransaction cursorのまま。#745でautoCommitもjavaStyle併記・comment単独・none併記に対応し、開始集合とMatchOnly終端の消費位置の証明をdocs/auto-commit.mdに記載した。共通auto-commit corpusでJava・両Rust hostの挿入と失敗位置、差分fuzzで受理集合を固定する。#770ではPBTの独立した組み合わせモードにも3設定のcommentを追加し、frontier後の失敗rule stackとautoCommitのnullable/raising検査を既存oracleで比較する。期待候補はbackend固有（Javaの子parser展開とRustの末端候補の差）で、種別・位置の一致と区別してcorpusに固定。",
       "evidence": [
         "docs/rule-trivia.md",
         "docs/auto-commit.md",
+        "docs/property-based-testing.md",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/propertybased/GrammarGenerator.java",
         "spec-corpus/auto-commit/cases.json",
         "spec-corpus/auto-commit/lint.json",
         "spec-corpus/auto-commit/warnings.json",

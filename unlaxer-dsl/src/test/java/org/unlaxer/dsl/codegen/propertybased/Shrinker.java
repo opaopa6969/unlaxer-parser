@@ -83,14 +83,31 @@ final class Shrinker {
         return Integer.parseInt(f.caseId().substring("shrink-".length()));
     }
 
+    /** Fixed small combination shapes have no GrammarModel; minimize their inputs instead. */
+    JsonObject shrink(ParityHarness.Finding finding, ParityHarness.Case source, JsonObject original) throws Exception {
+        var best = shrinkInput(source, finding.input(), finding.kind());
+        if (best == null) best = finding;
+        var entry = PropertyBasedParityTest.corpusEntry(best, source);
+        entry.addProperty("id", source.id() + "-min");
+        entry.addProperty("shrunk", true);
+        entry.addProperty("inputOnly", true);
+        entry.addProperty("budgetExhausted", expired());
+        entry.add("original", original);
+        return entry;
+    }
+
     /** The finding for the shortest reproducing simplification, or null when none reproduces. */
     private ParityHarness.Finding shrinkInput(GrammarModel model, String input, String kind) throws Exception {
+        return shrinkInput(ParityHarness.Case.of("shrink-0", model, List.of()), input, kind);
+    }
+
+    private ParityHarness.Finding shrinkInput(ParityHarness.Case source, String input, String kind) throws Exception {
         ParityHarness.Finding best = null;
         for (int round = 0; round < MAX_ROUNDS && !expired(); round++) {
             var candidates = GrammarGenerator.shrinkInput(input);
             if (candidates.isEmpty()) break;
             candidates = candidates.subList(0, Math.min(MAX_CANDIDATES, candidates.size()));
-            var c = ParityHarness.Case.of("shrink-0", model, candidates);
+            var c = new ParityHarness.Case("shrink-0", source.grammar(), candidates, source.features(), null);
             ParityHarness.Finding found = null;
             for (var f : harness.evaluate(List.of(c), null))
                 if (f.kind().equals(kind) && f.input() != null && known.match(f, c) == null

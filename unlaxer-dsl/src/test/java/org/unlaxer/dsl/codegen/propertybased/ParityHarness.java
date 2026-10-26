@@ -164,6 +164,8 @@ final class ParityHarness {
         long maxSteps;
         String maxStepsInput;
         final Map<String, Integer> features = new java.util.TreeMap<>();
+        /** Per-case replay coverage: Java success/failure, Rust success/failure (not compared). */
+        final Map<String, long[]> memoHits = new java.util.TreeMap<>();
         /** Frontend rejection reasons of grammars both frontends rejected, by error code. */
         final Map<String, Integer> rejections = new java.util.TreeMap<>();
         /** One line per input: case, input and the Java observation of the default configuration. */
@@ -468,6 +470,11 @@ final class ParityHarness {
                 stats.javaFailureHits += jh.get(1).getAsInt();
                 stats.rustSuccessHits += rh.get(0).getAsInt();
                 stats.rustFailureHits += rh.get(1).getAsInt();
+                long[] hits = stats.memoHits.computeIfAbsent(id, unused -> new long[4]);
+                hits[0] += jh.get(0).getAsInt();
+                hits[1] += jh.get(1).getAsInt();
+                hits[2] += rh.get(0).getAsInt();
+                hits[3] += rh.get(1).getAsInt();
             }
         }
         for (var host : List.of(Map.entry("java", java), Map.entry("rust", rust))) {
