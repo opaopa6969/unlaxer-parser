@@ -518,5 +518,53 @@
       "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 195}, "subject": "Rust structural constraints"}]},
       "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 200}, "subject": "Rust structural constraints"}]}
     }
+  },
+  {
+    "name": "shared-schema-before-later-duplicate-field",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(text,text)\n Root ::= A | B;\n @mapping(A, params=[text]) A ::= 'a' 'x' @text;\n @mapping(A, params=[text]) A2 ::= 'c' [ 'x' @text ];\n @mapping(B, params=[text]) B ::= 'b' 'y' @text;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 228}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 234}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "shared-schema-before-later-field-duplicate",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(u,t,u)\n Root ::= A | B;\n @mapping(A, params=[t,u]) A ::= 'a' 'x' @t 'k' @u;\n @mapping(A, params=[t,u]) A2 ::= 'c' [ 'x' @t ] 'k' @u;\n @mapping(B, params=[t,u]) B ::= 'b' 'y' @t 'k' @u;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 233}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 239}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "shared-schema-before-later-leaf-missing-field",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(text)\n Root ::= A | B;\n @mapping(A, params=[text]) A ::= 'a' 'x' @text;\n @mapping(A, params=[text]) A2 ::= 'c' [ 'x' @text ];\n @mapping(B, params=[other]) B ::= 'b' 'y' @other;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 225}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 231}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "shared-schema-before-later-missing-capture",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(text)\n Root ::= A | B;\n @mapping(B, params=[text]) B ::= 'b' 'y' @text;\n @mapping(A, params=[text]) A ::= 'a' 'x' @text;\n @mapping(A, params=[text]) A2 ::= 'c' [ 'x' @text ];\n @mapping(B, params=[text]) B2 ::= 'd' 'y';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 267}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 274}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "shared-schema-family-before-later-family",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(t) Root ::= A | B;\n @mapping(Node2) @commonField(t) Root2 ::= A | C;\n @mapping(A, params=[t]) A ::= 'a' 'x' @t;\n @mapping(A, params=[t]) A2 ::= 'c' [ 'x' @t ];\n @mapping(B, params=[t]) B ::= 'b' 'y' @t;\n @mapping(C, params=[u]) C ::= 'k' 'y' @u;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 294}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 301}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "schema-group-capture-type",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(v)\n Root ::= A | B;\n @mapping(A, params=[v]) A ::= 'a' ( 'x' 'y' ) @v;\n @mapping(B, params=[v]) B ::= 'b' 'z' @v;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 13, "end": 66}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 68}, "subject": "commonField schema"}]}
+    }
   }
 ]

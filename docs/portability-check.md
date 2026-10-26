@@ -169,7 +169,11 @@ Java-host の検証順を参照実装とし、native も同じ公開診断を返
    これは `@eval` の有無や規則の前後によらない。schema はまず mapping 名の正規化衝突、
    次に sum family の循環、最後に commonField 宣言を調べ、それぞれ宣言順で最初の失敗を選ぶ。
    二規則の commonField がともに不正なら、同じ検証段階で先に宣言された規則を返す。
-   field の型・cardinality・view 名も IR 生成前に確認する。
+   一つの規則の中では、宣言した field の順に、その field の重複・予約名、続けて family の
+   leaf ごとに mapping の引数・capture の欠落と型を調べる。field の型・cardinality・view 名も
+   IR 生成前に確認する。型の解析で同じ mapping を共有する規則どうしの引数・cardinality の
+   不一致が先に見つかれば、それは schema の失敗ではないので 5 の `P-STRUCTURE` になり、
+   後の field・leaf・規則の schema エラーは選ばない。
 5. 残る lowering / validator エラーは `P-STRUCTURE` / `Rust structural constraints` と
    grammar 全体の span にまとめる。複数の通常エラーがあっても一件で、内部で最初に失敗した
    検証の説明文は JSON に公開しない。
@@ -208,13 +212,14 @@ LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・
 同じ code/subject の root 出現と null 出現、作り直された rule/element/@lexicalContext、解決失敗と成功を固定する。
 非 BMP 文字を含む9ケースを LF/CRLF で読み、両 host の JSON 全体を固定期待値（配列順・件数・CP 範囲を含む）と照合し、
 `target/rust-portability-imports.tsv` に18ケースの証拠を残す。native の workspace test も同じ fixture を使う。
-`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む65ケースを
+`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む71ケースを
 LF/CRLF で検証する。enum・eval・embedding・typeof・未定義参照・IR 検証のエラー、
 前段の syntax/module/inventory、bounded/precedence/nested、二規則の schema エラー、
-複数 grammar の順序、既存 commonField corpus の型・cardinality も固定する。
+複数 grammar の順序、既存 commonField corpus の型・cardinality、共有 mapping の不一致が
+後の field・leaf・規則の schema エラーより先に `P-STRUCTURE` になることも固定する。
 annotation・capture・再帰を持つ正常な enum alias も受理し、別の eval エラーを隠さないことを確認する。
 両 host の JSON 全体と終了コードを比較し、`target/rust-portability-structure-priority.tsv`
-に130ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
+に142ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
 native CLI は `PATH=''` で実行し、入力・手書きファイルが変更されないことも確認する。
 

@@ -97,6 +97,20 @@ fn collect(
 }
 pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
     let mut result = Vec::new();
+    // Shared by every source type check of this grammar: the recursive analysis
+    // is solved lazily once, and contributors keep declaration order.
+    let recursive = crate::preferred_plan::RecursiveShapes::new(grammar);
+    let mut contributors = std::collections::HashMap::<&str, Vec<&RuleDecl>>::new();
+    for rule in &grammar.rules {
+        if let Some((name, _)) = mapping(rule) {
+            contributors.entry(name).or_default().push(rule);
+        }
+    }
+    let has_enum = grammar.rules.iter().any(|r| {
+        r.annotations
+            .iter()
+            .any(|a| matches!(a.kind, AnnotationKind::Enum))
+    });
     let mut names = HashSet::new();
     {
         let mut normalized = std::collections::HashMap::new();
@@ -172,6 +186,11 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
                 }
             }
         }
+        // Java CommonFieldSchema checks one field at a time and, within it, one
+        // leaf at a time: duplicate/reserved name, missing captures of that leaf,
+        // then the leaf's source type. A non-schema error from the type analysis
+        // (for example an incompatible shared mapping) must not be hidden by a
+        // schema error of a later field or leaf.
         let mut seen = HashSet::new();
         for field in &fields {
             if !seen.insert(field)
@@ -194,34 +213,25 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
                     &format!("duplicate or reserved field {field}"),
                 ));
             }
-        }
-        for field in &fields {
-            for contributor in &grammar.rules {
-                if contributor
-                    .annotations
-                    .iter()
-                    .any(|a| matches!(a.kind, AnnotationKind::Skip))
-                {
-                    continue;
-                }
-                if let Some((mapped, params)) = mapping(contributor) {
-                    if leaves.iter().any(|leaf| leaf == mapped) {
-                        let mut captured = HashSet::new();
-                        capture_types(grammar, &contributor.body, field, &mut captured);
-                        if !params.contains(field) || captured.is_empty() {
-                            return Err(invalid(
-                                &rule.name,
-                                &format!("missing field {field} on {}", contributor.name),
-                            ));
-                        }
-                    }
-                }
-            }
-            // Java CommonFieldSchema compares source types before eval/enum/ordinary
-            // lowering. Waiting for emit(ir) loses this error when lowering also fails.
             let mut contract = None;
             for leaf in &leaves {
-                let actual = source_contract(grammar, leaf, field)?;
+                let rules = contributors
+                    .get(leaf.as_str())
+                    .map_or(&[][..], Vec::as_slice);
+                for contributor in rules {
+                    let params = mapping(contributor).unwrap().1;
+                    let mut captured = HashSet::new();
+                    capture_types(grammar, &contributor.body, field, &mut captured);
+                    if !params.contains(field) || captured.is_empty() {
+                        return Err(invalid(
+                            &rule.name,
+                            &format!("missing field {field} on {}", contributor.name),
+                        ));
+                    }
+                }
+                // Source types are compared before eval/enum/ordinary lowering.
+                // Waiting for emit(ir) loses this error when lowering also fails.
+                let actual = source_contract(grammar, leaf, rules, field, &recursive, has_enum)?;
                 if contract
                     .as_ref()
                     .is_some_and(|previous| previous != &actual)
@@ -244,18 +254,18 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
     Ok(result)
 }
 
+/// `rules` are the non-skipped contributors of `mapped`, in declaration order.
 fn source_contract(
     grammar: &GrammarDecl,
     mapped: &str,
+    rules: &[&RuleDecl],
     field: &str,
+    recursive: &crate::preferred_plan::RecursiveShapes<'_>,
+    has_enum: bool,
 ) -> Result<(String, unlaxer_codegen::Cardinality), String> {
     let mut contract = None;
     let mut params = None;
-    for rule in grammar
-        .rules
-        .iter()
-        .filter(|r| mapping(r).is_some_and(|(n, _)| n == mapped))
-    {
+    for rule in rules {
         let current = mapping(rule).unwrap().1;
         if params.is_some_and(|previous| previous != current) {
             return Err(format!(
@@ -278,7 +288,7 @@ fn source_contract(
             source_children(&item.element, &mut pending);
         }
         let (semantic, cardinality) =
-            crate::preferred_plan::capture_contract(grammar, rule, field)?
+            crate::preferred_plan::capture_contract(grammar, rule, field, recursive)?
                 .unwrap_or((false, unlaxer_codegen::Cardinality::One));
         let types: HashSet<_> = sites
             .iter()
@@ -288,7 +298,7 @@ fn source_contract(
                 if !semantic && sites.len() > 1 {
                     Ok(text_site_nominal(grammar, site))
                 } else {
-                    source_nominal(grammar, site)
+                    source_nominal(grammar, site, has_enum)
                 }
             })
             .collect::<Result<_, String>>()?;
@@ -339,7 +349,11 @@ fn source_children<'a>(atom: &'a AtomicElement, out: &mut Vec<&'a unlaxer_ubnf::
     }
 }
 
-fn source_nominal(grammar: &GrammarDecl, atom: &AtomicElement) -> Result<String, String> {
+fn source_nominal(
+    grammar: &GrammarDecl,
+    atom: &AtomicElement,
+    has_enum: bool,
+) -> Result<String, String> {
     match &atom.kind {
         ElementKind::Optional(body) | ElementKind::Repeat(body) => {
             let [sequence] = body.alternatives.as_slice() else {
@@ -348,20 +362,16 @@ fn source_nominal(grammar: &GrammarDecl, atom: &AtomicElement) -> Result<String,
             let [item] = sequence.elements.as_slice() else {
                 return Ok("Object".into());
             };
-            return source_nominal(grammar, &item.element);
+            return source_nominal(grammar, &item.element, has_enum);
         }
         ElementKind::OneOrMore(a)
         | ElementKind::BoundedRepeat { element: a, .. }
-        | ElementKind::Separated { element: a, .. } => return source_nominal(grammar, a),
+        | ElementKind::Separated { element: a, .. } => return source_nominal(grammar, a, has_enum),
         _ => (),
     }
     // Ordinary enum aliases may carry trivia annotations or captures. They are
     // not subject to the stricter nested-capture helper expansion contract.
-    if grammar.rules.iter().any(|r| {
-        r.annotations
-            .iter()
-            .any(|a| matches!(a.kind, AnnotationKind::Enum))
-    }) {
+    if has_enum {
         let value = source_value_type(grammar, atom, &mut HashSet::new())?;
         if value.starts_with("enum:") {
             return Ok(value);

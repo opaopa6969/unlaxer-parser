@@ -382,7 +382,7 @@
         593,
         825
       ],
-      "observation": "nativeError/nativeMessage/javaGeneratorError は構造検証の fail-first 順序・説明文を区別する。例: family cyclic-sum の Java generator は E-LEFT-RECURSION、schema validator は E-COMMONFIELD-MISMATCH。受理してよい差ではなく、両経路の拒否を固定する。公開 check の共通診断契約とは区別する。 #825では公開checkをJava-hostの優先順位に揃える。syntax/module/inventoryで前段が失敗したら構造検証しない。grammarごとにbounded/precedence/nested検証がcommonField schemaに先行し、schemaエラーはeval/enum/embedding/通常lowering/IR検証より先に問題ruleのCP spanで返す。schemaの宣言順と複数grammarの診断順を固定し、単一エラーとJSON schemaVersion 1は維持する。共通structure-priority.jsonの65ケースをLF/CRLFでJSON全体・終了コードに照合する。issue #825はレビュー・merge待ち。",
+      "observation": "nativeError/nativeMessage/javaGeneratorError は構造検証の fail-first 順序・説明文を区別する。例: family cyclic-sum の Java generator は E-LEFT-RECURSION、schema validator は E-COMMONFIELD-MISMATCH。受理してよい差ではなく、両経路の拒否を固定する。公開 check の共通診断契約とは区別する。 #825では公開checkをJava-hostの優先順位に揃える。syntax/module/inventoryで前段が失敗したら構造検証しない。grammarごとにbounded/precedence/nested検証がcommonField schemaに先行し、schemaエラーはeval/enum/embedding/通常lowering/IR検証より先に問題ruleのCP spanで返す。schemaの宣言順と複数grammarの診断順を固定し、単一エラーとJSON schemaVersion 1は維持する。共通structure-priority.jsonの71ケースをLF/CRLFでJSON全体・終了コードに照合する。issue #825はレビュー・merge待ち。",
       "evidence": [
         "docs/portability-check.md",
         "spec-corpus/associative-projection/invalid-cases.json",

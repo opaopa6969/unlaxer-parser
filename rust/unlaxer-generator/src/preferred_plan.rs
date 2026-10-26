@@ -49,13 +49,13 @@ fn merge(a: Shape, b: Shape, seq: bool) -> Shape {
         },
     )
 }
-struct RecursiveShapes<'a> {
+pub(crate) struct RecursiveShapes<'a> {
     g: &'a GrammarDecl,
     indices: HashMap<&'a str, usize>,
     values: OnceCell<Result<Vec<Shape>, String>>,
 }
 impl<'a> RecursiveShapes<'a> {
-    fn new(g: &'a GrammarDecl) -> Self {
+    pub(crate) fn new(g: &'a GrammarDecl) -> Self {
         Self {
             g,
             indices: g
@@ -435,10 +435,13 @@ fn key(tag: u8, s: Span) -> Key {
 /// Source-level capture cardinality, shared with the common-field preflight.
 /// Returns whether the capture carries semantic values, and its cardinality.
 /// Unlike semantic `wrap`, a captured text repetition is also a collection.
+/// `recursive` must be built for `g`; callers share it so the grammar-wide
+/// recursive analysis runs at most once per schema check.
 pub(crate) fn capture_contract(
     g: &GrammarDecl,
     rule: &RuleDecl,
     name: &str,
+    recursive: &RecursiveShapes<'_>,
 ) -> Result<Option<(bool, unlaxer_codegen::Cardinality)>, String> {
     fn captured_wrap(s: Shape, count: Count) -> Shape {
         Shape(
@@ -522,18 +525,16 @@ pub(crate) fn capture_contract(
             _ => None,
         })
     }
-    Ok(
-        body(g, &rule.body, name, &RecursiveShapes::new(g))?.map(|s| {
-            (
-                s.0 != Kind::Text,
-                match s.1 {
-                    Count::One => unlaxer_codegen::Cardinality::One,
-                    Count::Optional => unlaxer_codegen::Cardinality::Optional,
-                    Count::Many => unlaxer_codegen::Cardinality::Many,
-                },
-            )
-        }),
-    )
+    Ok(body(g, &rule.body, name, recursive)?.map(|s| {
+        (
+            s.0 != Kind::Text,
+            match s.1 {
+                Count::One => unlaxer_codegen::Cardinality::One,
+                Count::Optional => unlaxer_codegen::Cardinality::Optional,
+                Count::Many => unlaxer_codegen::Cardinality::Many,
+            },
+        )
+    }))
 }
 struct Plan<'a> {
     g: &'a GrammarDecl,
