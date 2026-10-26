@@ -85,7 +85,8 @@ LF/CRLF は元入力のまま数え、escape 復号後の長さから逆算し�
 順序は `(start, end, code, subject)`、位置不明は末尾。同じ code・範囲・subject の重複だけを
 取り除く。同じ内容が別位置・別 grammar に出現した場合は両方残す。位置付きの root 診断と
 `span: null` の診断も別件とする。import 由来・出典不明でともに null の同じ code/subject は
-従来どおり一件にまとめる。import のない単一ファイルの出力・件数・順序は変えない。
+従来どおり一件にまとめる。出典保持の変更（#776）は import のない単一ファイルに影響しない。
+複数の構造エラーがある場合の優先順位は下記 #825 の契約に従う。
 JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等の escape 表現の byte 一致は
 要求しない。同じ host・同じ入力の出力は決定的。
 
@@ -136,12 +137,51 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 | `P-QUALIFIED-REFERENCE` | 名前空間付き参照 / `namespace.name` |
 | `P-ERROR-ELEMENT` | 旧版の`ERROR(...)`未対応診断。#329以降は生成対応により発行しない（別用途へ転用しない） |
 | `P-EMPTY-LITERAL` | 旧版の空 literal 未対応診断。#713 以降は [Java 互換生成](empty-literal.md)により発行しない（別用途へ転用しない） |
-| `P-STRUCTURE` | 構造検証失敗 / `Rust structural constraints` |
+| `P-NESTED-SHAPE` | nested capture schema の失敗 / `nested capture schema`（rule の範囲） |
+| `P-COMMONFIELD` | commonField schema の失敗 / `commonField schema`（rule の範囲） |
+| `P-STRUCTURE` | その他の構造検証失敗 / `Rust structural constraints`（grammar の範囲） |
 | `P-SYNTAX` | 構文失敗 / `UBNF syntax` |
 
 mapping 型・field 名は `[A-Za-z][A-Za-z0-9_]*` で、`Self/self/super/crate` を除く。
 field はさらに `span/semantics` を予約する。その他の衝突・型不整合は構造段階で検出する。
 機能が追加されれば、その構文は inventory の対象から外れる。code 名を別の意味に転用しない。
+
+## 複数の構造エラーの優先順位（#825）
+
+Java-host の検証順を参照実装とし、native も同じ公開診断を返す。
+エラーの文字列から常に commonField を優先するのではなく、次の段階順で判定する。
+
+1. frontend の失敗は `structure: unavailable`（通常は `P-SYNTAX`）。REGEX 廃止・
+   parameterized rule の位置付き診断は既存の専用 code を保つ。構造検証は行わない。
+2. ファイル API の v2 import 解決が失敗すれば `P-MODULE` / `blocked`。
+   次に全 grammar の名前・出力衝突と機能 inventory を収集する。一件でもあれば
+   `blocked` としてそれらだけを返し、別 grammar にある構造エラーも調べない。
+3. inventory を通過したら、各 grammar を独立に検証して最大一件を返す。
+   bounded repeat の範囲・overflow、precedence overflow、REGEX 廃止、nested capture、
+   raising operator の順に検証し、その後に commonField schema を検証する。
+   前の段階で失敗したら後の schema エラーは選ばない。nested capture の失敗は
+   `P-NESTED-SHAPE` / `nested capture schema` と問題の rule 全体の CP span、
+   bounded / precedence の失敗は `P-STRUCTURE` と grammar 全体の span になる。
+   raising operator など inventory でも検出するものは通常 2 の段階で止まる。
+4. commonField schema の失敗は `P-COMMONFIELD` / `commonField schema` と問題の
+   rule 全体（annotation を含む）の CP span。後段の enum・typeof・eval・embedding・
+   通常の lowering、さらに Java の共通 validator / native の `validate_ir` の失敗より優先する。
+   これは `@eval` の有無や規則の前後によらない。schema はまず mapping 名の正規化衝突、
+   次に sum family の循環、最後に commonField 宣言を調べ、それぞれ宣言順で最初の失敗を選ぶ。
+   二規則の commonField がともに不正なら、同じ検証段階で先に宣言された規則を返す。
+   一つの規則の中では、宣言した field の順に、その field の重複・予約名、続けて family の
+   leaf ごとに mapping の引数・capture の欠落と型を調べる。field の型・cardinality・view 名も
+   IR 生成前に確認する。型の解析で同じ mapping を共有する規則どうしの引数・cardinality の
+   不一致が先に見つかれば、それは schema の失敗ではないので 5 の `P-STRUCTURE` になり、
+   後の field・leaf・規則の schema エラーは選ばない。
+5. 残る lowering / validator エラーは `P-STRUCTURE` / `Rust structural constraints` と
+   grammar 全体の span にまとめる。複数の通常エラーがあっても一件で、内部で最初に失敗した
+   検証の説明文は JSON に公開しない。
+
+構造エラーがあれば `structure: failed`、終了コードは 3。
+複数 grammar の診断は既存どおり span の start、end、code、subject の順で並べ、
+位置不明は最後に置く。同じ code・subject でも位置が違えば別件。
+単一エラーの出力、JSON schemaVersion 1、公開済み 3.3.0 は変更しない。
 
 ## 境界と回帰修正
 
@@ -172,6 +212,14 @@ LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・
 同じ code/subject の root 出現と null 出現、作り直された rule/element/@lexicalContext、解決失敗と成功を固定する。
 非 BMP 文字を含む9ケースを LF/CRLF で読み、両 host の JSON 全体を固定期待値（配列順・件数・CP 範囲を含む）と照合し、
 `target/rust-portability-imports.tsv` に18ケースの証拠を残す。native の workspace test も同じ fixture を使う。
+`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む71ケースを
+LF/CRLF で検証する。enum・eval・embedding・typeof・未定義参照・IR 検証のエラー、
+前段の syntax/module/inventory、bounded/precedence/nested、二規則の schema エラー、
+複数 grammar の順序、既存 commonField corpus の型・cardinality、共有 mapping の不一致が
+後の field・leaf・規則の schema エラーより先に `P-STRUCTURE` になることも固定する。
+annotation・capture・再帰を持つ正常な enum alias も受理し、別の eval エラーを隠さないことを確認する。
+両 host の JSON 全体と終了コードを比較し、`target/rust-portability-structure-priority.tsv`
+に142ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
 native CLI は `PATH=''` で実行し、入力・手書きファイルが変更されないことも確認する。
 

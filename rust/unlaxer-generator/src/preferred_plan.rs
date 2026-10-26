@@ -49,13 +49,13 @@ fn merge(a: Shape, b: Shape, seq: bool) -> Shape {
         },
     )
 }
-struct RecursiveShapes<'a> {
+pub(crate) struct RecursiveShapes<'a> {
     g: &'a GrammarDecl,
     indices: HashMap<&'a str, usize>,
     values: OnceCell<Result<Vec<Shape>, String>>,
 }
 impl<'a> RecursiveShapes<'a> {
-    fn new(g: &'a GrammarDecl) -> Self {
+    pub(crate) fn new(g: &'a GrammarDecl) -> Self {
         Self {
             g,
             indices: g
@@ -430,6 +430,111 @@ fn site(
 }
 fn key(tag: u8, s: Span) -> Key {
     (tag, s.codepoint_start, s.codepoint_end)
+}
+
+/// Source-level capture cardinality, shared with the common-field preflight.
+/// Returns whether the capture carries semantic values, and its cardinality.
+/// Unlike semantic `wrap`, a captured text repetition is also a collection.
+/// `recursive` must be built for `g`; callers share it so the grammar-wide
+/// recursive analysis runs at most once per schema check.
+pub(crate) fn capture_contract(
+    g: &GrammarDecl,
+    rule: &RuleDecl,
+    name: &str,
+    recursive: &RecursiveShapes<'_>,
+) -> Result<Option<(bool, unlaxer_codegen::Cardinality)>, String> {
+    fn captured_wrap(s: Shape, count: Count) -> Shape {
+        Shape(
+            s.0,
+            if s.1 == Count::Many || count == Count::Many {
+                Count::Many
+            } else if s.1 == Count::Optional || count == Count::Optional {
+                Count::Optional
+            } else {
+                Count::One
+            },
+        )
+    }
+    fn join(a: Option<Shape>, b: Option<Shape>, seq: bool) -> Option<Shape> {
+        match (a, b) {
+            (Some(a), Some(b)) => Some(merge(a, b, seq)),
+            (a, b) => a.or(b),
+        }
+    }
+    fn body(
+        g: &GrammarDecl,
+        b: &RuleBody,
+        name: &str,
+        r: &RecursiveShapes<'_>,
+    ) -> Result<Option<Shape>, String> {
+        let mut result = None;
+        let mut missing = false;
+        for s in &b.alternatives {
+            let mut value = None;
+            for a in &s.elements {
+                if a.capture.as_deref() == Some(name) {
+                    let captured = match &a.element.kind {
+                        ElementKind::Optional(b) => {
+                            captured_wrap(site_body(g, b, r)?, Count::Optional)
+                        }
+                        ElementKind::Repeat(b) => captured_wrap(site_body(g, b, r)?, Count::Many),
+                        ElementKind::OneOrMore(a)
+                        | ElementKind::BoundedRepeat { element: a, .. }
+                        | ElementKind::Separated { element: a, .. } => {
+                            captured_wrap(site(g, a, r)?, Count::Many)
+                        }
+                        _ => shape(g, &a.element, &mut HashSet::new(), r)?,
+                    };
+                    value = join(value, Some(captured), true);
+                }
+                value = join(value, atom(g, &a.element, name, r)?, true);
+            }
+            missing |= value.is_none();
+            result = join(result, value, false);
+        }
+        Ok(result.map(|v| {
+            if missing {
+                captured_wrap(v, Count::Optional)
+            } else {
+                v
+            }
+        }))
+    }
+    fn atom(
+        g: &GrammarDecl,
+        a: &AtomicElement,
+        name: &str,
+        r: &RecursiveShapes<'_>,
+    ) -> Result<Option<Shape>, String> {
+        Ok(match &a.kind {
+            ElementKind::OwnedCapture { body: b, .. }
+            | ElementKind::CaptureScope(b)
+            | ElementKind::Commit { body: b, .. }
+            | ElementKind::Label { body: b, .. }
+            | ElementKind::Catch { choice: b, .. }
+            | ElementKind::Group(b) => body(g, b, name, r)?,
+            ElementKind::Optional(b) => {
+                body(g, b, name, r)?.map(|v| captured_wrap(v, Count::Optional))
+            }
+            ElementKind::Repeat(b) => body(g, b, name, r)?.map(|v| captured_wrap(v, Count::Many)),
+            ElementKind::OneOrMore(a)
+            | ElementKind::BoundedRepeat { element: a, .. }
+            | ElementKind::Separated { element: a, .. } => {
+                atom(g, a, name, r)?.map(|v| captured_wrap(v, Count::Many))
+            }
+            _ => None,
+        })
+    }
+    Ok(body(g, &rule.body, name, recursive)?.map(|s| {
+        (
+            s.0 != Kind::Text,
+            match s.1 {
+                Count::One => unlaxer_codegen::Cardinality::One,
+                Count::Optional => unlaxer_codegen::Cardinality::Optional,
+                Count::Many => unlaxer_codegen::Cardinality::Many,
+            },
+        )
+    }))
 }
 struct Plan<'a> {
     g: &'a GrammarDecl,
