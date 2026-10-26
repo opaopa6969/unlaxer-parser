@@ -161,4 +161,124 @@ failure memoization は、複数の選択肢が同じ内側部分木を最後ま
 listener を含む部分木の指数的な再導出までは省略しない。Rustの対応範囲・保存予算・未完境界は
 [pure success memo](pure-success-memo.md)を参照。
 
-関連: #40, #184, #192, #194, #269
+## CAPTURE / SAME_AS を含む相互再帰の計算量（#756）
+
+memo なしの PEG は、同じ位置から同じ rule を繰り返し試す文法では、入力長に対して
+最悪で指数時間になる。Java の `ParseOptions.DEFAULT` と Rust の `ParseOptions::default()` は
+ともに memo OFF である。`SAFE_FAILURES` / `Memoization::SafeFailures` も、安全と証明された
+部分だけを memo する方針なので、任意の文法に線形時間を保証するものではない。
+
+一般の owned binding を作る `CAPTURE(w, ...)` と、その値を読み直す `SAME_AS(w)` は、
+AST field の `@field` capture とは別である。`SAME_AS(w)` の成否は呼出し元が作った束縛にも
+依存し得るため、同じ rule・入力位置だけで失敗を再利用できない。現在の安全性解析は
+`CAPTURE` / `SAME_AS` / `CAPTURE_SCOPE` を含む rule と、それらに到達するすべての rule を
+Java / Rust とも保守的に memo 対象外にする。同じ rule 内に先行する `CAPTURE` があっても、
+すべての再帰・分岐で外の束縛に依存しないことまでは証明しない。
+state version が key にあるだけで、この安全性の証明が済むわけではない
+（[stateful failure memo](stateful-failure-memo.md)）。安全な子 parser の memo は利用できても、
+対象外の再帰 rule 全体の探索は省略できない。
+
+### 縮小例と測定
+
+[#756](https://github.com/opaopa6969/unlaxer-parser/issues/756) の縮小例は
+[`regressions.json`](../spec-corpus/property-based/regressions.json) の
+`step-budget-capture-mutual-recursion` に固定している。
+
+```ubnf
+grammar Pbt {
+  @package: pbt.corpus
+  @root @mapping(N0)
+  R0 ::= R1 ',' | R1 R1 | ',' ;
+  R1 ::= CAPTURE(w0, 'x' R0) SAME_AS(w0) ;
+}
+```
+
+入力を `x` の n 回繰り返しにすると、`R0` の第1・第2候補が同じ位置で `R1` を試し直す。
+`R1` は `x` を消費してから `R0` に戻るため左再帰でも無限ループでもないが、失敗するまでの
+探索が増幅する。両 rule が `CAPTURE` / `SAME_AS` に到達するので、SAFE_FAILURES でも
+この再試行は memo で省略されない。以下はすべて拒否される入力である。
+
+| n（入力のコードポイント数） | Java DEFAULT の transaction 数 | 出典・確認 |
+|---|---:|---|
+| 8 | 5,621 | #756 の値と再測定が一致 |
+| 12 | 90,101 | #756 の値と再測定が一致 |
+| 16 | 1,441,781 | #756 の値と再測定が一致 |
+| 20 | 23,068,661 | #756 の報告値（約10秒）。今回の再測定対象外 |
+
+再測定は 2026-10-26、revision `f70b0d3f`、JDK 21.0.9。生成した Java root parser を
+新しい `ParseContext` と `ParseOptions.DEFAULT` で1回呼び、
+`addMemoizationTransparentTransactionListener` の `onBegin` を数えた。
+これは [PBT harness](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/propertybased/ParityHarness.java)
+の `JavaApi.withinBudget` と同じ数え方で、生成・compile・Mapper の再解析は含めない。
+4文字増えるごとに約16倍になる。時間は機械・JIT・負荷に依存し、transaction 数も
+生成器・runtime の revision に依存する観測値で、公開 API の保証値ではない。
+Rust でも同じ形の増加が確認されている
+（[#739 の調査記録](https://github.com/opaopa6969/unlaxer-parser/issues/739#issuecomment-6370178979)）。
+上表の transaction 数は Java の値であり、Rust と同じ手数だと主張するものではない。
+
+### 利用者ができる対処
+
+- 文法上可能なら、`CAPTURE` / `SAME_AS` を相互再帰の外へ移し、再帰部分を状態非依存にする。
+  その後で SAFE_FAILURES を使えば安全な rule が memo 対象になる。ただし capture の範囲・
+  束縛の寿命・replay の意味を保つ必要があり、単に別 rule に切り出すだけでは到達関係は変わらない。
+- 共通の先頭部分を左因数分解し、同じ位置で同じ再帰 rule を試す回数を減らす。下記はこの方法の例。
+- 他の候補に戻っても成功しないと確定した位置では、[COMMIT による cut](cut-and-labeled-failures.md)
+  を検討する。`COMMIT(child)` は child の通常失敗を確定エラーに変えて後続候補を止めるため、
+  置き方によって受理する入力や診断が変わる。[FIRST 集合による解析の条件](auto-commit.md)も確認し、
+  受理・拒否の共通 fixture で確かめる。この縮小例への未検証の cut 挿入は推奨しない。
+
+上の縮小例を左因数分解すると、先頭の `R1` を一度だけ試す形になる。
+
+```ubnf
+grammar Pbt {
+  @package: pbt.corpus
+  @root @mapping(N0)
+  R0 ::= R1 (',' | R1) | ',' ;
+  R1 ::= CAPTURE(w0, 'x' R0) SAME_AS(w0) ;
+}
+```
+
+両方の文法から Java parser と Rust parser を実際に生成・compile して、次を確認した
+（同 revision、Rust 1.85.0。各 probe process に120秒の timeout）。
+
+- `x` / `,` の長さ0〜8の全511入力、回帰 corpus の32文字以外の入力、`x` の12・16回繰り返し、
+  入れ子の成功入力 `xx,x,,xx,x,,,`、異なる文字・補助文字・空白を含む入力を合わせた520入力で、
+  全入力の受理・拒否が書き換え前後、Java / Rust、memo OFF / SAFE_FAILURES で一致した。
+  受理は4入力。Java は生成 Mapper の `diagnose`、Rust は生成 parser の
+  `parse_tree_detailed_with_options` を使った。両 host が出す Rust 全5ファイルも文法ごとに byte 一致した。
+- 書き換え後の Java DEFAULT は `x` の8・12・16回繰り返しで54・78・102 transaction、
+  32回でも198 transaction で拒否した。Rust でも書き換え後の32文字を両 memo 方針で拒否して終了した。
+  書き換え前の32文字は無制限には実行していない。
+
+これは上記入力での受理の確認で、任意の stateful 文法への同値変換の証明ではない。
+書き換えによる CST の形、AST field の収集、診断候補・rule stack まで同じとは限らない。
+利用する文法の capture・mapping・診断の契約も別途検証する。
+
+信頼できない入力には、解析前にアプリケーション側で入力長の上限を設け、文法と最悪ケースに
+合わせて値を決める。既存の深さ上限も併用する。Java は
+[`ULX-PARSE-DEPTH-LIMIT`](java-parser-limits.md) の `ParseLimitException` を受け取り、
+Rust は [`resource_limit`](cut-and-labeled-failures.md#rule-cycles-through-catch) の診断を扱う。
+これらは同時に入れ子になる parser / rule の深さを制限するもので、累積の手数や実時間の上限ではない。
+深さが上限に達しないまま指数的に再試行する上の入力には、深さ上限だけでは対処できない。
+
+[#739](https://github.com/opaopa6969/unlaxer-parser/issues/739) /
+[PR #757](https://github.com/opaopa6969/unlaxer-parser/pull/757) の
+[PBT harness の手数上限](property-based-testing.md#入力ごとの手数の上限739)は、既定100,000
+transaction（`-Dpbt.stepBudget`）を超えた入力を**両 host の観測から除外して記録する試験用の予算**である。
+回帰例の `x` 32個は `overBudget` に登録されている。除外は parser が拒否したことでも
+Java / Rust の結果が一致したことでもなく、製品の `ParseOptions` に同じ手数上限があるわけでもない。
+
+### 今回の判断と将来の候補
+
+#756 は選択肢3（仕様上の計算量と対処法の文書化）を採る。既定値・runtime・公開 API を
+変更せず、利用者が現在使える対処を示す、最小で取り消し可能な変更である。
+次の2案は [#197 の性能作業凍結](https://github.com/opaopa6969/unlaxer-parser/issues/197#issuecomment-6111834921)
+の解除後に判断する候補として残し、今回の完了に含めない。
+
+1. capture を考慮した失敗 memo。外の束縛に依存しないことを再帰も含めて証明し、Java / Rust
+   共通 fixture で受理・CST・診断の不変を確認する必要がある。既定の memo OFF はこれだけでは速くならない。
+2. opt-in の手数上限。両言語の `ParseOptions` に新しい公開契約を追加し、上限超過を安定した code の
+   `resource_limit` として sticky に扱う案。現行の harness 予算とは別の機能追加なので、
+   凍結中に導入せず #756 に将来候補として残す。
+
+関連: #40, #184, #192, #194, #269, #739, #756

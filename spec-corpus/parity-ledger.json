@@ -356,6 +356,10 @@
     "835": {
       "state": "OPEN",
       "title": "fix(parity): spec corpus の結合性・precedence・profile 診断を Java と両 Rust host で揃える"
+    },
+    "756": {
+      "state": "OPEN",
+      "title": "CAPTURE / SAME_AS を含む相互再帰の文法が Java / Rust とも指数時間になる（SAFE_FAILURES でも memo されない）"
     }
   },
   "entries": [
@@ -498,15 +502,18 @@
         621,
         197,
         629,
-        184
+        184,
+        756
       ],
-      "observation": "memo-reset-policy の java_hits は Java 同一context の warm/next。Rust の同fixtureは別grammar sessionで意味だけ比較し、実hitは別probeが検証する。byte予算は言語のlayoutに依存する。measurement-metadata.json の java は計測JDKで期待値ではないが保守的な走査対象として登録。性能改善は #197 の凍結に従い本PRでは行わない。 capture比較effectやopaque callbackを自動memo/cache対象にする条件にもhost差がある。Javaのlistener通知を省略せず、Rustの未監査effectは保守的に除外する。hit数の一致と構文結果の一致を混同しない。",
+      "observation": "memo-reset-policy の java_hits は Java 同一context の warm/next。Rust の同fixtureは別grammar sessionで意味だけ比較し、実hitは別probeが検証する。byte予算は言語のlayoutに依存する。measurement-metadata.json の java は計測JDKで期待値ではないが保守的な走査対象として登録。性能改善は #197 の凍結に従い本PRでは行わない。 capture比較effectやopaque callbackを自動memo/cache対象にする条件にもhost差がある。Javaのlistener通知を省略せず、Rustの未監査effectは保守的に除外する。hit数の一致と構文結果の一致を混同しない。 #756は選択肢3として計算量を文書化。CAPTURE / SAME_ASに到達する相互再帰ruleは両言語ともSAFE_FAILURESの対象外で、指数時間になる場合がある。PBTの手数予算は試験入力の除外でありruntimeの手数上限ではない。captureを考慮した失敗memoとopt-inの手数上限は#197の凍結解除後の候補として残す。",
       "evidence": [
         "docs/memo-reset-policy.md",
         "docs/failure-memo-budget.md",
         "conformance/memo-scaling/measurement-metadata.json",
         "docs/generated-scope-effects.md",
-        "docs/incremental-cache.md"
+        "docs/incremental-cache.md",
+        "docs/packrat-memoization.md",
+        "docs/property-based-testing.md"
       ]
     },
     {
