@@ -23,8 +23,8 @@ jobs:
         with:
           node-version: '20.20.0'
       - name: Rust toolchain を既定を変更せずに準備
-        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update --target wasm32-unknown-unknown
-      - run: npm ci --ignore-scripts --no-audit --no-fund && npx playwright install chromium
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update --target wasm32-unknown-unknown
+      - run: bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" npm ci --ignore-scripts --no-audit --no-fund && bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" npx playwright install chromium
         working-directory: unlaxer-dsl/ubnf-vscode
       - run: python3 scripts/language-profile-corpus.py --check
       - run: python3 scripts/language-profile-packages.py --check

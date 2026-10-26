@@ -18,6 +18,7 @@
       "org.unlaxer.dsl.codegen.ParseBindingsConformanceTest": ["dictionariesComposeWithGeneratedParsers"],
       "org.unlaxer.dsl.codegen.DeclarativeTokenConformanceTest": ["authoringCatalogExamplesAgreeInJavaAndRust", "playgroundCatalogExamplesAgreeInJavaAndWasm", "learningScenariosAgreeInJavaRustAndBrowserWasm", "metaGrammarGeneratesAPlaygroundThatReadsItself", "illustratedGuideEmbedsExactExampleFiles", "illustratedGuideExamplesAgreeInJavaAndRust", "lexicalModulesHaveIndependentNamesCapturesAndPaths", "generatedProgramsPreserveCursorsCapturesSpansAndRollback"],
       "org.unlaxer.dsl.ApiImpactConformanceTest": ["reportsLocationsAndRealCompilerObligationsAgree"],
+      "org.unlaxer.dsl.codegen.SpecCorpusExecutionConformanceTest": ["validationCorpusRunsOnEveryHost", "runtimeCorpusRunsOnEveryHost"],
       "org.unlaxer.dsl.bootstrap.UbnfSpecCorpusTest": ["corpusKeepsItsShapeAndDoesNotGuessWhereTheSpecIsSilent", "everyCitationResolvesToARealHeadingAndSentenceInTheSpec", "javaBootstrapAgreesWithEverySpecDerivedExpectation"],
       "org.unlaxer.dsl.codegen.NumericCaptureRuntimeTest": ["scalarKeepsIntApiAndRejectsNonIntegerSpellingsAndOverflow", "rustMapsTheSameCheckedIntegersAndRetainsOriginalSource", "optionalAndRepeatedNumbersAreBoxedAndActuallyMapped", "digitTokenSupportsPrimitiveAndBoxedCaptures", "numericCaptureAbsentFromAChoiceBranchIsOptionalRatherThanZero"],
       "org.unlaxer.dsl.RustNativeEmitterTest": ["nativeEmitterMatchesJavaByteForByte"],

@@ -37,14 +37,14 @@ jobs:
           node-version: '20'
       - name: Prepare Rust and WASM
         run: |
-          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update --target wasm32-unknown-unknown
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update --target wasm32-unknown-unknown
       - name: Build the static learning site
         run: node scripts/build-learning.mjs
       - name: Verify all lessons in a browser
         working-directory: unlaxer-dsl/ubnf-vscode
         run: |
-          npm ci
-          npx playwright install chromium
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" npm ci
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" npx playwright install chromium
           node --test scripts/completion.test.mjs
           node scripts/learning-browser.mjs
       - uses: actions/upload-pages-artifact@v3

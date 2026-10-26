@@ -23,11 +23,11 @@ jobs:
         with:
           node-version: '20.20.0'
       - name: Rust toolchain を既定を変更せずに準備
-        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
       - name: Prepare locked dependencies for the offline LSP diagnostic probe
-        run: cargo fetch --locked --manifest-path rust/Cargo.toml
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" cargo fetch --locked --manifest-path rust/Cargo.toml
       - name: Install the locked TypeScript 5.9.3 compiler without package scripts
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" npm ci --ignore-scripts --no-audit --no-fund
         working-directory: unlaxer-dsl/ubnf-vscode
       - name: Prepare required tests (external-language-providers)
         run: python3 scripts/verify-optin-tests.py external-language-providers --prepare

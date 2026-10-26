@@ -7,13 +7,9 @@
 //! 導かれており、どの実装の観測値も使っていない。
 //!
 //! AGENTS.md「Java / Rust の機能対称性」に従い、片側だけの成功を完了根拠にしないための対。
-//! 差は次の 1 点だけで、これは corpus の `scope` に明示されている:
-//!
-//! - `scope: validate` の 18 件は診断コードを見るケースで、`unlaxer-ubnf` は構文解析だけを行い
-//!   独立した validator を持たない（Java 側は `GrammarValidator` で駆動する）。
-//!   `quantifier/huge-bound` は `unlaxer-generator/tests/bounded_overflow.rs` でも同じ fixture を駆動する。
-//! - `scope: runtime` の 3 件は生成パーサの実行時挙動で、UBNF を読む処理系の入出力からは
-//!   観測できない。Java 側も同じく駆動しない。
+//! validate/runtime は spec-corpus/execution/manifest.json の実行先へ委譲する。
+//! generator 側の spec_corpus_execution が原本を読み、独立期待値または issue 付きの
+//! 既知差と比較する。Java conformance と Python 検査が実行記録も照合する。
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -25,12 +21,41 @@ mod json;
 
 use json::Json;
 
-/// 構文木の比較でしか判定できないケース。Java 側の `RUNTIME_SCOPE_IDS` と同じ集合。
-const RUNTIME_SCOPE_IDS: [&str; 3] = [
-    "char-range/inclusive-bounds",
-    "error/hint-is-last-alternative",
-    "separator/expansion",
-];
+fn delegated_ids(scope: &str) -> BTreeSet<String> {
+    let path = repository_root().join("spec-corpus/execution/manifest.json");
+    let manifest = json::parse(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut ids = BTreeSet::new();
+    for row in manifest.get("cases").unwrap().array() {
+        if row.required_text("scope", "execution") != scope {
+            continue;
+        }
+        let id = row.required_text("id", "execution");
+        assert!(ids.insert(id.to_owned()), "実行先 ID 重複: {id}");
+        let drivers = row.get("drivers").unwrap().array();
+        for host in ["java", "java-host", "native"] {
+            let key = format!("{host}-{scope}");
+            assert!(
+                drivers.iter().any(|d| d.text() == Some(&key)),
+                "{id}: {key}"
+            );
+            let driver = manifest.get("drivers").unwrap().get(&key).unwrap();
+            let path = repository_root().join(driver.required_text("path", &key));
+            let source = std::fs::read_to_string(path).unwrap();
+            let method = driver.required_text("test", &key);
+            assert!(
+                source.contains(&format!("{method}(")),
+                "{id}: 実行先 {method} が無い"
+            );
+        }
+    }
+    let actual: BTreeSet<_> = load()
+        .into_iter()
+        .filter(|c| c.scope == scope)
+        .map(|c| c.id)
+        .collect();
+    assert_eq!(ids, actual, "新規除外 corpus は実行先の宣言が必要");
+    ids
+}
 
 /// 期待値を実装に合わせて書き換えず、黙って skip もしない差分。空であるべき状態が正常。
 /// `(ケース ID, 実測の文言, 理由)`。
@@ -214,7 +239,10 @@ fn corpus_keeps_its_shape_and_does_not_guess_where_the_spec_is_silent() {
         .collect();
     assert_eq!(
         undetermined,
-        RUNTIME_SCOPE_IDS.into_iter().collect::<BTreeSet<_>>(),
+        delegated_ids("runtime")
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>(),
         "undetermined の集合が SOURCE.md の説明と食い違う"
     );
 }
@@ -268,15 +296,15 @@ fn rust_frontend_agrees_with_every_spec_derived_expectation() {
     let mut honoured: BTreeSet<&str> = BTreeSet::new();
     let mut driven = 0usize;
     let mut skipped_validate = 0usize;
+    let runtime_ids = delegated_ids("runtime");
+    let validate_ids = delegated_ids("validate");
 
     for case in &cases {
-        if RUNTIME_SCOPE_IDS.contains(&case.id.as_str()) {
+        if runtime_ids.contains(&case.id) {
             continue;
         }
         if case.scope == "validate" {
-            // unlaxer-ubnf は構文解析だけを行い、独立した validator を持たない。
-            // Java の UbnfSpecCorpusTest が GrammarValidator で駆動する。
-            // overflow は generator の bounded_overflow テストでも構文受理・診断を検証する。
+            assert!(validate_ids.contains(&case.id), "{}: 未宣言の委譲", case.id);
             skipped_validate += 1;
             continue;
         }
@@ -331,7 +359,7 @@ fn rust_frontend_agrees_with_every_spec_derived_expectation() {
     }
 
     assert_eq!(
-        driven + skipped_validate + RUNTIME_SCOPE_IDS.len(),
+        driven + skipped_validate + runtime_ids.len(),
         cases.len(),
         "ケースの振り分けが合わない"
     );

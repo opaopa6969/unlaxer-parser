@@ -20,7 +20,7 @@ jobs:
           overwrite-settings: false
       - uses: ./.github/actions/maven-job-repository
       - name: Rust toolchain を既定を変更せずに準備
-        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt,clippy --no-self-update
       - name: Prepare required tests (source-edits)
         run: python3 scripts/verify-optin-tests.py source-edits --prepare
       - run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=SourceEditsTest,ProjectRenameTest,PlaygroundCommandTest -Dsurefire.failIfNoSpecifiedTests=false
