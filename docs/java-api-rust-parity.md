@@ -17,12 +17,15 @@
 python3 scripts/check-java-api-parity.py --list
 python3 scripts/check-java-api-parity.py
 python3 scripts/check-java-api-parity.py --write-doc
+python3 scripts/check-java-api-parity.py --remap --write-doc
 python3 -m pytest -q scripts/tests
 ```
 
 JSON の apis は監査済み宣言の固定一覧。--write-doc は未登録宣言を自動承認せず失敗する。
 新しい公開型・static overload、削除、signature 変更は実ソースとの集合比較で失敗する。
 line は現行ソースから表示し、宣言の移動だけでは API 変更としない。根拠は監査時のコード・既存テストであり、今回それらを再実行したという意味ではない。
+行を指す根拠は location と anchor（その行の先頭の宣言文字列。識別子の途中では切らない）を持ち、anchor がファイル内、scope があればその宣言の字下げブロック内で一意に一致する行を指していなければ失敗する。
+参照先の行の挿入・削除でずれたら --remap が anchor から行番号だけを付け替える。付け替え後の全検査（anchor が見つからない・複数行に一致する・形式が不正な根拠、schema、公開 API の一致）が一つでも失敗すれば JSON も Markdown も書き換えず失敗し、宣言の改名・削除は人が再監査する。
 
 ## 状態と追跡
 
