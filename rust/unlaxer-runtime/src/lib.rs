@@ -3490,6 +3490,8 @@ impl<'a> ParseContext<'a> {
                 | Expr::PredictiveChoice { .. }
                 | Expr::Recovery { .. }
                 | Expr::CatchLabels { .. }
+                | Expr::NameResolutionScope { .. }
+                | Expr::NamePredicate { .. }
         );
         let no_repeat_attempt = matches!(expression,
             Expr::Repeat { min, max: Some(max), .. } | Expr::JavaRepeat { min, max: Some(max), .. }
@@ -3500,7 +3502,11 @@ impl<'a> ParseContext<'a> {
                     || self.match_cursor_policy.non_ordered
                     || matches!(
                         expression,
-                        Expr::NonOrdered(_) | Expr::MatchOnly(_) | Expr::InvertMatch(_)
+                        Expr::NonOrdered(_)
+                            | Expr::MatchOnly(_)
+                            | Expr::InvertMatch(_)
+                            | Expr::NameResolutionScope { .. }
+                            | Expr::NamePredicate { .. }
                     ))
                 && self.match_cursor_policy.reset
                 && !matches!(
@@ -3747,22 +3753,21 @@ impl<'a> ParseContext<'a> {
                 // transaction rolls back. Resource failures keep full rollback.
                 if java_chain_disables_owner_reset(expression) {
                     self.match_cursor_policy.reset = false;
-                } else if self.token_mode.is_none()
-                    && matches!(
-                        expression,
-                        Expr::Rule(_)
-                            | Expr::TriviaScope { .. }
-                            | Expr::LexicalTriviaScope { .. }
-                            | Expr::LexicalContextScope { .. }
-                            | Expr::RuleEffects { .. }
-                            | Expr::CaptureEquality { .. }
-                            | Expr::Commit { .. }
-                            | Expr::Label { .. }
-                    )
-                {
+                } else if matches!(
+                    expression,
+                    Expr::Rule(_)
+                        | Expr::TriviaScope { .. }
+                        | Expr::LexicalTriviaScope { .. }
+                        | Expr::LexicalContextScope { .. }
+                        | Expr::RuleEffects { .. }
+                        | Expr::CaptureEquality { .. }
+                        | Expr::Commit { .. }
+                        | Expr::Label { .. }
+                ) {
                     // Rule references, lexical policies, rule effects (@scopeTree /
                     // @declares), @backref and Java Commit / Label call their child in the
-                    // owner's transaction: none of them begins a Java transaction.
+                    // owner's transaction in normal and Classic token modes: none
+                    // of them begins a Java transaction (#814).
                     self.match_cursor_policy.reset = failed_reset;
                 }
                 if self.token_mode.is_some()

@@ -315,6 +315,10 @@
     "809": {
       "state": "CLOSED",
       "title": "parity: 通常の経路で失敗した Chain の後、Java は resetMatchedWithConsumed を false のまま残し、Rust は呼び出し前の値に戻す（#794 後続）"
+    },
+    "814": {
+      "state": "OPEN",
+      "title": "parity: #809 の後続 — Java で frame を持つ NamePredicate / NameResolutionScope の成功経路と、Classic token mode の rule 参照後の owner reset"
     }
   },
   "entries": [
@@ -734,16 +738,24 @@
     {
       "id": "chain-failure-owner-reset",
       "category": "contract",
-      "title": "通常 Chain 失敗後の owner reset と後続 parser",
+      "title": "Chain と name frame の owner reset と後続 parser",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
+        814,
         809,
         794
       ],
-      "observation": "通常経路で失敗した Chain の owner reset=false を Rust でも保持する。ab の先読み後に生成 Root(a z) が失敗し、NonOrdered 内の LOOKAHEAD(b) を呼ぶと、旧 Rust は拒否 CP0/1、Java は成功 CP0/2。NEGATIVE_LOOKAHEAD / UNTIL / EMPTY・診断 CP・Unicode を共通 corpus で比較し、memo OFF と SAFE_FAILURES、両 Rust 生成 host・mapping grammar を検証する。通常・rule-local 空白・名前付き空白・lexical context・@scopeTree/@declares・@backref の6文法と手組みの COMMIT / LABEL で、透過 wrapper の lookup 正規化と失敗 policy 伝播も照合する。失敗 memo の実 hit と alias policy 再生、Choice / NonOrdered 候補隔離・明示 transaction rollback を固定。lexical context の反復呼出は Java Lexing.withContext が毎回 state epoch を更新するため failure hit 0、Rust は2、@backref は Rust の CaptureEquality が memo 対象外のため Java 2・Rust 0 となる既存の会計差を持つが、構文結果・cursor・診断・reset の期待値は共通。読み取り経路を README に列挙。resource failure の全復元、明示 transaction を持つ ParseContext::parse の契約と #197 の性能凍結は維持する。#809 は PR #813 で CLOSED。",
+      "observation": "通常経路で失敗した Chain の owner reset=false を Rust でも保持する。ab の先読み後に生成 Root(a z) が失敗し、NonOrdered 内の LOOKAHEAD(b) を呼ぶと、旧 Rust は拒否 CP0/1、Java は成功 CP0/2。NEGATIVE_LOOKAHEAD / UNTIL / EMPTY・診断 CP・Unicode を共通 corpus で比較し、memo OFF と SAFE_FAILURES、両 Rust 生成 host・mapping grammar を検証する。通常・rule-local 空白・名前付き空白・lexical context・@scopeTree/@declares・@backref の6文法と手組みの COMMIT / LABEL で、透過 wrapper の lookup 正規化と失敗 policy 伝播も照合する。失敗 memo の実 hit と alias policy 再生、Choice / NonOrdered 候補隔離・明示 transaction rollback を固定。lexical context の反復呼出は Java Lexing.withContext が毎回 state epoch を更新するため failure hit 0、Rust は2、@backref は Rust の CaptureEquality が memo 対象外のため Java 2・Rust 0 となる既存の会計差を持つが、構文結果・cursor・診断・reset の期待値は共通。読み取り経路を README に列挙。resource failure の全復元、明示 transaction を持つ ParseContext::parse の契約と #197 の性能凍結は維持する。#809 は PR #813 で CLOSED。#814 では生成 Java の NameResolutionScope / NamePredicate が Chain の外側で frame を持つことを確認し、Rust の成功後の reset 復元と開始時の matched 復元を揃える。Classic の rule 参照は生成 LazyChain の直接呼出に対応し、空白/字句・RuleEffects・CaptureEquality の透過 wrapper は外側 frame を足さないので token_mode にかかわらず失敗後の false を伝える。owner-reset.tsv の38行を生成 Java と両 Rust host の通常/mapping grammar で、memo OFF / SAFE_FAILURES × 診断3設定、初期 true/false、成功・構文失敗・名前種別拒否について比較する。predicate は外側 scope の終了前にも観測し、scope による不具合の隠蔽を防ぐ。Classic の同一 session 3回の failure hit 2回を両言語で確認。scope / predicate の transaction、Classic の token_mode 条件、scope の開始時復元の4変異で新テストが失敗する。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/cases.tsv",
+        "conformance/chain-reset-after-failure/owner-reset.tsv",
+        "conformance/chain-reset-after-failure/name-scope.ubnf",
+        "conformance/chain-reset-after-failure/name-scope-lookahead.ubnf",
+        "conformance/chain-reset-after-failure/name-predicate.ubnf",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NameScopeTokenModeResetConformanceTest.java",
+        "rust/unlaxer-runtime/tests/name_scope_token_mode_reset.rs",
+        "rust/unlaxer-runtime/tests/support/name_scope_token_mode_reset.rs",
         "conformance/chain-reset-after-failure/grammar.ubnf",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ChainResetAfterFailureConformanceTest.java",
         "rust/unlaxer-runtime/tests/chain_reset_after_failure.rs",
