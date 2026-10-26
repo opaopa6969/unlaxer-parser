@@ -1,0 +1,19 @@
+grammar NestedBoundary {
+    @package: nestedboundary
+    @whitespace: none
+    token N = NumberParser
+    @root @nestedCaptures @mapping(TextNode)
+    Root ::= ('a' 'z' | 'q') | N;
+    @nestedCaptures @mapping(IntegerNode)
+    Integer ::= (N | N) | 't';
+    Alias ::= Root;
+    OptionalRoot ::= [Root];
+    RepeatRoot ::= {Root};
+    IntegerAlias ::= Integer;
+    IntegerOptional ::= [Integer];
+    IntegerRepeat ::= {Integer};
+    @nestedCaptures @mapping(SingleNode)
+    Single ::= (('a' 'z' | 'q') | N);
+    @nestedCaptures @mapping(SingleIntegerNode)
+    SingleInteger ::= ((N | N) | 't');
+}

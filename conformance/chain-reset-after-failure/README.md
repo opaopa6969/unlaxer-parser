@@ -158,7 +158,7 @@ Java-host / native × 通常 / mapping grammar の Rust の1344観測を照合�
   `__CaptureSite` は子が Choice でも Chain なので、候補を単独で呼ぶと Java は失敗後 reset=false、
   Rust は子の Choice が復元した値（初期 true なら true）を返す（PR #821 のレビューで実測）。
   生成位置は必ず外側 Choice の候補で、Choice は Java の frame として成否どちらでも終了時に入口の policy を復元するため、
-  Root 全体の結果は両言語で一致する。この8行は Root 全体だけを照合し、候補単独の差は #823 で扱う。
+  Root 全体の結果は両言語で一致する。この8行は Root 全体だけを照合し、候補単独の差は下記 #823 の調査結果に記録する。
   値投影（`@nestedCaptures` なし）の mixed 候補の TextValue には Java の parser がない（`MixedParser` の候補は `WordParser`）ため、
   Rust で TextValue を一律に Chain 扱いにすることはできない。
 
@@ -208,3 +208,103 @@ SAFE_FAILURES の既存 lookup 正規化における透過 wrapper の確認、n
 #814 の成功経路は既存の `parent_policy` と `java_transaction` を再利用する scalar の保存/復元だけで、
 entry field・cache・allocation は追加しない。
 性能改善・JMH の再計測は行わない。公開済み3.3.0は変更しない。
+
+## nested mixed 候補と外部経路の調査 (#823)
+
+**結論:** 候補単独の owner reset 差は既知の内部差として残す。今回調べた生成文法の外部経路では、
+その候補に Java 相当の Chain 境界を加えても観測は変わらなかった。runtime / IR / 公開型の変更はしない。
+ただし、**Java / Rust の診断位置と memo hit がすべて一致したという意味ではない**。
+調査で見つかった別の差は #826 / #827 と差分表で追跡する。
+
+### lowering と frame の根拠
+
+- `rust/unlaxer-generator/src/lowering.rs` の `body()` は、nested rule かつ
+  `nested_captures::body_shape == Kind::Value` のときだけ mixed 候補を包む。
+  Text は `TextValue`、Integer は `ValueBoundary`、それ以外はそのまま。
+  **候補数が2以上なら必ず Choice を残す。** Group は `atomic()` から同じ `body()` に戻る。
+- 候補が1つなら Choice を省く分岐自体はある。しかし1要素の候補が Text / Integer なら body の型も
+  同じで `mixed_nested=false`。Value なら候補も Value で wrapper の腕へ入らない。
+  複数要素の単一候補は `body_shape_in()` により Text（node/container/value を含めると拒否）なので
+  やはり mixed にならない。`Single` / `SingleInteger` は単一候補の括弧を重ねた実生成例で、
+  `Sequence([Choice(...)])` となり、内側の mixed Choice が残ることを両言語で検査する。
+- `@longestChoice` / `@uniqueLongestChoice` / `@predictiveChoice` の変換も候補リストを保持する Choice 系
+  expression への置換であり、候補を単独で外へ出さない。これらも runtime の `java_transaction` 対象。
+  この3 profile の実行掃引は今回の corpus の対象外で、ここは lowering の静的確認である。
+- `project_text_values()` は Choice 系の候補か Capture の子に値投影 wrapper を加える。
+  `project_helper_value()` が追加する本体直下の ValueBoundary は値投影であり、nested 候補境界とは別物。
+  Java の `CaptureBindingPlan.markNestedMixed()` も Choice の Text / Integer 候補へ binding を付ける。
+  `ParserRuleEmitter` はそれを `__CaptureSite extends LazyChain` にする。
+- Java `ChoiceInterface.parse()` は候補ごとに `begin` し、成功時 commit、失敗時 rollback で owner に戻る。
+  Chain が変更した reset は候補の owner に閉じる。Rust の Choice 系は候補失敗時と終了時の復元を持つ。
+  rule 参照や外側 Optional / Repeat / NonOrdered / MatchOnly はこの内側 Choice を取り除かない。
+
+### 実行した外部経路と oracle
+
+`nested-boundary.ubnf` の Root は `('a' 'z' | 'q') | N`、Integer は `(N | N) | 't'`。
+両方の第1候補の子は Chain でない Choice で、Integer 側は実際に `Kind::Integer` の ValueBoundary になる。
+Java の対応候補はどちらも `__CaptureSite(LazyChoice)`。ソースの文字列だけでなく、生成 parser の型も確認する。
+
+`nested-boundary-inputs.tsv` の40行を、通常 / Classic × 初期 reset false/true × memo OFF/SAFE_FAILURES
+× 診断3設定で実行する。失敗は同じ context で3回呼び、毎回の成否・cursor・reset の不変を確認する。
+成功は消費位置を巻き戻さず1回で観測するため、成功 memo hit の強制再生は対象外。
+生成 Java の実測960行が `nested-boundary.tsv`。Rust は Java-host / native × 通常 / mapping grammar の
+3840行を検証し、さらに各生成グラフの Chain 対照実験3840行も照合する。
+
+- Root 全体（Java の `getRootParser()`）、Integer 全体、生成 alias rule。
+- 生成 Optional / Repeat の中から mixed rule を参照する経路。
+- 生成 mixed rule を外側の runtime NonOrdered / MatchOnly（LOOKAHEAD）/ Choice へ渡す経路。
+  NonOrdered と任意 rule の MatchOnly には対応する UBNF 構文がないため、ここだけ外側を手組みする。
+  候補を本体へ移した合成 rule は使わない。Rust の Custom は同じ grammar session を保持する観測 driver。
+- 単一候補の group、空入力、Unicode `a😀b`、数値・text 成功、途中失敗。
+- 同じ context の後続 `NonOrdered(LOOKAHEAD('b'))` と失敗する `NonOrdered(LOOKAHEAD('x'))`。
+  成否、consumed/matched CP、reset、最遠診断 CP、failure/success memo hit を採取する。
+
+`NestedCandidateBoundaryConformanceTest` は両 host の生成物全ファイルの一致も確認して個別に compile/実行する。
+生成ソースと観測 TSV は `unlaxer-dsl/target/nested-boundary-*` に残る。
+CI と `.github/optin-test-contracts.json` に2メソッドを登録している。
+
+### 対照実験と内部差
+
+テスト専用 `report_control()` は4つの nested rule にある8つの候補境界について、
+`TextValue(child)` / `ValueBoundary(child)` の child を `Sequence([child])` にする。
+Java の Chain の owner reset 動作を与えるだけの対照であり、CST / mapper の変更案ではない。
+候補が Choice 直下にあることと変換個数を assert し、元の生成グラフを別に実行する。
+外部観測は変換の前後で全項目一致する（下記の既存差も変わらない）。
+
+対照実験が空振りでないことは、生成候補を単独で呼ぶ検査で確かめる。
+Root / Integer の第1候補、`ab`、先行 `LOOKAHEAD('a')`、初期 reset=true のとき、
+通常 / Classic × memo 2設定 × 診断3設定で次の結果になる。
+
+| 観測 | 生成 Java | 生成 Rust | Chain 対照の Rust |
+| --- | --- | --- | --- |
+| 候補単独の失敗後 | reset=false、CP0/1 | reset=true、CP0/1 | reset=false、CP0/1 |
+| 後続 LOOKAHEAD(b) | 成功、CP0/2 | 失敗、CP0/1 | 成功、CP0/2 |
+
+外側の復元に対する負の対照も、隔離した runtime コピーで実行した。
+`java_transaction` から Choice を外す mutation は `Root-success`（通常・初期 true）で
+外部観測の reset が true → false となり、共通 oracle との比較が失敗する。
+元の runtime は変更していない。nested の Chain 付与は挙動修正として採用していないため、
+その付与を外して外部 corpus が落ちるとは主張しない。
+
+この内部差を `nested-candidate-internal-reset` として parity 台帳に残す。
+候補単独の一致や任意の手組み IR での一致は主張しない。
+値投影 TextValue の一律 Chain 化は Java に対応 parser がない経路を変えるため採用しない。
+
+### 別に見つかった診断・memo 差
+
+`nested-boundary-differences.tsv` は190行の**全行キー付きの明示差分**であり、
+Java oracle の該当値も照合してから Rust の3列だけに適用する。他の列や行を除外しない。
+通常 / mapping、両 host、Chain 対照に同じ値を要求する。PBT の known-differences は変更しない。
+
+- **#826 診断位置:** Root に `azb`、先行 `a`、通常、初期 reset=false の成功直後は Java CP2 / Rust CP0。
+  Integer を NonOrdered 内で `ab`、先行 `a`、初期 false で失敗させると CP1 / CP0 の差もある。
+  また成功後に後続先読みを行うと、最終 matched より前の CP に Rust の診断が残るケースがある。
+  DETAILED_ON_FAILURE の低水準入口は記録を遅延するため双方 CP0。詳細は #826 で追跡する。
+- **#827 memo 会計:** Integer などの生成 Java rule/group/__CaptureSite は安全 marker がなく、
+  failure hit 0。一方 Rust は rule 全体を cache し、3回呼出で2 hit するケースがある。
+  Root の text group は Java でも安全 marker を持つので、多くの経路で2 hit となるが、
+  空入力や MatchOnly 経由では0/2が残る。cache の単位まで同じとは主張しない。
+
+これらは候補への Chain 追加で変わらないため、#823 の owner reset 修正で解決したことにしない。
+本 PR は調査・回帰検証・台帳のみ。挙動を変えないので CHANGELOG / migration は追加せず、
+#197 に従いホットパスを変更せず、性能再計測もしない。

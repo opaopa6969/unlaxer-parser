@@ -323,6 +323,18 @@
     "820": {
       "state": "OPEN",
       "title": "parity: ValueBoundary / TextValue の rule 本体が失敗した後の owner reset を Java と照合する（#814 後続）"
+    },
+    "823": {
+      "state": "OPEN",
+      "title": "nested mixed 候補の非 Chain 子と __CaptureSite の owner reset 内部差"
+    },
+    "826": {
+      "state": "OPEN",
+      "title": "nested mixed grammar と後続 MatchOnly の診断位置差"
+    },
+    "827": {
+      "state": "OPEN",
+      "title": "nested mixed rule の failure memo hit 会計差"
     }
   },
   "entries": [
@@ -773,6 +785,64 @@
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ValueBoundaryResetConformanceTest.java",
         "rust/unlaxer-runtime/tests/value_boundary_reset.rs",
         "rust/unlaxer-runtime/tests/support/value_boundary_reset.rs"
+      ]
+    },
+    {
+      "id": "nested-candidate-internal-reset",
+      "category": "contract",
+      "title": "nested mixed 候補単独の既知内部差と外側 Choice の復元",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        823
+      ],
+      "observation": "生成 Java の __CaptureSite は LazyChain、Rust の nested TextValue / ValueBoundary は透過。子が Choice の候補を単独で呼ぶと ab・先行 LOOKAHEAD(a)・初期 reset=true で Java は失敗後 false、Rust は true。後続 NonOrdered(LOOKAHEAD(b)) も成功/失敗に分かれる。lowering の単一候補省略では Text/Integer の mixed 境界を生成できず、候補は Choice 内に残る。40入力経路×通常/Classic×初期reset×memo2×診断3のJava960観測を両Rust host・通常/mapping grammarで比較。外部からの成否・両cursor・reset・後続成否は一致。nested候補だけにSequenceを付ける対照は、候補単独の差を消す一方、外部観測全項目を変えない。runtime/IRは変更せず内部差を記録する。診断位置とmemo hitの別の残差は#826/#827と別項目で追跡し、全面一致を主張しない。",
+      "evidence": [
+        "conformance/chain-reset-after-failure/README.md",
+        "conformance/chain-reset-after-failure/nested-boundary.ubnf",
+        "conformance/chain-reset-after-failure/nested-boundary-inputs.tsv",
+        "conformance/chain-reset-after-failure/nested-boundary.tsv",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NestedCandidateBoundaryConformanceTest.java",
+        "rust/unlaxer-runtime/tests/support/nested_candidate_boundary.rs"
+      ]
+    },
+    {
+      "id": "nested-boundary-diagnostics",
+      "category": "unresolved",
+      "title": "nested mixed rule と後続先読みの診断位置",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        826,
+        823
+      ],
+      "observation": "nested-boundary-differences.tsv にJava実測oracleからの3列差分を全行キー付きで明示。Root成功入力azb・先行a・通常・初期falseの最遠CPはJava2/Rust0。IntegerをNonOrdered内でab・先行a・初期falseにより失敗させるとCP1/0。成功後のNonOrdered(LOOKAHEAD(b))→NonOrdered(LOOKAHEAD(x))でJavaの最終matched CPにRustの診断が届かない例もある。両host・通常/mapping・memo/診断設定を検証し、nested候補のChain対照でも変化しない。#823のowner resetとは分離して#826で追跡する。",
+      "evidence": [
+        "conformance/chain-reset-after-failure/README.md",
+        "conformance/chain-reset-after-failure/nested-boundary.ubnf",
+        "conformance/chain-reset-after-failure/nested-boundary-inputs.tsv",
+        "conformance/chain-reset-after-failure/nested-boundary.tsv",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NestedCandidateBoundaryConformanceTest.java",
+        "rust/unlaxer-runtime/tests/support/nested_candidate_boundary.rs",
+        "conformance/chain-reset-after-failure/nested-boundary-differences.tsv"
+      ]
+    },
+    {
+      "id": "nested-boundary-memo-accounting",
+      "category": "unresolved",
+      "title": "nested mixed rule の failure memo hit 会計",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        827,
+        823
+      ],
+      "observation": "Integer ::= (N | N) | t をab・先行LOOKAHEAD(a)で同一contextから3回呼ぶとSAFE_FAILURESでJava failure hit0/Rust2。Java生成rule/group/__CaptureSiteの安全markerとRustのrule単位cache対象が異なり、候補のChain対照でも差は変わらない。Rootのtext groupはJavaでも安全markerがあり多くの経路で2だが、空入力やMatchOnly経由は0/2。両hostと通常/mapping grammarで生のhit数を固定し、成否/cursor/resetを除外しない。意図した契約として採用するかの判断を含め#827で追跡する。",
+      "evidence": [
+        "conformance/chain-reset-after-failure/README.md",
+        "conformance/chain-reset-after-failure/nested-boundary.ubnf",
+        "conformance/chain-reset-after-failure/nested-boundary-inputs.tsv",
+        "conformance/chain-reset-after-failure/nested-boundary.tsv",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NestedCandidateBoundaryConformanceTest.java",
+        "rust/unlaxer-runtime/tests/support/nested_candidate_boundary.rs",
+        "conformance/chain-reset-after-failure/nested-boundary-differences.tsv"
       ]
     },
     {
@@ -1248,6 +1318,21 @@
     }
   ],
   "corpora": [
+    {
+      "path": "conformance/chain-reset-after-failure/nested-boundary-differences.tsv",
+      "fields": {
+        "javaDiagnosticCP": 1,
+        "javaFailureHits": 1,
+        "javaFollowerDiagnosticCP": 1,
+        "rustDiagnosticCP": 1,
+        "rustFailureHits": 1,
+        "rustFollowerDiagnosticCP": 1
+      },
+      "entries": [
+        "nested-boundary-diagnostics",
+        "nested-boundary-memo-accounting"
+      ]
+    },
     {
       "path": "conformance/memo-reset-policy/cases.tsv",
       "fields": {
