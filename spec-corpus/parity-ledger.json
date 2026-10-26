@@ -16,7 +16,8 @@
     "host別corpusの値の一致/差と未対応の意味分類は人が監査する。検査は新しいファイル/キー/出現数と台帳参照の欠落を落とすが、任意の新規skip条件や文書の意味を自動分類しない。",
     "2026-10-26 #784: 条件付き除外の宣言・元corpus・実行記録を照合する検査を追加。共通scopeの新規case/driver削除はmutation検査で検知する。root/診断優先順位に跨る16件の差は#833/#834/#835へ分離し、性能作業は行わない。",
     "2026-10-27 #833/#834/#835: spec corpusの診断差16件を両Rust hostで修正し契約へ移した（issueは本PRのmerge待ちでOPEN）。#784の実行先・独立期待値を維持し、rootあり/なしと複数不正の順序を追加検証する。 前提の#784（PR #836）・#825（PR #831）はmerge済み/CLOSEDを確認した。",
-    "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。"
+    "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。",
+    "2026-10-27 #861: Choice/PredictiveChoiceのFIRST判定を候補beginによるmatched reset後と同じ位置へ揃え、Java専用deferred例外30行を削除。公開runtimeの共通cursor/capture回帰を追加。機能や全体の対応宣言は増やさず、CI/mergeまでissueはOPENのまま維持する。"
   ],
   "issues": {
     "111": {
@@ -1541,16 +1542,19 @@
     },
     {
       "id": "java-first-exclusion-reset",
-      "category": "unresolved",
-      "title": "Java Choice の FIRST 除外が reset 前の cursor を読む",
-      "hosts": "Java Classic（DETAILED_ON_FAILURE） / Rust Classic",
+      "category": "contract",
+      "title": "Choice候補のFIRST判定とbegin後cursorの一致",
+      "hosts": "Java / Rust Classic",
       "issues": [
         861,
         848
       ],
-      "observation": "Java ChoiceInterfaceは候補のbegin前のcursorでlookaheadを取り、親のresetMatchedWithConsumed=trueでbeginがmatchedをconsumedへ戻すと、実際に読む位置と除外判定の位置がずれる。DETAILED_ON_FAILUREだけで成功する候補が除かれ受理が変わる（x LF、C=1/M=2/reset=true/matchOnlyの行終端はDETAILEDで成功、DETAILED_ON_FAILUREで失敗。除外を無効にすると成功）。Rust Classicはtoken modeで除外せずJava DETAILEDと同じ結果。line-boundaryのcases.tsvのjava-deferred-defect列30行がJavaの現状値をJava側だけの期待値として固定し、Rustは主の期待値へ照合する。#861の修正時に列を除く。",
+      "observation": "ChoiceとPredictiveChoiceの候補判定は、親reset=trueならconsumed、それ以外は指定kindのcursorを読む。実parserのkindは保持し、除外だけのtransactionは追加しない。全診断policyで受理・両cursor・選択・原CSTが一致する。line-boundaryの旧Java専用deferred例外30行を削除し、1088行を両版の主の期待値で照合する。後続nullable候補への誤選択はchoice-cursorのASCII/非BMP/複数CP共通corpusで固定する。issue861はCI/mergeまで継続。",
       "evidence": [
-        "conformance/line-boundary/README.md",
+        "conformance/choice-cursor/README.md",
+        "conformance/choice-cursor/predictive.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/ChoiceCursorExclusionTest.java",
+        "rust/unlaxer-runtime/tests/choice_cursor.rs",
         "conformance/line-boundary/cases.tsv",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
         "conformance/line-boundary/probe.rs"
@@ -1564,7 +1568,7 @@
       "issues": [
         848
       ],
-      "observation": "StartOfLine/StartOfSourceはtokenを作らず4kindの参照cursorを検査するCustom adapterで語彙BOL/BOFと接続する。LineTerminator/EndOfLineはChoice/Literal/Eofをそのまま使い、診断モードで分岐するadapterは置かない。DETAILED_ON_FAILUREだけに出るJavaのFIRST除外の欠陥（#861）はRustへ移植しない。既存runtimeへ処理を追加せず、全ケースを独立oracleへ照合。",
+      "observation": "StartOfLine/StartOfSourceはtokenを作らず4kindの参照cursorを検査するCustom adapterで語彙BOL/BOFと接続する。LineTerminator/EndOfLineはChoice/Literal/Eofをそのまま使い、診断モードで分岐するadapterは置かない。JavaのFIRST除外は#861で候補begin後と同じ位置へ修正し、診断modeで分岐しない主oracleを両版で照合する。既存runtimeへ処理を追加せず、全ケースを独立oracleへ照合。",
       "evidence": [
         "conformance/line-boundary/README.md",
         "conformance/line-boundary/cases.tsv",
@@ -2110,15 +2114,6 @@
       },
       "entries": [
         "line-boundary-composition"
-      ]
-    },
-    {
-      "path": "conformance/line-boundary/cases.tsv",
-      "fields": {
-        "java-deferred-defect": 1
-      },
-      "entries": [
-        "java-first-exclusion-reset"
       ]
     }
   ],

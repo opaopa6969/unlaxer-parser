@@ -752,7 +752,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 ### line-terminator
 
-**対応済み（記載した共通契約）**。LineTerminatorParser / EndOfLineParserのCRLF→CR→LF→EOFの順序、Classicの4kind/invert、両cursor/reset、原CST/reduced CST、失敗CP、isEndOfSourceとstatic構築経路を独立corpusで比較する。memo OFF/SAFE_FAILURESと診断3モード、choice敗者・先読み・外側失敗後の再試行も比較。DETAILED_ON_FAILUREだけに出るJava FIRST候補除外の欠陥（reset前のcursorを読む、#861）はRustへ移植せず、Javaの現状値30行をcases.tsvの別列に分けて固定する。既存runtimeの成功経路は変更しない。
+**対応済み（記載した共通契約）**。LineTerminatorParser / EndOfLineParserのCRLF→CR→LF→EOFの順序、Classicの4kind/invert、両cursor/reset、原CST/reduced CST、失敗CP、isEndOfSourceとstatic構築経路を独立corpusで比較する。memo OFF/SAFE_FAILURESと診断3モード、choice敗者・先読み・外側失敗後の再試行も比較。候補begin前のresetを反映しないJava FIRST除外は#861で修正し、旧Java専用例外30行を除いて全診断modeを主の共通oracleへ照合する。Rustは既存の正しいClassic経路を維持する。
 
 利用経路: `Expr::choice([Literal("\r\n"), Literal("\r"), Literal("\n"), Eof])`。`probe.rs::line_end` をそのまま使い、診断モードで分岐するadapterは置かない。既存の語彙EOLは非消費の別契約としてlexical.tsvで比較する。
 
@@ -1045,7 +1045,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 | [`parser.combinator.Choice`](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Choice.java#L12) | type | 対応あり・全API共通検証なし | [core-combinators](#core-combinators) |
 | [`parser.combinator.ChoiceCommitAction`](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7) | type | 未対応（記載した動作） | [selected-choice](#selected-choice) |
 | [`parser.combinator.ChoiceInterface`](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14) | type | 対応あり・全API共通検証なし | [core-combinators](#core-combinators) |
-| [`parser.combinator.ChoiceInterface#choiced(Token)`](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L68) | static | 対応あり・全API共通検証なし | [core-combinators](#core-combinators) |
+| [`parser.combinator.ChoiceInterface#choiced(Token)`](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L71) | static | 対応あり・全API共通検証なし | [core-combinators](#core-combinators) |
 | [`parser.combinator.ChoicePredictor`](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java#L9) | type | 対応あり・全API共通検証なし | [core-combinators](#core-combinators) |
 | [`parser.combinator.ChoicePredictor#any()`](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java#L15) | static | 対応あり・全API共通検証なし | [core-combinators](#core-combinators) |
 | [`parser.combinator.ChoicePredictor#anyOf(ChoicePredictor[])`](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java#L25) | static | 対応あり・全API共通検証なし | [core-combinators](#core-combinators) |

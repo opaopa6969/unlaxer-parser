@@ -73,6 +73,8 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- Java の Choice / PredictiveChoice は候補の開始時に適用される matched cursor の reset を先読み判定にも反映する。診断方針による受理差と nullable 候補の誤選択を修正し、Java/Rust の共通入力で検証した (#861)。
+
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
 - Rust の token-stream / lexical-context 文法の非空 literal の Classic 反転を Java の幅0 assertion に揃え、EOF・lexical goal・先読み後の cursor・CST・失敗位置を両 Rust host の共通 corpus で固定した (#768)。同じ区別により、これらの文法では Classic の非反転照合も lexical goal を通し、optional / repeat 内の literal の失敗で matched cursor を戻さず、token trace の label が `LexicalTokenParser` になる。Java の既存挙動は変更しない。
 - 量指定子 `{n}` / `{n,m}` / `{n,}` の整数 overflow を Java / Java-host Rust / native Rust の検証・生成で `E-BOUNDED-OVERFLOW` と元ソース CP 範囲として報告し、公開済み AST の整数型 API を維持した。境界値・非 BMP・未使用/ゼロ回反復を共通 fixture で検証し、仕様 corpus の既知差を削除 (#783)。
