@@ -2,6 +2,9 @@ package org.unlaxer.dsl;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertThrows;
+import static org.unlaxer.dsl.codegen.rust.GrammarIR.*;
+import java.util.List;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -43,6 +46,16 @@ public class RustNativeEmitterTest {
             """);
     }
 
+    private static GrammarIR sharedIr() {
+        var mapping = new Mapping("Value", List.of(new Field("value", Kind.TEXT, Cardinality.ONE)));
+        return new GrammarIR(List.of(
+            new GrammarIR.Rule("Root", new Choice(List.of(new Reference(1), new Reference(2))), null, null, null),
+            new GrammarIR.Rule("Left", new Sequence(List.of(new Capture("value", new Literal("a")))), mapping,
+                new Operator(Associativity.NONE, 20), null),
+            new GrammarIR.Rule("Right", new Sequence(List.of(new Capture("value", new Literal("b")))), mapping,
+                new Operator(Associativity.NONE, 10), null)), 0, true);
+    }
+
     private void compare(String fixture, String source) throws Exception {
         Path output = temporary.newFolder(fixture).toPath();
         Path log = output.resolve("cargo.log");
@@ -56,7 +69,9 @@ public class RustNativeEmitterTest {
         assertEquals(Files.readString(log), 0, process.exitValue());
         var grammar = UBNFMapper.parse(source).grammars().get(0);
         var backend = new RustBackend();
-        var ir = RustGrammarLowering.lower(grammar);
+        // Raw IR metadata need not be legal source annotations. Keep the original
+        // invalid UBNF below and assert rejection by both full lowering paths.
+        var ir = fixture.equals("shared") ? sharedIr() : RustGrammarLowering.lower(grammar);
         // The handwritten Rust fixture contains normalized IR, without source annotations.
         // Compare the same layer; preferred mapping and other source-derived APIs are
         // checked byte-for-byte below against the native UBNF frontend as well.
@@ -66,7 +81,8 @@ public class RustNativeEmitterTest {
             assertEquals(fixture + "/IR/" + module + ".rs", emitter.invoke(backend, ir),
                 Files.readString(output.resolve(module + ".rs"), StandardCharsets.UTF_8));
         }
-        assertEquals(backend.generate(grammar).get(0).content(), Files.readString(output.resolve("mod.rs")));
+        if (!fixture.equals("shared"))
+            assertEquals(backend.generate(grammar).get(0).content(), Files.readString(output.resolve("mod.rs")));
 
         Path input = temporary.newFile(fixture + ".ubnf").toPath();
         Files.writeString(input, source);
@@ -85,6 +101,10 @@ public class RustNativeEmitterTest {
             var issues = org.unlaxer.dsl.codegen.GrammarValidator.validateWithoutClassLoading(grammar);
             assertTrue(issues.toString(), issues.stream().anyMatch(issue ->
                 issue.code().equals("E-PRECEDENCE-NO-ASSOC")));
+            for (String message : List.of(
+                    assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(grammar)).getMessage(),
+                    assertThrows(IllegalArgumentException.class, () -> backend.generate(grammar)).getMessage()))
+                assertTrue(message, message.startsWith("E-PRECEDENCE-NO-ASSOC:"));
             assertEquals(Files.readString(fullLog), 3, nativeProcess.exitValue());
             assertTrue(Files.readString(fullLog).contains("associativity and @precedence must occur together"));
             try (var files = Files.list(fullOutput)) { assertEquals(0, files.count()); }

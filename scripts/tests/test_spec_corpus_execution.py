@@ -112,7 +112,8 @@ class SpecCorpusExecutionTest(unittest.TestCase):
         self.assertIn("未実行/過剰な corpus driver", errors)
 
     def test_known_difference_requires_open_issue_and_ledger(self):
-        self.data["cases"][0]["difference"]["issue"] = 999999
+        self.data["cases"][0]["difference"] = dict(ledger="spec-validation-root", issue=999999,
+                                                  native="old", **{"java-host": "old"})
         self.assertIn("既知差の台帳/OPEN issue が無い", self.errors())
 
     def test_frontend_cannot_restore_its_private_exclusion_list(self):
@@ -126,7 +127,7 @@ class SpecCorpusExecutionTest(unittest.TestCase):
             ("native-validate", "quantifier/reversed-bounds"): lambda r: r["observed"].__setitem__(0, "E-BOUNDED-WRONG: x"),
             ("java-host-validate", "quantifier/huge-bound"): lambda r: r["observed"].__setitem__(1, "E-BOUNDED-OVERFLOW: x at CP 0..1"),
             ("java-validate", "quantifier/reversed-bounds"): lambda r: r["observed"].pop(),
-            ("native-validate", "annotation/assoc-both"): lambda r: r["observed"].__setitem__(0, "E-ASSOC-BOTH: fixed"),
+            ("native-validate", "annotation/assoc-both"): lambda r: r["observed"].__setitem__(0, "duplicate/conflicting associativity on R"),
             ("native-runtime", "separator/expansion"): lambda r: r["observed"][3]["prefix"].__setitem__(1, 3),
             ("java-runtime", "error/hint-is-last-alternative"): lambda r: r["observed"][0].__setitem__("diagnostic", None),
             ("java-host-runtime", "char-range/inclusive-bounds"): lambda r: r["observed"].pop(),
@@ -144,7 +145,7 @@ class SpecCorpusExecutionTest(unittest.TestCase):
         self.assertIn("台帳 spec-validation-annotation の列挙 ID と manifest の既知差が不一致", self.errors())
 
     def test_resolved_known_differences_cannot_leave_the_ledger_entry_unresolved(self):
-        for row in self.data["cases"]:
-            if row.get("difference", {}).get("ledger") == "spec-validation-root":
-                del row["difference"]
+        ledger = execution.read(self.root / "spec-corpus/parity-ledger.json")
+        next(e for e in ledger["entries"] if e["id"] == "spec-validation-root")["category"] = "unresolved"
+        self.save("spec-corpus/parity-ledger.json", ledger)
         self.assertIn("既知差の無い未修正項目が台帳に残る: spec-validation-root", self.errors())
