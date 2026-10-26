@@ -58,7 +58,7 @@ skipped root の内部に mapped 子があっても、候補として再発見�
 - Java の IR は既存 5 引数の `Rule` constructor を保持する。skip を省略した場合は `false`。
 - skipped mapping は共有 AST schema の統合や生成 method 名の衝突判定には参加しない。一方、参照先、capture と mapping params の整合性、非消費ループなどの文法検証は省かない。
 - text は既存 mapper の字句変換契約に従う。任意の String field に独立した span field を追加する変更ではない。source span は CST/capture と source-preserving AST の既存 API で保持する。
-- `@skip` は未対応の組合せや未知 annotation の検証を省略しない。`@enum`・`@eval` 自体は後続で対応済みであり、現在の未対応例には数えない。未知 Simple annotation の Java/Rust 受理差は #715、nested owner との未対応組合せは #694 等で追跡する（[台帳](parity-ledger.md)）。
+- `@skip` は未対応の組合せや未知 annotation の検証を省略しない。`@enum`・`@eval` 自体は後続で対応済みであり、現在の未対応例には数えない。未知 Simple annotation は #715 で Java と Rust が同じく受け付けて無視し、`W-ANNOTATION-IGNORED` を出すようになった（[Simple annotation](simple-annotations.md)）。nested owner との未対応組合せは #694 等で追跡する（[台帳](parity-ledger.md)）。
 
 ## 検証
 
