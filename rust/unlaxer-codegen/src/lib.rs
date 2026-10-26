@@ -534,6 +534,7 @@ fn expression(expr: &Expression) -> String {
             format_expression(expr, &child, &alternative)
         }
         Literal(_)
+        | LexicalLiteral(_)
         | EmptyWordToken
         | ErrorExpected(_)
         | NumberToken
