@@ -49,6 +49,45 @@ fn all_declared_syntax_and_self_hosting_grammar_parse_without_java() {
 }
 
 #[test]
+fn bounded_quantifier_trivia_keeps_values_and_source_spans() {
+    let fixture = include_str!("fixtures/positive/quantifier-whitespace.ubnf");
+    let expected = [
+        ("Exact", 2, Some(2)),
+        ("BeforeComma", 2, Some(3)),
+        ("BeforeClose", 2, Some(3)),
+        ("AfterComma", 2, Some(3)),
+        ("AllSpaces", 2, Some(3)),
+        ("Open", 2, None),
+        ("ExactComments", 2, Some(2)),
+        ("RangeComments", 2, Some(3)),
+        ("OpenComments", 2, None),
+        ("LineBreaks", 2, Some(3)),
+        ("Whitespace", 2, Some(3)),
+        ("MultipleDigits", 10, Some(12)),
+    ];
+    for source in [fixture.to_owned(), fixture.replace('\n', "\r\n")] {
+        let ast = parse(&source).unwrap();
+        let rules = &ast.grammars[0].rules;
+        assert_eq!(rules.len(), expected.len());
+        for (rule, (name, expected_min, expected_max)) in rules.iter().zip(expected) {
+            assert_eq!(rule.name, name);
+            let repeat = &rule.body.alternatives[0].elements[0].element;
+            let ElementKind::BoundedRepeat { min, max, .. } = &repeat.kind else {
+                panic!("{name}: {:?}", repeat.kind);
+            };
+            assert_eq!((*min, *max), (expected_min, expected_max), "{name}");
+            let rule_start = source.find(&format!("{name} ::=")).unwrap();
+            let start = rule_start + source[rule_start..].find("'x'").unwrap();
+            let end = start + source[start..].find(';').unwrap();
+            assert_eq!(repeat.span.byte_start, start, "{name}");
+            assert_eq!(repeat.span.byte_end, end, "{name}");
+            assert_eq!(repeat.span.codepoint_start, source[..start].chars().count());
+            assert_eq!(repeat.span.codepoint_end, source[..end].chars().count());
+        }
+    }
+}
+
+#[test]
 fn owned_values_and_all_token_kinds_are_preserved() {
     let source = include_str!("fixtures/positive/all-tokens.ubnf").to_owned();
     let ast = parse(&source).unwrap();

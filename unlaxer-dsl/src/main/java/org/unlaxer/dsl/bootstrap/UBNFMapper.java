@@ -1122,23 +1122,12 @@ public class UBNFMapper {
      * Handles: {n}  {n,m}  {n,}
      */
     private BoundedRepeatElement parseBoundedRepeat(Token boundedToken, AtomicElement baseElement, Token baseToken) {
-        // Collect all DigitParser groups in the bounded token.
-        // BoundedQuantifierParser structure: '{' OneOrMore(Digit) [CommaParser [OneOrMore(Digit)?]] '}'
-        // We extract the digit runs as strings by scanning children.
-        String raw = boundedToken.source.sourceAsString().trim(); // e.g. "{2}" or "{1,3}" or "{2,}"
-        // Strip braces
-        String inner = raw.substring(1, raw.length() - 1).trim(); // "2" or "1,3" or "2,"
-        int commaIdx = inner.indexOf(',');
-        int min, max;
-        if (commaIdx < 0) {
-            // {n}
-            min = BoundedQuantifiers.bound(inner.trim());
-            max = min;
-        } else {
-            min = BoundedQuantifiers.bound(inner.substring(0, commaIdx).trim());
-            String maxStr = inner.substring(commaIdx + 1).trim();
-            max = maxStr.isEmpty() ? BoundedRepeatElement.UNBOUNDED : BoundedQuantifiers.bound(maxStr);
-        }
+        // Read recognized digit runs, never trivia (which may itself contain digits or commas).
+        List<Token> numbers = findDescendants(boundedToken, org.unlaxer.parser.combinator.OneOrMore.class);
+        int min = BoundedQuantifiers.bound(numbers.get(0).source.toString());
+        boolean hasComma = !findDescendants(boundedToken, org.unlaxer.parser.posix.CommaParser.class).isEmpty();
+        int max = numbers.size() > 1 ? BoundedQuantifiers.bound(numbers.get(1).source.toString())
+            : hasComma ? BoundedRepeatElement.UNBOUNDED : min;
         var repeat = extend(new BoundedRepeatElement(baseElement, min, max), baseElement, boundedToken);
         if (BoundedQuantifiers.overflow(repeat)) {
             // Only invalid bounds need extra origins on the position-free parse path.

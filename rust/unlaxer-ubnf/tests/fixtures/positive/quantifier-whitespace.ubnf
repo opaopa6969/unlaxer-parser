@@ -1,0 +1,28 @@
+// #818: UBNF trivia between tokens, never within one integer.
+grammar QuantifierWhitespace {
+  @root @mapping(ExactNode) Exact ::= 'x'{ 2 };
+  BeforeComma ::= 'x'{2 ,3};
+  BeforeClose ::= 'x'{2,3 };
+  AfterComma ::= 'x'{2, 3};
+  AllSpaces ::= 'x'{ 2 , 3 };
+  Open ::= 'x'{2, };
+  ExactComments ::= 'x'{ // 😀 , 999 } {
+    2 // , 888 } {
+  };
+  RangeComments ::= 'x'{ // 😀 , 999 } {
+    2 // , 888 } {
+    , // , 777 } {
+    3 // , 666 } {
+  };
+  OpenComments ::= 'x'{ // , 999
+    2 // , 888
+    , // , 777
+  };
+  LineBreaks ::= 'x'{
+    2
+    ,
+    3
+  };
+  Whitespace ::= 'x'{	2,3};
+  MultipleDigits ::= 'x'{ 10 , 12 };
+}
