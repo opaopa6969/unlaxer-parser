@@ -572,11 +572,11 @@ impl Lowering<'_> {
         self.analysis_depth.set(depth + 1);
         Ok(AnalysisDepth(&self.analysis_depth))
     }
-    fn run(mut self) -> Result<GrammarIr> {
+    fn run(self) -> Result<GrammarIr> {
         for rule in &self.grammar.rules {
             validate_typeof(rule)?;
         }
-        let mut lexical = crate::lexical::compile(self.grammar)?;
+        let lexical = crate::lexical::compile(self.grammar)?;
         if !self.grammar.imports.is_empty() {
             return Err("unsupported imports".into());
         }
@@ -615,6 +615,22 @@ impl Lowering<'_> {
                 None
             }
         };
+        // Java-host runs only name-predicate checks before this diagnostic, so a
+        // retained one still precedes every other lowering error (#833).
+        let deferred = declaration_error.clone();
+        self.run_after_declarations(lexical, adapter_registry, declaration_error)
+            .map_err(|error| match deferred {
+                Some(deferred) if !error.starts_with("E-NAME-PREDICATE-") => deferred,
+                _ => error,
+            })
+    }
+
+    fn run_after_declarations(
+        mut self,
+        mut lexical: HashMap<String, unlaxer_codegen::lexical::LexicalExpression>,
+        adapter_registry: AdapterRegistry,
+        declaration_error: Option<String>,
+    ) -> Result<GrammarIr> {
         let line_comments = crate::global_comment::line_comments(self.grammar);
         let whitespace_definitions = lexical.clone();
         let mut whitespace = false;

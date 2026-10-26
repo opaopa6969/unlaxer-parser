@@ -1514,6 +1514,10 @@ public final class GrammarValidator {
                 if (dot > 0 && importAliases.contains(refName.substring(0, dot))) {
                     continue;
                 }
+                // Rust keeps its own qualified-reference rejection, like native lowering.
+                if (rustDescription && dot > 0) {
+                    continue;
+                }
                 if (false == definedNames.contains(refName)) {
                     String suggestion = suggestSimilarName(refName, definedNames);
                     String hint;

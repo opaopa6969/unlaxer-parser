@@ -32,7 +32,7 @@ validate は元入力のまま、syntax 受理後に validator / lowering / gene
 OPEN issue を必須とし、`observation` の backtick で列挙する corpus ID と既知差の集合を完全一致させる。
 解消後に未修正項目だけ残すことも検査で落ちる。
 
-`diagnostic-priority.json` は別途、複数エラーを持つ 18 入力を root なし／独立した有効な root 付きで
+`diagnostic-priority.json` は別途、複数エラーを持つ 19 入力を root なし／独立した有効な root 付きで
 実行する。Java validator の最初の ERROR と独立期待値を照合し、両 Rust host の lowering / generator が
 同じコードを選ぶことを確認する。対象コードの順序は global whitespace（重複→style）、規則の宣言順に
 whitespace（style→重複）→mapping（重複param→欠落→未列挙）→左右の結合性競合→precedence→
@@ -48,7 +48,9 @@ Java generator API は全 validator の代替ではなく、通常 frontend が�
 Java-host の既存 `Rust subset: ` は説明内へ残し、対象コードを先頭に置く。
 既存 choice profile の失敗は precedence より先の従来経路へ委ね、説明文を維持する。
 名前述語の capture 検証が mapping 診断に先行する契約も保持する。native はその検証に必要な
-body を構築する間だけ mapping 診断を保留し、検証後は root 欠如より先に返す。
+body を構築する間だけ mapping 診断を保留し、検証後は root 欠如より先に返す。保留中に起きた
+名前述語以外の lowering エラー（未定義参照など）より保留した診断を優先し、Java-host と同じ順にする。
+修飾参照（`ns.Name`）は両 host とも従来の Rust の拒否（qualified rule reference）を保つ。
 check JSON は説明文を公開せず、従来の inventory code / `P-STRUCTURE` と CP span・終了コードを維持する。
 
 Rust は照合後に `SPEC-CORPUS` 実行記録を出力し、Java は native テストを `--exact` で

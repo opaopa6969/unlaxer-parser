@@ -88,5 +88,10 @@
     "name": "name-predicate-capture-before-mapping",
     "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n,missing]) R ::= 'x' @n 'y' @n; }",
     "code": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "name-predicate-mapping-before-undefined",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n,missing]) R ::= 'x' @n B; B ::= Missing; }",
+    "code": "E-MAPPING-MISSING-CAPTURE"
   }
 ]

@@ -116,6 +116,13 @@ public class SpecCorpusExecutionConformanceTest {
             assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(noRoot)).getMessage());
         assertFalse(new RustBackend().generate(UBNFMapper.parse(
             "grammar G { @root @mapping(X) R ::= 'x'; }").grammars().get(0)).isEmpty());
+        // Qualified references keep the existing Rust rejection, as in native lowering.
+        var qualified = UBNFMapper.parse("grammar G { @root @mapping(X) R ::= 'x' ns.Missing; }").grammars().get(0);
+        assertEquals("Rust subset: qualified rule reference",
+            assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(qualified)).getMessage());
+        var qualifiedNoRoot = UBNFMapper.parse("grammar G { R ::= ns.Missing; }").grammars().get(0);
+        assertEquals("Rust subset: exactly one @root is required",
+            assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(qualifiedNoRoot)).getMessage());
     }
 
     private static String cpSuffix(JsonObject row) {

@@ -184,6 +184,16 @@ fn declaration_diagnostic_priority() {
         "exactly one @root is required"
     );
     assert!(unlaxer_generator::generate("grammar G { @root @mapping(X) R ::= 'x'; }").is_ok());
+    // Qualified references keep the existing Rust rejection, as on Java-host.
+    assert_eq!(
+        unlaxer_generator::generate("grammar G { @root @mapping(X) R ::= 'x' ns.Missing; }")
+            .unwrap_err(),
+        "unsupported qualified rule reference"
+    );
+    assert_eq!(
+        unlaxer_generator::generate("grammar G { R ::= ns.Missing; }").unwrap_err(),
+        "exactly one @root is required"
+    );
 }
 
 struct Work(PathBuf);
