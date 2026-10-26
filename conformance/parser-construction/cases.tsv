@@ -1,0 +1,40 @@
+# Independent oracle for parser construction and rule references (#845). UTF8 hex, ~ = empty.
+# Grammar, built by every construction variant in ParserConstructionParityTest.java and
+# rust/unlaxer-runtime/tests/parser_construction.rs (rule IDs in declaration order):
+#   0 Root      ::= Item '!' | Item '?' | Missing | MATCH_ONLY(Item) Item '#'   (Missing is unregistered)
+#   1 Item      ::= '(' Item ')' | 'x' | '😀' | CR LF
+#   2 Leaf      ::= 'a'
+#   3 Probe     ::= Leaf
+#   4 NotProbe  ::= NOT(Leaf)            (Classic invert source; Java custom AbstractPropagatableSource)
+#   5 StopProbe ::= STOP_INVERT(Leaf)    (Java InvertMatchPropagationStopper, a PropagationStopper)
+# kind/invert are the Classic arguments of the root call. failureCP is the farthest failure
+# offset, or the reached offset when nothing failed (0 under DETAILED_ON_FAILURE, which records
+# nothing in a direct context). ruleStack is the
+# failure stack (outermost first, rule@startCP) and is only recorded under DETAILED/AUTO.
+# original = Parsed.getOriginalTokens(); committed = root tokens; leaves = retained terminal tokens.
+# A Rust rule node has no Java counterpart (a Java rule is the combinator itself), so Rust reads
+# original from the rule's expression node, as classic_memo.rs does.
+# id	root	inputHex	kind	invert	success	consumedCP	matchedCP	failureCP	original	committed	leaves	ruleStack
+root-bang	Root	7821	consumed	false	true	2	2	0	consumed@0:1:78;consumed@1:1:21	consumed@0:2:7821	consumed@0:1:78;consumed@1:1:21	~
+root-retry	Root	783f	consumed	false	true	2	2	1	consumed@0:1:78;consumed@1:1:3f	consumed@0:2:783f	consumed@0:1:78;consumed@1:1:3f	~
+root-nested-nonbmp	Root	2828f09f988029293f	consumed	false	true	6	6	5	consumed@0:5:2828f09f98802929;consumed@5:1:3f	consumed@0:6:2828f09f988029293f	consumed@0:1:28;consumed@1:1:28;consumed@2:1:f09f9880;consumed@3:1:29;consumed@4:1:29;consumed@5:1:3f	~
+root-crlf	Root	0d0a21	consumed	false	true	3	3	0	consumed@0:2:0d0a;consumed@2:1:21	consumed@0:3:0d0a21	consumed@0:2:0d0a;consumed@2:1:21	~
+root-lookahead	Root	28782923	consumed	false	true	4	4	3	matchOnly@0:3:287829;consumed@0:3:287829;consumed@3:1:23	consumed@0:4:28782923	consumed@0:1:28;consumed@1:1:78;consumed@2:1:29;consumed@3:1:23	~
+root-empty	Root	~	consumed	false	false	0	0	0	~	~	~	Root@0>Item@0
+root-incomplete	Root	2878	consumed	false	false	0	0	2	~	~	~	Root@0>Item@0
+root-cr-only	Root	0d21	consumed	false	false	0	0	0	~	~	~	Root@0>Item@0
+root-choice-loser	Root	79	consumed	false	false	0	0	0	~	~	~	Root@0>Item@0
+root-trailing	Root	782121	consumed	false	true	2	2	0	consumed@0:1:78;consumed@1:1:21	consumed@0:2:7821	consumed@0:1:78;consumed@1:1:21	~
+root-match-only	Root	7821	matchOnly	false	true	0	2	0	matchOnly@0:1:78;matchOnly@1:1:21	matchOnly@0:2:7821	matchOnly@0:1:78;matchOnly@1:1:21	~
+probe-a	Probe	61	consumed	false	true	1	1	1	consumed@0:1:61	consumed@0:1:61	consumed@0:1:61	~
+probe-invert	Probe	f09f988078	consumed	true	true	1	1	1	consumed@0:1:f09f9880	consumed@0:1:f09f9880	consumed@0:1:f09f9880	~
+probe-invert-match-only	Probe	f09f988078	matchOnly	true	true	0	1	1	matchOnly@0:1:f09f9880	matchOnly@0:1:f09f9880	matchOnly@0:1:f09f9880	~
+probe-invert-fail	Probe	61	consumed	true	false	0	0	0	~	~	~	Probe@0>Leaf@0
+probe-empty	Probe	~	consumed	false	false	0	0	0	~	~	~	Probe@0>Leaf@0
+probe-eof-invert	Probe	~	consumed	true	false	0	0	0	~	~	~	Probe@0>Leaf@0
+not-probe	NotProbe	f09f9880	consumed	false	true	1	1	1	consumed@0:1:f09f9880	consumed@0:1:f09f9880	consumed@0:1:f09f9880	~
+not-probe-invert	NotProbe	61	consumed	true	true	1	1	1	consumed@0:1:61	consumed@0:1:61	consumed@0:1:61	~
+not-probe-fail	NotProbe	61	consumed	false	false	0	0	0	~	~	~	NotProbe@0>Leaf@0
+not-probe-match-only	NotProbe	f09f9880	matchOnly	false	true	0	1	1	matchOnly@0:1:f09f9880	matchOnly@0:1:f09f9880	matchOnly@0:1:f09f9880	~
+stop-probe-invert	StopProbe	61	consumed	true	true	1	1	1	consumed@0:1:61	consumed@0:1:61	consumed@0:1:61	~
+stop-probe-invert-fail	StopProbe	f09f9880	consumed	true	false	0	0	0	~	~	~	StopProbe@0>Leaf@0

@@ -51,6 +51,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Added
 
+- Rust runtime に構築時の名前解決 `RuleNames` / `RuleNameError` を追加し、Java の Class/Supplier factory・lazy children・`ReferenceByNameParser`・`ReferenceParser` の移植経路を Java 6 経路・Rust 5 経路の共通 corpus（`conformance/parser-construction`）で固定した (#845)。[移植の契約](docs/rust-shared-grammar.md#java-parser構築からの移植845)。
 - cut とラベル付き失敗を Java/Rust runtime および UBNF の `COMMIT` / `LABEL` / `CATCH` に追加 (PR #707、#710、issue #700)。確定エラーは recovery 境界へ、ラベル付き失敗は指定した CATCH へ伝わる。[契約](docs/cut-and-labeled-failures.md)。
 - 一階の引数付き規則を両 frontend で生成前に単相化し、`F(=x, y)` の値渡し引数を `CAPTURE_SCOPE` / `CAPTURE` / `SAME_AS` へ展開する (PR #708、#711、issue #701、#704)。[引数付き規則](docs/parameterized-rules.md)、[値渡し](docs/call-by-value-arguments.md)。
 - FIRST 集合と外側の文脈による cut 位置の lint、規則単位で opt-in する `@autoCommit` を追加。文法全体の `@whitespace: javaStyle` にも対応する (PR #724、#731、issue #702、#728)。対象外の警告は lint API から取得する。[条件と制限](docs/auto-commit.md)。
@@ -72,6 +73,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- Java の `ParserFactoryByClass.ClassAndKind(Class).kind()` が `NullPointerException` ではなく空の `Optional` を返し、`HasChildrenParser.newWithoutRecursive` が入れ子の子を自身の複製に置き換えずに各 combinator の型のまま一致した子孫だけを除くよう修正した。`ParserNameContext` は複数の親から届く同一 parser を重複にしない（別 parser の同名は従来どおり `IllegalStateException`）(#845)。
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
 - Rust の token-stream / lexical-context 文法の非空 literal の Classic 反転を Java の幅0 assertion に揃え、EOF・lexical goal・先読み後の cursor・CST・失敗位置を両 Rust host の共通 corpus で固定した (#768)。同じ区別により、これらの文法では Classic の非反転照合も lexical goal を通し、optional / repeat 内の literal の失敗で matched cursor を戻さず、token trace の label が `LexicalTokenParser` になる。Java の既存挙動は変更しない。
 - 量指定子 `{n}` / `{n,m}` / `{n,}` の整数 overflow を Java / Java-host Rust / native Rust の検証・生成で `E-BOUNDED-OVERFLOW` と元ソース CP 範囲として報告し、公開済み AST の整数型 API を維持した。境界値・非 BMP・未使用/ゼロ回反復を共通 fixture で検証し、仕様 corpus の既知差を削除 (#783)。

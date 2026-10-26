@@ -113,8 +113,9 @@ public class ParserFactoryByClass{
 			return kind == other.kind && Objects.equals(parserClass, other.parserClass);
 		}
 
+		/** Empty for {@link #ClassAndKind(Class)}, which has no node kind. */
 		public Optional<ASTNodeKind> kind(){
-			return Optional.of(kind);
+			return Optional.ofNullable(kind);
 		}
 	}
 	

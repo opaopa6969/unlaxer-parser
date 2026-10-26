@@ -16,7 +16,8 @@
     "host別corpusの値の一致/差と未対応の意味分類は人が監査する。検査は新しいファイル/キー/出現数と台帳参照の欠落を落とすが、任意の新規skip条件や文書の意味を自動分類しない。",
     "2026-10-26 #784: 条件付き除外の宣言・元corpus・実行記録を照合する検査を追加。共通scopeの新規case/driver削除はmutation検査で検知する。root/診断優先順位に跨る16件の差は#833/#834/#835へ分離し、性能作業は行わない。",
     "2026-10-27 #833/#834/#835: spec corpusの診断差16件を両Rust hostで修正し契約へ移した（issueは本PRのmerge待ちでOPEN）。#784の実行先・独立期待値を維持し、rootあり/なしと複数不正の順序を追加検証する。 前提の#784（PR #836）・#825（PR #831）はmerge済み/CLOSEDを確認した。",
-    "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。"
+    "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。",
+    "2026-10-27 #845: parser構築・名前参照・identity の移植境界を conformance/parser-construction に固定した。Java 6経路（ReferenceByName・ReferenceParser名前/predicate・Class/Supplier factory・newInstance）と Rust 5経路（Rule index・RuleNames・構築時predicate・OnceLock・都度構築）が同じ cases.tsv を全memo/diagnosticsで実行する。台帳全体の再監査ではない。"
   ],
   "issues": {
     "111": {
@@ -1515,6 +1516,23 @@
         "rust/unlaxer-generator/tests/spec_corpus_execution.rs",
         "spec-corpus/execution/diagnostic-priority.json"
       ]
+    },
+    {
+      "id": "parser-construction-boundary",
+      "category": "contract",
+      "title": "parser構築・名前参照・identity の言語別表現",
+      "hosts": "Java runtime / Rust runtime",
+      "issues": [
+        845
+      ],
+      "observation": "construction.tsv の java/rust 列は各言語の構築観測。同じ契約の行は同値を共有し、`-` と値の違いは意図した差: Java は parser instance・親pointer・反射名・PseudoRoot・共有sourceの反転状態を持ち、Rust は構築時に名前を Rule index へ解決（RuleNames の重複/未登録/順序不一致は構築エラー）し、反転は context の token_mode に置く。左再帰は両方とも資源上限（Java ParseLimitException 1024、Rust rule nesting 256）。parse 結果（cursor・CST・失敗位置・RuleStack）は cases.tsv で差を許さない。",
+      "evidence": [
+        "conformance/parser-construction/cases.tsv",
+        "conformance/parser-construction/construction.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/ParserConstructionParityTest.java",
+        "rust/unlaxer-runtime/tests/parser_construction.rs",
+        "docs/java-api-rust-parity.md"
+      ]
     }
   ],
   "corpora": [
@@ -2012,6 +2030,16 @@
         "spec-validation-root",
         "spec-validation-whitespace",
         "spec-validation-annotation"
+      ]
+    },
+    {
+      "path": "conformance/parser-construction/construction.tsv",
+      "fields": {
+        "java": 1,
+        "rust": 1
+      },
+      "entries": [
+        "parser-construction-boundary"
       ]
     }
   ],

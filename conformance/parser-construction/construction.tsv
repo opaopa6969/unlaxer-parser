@@ -1,0 +1,43 @@
+# Construction and identity observations (#845); each test implements every id.
+# java/rust are the expected observations; - means no counterpart, and note gives the reason
+# and the invariant that replaces it. Values are shared only where a row states one contract.
+# id	java	rust	note
+factory-class-shared	same	same	Parser.get(Class) twice / one OnceLock<SharedGrammar>::get_or_init twice (Arc::ptr_eq)
+factory-new-instance	distinct	distinct	Parser.newInstance(Class) / share_grammar(build()) per call
+factory-supplier-same	same	same	Parser.get(Supplier) with one supplier instance / one OnceLock
+factory-supplier-distinct	distinct	distinct	two supplier lambdas building equal parsers / two OnceLock statics
+factory-get-supplier	same	same	Parser.getSupplier(Class) closures delegate to the class singleton / closures calling one accessor
+factory-failure-retried	error;instance;same	error;instance;same	a failing constructor is not cached: Java FactoryBoundCache stores only results; Rust sets the OnceLock only after Ok
+factory-kind	same;distinct;distinct	same;distinct;distinct	ParserFactoryByClass.get(kind,Class): same key, other kind, no kind / one OnceLock per (grammar, kind) key
+class-and-kind-without-kind	empty	-	Java ClassAndKind(Class).kind() is Optional.empty (was Optional.of(null) -> NPE). Rust has no runtime node kind: the kind-less key is the plain factory row
+eager-construction-cycle	StackOverflowError	-	a constructor taking Parsers(ItsOwnClass) re-enters the synchronized factory. Rust never recurses in OnceLock::get_or_init (reentrant init is unspecified); cycles use Rule(index), see lazy-construction-cycle
+lazy-construction-cycle	true/5	true/5	LazyChoice child Parser.get(Self) / Expr::Rule(own index), parse ((x))
+lazy-children-once	1	1	getLazyParsers calls / OnceLock builder calls after three parses on the shared graph
+shared-graph-independent-contexts	true/2;false/0;true/2	true/2;false/0;true/2	one shared graph, three fresh contexts x! / y / x?
+name-context-duplicate	duplicate:Item	duplicate:Item	ParserNameContext with two distinct parsers named Item / RuleNames::new([.., Item, Item])
+name-context-reused-instance	Item	Item	one parser under two parents is one entry (Java fixed in #845) / one rule referenced twice by Rule(index)
+name-context-unregistered	absent	absent	ParserNameContext.get / RuleNames::get for an undeclared name
+name-context-default-names	duplicate:org.unlaxer.parser.elementary.WordParser	-	Java default names are class names, so two WordParsers collide. Rust literals are unnamed; only Rule names enter RuleNames
+by-name-first-match	true/1;false/0	true/1;false/0	ReferenceByNameParser resolves the first parser in flatten preorder (Item:a before Item:b), inputs a / b. Rust rejects the duplicate in RuleNames; the port chooses the first declaration explicitly
+by-name-late-registration	false/0;true/2	false/0;true/2	ReferenceByNameParser re-searches after a miss, so a parser named Late added after parse 1 is found / rebuilding rules re-resolves the name
+predicate-miss-cached	false/0;false/0	false/0;false/0	ReferenceParser caches its miss for the instance lifetime / the Expr resolved once is kept when rules are extended
+predicate-evaluated-once	0	0	predicate evaluations during later parses in fresh contexts: Java caches the first lookup, Rust resolves at construction
+referencer-uncached	absent;present	absent;present	Referencer.AbstractReference searches from the root on every call / a lookup function over the current rule vector
+unregistered-strict	-	unregistered:Missing	RuleNames::reference rejects an undeclared name at construction. Java has no strict lookup; its tolerant miss is the Missing alternative of cases.tsv (reference_or_never)
+share-mismatch	-	mismatch:1:Item:Leaf	RuleNames::share rejects rules built out of the declared order. Java parsers carry their own names, so there is no index order to check
+shared-parent-last-writer	second	-	a shared singleton's parent is the last container constructed. Rust rules have no parent pointer; dynamic parents are RuleStack frames
+parent-cycle-walk	IllegalStateException	-	findFirstToParent stops after 1000 parents. Rust has no parent walk; unbounded rule recursion is a resource_limit in both (left-recursion row)
+left-recursion	resource_limit	resource_limit	A ::= A 'x' through a name reference: Java throws ParseLimitException ULX-PARSE-DEPTH-LIMIT (1024 active frames), Rust returns the non-recoverable rule-nesting resource_limit (256)
+pseudo-root-as-child	RuntimeException:IllegalAccessException	-	PseudoRootParser rejects setParent. In Rust any rule index can be the parse root
+pseudo-root-multi	RuntimeException:IllegalAccessException	-	PseudoRootParser parses only a single child. Rust roots are one Expr::Rule(index)
+source-before-parse	IllegalStateException	consumed/false	AbstractPropagatableSource.getInvertMatchToChild before any parse / a fresh context's token_mode(); Rust keeps the mode per context, never on the shared graph
+destination-without-source	false	false	getInvertMatchFromParent without a source ancestor / token_mode().invert at the root
+destination-under-source	true	true	a leaf under NotPropagatableSource after parse / Custom parser under invert_match reading token_mode().invert
+token-parsed-by	true;false	true;false	Parser.isTokenParsedBySpecifiedParser(token, exact class / superclass) / Node.rule == rule index / other index
+parsers-specifier	true;false	true;false	ParsersSpecifier.contains by exact class / a set of rule indices
+grammar-rule-names	Item;Item;Word;fallback;fallback	-	GrammarRule.nameOf: explicit, ItemParser class default, WordParser, null and blank overrides fall back to the class. Rust Rule.name is always explicit
+parser-printer	parser:org.unlaxer.parser.elementary.WordParser;parser:/Root/Item/org.unlaxer.parser.elementary.WordParser;parser:/Root/Item/WordParser	-	ParserPrinter simple / detail / mostDetail over the parent path. Rust reports rule names through RuleStack
+name-kinds	false;true;true	-	Name.of(fqcn) vs Name.of(Class); Name.classBaseOf vs Name.of(fqcn); Name.of(text) is interned. Rust rule names compare by text, so distinct Java kinds need distinct spellings
+new-filtered	true/2	true/2	HasChildrenParser.newFiltered drops a direct child c, parse ab / Vec::retain on the sequence
+new-without-recursive	true/2	true/2	newWithoutRecursive drops c at any depth keeping each combinator type (Java fixed in #845), parse ab / recursive Expr filter
+child-occurs	none;single;multi	-	ChildOccurs of WordParser / ConstructedSingleChildParser / Chain. Rust arity is the Expr variant
