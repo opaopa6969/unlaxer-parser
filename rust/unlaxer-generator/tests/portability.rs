@@ -199,6 +199,78 @@ fn imported_diagnostics_retain_only_root_positions_and_distinct_occurrences() {
     }
 }
 
+#[test]
+fn structural_diagnostic_priority_matches_shared_oracle() {
+    let cases: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/portability/structure-priority.json")).unwrap();
+    for case in cases.as_array().unwrap() {
+        let source = if let Some(path) = case["sourceFile"].as_str() {
+            fs::read_to_string(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../..")
+                    .join(path),
+            )
+            .unwrap()
+        } else {
+            case["source"].as_str().unwrap().into()
+        };
+        if case["name"] == "ir-error-only" {
+            let file = unlaxer_ubnf::parse(&source).unwrap();
+            let ir = unlaxer_generator::lowering::lower(&file.grammars[0])
+                .expect("this fixture must reach IR validation");
+            assert!(unlaxer_codegen::validate_ir(&ir)
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate or empty recovery sync token"));
+        }
+        for ending in ["LF", "CRLF"] {
+            let directory = Directory::new();
+            let source = if ending == "LF" {
+                source.clone()
+            } else {
+                source.replace('\n', "\r\n")
+            };
+            let path = directory.0.join("main.ubnf");
+            fs::write(&path, &source).unwrap();
+            let expected = &case["expected"][ending];
+            let report = unlaxer_generator::portability::check_file(&path);
+            assert_eq!(
+                expected,
+                &serde_json::from_str::<serde_json::Value>(&report.to_json()).unwrap(),
+                "{} / {ending}",
+                case["name"]
+            );
+            for _ in 0..2 {
+                let output = run(
+                    &directory,
+                    &[
+                        "check",
+                        "--target",
+                        "rust",
+                        "--grammar",
+                        "main.ubnf",
+                        "--format",
+                        "json",
+                    ],
+                );
+                assert_eq!(
+                    Some(if report.portable { 0 } else { 3 }),
+                    output.status.code(),
+                    "{} / {ending}",
+                    case["name"]
+                );
+                assert!(output.stderr.is_empty());
+                assert_eq!(
+                    expected,
+                    &serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()
+                );
+            }
+            assert_eq!(source, fs::read_to_string(path).unwrap());
+            assert_eq!(1, fs::read_dir(&directory.0).unwrap().count());
+        }
+    }
+}
+
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {

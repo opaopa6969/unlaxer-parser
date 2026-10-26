@@ -204,6 +204,33 @@ public class RustPortabilityConformanceTest {
         Files.write(Path.of("target/rust-portability-imports.tsv"), report);
     }
 
+    @Test public void structuralDiagnosticPriorityMatchesJavaForEveryLineEnding() throws Exception {
+        Path binary = binary();
+        var cases = JsonParser.parseString(Files.readString(repo.resolve(
+            "rust/unlaxer-generator/tests/fixtures/portability/structure-priority.json"))).getAsJsonArray();
+        List<String> report = new ArrayList<>(List.of("case\tline_endings\tstructure\tdiagnostics\tresult"));
+        for (var entry : cases) {
+            var fixture = entry.getAsJsonObject();
+            String name = fixture.get("name").getAsString();
+            String source = fixture.has("sourceFile")
+                ? Files.readString(repo.resolve(fixture.get("sourceFile").getAsString()))
+                : fixture.get("source").getAsString();
+            for (String ending : List.of("LF", "CRLF")) {
+                Path directory = temporary.newFolder().toPath();
+                Path input = directory.resolve("main.ubnf");
+                String text = ending.equals("LF") ? source : source.replace("\n", "\r\n");
+                Files.writeString(input, text);
+                var actual = compareFile(binary, directory, input, text);
+                assertEquals(name + " / " + ending,
+                    fixture.getAsJsonObject("expected").getAsJsonObject(ending), actual);
+                try (var files = Files.list(directory)) { assertEquals(name, 1, files.count()); }
+                report.add(name + "\t" + ending + "\t" + actual.get("structure").getAsString() + "\t"
+                    + actual.getAsJsonArray("diagnostics").size() + "\tequal");
+            }
+        }
+        Files.write(Path.of("target/rust-portability-structure-priority.tsv"), report);
+    }
+
     private JsonObject compare(Path binary, Path cwd, String source) throws Exception {
         Path input = temporary.newFile().toPath();
         Files.writeString(input, source);

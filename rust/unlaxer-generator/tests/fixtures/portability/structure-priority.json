@@ -1,0 +1,570 @@
+[
+  {
+    "name": "issue-825",
+    "source": "grammar G {\n  @root @eval(kind='variable_ref', strip_prefix='$')\n  A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 80, "end": 111}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 83, "end": 115}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "issue-825-reversed",
+    "source": "grammar G {\n  @commonField(left)\n  B ::= 'x';\n  @root @eval(kind='variable_ref', strip_prefix='$')\n  A ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 45}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 15, "end": 47}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "annotation-parity",
+    "sourceFile": "rust/unlaxer-ubnf/tests/fixtures/positive/annotation-parity.ubnf",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 707, "end": 795}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 726, "end": 816}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "common-with-enum",
+    "source": "grammar G {\n  @root @enum A ::= 'x' 'y';\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 43, "end": 74}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 45, "end": 77}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "common-before-enum",
+    "source": "grammar G {\n  @commonField(left)\n  B ::= 'x';\n  @root @enum A ::= 'x' 'y';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 45}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 15, "end": 47}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "enum-only",
+    "source": "grammar G {\n  @root @enum A ::= 'x' 'y';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 42}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 44}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "common-with-embedding",
+    "source": "grammar G {\n  @embedding: invalid\n  @root A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 55, "end": 86}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 58, "end": 90}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "common-before-embedding",
+    "source": "grammar G {\n  @embedding: invalid\n  @commonField(left)\n  B ::= 'x';\n  @root A ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 36, "end": 67}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 38, "end": 70}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "embedding-only",
+    "source": "grammar G {\n  @embedding: invalid\n  @root A ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 54}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 57}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "common-with-undefined-reference",
+    "source": "grammar G {\n  @root A ::= Missing;\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 37, "end": 68}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 39, "end": 71}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "common-before-undefined-reference",
+    "source": "grammar G {\n  @commonField(left)\n  B ::= 'x';\n  @root A ::= Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 45}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 15, "end": 47}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "undefined-reference-only",
+    "source": "grammar G {\n  @root A ::= Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 36}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 38}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "common-with-typeof",
+    "source": "grammar G {\n  @root @mapping(A,params=[value]) A ::= @typeof(missing) 'x' @value;\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 84, "end": 115}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 86, "end": 118}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "common-before-typeof",
+    "source": "grammar G {\n  @commonField(left)\n  B ::= 'x';\n  @root @mapping(A,params=[value]) A ::= @typeof(missing) 'x' @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 45}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 15, "end": 47}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "typeof-only",
+    "source": "grammar G {\n  @root @mapping(A,params=[value]) A ::= @typeof(missing) 'x' @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 83}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 85}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "bounded-before-common",
+    "source": "grammar G {\n  @root A ::= 'x'{3,2};\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 71}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 75}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "bounded-before-common-reversed",
+    "source": "grammar G {\n  @commonField(left)\n  B ::= 'x';\n  @root A ::= 'x'{3,2};\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 71}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 75}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "precedence-before-common",
+    "source": "grammar G {\n  @root @precedence(level=2147483648) A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 100}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "precedence-before-common-reversed",
+    "source": "grammar G {\n  @commonField(left)\n  B ::= 'x';\n  @root @precedence(level=2147483648) A ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 100}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "nested-before-common",
+    "source": "grammar G {\n  @root @nestedCaptures A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-NESTED-SHAPE", "severity": "error", "span": {"start": 14, "end": 46}, "subject": "nested capture schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-NESTED-SHAPE", "severity": "error", "span": {"start": 15, "end": 47}, "subject": "nested capture schema"}]}
+    }
+  },
+  {
+    "name": "nested-before-common-reversed",
+    "source": "grammar G {\n  @commonField(left)\n  B ::= 'x';\n  @root @nestedCaptures A ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-NESTED-SHAPE", "severity": "error", "span": {"start": 48, "end": 80}, "subject": "nested capture schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-NESTED-SHAPE", "severity": "error", "span": {"start": 51, "end": 83}, "subject": "nested capture schema"}]}
+    }
+  },
+  {
+    "name": "eval-only",
+    "source": "grammar G {\n  @root @eval(kind='variable_ref', strip_prefix='$')\n  A ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 79}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 82}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "common-only",
+    "source": "grammar G {\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 45}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 15, "end": 47}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "nested-only",
+    "source": "grammar G {\n  @root @nestedCaptures A ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-NESTED-SHAPE", "severity": "error", "span": {"start": 14, "end": 46}, "subject": "nested capture schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-NESTED-SHAPE", "severity": "error", "span": {"start": 15, "end": 47}, "subject": "nested capture schema"}]}
+    }
+  },
+  {
+    "name": "two-common-B-first",
+    "source": "grammar G {\n  @root @eval(kind='variable_ref', strip_prefix='$')\n  A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n  @commonField(right)\n  C ::= 'y';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 80, "end": 111}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 83, "end": 115}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "two-common-C-first",
+    "source": "grammar G {\n  @root @eval(kind='variable_ref', strip_prefix='$')\n  A ::= 'x';\n  @commonField(right)\n  C ::= 'y';\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 80, "end": 112}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 83, "end": 116}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "multiple-without-common",
+    "source": "grammar G {\n  @root @eval(kind='literal') A ::= Missing;\n  @enum B ::= 'x' 'y';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 81}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 84}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "common-with-ir-error",
+    "source": "grammar G {\n  @root @mapping(A) @recovery(sync=';,;') A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 67, "end": 98}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 69, "end": 101}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "ir-error-only",
+    "source": "grammar G {\n  @root @mapping(A) @recovery(sync=';,;') A ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 66}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 68}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "inventory-before-structure",
+    "source": "grammar G {\n  @probe: value\n  @root @eval(kind='variable_ref', strip_prefix='$')\n  A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 14, "end": 27}, "subject": "probe"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 15, "end": 28}, "subject": "probe"}]}
+    }
+  },
+  {
+    "name": "module-before-structure",
+    "source": "grammar G {\n  @import dep from 'missing.ubnf'\n  @ubnf: v2\n  @root @eval(kind='variable_ref', strip_prefix='$')\n  A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-MODULE", "severity": "error", "span": null, "subject": "UBNF module resolution"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-MODULE", "severity": "error", "span": null, "subject": "UBNF module resolution"}]}
+    }
+  },
+  {
+    "name": "syntax-before-structure",
+    "source": "grammar G {\n  @root @eval(kind='variable_ref', strip_prefix='$')\n  A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "unavailable", "diagnostics": [{"code": "P-SYNTAX", "severity": "error", "span": null, "subject": "UBNF syntax"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "unavailable", "diagnostics": [{"code": "P-SYNTAX", "severity": "error", "span": null, "subject": "UBNF syntax"}]}
+    }
+  },
+  {
+    "name": "multiple-grammars",
+    "source": "// 😀\ngrammar First {\n  @root @eval(kind='variable_ref', strip_prefix='$')\n  A ::= 'x';\n  @commonField(left)\n  B ::= 'x';\n}\ngrammar Second {\n  @root @nestedCaptures A ::= 'x';\n}\ngrammar Third {\n  @root @eval(kind='literal') A ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 89, "end": 120}, "subject": "commonField schema"}, {"code": "P-NESTED-SHAPE", "severity": "error", "span": {"start": 142, "end": 174}, "subject": "nested capture schema"}, {"code": "P-STRUCTURE", "severity": "error", "span": {"start": 177, "end": 235}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 93, "end": 125}, "subject": "commonField schema"}, {"code": "P-NESTED-SHAPE", "severity": "error", "span": {"start": 150, "end": 182}, "subject": "nested capture schema"}, {"code": "P-STRUCTURE", "severity": "error", "span": {"start": 187, "end": 247}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "schema-missing-with-eval",
+    "source": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[maybe,many,mode])\n B ::= 'b' 'é' '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 61, "end": 133}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 64, "end": 137}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-cardinality-with-eval",
+    "source": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' 'x' @maybe ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 61, "end": 133}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 64, "end": 137}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-enum-type-with-eval",
+    "source": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' Mode @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 61, "end": 133}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 64, "end": 137}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-duplicate-with-eval",
+    "source": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,text)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 61, "end": 122}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 64, "end": 126}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-not-sum-with-eval",
+    "source": "grammar Invalid {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= 'prefix' A;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 61, "end": 138}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 64, "end": 142}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-numeric-type-with-eval",
+    "source": "grammar Numeric {\n @package: commonprobe\n token NUMBER = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' NUMBER @value;\n @mapping(B,params=[value]) B ::= 'b' 'word' @value;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 101, "end": 158}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 104, "end": 162}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-view-collision-with-eval",
+    "source": "grammar Flat {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @mapping(NodeFields) Extra ::= 'q';\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 58, "end": 130}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 61, "end": 134}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-duplicate-family-with-eval",
+    "source": "grammar Flat {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @mapping(Node) @commonField(text) Extra ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 132, "end": 182}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 137, "end": 187}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-reserved-field-with-eval",
+    "source": "grammar Flat {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(hashCode,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[hashCode,maybe,many,mode])\n A ::= 'a' '😀' @hashCode '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[hashCode,maybe,many,mode])\n B ::= 'b' 'é' @hashCode '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 58, "end": 134}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 61, "end": 138}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-normalized-collision-with-eval",
+    "source": "grammar Dotted {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @mapping(Node__A) Extra ::= 'q';\n @enum Mode ::= 'on' | 'off';\n @mapping(Node.A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(Node.B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 198, "end": 323}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 205, "end": 331}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-mixed-cardinality-with-eval",
+    "source": "grammar MixedFields {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(value,maybe,many)\n Root ::= A | B;\n @enum Mode ::= 'on' | '😀';\n @enum Heat ::= 'hot' | 'cold';\n @mapping(Leaf,params=[text]) Leaf ::= '<' 'node' @text '>';\n Item ::= Mode | Heat | Leaf | 'text';\n @mapping(A,params=[value,maybe,many]) A ::= 'a' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n @mapping(B,params=[value,maybe,many]) B ::= 'b' [Item] @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 65, "end": 133}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 68, "end": 137}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-mixed-missing-capture-with-eval",
+    "source": "grammar MixedFields {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(value,maybe,many)\n Root ::= A | B;\n @enum Mode ::= 'on' | '😀';\n @enum Heat ::= 'hot' | 'cold';\n @mapping(Leaf,params=[text]) Leaf ::= '<' 'node' @text '>';\n Item ::= Mode | Heat | Leaf | 'text';\n @mapping(A,params=[value,maybe,many]) A ::= 'a' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n @mapping(B,params=[value,maybe,many]) B ::= 'b' Item '[' [Item] @maybe ']' '{' {Item} @many '}';\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 65, "end": 133}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 68, "end": 137}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "schema-mixed-shared-missing-param-with-eval",
+    "source": "grammar SharedMixedFields {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(value,maybe,many)\n Root ::= AEnum | AText | ANode | B;\n @enum Mode ::= 'on' | '😀';\n @enum Heat ::= 'hot' | 'cold';\n @mapping(Leaf,params=[text]) Leaf ::= '<' 'node' @text '>';\n Item ::= Mode | Heat | Leaf | 'text';\n @mapping(A,params=[maybe,many]) AEnum ::= 'm' Mode @value '[' [Mode] @maybe ']' '{' {Mode} @many '}';\n @mapping(A,params=[value,maybe,many]) AText ::= 't' 'text' @value '[' ['text'] @maybe ']' '{' {'text'} @many '}';\n @mapping(A,params=[value,maybe,many]) ANode ::= 'n' Leaf @value '[' [Leaf] @maybe ']' '{' {Leaf} @many '}';\n @mapping(B,params=[value,maybe,many]) B ::= 'b' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 71, "end": 159}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 74, "end": 163}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "valid-schema-Flat-with-eval",
+    "source": "grammar Flat {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 446}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 458}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-schema-Dotted-with-eval",
+    "source": "grammar Dotted {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @mapping(Node.A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(Node.B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 458}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 470}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-schema-Nodes-with-eval",
+    "source": "grammar Nodes {\n @package: commonprobe\n @root @mapping(Node) @commonField(child)\n Root ::= A | B;\n @mapping(A,params=[child]) A ::= 'a' Leaf @child;\n @mapping(B,params=[child]) B ::= 'b' Leaf @child;\n @mapping(Leaf,params=[value]) Leaf ::= 'l' @value;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 292}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 301}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-schema-Numeric-with-eval",
+    "source": "grammar Numeric {\n @package: commonprobe\n token NUMBER = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' NUMBER @value;\n @mapping(B,params=[value]) B ::= 'b' NUMBER @value;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 305}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 314}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-schema-EnumContainers-with-eval",
+    "source": "grammar EnumContainers {\n @package: commonprobe\n @root @mapping(Node) @commonField(maybe,many)\n Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n Alias ::= Mode;\n @mapping(A,params=[maybe,many]) A ::= 'a' '[' [ Mode @maybe ] ']' '{' { Mode @many } '}';\n @mapping(B,params=[maybe,many]) B ::= 'b' '[' [ Alias @maybe ] ']' '{' { Alias @many } '}';\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 383}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 393}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-schema-Nested-with-eval",
+    "source": "grammar Nested {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(text,maybe,many,mode)\n Root ::= Branch | C;\n @mapping(Branch) Branch ::= A | B;\n @mapping(C,params=[text,maybe,many,mode]) C ::= 'c' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @enum Mode ::= 'on' | 'off';\n @mapping(A, params=[text,maybe,many,mode])\n A ::= 'a' '😀' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n @mapping(B, params=[text,maybe,many,mode])\n B ::= 'b' 'é' @text '[' [ 'x' @maybe ] ']' '{' { 'z' @many } '}' Mode @mode;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 609}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 623}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-schema-NodeContainers-with-eval",
+    "source": "grammar NodeContainers {\n @package: commonprobe\n @root @mapping(Node) @commonField(maybe,many)\n Root ::= A | B;\n @mapping(A,params=[maybe,many]) A ::= 'a' '[' [ Leaf @maybe ] ']' '{' { Leaf @many } '}';\n @mapping(B,params=[maybe,many]) B ::= 'b' '[' [ Leaf @maybe ] ']' '{' { Leaf @many } '}';\n @mapping(Leaf,params=[value]) Leaf ::= 'l' @value;\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 386}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 395}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-schema-MixedFields-with-eval",
+    "source": "grammar MixedFields {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(value,maybe,many)\n Root ::= A | B;\n @enum Mode ::= 'on' | '😀';\n @enum Heat ::= 'hot' | 'cold';\n @mapping(Leaf,params=[text]) Leaf ::= '<' 'node' @text '>';\n Item ::= Mode | Heat | Leaf | 'text';\n @mapping(A,params=[value,maybe,many]) A ::= 'a' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n @mapping(B,params=[value,maybe,many]) B ::= 'b' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 544}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 557}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-schema-DottedMixedFields-with-eval",
+    "source": "grammar DottedMixedFields {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(value,maybe,many)\n Root ::= A | B;\n @enum Mode ::= 'on' | '😀';\n @enum Heat ::= 'hot' | 'cold';\n @mapping(Leaf,params=[text]) Leaf ::= '<' 'node' @text '>';\n Item ::= Mode | Heat | Leaf | 'text';\n @mapping(Node.A,params=[value,maybe,many]) A ::= 'a' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n @mapping(Node.B,params=[value,maybe,many]) B ::= 'b' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 560}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 573}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-schema-SharedMixedFields-with-eval",
+    "source": "grammar SharedMixedFields {\n @package: commonprobe\n @whitespace: none\n @root @mapping(Node) @commonField(value,maybe,many)\n Root ::= AEnum | AText | ANode | B;\n @enum Mode ::= 'on' | '😀';\n @enum Heat ::= 'hot' | 'cold';\n @mapping(Leaf,params=[text]) Leaf ::= '<' 'node' @text '>';\n Item ::= Mode | Heat | Leaf | 'text';\n @mapping(A,params=[value,maybe,many]) AEnum ::= 'm' Mode @value '[' [Mode] @maybe ']' '{' {Mode} @many '}';\n @mapping(A,params=[value,maybe,many]) AText ::= 't' 'text' @value '[' ['text'] @maybe ']' '{' {'text'} @many '}';\n @mapping(A,params=[value,maybe,many]) ANode ::= 'n' Leaf @value '[' [Leaf] @maybe ']' '{' {Leaf} @many '}';\n @mapping(B,params=[value,maybe,many]) B ::= 'b' Item @value '[' [Item] @maybe ']' '{' {Item} @many '}';\n\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 798}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 813}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "earlier-type-before-later-common",
+    "source": "grammar Numeric {\n @package: commonprobe\n token NUMBER = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' NUMBER @value;\n @mapping(B,params=[value]) B ::= 'b' 'word' @value;\n\n @commonField(value) Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 101, "end": 158}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 104, "end": 162}, "subject": "commonField schema"}]}
+    }
+  },
+  {
+    "name": "valid-enum-alias-annotated",
+    "source": "grammar G {\n @root @mapping(Family) @commonField(value) Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @whitespace Alias ::= Mode;\n @mapping(A,params=[value]) A ::= Mode @value;\n @mapping(B,params=[value]) B ::= Alias @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    }
+  },
+  {
+    "name": "valid-enum-alias-annotated-with-eval",
+    "source": "grammar G {\n @root @mapping(Family) @commonField(value) Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n @whitespace Alias ::= Mode;\n @mapping(A,params=[value]) A ::= Mode @value;\n @mapping(B,params=[value]) B ::= Alias @value;\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 265}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 272}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-enum-alias-captured",
+    "source": "grammar G {\n @root @mapping(Family) @commonField(value) Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n Alias ::= Mode @inner;\n @mapping(A,params=[value]) A ::= Mode @value;\n @mapping(B,params=[value]) B ::= Alias @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    }
+  },
+  {
+    "name": "valid-enum-alias-captured-with-eval",
+    "source": "grammar G {\n @root @mapping(Family) @commonField(value) Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n Alias ::= Mode @inner;\n @mapping(A,params=[value]) A ::= Mode @value;\n @mapping(B,params=[value]) B ::= Alias @value;\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 260}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 267}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-enum-alias-recursive",
+    "source": "grammar G {\n @root @mapping(Family) @commonField(value) Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n Alias ::= Mode | 'x' Alias;\n @mapping(A,params=[value]) A ::= Mode @value;\n @mapping(B,params=[value]) B ::= Alias @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    }
+  },
+  {
+    "name": "valid-enum-alias-recursive-with-eval",
+    "source": "grammar G {\n @root @mapping(Family) @commonField(value) Root ::= A | B;\n @enum Mode ::= 'on' | 'off';\n Alias ::= Mode | 'x' Alias;\n @mapping(A,params=[value]) A ::= Mode @value;\n @mapping(B,params=[value]) B ::= Alias @value;\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 265}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 272}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "valid-overlapping-text-captures",
+    "source": "grammar G {\n @root @mapping(Family) @commonField(v) Root ::= A | B;\n @mapping(A,params=[v]) A ::= ('a' @v) @v;\n @mapping(B,params=[v]) B ::= 'b' @v 'c' @v;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    }
+  },
+  {
+    "name": "valid-overlapping-text-captures-with-eval",
+    "source": "grammar G {\n @root @mapping(Family) @commonField(v) Root ::= A | B;\n @mapping(A,params=[v]) A ::= ('a' @v) @v;\n @mapping(B,params=[v]) B ::= 'b' @v 'c' @v;\n @eval(kind='literal') Other ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 195}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 200}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "shared-schema-before-later-duplicate-field",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(text,text)\n Root ::= A | B;\n @mapping(A, params=[text]) A ::= 'a' 'x' @text;\n @mapping(A, params=[text]) A2 ::= 'c' [ 'x' @text ];\n @mapping(B, params=[text]) B ::= 'b' 'y' @text;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 228}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 234}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "shared-schema-before-later-field-duplicate",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(u,t,u)\n Root ::= A | B;\n @mapping(A, params=[t,u]) A ::= 'a' 'x' @t 'k' @u;\n @mapping(A, params=[t,u]) A2 ::= 'c' [ 'x' @t ] 'k' @u;\n @mapping(B, params=[t,u]) B ::= 'b' 'y' @t 'k' @u;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 233}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 239}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "shared-schema-before-later-leaf-missing-field",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(text)\n Root ::= A | B;\n @mapping(A, params=[text]) A ::= 'a' 'x' @text;\n @mapping(A, params=[text]) A2 ::= 'c' [ 'x' @text ];\n @mapping(B, params=[other]) B ::= 'b' 'y' @other;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 225}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 231}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "shared-schema-before-later-missing-capture",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(text)\n Root ::= A | B;\n @mapping(B, params=[text]) B ::= 'b' 'y' @text;\n @mapping(A, params=[text]) A ::= 'a' 'x' @text;\n @mapping(A, params=[text]) A2 ::= 'c' [ 'x' @text ];\n @mapping(B, params=[text]) B2 ::= 'd' 'y';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 267}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 274}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "shared-schema-family-before-later-family",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(t) Root ::= A | B;\n @mapping(Node2) @commonField(t) Root2 ::= A | C;\n @mapping(A, params=[t]) A ::= 'a' 'x' @t;\n @mapping(A, params=[t]) A2 ::= 'c' [ 'x' @t ];\n @mapping(B, params=[t]) B ::= 'b' 'y' @t;\n @mapping(C, params=[u]) C ::= 'k' 'y' @u;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 294}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 301}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "schema-group-capture-type",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(v)\n Root ::= A | B;\n @mapping(A, params=[v]) A ::= 'a' ( 'x' 'y' ) @v;\n @mapping(B, params=[v]) B ::= 'b' 'z' @v;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 13, "end": 66}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 68}, "subject": "commonField schema"}]}
+    }
+  }
+]

@@ -107,6 +107,9 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     }
     crate::nested_captures::validate(grammar)?;
     crate::raising::validate(grammar)?;
+    // Match Java RustGrammarLowering: schema failures precede enum/eval/embedding
+    // and ordinary lowering failures, but not bounded/precedence/nested failures.
+    crate::common_fields::families(grammar)?;
     crate::lexical_contexts::validate(grammar)?;
     let format_two = grammar.settings.iter().any(|setting| {
         setting.key == "ubnf"
@@ -123,7 +126,6 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     crate::embedded::validate(grammar)?;
     validate_enum_rules(grammar)?;
     crate::evaluation::validate(grammar)?;
-    crate::common_fields::families(grammar)?;
     let mut ir = Lowering {
         grammar,
         nested_rule: false,
