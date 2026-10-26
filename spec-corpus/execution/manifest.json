@@ -1,0 +1,626 @@
+{
+  "schema_version": 1,
+  "drivers": {
+    "java-validate": {
+      "host": "java",
+      "scope": "validate",
+      "path": "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SpecCorpusExecutionConformanceTest.java",
+      "test": "validationCorpusRunsOnEveryHost"
+    },
+    "java-host-validate": {
+      "host": "java-host",
+      "scope": "validate",
+      "path": "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SpecCorpusExecutionConformanceTest.java",
+      "test": "validationCorpusRunsOnEveryHost"
+    },
+    "native-validate": {
+      "host": "native",
+      "scope": "validate",
+      "path": "rust/unlaxer-generator/tests/spec_corpus_execution.rs",
+      "test": "validate_corpus_on_native"
+    },
+    "java-runtime": {
+      "host": "java",
+      "scope": "runtime",
+      "path": "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SpecCorpusExecutionConformanceTest.java",
+      "test": "runtimeCorpusRunsOnEveryHost"
+    },
+    "java-host-runtime": {
+      "host": "java-host",
+      "scope": "runtime",
+      "path": "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SpecCorpusExecutionConformanceTest.java",
+      "test": "runtimeCorpusRunsOnEveryHost"
+    },
+    "native-runtime": {
+      "host": "native",
+      "scope": "runtime",
+      "path": "rust/unlaxer-generator/tests/spec_corpus_execution.rs",
+      "test": "runtime_corpus_on_native"
+    }
+  },
+  "cases": [
+    {
+      "id": "annotation/mapping-missing-capture",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-root",
+        "issue": 833,
+        "native": "exactly one @root is required",
+        "java-host": "Rust subset: exactly one @root is required"
+      }
+    },
+    {
+      "id": "annotation/mapping-extra-capture",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-root",
+        "issue": 833,
+        "native": "exactly one @root is required",
+        "java-host": "Rust subset: exactly one @root is required"
+      }
+    },
+    {
+      "id": "annotation/mapping-duplicate-param",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-root",
+        "issue": 833,
+        "native": "exactly one @root is required",
+        "java-host": "Rust subset: exactly one @root is required"
+      }
+    },
+    {
+      "id": "annotation/whitespace-bad-style",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-whitespace",
+        "issue": 834,
+        "native": "E-WHITESPACE: undefined declarative whitespace bogus",
+        "java-host": "E-WHITESPACE: undefined declarative whitespace bogus"
+      }
+    },
+    {
+      "id": "annotation/whitespace-rule-duplicate",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-whitespace",
+        "issue": 834,
+        "native": "duplicate @whitespace on R",
+        "java-host": "Rust subset: duplicate @whitespace on R"
+      }
+    },
+    {
+      "id": "annotation/precedence-duplicate",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-annotation",
+        "issue": 835,
+        "native": "duplicate @precedence on R",
+        "java-host": "Rust subset: duplicate @precedence on R"
+      }
+    },
+    {
+      "id": "annotation/precedence-without-assoc",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-annotation",
+        "issue": 835,
+        "native": "associativity and @precedence must occur together on R",
+        "java-host": "Rust subset: exactly one @root is required"
+      }
+    },
+    {
+      "id": "annotation/assoc-without-precedence",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-annotation",
+        "issue": 835,
+        "native": "associativity and @precedence must occur together on R",
+        "java-host": "Rust subset: exactly one @root is required"
+      }
+    },
+    {
+      "id": "annotation/assoc-both",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-annotation",
+        "issue": 835,
+        "native": "duplicate/conflicting associativity on R",
+        "java-host": "Rust subset: duplicate/conflicting associativity on R"
+      }
+    },
+    {
+      "id": "annotation/interleave-bad-profile",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-annotation",
+        "issue": 835,
+        "native": "unsupported interleave profile bogus",
+        "java-host": "Rust subset: interleave profile bogus"
+      }
+    },
+    {
+      "id": "annotation/scopetree-bad-mode",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-annotation",
+        "issue": 835,
+        "native": "unsupported scopeTree mode bogus",
+        "java-host": "Rust subset: scopeTree mode bogus"
+      }
+    },
+    {
+      "id": "spec-contradiction/minilang-leftassoc",
+      "file": "annotations.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-annotation",
+        "issue": 835,
+        "native": "associativity and @precedence must occur together on AddExpr",
+        "java-host": "Rust subset: exactly one @root is required"
+      }
+    },
+    {
+      "id": "char-range/inclusive-bounds",
+      "file": "char-range.json",
+      "scope": "runtime",
+      "excluded_from": [
+        "java-frontend",
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-runtime",
+        "java-host-runtime",
+        "native-runtime"
+      ],
+      "oracle": "仕様の実行時契約から導出した prefix 成否・CP カーソル・ERROR hint。frontend の undetermined は変更しない。",
+      "entry": "R",
+      "add_root": false,
+      "samples": [
+        {
+          "input": "",
+          "prefix": [
+            false,
+            0,
+            0
+          ]
+        },
+        {
+          "input": "/",
+          "prefix": [
+            false,
+            0,
+            0
+          ]
+        },
+        {
+          "input": "0",
+          "prefix": [
+            true,
+            1,
+            1
+          ]
+        },
+        {
+          "input": "5",
+          "prefix": [
+            true,
+            1,
+            1
+          ]
+        },
+        {
+          "input": "9",
+          "prefix": [
+            true,
+            1,
+            1
+          ]
+        },
+        {
+          "input": ":",
+          "prefix": [
+            false,
+            0,
+            0
+          ]
+        },
+        {
+          "input": "😀",
+          "prefix": [
+            false,
+            0,
+            0
+          ]
+        },
+        {
+          "input": "09",
+          "prefix": [
+            true,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "error/element-needs-string",
+      "file": "formal-grammar.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-root",
+        "issue": 833,
+        "native": "exactly one @root is required",
+        "java-host": "Rust subset: exactly one @root is required"
+      }
+    },
+    {
+      "id": "error/hint-is-last-alternative",
+      "file": "formal-grammar.json",
+      "scope": "runtime",
+      "excluded_from": [
+        "java-frontend",
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-runtime",
+        "java-host-runtime",
+        "native-runtime"
+      ],
+      "oracle": "仕様の実行時契約から導出した prefix 成否・CP カーソル・ERROR hint。frontend の undetermined は変更しない。",
+      "entry": "R",
+      "add_root": true,
+      "samples": [
+        {
+          "input": "",
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "hint": "m",
+          "hint_cp": 0
+        },
+        {
+          "input": "a",
+          "prefix": [
+            true,
+            1,
+            1
+          ]
+        },
+        {
+          "input": "b",
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "hint": "m",
+          "hint_cp": 0
+        },
+        {
+          "input": "😀",
+          "prefix": [
+            false,
+            0,
+            0
+          ],
+          "hint": "m",
+          "hint_cp": 0
+        },
+        {
+          "input": "ab",
+          "prefix": [
+            true,
+            1,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "setting/whitespace-bad-style",
+      "file": "global-settings.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-whitespace",
+        "issue": 834,
+        "native": "unsupported setting whitespace: bogus",
+        "java-host": "E-WHITESPACE: undefined declarative whitespace bogus"
+      }
+    },
+    {
+      "id": "setting/whitespace-duplicate",
+      "file": "global-settings.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-whitespace",
+        "issue": 834,
+        "native": "duplicate setting whitespace",
+        "java-host": "Rust subset: duplicate setting whitespace"
+      }
+    },
+    {
+      "id": "setting/whitespace-block-value",
+      "file": "global-settings.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "difference": {
+        "ledger": "spec-validation-whitespace",
+        "issue": 834,
+        "native": "unsupported block setting whitespace",
+        "java-host": "Rust subset: block setting whitespace"
+      }
+    },
+    {
+      "id": "quantifier/reversed-bounds",
+      "file": "quantifiers.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator"
+    },
+    {
+      "id": "quantifier/huge-bound",
+      "file": "quantifiers.json",
+      "scope": "validate",
+      "excluded_from": [
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-validate",
+        "java-host-validate",
+        "native-validate"
+      ],
+      "oracle": "spec-corpus expectation.code; Java GrammarValidator",
+      "cp": [
+        18,
+        33
+      ]
+    },
+    {
+      "id": "separator/expansion",
+      "file": "quantifiers.json",
+      "scope": "runtime",
+      "excluded_from": [
+        "java-frontend",
+        "rust-frontend"
+      ],
+      "drivers": [
+        "java-runtime",
+        "java-host-runtime",
+        "native-runtime"
+      ],
+      "oracle": "仕様の実行時契約から導出した prefix 成否・CP カーソル・ERROR hint。frontend の undetermined は変更しない。",
+      "entry": "ExprList",
+      "add_root": true,
+      "samples": [
+        {
+          "input": "",
+          "prefix": [
+            false,
+            0,
+            0
+          ]
+        },
+        {
+          "input": "e",
+          "prefix": [
+            true,
+            1,
+            1
+          ]
+        },
+        {
+          "input": "e,e",
+          "prefix": [
+            true,
+            3,
+            3
+          ]
+        },
+        {
+          "input": "e;e!e",
+          "prefix": [
+            true,
+            5,
+            5
+          ]
+        },
+        {
+          "input": "e😀e",
+          "prefix": [
+            true,
+            3,
+            3
+          ]
+        },
+        {
+          "input": "e,",
+          "prefix": [
+            true,
+            1,
+            1
+          ]
+        },
+        {
+          "input": "e,x",
+          "prefix": [
+            true,
+            1,
+            1
+          ]
+        },
+        {
+          "input": "x",
+          "prefix": [
+            false,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}
