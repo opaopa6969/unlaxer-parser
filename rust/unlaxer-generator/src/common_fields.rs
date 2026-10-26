@@ -146,6 +146,16 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
         if !names.insert(name) {
             return Err(invalid(&rule.name, "duplicate family declaration"));
         }
+        let view = format!("{}Fields", rust_name(name));
+        if grammar.rules.iter().any(|r| {
+            mapping(r).is_some_and(|(n, _)| rust_name(n) == view)
+                || r.name == view
+                    && r.annotations
+                        .iter()
+                        .any(|a| matches!(a.kind, AnnotationKind::Enum))
+        }) {
+            return Err(invalid(&rule.name, "view name collision"));
+        }
         let mut leaves = Vec::new();
         collect(grammar, rule, &mut HashSet::new(), &mut leaves)?;
         for sibling in &grammar.rules {
@@ -207,6 +217,22 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
                     }
                 }
             }
+            // Java CommonFieldSchema compares source types before eval/enum/ordinary
+            // lowering. Waiting for emit(ir) loses this error when lowering also fails.
+            let mut contract = None;
+            for leaf in &leaves {
+                let actual = source_contract(grammar, leaf, field)?;
+                if contract
+                    .as_ref()
+                    .is_some_and(|previous| previous != &actual)
+                {
+                    return Err(invalid(
+                        &rule.name,
+                        &format!("incompatible field {field} on {leaf}"),
+                    ));
+                }
+                contract = Some(actual);
+            }
         }
         result.push(Family {
             name: name.into(),
@@ -216,6 +242,265 @@ pub(crate) fn families(grammar: &GrammarDecl) -> Result<Vec<Family>, String> {
         });
     }
     Ok(result)
+}
+
+fn source_contract(
+    grammar: &GrammarDecl,
+    mapped: &str,
+    field: &str,
+) -> Result<(String, unlaxer_codegen::Cardinality), String> {
+    let mut contract = None;
+    let mut params = None;
+    for rule in grammar
+        .rules
+        .iter()
+        .filter(|r| mapping(r).is_some_and(|(n, _)| n == mapped))
+    {
+        let current = mapping(rule).unwrap().1;
+        if params.is_some_and(|previous| previous != current) {
+            return Err(format!(
+                "Incompatible shared mapping schema {mapped}: parameter names/order differ on {}",
+                rule.name
+            ));
+        }
+        params = Some(current);
+        let mut sites = Vec::new();
+        let mut pending: Vec<_> = rule
+            .body
+            .alternatives
+            .iter()
+            .flat_map(|s| &s.elements)
+            .collect();
+        while let Some(item) = pending.pop() {
+            if item.capture.as_deref() == Some(field) {
+                sites.push(&item.element);
+            }
+            source_children(&item.element, &mut pending);
+        }
+        let (semantic, cardinality) =
+            crate::preferred_plan::capture_contract(grammar, rule, field)?
+                .unwrap_or((false, unlaxer_codegen::Cardinality::One));
+        let types: HashSet<_> = sites
+            .iter()
+            .map(|site| {
+                // SemanticCardinality normalizes repeated text bindings: a group
+                // and its child can have the same capture name and text type.
+                if !semantic && sites.len() > 1 {
+                    Ok(text_site_nominal(grammar, site))
+                } else {
+                    source_nominal(grammar, site)
+                }
+            })
+            .collect::<Result<_, String>>()?;
+        let mut nominal = if types.len() != 1 {
+            "Object".into()
+        } else {
+            types.into_iter().next().unwrap()
+        };
+        if nominal == "String" && semantic {
+            nominal = "Object".into();
+        }
+        if crate::nested_captures::enabled(rule) {
+            nominal = format!(
+                "{:?}:{nominal}",
+                crate::nested_captures::field(grammar, rule, field)?
+            );
+        }
+        if let Some((previous, count)) = &mut contract {
+            if *count != cardinality {
+                return Err(format!("Incompatible shared mapping schema {mapped}: capture cardinality differs for {field}"));
+            }
+            if *previous != nominal {
+                *previous = "Object".into();
+            }
+        } else {
+            contract = Some((nominal, cardinality));
+        }
+    }
+    contract.ok_or_else(|| invalid(mapped, "missing variant"))
+}
+
+fn source_children<'a>(atom: &'a AtomicElement, out: &mut Vec<&'a unlaxer_ubnf::AnnotatedElement>) {
+    match &atom.kind {
+        ElementKind::OwnedCapture { body, .. }
+        | ElementKind::CaptureScope(body)
+        | ElementKind::Commit { body, .. }
+        | ElementKind::Label { body, .. }
+        | ElementKind::Catch { choice: body, .. }
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => {
+            out.extend(body.alternatives.iter().flat_map(|s| &s.elements));
+        }
+        ElementKind::OneOrMore(a)
+        | ElementKind::BoundedRepeat { element: a, .. }
+        | ElementKind::Separated { element: a, .. } => source_children(a, out),
+        _ => (),
+    }
+}
+
+fn source_nominal(grammar: &GrammarDecl, atom: &AtomicElement) -> Result<String, String> {
+    match &atom.kind {
+        ElementKind::Optional(body) | ElementKind::Repeat(body) => {
+            let [sequence] = body.alternatives.as_slice() else {
+                return Ok("Object".into());
+            };
+            let [item] = sequence.elements.as_slice() else {
+                return Ok("Object".into());
+            };
+            return source_nominal(grammar, &item.element);
+        }
+        ElementKind::OneOrMore(a)
+        | ElementKind::BoundedRepeat { element: a, .. }
+        | ElementKind::Separated { element: a, .. } => return source_nominal(grammar, a),
+        _ => (),
+    }
+    // Ordinary enum aliases may carry trivia annotations or captures. They are
+    // not subject to the stricter nested-capture helper expansion contract.
+    if grammar.rules.iter().any(|r| {
+        r.annotations
+            .iter()
+            .any(|a| matches!(a.kind, AnnotationKind::Enum))
+    }) {
+        let value = source_value_type(grammar, atom, &mut HashSet::new())?;
+        if value.starts_with("enum:") {
+            return Ok(value);
+        }
+    }
+    if matches!(
+        atom.kind,
+        ElementKind::OwnedCapture { .. }
+            | ElementKind::CaptureScope(_)
+            | ElementKind::Commit { .. }
+            | ElementKind::Label { .. }
+            | ElementKind::Catch { .. }
+            | ElementKind::Group(_)
+    ) {
+        return Ok("Object".into());
+    }
+    let mut types = HashSet::new();
+    atom_types(grammar, atom, &mut types);
+    Ok(if types.len() == 1 {
+        types.into_iter().next().unwrap()
+    } else {
+        "Object".into()
+    })
+}
+
+fn text_site_nominal(grammar: &GrammarDecl, atom: &AtomicElement) -> String {
+    match &atom.kind {
+        ElementKind::OwnedCapture { body, .. }
+        | ElementKind::CaptureScope(body)
+        | ElementKind::Commit { body, .. }
+        | ElementKind::Label { body, .. }
+        | ElementKind::Catch { choice: body, .. }
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => {
+            if let [sequence] = body.alternatives.as_slice() {
+                if let [item] = sequence.elements.as_slice() {
+                    return text_site_nominal(grammar, &item.element);
+                }
+            }
+            "String".into()
+        }
+        ElementKind::OneOrMore(a)
+        | ElementKind::BoundedRepeat { element: a, .. }
+        | ElementKind::Separated { element: a, .. } => text_site_nominal(grammar, a),
+        _ => {
+            let mut types = HashSet::new();
+            atom_types(grammar, atom, &mut types);
+            if types.len() == 1 {
+                types.into_iter().next().unwrap()
+            } else {
+                "Object".into()
+            }
+        }
+    }
+}
+
+// EnumSchema.valueType: sequences discard raw text, choices retain it. An
+// active recursive alias is an unresolved value, joined with its productive
+// alternatives rather than prematurely assuming text.
+fn source_value_type(
+    grammar: &GrammarDecl,
+    atom: &AtomicElement,
+    seen: &mut HashSet<String>,
+) -> Result<String, String> {
+    match &atom.kind {
+        ElementKind::RuleRef { name, .. } => {
+            if seen.len() >= 128 {
+                return Err("E-ENUM: enum value analysis exceeds 128 rules".into());
+            }
+            let Some(rule) = grammar.rules.iter().find(|r| &r.name == name) else {
+                return Ok("#text".into());
+            };
+            if rule
+                .annotations
+                .iter()
+                .any(|a| matches!(a.kind, AnnotationKind::Skip))
+            {
+                return Ok("#text".into());
+            }
+            if !seen.insert(name.clone()) {
+                return Ok("#unknown".into());
+            }
+            let result = if rule
+                .annotations
+                .iter()
+                .any(|a| matches!(a.kind, AnnotationKind::Enum))
+            {
+                Ok(format!("enum:{name}"))
+            } else if mapping(rule).is_some() {
+                Ok("#node".into())
+            } else {
+                source_body_type(grammar, &rule.body, seen)
+            };
+            seen.remove(name);
+            result
+        }
+        ElementKind::OwnedCapture { body, .. }
+        | ElementKind::CaptureScope(body)
+        | ElementKind::Commit { body, .. }
+        | ElementKind::Label { body, .. }
+        | ElementKind::Catch { choice: body, .. }
+        | ElementKind::Group(body)
+        | ElementKind::Optional(body)
+        | ElementKind::Repeat(body) => source_body_type(grammar, body, seen),
+        ElementKind::OneOrMore(a)
+        | ElementKind::BoundedRepeat { element: a, .. }
+        | ElementKind::Separated { element: a, .. } => source_value_type(grammar, a, seen),
+        _ => Ok("#text".into()),
+    }
+}
+
+fn source_body_type(
+    grammar: &GrammarDecl,
+    body: &RuleBody,
+    seen: &mut HashSet<String>,
+) -> Result<String, String> {
+    fn joined(mut values: HashSet<String>, empty: &str) -> String {
+        if values.len() > 1 {
+            values.remove("#unknown");
+        }
+        match values.len() {
+            0 => empty.into(),
+            1 => values.into_iter().next().unwrap(),
+            _ => "#join".into(),
+        }
+    }
+    let mut choices = HashSet::new();
+    for sequence in &body.alternatives {
+        let mut nodes = HashSet::new();
+        for item in &sequence.elements {
+            let value = source_value_type(grammar, &item.element, seen)?;
+            if value != "#text" {
+                nodes.insert(value);
+            }
+        }
+        choices.insert(joined(nodes, "#text"));
+    }
+    Ok(joined(choices, "#text"))
 }
 // Match the Java field's nominal scalar contract, which is stricter than Rust's Node/Text storage.
 fn atom_types(grammar: &GrammarDecl, atom: &AtomicElement, out: &mut HashSet<String>) {

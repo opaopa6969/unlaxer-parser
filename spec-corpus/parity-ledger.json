@@ -11,7 +11,7 @@
     "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。後続のCST #767（PR #797）、Number #752（PR #792）、Java生成 #754（PR #804）、数値判定の作業量差 #758（PR #803）もCLOSEDで、それぞれchoice-root-cst / number-internal-failures / java-generation-depth / analysis-work-limitの契約として記録する。#741の境界差は契約化済み。",
     "CLOSED #331/#545/#571/#176/#537の後に残った旧未対応記述（回復内match-only、汎用伝播、Rust LSP/DAP、scopeTree、enum/eval、Backreference）は現行契約へ訂正する。未解決範囲はOPEN #111と個別子issueで追跡する。",
     "2026-10-24の監査で作成した量指定子overflow #783はPR #801で修正してCLOSED（bounded-overflow）。内部条件付き除外の検証漏れ #784はOPENのままspec-driver-coverageで追跡する。個別issueのない残機能群は既存全仕様issue #111の受け入れ範囲に結ぶ。",
-    "2026-10-26の再監査で、2026-10-24〜26にmergeされたPR（#766/#772/#778/#785/#787/#791/#796/#797/#799/#800/#801/#803/#804/#806/#807/#808/#810/#813）とissueの状態を反映した。未修正の差だったglobal-comment / multi-grammar / simple-annotation / capture-generated-source / capture-resetは、対応issueがすべてCLOSEDで、両言語の挙動を共通corpusとテストで固定したため契約へ移した。OPENのまま残る追跡issueは#111・#716・#784と、両Rust hostのcheck診断を追跡する#776（本変更で回帰修正、merge待ち）。",
+    "2026-10-26の再監査で、2026-10-24〜26にmergeされたPR（#766/#772/#778/#785/#787/#791/#796/#797/#799/#800/#801/#803/#804/#806/#807/#808/#810/#813）とissueの状態を反映した。未修正の差だったglobal-comment / multi-grammar / simple-annotation / capture-generated-source / capture-resetは、対応issueがすべてCLOSEDで、両言語の挙動を共通corpusとテストで固定したため契約へ移した。OPENのまま残る追跡issueは#111・#716・#784と、両Rust hostのcheck構造診断を追跡する#825（本変更で回帰修正、merge待ち）。import診断の#776はPR #824でmerge済み。",
     "catalog/corpus.jsonのGsonが許していた単引用符escapeを同じ復号値の標準JSONへ訂正した。JSONの不正構文を黙って走査から除外しない。",
     "host別corpusの値の一致/差と未対応の意味分類は人が監査する。検査は新しいファイル/キー/出現数と台帳参照の欠落を落とすが、任意の新規skip条件や文書の意味を自動分類しない。"
   ],
@@ -277,7 +277,7 @@
       "title": "parity: token-stream / lexical-context で空でない literal の Classic 反転の幅が Java 0 / Rust 1 文字（#716 の子）"
     },
     "776": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "check: import と無関係な grammar の診断・CP位置が null化と dedup で消える"
     },
     "777": {
@@ -323,6 +323,10 @@
     "820": {
       "state": "OPEN",
       "title": "parity: ValueBoundary / TextValue の rule 本体が失敗した後の owner reset を Java と照合する（#814 後続）"
+    },
+    "825": {
+      "state": "OPEN",
+      "title": "check: @eval と @commonField の構造エラーが同居すると code と位置が変わる"
     }
   },
   "entries": [
@@ -375,16 +379,20 @@
         422,
         427,
         592,
-        593
+        593,
+        825
       ],
-      "observation": "nativeError/nativeMessage/javaGeneratorError は構造検証の fail-first 順序・説明文を区別する。例: family cyclic-sum の Java generator は E-LEFT-RECURSION、schema validator は E-COMMONFIELD-MISMATCH。受理してよい差ではなく、両経路の拒否を固定する。公開 check の共通診断契約とは区別する。",
+      "observation": "nativeError/nativeMessage/javaGeneratorError は構造検証の fail-first 順序・説明文を区別する。例: family cyclic-sum の Java generator は E-LEFT-RECURSION、schema validator は E-COMMONFIELD-MISMATCH。受理してよい差ではなく、両経路の拒否を固定する。公開 check の共通診断契約とは区別する。 #825では公開checkをJava-hostの優先順位に揃える。syntax/module/inventoryで前段が失敗したら構造検証しない。grammarごとにbounded/precedence/nested検証がcommonField schemaに先行し、schemaエラーはeval/enum/embedding/通常lowering/IR検証より先に問題ruleのCP spanで返す。schemaの宣言順と複数grammarの診断順を固定し、単一エラーとJSON schemaVersion 1は維持する。共通structure-priority.jsonの65ケースをLF/CRLFでJSON全体・終了コードに照合する。issue #825はレビュー・merge待ち。",
       "evidence": [
         "docs/portability-check.md",
         "spec-corpus/associative-projection/invalid-cases.json",
         "spec-corpus/family-projection/invalid-cases.json",
         "unlaxer-dsl/src/test/resources/unique-longest/invalid.json",
         "unlaxer-dsl/src/test/resources/name-predicate/invalid.json",
-        "unlaxer-dsl/src/test/resources/ambiguity-boundaries/invalid.json"
+        "unlaxer-dsl/src/test/resources/ambiguity-boundaries/invalid.json",
+        "rust/unlaxer-generator/tests/fixtures/portability/structure-priority.json",
+        "rust/unlaxer-generator/tests/portability.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/RustPortabilityConformanceTest.java"
       ]
     },
     {
@@ -657,7 +665,7 @@
         714,
         776
       ],
-      "observation": "#714（PR #772）でJava CLI・Java-host Rust・native Rustは同一fileの各grammarを独立生成し、両Rust hostのcheckも全grammarを構造検証する。Rust出力は単一grammarなら従来の5ファイル、複数なら宣言順のroot mod.rsとgrammar_<ASCII小文字名>/に置き、各moduleは単独生成とbyte一致する。共通corpusでJava向けと両Rust hostの生成物をcompile/parse/map/evalし、原文・capture・CP span・別grammarの入力の拒否、両hostの生成物一致、後続grammarの失敗時に部分出力を残さないことを照合する。意図した差: 出力名の衝突はRustがASCII大小文字を無視したmodule名でP-OUTPUT-COLLISION、Javaはpackageと小文字化した生成クラス名の組が一致したときだけ拒否する（各言語の出力配置の規則）。出力先の祖先symlinkはJava-hostが許容し、nativeは従来どおり拒否する。impactとplaygroundは単一grammarのまま。#776でimport解決後もroot由来のnodeのCP範囲を保持し、別grammar・別位置の同じcode/subjectを残す。import由来・出典不明はnullとし、同じcode/subjectのnull診断は従来どおりdedupする。schemaVersion 1・既存フィールド・単一file契約を維持。共通imports.jsonの9ケースをLF/CRLFで両hostのJSON全体（順序・件数・CP範囲）と固定期待値に照合する。issue #776はPRのmergeまでOPEN。",
+      "observation": "#714（PR #772）でJava CLI・Java-host Rust・native Rustは同一fileの各grammarを独立生成し、両Rust hostのcheckも全grammarを構造検証する。Rust出力は単一grammarなら従来の5ファイル、複数なら宣言順のroot mod.rsとgrammar_<ASCII小文字名>/に置き、各moduleは単独生成とbyte一致する。共通corpusでJava向けと両Rust hostの生成物をcompile/parse/map/evalし、原文・capture・CP span・別grammarの入力の拒否、両hostの生成物一致、後続grammarの失敗時に部分出力を残さないことを照合する。意図した差: 出力名の衝突はRustがASCII大小文字を無視したmodule名でP-OUTPUT-COLLISION、Javaはpackageと小文字化した生成クラス名の組が一致したときだけ拒否する（各言語の出力配置の規則）。出力先の祖先symlinkはJava-hostが許容し、nativeは従来どおり拒否する。impactとplaygroundは単一grammarのまま。#776でimport解決後もroot由来のnodeのCP範囲を保持し、別grammar・別位置の同じcode/subjectを残す。import由来・出典不明はnullとし、同じcode/subjectのnull診断は従来どおりdedupする。schemaVersion 1・既存フィールド・単一file契約を維持。共通imports.jsonの9ケースをLF/CRLFで両hostのJSON全体（順序・件数・CP範囲）と固定期待値に照合する。issue #776はPR #824でmerge済み。",
       "evidence": [
         "docs/multiple-grammars.md",
         "docs/portability-check.md",
