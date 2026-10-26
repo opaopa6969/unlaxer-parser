@@ -77,6 +77,11 @@ public class ValueBoundaryResetConformanceTest {
                         assertTrue(parser.getChildren().get(0) instanceof LazyChain);
                     } else if (!c[2].equals("Root")) {
                         assertTrue(parser instanceof LazyChain);
+                    } else if (file.equals("text-value-choice.ubnf")) {
+                        // __CaptureSite is a Chain even around a non-Chain child; Root restores it.
+                        Parser site = parser.getChildren().get(0);
+                        assertEquals("__CaptureSite", site.getClass().getSimpleName());
+                        assertTrue(site.getChildren().get(0) instanceof LazyChoice);
                     }
                     for (var memo : Memoization.values()) for (var mode : ParseOptions.Diagnostics.values()) {
                         try (var context = ParseContext.withOptions(StringSource.createRootSource(c[4]),

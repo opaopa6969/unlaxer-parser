@@ -41,4 +41,18 @@ fn projected_values_preserve_failed_chain_policy() {
             ]),
         }],
     );
+    oracle::check(
+        "text-value-choice.ubnf",
+        vec![Rule {
+            name: "Root",
+            expression: Expr::Choice(vec![
+                Expr::Choice(vec![
+                    Expr::Sequence(vec![Expr::Literal("a"), Expr::Literal("z")]),
+                    Expr::Literal("q"),
+                ])
+                .text_value(),
+                Expr::Number.value_boundary(),
+            ]),
+        }],
+    );
 }

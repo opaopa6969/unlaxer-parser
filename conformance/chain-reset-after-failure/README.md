@@ -132,9 +132,9 @@ name scope / name predicate の開始時 matched 復元を個別に外す、の5
 
 ## 値投影境界の実測 (#820)
 
-`value-reset.tsv` の48行は生成 Java を実行して採取した期待値。
-`ValueBoundaryResetConformanceTest` は memo OFF / SAFE_FAILURES × 診断3設定で Java の288観測と、
-Java-host / native × 通常 / mapping grammar の Rust の1152観測を照合する。
+`value-reset.tsv` の56行は生成 Java を実行して採取した期待値。
+`ValueBoundaryResetConformanceTest` は memo OFF / SAFE_FAILURES × 診断3設定で Java の336観測と、
+Java-host / native × 通常 / mapping grammar の Rust の1344観測を照合する。
 生成物の一致、生成ソースの `.value_boundary()` / `.text_value()`、観測する式の位置と子の型も検査する。
 両言語の生成ソースと観測結果は `unlaxer-dsl/target/value-reset-{java,rust}` および同名の TSV に保存する。
 
@@ -153,6 +153,14 @@ Java-host / native × 通常 / mapping grammar の Rust の1152観測を照合�
   `__CaptureSite(ValueResetPlainLazyChain('a','z'), "#nested:text")` を生成する。
   `__CaptureSite` 自身も LazyChain で、子の Chain と同様に `begin` 前に owner を false にする。
   候補を `getChildren().get(0)` で取得して単独で呼ぶので、期待値は手組み Java からではない。
+- `text-value-choice.ubnf`: `Root ::= ('a' 'z' | 'q') | N`。第1候補は子が Chain でない
+  `TextValue(Choice(...))` で、Java は `__CaptureSite(LazyChoice)` を生成する。
+  `__CaptureSite` は子が Choice でも Chain なので、候補を単独で呼ぶと Java は失敗後 reset=false、
+  Rust は子の Choice が復元した値（初期 true なら true）を返す（PR #821 のレビューで実測）。
+  生成位置は必ず外側 Choice の候補で、Choice は Java の frame として成否どちらでも終了時に入口の policy を復元するため、
+  Root 全体の結果は両言語で一致する。この8行は Root 全体だけを照合し、候補単独の差は #823 で扱う。
+  値投影（`@nestedCaptures` なし）の mixed 候補の TextValue には Java の parser がない（`MixedParser` の候補は `WordParser`）ため、
+  Rust で TextValue を一律に Chain 扱いにすることはできない。
 
 **TextValue の生成上の制約:** 現在の lowering は TextValue を mixed Choice の候補か Capture の子に置く。
 `body` の単一選択肢が Text なら `mixed_nested=false`、Value なら候補の kind も Value なので

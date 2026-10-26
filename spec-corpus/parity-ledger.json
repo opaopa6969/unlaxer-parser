@@ -768,6 +768,7 @@
         "rust/unlaxer-runtime/src/lib.rs",
         "conformance/chain-reset-after-failure/value-boundary.ubnf",
         "conformance/chain-reset-after-failure/text-value.ubnf",
+        "conformance/chain-reset-after-failure/text-value-choice.ubnf",
         "conformance/chain-reset-after-failure/value-reset.tsv",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ValueBoundaryResetConformanceTest.java",
         "rust/unlaxer-runtime/tests/value_boundary_reset.rs",

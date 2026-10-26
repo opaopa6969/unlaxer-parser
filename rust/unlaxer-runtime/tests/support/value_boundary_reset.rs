@@ -57,6 +57,13 @@ fn observations(file: &str, rules: Vec<Rule>) -> Vec<(String, String)> {
                     matches!(unscoped(&grammar[id].expression), Expr::ValueBoundary(child)
                     if matches!(child.as_ref(), Expr::Sequence(_)))
                 );
+            } else if file == "text-value-choice.ubnf" {
+                // A non-Chain child: only the enclosing Choice makes Rust match Java here.
+                let Expr::Choice(alternatives) = unscoped(&grammar[id].expression) else {
+                    panic!("nested mixed root must be a generated Choice");
+                };
+                assert!(matches!(unscoped(&alternatives[0]), Expr::TextValue(child)
+                    if matches!(child.as_ref(), Expr::Choice(_))));
             }
             id
         };
