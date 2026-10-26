@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CI workflows: self-hosted runners only, superseded PR runs cancelled, master and tags never."""
 from pathlib import Path
+import re
 import unittest
 
 import yaml
@@ -15,6 +16,9 @@ PR_GROUP = '${{ github.workflow }}-${{ github.event.pull_request.number || githu
 PR_CANCEL = "${{ github.event_name == 'pull_request' }}"
 # Network steps that may fail once; the step after each of them repeats it and decides the job.
 RETRIED_ACTIONS = ('actions/configure-pages@', 'actions/deploy-pages@')
+NETWORK_COMMAND = re.compile(
+    r'\b(?:rustup\s+(?:toolchain\s+install|target\s+add)|'
+    r'cargo\s+(?:\+\S+\s+)?fetch\s+--locked|npm\s+ci|npx\s+playwright\s+install\s+chromium)\b')
 
 
 def workflows():
@@ -63,6 +67,43 @@ class WorkflowRunnerTest(unittest.TestCase):
 
 
 class NetworkRetryTest(unittest.TestCase):
+
+    def test_every_dependency_download_uses_the_wrapper_from_its_own_checkout(self):
+        checked = 0
+        for name, document, _ in workflows():
+            for job_name, job in document['jobs'].items():
+                own = [step.get('with', {}).get('path', '') for step in job.get('steps', [])
+                       if str(step.get('uses', '')).startswith('actions/checkout@')
+                       and 'repository' not in step.get('with', {})]
+                for step in job.get('steps', []):
+                    script = step.get('run', '')
+                    for command in NETWORK_COMMAND.finditer(script):
+                        where = f'{name}:{job_name}: {step}'
+                        self.assertEqual(len(own), 1, where)
+                        prefix = own[0] + '/' if own[0] else ''
+                        wrapper = f'bash "$GITHUB_WORKSPACE/{prefix}scripts/ci/retry-network.sh" '
+                        self.assertTrue(script[:command.start()].endswith(wrapper), where)
+                        checked += 1
+        self.assertGreaterEqual(checked, 30)
+
+    def test_wrapper_only_runs_download_commands_never_tests_or_shell_blocks(self):
+        checked = 0
+        for name, document, _ in workflows():
+            for job_name, job in document['jobs'].items():
+                for step in job.get('steps', []):
+                    script = step.get('run', '')
+                    # An allowlist also rejects bash -c, mvn, cargo test, node --test,
+                    # npm test/run and test scripts, including multi-command blocks.
+                    for call in re.finditer(r'retry-network\.sh[\"\']?\s+', script):
+                        self.assertIsNotNone(NETWORK_COMMAND.match(script, call.end()),
+                                             f'{name}:{job_name}: {step}')
+                        checked += 1
+        self.assertGreaterEqual(checked, 30)
+
+    def test_retry_regressions_run_through_the_required_unittest_runner(self):
+        command = 'python3 scripts/run-required-unittests.py scripts.tests.test_ci_network_retry'
+        build = dict((name, doc) for name, doc, _ in workflows())['maven.yml']['jobs']['build']
+        self.assertTrue(any(step.get('run') == command for step in build['steps']))
 
     def test_only_retried_network_steps_may_fail(self):
         for name, document, _ in workflows():
