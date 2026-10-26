@@ -87,7 +87,17 @@ public class RustUbnfFrontendConformanceTest {
                 () -> UBNFMapper.parseWithSource(input));
             assertEquals(parts[0], javaError.getClass(), snapshotError.getClass());
             assertEquals(parts[0], javaError.getMessage(), snapshotError.getMessage());
-            if (POSITIONED_REJECTIONS.contains(parts[0])) {
+            if (parts[0].startsWith("non-ascii-")) {
+                // These must fail in grammar recognition, before any numeric conversion.
+                assertEquals(parts[0], IllegalArgumentException.class, javaError.getClass());
+                assertTrue(javaError.getMessage(), javaError.getMessage().startsWith("UBNF パース失敗"));
+                String ascii = input.replace('１', '1').replace('２', '2').replace('٣', '3');
+                Files.writeString(source, ascii);
+                JsonObject nativeAscii = inspect(binary, source);
+                assertTrue(parts[0] + " " + nativeAscii, nativeAscii.has("ast"));
+                assertEquals(parts[0], canonical(UBNFMapper.parse(ascii)), nativeAscii.get("ast"));
+                report.add(parts[0] + "\treject\t" + javaError.getMessage() + "\t" + nativeResult);
+            } else if (POSITIONED_REJECTIONS.contains(parts[0])) {
                 String position = "line " + nativeResult.get("line").getAsInt()
                     + ", column " + nativeResult.get("column").getAsInt();
                 assertTrue(parts[0] + ": java=" + javaError.getMessage() + " rust=" + nativeResult,

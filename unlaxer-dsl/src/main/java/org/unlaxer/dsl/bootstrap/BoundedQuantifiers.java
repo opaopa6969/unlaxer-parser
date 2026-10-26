@@ -32,8 +32,8 @@ public final class BoundedQuantifiers {
         // No BigInteger allocation or exception for arbitrarily long digit runs, including zeroes.
         int value = 0;
         for (int i = 0; i < digits.length(); i++) {
-            int digit = Character.digit(digits.charAt(i), 10);
-            if (digit < 0) throw new NumberFormatException("Invalid repeat bound: " + digits);
+            int digit = digits.charAt(i) - '0';
+            if (digit < 0 || digit > 9) throw new NumberFormatException("Invalid repeat bound: " + digits);
             if (value > (Integer.MAX_VALUE - digit) / 10) return OVERFLOW;
             value = value * 10 + digit;
         }

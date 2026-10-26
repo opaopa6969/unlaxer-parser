@@ -18,6 +18,17 @@ public class UBNFParsersTest {
         }
     }
 
+    @Test
+    public void testGrammarDigitsAreAsciiOnly() {
+        Parser digit = Parser.get(UBNFParsers.DigitParser.class);
+        for (char c = '0'; c <= '9'; c++) {
+            assertTrue(parse(digit, String.valueOf(c)).isSucceeded());
+        }
+        for (String text : new String[] {"１", "２", "٣", "９", "/", ":"}) {
+            org.junit.Assert.assertFalse(text, parse(digit, text).isSucceeded());
+        }
+    }
+
     // =========================================================================
     // IDENTIFIER
     // =========================================================================

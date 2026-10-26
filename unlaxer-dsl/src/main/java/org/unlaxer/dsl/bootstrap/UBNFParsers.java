@@ -193,12 +193,13 @@ public class UBNFParsers {
         }
     }
 
+    /** UBNF grammar digits only; runtime token parsers are separate classes. */
     public static class DigitParser extends SingleCharacterParser {
         private static final long serialVersionUID = 1L;
 
         @Override
         public boolean isMatch(char target) {
-            return Character.isDigit(target);
+            return target >= '0' && target <= '9';
         }
     }
 
