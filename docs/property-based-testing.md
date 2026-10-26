@@ -145,6 +145,11 @@ Java の `ParseOptions.DEFAULT` で 1 回解析し、始まった parser transac
 `ULX-PARSE-DEPTH-LIMIT`、Rust の rule 呼出の上限）は深さに対するもので、この形の指数的な探索は
 深さが入力長以下のまま進むので止めない。
 
+縮小例の transaction 数、生成 parser で確かめた左因数分解の例、入力長の上限などの対処と、
+将来の runtime 手数上限の位置づけは
+[相互再帰の計算量（#756）](packrat-memoization.md#capture--same_as-を含む相互再帰の計算量756)を参照。
+上限超過の除外は、対象入力の受理・拒否や Java / Rust の一致を検証したことを意味しない。
+
 ## 縮小と corpus
 
 不一致や不変条件違反が見つかると、`Shrinker` が入力 → 文法 → 入力の順に貪欲に縮小する。
