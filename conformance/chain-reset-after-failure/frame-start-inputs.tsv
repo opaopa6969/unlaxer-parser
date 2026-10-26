@@ -95,3 +95,11 @@ PlainSeq-invert	PlainSeq	invert	ab	a
 PlainSeq-recovery	PlainSeq	recovery	ab	a
 PlainSeq-predictive	PlainSeq	predictive	ab	a
 PlainSeq-until-frame	PlainSeq	until-frame	ab	a
+Root-commit	Root	commit	ab	a
+PlainSeq-commit	PlainSeq	commit	ab	a
+Root-label	Root	label	ab	a
+PlainSeq-label	PlainSeq	label	ab	a
+Root-stop-consume	Root	stop-consume	ab	a
+PlainSeq-stop-consume	PlainSeq	stop-consume	ab	a
+Root-stop-invert	Root	stop-invert	ab	a
+PlainSeq-stop-invert	PlainSeq	stop-invert	ab	a

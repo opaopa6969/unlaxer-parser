@@ -95,6 +95,11 @@ public class FrameStartMatchedResetConformanceTest {
             case "capture" -> new NamedCapture("value", parser);
             case "catch" -> new CatchLabels(new Label("L", parser), parser, "L");
             case "empty" -> new EmptyParser();
+            // Negative controls: these Java wrappers do not begin a transaction.
+            case "commit" -> new Commit(parser);
+            case "label" -> new Label("L", parser);
+            case "stop-consume" -> new DoConsumePropagationStopper(parser);
+            case "stop-invert" -> new InvertMatchPropagationStopper(parser);
             case "positive" -> new MatchOnly(new WordParser("b"));
             case "negative" -> new Not(new WordParser("b"));
             default -> throw new AssertionError(boundary);

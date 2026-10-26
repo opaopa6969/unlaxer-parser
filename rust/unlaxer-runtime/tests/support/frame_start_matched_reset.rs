@@ -121,6 +121,11 @@ fn observe(context: &mut ParseContext<'_>) -> ParseResult {
         "capture" => Expr::OwnedCapture("value", Box::new(rule)),
         "catch" => rule.clone().label("L").catch_labels(rule, ["L"]),
         "empty" => Expr::JavaEmpty,
+        // Java Commit / Label / propagation stoppers have no transaction.
+        "commit" => rule.commit(),
+        "label" => rule.label("L"),
+        "stop-consume" => rule.stop_consume(),
+        "stop-invert" => rule.stop_invert(),
         "positive" => Expr::JavaLookahead {
             pattern: "b",
             positive: true,

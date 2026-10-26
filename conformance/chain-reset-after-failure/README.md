@@ -362,15 +362,18 @@ PEG `Lookahead` / `Optional` / `Repeat` には Java 互換 variant と異なる�
 
 `frame-start.ubnf` は issue の Root / PlainTok / PlainGroup / PlainSeq、負の先読み、
 3 Choice profile、Optional / Repeat / Separated / Capture / COMMIT / LABEL、nested 対照を生成する。
-`frame-start-inputs.tsv` の96経路 × 通常 / Classic × 初期 reset false/true × memo 2設定 × 診断3設定。
-生成 Java の実行結果2,304行が `frame-start.tsv`。Rust は両生成 host × 通常 / mapping grammar の
-9,216行を照合する。両 host の全生成ファイルが一致すること、実生成された frame の型も検査する。
+`frame-start-inputs.tsv` の104経路 × 通常 / Classic × 初期 reset false/true × memo 2設定 × 診断3設定。
+生成 Java の実行結果2,496行が `frame-start.tsv`。Rust は両生成 host × 通常 / mapping grammar の
+9,984行を照合する。両 host の全生成ファイルが一致すること、実生成された frame の型も検査する。
 失敗を同じ context で3回呼び、成否・cursor・reset の不変と memo hit を採取する。
 後続 `NonOrdered(LOOKAHEAD('b'))` と `NonOrdered(LOOKAHEAD('x'))` も同じ context で観測する。
 
 外側を runtime API で包むケースは NonOrdered / MatchOnly / Choice / Optional / Repeat /
 Longest / Unique / Predictive / owned capture / capture scope / CatchLabels / recovery / invert を含む。
 直接の EMPTY と正負の先読み、Unicode、EOF、回数0、不正 bounds、ZeroMatch も固定する。
+Java で transaction を持たない `Commit` / `Label` / `DoConsumePropagationStopper` /
+`InvertMatchPropagationStopper` で包む8経路は対照で、Rust の `commit` / `label` / `stop_consume` /
+`stop_invert` が開始時に巻き戻さない（`PlainSeq` は成功 CP0/2 のまま）ことを固定する（PR #837 のレビューで追加）。
 `until-frame` は Java の `WildCardStringTerminatorParser.parse(context, consumed, false)` を呼ぶ。
 引数なし overload が自身で false にする契約と区別し、Occurs の begin を観測するためである。
 
@@ -382,9 +385,14 @@ Longest / Unique / Predictive / owned capture / capture scope / CatchLabels / re
 | 直接の EMPTY | 成功 CP0/1 | 成功 CP0/2 |
 
 全行で成否・cursor・reset・後続の成否を Java oracle へ直接照合する。
-診断 CP と failure / success memo hit は #826 / #827 の残差があり、582行について
+診断 CP と failure / success memo hit は #826 / #827 / #838 の残差があり、606行について
 `frame-start-differences.tsv` に Java / Rust の値を行キー付きで記録する。
 Java 側の値も照合してからこの4列だけを差し替え、行全体や設定を除外しない。
+このうち42行は、修正前の Rust が先読みの進めた位置で照合して失敗していたため**たまたま** Java と同じ値だった。
+36行は診断 CP（`positive-eof`、`negative-*` / `Negative-*`、`*-longest` / `*-unique` の通常・初期 true・AUTO/DETAILED）で、
+Java の `startParse` が begin の reset **前**に frame 開始を `max(consumed, matched)` として記録するのに対し、
+Rust は rule を介さない frame の失敗でこの位置を記録しないことによる（#838）。
+残る6行は `PlainTok-ahead` / `PlainTok-unicode` の SAFE_FAILURES の failure hit（Java 0 / Rust 2）で、#827 の型である。
 既存 nested corpus では `Longest-partial` / `Unique-partial` の通常・初期 true・AUTO/DETAILED の8行で、
 開始時の巻き戻しに伴い Rust の診断 CP が1から0へ変わり、この列は Java の CP0と一致する。
 後続の診断 CP3/2 などの残差は #826 に残し、差分表を更新する。既存456差分行の数、Java oracle、成否・cursor・reset、Chain 対照の一致は維持する。
