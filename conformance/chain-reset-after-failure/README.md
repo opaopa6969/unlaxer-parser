@@ -1,4 +1,4 @@
-# Chain・name frame・値投影境界の owner reset (#809 / #814 / #820)
+# Chain・frame 開始・name frame・値投影境界の owner reset (#809 / #814 / #820 / #829)
 
 Java を参照実装とする。`grammar.ubnf` の生成 Root (`'a' 'z'`) は通常の consumed 経路で失敗する。
 同じ context を再利用すると、Java は owner の `resetMatchedWithConsumed=false` を残す。
@@ -13,7 +13,7 @@ Java は成功、consumed CP0 / matched CP2、旧 Rust は失敗、CP0 / CP1。
 
 | 経路 | Java | Rust | 失敗後の値の影響 |
 | --- | --- | --- | --- |
-| 子の transaction 開始 | `Transaction.begin` → `TransactionElement.createNew` → `ParserCursor(..., reset)` | `expression` の `java_transaction`、`token.rs` の `classic_longest_choice` | true なら matched を consumed へ戻す。NonOrdered / MatchOnly / InvertMatch は通常の呼出からも到達する |
+| 子の transaction 開始 | `Transaction.begin` → `TransactionElement.createNew` → `ParserCursor(..., reset)` | `expression` の `java_transaction`、`token.rs` の `classic_longest_choice` | true なら matched を consumed へ戻す。#829 で通常の呼出も全対応 frame に適用する |
 | LOOKAHEAD | `MatchOnly` → `parseMatchOnly` → `WordParser` | `JavaLookahead` / `MatchOnly` | transaction が保持した matched から照合し、成功時に matched を進める |
 | NEGATIVE_LOOKAHEAD | `Not` の transaction と matchOnly の子 | `JavaLookahead { positive: false }` | matched の位置で成功/失敗が変わる |
 | UNTIL | `WildCardStringTerminatorParser` と terminator の MatchOnly | `JavaUntil` | matched 上の終端検出が consumed の進み方を決める。Java の引数なし `parse(context)` は自身でも false を設定するが、NonOrdered から呼ぶ三引数 overload はその経路を通らない |
@@ -27,10 +27,9 @@ Java は成功、consumed CP0 / matched CP2、旧 Rust は失敗、CP0 / CP1。
 | lookup と失敗後の透過一覧 | Chain の `begin` 前の owner reset 設定 | 共通の `java_owner_transparent_child` | 値投影2式と StopConsume / StopInvert を含む同じ一覧を辿る。初期 true/false を切り替えても同じ failure memo に hit する (#820) |
 | 公開 getter | `TransactionElement.isResetMatchedWithConsumed` | `ParseContext.reset_matched_with_consumed` | 同じ context を使う caller も値を観測できる |
 
-通常の Rust は全ての Java frame を作るわけではなく、直接の `JavaLookahead` / `JavaEmpty` では
-reset を参照しない最適化経路も持つ。したがって corpus では、両言語で owner reset を読む
-NonOrdered の transaction を明示し、その内側で4種の matched reader を比較する。
-値が異なるだけで「観測不能」とは結論しない。
+#829 で直接の `JavaLookahead` / `JavaEmpty` を含む通常の frame 開始も Java に揃えた。
+既存の Chain 失敗 corpus は NonOrdered 内の4種の matched reader を使い、
+新しい frame-start corpus は先読み後の通常の呼出を直接比較する。
 
 ## 修正と検証
 
@@ -203,7 +202,7 @@ lookup だけで ValueBoundary / TextValue / StopConsume / StopInvert の走査�
 初期値を切り替えた3回の呼出しが hit 2回にならないことを検出する。
 CI の Cross-language テストと `.github/optin-test-contracts.json` に新クラスの2メソッドを登録する。
 
-性能は #197 の凍結に従う。変更は失敗の復元・再生、候補境界の bool 保存/失敗時復元、
+#809 / #814 / #820 の性能方針は #197 の凍結に従う。変更は失敗の復元・再生、候補境界の bool 保存/失敗時復元、
 SAFE_FAILURES の既存 lookup 正規化における透過 wrapper の確認、name frame の既存 policy 保存/復元に限定する。
 #814 の成功経路は既存の `parent_policy` と `java_transaction` を再利用する scalar の保存/復元だけで、
 entry field・cache・allocation は追加しない。
@@ -212,7 +211,7 @@ entry field・cache・allocation は追加しない。
 ## nested mixed 候補と外部経路の調査 (#823)
 
 **結論:** 候補単独の owner reset 差は既知の内部差として残す。今回調べた生成文法の外部経路では、
-その候補に Java 相当の Chain 境界を加えても観測は変わらなかった。runtime / IR / 公開型の変更はしない。
+その候補に Java 相当の Chain 境界を加えても観測は変わらなかった。PR #828 では runtime / IR / 公開型を変更しなかった。
 ただし、**Java / Rust の診断位置と memo hit がすべて一致したという意味ではない**。
 調査で見つかった別の差は #826 / #827 と差分表で追跡する。
 
@@ -238,8 +237,8 @@ entry field・cache・allocation は追加しない。
 - Java `ChoiceInterface.parse()` は候補ごとに `begin` し、成功時 commit、失敗時 rollback で owner に戻る。
   Chain が変更した reset は候補の owner に閉じる。Rust の Choice 系は候補失敗時と終了時の復元を持つ。
   rule 参照や外側 Optional / Repeat / NonOrdered / MatchOnly はこの内側 Choice を取り除かない。
-- 候補の中で Rust が owner reset を読むのは、(1) token mode / NonOrdered 内の frame 開始と
-  NonOrdered / MatchOnly / InvertMatch / name frame の開始、(2) rule の memo key、(3) 失敗の owner への伝播である。
+- 候補の中で Rust が owner reset を読むのは、(1) Java に対応する frame の開始（#829 で通常の呼出も含む）、
+  (2) rule の memo key、(3) 失敗の owner への伝播である。
   (1) が matched を巻き戻すのは matched が consumed より先にあるときだけである。corpus の経路では、
   外側の Choice 系（Classic では候補ごと）か NonOrdered / MatchOnly の開始がすでに巻き戻しており、
   内側 Choice の候補は失敗ごとに cursor を戻す。手組みの NonOrdered で先読みの兄弟の後に呼ぶ経路などは対象外。
@@ -250,7 +249,7 @@ entry field・cache・allocation は追加しない。
   Java の候補はそれぞれ `__CaptureSite(LazyChoice)` / `__CaptureSite(MatchOnly)`。通常の呼出で先読みの後に
   直接呼ぶ経路は nested と無関係な frame 開始時の matched 巻き戻しの差（#829。`@nestedCaptures` なしでも出て、
   候補の Chain 対照でも変わらない）に当たるため、corpus では NonOrdered / MatchOnly の中から呼ぶ行と
-  先読みなしで直接呼ぶ行に分ける。
+  先読みなしで直接呼ぶ行に分ける。この除外経路は #829 の `frame-start-*` corpus に追加した。
 
 ### 実行した外部経路と oracle
 
@@ -327,5 +326,92 @@ Java oracle の該当値も照合してから Rust の4列（最遠診断 CP、f
   `Longest` / `Unique` の text・途中失敗の経路では、1回の呼出で Java が success hit 1、Rust が0になる。
 
 これらは候補への Chain 追加で変わらないため、#823 の owner reset 修正で解決したことにしない。
-本 PR は調査・回帰検証・台帳のみ。挙動を変えないので CHANGELOG / migration は追加せず、
-#197 に従いホットパスを変更せず、性能再計測もしない。
+PR #828 は調査・回帰検証・台帳のみで挙動を変えていない。後続 #829 の変更と検証は以下に記録する。
+
+## 通常の frame 開始 (#829)
+
+Java を参照実装とし、公開 API で先読みした後に同一 context から rule を呼ぶ契約を揃える。
+`Transaction.begin` は `TransactionElement.createNew` → `ParserCursor(cursor, reset)` により、
+owner reset=true なら matched を consumed へ戻す。Rust の通常経路でもこの判定を行う。
+`Sequence` は Java `ChainInterface.parse` と同じく **begin より先に** owner を false にする。
+ルール参照・metadata・値投影の透過 wrapper 自体に frame は追加しない。
+
+### Java から確認した frame 対応
+
+| Rust の `java_transaction` | Java の begin / commit / rollback の所有者 |
+| --- | --- |
+| NonOrdered | `NonOrdered.parse`（本体と各候補） |
+| OwnedCapture / CaptureScope | `NamedCapture` / `CaptureScope` → `ParseContext.parseCaptureBoundary` |
+| MatchOnly / InvertMatch | `ParseContext.parseMatchOnly` / `NotPropagatableSource.parseDelegated` |
+| JavaEmpty | `EmptyParser extends LazyZeroOrOne` → `Occurs.parse`（子は MatchOnly） |
+| JavaLookahead（正 / 負） | `MatchOnly` / `Not.parse` |
+| JavaUntil | `WildCardStringTerminatorParser` → `Occurs.parse`（terminator も frame を持つ） |
+| JavaOptional / JavaRepeat / ZeroMatch | `Optional` / `Repeat`・`ZeroOrMore` / `Zero` → `Occurs.parse` |
+| Choice / PredictiveChoice | `ChoiceInterface.parse` / `PredictiveChoiceInterface.parse` の候補ごとの begin |
+| LongestChoice / UniqueLongestChoice | `LongestChoiceInterface.parse` の各候補・winner 再実行の begin |
+| Recovery / CatchLabels | `SyncPointRecoveryParser.parse` / `CatchLabels.parse` |
+| NameResolutionScope / NamePredicate | `NameResolutionScope.parse` / `NamePredicateParser.parse`（#814 の corpus も継続実行） |
+
+回数0・不正 bounds の通常反復は `Occurs.beginPreservingMatched` に対応するため巻き戻さない。
+`ZeroMatch` は子を試すため巻き戻す。Longest 系は候補ごとに reset 判定を行い、
+Classic の既存実装 `token.rs::classic_longest_choice` は維持する。
+Chain の frame はこの一覧とは別に owner を false にするため、開始時の matched 代入は不要。
+PEG `Lookahead` / `Optional` / `Repeat` には Java 互換 variant と異なる既存契約がある。
+
+### 共通 corpus と残差
+
+`frame-start.ubnf` は issue の Root / PlainTok / PlainGroup / PlainSeq、負の先読み、
+3 Choice profile、Optional / Repeat / Separated / Capture / COMMIT / LABEL、nested 対照を生成する。
+`frame-start-inputs.tsv` の104経路 × 通常 / Classic × 初期 reset false/true × memo 2設定 × 診断3設定。
+生成 Java の実行結果2,496行が `frame-start.tsv`。Rust は両生成 host × 通常 / mapping grammar の
+9,984行を照合する。両 host の全生成ファイルが一致すること、実生成された frame の型も検査する。
+失敗を同じ context で3回呼び、成否・cursor・reset の不変と memo hit を採取する。
+後続 `NonOrdered(LOOKAHEAD('b'))` と `NonOrdered(LOOKAHEAD('x'))` も同じ context で観測する。
+
+外側を runtime API で包むケースは NonOrdered / MatchOnly / Choice / Optional / Repeat /
+Longest / Unique / Predictive / owned capture / capture scope / CatchLabels / recovery / invert を含む。
+直接の EMPTY と正負の先読み、Unicode、EOF、回数0、不正 bounds、ZeroMatch も固定する。
+Java で transaction を持たない `Commit` / `Label` / `DoConsumePropagationStopper` /
+`InvertMatchPropagationStopper` で包む8経路は対照で、Rust の `commit` / `label` / `stop_consume` /
+`stop_invert` が開始時に巻き戻さない（`PlainSeq` は成功 CP0/2 のまま）ことを固定する（PR #837 のレビューで追加）。
+`until-frame` は Java の `WildCardStringTerminatorParser.parse(context, consumed, false)` を呼ぶ。
+引数なし overload が自身で false にする契約と区別し、Occurs の begin を観測するためである。
+
+| `ab`、先行 `LOOKAHEAD('a')`、通常・初期 true | Java / 修正後 Rust | 修正前 Rust |
+| --- | --- | --- |
+| Root / PlainTok / PlainGroup | 失敗 CP0/1 | 成功 CP0/2 |
+| PlainSeq | 成功 CP0/2、reset=false | 同じ |
+| Choice(PlainSeq, fallback) | 失敗 CP0/1 | 成功 CP0/2 |
+| 直接の EMPTY | 成功 CP0/1 | 成功 CP0/2 |
+
+全行で成否・cursor・reset・後続の成否を Java oracle へ直接照合する。
+診断 CP と failure / success memo hit は #826 / #827 / #838 の残差があり、606行について
+`frame-start-differences.tsv` に Java / Rust の値を行キー付きで記録する。
+Java 側の値も照合してからこの4列だけを差し替え、行全体や設定を除外しない。
+このうち42行は、修正前の Rust が先読みの進めた位置で照合して失敗していたため**たまたま** Java と同じ値だった。
+36行は診断 CP（`positive-eof`、`negative-*` / `Negative-*`、`*-longest` / `*-unique` の通常・初期 true・AUTO/DETAILED）で、
+Java の `startParse` が begin の reset **前**に frame 開始を `max(consumed, matched)` として記録するのに対し、
+Rust は rule を介さない frame の失敗でこの位置を記録しないことによる（#838）。
+残る6行は `PlainTok-ahead` / `PlainTok-unicode` の SAFE_FAILURES の failure hit（Java 0 / Rust 2）で、#827 の型である。
+既存 nested corpus では `Longest-partial` / `Unique-partial` の通常・初期 true・AUTO/DETAILED の8行で、
+開始時の巻き戻しに伴い Rust の診断 CP が1から0へ変わり、この列は Java の CP0と一致する。
+後続の診断 CP3/2 などの残差は #826 に残し、差分表を更新する。既存456差分行の数、Java oracle、成否・cursor・reset、Chain 対照の一致は維持する。
+`PropertyBasedParityTest` の known-differences は追加しない。
+
+実装は既存 frame の bool 判定と cursor 代入に限り、新しい確保・cache・entry field は追加しない。
+#197 に従い性能改善は行わず、既存 `rust/examples/evolution/examples/shared_grammar_benchmark.rs`
+を修正前後で各3回交互に実行して退行を確認する。計測値と mutation の結果は PR 本文に記録する。
+`FrameStartMatchedResetConformanceTest` の2メソッドは Cross-language CI と
+`.github/optin-test-contracts.json` に登録する。
+
+### #829 の mutation
+
+修正済み runtime を保存して、各変異を単独で `FrameStartMatchedResetConformanceTest` にかけ、
+最後に保存した内容と byte 一致するよう復元した。
+
+- 修正全体を外すと `Root-ahead / 通常 / 初期true / OFF / AUTO` で、期待の失敗 CP0/1 が成功 CP0/2となり失敗する。
+- `ordered_choice` の判定に旧 `token_mode.is_some()` を戻すと `PlainSeq-choice` の同設定で同じ受理差を検出する。
+- 通常 `longest_choice` の候補開始の reset を外すと `Root-longest` の診断列で失敗する。
+  出力全行には `PlainSeq-longest` の同設定が失敗 CP0/1から成功 CP0/2になる差もあり、成否の検証にも効く。
+
+Java は変更せず参照実装として再実行し、修正を外した状態を期待値へ取り込まない。

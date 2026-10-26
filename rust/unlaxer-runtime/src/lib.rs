@@ -3511,21 +3511,17 @@ impl<'a> ParseContext<'a> {
             Expr::Repeat { min, max: Some(max), .. } | Expr::JavaRepeat { min, max: Some(max), .. }
                 if *max == 0 || *max < *min);
         if java_transaction {
+            // Transaction.begin resets every Java frame, including ordinary calls (#829).
+            // Chain has already disabled reset above; zero-attempt Occurs preserves matched.
+            // Choice families start each candidate separately below (and in token.rs).
             if !no_repeat_attempt
-                && (self.token_mode.is_some()
-                    || self.match_cursor_policy.non_ordered
-                    || matches!(
-                        expression,
-                        Expr::NonOrdered(_)
-                            | Expr::MatchOnly(_)
-                            | Expr::InvertMatch(_)
-                            | Expr::NameResolutionScope { .. }
-                            | Expr::NamePredicate { .. }
-                    ))
                 && self.match_cursor_policy.reset
                 && !matches!(
                     expression,
-                    Expr::LongestChoice(_) | Expr::UniqueLongestChoice(_)
+                    Expr::Choice(_)
+                        | Expr::PredictiveChoice { .. }
+                        | Expr::LongestChoice(_)
+                        | Expr::UniqueLongestChoice(_)
                 )
             {
                 self.matched_position = self.position;
@@ -5176,6 +5172,9 @@ impl<'a> ParseContext<'a> {
                 continue;
             }
             let checkpoint = self.checkpoint();
+            if self.match_cursor_policy.reset {
+                self.matched_position = self.position;
+            }
             if let Some(fragment) = self.expression(alternative, depth) {
                 let consumed = self.position - start;
                 let replaces = winner
@@ -5275,7 +5274,7 @@ impl<'a> ParseContext<'a> {
                 .token_mode
                 .is_some()
                 .then(|| Box::new(self.checkpoint()));
-            if self.token_mode.is_some() && self.match_cursor_policy.reset {
+            if self.match_cursor_policy.reset {
                 self.matched_position = self.position;
             }
             if let Some(fragment) = self.expression(alternative, depth) {

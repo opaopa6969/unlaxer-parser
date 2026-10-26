@@ -50,8 +50,17 @@ Chain / Rust Sequence は現在の transaction を「matched を引き継ぐ」�
 | `N(C(E), E, E)` | 2 |
 
 Java の Number / Identifier / Quoted も Chain としてこの方針を変更する。
-Rust は NonOrdered 内で対応する transaction 開始を再現し、方針を rollback と失敗 memo key
-に含める。NonOrdered 外の既存 JavaEmpty / JavaLookahead の挙動は変更しない。
+Rust は通常の呼出も含め、Java に対応する frame の開始で owner の reset が true なら
+matched を consumed へ戻す（#829）。方針は rollback と失敗 memo key にも含める。
+公開 API で先読みの後に同じ context を使う場合の受理・拒否を Java に揃えるため、
+NonOrdered 外の `JavaEmpty` / `JavaLookahead` もこの規則に従う。
+例えば `ab` に `LOOKAHEAD('a')` を実行後、reset=true のまま `B | N`
+（B は `LOOKAHEAD('b')`、N は Number）を呼ぶと、旧 Rust の成功 CP0/2 から
+Java と同じ失敗 CP0/1 に変わる。直接の `EMPTY` は matched CP2 から CP1 になる。
+Chain / Sequence は begin **前**に owner を false にするので、`B` だけの生成 Chain は
+引き続き成功 CP0/2。初期 reset=false、Classic、NonOrdered / MatchOnly 内も共通 corpus で検証する。
+回数0・不正 bounds の反復は Java の `beginPreservingMatched` に合わせ、matched を保持する。
+LongestChoice / UniqueLongestChoice は候補ごとに開始時の reset を適用する。
 観測のためだけに Java child を Chain で包むとこの方針が変わるので、共通テストは
 実 child の parser identity から CST を照合する。
 
