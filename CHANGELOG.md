@@ -58,6 +58,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - DETAILED 診断の最終エラーに、外側からの規則名・開始 CP を保持する rule stack を追加 (PR #723、issue #703)。Java/Rust runtime API と両 LSP の `relatedInformation` / `data.ruleStack` で取得できる。[契約](docs/rule-stack-diagnostics.md)。
 - seed 付き文法・入力生成、差分比較、失敗例の縮小と corpus 化による property-based テストを追加 (PR #709、issue #705)。Java/Rust の受理・cursor・CST・AST・診断と設定間の不変条件、両 host の Rust 生成物を検証する。[seed の再現手順](docs/property-based-testing.md)。
 - Java 公開 parser API の基準 revision 付き [全API対応表](docs/java-api-rust-parity.md)、JDK 構文木による型・static API の列挙と更新漏れ検査、Rust の利用経路・共通検証の不足を追跡する子 issue を追加 (#716)。runtime の挙動は変更しない。
+- 行頭・source先頭・行終端の4公開parserとRust公開API移植例を独立corpusで共通検証し、Classic token kind・invert・両cursor・CST・診断・rollbackを固定。EmptyLine / WildCardLine の反復合成に残る差は #846 依存として明記 (#848)。既存runtimeの挙動は変更しない。
 - PBT に値引数・owned capture・先読み・memo、コメント後の frontier / rule stack、autoCommit の nullable / raising 検査、COMMIT / LABEL / CATCH の小さな組み合わせを追加 (#770)。独立した生成モードで既存 seed 列を保ち、Java/Rust の既存 oracle と手数上限で比較する。構文の出現・受理と失敗・memo 再生を検査する。
 - Rust の `CI`、transactional `NonOrdered`、Java の明示 PEG assertion `PegLookahead` を追加 (PR #534、#551、#560)。[CI](spec-corpus/case-insensitive/README.md)、[NonOrdered](docs/nonordered-runtime.md)、[PEG assertion](docs/peg-assertions.md)。
 - Rust の一般 parser / custom parser に4種の Classic token kind・invert・stopper を伝播し、Tiny の CodeStart / CodeEnd / LongCodeBlock へ接続した (PR #576、#608)。[token mode](docs/classic-token-propagation.md)、[Tiny](docs/tiny-classic-modes.md)。

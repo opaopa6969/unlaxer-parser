@@ -1085,7 +1085,7 @@
         854,
         856
       ],
-      "observation": "2026-10-27、origin/master 5a4e51620dc245186f683cded7c6a191398a9550 の公開441宣言（型330・static111）を構文木で列挙し、Rust経路と根拠を全API対応表へ記録した。対応済み41、対応あり・全API共通検証なし233、未対応の動作58、言語固有109。名指し12項目は個別判定し、残る構築/参照・terminator・選択再利用・行境界・字句・補完・CST/tag・旧replay・combinator・context・失敗診断の実装と共通corpusは11本の子issueで追跡する。第1段は全API parity完了ではなく、#716/#111はopenを維持する。",
+      "observation": "2026-10-27、origin/master 5a4e51620dc245186f683cded7c6a191398a9550 の公開441宣言（型330・static111）を構文木で列挙し、Rust経路と根拠を全API対応表へ記録した。対応済み41、対応あり・全API共通検証なし233、未対応の動作58、言語固有109。名指し12項目は個別判定し、残る構築/参照・terminator・選択再利用・行境界・字句・補完・CST/tag・旧replay・combinator・context・失敗診断の実装と共通corpusは11本の子issueで追跡する。第1段は全API parity完了ではなく、#716/#111はopenを維持する。 #848で行境界4型を共通検証し、現在は対応済み45・対応あり全API共通検証なし229。EmptyLine/WildCardLineの2型は#846依存のまま残る。",
       "evidence": [
         "docs/java-api-rust-parity.md",
         "docs/java-api-rust-parity.json",
@@ -1514,6 +1514,42 @@
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SpecCorpusExecutionConformanceTest.java",
         "rust/unlaxer-generator/tests/spec_corpus_execution.rs",
         "spec-corpus/execution/diagnostic-priority.json"
+      ]
+    },
+    {
+      "id": "line-boundary-composition",
+      "category": "unresolved",
+      "title": "EmptyLine / WildCardLine の任意terminator付き反復",
+      "hosts": "Java Classic / Rust public API composition",
+      "issues": [
+        848,
+        846
+      ],
+      "observation": "#848の4型（StartOfLine/StartOfSource/LineTerminator/EndOfLine）は独立corpusで検証。残る2型ではguard付きRepeatにbodyごとのChain CSTが増え、terminator-first ChoiceのRepeatはmatchOnlyで終端後も進む。入力LF LF xでWildCardLineのJava matched=1に対して候補式は3、EmptyLineはJava成功に対して候補式失敗。2案の反例を両言語で実行し、#846の停止/commit/rollback契約に依存する2型だけを未完了とする。runtime変更なし。",
+      "evidence": [
+        "conformance/line-boundary/README.md",
+        "conformance/line-boundary/compositions.tsv",
+        "conformance/line-boundary/repeat-choice.tsv",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
+        "conformance/line-boundary/probe.rs"
+      ]
+    },
+    {
+      "id": "line-boundary-classic-adapters",
+      "category": "contract",
+      "title": "Classic行境界と語彙BOL/BOF/EOLの移植境界",
+      "hosts": "Java Classic / Rust public API adapter",
+      "issues": [
+        848
+      ],
+      "observation": "StartOfLine/StartOfSourceはtokenを作らず4kindの参照cursorを検査するCustom adapterで語彙BOL/BOFと接続する。LineTerminator/EndOfLineはChoice/Literal/Eofを使う。DETAILED_ON_FAILUREのJava FIRST除外がreset前cursorを読む条件をfixtureのadapterが再現する（x LF、C=1/M=2/reset=true/matchOnlyは詳細診断で成功、遅延診断で失敗）。既存runtimeへ処理を追加せず、全ケースを独立oracleへ照合。",
+      "evidence": [
+        "conformance/line-boundary/README.md",
+        "conformance/line-boundary/cases.tsv",
+        "conformance/line-boundary/lexical.tsv",
+        "conformance/line-boundary/transactions.tsv",
+        "conformance/line-boundary/probe.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java"
       ]
     }
   ],
@@ -2012,6 +2048,30 @@
         "spec-validation-root",
         "spec-validation-whitespace",
         "spec-validation-annotation"
+      ]
+    },
+    {
+      "path": "conformance/line-boundary/compositions.tsv",
+      "fields": {
+        "javaBodyFrames": 1,
+        "rustBodyFrames": 1
+      },
+      "entries": [
+        "line-boundary-composition"
+      ]
+    },
+    {
+      "path": "conformance/line-boundary/repeat-choice.tsv",
+      "fields": {
+        "javaAccepted": 1,
+        "javaConsumed": 1,
+        "javaMatched": 1,
+        "rustAccepted": 1,
+        "rustConsumed": 1,
+        "rustMatched": 1
+      },
+      "entries": [
+        "line-boundary-composition"
       ]
     }
   ],
