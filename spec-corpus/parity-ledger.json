@@ -657,7 +657,7 @@
         714,
         776
       ],
-      "observation": "#714（PR #772）でJava CLI・Java-host Rust・native Rustは同一fileの各grammarを独立生成し、両Rust hostのcheckも全grammarを構造検証する。Rust出力は単一grammarなら従来の5ファイル、複数なら宣言順のroot mod.rsとgrammar_<ASCII小文字名>/に置き、各moduleは単独生成とbyte一致する。共通corpusでJava向けと両Rust hostの生成物をcompile/parse/map/evalし、原文・capture・CP span・別grammarの入力の拒否、両hostの生成物一致、後続grammarの失敗時に部分出力を残さないことを照合する。意図した差: 出力名の衝突はRustがASCII大小文字を無視したmodule名でP-OUTPUT-COLLISION、Javaはpackageと小文字化した生成クラス名の組が一致したときだけ拒否する（各言語の出力配置の規則）。出力先の祖先symlinkはJava-hostが許容し、nativeは従来どおり拒否する。impactとplaygroundは単一grammarのまま。#776でimport解決後もroot由来のnodeのCP範囲を保持し、別grammar・別位置の同じcode/subjectを残す。import由来・出典不明はnullとし、同じcode/subjectのnull診断は従来どおりdedupする。schemaVersion 1・既存フィールド・単一file契約を維持。共通imports.jsonの8ケースをLF/CRLFで両hostのJSON全体（順序・件数・CP範囲）と固定期待値に照合する。issue #776はPRのmergeまでOPEN。",
+      "observation": "#714（PR #772）でJava CLI・Java-host Rust・native Rustは同一fileの各grammarを独立生成し、両Rust hostのcheckも全grammarを構造検証する。Rust出力は単一grammarなら従来の5ファイル、複数なら宣言順のroot mod.rsとgrammar_<ASCII小文字名>/に置き、各moduleは単独生成とbyte一致する。共通corpusでJava向けと両Rust hostの生成物をcompile/parse/map/evalし、原文・capture・CP span・別grammarの入力の拒否、両hostの生成物一致、後続grammarの失敗時に部分出力を残さないことを照合する。意図した差: 出力名の衝突はRustがASCII大小文字を無視したmodule名でP-OUTPUT-COLLISION、Javaはpackageと小文字化した生成クラス名の組が一致したときだけ拒否する（各言語の出力配置の規則）。出力先の祖先symlinkはJava-hostが許容し、nativeは従来どおり拒否する。impactとplaygroundは単一grammarのまま。#776でimport解決後もroot由来のnodeのCP範囲を保持し、別grammar・別位置の同じcode/subjectを残す。import由来・出典不明はnullとし、同じcode/subjectのnull診断は従来どおりdedupする。schemaVersion 1・既存フィールド・単一file契約を維持。共通imports.jsonの9ケースをLF/CRLFで両hostのJSON全体（順序・件数・CP範囲）と固定期待値に照合する。issue #776はPRのmergeまでOPEN。",
       "evidence": [
         "docs/multiple-grammars.md",
         "docs/portability-check.md",

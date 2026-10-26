@@ -169,9 +169,9 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
 同一 precedence の左右混在を検査する。13 fixture、5 種類の alias chain、2 種類の括弧の入れ子を
 LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・終了コード一致を残す。
 `imports.json` は Imported + One + Two、複数 import・同じ module の再利用・ネストした import、
-同じ code/subject の root 出現と null 出現、作り直された rule/element、解決失敗と成功を固定する。
-非 BMP 文字を含む8ケースを LF/CRLF で読み、両 host の JSON 全体を固定期待値（配列順・件数・CP 範囲を含む）と照合し、
-`target/rust-portability-imports.tsv` に16ケースの証拠を残す。native の workspace test も同じ fixture を使う。
+同じ code/subject の root 出現と null 出現、作り直された rule/element/@lexicalContext、解決失敗と成功を固定する。
+非 BMP 文字を含む9ケースを LF/CRLF で読み、両 host の JSON 全体を固定期待値（配列順・件数・CP 範囲を含む）と照合し、
+`target/rust-portability-imports.tsv` に18ケースの証拠を残す。native の workspace test も同じ fixture を使う。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
 native CLI は `PATH=''` で実行し、入力・手書きファイルが変更されないことも確認する。
 

@@ -464,6 +464,67 @@
     }
   },
   {
+    "name": "rebuilt-lexical-context",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar Imported {\n  @import part from 'part.ubnf'\n  @ubnf: v2\n  token END = EOF\n  @root @mapping(Value,params=[value])\n  Root ::= (Left | Right) @value END;\n  @lexicalContext(tokens=['part.GT'])\n  Left ::= part.GT;\n  @lexicalContext(tokens=['part.Maybe'])\n  Right ::= part.GT;\n}\ngrammar Plain {\n  @ubnf: v2\n  token GT ::= [ '>' ];\n  token END = EOF\n  @root @mapping(Value,params=[value])\n  @lexicalContext(tokens=['GT'])\n  Root ::= GT @value END;\n}\n",
+      "part.ubnf": "grammar Part { @ubnf: v2 token GT ::= '>'; token Maybe ::= [ '>' ]; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "E-LEXICAL-CONTEXT-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 241,
+              "end": 279
+            },
+            "subject": "ImportedLexical1"
+          },
+          {
+            "code": "E-LEXICAL-CONTEXT-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 414,
+              "end": 444
+            },
+            "subject": "GT"
+          }
+        ]
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "E-LEXICAL-CONTEXT-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 250,
+              "end": 288
+            },
+            "subject": "ImportedLexical1"
+          },
+          {
+            "code": "E-LEXICAL-CONTEXT-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 431,
+              "end": 461
+            },
+            "subject": "GT"
+          }
+        ]
+      }
+    }
+  },
+  {
     "name": "missing-module",
     "files": {
       "main.ubnf": "// 😀 root CP positions\ngrammar Imported { @import part from 'part.ubnf' @ubnf: v2 @root @mapping(Value,params=[text]) Root ::= part.X @text; }\n"
