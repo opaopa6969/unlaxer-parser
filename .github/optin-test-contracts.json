@@ -153,6 +153,7 @@
       "org.unlaxer.dsl.codegen.ChainResetAfterFailureConformanceTest": ["generatedJavaMatchesSharedFailureAndFollowerOracle", "enclosingBoundariesRestoreTheOwnerPolicy", "raisingWrappersKeepTheFailedChainPolicy", "bothRustHostsMatchSharedFailureAndFollowerOracle"],
       "org.unlaxer.dsl.codegen.NameScopeTokenModeResetConformanceTest": ["generatedJavaMatchesOwnerResetOracle", "bothGeneratedRustHostsMatchOwnerResetOracle", "propagationStoppersKeepTheFailedChainPolicy"],
       "org.unlaxer.dsl.codegen.ValueBoundaryResetConformanceTest": ["generatedJavaMatchesValueResetOracle", "bothGeneratedRustHostsMatchValueResetOracle"],
+      "org.unlaxer.dsl.codegen.NestedCandidateBoundaryConformanceTest": ["generatedJavaMatchesExternalBoundaryOracle", "bothGeneratedRustHostsMatchExternalBoundaryOracle"],
       "org.unlaxer.dsl.GenerationWarningsConformanceTest": ["libraryMatchesTheSharedCorpus", "javaHostRustCliPrintsTheLinesAndFailsWhenStrict", "javaFlagCliReportsEveryWarningAndFailsWhenStrict"],
       "org.unlaxer.dsl.SimpleAnnotationConformanceTest": ["warningsMatchTheSharedCorpus", "everyJavaConsumerGeneratesIgnoredAnnotationsAsAbsent", "suggestionsFollowTheDocumentedDistance", "parserIrKeepsTheNameAsMetadata", "rejectedFormsFailInEveryJavaConsumer", "cliWarnsAndStrictOrFailOnWarningFails"],
       "org.unlaxer.dsl.CodegenRunnerTest": ["testHasErrorRowsDetectsNonWarningSeverity", "testHasWarningRowsDetectsWarningSeverity", "testExecuteUsesInjectedFileSystemPort"],
