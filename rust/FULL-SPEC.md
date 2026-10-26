@@ -26,6 +26,8 @@ annotation、`ParseContext` API、consume/invert伝播、incremental、IDE proto
 
 ## 対応表
 
+Java 公開 parser の宣言単位の棚卸しは [全API対応表](../docs/java-api-rust-parity.md)（#716）を参照する。基準 revision、機械列挙との一致、Rust の利用経路と共通 corpus の有無、未対応の子 issue を記録する。下の機能群表だけで全公開APIの完了とはしない。
+
 以下は開発版の実装範囲であり、公開済み3.3.0の機能一覧ではない。個別PRの実装・共通検証と、CI/mergeを含むissueの完了を区別する。未完了は親#111と記載した子issueで追跡する。
 
 2026-10-17の追加実consumer監査で再現した、flat tokenStreamの直接literal captureがJavaだけnullになる差（#668）と左結合のliteral operand誤選択（#669）は、開発候補で修正し両Rust hostとの共有回帰を通過した。#668は19文法69入力×4 mode×trivia公開有無、#669は21文法69入力で実consumerを検証する。CI/mergeと全体回帰は別の完了条件として残る。非捕捉の固定literal delimiter付き左結合規則は#674の開発候補で両Rust hostへ対応し、7文法27入力×6設定×3consumerで共有回帰を通過した。基準Javaの非捕捉optional/zero-or-more repeat delimiterも#679の開発候補で対応し、固定literal列を1段で包む6文法27入力×6設定×3consumerを検証した。任意helper/choice等までの対応を意味しない。これらを新nestedの共通制約と混同しない。

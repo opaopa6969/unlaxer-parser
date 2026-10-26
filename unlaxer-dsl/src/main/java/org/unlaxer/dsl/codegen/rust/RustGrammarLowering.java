@@ -74,6 +74,55 @@ public final class RustGrammarLowering {
         return ir;
     }
 
+    private void requireValidDeclarations() {
+        var issues = org.unlaxer.dsl.codegen.GrammarValidator.validateRustDeclarations(grammar);
+        if (issues.isEmpty()) return;
+        var issue = issues.get(0);
+        var rule = grammar.rules().stream().filter(r -> r.name().equals(issue.rule())).findFirst().orElse(null);
+        String detail;
+        switch (issue.code()) {
+            case "E-MAPPING-DUPLICATE-PARAM", "E-MAPPING-MISSING-CAPTURE", "E-MAPPING-UNLISTED-CAPTURE" ->
+                detail = "@mapping params must match capture names on " + issue.rule();
+            case "E-WHITESPACE-GLOBAL-DUPLICATE" -> detail = "duplicate setting whitespace";
+            case "E-WHITESPACE-GLOBAL-STYLE", "E-WHITESPACE-RULE-STYLE" -> {
+                var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
+                var styles = new ArrayList<String>();
+                if (rule == null) {
+                    for (var setting : grammar.settings()) if (setting.key().equals("whitespace")) {
+                        if (!(setting.value() instanceof StringSettingValue value)) {
+                            throw new IllegalArgumentException(issue.code() + ": Rust subset: block setting whitespace");
+                        }
+                        styles.add(value.value());
+                    }
+                } else for (var annotation : rule.annotations()) if (annotation instanceof WhitespaceAnnotation value)
+                    styles.add(value.style().orElse("javaStyle"));
+                for (String style : styles) {
+                    try { org.unlaxer.dsl.bootstrap.WhitespaceDefinitions.resolve(style, lexical); }
+                    catch (IllegalArgumentException error) {
+                        String message = error.getMessage();
+                        // Replace the old generic code; keep the original explanation.
+                        if (message.startsWith("E-WHITESPACE: ")) message = message.substring("E-WHITESPACE: ".length());
+                        throw new IllegalArgumentException(issue.code() + ": " + message);
+                    }
+                }
+                throw new IllegalStateException("whitespace diagnostic without invalid style");
+            }
+            case "E-WHITESPACE-RULE-DUPLICATE" -> detail = "duplicate @whitespace on " + issue.rule();
+            case "E-PRECEDENCE-DUPLICATE" -> detail = "duplicate @precedence on " + issue.rule();
+            case "E-PRECEDENCE-NO-ASSOC", "E-ASSOC-NO-PRECEDENCE" ->
+                detail = "associativity and @precedence must occur together on " + issue.rule();
+            case "E-ASSOC-BOTH" -> detail = "duplicate/conflicting associativity on " + issue.rule();
+            case "E-ANNOTATION-INTERLEAVE-PROFILE" -> detail = "interleave profile " + rule.annotations().stream()
+                .filter(InterleaveAnnotation.class::isInstance).map(InterleaveAnnotation.class::cast).findFirst().orElseThrow().profile();
+            case "E-ANNOTATION-SCOPETREE-MODE" -> detail = "scopeTree mode " + rule.annotations().stream()
+                .filter(ScopeTreeAnnotation.class::isInstance).map(ScopeTreeAnnotation.class::cast).findFirst().orElseThrow().mode();
+            case "E-RULE-UNDEFINED" -> detail = issue.message();
+            default -> throw new IllegalStateException("unhandled declaration diagnostic " + issue.code());
+        }
+        // Keep the host label in the explanation, with the stable code first like other E-* errors.
+        throw new IllegalArgumentException(issue.code() + ": Rust subset: " + detail);
+    }
+
     private GrammarIR run() {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
         org.unlaxer.dsl.codegen.LexicalContexts.requireValid(grammar);
@@ -81,6 +130,7 @@ public final class RustGrammarLowering {
         var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
         org.unlaxer.dsl.codegen.TokenStreamGrammar.requireValid(grammar);
         org.unlaxer.dsl.codegen.GlobalComment.requireValid(grammar);
+        requireValidDeclarations();
         boolean lineComments = org.unlaxer.dsl.codegen.GlobalComment.lineComments(grammar);
         boolean whitespace = false;
         String globalStyle = "none";

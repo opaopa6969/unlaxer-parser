@@ -34,6 +34,213 @@ fn whitespace_style(style: &str) -> Result<bool> {
     }
 }
 
+/// The syntax-only diagnostics from Java GrammarValidator, in validator order.
+/// Run after the existing schema checks (#825), before Rust's root requirement.
+fn validate_declarations(
+    grammar: &ast::GrammarDecl,
+    lexical: &HashMap<String, unlaxer_codegen::lexical::LexicalExpression>,
+) -> Result<()> {
+    let whitespace: Vec<_> = grammar
+        .settings
+        .iter()
+        .filter(|s| s.key == "whitespace")
+        .collect();
+    if whitespace.len() > 1 {
+        return Err("E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace".into());
+    }
+    for setting in whitespace {
+        let SettingValue::String(style) = &setting.value else {
+            return Err("E-WHITESPACE-GLOBAL-STYLE: unsupported block setting whitespace".into());
+        };
+        named_whitespace_style(style, lexical).map_err(|_| {
+            format!("E-WHITESPACE-GLOBAL-STYLE: unsupported setting whitespace: {style}")
+        })?;
+    }
+    for rule in &grammar.rules {
+        let mut whitespace_count = 0;
+        let mut mapping = None;
+        let mut left = false;
+        let mut right = false;
+        let mut precedence_count = 0;
+        let mut interleave = None;
+        let mut scope = None;
+        for annotation in &rule.annotations {
+            match &annotation.kind {
+                AnnotationKind::Whitespace { style } => {
+                    whitespace_count += 1;
+                    named_whitespace_style(style.as_deref().unwrap_or("javaStyle"), lexical)
+                        .map_err(|message| {
+                            format!(
+                                "E-WHITESPACE-RULE-STYLE: {}",
+                                message.strip_prefix("E-WHITESPACE: ").unwrap_or(&message)
+                            )
+                        })?;
+                }
+                AnnotationKind::Mapping { params, .. } => mapping = Some(params),
+                AnnotationKind::LeftAssoc => left = true,
+                AnnotationKind::RightAssoc => right = true,
+                AnnotationKind::Precedence { .. } => precedence_count += 1,
+                AnnotationKind::Interleave { profile } => {
+                    interleave.get_or_insert(profile);
+                }
+                AnnotationKind::ScopeTree { mode } => {
+                    scope.get_or_insert(mode);
+                }
+                _ => (),
+            }
+        }
+        if whitespace_count > 1 {
+            return Err(format!(
+                "E-WHITESPACE-RULE-DUPLICATE: duplicate @whitespace on {}",
+                rule.name
+            ));
+        }
+        if let Some(params) = mapping {
+            let mut captures = HashSet::new();
+            collect_capture_names(&rule.body, &mut captures);
+            let names: HashSet<_> = params.iter().collect();
+            let constraints = typeof_names(&rule.body);
+            let code = if names.len() != params.len() {
+                Some("E-MAPPING-DUPLICATE-PARAM")
+            } else if params.iter().any(|p| !captures.contains(p)) {
+                Some("E-MAPPING-MISSING-CAPTURE")
+            } else if captures
+                .iter()
+                .any(|c| !names.contains(c) && !constraints.contains(c))
+            {
+                Some("E-MAPPING-UNLISTED-CAPTURE")
+            } else {
+                None
+            };
+            if let Some(code) = code {
+                return Err(format!(
+                    "{code}: @mapping params must match capture names on {}",
+                    rule.name
+                ));
+            }
+        }
+        if left && right {
+            return Err(format!(
+                "E-ASSOC-BOTH: duplicate/conflicting associativity on {}",
+                rule.name
+            ));
+        }
+        // Preserve existing choice-profile errors, which Java diagnoses before
+        // precedence/consistency. Ordinary lowering will return their old messages.
+        let count = |test: fn(&AnnotationKind) -> bool| {
+            rule.annotations.iter().filter(|a| test(&a.kind)).count()
+        };
+        let longest = count(|a| matches!(a, AnnotationKind::LongestChoice));
+        let predictive = count(|a| matches!(a, AnnotationKind::PredictiveChoice));
+        let unique = count(|a| matches!(a, AnnotationKind::UniqueLongestChoice));
+        let alternatives = rule.body.alternatives.len();
+        if (longest > 0 && (longest > 1 || alternatives < 2 || left || right))
+            || (predictive > 0
+                && (predictive > 1 || alternatives < 2 || left || right || longest > 0))
+            || (unique > 0
+                && (unique > 1
+                    || !(2..=64).contains(&alternatives)
+                    || left
+                    || right
+                    || longest > 0
+                    || predictive > 0))
+        {
+            return Ok(());
+        }
+        if precedence_count > 1 {
+            return Err(format!(
+                "E-PRECEDENCE-DUPLICATE: duplicate @precedence on {}",
+                rule.name
+            ));
+        }
+        if precedence_count > 0 && !left && !right {
+            return Err(format!(
+                "E-PRECEDENCE-NO-ASSOC: associativity and @precedence must occur together on {}",
+                rule.name
+            ));
+        }
+        if let Some(profile) = interleave {
+            if !matches!(profile.trim(), "javaStyle" | "commentsAndSpaces") {
+                return Err(format!(
+                    "E-ANNOTATION-INTERLEAVE-PROFILE: unsupported interleave profile {profile}"
+                ));
+            }
+        }
+        if let Some(mode) = scope {
+            if !matches!(mode.trim(), "lexical" | "dynamic") {
+                return Err(format!(
+                    "E-ANNOTATION-SCOPETREE-MODE: unsupported scopeTree mode {mode}"
+                ));
+            }
+        }
+    }
+    // Java checks missing precedence only after all rule-local diagnostics.
+    for rule in &grammar.rules {
+        let assoc = rule.annotations.iter().any(|a| {
+            matches!(
+                a.kind,
+                AnnotationKind::LeftAssoc | AnnotationKind::RightAssoc
+            )
+        });
+        let precedence = rule
+            .annotations
+            .iter()
+            .any(|a| matches!(a.kind, AnnotationKind::Precedence { .. }));
+        if assoc && !precedence {
+            return Err(format!(
+                "E-ASSOC-NO-PRECEDENCE: associativity and @precedence must occur together on {}",
+                rule.name
+            ));
+        }
+    }
+    let defined: HashSet<_> = grammar
+        .rules
+        .iter()
+        .map(|r| r.name.as_str())
+        .chain(grammar.tokens.iter().map(|t| t.name.as_str()))
+        .collect();
+    for rule in &grammar.rules {
+        // Match GrammarValidator.collectReferencedRuleNames: transparent bodies,
+        // optional and repeat, in source order. Other atomic forms retain lowering checks.
+        let mut pending: Vec<_> = rule
+            .body
+            .alternatives
+            .iter()
+            .flat_map(|s| &s.elements)
+            .map(|e| &e.element)
+            .rev()
+            .collect();
+        while let Some(element) = pending.pop() {
+            match &element.kind {
+                ElementKind::RuleRef {
+                    namespace: None,
+                    name,
+                } if !defined.contains(name.as_str()) => {
+                    return Err(format!("E-RULE-UNDEFINED: unknown reference {name}"));
+                }
+                ElementKind::OwnedCapture { body, .. }
+                | ElementKind::CaptureScope(body)
+                | ElementKind::Commit { body, .. }
+                | ElementKind::Label { body, .. }
+                | ElementKind::Catch { choice: body, .. }
+                | ElementKind::Group(body)
+                | ElementKind::Optional(body)
+                | ElementKind::Repeat(body) => {
+                    pending.extend(
+                        body.alternatives
+                            .iter()
+                            .flat_map(|s| &s.elements)
+                            .map(|e| &e.element)
+                            .rev(),
+                    );
+                }
+                _ => (),
+            }
+        }
+    }
+    Ok(())
+}
+
 fn direct_ref(atom: &ast::AtomicElement, target: &str) -> bool {
     matches!(&atom.kind, ElementKind::RuleRef { name, .. } if name == target)
 }
@@ -365,11 +572,11 @@ impl Lowering<'_> {
         self.analysis_depth.set(depth + 1);
         Ok(AnalysisDepth(&self.analysis_depth))
     }
-    fn run(mut self) -> Result<GrammarIr> {
+    fn run(self) -> Result<GrammarIr> {
         for rule in &self.grammar.rules {
             validate_typeof(rule)?;
         }
-        let mut lexical = crate::lexical::compile(self.grammar)?;
+        let lexical = crate::lexical::compile(self.grammar)?;
         if !self.grammar.imports.is_empty() {
             return Err("unsupported imports".into());
         }
@@ -389,6 +596,41 @@ impl Lowering<'_> {
         if let Some(issue) = crate::global_comment::problems(self.grammar).first() {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
+        let declaration_error = match validate_declarations(self.grammar, &lexical) {
+            // Java validates name-predicate capture shapes before mapping params.
+            // Native needs lowered bodies for that check, so retain the diagnostic
+            // until then instead of letting the new preflight mask it.
+            Err(error)
+                if error.starts_with("E-MAPPING-")
+                    && self.grammar.rules.iter().any(|rule| {
+                        rule.annotations
+                            .iter()
+                            .any(|a| matches!(a.kind, AnnotationKind::NamePredicate { .. }))
+                    }) =>
+            {
+                Some(error)
+            }
+            result => {
+                result?;
+                None
+            }
+        };
+        // Java-host runs only name-predicate checks before this diagnostic, so a
+        // retained one still precedes every other lowering error (#833).
+        let deferred = declaration_error.clone();
+        self.run_after_declarations(lexical, adapter_registry, declaration_error)
+            .map_err(|error| match deferred {
+                Some(deferred) if !error.starts_with("E-NAME-PREDICATE-") => deferred,
+                _ => error,
+            })
+    }
+
+    fn run_after_declarations(
+        mut self,
+        mut lexical: HashMap<String, unlaxer_codegen::lexical::LexicalExpression>,
+        adapter_registry: AdapterRegistry,
+        declaration_error: Option<String>,
+    ) -> Result<GrammarIr> {
         let line_comments = crate::global_comment::line_comments(self.grammar);
         let whitespace_definitions = lexical.clone();
         let mut whitespace = false;
@@ -721,7 +963,9 @@ impl Lowering<'_> {
             self.comparisons.push(comparison);
             self.skips.push(skip);
         }
-        let root = root.ok_or("exactly one @root is required")?;
+        if root.is_none() && declaration_error.is_none() {
+            return Err("exactly one @root is required".into());
+        }
         self.check_parser_names()?;
         for rule in &self.grammar.rules {
             self.nested_rule = crate::nested_captures::enabled(rule);
@@ -744,15 +988,19 @@ impl Lowering<'_> {
         for i in 0..self.bodies.len() {
             self.check_left_recursion(i, &mut HashSet::new(), &mut HashSet::new())?;
         }
-        if !self.expression_reaches_skip(&Expression::Reference(root), &mut HashSet::new())? && {
-            let shape = self.rule_shape_projected(root, &mut HashSet::new(), true)?;
-            shape.cardinality != Cardinality::One
-                || !(shape.kind == Kind::Node || matches!(shape.kind, Kind::Enum(_)))
-        } {
-            if self.contains_enum(&Expression::Reference(root), &mut HashSet::new()) {
-                return Err("E-ENUM: root must project exactly one AST node".into());
+        if let Some(root) = root {
+            if !self.expression_reaches_skip(&Expression::Reference(root), &mut HashSet::new())?
+                && {
+                    let shape = self.rule_shape_projected(root, &mut HashSet::new(), true)?;
+                    shape.cardinality != Cardinality::One
+                        || !(shape.kind == Kind::Node || matches!(shape.kind, Kind::Enum(_)))
+                }
+            {
+                if self.contains_enum(&Expression::Reference(root), &mut HashSet::new()) {
+                    return Err("E-ENUM: root must project exactly one AST node".into());
+                }
+                return Err("root must resolve to exactly one AST node".into());
             }
-            return Err("root must resolve to exactly one AST node".into());
         }
         let mut name_versions = Vec::<(String, String)>::new();
         for (i, rule) in self.grammar.rules.iter().enumerate() {
@@ -824,6 +1072,10 @@ impl Lowering<'_> {
         if name_versions.len() > 64 {
             return Err("E-NAME-PREDICATE-LIMIT: at most 64 snapshots".into());
         }
+        if let Some(error) = declaration_error {
+            return Err(error);
+        }
+        let root = root.ok_or("exactly one @root is required")?;
         if self.enums.iter().any(|values| !values.is_empty())
             && self
                 .mappings

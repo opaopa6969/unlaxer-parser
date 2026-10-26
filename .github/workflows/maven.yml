@@ -35,6 +35,10 @@ jobs:
         distribution: 'temurin'
         overwrite-settings: false
     - uses: ./.github/actions/maven-job-repository
+    - name: Check public Java parser API inventory (#716)
+      run: |
+        python3 scripts/check-java-api-parity.py
+        python3 scripts/run-required-unittests.py scripts.tests.test_java_api_parity
     - name: Set up Rust (minimum supported version)
       run: |
         export PATH="$HOME/.cargo/bin:$PATH"

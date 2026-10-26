@@ -30,13 +30,108 @@ public final class GrammarGenerator {
     static final int MAX_DERIVED_CHARS = 32;
 
     private final Random random;
+    private final long seed;
     private final Limits limits;
     private int rules;
     private int owned;
 
     public GrammarGenerator(long seed, Limits limits) {
+        this.seed = seed;
         this.random = new Random(seed);
         this.limits = limits;
+    }
+
+    /**
+     * Separate, bounded generation mode (#770). Call on a fresh generator: the legacy grammar,
+     * derivation and reserve streams remain byte-for-byte unchanged. Each seed rotates through
+     * one of four small shapes; literals, labels, trivia and broken inputs vary within the shape.
+     * These templates have at most four rules and no recursive calls.
+     */
+    List<ParityHarness.Case> featureCombinations() {
+        int family = (int) Math.floorMod(seed - 1, 4);
+        int variant = (int) Math.floorMod(Math.floorDiv(seed - 1, 4), 6);
+        String word = LITERALS[random.nextInt(LITERALS.length)];
+        String other = word.equals("a") ? "b" : "a";
+        String label = "L" + random.nextInt(4);
+        String settings = "  @whitespace: none\n";
+        String declarations = "";
+        var inputs = new LinkedHashSet<String>();
+        inputs.add("");
+        String tag;
+        if (family == 0) {
+            tag = "value-owned-lookahead-memo";
+            declarations = "  token AHEAD = LOOKAHEAD('" + word + "')\n"
+                    + "  @root @mapping(N0) R0 ::= R1 '!' | R1 '?' ;\n"
+                    + "  R1 ::= CAPTURE(w, Bind(R2)) AHEAD SAME_AS(w) ;\n"
+                    + "  R2 ::= '" + word + "' | '" + other + "' ;\n"
+                    + "  Bind(=arg) ::= arg ;\n";
+            // R2 is pure, while Bind and R1 carry owned state. Retrying R1 replays R2's
+            // success/failure memo without memoizing the value/capture-dependent rules.
+            inputs.addAll(List.of(word.repeat(4) + "!", word.repeat(4) + "?",
+                    other.repeat(2) + word + "?", word.repeat(2), "z"));
+        } else if (family == 1) {
+            tag = "comment-frontier-stack";
+            int profile = variant % 3;
+            settings = commentSettings(profile);
+            String newline = new String[] {"\n", "\r", "\r\n"}[variant / 2];
+            String comment = "//" + other + "😀" + newline;
+            declarations = "  token AHEAD = LOOKAHEAD('" + word + "')\n"
+                    + "  @root @mapping(N0) R0 ::= 'k' " + (profile == 0 ? "" : "'" + quoted(newline) + "' ") + "AHEAD R1 ;\n"
+                    + "  R1 ::= R2 ;\n"
+                    + "  R2 ::= '" + word + "' '!' ;\n";
+            inputs.addAll(List.of("k" + comment + word + "!", "k" + comment + word + "?",
+                    "k" + comment + word, "k" + comment, "k//EOF😀"));
+        } else if (family == 2) {
+            tag = "autoCommit-nullable-raising";
+            settings = commentSettings(variant % 3);
+            boolean nullablePrefix = variant >= 3;
+            declarations = "  @root @mapping(N0) R0 ::= { R1 } ;\n"
+                    + "  @autoCommit R1 ::= " + (nullablePrefix ? "['k']" : "'k'") + " R2 | 'q' R3 ;\n"
+                    + "  R2 ::= " + (nullablePrefix ? "'" + word + "'" : "['" + word + "']") + " ;\n"
+                    + "  R3 ::= '" + word + "' ;\n";
+            inputs.addAll(List.of("k" + word, "q" + word, "k", "q", word, "q?",
+                    "k" + word + "q" + word, "q//😀\r\n" + word, "q" + word + "//EOF😀"));
+        } else {
+            tag = "commit-label-catch";
+            declarations = "  @root @mapping(N0) R0 ::= CATCH(LABEL(" + label
+                    + ", 'k') R1, LABEL(M, 'q') R1, " + label + ") ;\n"
+                    + "  R1 ::= COMMIT(R2, 'expected value') ;\n"
+                    + "  R2 ::= '" + word + "' ;\n";
+            inputs.addAll(List.of("k" + word, "q" + word, "k?", "q?", "z", "k", "q"));
+        }
+        // Keep the deliberately reaching inputs, and add the same bounded CP mutations as the
+        // legacy mode. No reserve selection is needed for these finite derivations.
+        for (String input : List.copyOf(inputs)) inputs.add(mutate(input));
+        String grammar = "grammar Pbt {\n  @package: pbt.generated\n" + settings + declarations + "}\n";
+        var features = new java.util.LinkedHashMap<String, Integer>();
+        features.put("combination:" + tag, 1);
+        for (String syntax : List.of("(=arg)", "CAPTURE(", "SAME_AS(", "LOOKAHEAD(", "@comment:",
+                "@autoCommit", "COMMIT(", "LABEL(", "CATCH(")) {
+            int count = (grammar.length() - grammar.replace(syntax, "").length()) / syntax.length();
+            if (count > 0) features.put("syntax:" + syntax, count);
+        }
+        String id = "combination-" + seed + "-" + tag;
+        var cases = new ArrayList<ParityHarness.Case>();
+        cases.add(new ParityHarness.Case(id, grammar, List.copyOf(inputs), features, null));
+        if (family == 2) {
+            // A nonnullable always-raising body cannot end an unbounded repetition. Unlike
+            // a nullable body, it cannot stop via the zero-consumption termination rule.
+            String raising = variant % 2 == 0 ? "COMMIT('" + word + "')"
+                    : "LABEL(" + label + ", '" + word + "')";
+            String invalid = "grammar Pbt {\n  @package: pbt.generated\n" + settings
+                    + "  @root @autoCommit @mapping(N0) R0 ::= { " + raising + " } ;\n}\n";
+            cases.add(new ParityHarness.Case(id + "-rejected", invalid, List.of(), Map.of(), "E-RAISING-REPETITION"));
+        }
+        return List.copyOf(cases);
+    }
+
+    private static String commentSettings(int profile) {
+        return (profile == 0 ? "  @whitespace: javaStyle\n" : profile == 1 ? "" : "  @whitespace: none\n")
+                + "  @comment: { line: '//' }\n";
+    }
+
+    private static String quoted(String text) {
+        return text.replace("\r", "\\r").replace("\n", "\\n");
     }
 
     // ------------------------------------------------------------------ grammars

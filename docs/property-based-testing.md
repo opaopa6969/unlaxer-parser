@@ -58,10 +58,11 @@ corpus（`spec-corpus/`、`conformance/`）は人が思いつく組み合わせ�
   ため、Rust 側は root span の text で確かめる）。
 - memo の実行経路を通ったことの確認として、run 全体で両 host の成功 memo と失敗 memo の hit が
   それぞれ 1 以上あることを要求する（`regressions.json` の `memo-replay` が必ず両方を起こす）。
-- 受理経路を通ったことの確認として、corpus を除く生成入力だけで受理入力を持つ seed が 60% 以上
-  あることを要求する（CI seed 集合で 20 / 24、seed `1000..1149` で 124 / 150）。
-- 生成文法の受理率・左再帰の拒否数・受理入力の割合は seed 数が 12 以上のときだけ検査する。
-  1 seed を手で再現するときは finding の有無だけで判定し、finding の検査はこれらより先に行う。
+- 受理経路を通ったことの確認として、corpus を除く既存モードの生成入力だけで受理入力を持つ seed が
+  60% 以上あることを要求する（CI seed 集合で 20 / 24、seed `1000..1149` で 124 / 150）。
+- 生成文法の受理率・期待する拒否（左再帰と raising）の全件一致・受理入力の割合は seed 数が 12 以上の
+  ときだけ検査する。1 seed を手で再現するときはこれらを省き、finding の検査はこれらより先に行う。
+  組み合わせモード（下記）の各文法の経路の検査は、文法ごとに決まるので seed 数によらず行う。
 
 ## 生成対象
 
@@ -85,9 +86,33 @@ corpus（`spec-corpus/`、`conformance/`）は人が思いつく組み合わせ�
 Java parser が全体を受理する予備を最大 2 組だけ入力に加える（`ParityHarness.RESERVE_GROUPS`）。
 Java parser による選別は決定的で、選んだ入力は両 host で同じに比べる。
 
-[#700](https://github.com/opaopa6969/unlaxer-parser/issues/700) の cut / label、
-[#701](https://github.com/opaopa6969/unlaxer-parser/issues/701) の引数付き規則は、merge 後に
-`GrammarModel` の式と `GrammarGenerator.element` に追加する。
+### 小さな機能の組み合わせ（#770）
+
+`GrammarGenerator.featureCombinations` は既存の `grammar()` と別の生成モードで、同じ seed の
+独立した `Random` を使う。既存モードの文法・入力・予備入力・左再帰変種は変更しない。
+CI seed `1..24` の変更前（`ead93369`）の SHA-256 をテストに固定して生成列を守る。
+`regressions.json` の再生と既存の個別 conformance テストも引き続き実行する。
+
+seed を4組で巡回させ、各組の literal、label 名、コメント設定、改行、破壊入力を変える。
+CI では各組6文法、計24文法と raising の拒否例6文法を既存の生成列の後ろに追加する。
+
+| 組 | 生成する形と実行経路 |
+|---|---|
+| 値渡し → owned capture → 先読み → memo | `Bind(=arg)` の値を再照合し、呼出しを `CAPTURE` で包んで `LOOKAHEAD` と `SAME_AS` に渡す。選択の再試行で pure な実引数 rule の成功・失敗 memo を両 host で実際に再生する。値 scope 内のユーザー `CAPTURE` は禁止なので外側に置く。 |
+| `@comment` → frontier → 失敗時の rule stack | javaStyle 併記・comment 単独・none 併記、LF / CR / CRLF と補助文字のコメント。先読みの後に2段の rule 参照を通り、受理と末尾不一致を作る。comment 単独・none 併記では改行を literal で消費する。 |
+| autoCommit → nullable / raising 検査 | `@comment` の3設定すべてで `@autoCommit` を使う（#745 / PR #839）。nullable な後続と非 nullable な先頭では挿入し、nullable な先頭には挿入しない。書き換え後の raising 検査を通す。別の変種で非 nullable な `COMMIT` / `LABEL` の無界反復を両 frontend が `E-RAISING-REPETITION` で拒否する。 |
+| COMMIT / LABEL / CATCH | label を捕捉して別の選択肢を受理する経路、捕捉されない別 label、`CATCH` を越える COMMIT の確定失敗。 |
+
+いずれも最大4 rule・再帰なし・入力最大64 CP・22件以内の小さな形で、既存の CP 単位の破壊入力も
+加える。両 Rust host の生成物 byte 比較、Java/native Rust の12設定の oracle、#739 の手数上限を
+そのまま使う。生成した構文の実際の出現数、autoCommit の挿入数と拒否数を単体テストで確認し、
+各文法の受理・失敗、コメント後の失敗 stack、値渡し文法の両 host の memo hit も検査する。
+既存の「受理入力を持つ seed が60%以上」の分母・分子には追加モードを混ぜない。
+
+このモードは小さな形を組み立てるので `GrammarModel` の構造縮小は使わず、同じ予算の
+`Shrinker` で入力だけを縮小し `inputOnly: true` を出す。finding は文法も手で縮小して
+`regressions.json` と受け入れ条件付きの別 issue に固定する。製品側の修正は分離し、既存の
+`known-differences.json` の仕組みで範囲を限定して追跡する。
 
 ## 実行のしくみ
 
@@ -182,8 +207,9 @@ Java の `ParseOptions.DEFAULT` で 1 回解析し、始まった parser transac
 ## CI と手での実行
 
 CI（`.github/workflows/maven.yml` の "Rust backend and Java conformance"）は固定 seed `1..24`
-を 1 batch で回す。予算は 2 分以内（手元の負荷の高い共有機で約 15 秒。生成器の決定性・
-妥当性を 1,000 seed で確かめる Java だけのテストが別に約 6 秒）。テストコードは Java 17 で
+を既存モードと組み合わせモードの両方で回し、corpus を含め24文法ずつ compile する。
+PBT 本体の予算は2分以内。生成器の決定性・妥当性を1,000 seed で確かめる Java だけの
+テストと、組み合わせモードの CI seed の網羅・既存生成列の fingerprint 検査も実行する。テストコードは Java 17 で
 compile できる書き方にしてあり、`unlaxer-dsl-jdk17` の `--release 17` build でも同じテストが走る
 （Rust を要するテストは `-DrustConformance=true` のときだけ）。
 
@@ -206,7 +232,7 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=PropertyBasedParityTest \
 | property | 既定 | 意味 |
 |---|---|---|
 | `pbt.seed` | `1` | 最初の seed |
-| `pbt.grammars` | `24` | seed の数（文法の数） |
+| `pbt.grammars` | `24` | seed の数（各 seed で既存文法と組み合わせ文法、該当する拒否変種を生成） |
 | `pbt.batch` | `24` | 1 回の compile にまとめる文法の数 |
 | `pbt.noShrink` | `false` | 縮小を省略する |
 | `pbt.shrinkLimit` | `3` | 縮小する finding の最大数（種別の異なる代表を優先） |
@@ -226,10 +252,21 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test -Dtest=PropertyBasedParityTest \
 - `target/property-based-parity-stats.txt`: 文法数、入力数、受理数、memo hit、生成した構文の内訳。
 
 seed は `java.util.Random` で展開する（JDK 仕様で列が固定）。同じ seed・同じ revision なら同じ
-文法と入力になる。生成器を変えると同じ seed でも別の文法になるので、再現例は seed ではなく
+文法と入力になる。既存モードの CI seed 列は fingerprint で維持するが、生成器の将来の変更でも再現できるよう、再現例は seed ではなく
 縮小した文法と入力を `regressions.json` に固定する。
 
 ## これまでの結果
+
+#770 の追加後（2026-10-27、CI seed `1..24`）:
+
+| 範囲 | 文法 | 入力 | 観測（host あたり） | finding | 本体の時間 |
+|---|---|---|---|---|---|
+| 既存生成 + 組み合わせ生成 + corpus 51件 | 113（期待する拒否15を含む） | 958 | 11,496 | 0（既知差除外0） | 27秒 |
+
+既存モードと corpus の631入力に、組み合わせモードの327入力を追加した。
+手数上限による除外は既存 corpus の1入力だけ。追加モードは4組各6文法、autoCommit の挿入9件、
+raising の拒否6件。4組をそれぞれ生成しない mutation はすべて網羅テストが検出した。
+入力縮小は合成 finding の `a😀tail` → `a😀` でも確認した。
 
 開発時（2026-10-19、生成器の現 revision）に次を回した。
 
