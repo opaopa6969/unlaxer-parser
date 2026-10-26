@@ -152,7 +152,7 @@ public class AutoCommitConformanceTest {
     /** The rewrite equals the hand-written grammar and generates byte-identical code on every path. */
     @Test public void rewriteEqualsTheHandWrittenCommits() throws Exception {
         var rows = corpus("cases.json");
-        assertEquals(18, rows.size());
+        assertEquals(19, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String name = row.get("name").getAsString();
@@ -279,8 +279,8 @@ public class AutoCommitConformanceTest {
                 runJava(row.get("manual").getAsString(), cases), runJava(plain(grammar), cases));
             observations += auto.size();
         }
-        assertEquals(230 * 6, observations);
-        assertEquals(91 * 6, accepted);
+        assertEquals(243 * 6, observations);
+        assertEquals(98 * 6, accepted);
     }
 
     @Test public void bothRustHostsMatchTheOracleAndTheUnannotatedGrammar() throws Exception {
@@ -343,7 +343,7 @@ public class AutoCommitConformanceTest {
                 }
             }
         }
-        assertEquals(2 * 91 * 6, accepted);
+        assertEquals(2 * 98 * 6, accepted);
     }
 
     private static final String RUST_PROBE = """

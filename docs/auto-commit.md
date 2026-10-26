@@ -438,14 +438,16 @@ runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする�
   本当の左再帰がある `whitespace-left-recursion`、まだ対象外の `rule-whitespace`、
   `declarative-whitespace`、javaStyle と規則の `@whitespace(none)` / `@interleave` / `@lexicalContext`
   の組み合わせ（`whitespace-rule-none`、`whitespace-interleave`、`whitespace-lexical-context`）。
-- `cases.json`: 18 文法 230 入力。自動挿入の文法、同じ位置に手で `COMMIT` を書いた文法、
+- `cases.json`: 19 文法 243 入力。自動挿入の文法、同じ位置に手で `COMMIT` を書いた文法、
   それぞれの入力の結果（受理・拒否、確定エラーの位置と message）。`group-after-commit` は
   包んだ参照の後ろに group が続き、Java の group helper の番号が変わらないことを CST で確かめる。
   javaStyle の 4 文法（`whitespace-statements`、`whitespace-expression`、`whitespace-slash`、
   `whitespace-raw-slash`）は、空白・tab・CRLF・行コメント・ブロックコメント・閉じていないコメント・
   単独の `/`・末尾の空白・空白だけの入力を含む。
-  #745 の8実行例では javaStyle 併記・comment 単独・none 併記と、空白・改行の終端、
+  #745 の9実行例では javaStyle 併記・comment 単独・none 併記と、空白・改行の終端、
   MatchOnly 終端（LF / CR / CRLF / EOF）、補助文字、素の `/` の反例を固定する。
+  `comment-only-newline-continuation` は、コメントの終端の CR / LF を外側の続きが消費する文法で、
+  `kn//c\nk` の受理が変わらず、`k//c\nk` が消費位置4の確定エラーになることを確かめる。
 - `warnings.json`: 25 文法。`W-AUTO-COMMIT-SKIPPED` の規則・reason・位置と、
   comment に関する具体的な3種類の reason / message、警告しない解析対象を固定する。
   `generation-warnings/corpus.json` でも規則 trivia 併記の警告を3経路の CLI・strict 拒否で確認する。
@@ -469,11 +471,17 @@ runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする�
 （#705、`PropertyBasedParityTest` と共用）の文法に javaStyle 単独・javaStyle と comment・
 comment 単独・none と comment の4設定を順番に付け、全規則に `@autoCommit` を付けた文法と付けない文法を
 比べる。`COMMIT` が 1 個以上入った文法だけを使う。生成器の literal は trivia を始めないので、3 分の 2 の
-seed では `y` を `/`、`,` を `*`、`x` を空白に置き換える（文法と入力の両方）。入力は生成器の導出と変異に、
-空白・LF・CR・CRLF・補助文字入りコメント・EOF コメント・単独の `/`・`/*`・`*/` を符号位置の間に差し込んだものを加える。
+seed では `y` を `/`、`,` を `*`、`x` を空白に置き換える（文法と入力の両方）。comment 単独・none 併記の
+文法では、さらに全 seed で `x` か `,` を LF / CRLF に置き換え、解析が模型化する改行の終端記号がコメントの
+MatchOnly 終端の直後に来るようにする。入力は生成器の導出と変異に、
+空白・LF・CR・CRLF・補助文字入りコメント・EOF コメント・単独の `/`・`/*`・`*/` を符号位置の間に差し込んだもの、
+最初の CR / LF の直前に `// c` を入れたもの、末尾に `// EOF` を足したものを加える。
 
 - Java の生成 parser で、6 設定のすべての入力について、受理・拒否が一致し、受理した入力の CST と
   AST が一致する。
+- 4 設定のそれぞれで、行コメントを含む入力の受理と、行コメントを含む入力の挿入した `COMMIT` による
+  拒否が 1 件以上あること、comment 単独と none 併記を合わせてコメントの後ろに入力が続く受理が 1 件以上あることを
+  確かめる（生成器が comment の組み合わせを出さなくなったら失敗する）。
 - `-DrustConformance=true` のとき、native generator と Java host の Rust 生成物が byte 単位で一致し、
   native Rust の parser で同じ比較を行う。両 frontend の lint と警告（位置・件数・inserted）も
   全文法で比べる。

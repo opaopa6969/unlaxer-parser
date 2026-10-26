@@ -80,7 +80,7 @@ fn lint_reports_the_corpus_positions() {
 #[test]
 fn rewrite_equals_the_hand_written_commits() {
     let rows = corpus("cases.json");
-    assert_eq!(rows.len(), 18);
+    assert_eq!(rows.len(), 19);
     for row in &rows {
         let name = text(row, "name");
         let auto = parse(text(row, "grammar")).unwrap_or_else(|e| panic!("{name}: {e}"));

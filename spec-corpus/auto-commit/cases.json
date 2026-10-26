@@ -1198,5 +1198,73 @@
         "outcome": "syntax"
       }
     ]
+  },
+  {
+    "name": "comment-only-newline-continuation",
+    "note": "コメントの MatchOnly 終端の CR / LF を外側の続き（{ T }）が消費する。続きの FIRST {LF, CR} は S の FIRST {k} と交わらないので挿入し、kn//c\\nk は受理のまま、k//c\\nk は消費位置4の確定エラーになる（#745 review）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S } { T };\n  @autoCommit S ::= 'k' N;\n  N ::= 'n';\n  T ::= '\\n' 'k' | '\\r' 'k';\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S } { T };\n  S ::= 'k' COMMIT(N);\n  N ::= 'n';\n  T ::= '\\n' 'k' | '\\r' 'k';\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "kn",
+        "outcome": "success"
+      },
+      {
+        "input": "kn\nk",
+        "outcome": "success"
+      },
+      {
+        "input": "kn//c\nk",
+        "outcome": "success"
+      },
+      {
+        "input": "kn//c\rk",
+        "outcome": "success"
+      },
+      {
+        "input": "kn//c\nk\nk",
+        "outcome": "success"
+      },
+      {
+        "input": "kn//c\nk//d\rk",
+        "outcome": "success"
+      },
+      {
+        "input": "k//c\nk",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k\nk",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\nn",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\r\nk",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "kn//c\r\nk",
+        "outcome": "syntax"
+      },
+      {
+        "input": "kn//c\nkn",
+        "outcome": "syntax"
+      }
+    ]
   }
 ]
