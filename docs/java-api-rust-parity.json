@@ -1,0 +1,1261 @@
+{
+  "schema_version": 1,
+  "revision": "5a4e51620dc245186f683cded7c6a191398a9550",
+  "audited_on": "2026-10-27",
+  "scope_notes": [
+    "- `unlaxer-common/src/main/java/org/unlaxer/parser/**/*.java` の全階層（combinator / elementary / posix / referencer に加え ascii / clang / incremental と root package）。public class だけでなく interface / enum / record / 公開nested型も含む。",
+    "- 関連境界は `org/unlaxer/Parser*.java`、`*Tag*.java`、Name / Parsed / Token / TokenKind / TokenList / TokenPredicators / TransactionElement / CapturedValue、context の ParseContext / TransactionalState / MutationAwareTransactionalState、reducer の TagBasedReducer。source座標一般・editor・logging・DSL生成API全体は機能群表の範囲で、このparser宣言一覧には含めない。",
+    "- 公開 static method は factory の命名を推測せず utility も全件列挙。interfaceの暗黙publicも含み、overloadは引数型で分ける。constructor・instance method・field・合成enum values等は型行の動作監査に含め、個別宣言行は作らない。非公開outer内のpublic型、private/protected、コメント、文字列内の偽宣言は除く。",
+    "- JDK 21+ の javac parse-only AST を使用し、依存解決・ビルド・annotation processor・外部取得を行わない。追加ファイルは実ソースの再走査で検出する。判定は名前検索ではなくJava parse/構築処理とRust Expr/実行処理を読み、共通corpusと実行testの対応範囲を区別した。",
+    "- 初期機能群表は `79975781` 時点の `rust/FULL-SPEC.md`。これは機能単位の記録であり、この全宣言表による個別監査へ接続する。",
+    "- [機能群表](../rust/FULL-SPEC.md)・[既知差台帳](parity-ledger.md)の既存契約と未解決差も併読する。言語固有は検証不要という意味ではない。"
+  ],
+  "assessments": {
+    "construction": {
+      "status": "language-specific",
+      "reason": "Java の継承・Class/Supplier cache・lazy 初期化・親子 identity を Rust の同名型へ写す契約はない。Rust は Expr 値と Rule index、Arc の不変 graph を構築する。共有 instance と独立 context の分離は既存実装にあるが、各 Java factory overload と初期化順・循環・名前重複の移植例を共通検証する必要がある。",
+      "route": "`Expr::sequence/choice`、`Rule { name, expression }`、`share_grammar(Vec<Rule>)` と `OnceLock<SharedGrammar>`。JVM class loading/serialization は明示 factory/adapter へ移す。parser identity を比較する利用者は安定 Rule ID を明示的に割り当てる。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L338",
+        "rust/unlaxer-runtime/src/lib.rs#L562",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/ParserFactoryByClass.java#L14",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/ParserFactoryBySupplier.java#L11"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/RustBackendTest.java"
+      ],
+      "fixtures": [],
+      "issues": [
+        845
+      ],
+      "followup_group": "graph"
+    },
+    "reference-by-name": {
+      "status": "uncorroborated",
+      "reason": "ReferenceByNameParser は root から作った ParserNameContext の Name→Parser を呼び、未登録なら FAILED。Rust Rule(index) と生成 rule 名解決に通常参照の経路はあるが、実行時名前登録・未登録・duplicate name・共有 graph の再構築まで同じ oracle で比較していない。",
+      "route": "`Rule { name: \"Item\", expression: ... }` を登録し `Expr::Rule(index)`、または UBNF の `Root ::= Item;`。動的名前 lookup は利用側で検証済み index 表を作る境界として明示する。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/ReferenceByNameParser.java#L14",
+        "unlaxer-common/src/main/java/org/unlaxer/ParserNameContext.java#L10",
+        "rust/unlaxer-runtime/src/lib.rs#L122"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustConformanceTest.java"
+      ],
+      "fixtures": [],
+      "issues": [
+        845
+      ],
+      "followup_group": "graph"
+    },
+    "reference-predicate": {
+      "status": "language-specific",
+      "reason": "ReferenceParser/Referencer は Java parser graph を Predicate<Parser> で探索し結果を cache する。Rust Rule(index) は明示参照であり、任意 Java class/instance predicate の自動移植ではない。名前参照だけで全 predicate を対応済みにしない。",
+      "route": "構築時に Rule ID を解決して `Expr::Rule(id)` を保持する。未登録・循環・同名/別 identity・cache lifetime を明示 registry の利用例と共通 fixture で固定する。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/ReferenceParser.java#L16",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/Referencer.java#L9",
+        "rust/unlaxer-runtime/src/lib.rs#L122"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        845
+      ],
+      "followup_group": "graph"
+    },
+    "meta-function": {
+      "status": "language-specific",
+      "reason": "MetaFunctionParser 自体は空 marker だが、Transaction.commit の doCreateMetaToken/LazyInstance 判定と MetaFunctionTokenReducer の子昇格に作用する。Rust の Fragment 合成は中間 combinator node を省くが、Java の全 marker/収集設定の同値性を証明しない。",
+      "route": "通常は `Expr::Sequence/Choice` の Fragment、所有する CST が必要なら `Rule` node と明示 mapper へ移す。原 CST と reduced CST の違い、LazyInstance と createMetaToken の全設定を比較する。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/MetaFunctionParser.java#L3",
+        "unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L125",
+        "unlaxer-common/src/main/java/org/unlaxer/reducer/MetaFunctionTokenReducer.java#L8",
+        "rust/unlaxer-runtime/src/lib.rs#L3859"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        851
+      ],
+      "followup_group": "cst"
+    },
+    "terminated-repeat": {
+      "status": "missing",
+      "reason": "ChildOccursWithTerminator/Occurs は各 body より前に任意 parser terminator を実行する。成功した consumed terminator の commit、match-only の rollback、min/max と nullable body の停止を持つ。Rust JavaRepeat は child/min/max のみ、JavaUntil は固定文字列だけであり、この任意 terminator 経路はない。",
+      "route": "`repeat_java` と `JavaUntil` が部分的な既存部品。任意 terminator を PEG not_ahead へ単純置換すると cursor/CST/state が変わるため、新しい小さな runtime API または実証した組合せが必要。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChildOccursWithTerminator.java#L12",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L65",
+        "rust/unlaxer-runtime/src/lib.rs#L410",
+        "rust/unlaxer-runtime/src/lib.rs#L4628"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/combinator/ZeroOrMoreTest.java",
+        "rust/unlaxer-runtime/tests/nullable_repeat.rs"
+      ],
+      "fixtures": [
+        "conformance/nullable-repeat/state.tsv"
+      ],
+      "issues": [
+        846
+      ],
+      "followup_group": "terminator"
+    },
+    "until-variants": {
+      "status": "uncorroborated",
+      "reason": "WildCardStringTerminatorParser は任意 parser/複数文字列・消費の有無を指定でき、parse(context) で resetMatchedWithConsumed=false にする。Rust JavaUntil は固定文字列の非消費終端と EOF 成功に対応するが、全 overload は共通検証されていない。",
+      "route": "固定非消費終端なら `Expr::JavaUntil(\"END\")` / UBNF `UNTIL(...)`。任意/消費終端は terminated-repeat の追跡対象。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardStringTerminatorParser.java#L19",
+        "rust/unlaxer-runtime/src/lib.rs#L262"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustConformanceTest.java"
+      ],
+      "fixtures": [],
+      "issues": [
+        846
+      ],
+      "followup_group": "terminator"
+    },
+    "selected-choice": {
+      "status": "missing",
+      "reason": "MatchedChoiceParser は以前選ばれた Choice の child parser を再実行する。Rust ordered_choice は最初の成功 Fragment を返すが、Choice identity ごとの選択 child を保存・再適用する公開 API を持たない。Backreference/Replay の文字列一致とは異なる。",
+      "route": "明示 Choice ID と選択 branch ID の transaction 管理、および branch 再呼出しの API/例が必要。既存 `Expr::Choice` と `ParseContext::state` は部品であり完成した対応ではない。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7",
+        "rust/unlaxer-runtime/src/lib.rs#L5261"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedChoiceParserTest.java"
+      ],
+      "fixtures": [],
+      "issues": [
+        847
+      ],
+      "followup_group": "selection"
+    },
+    "selected-order": {
+      "status": "missing",
+      "reason": "MatchedNonOrderedParser は getOrdered に保存した parser 順を Ordered で再実行する。Rust non_ordered の selected Vec は呼出し内だけで、成功時は Fragment に変わり順序再適用用 handle を公開しない。既存 NonOrdered parity はこの機能を含まない。",
+      "route": "NonOrdered ID ごとに選択 occurrence の順序を保存し、同じ順序で再実行する API と rollback の共通 oracle を追加する。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedNonOrderedParser.java#L17",
+        "rust/unlaxer-runtime/src/lib.rs#L3881"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedNonOrderedParserTest.java",
+        "rust/unlaxer-runtime/tests/nonordered.rs"
+      ],
+      "fixtures": [],
+      "issues": [
+        847
+      ],
+      "followup_group": "selection"
+    },
+    "nonordered": {
+      "status": "verified",
+      "reason": "各 child 出現を一度だけ宣言順優先で選ぶ認識・CST入力順・両cursor・登録stateのrollbackは共通 oracle に対応。getOrdered の parser identity 再利用は selected-order の別行で追跡する。",
+      "route": "`Expr::non_ordered([Expr::literal(\"a\"), Expr::literal(\"b\")])`。専用 UBNF 構文はない。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NonOrdered.java#L22",
+        "rust/unlaxer-runtime/src/lib.rs#L3881"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/NonOrderedParityTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NonOrderedStateTest.java",
+        "rust/unlaxer-runtime/tests/nonordered.rs"
+      ],
+      "fixtures": [
+        "spec-corpus/nonordered/cases.tsv",
+        "spec-corpus/nonordered/state.tsv"
+      ],
+      "issues": []
+    },
+    "start-of-line": {
+      "status": "missing",
+      "reason": "StartOfLineParser は CP0 または直前1CPが CR/LF の位置を認識し消費しない。CRLF の CR直後も対象で、非行頭で invert=true でも最後は FAILED。Rust にこの検査の既成 combinator はなく、CodeStart/CodeEnd の行境界は fence 専用で同じ契約ではない。",
+      "route": "`Expr::Custom` から position/matched_position と原文を読む実装は可能だが、4 token kind・invert・CRLF途中の Java 動作を含む再利用可能な adapter と共通 fixture が必要。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/StartOfLineParser.java#L16",
+        "rust/unlaxer-runtime/src/lib.rs#L2396",
+        "rust/unlaxer-runtime/src/long_code_fence.rs#L1"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        848
+      ],
+      "followup_group": "line"
+    },
+    "line-composition": {
+      "status": "uncorroborated",
+      "reason": "LineTerminatorParser/EndOfLineParser は CRLF→CR→LF→EOF の consuming choice。StartOfSourceParser は現在の token-kind cursor の0判定。EmptyLine/WildCardLine は行頭と任意 terminator も使う。Rust の Choice/Literal/Eof は部品としてあるが、行頭・EOF・全合成の共通 corpus はない。",
+      "route": "`Expr::choice([Literal(\"\\r\\n\"), Literal(\"\\r\"), Literal(\"\\n\"), Eof])`。StartOfSource は Custom の cursor 検査が必要。EmptyLine/WildCardLine は start-of-line / terminated-repeat 完了に依存する。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java#L13",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/StartOfSourceParser.java#L13",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyLineParser.java#L12",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardLineParser.java#L8",
+        "rust/unlaxer-runtime/src/lib.rs#L353"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        848
+      ],
+      "followup_group": "line"
+    },
+    "suggest": {
+      "status": "missing",
+      "reason": "SuggestableParser は候補文字列の認識と、入力 prefix を短くして最初に候補が得られる集合を返す getSuggests を持つ。Suggest は候補と suggestedBy identity、Collector は siblings を走査し stopped を返す。Rust LSP の keyword/provider completion は snapshot と cursor に基づく別契約で、この候補算法・停止結果・identity の対応にはならない。",
+      "route": "認識だけなら `Expr::Choice` / `CaseInsensitive`。補完候補集合、suggestedBy の安定 ID、stopped 相当の結果を parser/補完 adapter の共通例として用意する。Java の未接続 addSuggests や TODO を Rust 完了の根拠にしない。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/SuggestableParser.java#L19",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/Suggest.java#L7",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/SuggestsCollectorParser.java#L17",
+        "rust/unlaxer-lsp/src/lib.rs#L980"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        850
+      ],
+      "followup_group": "suggest"
+    },
+    "tag-wrapper": {
+      "status": "missing",
+      "reason": "TagWrapper は構築時に子 parser の Tag を add/remove し、その子を呼ぶ。Rust portable token metadata は parse ごとの node 値であり、共有 parser graph の tag mutation/伝播/探索の代替ではない。",
+      "route": "明示 Rule ID→tag set と構築時 policy、および公開 tree/metadata の利用例が必要。共有 graph と context-local metadata の所有境界を決め、Java raw Object を自動変換すると主張しない。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/TagWrapper.java#L11",
+        "unlaxer-common/src/main/java/org/unlaxer/ParserTaggable.java#L8",
+        "rust/unlaxer-runtime/src/token.rs#L1"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        851
+      ],
+      "followup_group": "cst"
+    },
+    "not-ast-node": {
+      "status": "missing",
+      "reason": "NotASTNode は子へ notNode tag を追加し、汎用 TagBasedReducer はその node を縮約して子を昇格する。Rust generated mapper の @skip は subtree 探索を省く契約なので同等ではない。ASTNode の tag remove と複数 wrapper 順序も追跡する。",
+      "route": "原 CST を保存したまま tag に応じた reduced tree を作る Rust projector と共通 fixture が必要。既存 UBNF `@skip` をこの行の対応済み証拠にしない。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NotASTNode.java#L8",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ASTNode.java#L8",
+        "unlaxer-common/src/main/java/org/unlaxer/reducer/TagBasedReducer.java#L7",
+        "rust/unlaxer-runtime/src/mapping.rs#L1"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SkipMappingConformanceTest.java"
+      ],
+      "fixtures": [],
+      "issues": [
+        851
+      ],
+      "followup_group": "cst"
+    },
+    "parsed-predicate": {
+      "status": "missing",
+      "reason": "PredicateAnyMatchForParsedParser は子の成功後、rootToken.flatten のいずれかが任意 Token predicate に合致しなければ Parsed を negate する。NamePredicate は immutable 名前 snapshot、CaptureEquality は意味診断であり、この CST predicate を代替しない。",
+      "route": "`ParseContext::parse/transaction` と返却 nodes/Tree の走査は部品。predicate 失敗時の consumed/matched・CST・state・failure位置を保つ公開 wrapper または adapter 例が必要。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PredicateAnyMatchForParsedParser.java#L13",
+        "rust/unlaxer-runtime/src/lib.rs#L2352",
+        "rust/unlaxer-runtime/src/lib.rs#L2557"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        851
+      ],
+      "followup_group": "cst"
+    },
+    "escape-in-quoted": {
+      "status": "uncorroborated",
+      "reason": "EscapeInQuotedParser は backslash と WildCardStringParser（1コードポイント）の LazyChain。Rust Quoted 内部にも backslash＋1scalar があり復号しないが、単独呼出し・trivia・Classic引数の独立 fixture はない。",
+      "route": "単独なら `Expr::sequence([Expr::literal(\"\\\\\"), Expr::Any])`、引用全体なら `Expr::Quoted(quote)`。trivia policy と短い末尾 backslash の位置を確認して使い分ける。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EscapeInQuotedParser.java#L10",
+        "rust/unlaxer-runtime/src/lib.rs#L121",
+        "rust/unlaxer-runtime/src/lib.rs#L3859"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustConformanceTest.java"
+      ],
+      "fixtures": [
+        "unlaxer-dsl/src/test/resources/lexical/corpus.json"
+      ],
+      "issues": [
+        849
+      ],
+      "followup_group": "lexical"
+    },
+    "parentheses": {
+      "status": "uncorroborated",
+      "reason": "ParenthesesParser は whitespace-delimited chain と inner parser identity による Token 抽出。Rust は sequence/trivia/capture で認識と inner 範囲を表せるが、Java の getParenthesesed/getInnerParserParsed の誤token拒否や named版の AST child選択を共通比較していない。",
+      "route": "`Expr::sequence([Literal(\"(\"), inner.capture(\"inner\"), Literal(\")\")]).trivia_scope(true)`、または UBNF の括弧 literal と capture。Java identity による抽出は明示 capture 名/Rule ID へ移す。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ParenthesesParser.java#L14",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/NamedParenthesesParser.java#L14",
+        "rust/unlaxer-runtime/src/lib.rs#L350",
+        "rust/unlaxer-runtime/src/lib.rs#L459"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustConformanceTest.java"
+      ],
+      "fixtures": [],
+      "issues": [
+        849
+      ],
+      "followup_group": "lexical"
+    },
+    "character-recipes": {
+      "status": "uncorroborated",
+      "reason": "ASCII/POSIX と SingleCharacter/SingleString/MappedSingleCharacter は Java に記載された文字集合・char/int override で認識する。Rust Character/CharRange/Any/Choice で同じ集合を構成できるが、全公開クラス・newWithout・各 token kind/invert・expected文字列を共通 corpus が網羅していない。POSIX 名から Unicode 標準関数へ拡張しない。",
+      "route": "`Expr::character(\"label\", predicate)` に各 Java constructor の集合をそのまま移す。例: Blank は space/tab、Space は CP32,9..13、Word は ASCII英数と underscore、Ascii は0..127。単一記号は `Expr::literal`。Java char-only override の非BMP拒否も保存する。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L347",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/SingleCharacterParser.java#L18",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/SingleStringParser.java#L17",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/MappedSingleCharacterParser.java#L10"
+      ],
+      "tests": [
+        "rust/unlaxer-runtime/tests/token_propagation.rs"
+      ],
+      "fixtures": [
+        "conformance/token-propagation/cases.tsv"
+      ],
+      "issues": [
+        849
+      ],
+      "followup_group": "lexical"
+    },
+    "lexical-composites": {
+      "status": "uncorroborated",
+      "reason": "Number/Identifier/固定single-double quote は Rust の専用 atom に対応し既存 corpus がある。ただし任意 quote parser、Quoted.contents/Parts/QuotedContentsParser、補助数字parserの直接利用と全CST抽出まで同じ共通 corpus では未確認。",
+      "route": "`Expr::Number` / `Identifier` / `Quoted('\"')`、UBNF token binding。汎用 QuotedParser は明示 sequence/quote/body の移植例を追加する。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L108",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/QuotedParser.java#L20"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustConformanceTest.java",
+        "rust/unlaxer-runtime/tests/number_token.rs"
+      ],
+      "fixtures": [
+        "unlaxer-dsl/src/test/resources/lexical/corpus.json",
+        "conformance/number-token/cases.tsv"
+      ],
+      "issues": [
+        849
+      ],
+      "followup_group": "lexical"
+    },
+    "word-transforms": {
+      "status": "uncorroborated",
+      "reason": "WordParser は通常word/ignoreCaseだけでなく Source・slice/reverse/effect と派生 factory相当の instance API を持つ。Rust Literal/CaseInsensitive は認識部品だが、任意 effect・範囲・source provenance の全経路は共通検証されていない。",
+      "route": "`Expr::Literal`（空は JavaEmptyWord）、固定Unicode CIは CaseInsensitive。実行前にホストで値変換してから明示 parser を構成する境界を文書化する。JDK依存 IgnoreCaseWordParser と Unicode17 固定版を混同しない。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WordParser.java#L21",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/IgnoreCaseWordParser.java#L3",
+        "rust/unlaxer-runtime/src/lib.rs#L99"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/parser/elementary/UnicodeIgnoreCaseWordParserTest.java",
+        "rust/unlaxer-runtime/tests/case_insensitive.rs"
+      ],
+      "fixtures": [
+        "spec-corpus/case-insensitive/jdk21-legacy-delta.tsv"
+      ],
+      "issues": [
+        852
+      ],
+      "followup_group": "replay"
+    },
+    "historical-replay": {
+      "status": "uncorroborated",
+      "reason": "MatchedTokenParser は過去の token を predicate で集め、複数候補を cache して slice/effect/reverse 後に試す。Old版は単一 token。Rust Backreference と owned Replay は記録済み名前を replay できるが、token predicate・履歴候補・変換・cache lifetime まで同等ではない。",
+      "route": "新規コードは `capture_owned(\"name\")` と `Expr::Replay(\"name\")`、UBNF `CAPTURE/SAME_AS`。旧APIを移植する場合は token selector/変換/履歴寿命の明示 adapter を追加し共通 oracle で検証する。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L25",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L20",
+        "rust/unlaxer-runtime/src/lib.rs#L3963"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java",
+        "rust/unlaxer-runtime/tests/owned_capture.rs"
+      ],
+      "fixtures": [
+        "conformance/owned-capture/cases.tsv"
+      ],
+      "issues": [
+        852
+      ],
+      "followup_group": "replay"
+    },
+    "owned-capture": {
+      "status": "verified",
+      "reason": "名前付き owned capture/replay、capture scope、Input/Projected/Generated の provenance と失敗後状態は共通 corpus の契約に対応。旧 MatchedTokenParser の任意 selector/変換を含まない。",
+      "route": "`expr.capture_owned(\"x\").capture_scope()`、`Expr::Replay(\"x\")`。UBNF `CAPTURE/CAPTURE_SCOPE/SAME_AS`。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L426",
+        "rust/unlaxer-runtime/src/lib.rs#L3963",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NamedCapture.java#L15",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureScope.java#L15",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ReplayParser.java#L18"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java",
+        "rust/unlaxer-runtime/tests/owned_capture.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/OwnedCaptureConformanceTest.java"
+      ],
+      "fixtures": [
+        "conformance/owned-capture/cases.tsv",
+        "conformance/owned-capture/state.tsv",
+        "conformance/owned-capture/failures.tsv"
+      ],
+      "issues": []
+    },
+    "capture-boundaries": {
+      "status": "verified",
+      "reason": "明示 value/optional/list/input capture boundary と origin は共通 corpus で所有値・CP span・全token kind・reset・rollbackを検証する。",
+      "route": "`Expr::CaptureBoundary(kind, child)` / `InputCaptureBoundary` と `capture_tree::snapshot`。UBNF nested capture 生成経路も既存。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L165",
+        "rust/unlaxer-runtime/src/capture_tree.rs#L1",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java#L7"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/context/CaptureBoundaryTest.java",
+        "rust/unlaxer-runtime/tests/capture_boundaries.rs"
+      ],
+      "fixtures": [
+        "conformance/capture-boundaries/runtime.tsv",
+        "conformance/input-capture-boundary-reset/cases.tsv"
+      ],
+      "issues": []
+    },
+    "classic-propagation": {
+      "status": "verified",
+      "reason": "MatchOnly と consume/invert stopper の実 leaf 伝播・両cursor・CST・所有stateの復元は共通 corpus の契約。PEG先読みとは区別する。",
+      "route": "`expr.match_only()/invert_match()/stop_invert()/stop_consume()` と `ParseContext::parse_classic`。Java NotPropagatableSource は invert_match。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L496",
+        "rust/unlaxer-runtime/src/token.rs#L1",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/MatchOnly.java#L10"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/context/GeneralTokenPropagationTest.java",
+        "rust/unlaxer-runtime/tests/token_propagation.rs"
+      ],
+      "fixtures": [
+        "conformance/token-propagation/cases.tsv",
+        "conformance/token-propagation/state.tsv"
+      ],
+      "issues": []
+    },
+    "propagation-markers": {
+      "status": "language-specific",
+      "reason": "PropagatableSource/Destination/Stopper と AbstractPropagatableSource は Java の型/graph と伝播契約を結ぶ。Rust は明示 Expr variant と TokenMode で表現する。任意 subclass・markerの組合せは未検証。",
+      "route": "`Expr::MatchOnly/InvertMatch/StopInvert/StopConsume`、custom `Parser::parse_classic` と `context.token_mode()`。markerを付けただけでRust安全宣言としない。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/PropagatableSource.java#L3",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/AbstractPropagatableSource.java#L12",
+        "rust/unlaxer-runtime/src/lib.rs#L145"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        845
+      ],
+      "followup_group": "graph"
+    },
+    "peg-assertion": {
+      "status": "verified",
+      "reason": "PegLookahead は両cursor・CST・登録stateを復元し、極性をClassic invertから分離する。両言語が共通 cases/state を実行する。",
+      "route": "`expr.ahead()` / `expr.not_ahead()`。Java Not（match-only child）とは別契約。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PegLookahead.java#L16",
+        "rust/unlaxer-runtime/src/lib.rs#L490"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/PegLookaheadTest.java",
+        "rust/unlaxer-runtime/tests/peg_assertion.rs"
+      ],
+      "fixtures": [
+        "conformance/peg-assertion/cases.tsv",
+        "conformance/peg-assertion/state.tsv"
+      ],
+      "issues": []
+    },
+    "legacy-not": {
+      "status": "uncorroborated",
+      "reason": "Java Not は child を matchOnly で呼んで結果を反転し、成功側の所有state/診断を戻す。Rust JavaLookahead(false) は固定pattern、not_ahead は純PEGであり任意childのClassic版と自動的には等価でない。",
+      "route": "固定patternは `Expr::JavaLookahead { pattern, positive: false }`。任意childは Classic 引数・raised failure・cursorを保つ組合せの共通例を追加する。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Not.java#L9",
+        "rust/unlaxer-runtime/src/lib.rs#L249",
+        "rust/unlaxer-runtime/src/lib.rs#L511"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/context/GeneralTokenPropagationTest.java"
+      ],
+      "fixtures": [],
+      "issues": [
+        853
+      ],
+      "followup_group": "combinator"
+    },
+    "cut-labels": {
+      "status": "verified",
+      "reason": "通常失敗のcommit/label昇格、指定labelのcatch、原位置とstate rollbackを共通 corpus で比較する。資源失敗を通常の選択へ吸収しない。",
+      "route": "`expr.commit()/label(\"x\")/catch_labels(other, [\"x\"])`。UBNF `COMMIT/LABEL/CATCH`。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L4517",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Commit.java#L22",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Label.java#L22",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CatchLabels.java#L28"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/CutLabeledFailureTest.java",
+        "rust/unlaxer-runtime/tests/cut_labeled_failure.rs"
+      ],
+      "fixtures": [
+        "conformance/cut-labeled-failure/cases.tsv",
+        "conformance/cut-labeled-failure/state.tsv"
+      ],
+      "issues": []
+    },
+    "core-combinators": {
+      "status": "uncorroborated",
+      "reason": "sequence/ordered/choice/longest/unique-longest/predictive/zero は Rust に専用経路があり個別テストもある。ただし全 constructed/lazy overload と collect/createMetaToken、chosen抽出、手書き graph の共通API行ごとの検証は未完了。",
+      "route": "`Expr::sequence/choice/longest_choice/unique_longest_choice/predictive_choice/zero_match`。Lazy版は構築済み Rule参照へ移す。min/max反復の terminator は別行。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L350",
+        "rust/unlaxer-runtime/src/lib.rs#L5261",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/LongestChoiceTest.java",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/UniqueLongestChoiceTest.java",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/PredictiveChoiceTest.java",
+        "rust/unlaxer-runtime/tests/longest_choice.rs",
+        "rust/unlaxer-runtime/tests/unique_longest.rs",
+        "rust/unlaxer-runtime/tests/zero_repeat.rs"
+      ],
+      "fixtures": [],
+      "issues": [
+        853
+      ],
+      "followup_group": "combinator"
+    },
+    "graph-utilities": {
+      "status": "uncorroborated",
+      "reason": "Flatten は child.getChildren を Chain化し、Reverse は一部 constructor だけ元の Parsers を反転する。ParserHolder/MappedSingleCharacterParserHolder は引数を捨て child.parse(context)、ParserWrapper は保存した kind/invert で呼ぶ。Rust の sequence/Vec操作/parse_classic で表現できるが、各 overload の副作用と位置は未検証。",
+      "route": "`Expr::sequence(children)`、明示 `Vec::reverse`、custom Parser から `parse_classic`。Reverse の varargs は Java でも反転しないので、名前から全constructorを逆順扱いしない。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Reverse.java#L11",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Flatten.java#L14",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ParserHolder.java#L10",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ParserWrapper.java#L11",
+        "rust/unlaxer-runtime/src/token.rs#L1"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        853
+      ],
+      "followup_group": "combinator"
+    },
+    "trivia-recipes": {
+      "status": "uncorroborated",
+      "reason": "SpaceDelimitor/CStyleDelimitor と whitespace-delimited chain は既存 Rust trivia policyに対応する部分がある。独立comment parserのCST、全lazy overload、正確な空白集合と終端条件を共通 fixture で網羅していない。",
+      "route": "`Expr::sequence(...).trivia_scope(true)`、`line_comment_scope()`、UBNF `@whitespace/@comment/@interleave`。コメントだけの CPPComment は line_comment_scope。直接 comment leafは専用 lexical式/adapterで抽出する。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L3859",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/WhiteSpaceDelimitedLazyChain.java#L16",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/clang/BlockComment.java#L10",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/clang/CPPComment.java#L15"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RuleTriviaConformanceTest.java"
+      ],
+      "fixtures": [
+        "conformance/token-propagation/sequence-trivia.tsv"
+      ],
+      "issues": [
+        849
+      ],
+      "followup_group": "lexical"
+    },
+    "wildcard-interleave": {
+      "status": "uncorroborated",
+      "reason": "WildCardInterleaveParser は指定 parser の choice＋wildcard を反復し、補助メソッドで連続文字 token を再結合する。Rust choice/repeatで認識できるが、getParsedWithConcattedCharcter の detached source と末尾処理まで同じ corpus では検証していない。",
+      "route": "`Expr::choice([... , Expr::Any]).repeat_java(0, None)` と明示 owned token projector。文字再結合は user mapper として原文位置を保つ契約を追加する。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardInterleaveParser.java#L21",
+        "rust/unlaxer-runtime/src/lib.rs#L410"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        849
+      ],
+      "followup_group": "lexical"
+    },
+    "empty-eof": {
+      "status": "uncorroborated",
+      "reason": "EmptyParser は非EOFで matchedを1進める JavaEmpty、EOF は Eof。既存の境界検証はあるが直接公開parserと全kind/invert/初期cursorの行列はAPI単位で未整理。Empty を純PEG Empty と置換しない。",
+      "route": "`Expr::JavaEmpty` / `Expr::Eof`。UBNF `EMPTY/EOF`。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyParser.java#L12",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfSourceParser.java#L11",
+        "rust/unlaxer-runtime/src/lib.rs#L253"
+      ],
+      "tests": [
+        "rust/unlaxer-runtime/tests/nonordered.rs",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/NonOrderedParityTest.java"
+      ],
+      "fixtures": [
+        "spec-corpus/nonordered/cases.tsv"
+      ],
+      "issues": [
+        853
+      ],
+      "followup_group": "combinator"
+    },
+    "unicode-ci": {
+      "status": "verified",
+      "reason": "UnicodeIgnoreCaseWordParser の固定Unicode17 simple fold、原文CP、invert/match-only、派生wordの契約。JDK依存の旧IgnoreCase版は別行。",
+      "route": "`Expr::case_insensitive(\"text\")`、UBNF `CI(...)`。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L340",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/UnicodeIgnoreCaseWordParser.java#L15"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/parser/elementary/UnicodeIgnoreCaseWordParserTest.java",
+        "rust/unlaxer-runtime/tests/case_insensitive.rs"
+      ],
+      "fixtures": [
+        "spec-corpus/case-insensitive/runtime.tsv"
+      ],
+      "issues": []
+    },
+    "grapheme": {
+      "status": "verified",
+      "reason": "Unicode17 拡張書記素境界で1clusterを認識し、原文CP span・rollbackを共通 oracle で検証する。",
+      "route": "`Expr::Grapheme` / UBNF `GRAPHEME`。",
+      "code": [
+        "rust/unlaxer-runtime/src/grapheme.rs#L1",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/GraphemeParser.java#L12"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/source/GraphemeTest.java",
+        "rust/unlaxer-runtime/tests/grapheme.rs"
+      ],
+      "fixtures": [
+        "spec-corpus/grapheme/parser.tsv"
+      ],
+      "issues": []
+    },
+    "name-snapshots": {
+      "status": "verified",
+      "reason": "明示 immutable name snapshot の predicate と必要snapshotの entry boundaryは既存共通corpusで位置・失敗・rollbackを比較する。任意Token predicateとは別。",
+      "route": "`Expr::NamePredicate` / `NameResolutionScope`、`ParseContext::with_name_snapshots`。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L180",
+        "rust/unlaxer-runtime/src/names.rs#L1",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NamePredicateParser.java#L9"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NamePredicateConformanceTest.java",
+        "rust/unlaxer-runtime/tests/name_scope_token_mode_reset.rs"
+      ],
+      "fixtures": [
+        "unlaxer-dsl/src/test/resources/name-predicate/corpus.json"
+      ],
+      "issues": []
+    },
+    "recovery": {
+      "status": "uncorroborated",
+      "reason": "SyncPointRecoveryParser と Rust Recovery は sync/auto/skip、CST marker・state rollbackに既存共通 corpus がある。RecoveryDiagnostic.from(Token/Context) の全公開抽出入口と任意手書きchildの設定網羅は残る。",
+      "route": "`expr.recover(mode, [\";\"], \"message\")`、`Tree.recoveries` / `ParseContext::recoveries`、UBNF `@recovery`。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L474",
+        "rust/unlaxer-runtime/src/lib.rs#L4420",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java#L11"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RecoveryConformanceTest.java",
+        "rust/unlaxer-runtime/tests/recovery.rs"
+      ],
+      "fixtures": [
+        "spec-corpus/recovery/corpus.json"
+      ],
+      "issues": [
+        854
+      ],
+      "followup_group": "context"
+    },
+    "context-results": {
+      "status": "uncorroborated",
+      "reason": "ParseContext/TransactionElement/Parsed/Token/TokenList/ParserCursor は Rust context/ParseResult/Fragment/Tree/Span として利用できる。既存の両cursor・所有state・portable metadataの共通 corpusはあるが、Java stopped/失敗結果、全static factory、抽出・走査・listener・raw Object metadataまで全API同値とは扱わない。",
+      "route": "`ParseContext::parse/parse_classic/transaction`、`position()/matched_position()`、`state/with_scope`、`Tree` と token metadata。任意外部副作用は登録state以外rollback対象にならない。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L2352",
+        "rust/unlaxer-runtime/src/lib.rs#L2447",
+        "rust/unlaxer-runtime/src/lib.rs#L2557",
+        "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39",
+        "rust/unlaxer-runtime/src/token.rs#L1"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/context/PortableTokenMetadataTest.java",
+        "rust/unlaxer-runtime/tests/token_metadata.rs",
+        "rust/unlaxer-runtime/tests/scopes.rs"
+      ],
+      "fixtures": [
+        "conformance/token-metadata/metadata.tsv",
+        "conformance/token-metadata/words.tsv"
+      ],
+      "issues": [
+        854
+      ],
+      "followup_group": "context"
+    },
+    "parse-bindings": {
+      "status": "verified",
+      "reason": "withBindings は map/listを固定し、文字列の順序・重複・空を保持する共通契約。Rustは所有権、Javaはcopyで保持する。",
+      "route": "`ParseContext::with_bindings(source, map, options)`。",
+      "code": [
+        "rust/unlaxer-runtime/src/lib.rs#L2170",
+        "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ParseBindingsConformanceTest.java"
+      ],
+      "fixtures": [
+        "spec-corpus/parse-bindings/runtime.json"
+      ],
+      "issues": []
+    },
+    "error-container": {
+      "status": "uncorroborated",
+      "reason": "ErrorMessageParser.expected は失敗hint、通常constructorは成功する空token Container。Rust Error は失敗であり通常constructorの代替ではない。Container.getRangedContents は Java classでtokenを探す。",
+      "route": "失敗hintは `Expr::Error(\"expected\")`。成功containerは `add_token_node` と portable metadata/owned値、typed抽出は明示 Rule ID に移す。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/ErrorMessageParser.java#L17",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ContainerParser.java#L17",
+        "rust/unlaxer-runtime/src/lib.rs#L263",
+        "rust/unlaxer-runtime/src/token.rs#L1"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        854
+      ],
+      "followup_group": "context"
+    },
+    "first-predictors": {
+      "status": "missing",
+      "reason": "FirstSet/FirstSets は Java parser graph の保守的FIRST。Rust first::FirstSet/compute は Expr/Ruleを内部分析するが pub(crate) で、公開FIRST集合照会の同等経路はない。表現差だけでなくunknown/nullable/非ASCII・独自parserの除外を両言語の共通oracleで固定する必要がある。性能改善は行わない。",
+      "route": "`SharedGrammar` 構築時のFIRST分析、明示 `Predictor`。新たなmemo安全宣言は#184へ回す。",
+      "code": [
+        "rust/unlaxer-runtime/src/first.rs#L1",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/FirstSet.java#L19",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/FirstSets.java#L33"
+      ],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/parser/FirstSetExclusionTest.java"
+      ],
+      "fixtures": [],
+      "issues": [
+        853
+      ],
+      "followup_group": "combinator"
+    },
+    "rule-diagnostics": {
+      "status": "language-specific",
+      "reason": "GrammarRule の明示規則名は Rust Rule.name/rule_stack に対応する。nameOf の Java class名fallback はホスト固有で、匿名class・null/blank overrideの移植規則は未検証。ParserPrinterもJava型/graphを表示する。",
+      "route": "`Rule { name, expression }` に名前を明示し、RuleFrameを表示する。Java reflection由来の自動命名/graph表示は明示名と出力adapterへ移す。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/GrammarRule.java#L10",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/ParserPrinter.java#L5",
+        "rust/unlaxer-runtime/src/rule_stack.rs#L1"
+      ],
+      "tests": [
+        "rust/unlaxer-runtime/tests/rule_stack.rs"
+      ],
+      "fixtures": [
+        "conformance/rule-stack/cases.tsv"
+      ],
+      "issues": [
+        845
+      ],
+      "followup_group": "graph"
+    },
+    "incremental": {
+      "status": "uncorroborated",
+      "reason": "SnapshotParseCache/IncrementalParseCache は Rust incremental の snapshot/chunk cacheへ対応する。既存編集corpusはあるが、Java公開 nested result/stat型の全consumer・cache identity条件をAPI単位で網羅した共通表はまだない。部分CSTの再配置を対応済みとしない。",
+      "route": "`incremental::SnapshotParseCache` と chunk cache、UBNF生成consumer。全再解析との一致を既存cache契約に沿って追加する。",
+      "code": [
+        "rust/unlaxer-runtime/src/incremental.rs#L1",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/incremental/IncrementalParseCache.java#L21"
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/IncrementalCacheConformanceTest.java",
+        "rust/unlaxer-runtime/tests/incremental.rs"
+      ],
+      "fixtures": [
+        "spec-corpus/incremental-cache/edits.json",
+        "spec-corpus/incremental-cache/chunks.tsv"
+      ],
+      "issues": [
+        854
+      ],
+      "followup_group": "context"
+    },
+    "token-memo": {
+      "status": "language-specific",
+      "reason": "Token.MemoSnapshot と prepareMemoSnapshot は Java object graphのcopy/予算境界。Rustのowned memo payloadは別表現。parser identityと任意host objectの安全宣言は既存#184で扱い重複issueを作らない。",
+      "route": "既存 memo options と pure-success-memo 契約。利用者が任意stateful parserを成功cacheへ無条件登録する機能ではない。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/Token.java#L23",
+        "rust/unlaxer-runtime/src/lib.rs#L1"
+      ],
+      "tests": [
+        "rust/unlaxer-runtime/tests/pure_success_memo.rs"
+      ],
+      "fixtures": [
+        "conformance/pure-success-memo/generated-cases.json"
+      ],
+      "issues": [
+        184
+      ]
+    },
+    "start-of-source": {
+      "status": "missing",
+      "reason": "StartOfSourceParser は tokenKind のcursorがCP0かを invert とXORして判定するゼロ幅parser。Rust Eofは末尾検査であり、先頭検査の既成APIにはならない。",
+      "route": "CustomからTokenModeに応じてposition/matched_positionを調べるadapterを用意し、途中からの呼出しと4kind/invertを共通検証する。",
+      "code": [
+        "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/StartOfSourceParser.java#L13",
+        "rust/unlaxer-runtime/src/lib.rs#L2557"
+      ],
+      "tests": [],
+      "fixtures": [],
+      "issues": [
+        848
+      ],
+      "followup_group": "line"
+    }
+  },
+  "followups": {
+    "graph": {
+      "number": 845,
+      "title": "parity: parser構築・名前参照・identityのRust移植境界を共通corpusで固定する",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/845",
+      "reason": "反射・Class/Supplier・lazy graph・名前参照の構築境界を一つの意味単位にする。Java機構を削除せず、Rustの明示Rule ID/registryへの移植と失敗条件を検証する。"
+    },
+    "terminator": {
+      "number": 846,
+      "title": "parity: 任意terminator付き反復のRust利用経路と共通corpusを追加する",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/846",
+      "reason": "body/terminatorの実行順序とcursor・CST・所有状態を一体で扱う。固定文字列JavaUntilだけで全Overloadを完了にしない。"
+    },
+    "selection": {
+      "number": 847,
+      "title": "parity: 選択済みChoice・NonOrderedの再実行をRustと共通検証する",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/847",
+      "reason": "過去に選んだbranch/occurrence順をtransactionalに保存・再実行する意味単位。文字列replayとは分ける。"
+    },
+    "line": {
+      "number": 848,
+      "title": "parity: 行頭・source先頭・行終端parserのRust利用経路を共通検証する",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/848",
+      "reason": "CR/LF/CRLF/EOFと初期cursorに依存する境界判定をまとめる。EmptyLine/WildCardLineの合成は任意terminator付き反復の子issueに依存する。"
+    },
+    "lexical": {
+      "number": 849,
+      "title": "parity: ASCII・POSIX・引用・括弧の公開parserをRustの字句構成と共通corpusへ対応付ける",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/849",
+      "reason": "認識部品は既にあるため、公開文字集合・字句合成・抽出の共通oracleを追加し、不足だけ実装する。行頭や任意terminatorの基盤は別issue。"
+    },
+    "suggest": {
+      "number": 850,
+      "title": "parity: SuggestableParser・Suggestの候補と停止結果をRustで利用可能にする",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/850",
+      "reason": "parserのprefix候補算法、suggestedBy、Collectorのstoppedを一体で固定する。LSPの一般completionがあることだけで対応済みにしない。"
+    },
+    "cst": {
+      "number": 851,
+      "title": "parity: parser tag・meta node・解析後CST predicateのRust移植経路を揃える",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/851",
+      "reason": "共有parserのtagと原CST/reduced CST・解析後predicateの境界をまとめる。@skipとNotASTNodeの異なる子昇格を明示する。"
+    },
+    "replay": {
+      "number": 852,
+      "title": "parity: MatchedTokenの履歴選択・slice・effectをRustのowned replayと共通検証する",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/852",
+      "reason": "旧token selectorと派生wordのsource変換が一つの認識経路を作るためまとめる。新OwnedCapture/Replayの既存契約は保持する。"
+    },
+    "combinator": {
+      "number": 853,
+      "title": "parity: 公開combinatorの構築variant・wrapper・FIRST照会を共通corpusで固定する",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/853",
+      "reason": "既存Expr経路を公開API行へ接続する共通検証。holder引数、Reverse overload、Classic Not、公開FIRST照会の不足は具体的に実装する。性能改善やmemo安全宣言は含めない。"
+    },
+    "context": {
+      "number": 854,
+      "title": "parity: ParseContext・解析結果・metadataの公開API利用経路を共通corpusで固定する",
+      "url": "https://github.com/opaopa6969/unlaxer-parser/issues/854",
+      "reason": "contextと返却された結果の所有/抽出境界を一体で検証する。既存portable metadata/recovery/cacheの契約を再利用し、raw Objectやstopped等の不足を明記して埋める。"
+    }
+  },
+  "apis": [
+    {"id": "org.unlaxer.CapturedValue", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/CapturedValue.java", "assessment": "owned-capture"},
+    {"id": "org.unlaxer.CapturedValue#from(Source,Source,int)", "kind": "static", "signature": " CapturedValue from(Source,Source,int) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/CapturedValue.java", "assessment": "owned-capture"},
+    {"id": "org.unlaxer.CapturedValue#provenanceOf(Source,Source)", "kind": "static", "signature": " Provenance provenanceOf(Source,Source) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/CapturedValue.java", "assessment": "owned-capture"},
+    {"id": "org.unlaxer.CapturedValue.Provenance", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/CapturedValue.java", "assessment": "owned-capture"},
+    {"id": "org.unlaxer.Name", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/Name.java", "assessment": "construction"},
+    {"id": "org.unlaxer.Name#classBaseOf(Object)", "kind": "static", "signature": " Name classBaseOf(Object) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Name.java", "assessment": "construction"},
+    {"id": "org.unlaxer.Name#of(Class<?>)", "kind": "static", "signature": " Name of(Class<?>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Name.java", "assessment": "construction"},
+    {"id": "org.unlaxer.Name#of(Class<?>,Specifier<?>)", "kind": "static", "signature": " Name of(Class<?>,Specifier<?>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Name.java", "assessment": "construction"},
+    {"id": "org.unlaxer.Name#of(Class<?>,String)", "kind": "static", "signature": " Name of(Class<?>,String) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Name.java", "assessment": "construction"},
+    {"id": "org.unlaxer.Name#of(Enum<?>)", "kind": "static", "signature": " Name of(Enum<?>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Name.java", "assessment": "construction"},
+    {"id": "org.unlaxer.Name#of(String)", "kind": "static", "signature": " Name of(String) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Name.java", "assessment": "construction"},
+    {"id": "org.unlaxer.Parsed", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/Parsed.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.Parsed.Status", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/Parsed.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.ParserCursor", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserCursor.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.ParserFinder", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserFinder.java", "assessment": "construction"},
+    {"id": "org.unlaxer.ParserFinderFromRoot", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserFinderFromRoot.java", "assessment": "construction"},
+    {"id": "org.unlaxer.ParserFinderToChild", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserFinderToChild.java", "assessment": "construction"},
+    {"id": "org.unlaxer.ParserFinderToRoot", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserFinderToRoot.java", "assessment": "construction"},
+    {"id": "org.unlaxer.ParserHierarchy", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserHierarchy.java", "assessment": "construction"},
+    {"id": "org.unlaxer.ParserHierarchy.NameKind", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserHierarchy.java", "assessment": "construction"},
+    {"id": "org.unlaxer.ParserNameContext", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserNameContext.java", "assessment": "construction"},
+    {"id": "org.unlaxer.ParserPath", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserPath.java", "assessment": "construction"},
+    {"id": "org.unlaxer.ParserTaggable", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/ParserTaggable.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.PropagatedTag", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/PropagatedTag.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.RecursiveTaggable", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/RecursiveTaggable.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.RecursiveTaggable.PropagatedTaggable", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/RecursiveTaggable.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.Tag", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/Tag.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.Tag#classBaseOf(Object)", "kind": "static", "signature": " Tag classBaseOf(Object) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Tag.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.Tag#of(Class<?>)", "kind": "static", "signature": " Tag of(Class<?>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Tag.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.Tag#of(Class<?>,Specifier<?>)", "kind": "static", "signature": " Tag of(Class<?>,Specifier<?>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Tag.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.Tag#of(Class<?>,String)", "kind": "static", "signature": " Tag of(Class<?>,String) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Tag.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.Tag#of(Enum<?>)", "kind": "static", "signature": " Tag of(Enum<?>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Tag.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.Tag#of(String)", "kind": "static", "signature": " Tag of(String) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Tag.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.TaggableAccessor", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/TaggableAccessor.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.Token", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/Token.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.Token#empty(TokenKind,EndExclusiveCursor,Parser)", "kind": "static", "signature": " Token empty(TokenKind,EndExclusiveCursor,Parser) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Token.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.Token#prepareMemoSnapshot(TokenList,List<Token>,long)", "kind": "static", "signature": " MemoSnapshot prepareMemoSnapshot(TokenList,List<Token>,long) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Token.java", "assessment": "token-memo"},
+    {"id": "org.unlaxer.Token#prepareMemoSnapshot(TokenList,long)", "kind": "static", "signature": " MemoSnapshot prepareMemoSnapshot(TokenList,long) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/Token.java", "assessment": "token-memo"},
+    {"id": "org.unlaxer.Token.AbstractDescendantFinder", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/Token.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.Token.ChildrenKind", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/Token.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.Token.MemoSnapshot", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/Token.java", "assessment": "token-memo"},
+    {"id": "org.unlaxer.Token.MemoSnapshot.Replay", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/Token.java", "assessment": "token-memo"},
+    {"id": "org.unlaxer.Token.ScanDirection", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/Token.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.TokenKind", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenKind.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.TokenKind#of(boolean)", "kind": "static", "signature": " TokenKind of(boolean) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenKind.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.TokenList", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenList.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.TokenList#combinedCursorRange(TokenList,PositionResolver)", "kind": "static", "signature": " CursorRange combinedCursorRange(TokenList,PositionResolver) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenList.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.TokenList#of(List<Token>)", "kind": "static", "signature": " TokenList of(List<Token>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenList.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.TokenList#of(Token[])", "kind": "static", "signature": " TokenList of(Token[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenList.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.TokenList#toSource(TokenList,SourceKind)", "kind": "static", "signature": " Source toSource(TokenList,SourceKind) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenList.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.TokenPredicators", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#afterToken(Token)", "kind": "static", "signature": " Predicate<Token> afterToken(Token) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#allMatch()", "kind": "static", "signature": " Predicate<Token> allMatch() throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#beforeToken(Token)", "kind": "static", "signature": " Predicate<Token> beforeToken(Token) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#hasTag(Tag)", "kind": "static", "signature": " Predicate<Token> hasTag(Tag) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#hasTagInParent(Tag)", "kind": "static", "signature": " Predicate<Token> hasTagInParent(Tag) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#noMatch()", "kind": "static", "signature": " Predicate<Token> noMatch() throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#parentPathEndsWith(String)", "kind": "static", "signature": " Predicate<Token> parentPathEndsWith(String) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#parserImplements(Class<?>[])", "kind": "static", "signature": " Predicate<Token> parserImplements(Class<?>[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#parsers(Class<? extends Parser>[])", "kind": "static", "signature": " Predicate<Token> parsers(Class<? extends Parser>[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#parsersMatchWithClass(Parser[])", "kind": "static", "signature": " Predicate<Token> parsersMatchWithClass(Parser[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#pathEndsWith(String)", "kind": "static", "signature": " Predicate<Token> pathEndsWith(String) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TokenPredicators#relation(Token,RangesRelation)", "kind": "static", "signature": " Predicate<Token> relation(Token,RangesRelation) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/TokenPredicators.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.TransactionElement", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/TransactionElement.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.context.MutationAwareTransactionalState", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/context/MutationAwareTransactionalState.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.context.ParseContext", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.context.ParseContext#getParseContextWithCurrentThread()", "kind": "static", "signature": " ParseContext getParseContextWithCurrentThread() throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.context.ParseContext#memoize()", "kind": "static", "signature": " ParseContextEffector memoize() throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.context.ParseContext#withBindings(Source,Map<String, ? extends List<String>>,ParseOptions,ParseContextEffector[])", "kind": "static", "signature": " ParseContext withBindings(Source,Map<String, ? extends List<String>>,ParseOptions,ParseContextEffector[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java", "assessment": "parse-bindings"},
+    {"id": "org.unlaxer.context.ParseContext#withNameSnapshots(Source,List<NameSnapshot>,ParseOptions,ParseContextEffector[])", "kind": "static", "signature": " ParseContext withNameSnapshots(Source,List<NameSnapshot>,ParseOptions,ParseContextEffector[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java", "assessment": "name-snapshots"},
+    {"id": "org.unlaxer.context.ParseContext#withOptions(Source,ParseOptions,ParseContextEffector[])", "kind": "static", "signature": " ParseContext withOptions(Source,ParseOptions,ParseContextEffector[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.context.ParseContext.DiagnosticSpeculation", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.context.ParseContext.FailureDiagnostic", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.context.ParseContext.LocalDiagnostic", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.context.TransactionalState", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/context/TransactionalState.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.parser.AbstractParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/AbstractParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.AfterParse", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/AfterParse.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.parser.ChainParsers", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ChainParsers.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ChildOccurs", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ChildOccurs.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ChoiceParsers", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ChoiceParsers.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.CollectingParser", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/CollectingParser.java", "assessment": "meta-function"},
+    {"id": "org.unlaxer.parser.ConstructedAbstractParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ConstructedAbstractParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ErrorMessageParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ErrorMessageParser.java", "assessment": "error-container"},
+    {"id": "org.unlaxer.parser.ErrorMessageParser#expected(String)", "kind": "static", "signature": " ErrorMessageParser expected(String) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ErrorMessageParser.java", "assessment": "error-container"},
+    {"id": "org.unlaxer.parser.ErrorMessageParser#expected(String,Name)", "kind": "static", "signature": " ErrorMessageParser expected(String,Name) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ErrorMessageParser.java", "assessment": "error-container"},
+    {"id": "org.unlaxer.parser.FirstSet", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/FirstSet.java", "assessment": "first-predictors"},
+    {"id": "org.unlaxer.parser.FirstSet#ofCodePoints(int[])", "kind": "static", "signature": " FirstSet ofCodePoints(int[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/FirstSet.java", "assessment": "first-predictors"},
+    {"id": "org.unlaxer.parser.FirstSets", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/FirstSets.java", "assessment": "first-predictors"},
+    {"id": "org.unlaxer.parser.FirstSets#of(Parser)", "kind": "static", "signature": " FirstSet of(Parser) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/FirstSets.java", "assessment": "first-predictors"},
+    {"id": "org.unlaxer.parser.GlobalScopeTree", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/GlobalScopeTree.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.parser.GrammarRule", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/GrammarRule.java", "assessment": "rule-diagnostics"},
+    {"id": "org.unlaxer.parser.GrammarRule#nameOf(Object)", "kind": "static", "signature": " String nameOf(Object) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/GrammarRule.java", "assessment": "rule-diagnostics"},
+    {"id": "org.unlaxer.parser.HasChildParser", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/HasChildParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.HasChildrenParser", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/HasChildrenParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Initializable", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Initializable.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.LazyAbstractParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/LazyAbstractParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.LazyInstance", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/LazyInstance.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.LazyOccursParserSpecifier", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/LazyOccursParserSpecifier.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.LazyParserChildSpecifier", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/LazyParserChildSpecifier.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.LazyParserChildrenSpecifier", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/LazyParserChildrenSpecifier.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.MetaFunctionParser", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/MetaFunctionParser.java", "assessment": "meta-function"},
+    {"id": "org.unlaxer.parser.NodeReduceMarker", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/NodeReduceMarker.java", "assessment": "meta-function"},
+    {"id": "org.unlaxer.parser.NonTerminalSymbol", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/NonTerminalSymbol.java", "assessment": "meta-function"},
+    {"id": "org.unlaxer.parser.NonTerminallSymbol", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/NonTerminallSymbol.java", "assessment": "meta-function"},
+    {"id": "org.unlaxer.parser.ParseException", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParseException.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.parser.Parser", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Parser#checkTokenParsedBySpecifiedParser(Token,Class<? extends Parser>)", "kind": "static", "signature": " void checkTokenParsedBySpecifiedParser(Token,Class<? extends Parser>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Parser#get(Class<T>)", "kind": "static", "signature": "T extends Parser T get(Class<T>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Parser#get(Supplier<T>)", "kind": "static", "signature": "T extends Parser T get(Supplier<T>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Parser#getSupplier(Class<T>)", "kind": "static", "signature": "T extends Parser Supplier<T> getSupplier(Class<T>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Parser#isTokenParsedBySpecifiedParser(Token,Class<? extends Parser>)", "kind": "static", "signature": " boolean isTokenParsedBySpecifiedParser(Token,Class<? extends Parser>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Parser#newInstance(Class<T>)", "kind": "static", "signature": "T extends Parser T newInstance(Class<T>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParserFactoryByClass", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserFactoryByClass.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParserFactoryByClass#get(ASTNodeKind,Class<T>)", "kind": "static", "signature": "T extends Parser T get(ASTNodeKind,Class<T>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserFactoryByClass.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParserFactoryByClass#get(Class<T>)", "kind": "static", "signature": "T extends Parser T get(Class<T>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserFactoryByClass.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParserFactoryByClass#newInstance(Class<T>)", "kind": "static", "signature": "T extends Parser T newInstance(Class<T>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserFactoryByClass.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParserFactoryByClass.ClassAndKind", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserFactoryByClass.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParserFactoryBySupplier", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserFactoryBySupplier.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParserFactoryBySupplier#get(Supplier<? extends Parser>)", "kind": "static", "signature": "T extends Parser T get(Supplier<? extends Parser>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserFactoryBySupplier.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParserInitializer", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserInitializer.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParserPrinter", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserPrinter.java", "assessment": "rule-diagnostics"},
+    {"id": "org.unlaxer.parser.ParserPrinter#get(Parser,OutputLevel)", "kind": "static", "signature": " String get(Parser,OutputLevel) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParserPrinter.java", "assessment": "rule-diagnostics"},
+    {"id": "org.unlaxer.parser.Parsers", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parsers.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Parsers#of(List<Parser>)", "kind": "static", "signature": " Parsers of(List<Parser>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parsers.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Parsers#of(Parser[])", "kind": "static", "signature": " Parsers of(Parser[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Parsers.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.ParsersSpecifier", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ParsersSpecifier.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.PositionedElements", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/PositionedElements.java", "assessment": "context-results"},
+    {"id": "org.unlaxer.parser.PropagatableDestination", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/PropagatableDestination.java", "assessment": "propagation-markers"},
+    {"id": "org.unlaxer.parser.PropagatableSource", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/PropagatableSource.java", "assessment": "propagation-markers"},
+    {"id": "org.unlaxer.parser.PseudoRootParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/PseudoRootParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.RootParserIndicator", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/RootParserIndicator.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.StaticParser", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/StaticParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.Suggest", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Suggest.java", "assessment": "suggest"},
+    {"id": "org.unlaxer.parser.SuggestableParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/SuggestableParser.java", "assessment": "suggest"},
+    {"id": "org.unlaxer.parser.Suggests", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/Suggests.java", "assessment": "suggest"},
+    {"id": "org.unlaxer.parser.SuggestsCollectorParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/SuggestsCollectorParser.java", "assessment": "suggest"},
+    {"id": "org.unlaxer.parser.TerminalSymbol", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/TerminalSymbol.java", "assessment": "meta-function"},
+    {"id": "org.unlaxer.parser.ascii.BackSlashParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/BackSlashParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.DivisionParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/DivisionParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.DoubleQuoteParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/DoubleQuoteParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.EqualParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/EqualParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.GreaterThanParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/GreaterThanParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.LeftParenthesisParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/LeftParenthesisParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.LessThanParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/LessThanParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.MinusParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/MinusParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.PlusParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/PlusParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.PointParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/PointParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.RightParenthesisParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/RightParenthesisParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.ascii.SlashParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/ascii/SlashParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.clang.BlockComment", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/clang/BlockComment.java", "assessment": "trivia-recipes"},
+    {"id": "org.unlaxer.parser.clang.CPPComment", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/clang/CPPComment.java", "assessment": "trivia-recipes"},
+    {"id": "org.unlaxer.parser.clang.CStyleDelimitedLazyChain", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/clang/CStyleDelimitedLazyChain.java", "assessment": "trivia-recipes"},
+    {"id": "org.unlaxer.parser.clang.CStyleDelimitor", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/clang/CStyleDelimitor.java", "assessment": "trivia-recipes"},
+    {"id": "org.unlaxer.parser.clang.CStyleDelimitorElements", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/clang/CStyleDelimitorElements.java", "assessment": "trivia-recipes"},
+    {"id": "org.unlaxer.parser.clang.IdentifierParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/clang/IdentifierParser.java", "assessment": "lexical-composites"},
+    {"id": "org.unlaxer.parser.combinator.ASTNode", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ASTNode.java", "assessment": "not-ast-node"},
+    {"id": "org.unlaxer.parser.combinator.AbstractPropagatableSource", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/AbstractPropagatableSource.java", "assessment": "propagation-markers"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser#input(Kind,Parser)", "kind": "static", "signature": " CaptureBoundaryParser input(Kind,Parser) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser#list(Parser)", "kind": "static", "signature": " CaptureBoundaryParser list(Parser) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser#list(Parser,int,int)", "kind": "static", "signature": " CaptureBoundaryParser list(Parser,int,int) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser#optional(Parser)", "kind": "static", "signature": " CaptureBoundaryParser optional(Parser) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser#originOf(org.unlaxer.Token)", "kind": "static", "signature": " java.util.Optional<Origin> originOf(org.unlaxer.Token) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser#value(Parser)", "kind": "static", "signature": " CaptureBoundaryParser value(Parser) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser#wrap(Kind,Parser)", "kind": "static", "signature": " CaptureBoundaryParser wrap(Kind,Parser) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser.Kind", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureBoundaryParser.Origin", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureBoundaryParser.java", "assessment": "capture-boundaries"},
+    {"id": "org.unlaxer.parser.combinator.CaptureScope", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureScope.java", "assessment": "owned-capture"},
+    {"id": "org.unlaxer.parser.combinator.CatchLabels", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CatchLabels.java", "assessment": "cut-labels"},
+    {"id": "org.unlaxer.parser.combinator.Chain", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Chain.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChainInterface", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChildOccursWithTerminator", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChildOccursWithTerminator.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.Choice", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Choice.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoiceCommitAction", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java", "assessment": "selected-choice"},
+    {"id": "org.unlaxer.parser.combinator.ChoiceInterface", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoiceInterface#choiced(Token)", "kind": "static", "signature": " Token choiced(Token) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor#any()", "kind": "static", "signature": " ChoicePredictor any() throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor#anyOf(ChoicePredictor[])", "kind": "static", "signature": " ChoicePredictor anyOf(ChoicePredictor[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor#identifier()", "kind": "static", "signature": " ChoicePredictor identifier() throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor#literal(String)", "kind": "static", "signature": " ChoicePredictor literal(String) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor#number()", "kind": "static", "signature": " ChoicePredictor number() throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor#quoted(char)", "kind": "static", "signature": " ChoicePredictor quoted(char) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor.Any", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor.AnyOf", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor.Identifier", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor.Literal", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor.Number", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ChoicePredictor.Quoted", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoicePredictor.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.Commit", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Commit.java", "assessment": "cut-labels"},
+    {"id": "org.unlaxer.parser.combinator.ConstructedCombinatorParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ConstructedCombinatorParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.combinator.ConstructedOccurs", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ConstructedOccurs.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.ConstructedSingleChildParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ConstructedSingleChildParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.combinator.ContainerParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ContainerParser.java", "assessment": "error-container"},
+    {"id": "org.unlaxer.parser.combinator.ContainerParser#getRangedContents(Token)", "kind": "static", "signature": "T List<RangedContent<T>> getRangedContents(Token) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ContainerParser.java", "assessment": "error-container"},
+    {"id": "org.unlaxer.parser.combinator.ContainerParser#getRangedContents(Token,Class<? extends ContainerParser<T>>)", "kind": "static", "signature": "T List<RangedContent<T>> getRangedContents(Token,Class<? extends ContainerParser<T>>) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ContainerParser.java", "assessment": "error-container"},
+    {"id": "org.unlaxer.parser.combinator.DoConsumePropagationStopper", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/DoConsumePropagationStopper.java", "assessment": "classic-propagation"},
+    {"id": "org.unlaxer.parser.combinator.Flatten", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Flatten.java", "assessment": "graph-utilities"},
+    {"id": "org.unlaxer.parser.combinator.InvertMatchPropagationStopper", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/InvertMatchPropagationStopper.java", "assessment": "classic-propagation"},
+    {"id": "org.unlaxer.parser.combinator.Label", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Label.java", "assessment": "cut-labels"},
+    {"id": "org.unlaxer.parser.combinator.LazyChain", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyChain.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.LazyChoice", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyChoice.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.LazyCombinatorParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyCombinatorParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.combinator.LazyLongestChoice", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyLongestChoice.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.LazyOccurs", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyOccurs.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.LazyOneOrMore", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyOneOrMore.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.LazyOptional", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyOptional.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.LazyPredictiveChoice", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyPredictiveChoice.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.LazyRepeat", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyRepeat.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.LazyUniqueLongestChoice", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyUniqueLongestChoice.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.LazyZero", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyZero.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.LazyZeroOrMore", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyZeroOrMore.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.LazyZeroOrOne", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LazyZeroOrOne.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.LongestChoice", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LongestChoice.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.LongestChoiceInterface", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/LongestChoiceInterface.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.MappedSingleCharacterParserHolder", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/MappedSingleCharacterParserHolder.java", "assessment": "graph-utilities"},
+    {"id": "org.unlaxer.parser.combinator.MatchOnly", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/MatchOnly.java", "assessment": "classic-propagation"},
+    {"id": "org.unlaxer.parser.combinator.NamePredicateParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NamePredicateParser.java", "assessment": "name-snapshots"},
+    {"id": "org.unlaxer.parser.combinator.NameResolutionScope", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NameResolutionScope.java", "assessment": "name-snapshots"},
+    {"id": "org.unlaxer.parser.combinator.NamedCapture", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NamedCapture.java", "assessment": "owned-capture"},
+    {"id": "org.unlaxer.parser.combinator.NonOrdered", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NonOrdered.java", "assessment": "nonordered"},
+    {"id": "org.unlaxer.parser.combinator.NonOrdered.NonOrderedCommitAction", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NonOrdered.java", "assessment": "selected-order"},
+    {"id": "org.unlaxer.parser.combinator.NoneChildParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NoneChildParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.combinator.Not", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Not.java", "assessment": "legacy-not"},
+    {"id": "org.unlaxer.parser.combinator.NotASTNode", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NotASTNode.java", "assessment": "not-ast-node"},
+    {"id": "org.unlaxer.parser.combinator.NotPropagatableSource", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NotPropagatableSource.java", "assessment": "classic-propagation"},
+    {"id": "org.unlaxer.parser.combinator.Occurs", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.OneOrMore", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/OneOrMore.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.Optional", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Optional.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.Ordered", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Ordered.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ParserHolder", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ParserHolder.java", "assessment": "graph-utilities"},
+    {"id": "org.unlaxer.parser.combinator.ParserWrapper", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ParserWrapper.java", "assessment": "graph-utilities"},
+    {"id": "org.unlaxer.parser.combinator.PegLookahead", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PegLookahead.java", "assessment": "peg-assertion"},
+    {"id": "org.unlaxer.parser.combinator.PredicateAnyMatchForParsedParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PredicateAnyMatchForParsedParser.java", "assessment": "parsed-predicate"},
+    {"id": "org.unlaxer.parser.combinator.PredictiveChoice", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PredictiveChoice.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.PredictiveChoiceInterface", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PredictiveChoiceInterface.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.PropagationStopper", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PropagationStopper.java", "assessment": "propagation-markers"},
+    {"id": "org.unlaxer.parser.combinator.RecoveryDiagnostic", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java", "assessment": "recovery"},
+    {"id": "org.unlaxer.parser.combinator.RecoveryDiagnostic#from(ParseContext)", "kind": "static", "signature": " List<RecoveryDiagnostic> from(ParseContext) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java", "assessment": "recovery"},
+    {"id": "org.unlaxer.parser.combinator.RecoveryDiagnostic#from(Token)", "kind": "static", "signature": " List<RecoveryDiagnostic> from(Token) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java", "assessment": "recovery"},
+    {"id": "org.unlaxer.parser.combinator.RecoveryDiagnostic.Marker", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java", "assessment": "recovery"},
+    {"id": "org.unlaxer.parser.combinator.Repeat", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Repeat.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.Reverse", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Reverse.java", "assessment": "graph-utilities"},
+    {"id": "org.unlaxer.parser.combinator.SingleChildCollectingParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SingleChildCollectingParser.java", "assessment": "meta-function"},
+    {"id": "org.unlaxer.parser.combinator.SyncPointRecoveryParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SyncPointRecoveryParser.java", "assessment": "recovery"},
+    {"id": "org.unlaxer.parser.combinator.SyncPointRecoveryParser#withMessage(Parser,String,String[])", "kind": "static", "signature": " SyncPointRecoveryParser withMessage(Parser,String,String[]) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SyncPointRecoveryParser.java", "assessment": "recovery"},
+    {"id": "org.unlaxer.parser.combinator.SyncPointRecoveryParser.Mode", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SyncPointRecoveryParser.java", "assessment": "recovery"},
+    {"id": "org.unlaxer.parser.combinator.TagWrapper", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/TagWrapper.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.parser.combinator.TagWrapper.TagWrapperAction", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/TagWrapper.java", "assessment": "tag-wrapper"},
+    {"id": "org.unlaxer.parser.combinator.UniqueLongestChoice", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/UniqueLongestChoice.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.WhiteSpaceDelimitedChain", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/WhiteSpaceDelimitedChain.java", "assessment": "trivia-recipes"},
+    {"id": "org.unlaxer.parser.combinator.WhiteSpaceDelimitedLazyChain", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/WhiteSpaceDelimitedLazyChain.java", "assessment": "trivia-recipes"},
+    {"id": "org.unlaxer.parser.combinator.Zero", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Zero.java", "assessment": "core-combinators"},
+    {"id": "org.unlaxer.parser.combinator.ZeroOrMore", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ZeroOrMore.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.combinator.ZeroOrOne", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ZeroOrOne.java", "assessment": "terminated-repeat"},
+    {"id": "org.unlaxer.parser.elementary.AbstractTokenParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/AbstractTokenParser.java", "assessment": "construction"},
+    {"id": "org.unlaxer.parser.elementary.DoubleQuotedParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/DoubleQuotedParser.java", "assessment": "lexical-composites"},
+    {"id": "org.unlaxer.parser.elementary.EParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.elementary.EmptyLineParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyLineParser.java", "assessment": "line-composition"},
+    {"id": "org.unlaxer.parser.elementary.EmptyParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyParser.java", "assessment": "empty-eof"},
+    {"id": "org.unlaxer.parser.elementary.EndOfLineParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfLineParser.java", "assessment": "line-composition"},
+    {"id": "org.unlaxer.parser.elementary.EndOfSourceParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfSourceParser.java", "assessment": "empty-eof"},
+    {"id": "org.unlaxer.parser.elementary.EscapeInQuotedParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EscapeInQuotedParser.java", "assessment": "escape-in-quoted"},
+    {"id": "org.unlaxer.parser.elementary.ExponentParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ExponentParser.java", "assessment": "lexical-composites"},
+    {"id": "org.unlaxer.parser.elementary.GraphemeParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/GraphemeParser.java", "assessment": "grapheme"},
+    {"id": "org.unlaxer.parser.elementary.IgnoreCaseWordParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/IgnoreCaseWordParser.java", "assessment": "word-transforms"},
+    {"id": "org.unlaxer.parser.elementary.LineTerminatorParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java", "assessment": "line-composition"},
+    {"id": "org.unlaxer.parser.elementary.MappedSingleCharacterParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/MappedSingleCharacterParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.elementary.MultipleParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/MultipleParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.elementary.NamedParenthesesParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/NamedParenthesesParser.java", "assessment": "parentheses"},
+    {"id": "org.unlaxer.parser.elementary.NamedParenthesesParser#getInnerParserParsed(Token)", "kind": "static", "signature": " Token getInnerParserParsed(Token) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/NamedParenthesesParser.java", "assessment": "parentheses"},
+    {"id": "org.unlaxer.parser.elementary.NumberParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/NumberParser.java", "assessment": "lexical-composites"},
+    {"id": "org.unlaxer.parser.elementary.ParenthesesParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ParenthesesParser.java", "assessment": "parentheses"},
+    {"id": "org.unlaxer.parser.elementary.ParenthesesParser#getParenthesesed(Token)", "kind": "static", "signature": " Token getParenthesesed(Token) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ParenthesesParser.java", "assessment": "parentheses"},
+    {"id": "org.unlaxer.parser.elementary.QuotedParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/QuotedParser.java", "assessment": "lexical-composites"},
+    {"id": "org.unlaxer.parser.elementary.QuotedParser#contents(Token)", "kind": "static", "signature": " Source contents(Token) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/QuotedParser.java", "assessment": "lexical-composites"},
+    {"id": "org.unlaxer.parser.elementary.QuotedParser.Parts", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/QuotedParser.java", "assessment": "lexical-composites"},
+    {"id": "org.unlaxer.parser.elementary.QuotedParser.QuotedContentsParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/QuotedParser.java", "assessment": "lexical-composites"},
+    {"id": "org.unlaxer.parser.elementary.ReplayParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ReplayParser.java", "assessment": "owned-capture"},
+    {"id": "org.unlaxer.parser.elementary.SignParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/SignParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.elementary.SingleCharacterParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/SingleCharacterParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.elementary.SingleQuoteParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/SingleQuoteParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.elementary.SingleQuotedParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/SingleQuotedParser.java", "assessment": "lexical-composites"},
+    {"id": "org.unlaxer.parser.elementary.SingleStringParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/SingleStringParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.elementary.SpaceDelimitor", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/SpaceDelimitor.java", "assessment": "trivia-recipes"},
+    {"id": "org.unlaxer.parser.elementary.StartOfLineParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/StartOfLineParser.java", "assessment": "start-of-line"},
+    {"id": "org.unlaxer.parser.elementary.StartOfSourceParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/StartOfSourceParser.java", "assessment": "start-of-source"},
+    {"id": "org.unlaxer.parser.elementary.UnicodeIgnoreCaseWordParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/UnicodeIgnoreCaseWordParser.java", "assessment": "unicode-ci"},
+    {"id": "org.unlaxer.parser.elementary.WildCardCharacterParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardCharacterParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.elementary.WildCardInterleaveParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardInterleaveParser.java", "assessment": "wildcard-interleave"},
+    {"id": "org.unlaxer.parser.elementary.WildCardLineParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardLineParser.java", "assessment": "line-composition"},
+    {"id": "org.unlaxer.parser.elementary.WildCardStringParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardStringParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.elementary.WildCardStringTerminatorParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardStringTerminatorParser.java", "assessment": "until-variants"},
+    {"id": "org.unlaxer.parser.elementary.WordParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WordParser.java", "assessment": "word-transforms"},
+    {"id": "org.unlaxer.parser.elementary.WordParser.BeginSpecifier", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WordParser.java", "assessment": "word-transforms"},
+    {"id": "org.unlaxer.parser.elementary.WordParser.EndSpecifier", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WordParser.java", "assessment": "word-transforms"},
+    {"id": "org.unlaxer.parser.elementary.WordParser.RangeSpecifier", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WordParser.java", "assessment": "word-transforms"},
+    {"id": "org.unlaxer.parser.elementary.WordParser.WordEffector", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WordParser.java", "assessment": "word-transforms"},
+    {"id": "org.unlaxer.parser.incremental.IncrementalParseCache", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/incremental/IncrementalParseCache.java", "assessment": "incremental"},
+    {"id": "org.unlaxer.parser.incremental.IncrementalParseCache.CacheStats", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/incremental/IncrementalParseCache.java", "assessment": "incremental"},
+    {"id": "org.unlaxer.parser.incremental.IncrementalParseCache.CachedChunk", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/incremental/IncrementalParseCache.java", "assessment": "incremental"},
+    {"id": "org.unlaxer.parser.incremental.SnapshotParseCache", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/incremental/SnapshotParseCache.java", "assessment": "incremental"},
+    {"id": "org.unlaxer.parser.incremental.SnapshotParseCache.Revisions", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/incremental/SnapshotParseCache.java", "assessment": "incremental"},
+    {"id": "org.unlaxer.parser.incremental.SnapshotParseCache.Stats", "kind": "type", "signature": "RECORD", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/incremental/SnapshotParseCache.java", "assessment": "incremental"},
+    {"id": "org.unlaxer.parser.posix.AlphabetNumericParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/AlphabetNumericParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.AlphabetNumericUnderScoreParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/AlphabetNumericUnderScoreParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.AlphabetParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/AlphabetParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.AlphabetUnderScoreParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/AlphabetUnderScoreParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.AsciiParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/AsciiParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.BlankParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/BlankParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.ColonParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/ColonParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.CommaParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/CommaParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.ControlParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/ControlParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.DigitParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/DigitParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.DotParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/DotParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.GraphParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/GraphParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.HashParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/HashParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.LowerParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/LowerParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.PrintParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/PrintParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.PunctuationParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/PunctuationParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.SemiColonParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/SemiColonParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.SpaceParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/SpaceParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.UpperParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/UpperParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.WordParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/WordParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.posix.XDigitParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/posix/XDigitParser.java", "assessment": "character-recipes"},
+    {"id": "org.unlaxer.parser.referencer.MatchedChoiceParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java", "assessment": "selected-choice"},
+    {"id": "org.unlaxer.parser.referencer.MatchedNonOrderedParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedNonOrderedParser.java", "assessment": "selected-order"},
+    {"id": "org.unlaxer.parser.referencer.MatchedTokenParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java", "assessment": "historical-replay"},
+    {"id": "org.unlaxer.parser.referencer.MatchedTokenParser.ScopeVariable", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java", "assessment": "historical-replay"},
+    {"id": "org.unlaxer.parser.referencer.OldMatchedTokenParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java", "assessment": "historical-replay"},
+    {"id": "org.unlaxer.parser.referencer.OldMatchedTokenParser.ScopeVariable", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java", "assessment": "historical-replay"},
+    {"id": "org.unlaxer.parser.referencer.ReferenceByNameParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/ReferenceByNameParser.java", "assessment": "reference-by-name"},
+    {"id": "org.unlaxer.parser.referencer.ReferenceParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/ReferenceParser.java", "assessment": "reference-predicate"},
+    {"id": "org.unlaxer.parser.referencer.ReferenceParser#of(Name)", "kind": "static", "signature": " ReferenceParser of(Name) throws ", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/ReferenceParser.java", "assessment": "reference-predicate"},
+    {"id": "org.unlaxer.parser.referencer.Referencer", "kind": "type", "signature": "INTERFACE", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/Referencer.java", "assessment": "reference-predicate"},
+    {"id": "org.unlaxer.parser.referencer.Referencer.AbstractReference", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/Referencer.java", "assessment": "reference-predicate"},
+    {"id": "org.unlaxer.reducer.TagBasedReducer", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/reducer/TagBasedReducer.java", "assessment": "not-ast-node"},
+    {"id": "org.unlaxer.reducer.TagBasedReducer.NodeKind", "kind": "type", "signature": "ENUM", "path": "unlaxer-common/src/main/java/org/unlaxer/reducer/TagBasedReducer.java", "assessment": "not-ast-node"}
+  ]
+}
