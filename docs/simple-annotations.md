@@ -146,4 +146,4 @@ Java 生成物、Java-host Rust の生成物と CLI 出力、移植可能性検�
   （その rule 自身の `@autoCommit` は `W-AUTO-COMMIT-SKIPPED`、reason=opaque）。警告文はこれを示すが、
   実際に挿入が変わったかどうかまでは判定しない。
 - Simple annotation を意図的な metadata として使う場合も警告は出る。警告を抑える指定は設けていない。
-- LSP の診断・`unlaxer check` の JSON には警告を出していない。
+- LSP の診断には、CLI と同じ code・message・CP 範囲で警告を出す（#798）。`unlaxer check` の JSON には警告を出していない。

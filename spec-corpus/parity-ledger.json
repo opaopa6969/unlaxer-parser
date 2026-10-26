@@ -1,16 +1,17 @@
 {
   "schema_version": 1,
-  "audited_on": "2026-10-24",
-  "audited_revision": "274bf68319fa377ef6d99a2048b48d70a1fdd325",
+  "audited_on": "2026-10-26",
+  "audited_revision": "fed097744f078bc76b885bfe556bc33a290f344e",
   "scope_notes": [
     "Java runtime/生成物、Rust runtimeとJava-host/nativeの両生成経路を区別する。hostの省略は互換性の証明にはしない。",
     "docs、README、rust/FULL-SPEC、spec-corpus/conformance、Java test resources、docs/fixtures、全Java/Rust/Pythonのdisable/assume/skip、CIの条件を横断した。過去のstory/dge/設計案と実装済みの規範文書は区別する。",
     "検索例: `rg -n \"@Disabled|@Ignore|Assume|assumeTrue|assumeFalse|#\\[ignore|skipUnless|skipIf|skipTest|pytest.skip\" --glob \"*.java\" --glob \"*.rs\" --glob \"*.py\"`。さらに `skipped_validate` / `RUNTIME_SCOPE_IDS` 等の条件分岐を確認した。",
     "3分類を項目ごとに記録する。試験環境のopt-inは製品差ではないので契約として分類し、内部の未駆動caseは検証の未修正差として明記する。",
     "`spec-corpus/property-based/known-differences.json` はPBT findingの許可表なので空のまま維持する。全repo台帳をPBTの許可表へコピーして失敗を抑制しない。",
-    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。CST #767、Number #752、Java生成 #754は別のOPEN issueへ結ぶ。数値判定の作業量差 #758は不要なAST型推論を省いて修正し、解析の適用範囲を契約として記録する（issueはmerge前のOPEN）。#741の境界差は契約化済み。",
+    "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。後続のCST #767（PR #797）、Number #752（PR #792）、Java生成 #754（PR #804）、数値判定の作業量差 #758（PR #803）もCLOSEDで、それぞれchoice-root-cst / number-internal-failures / java-generation-depth / analysis-work-limitの契約として記録する。#741の境界差は契約化済み。",
     "CLOSED #331/#545/#571/#176/#537の後に残った旧未対応記述（回復内match-only、汎用伝播、Rust LSP/DAP、scopeTree、enum/eval、Backreference）は現行契約へ訂正する。未解決範囲はOPEN #111と個別子issueで追跡する。",
-    "規範違反の量指定子overflow #783 と、内部条件付き除外の検証漏れ #784 を新規作成した。個別issueのない残機能群は既存全仕様issue #111の受け入れ範囲に結ぶ。",
+    "2026-10-24の監査で作成した量指定子overflow #783はPR #801で修正してCLOSED（bounded-overflow）。内部条件付き除外の検証漏れ #784はOPENのままspec-driver-coverageで追跡する。個別issueのない残機能群は既存全仕様issue #111の受け入れ範囲に結ぶ。",
+    "2026-10-26の再監査で、2026-10-24〜26にmergeされたPR（#766/#772/#778/#785/#787/#791/#796/#797/#799/#800/#801/#803/#804/#806/#807/#808/#810/#813）とissueの状態を反映した。未修正の差だったglobal-comment / multi-grammar / simple-annotation / capture-generated-source / capture-resetは、対応issueがすべてCLOSEDで、両言語の挙動を共通corpusとテストで固定したため契約へ移した。OPENのまま残る追跡issueは#111・#716・#784と、両Rust hostに共通の既存制限#776。",
     "catalog/corpus.jsonのGsonが許していた単引用符escapeを同じ復号値の標準JSONへ訂正した。JSONの不正構文を黙って走査から除外しない。",
     "host別corpusの値の一致/差と未対応の意味分類は人が監査する。検査は新しいファイル/キー/出現数と台帳参照の欠落を落とすが、任意の新規skip条件や文書の意味を自動分類しない。"
   ],
@@ -208,11 +209,11 @@
       "title": "parity: 空literalのJava WordParser契約をRust生成器へ実装する"
     },
     "714": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: 複数grammarファイルのRust生成と移植checkをJavaと揃える"
     },
     "715": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: 未知のSimple annotationの受理・診断をJava/Rustで統一する"
     },
     "716": {
@@ -228,7 +229,7 @@
       "title": "ci: 全Maven install経路をjob専用repositoryへ隔離して公開3.3.0の混同を防ぐ"
     },
     "719": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "ci: opt-in適合性のskip・未実行を検出し実Tiny Catalog検証を補完する"
     },
     "740": {
@@ -248,60 +249,72 @@
       "title": "parity: Rust native Number が不完全な指数以外の Java 内部失敗を記録しない（負の先読みで診断位置が異なる）"
     },
     "753": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: trivia の読み飛ばしで LOOKAHEAD の matched cursor が小さく上書きされる（#706・#712 後続）"
     },
     "754": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: 再帰と深いネストの文法で、Java の Java 生成だけが E-RECURSIVE-SHAPE で拒否する（#740 の後続）"
     },
     "758": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: Java の型推論が作業量の上限に達すると、Java host の Rust 生成だけが失敗する（#755 の後続）"
     },
     "761": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "Rust: 生成・投影した原文の @f 拒否が Choice/rule 経由と全入力解析で漏れる"
     },
     "762": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "Rust: MatchOnly + reset=true で繰り返しを包む @f が Java と違う"
     },
     "767": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: root が choice のとき Java の CST には root rule が残らず Rust は残る"
     },
     "768": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: token-stream / lexical-context で空でない literal の Classic 反転の幅が Java 0 / Rust 1 文字（#716 の子）"
     },
-    "777": {
+    "776": {
       "state": "OPEN",
+      "title": "check: import と無関係な grammar の診断・CP位置が null化と dedup で消える"
+    },
+    "777": {
+      "state": "CLOSED",
       "title": "parity: W-COMMENT-IGNORED を生成の警告（GenerationWarnings / warnings::collect）と Rust CLI に載せる"
     },
     "783": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: 量指定子 overflow が Java/Rust とも E-BOUNDED-OVERFLOW に到達しない"
     },
     "784": {
       "state": "OPEN",
       "title": "test(parity): spec corpus の validate/runtime 条件付き除外を両言語の実行先へ結ぶ"
     },
+    "788": {
+      "state": "CLOSED",
+      "title": "Rust: preferred AST 用 parser の合成 capture が @f と同じ収集・原文検査・reset を行い、通常の parser・Java と結果が違う"
+    },
     "793": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: 正の LOOKAHEAD の後の group・選択が失敗したとき、frame の開始が Rust の失敗位置に入らない（#753 後続）"
     },
     "794": {
       "state": "CLOSED",
       "title": "parity: SAFE_FAILURES で負の先読み内の Num failure memo を Java は再生し、Rust は再評価する（negative lookahead の候補差）"
     },
+    "798": {
+      "state": "CLOSED",
+      "title": "LSP: 生成の警告（W-COMMENT-IGNORED・W-ANNOTATION-IGNORED）を CLI と同じ位置で出す"
+    },
     "802": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: @precedence の level overflow と、逆順境界＋overflow の診断順が Java と Rust で違う（#783 後続）"
     },
     "809": {
-      "state": "OPEN",
-      "title": "parity: 通常の経路で失敗した Chain の後の owner reset を Java と揃える"
+      "state": "CLOSED",
+      "title": "parity: 通常の経路で失敗した Chain の後、Java は resetMatchedWithConsumed を false のまま残し、Rust は呼び出し前の値に戻す（#794 後続）"
     }
   },
   "entries": [
@@ -424,7 +437,7 @@
         516,
         741
       ],
-      "observation": "Java は parser frame 1024、Rust は rule 256/expression 1024。UBNF frontend は Java が形により126〜168括弧、native は127括弧。#741 CLOSED はこの差の契約化と境界テストによる。lowering の深さ256とは別。Java生成深さの契約は後述の #754、未解決の作業量は #758 に残す。",
+      "observation": "Java は parser frame 1024、Rust は rule 256/expression 1024。UBNF frontend は Java が形により126〜168括弧、native は127括弧。#741 CLOSED はこの差の契約化と境界テストによる。lowering の深さ256とは別。Java生成深さの契約は後述の #754（PR #804）、作業量の差は #758（PR #803）で修正し analysis-work-limit に記録する。",
       "evidence": [
         "docs/java-parser-limits.md",
         "rust/unlaxer-ubnf/src/lib.rs",
@@ -522,13 +535,15 @@
         719,
         718
       ],
-      "observation": "Assume/assumeTrue は rustConformance、tokenStreamBench、JDK21、tinyexpression.grammar/classes、JVM allocation counter を条件にする。Python skipUnless は node/mvn/共有tail pluginの存在条件3か所。通常mvn testのskipはRust未対応の証拠ではない。必須jobでの未実行は #719 が検出する。active @Disabled/@Ignore/assumeFalse、Rust #[ignore]、Python skipTest/pytest.skip は監査時0件（コメント中の @Ignore は除外）。active な @Disabled/@Ignore/#[ignore] の追加は test_markers の検査が落とす。",
+      "observation": "Assume/assumeTrue は rustConformance、tokenStreamBench、JDK21、tinyexpression.grammar/classes、JVM allocation counter を条件にする。Python skipUnless は node/mvn/共有tail pluginの存在条件3か所。通常mvn testのskipはRust未対応の証拠ではない。必須jobでの未実行・skipは #719（PR #766）の verify-optin-tests と .github/optin-test-contracts.json が検出する。active @Disabled/@Ignore/assumeFalse、Rust #[ignore]、Python skipTest/pytest.skip は監査時0件（コメント中の @Ignore は除外）。active な @Disabled/@Ignore/#[ignore] の追加は test_markers の検査が落とす。",
       "evidence": [
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/Java21TestSupport.java",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustCatalogConformanceTest.java",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/TokenStreamConformanceTest.java",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ParserScalingSmokeTest.java",
-        "scripts/tests/test_maven_job_repository.py"
+        "scripts/tests/test_maven_job_repository.py",
+        ".github/optin-test-contracts.json",
+        "scripts/verify-optin-tests.py"
       ]
     },
     {
@@ -539,7 +554,7 @@
       "issues": [
         719
       ],
-      "observation": "rustConformanceがfalseならRust部分のみreturnするClassicDap/ClassicLspKeyword/RaisingOperatorや、if内でnativeを実行するContextualLexing/Typeof等がある。JUnitのskipped数だけでは実行証明にならず、#719のflag・artifact・対象method検査へ結ぶ。Rust native/playgroundのsymlink試験2件は#[cfg(unix)]による条件付きcompileで、CIのLinuxでは有効。製品のJava/Rust機能差とは数えない。",
+      "observation": "rustConformanceがfalseならRust部分のみreturnするClassicDap/ClassicLspKeyword/RaisingOperatorや、if内でnativeを実行するContextualLexing/Typeof等がある。JUnitのskipped数だけでは実行証明にならず、#719（PR #766）のflag・artifact・対象method検査へ結ぶ。Rust native/playgroundのsymlink試験2件は#[cfg(unix)]による条件付きcompileで、CIのLinuxでは有効。製品のJava/Rust機能差とは数えない。",
       "evidence": [
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ClassicDapProtocolConformanceTest.java",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ClassicLspKeywordConformanceTest.java",
@@ -583,24 +598,29 @@
     },
     {
       "id": "global-comment",
-      "category": "unresolved",
-      "title": "global @comment の生成差",
+      "category": "contract",
+      "title": "global @comment の生成と W-COMMENT-IGNORED",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         712,
-        777
+        777,
+        753,
+        798
       ],
-      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。javaStyle併記時のW-COMMENT-IGNOREDは#777で共通収集APIと3経路のCLIに統合し、code・message・CP span、strictの終了コード5と無出力、生成物不変を共通fixtureで固定した。triviaの後で失敗するruleの診断位置（#753）は、失敗したruleのframeの開始をRustも失敗位置に記録して解消した（PR #791）。trivia後のmatched cursorはJavaのtransaction cursorのまま。期待候補はbackend固有（Javaの子parser展開とRustの末端候補の差）で、種別・位置の一致と区別してcorpusに固定。",
+      "observation": "#712（PR #748）でglobal @commentはJava・Java-host・native Rustの3経路で同じ意味になった。javaStyle併記時のW-COMMENT-IGNOREDは#777（PR #796）で共通収集API（GenerationWarnings.collect / warnings::collect）と3経路のCLIに統合し、code・message・CP span、--strict / --fail-on warningの終了コード5と無出力、javaStyle単独との生成物byte一致を共通fixture（generation-warnings 8例、global-comment/ignored.json 8例）で固定した。GrammarValidatorは従来どおりWARNINGを返す。UBNF LSPはJavaだけにあり、#798（PR #806）でCLIと同じ位置・messageで1回だけ表示する。triviaの後で失敗するruleの診断位置（#753）は、失敗したruleのframeの開始をRustも失敗位置に記録して解消した（PR #791）。trivia後のmatched cursorはJavaのtransaction cursorのまま。期待候補はbackend固有（Javaの子parser展開とRustの末端候補の差）で、種別・位置の一致と区別してcorpusに固定。",
       "evidence": [
         "docs/rule-trivia.md",
         "spec-corpus/global-comment/README.md",
+        "spec-corpus/global-comment/ignored.json",
         "docs/prior-matched-diagnostics.md",
         "rust/unlaxer-runtime/src/lib.rs",
         "rust/unlaxer-runtime/src/rule_stack.rs",
         "conformance/prior-matched-diagnostics/rule-frames.tsv",
         "spec-corpus/generation-warnings/corpus.json",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/GenerationWarningsConformanceTest.java",
-        "rust/unlaxer-generator/tests/generation_warnings.rs"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/GlobalCommentConformanceTest.java",
+        "rust/unlaxer-generator/tests/generation_warnings.rs",
+        "rust/unlaxer-generator/tests/global_comment.rs"
       ]
     },
     {
@@ -611,7 +631,7 @@
       "issues": [
         793
       ],
-      "observation": "#793でRustのgroup・選択・回数指定の反復（Sequence / Choice / PredictiveChoice / Repeat）が失敗したとき、既存checkpointから復元したmax(consumed, matched)を失敗候補に加える。Javaのparse frameと同じく、axyzのgroup・選択・入れ子groupはsyntax CP4、prefixは[false,0,0]。共通corpusの19文法19入力をJavaとRust両生成経路でmemo OFF/ON × 3診断方針に照合する。成功した式の開始は候補にせず、matched cursorとtoken-streamの規則は維持。候補文字列はbackend固有。issueはmerge前のOPEN。",
+      "observation": "#793でRustのgroup・選択・回数指定の反復（Sequence / Choice / PredictiveChoice / Repeat）が失敗したとき、既存checkpointから復元したmax(consumed, matched)を失敗候補に加える。Javaのparse frameと同じく、axyzのgroup・選択・入れ子groupはsyntax CP4、prefixは[false,0,0]。共通corpusの19文法19入力をJavaとRust両生成経路でmemo OFF/ON × 3診断方針に照合する。成功した式の開始は候補にせず、matched cursorとtoken-streamの規則は維持。候補文字列はbackend固有。#793はPR #807でCLOSED。",
       "evidence": [
         "docs/prior-matched-diagnostics.md",
         "spec-corpus/lookahead-group-frame/README.md",
@@ -622,31 +642,40 @@
     },
     {
       "id": "multi-grammar",
-      "category": "unresolved",
+      "category": "contract",
       "title": "複数 grammar の生成と check",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
-        714
+        714,
+        776
       ],
-      "observation": "Java CLIは同一fileの複数grammarを生成するがRust両hostはP-GRAMMAR-COUNT等で拒否する。frontendが複数grammarを読めることとは別。",
+      "observation": "#714（PR #772）でJava CLI・Java-host Rust・native Rustは同一fileの各grammarを独立生成し、両Rust hostのcheckも全grammarを構造検証する。Rust出力は単一grammarなら従来の5ファイル、複数なら宣言順のroot mod.rsとgrammar_<ASCII小文字名>/に置き、各moduleは単独生成とbyte一致する。共通corpusでJava向けと両Rust hostの生成物をcompile/parse/map/evalし、原文・capture・CP span・別grammarの入力の拒否、両hostの生成物一致、後続grammarの失敗時に部分出力を残さないことを照合する。意図した差: 出力名の衝突はRustがASCII大小文字を無視したmodule名でP-OUTPUT-COLLISION、Javaはpackageと小文字化した生成クラス名の組が一致したときだけ拒否する（各言語の出力配置の規則）。出力先の祖先symlinkはJava-hostが許容し、nativeは従来どおり拒否する。impactとplaygroundは単一grammarのまま。importを持つfileのcheckで無関係なgrammarの診断までnull化・dedupされる問題は両Rust hostに共通の既存制限で、Java/Rustの差ではなくOPEN #776で追跡する。",
       "evidence": [
+        "docs/multiple-grammars.md",
         "docs/portability-check.md",
-        "rust/unlaxer-ubnf/README.md"
+        "spec-corpus/multiple-grammars/corpus.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/MultiGrammarConformanceTest.java",
+        "rust/unlaxer-generator/tests/multiple_grammars.rs"
       ]
     },
     {
       "id": "simple-annotation",
-      "category": "unresolved",
-      "title": "未知 Simple annotation の無視/拒否",
+      "category": "contract",
+      "title": "未知 Simple annotation の受理と W-ANNOTATION-IGNORED",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
-        715
+        715,
+        798
       ],
-      "observation": "Java生成は未知Simple注釈を無言で無視し、Rust両hostは拒否する。@enum/@eval等の実装済み注釈を未対応とする古いskip文書は訂正する。",
+      "observation": "#715（PR #778）で未知のSimple annotation（@nestedCaptures・@autoCommit以外の@name）はJava・Java-host Rust・native Rustの3経路とも受理し、生成器は名前を使わない。同じcode・CP span・messageのW-ANNOTATION-IGNOREDを共通収集APIと3経路のCLIで報告し、--strict / --fail-on warningは無出力で終了コード5。@autoCommitが解析しない文法では注釈を除いた文法と生成物がbyte一致し、解析する文法でも3経路の生成物は同じ。`@ leftAssoc`や`(`なしの`@mapping`はnative frontendもJavaと同じくSimple annotationとして読み、引数付きの未知名`@custom(x)`は両frontendとも構文エラー。共通corpusの16文法と拒否4件で照合する。P-ANNOTATIONは旧版の診断で、発行しない。UBNF LSP（Javaのみ）の表示は#798（PR #806）でCLIと同じ位置に揃えた。",
       "evidence": [
-        "docs/skip-ast-projection.md",
+        "docs/simple-annotations.md",
         "docs/portability-check.md",
-        "rust/FULL-SPEC.md"
+        "rust/FULL-SPEC.md",
+        "spec-corpus/simple-annotations/corpus.json",
+        "spec-corpus/simple-annotations/rejected.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/SimpleAnnotationConformanceTest.java",
+        "rust/unlaxer-generator/tests/simple_annotations.rs"
       ]
     },
     {
@@ -658,7 +687,7 @@
         754,
         740
       ],
-      "observation": "#754で単一選択肢のchoiceを追加深さから除外し、Rust preferred_planも同じ計数にした。再帰helperの84〜122括弧はJava生成とRust両hostで受理し、生成parserの成否・CST・ASTが一致する。資源上限256は維持し、この形のJava生成は126段まで、127段でE-RECURSIVE-SHAPE。Rust生成はlowered IRの122/123段を維持する。target別の上限は契約で、作業量の残差は#758。",
+      "observation": "#754で単一選択肢のchoiceを追加深さから除外し、Rust preferred_planも同じ計数にした。再帰helperの84〜122括弧はJava生成とRust両hostで受理し、生成parserの成否・CST・ASTが一致する。資源上限256は維持し、この形のJava生成は126段まで、127段でE-RECURSIVE-SHAPE。Rust生成はlowered IRの122/123段を維持する。target別の上限は契約。#754はPR #804でCLOSED、作業量の差は#758（PR #803）で修正しanalysis-work-limitに記録。",
       "evidence": [
         "docs/java-parser-limits.md",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/NestingLimitGrammars.java",
@@ -676,7 +705,7 @@
         758,
         740
       ],
-      "observation": "Rust両hostの数値判定はcaptureから直接行う。numericBesideAnalysisWork(560)等でJava-hostだけがAST型推論の作業量上限に達する差を修正し、0/500/550/560/575 fillerで生成物5ファイルのbyte一致、580/600/700で同じ作業量診断を検証する。@typeof制約のcaptureも同じ規則で判定し、typeofBesideAnalysisWorkで同じ掃引を行う。Java targetのAST型推論とその作業量上限、両hostのlowered IR・preferred projectionの上限は維持する。#758はPR merge前のためOPEN。",
+      "observation": "Rust両hostの数値判定はcaptureから直接行う。numericBesideAnalysisWork(560)等でJava-hostだけがAST型推論の作業量上限に達する差を修正し、0/500/550/560/575 fillerで生成物5ファイルのbyte一致、580/600/700で同じ作業量診断を検証する。@typeof制約のcaptureも同じ規則で判定し、typeofBesideAnalysisWorkで同じ掃引を行う。Java targetのAST型推論とその作業量上限、両hostのlowered IR・preferred projectionの上限は維持する。#758はPR #803でCLOSED。",
       "evidence": [
         "docs/java-parser-limits.md",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NumericFieldsTest.java",
@@ -711,7 +740,7 @@
         809,
         794
       ],
-      "observation": "通常経路で失敗した Chain の owner reset=false を Rust でも保持する。ab の先読み後に生成 Root(a z) が失敗し、NonOrdered 内の LOOKAHEAD(b) を呼ぶと、旧 Rust は拒否 CP0/1、Java は成功 CP0/2。NEGATIVE_LOOKAHEAD / UNTIL / EMPTY・診断 CP・Unicode を共通 corpus で比較し、memo OFF と SAFE_FAILURES、両 Rust 生成 host・mapping grammar を検証する。通常・rule-local 空白・名前付き空白・lexical context・@scopeTree/@declares・@backref の6文法と手組みの COMMIT / LABEL で、透過 wrapper の lookup 正規化と失敗 policy 伝播も照合する。失敗 memo の実 hit と alias policy 再生、Choice / NonOrdered 候補隔離・明示 transaction rollback を固定。lexical context の反復呼出は Java Lexing.withContext が毎回 state epoch を更新するため failure hit 0、Rust は2、@backref は Rust の CaptureEquality が memo 対象外のため Java 2・Rust 0 となる既存の会計差を持つが、構文結果・cursor・診断・reset の期待値は共通。読み取り経路を README に列挙。resource failure の全復元、明示 transaction を持つ ParseContext::parse の契約と #197 の性能凍結は維持する。#809 は PR merge 前のため OPEN。",
+      "observation": "通常経路で失敗した Chain の owner reset=false を Rust でも保持する。ab の先読み後に生成 Root(a z) が失敗し、NonOrdered 内の LOOKAHEAD(b) を呼ぶと、旧 Rust は拒否 CP0/1、Java は成功 CP0/2。NEGATIVE_LOOKAHEAD / UNTIL / EMPTY・診断 CP・Unicode を共通 corpus で比較し、memo OFF と SAFE_FAILURES、両 Rust 生成 host・mapping grammar を検証する。通常・rule-local 空白・名前付き空白・lexical context・@scopeTree/@declares・@backref の6文法と手組みの COMMIT / LABEL で、透過 wrapper の lookup 正規化と失敗 policy 伝播も照合する。失敗 memo の実 hit と alias policy 再生、Choice / NonOrdered 候補隔離・明示 transaction rollback を固定。lexical context の反復呼出は Java Lexing.withContext が毎回 state epoch を更新するため failure hit 0、Rust は2、@backref は Rust の CaptureEquality が memo 対象外のため Java 2・Rust 0 となる既存の会計差を持つが、構文結果・cursor・診断・reset の期待値は共通。読み取り経路を README に列挙。resource failure の全復元、明示 transaction を持つ ParseContext::parse の契約と #197 の性能凍結は維持する。#809 は PR #813 で CLOSED。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/cases.tsv",
@@ -723,29 +752,39 @@
     },
     {
       "id": "capture-generated-source",
-      "category": "unresolved",
-      "title": "生成/投影sourceのfield capture拒否漏れ",
+      "category": "contract",
+      "title": "生成/投影sourceのfield capture拒否",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
-        761
+        761,
+        788
       ],
-      "observation": "Tが非消費でbbを生成すると、(T | q) @fや全入力入口でRustが受理してJavaはCP0失敗となる。直接captureの一部検査成功だけでは解消しない。",
+      "observation": "#761（PR #785）でRustの@fは収集前に子が返したParsed原文を検査する。入力を消費せず原文を生成・投影するadapterがChoice／rule経由や全入力解析の入口にあっても、Javaと同じく生成原文はCP0、投影原文はCP1のsyntax失敗として拒否する。共通corpusのdirect／Choice／rule × 生成／投影 × owned captureの有無の12件を、Java・Java-host Rust・native Rustでcursor・bindingのrollback、context／全入力／rule stack付き全入力の診断まで照合する。preferred ASTの合成captureは#788（PR #799）でExpr::MetadataCaptureに分離し、ユーザーの@fの原文検査とreset契約から外した。",
       "evidence": [
         "docs/general-owned-capture-syntax.md",
+        "docs/preferred-ast-snapshots.md",
+        "spec-corpus/owned-capture/cases.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/OwnedCaptureConformanceTest.java",
+        "rust/unlaxer-runtime/tests/owned_capture.rs",
         "rust/unlaxer-runtime/src/lib.rs"
       ]
     },
     {
       "id": "capture-reset",
-      "category": "unresolved",
+      "category": "contract",
       "title": "MatchOnly反復を包むfield captureのreset",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
-        762
+        762,
+        788
       ],
-      "observation": "入力x、明示MatchOnly、reset=trueの反復captureでJavaは成功(cursor 0,1 / w=x)、Rustはsource由来の拒否。memo ON/OFFとも追跡対象。",
+      "observation": "#762（PR #787）でRustのExpr::CaptureをJavaのLazyChainと同じく子の評価前にreset_matched_with_consumedをfalseにする対象へ加え、@fが失敗してrollbackした後もその設定を残す。入力x、明示MatchOnly、reset=trueの反復captureは両言語とも成功（cursor 0,1 / f=x）。reset true／false × 入力x／xx／空文字列と、先行する@fの失敗後の2件を、Java（OwnedCaptureTest）とRustが同じconformance/owned-capture/cases.tsvからmemo OFF／SAFE_FAILURES × 3診断設定で照合する。preferred ASTの合成captureは#788（PR #799）でこのreset対象から外し、metadata-*-resetの行で固定する。",
       "evidence": [
         "docs/general-owned-capture-syntax.md",
+        "docs/preferred-ast-snapshots.md",
+        "conformance/owned-capture/cases.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java",
+        "rust/unlaxer-runtime/tests/owned_capture.rs",
         "rust/unlaxer-runtime/src/lib.rs"
       ]
     },
@@ -757,7 +796,7 @@
       "issues": [
         783
       ],
-      "observation": "Java / Java-host Rust / native Rust は構文層で範囲外の数字列を受理し、検証・生成で E-BOUNDED-OVERFLOW と元ソースの反復式の CP 範囲を報告する。{n}/{n,m}/{n,} の 2147483647/2147483648 境界・非 BMP・死んだ定義を共通 fixture で検証。#783 はレビュー・merge 後に close。",
+      "observation": "Java / Java-host Rust / native Rust は構文層で範囲外の数字列を受理し、検証・生成で E-BOUNDED-OVERFLOW と元ソースの反復式の CP 範囲を報告する。{n}/{n,m}/{n,} の 2147483647/2147483648 境界・非 BMP・死んだ定義を共通 fixture で検証。#783 は PR #801 で CLOSED。",
       "evidence": [
         "conformance/bounded-overflow/corpus.json",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/BoundedOverflowConformanceTest.java",
@@ -773,7 +812,7 @@
       "issues": [
         802
       ],
-      "observation": "Java / Java-host Rust / native Rust は構文層で範囲外の level を受理し、検証・生成で E-PRECEDENCE-OVERFLOW と @precedence 全体の元ソース CP 範囲を報告する。sentinel は順序・結合性の比較、Parser IR export、BNF 変換に出さない。逆順境界と量指定子 overflow は Java の宣言順・左から右・親から子の 1 回の走査で E-BOUNDED-INVALID / E-BOUNDED-OVERFLOW を報告する。Java は validator の全診断、各生成器と Rust は最初の診断を共通 fixture で検証。#802 はレビュー・merge 後に close。",
+      "observation": "Java / Java-host Rust / native Rust は構文層で範囲外の level を受理し、検証・生成で E-PRECEDENCE-OVERFLOW と @precedence 全体の元ソース CP 範囲を報告する。sentinel は順序・結合性の比較、Parser IR export、BNF 変換に出さない。逆順境界と量指定子 overflow は Java の宣言順・左から右・親から子の 1 回の走査で E-BOUNDED-INVALID / E-BOUNDED-OVERFLOW を報告する。Java は validator の全診断、各生成器と Rust は最初の診断を共通 fixture で検証。#802 は PR #810 で CLOSED。",
       "evidence": [
         "conformance/precedence-overflow/corpus.json",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/PrecedenceOverflowConformanceTest.java",
@@ -790,7 +829,7 @@
         784,
         719
       ],
-      "observation": "Rust spec_corpusはscope=validateの18件をcontinueする。runtimeの3件は両frontend driverから除外する。製品機能が全て未実装とは断定せず、実行先と期待値の対応の不足として新規 #784 で追跡する。Surefire/#[ignore]だけでは検出できない。",
+      "observation": "Rust spec_corpusはscope=validateの18件をcontinueする。runtimeの3件は両frontend driverから除外する。製品機能が全て未実装とは断定せず、実行先と期待値の対応の不足としてOPEN #784 で追跡する。Surefire/#[ignore]だけでは検出できない。",
       "evidence": [
         "rust/unlaxer-ubnf/tests/spec_corpus.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/bootstrap/UbnfSpecCorpusTest.java"
