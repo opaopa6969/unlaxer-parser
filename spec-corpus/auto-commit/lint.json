@@ -275,9 +275,28 @@
   },
   {
     "name": "comment",
-    "note": "@comment is not analysed yet (#745), although its Java and Rust meaning agree since #712.",
+    "note": "行コメント単独は T₀={/} で解析する（#745）。",
     "grammar": "grammar Commented {\n  @comment: { line: '//' }\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
-    "findings": []
+    "findings": [
+      {
+        "rule": "Statement",
+        "alternative": "'let' Name ';'",
+        "first": "'let'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Statement",
+        "alternative": "'print' Name ';'",
+        "first": "'print'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
   },
   {
     "name": "declarative-whitespace",
@@ -494,6 +513,202 @@
           "Name"
         ],
         "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-javaStyle-whitespace",
+    "note": "既存の FIRST・左再帰の期待値を @comment でも固定（#745）。",
+    "grammar": "grammar Spaced {\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Statement",
+        "alternative": "'let' Name ';'",
+        "first": "'let'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Statement",
+        "alternative": "'print' Name ';'",
+        "first": "'print'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-javaStyle-whitespace-case",
+    "note": "既存の FIRST・左再帰の期待値を @comment でも固定（#745）。",
+    "grammar": "grammar SpacedCase {\n  @whitespace: JavaStyle\n  @comment: { line: '//' }\n  @root\n  Root ::= { Statement } ;\n  Statement ::= 'let' Name ';' | 'print' Name ';' ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Statement",
+        "alternative": "'let' Name ';'",
+        "first": "'let'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Statement",
+        "alternative": "'print' Name ';'",
+        "first": "'print'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-javaStyle-whitespace-trivia-start",
+    "note": "既存の FIRST・左再帰の期待値を @comment でも固定（#745）。",
+    "grammar": "grammar SpacedStart {\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  token ANYC = ANY\n  token DIGIT = CHAR_RANGE('0','9')\n  @root\n  Root ::= { Item } ;\n  Item ::= 'k' Name ';' | '/' Name ';' | 'm' Name | ANYC Name | 'p' Name | ' ' Name | DIGIT Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Item",
+        "alternative": "DIGIT Name",
+        "first": "DIGIT",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-javaStyle-whitespace-left-recursion-check",
+    "note": "既存の FIRST・左再帰の期待値を @comment でも固定（#745）。",
+    "grammar": "grammar SpacedConsuming {\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  token ANYC = ANY\n  token ID ::= XID_IDENTIFIER;\n  @root\n  Root ::= { S } ;\n  S ::= 'k' N | 'm' N ;\n  N ::= 'n' ;\n  P ::= '/' P | 'x' ;\n  Q ::= ANYC Q | 'y' ;\n  X ::= ID X | 'z' ;\n}\n",
+    "findings": [
+      {
+        "rule": "S",
+        "alternative": "'k' N",
+        "first": "'k'",
+        "commits": [
+          "N"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "S",
+        "alternative": "'m' N",
+        "first": "'m'",
+        "commits": [
+          "N"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-javaStyle-whitespace-left-recursion",
+    "note": "既存の FIRST・左再帰の期待値を @comment でも固定（#745）。",
+    "grammar": "grammar SpacedLeft {\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  S ::= 'k' N | 'm' N ;\n  N ::= 'n' ;\n  P ::= [ '/' ] P | 'x' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "comment-only-whitespace-left-recursion-check",
+    "note": "既存の FIRST・左再帰の期待値を @comment でも固定（#745）。",
+    "grammar": "grammar SpacedConsuming {\n  @comment: { line: '//' }\n  token ANYC = ANY\n  token ID ::= XID_IDENTIFIER;\n  @root\n  Root ::= { S } ;\n  S ::= 'k' N | 'm' N ;\n  N ::= 'n' ;\n  P ::= '/' P | 'x' ;\n  Q ::= ANYC Q | 'y' ;\n  X ::= ID X | 'z' ;\n}\n",
+    "findings": [
+      {
+        "rule": "S",
+        "alternative": "'k' N",
+        "first": "'k'",
+        "commits": [
+          "N"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "S",
+        "alternative": "'m' N",
+        "first": "'m'",
+        "commits": [
+          "N"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-only-whitespace-left-recursion",
+    "note": "既存の FIRST・左再帰の期待値を @comment でも固定（#745）。",
+    "grammar": "grammar SpacedLeft {\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  S ::= 'k' N | 'm' N ;\n  N ::= 'n' ;\n  P ::= [ '/' ] P | 'x' ;\n}\n",
+    "findings": []
+  },
+  {
+    "name": "comment-only-trivia-start",
+    "note": "T₀ は / だけ。空白で始まる終端は unknown にならず、ANY は unknown（#745）。",
+    "grammar": "grammar UnspacedStart {\n  @comment: { line: '//' }\n  token ANYC = ANY\n  token DIGIT = CHAR_RANGE('0','9')\n  @root\n  Root ::= { Item } ;\n  Item ::= 'k' Name ';' | '/' Name ';' | 'm' Name | ANYC Name | 'p' Name | ' ' Name | DIGIT Name ;\n  Name ::= 'n' ;\n}\n",
+    "findings": [
+      {
+        "rule": "Item",
+        "alternative": "'p' Name",
+        "first": "'p'",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Item",
+        "alternative": "' ' Name",
+        "first": "' '",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      },
+      {
+        "rule": "Item",
+        "alternative": "DIGIT Name",
+        "first": "DIGIT",
+        "commits": [
+          "Name"
+        ],
+        "inserted": false
+      }
+    ]
+  },
+  {
+    "name": "comment-only-newline",
+    "note": "改行は消費する終端、行コメント終端の先読みとは別（#745）。",
+    "grammar": "// 😀 CP spans\ngrammar G {\n  @comment: { line: '//' }\n  @root Root ::= { S };\n  @autoCommit S ::= '\\n' N | '\\r\\n' N | ' ' N;\n  N ::= 'n';\n}\n",
+    "findings": [
+      {
+        "rule": "S",
+        "alternative": "'\\n' N",
+        "first": "'\\n'",
+        "commits": [
+          "N"
+        ],
+        "inserted": true
+      },
+      {
+        "rule": "S",
+        "alternative": "'\\r\\n' N",
+        "first": "'\\r\\n'",
+        "commits": [
+          "N"
+        ],
+        "inserted": true
+      },
+      {
+        "rule": "S",
+        "alternative": "' ' N",
+        "first": "' '",
+        "commits": [
+          "N"
+        ],
+        "inserted": true
       }
     ]
   }

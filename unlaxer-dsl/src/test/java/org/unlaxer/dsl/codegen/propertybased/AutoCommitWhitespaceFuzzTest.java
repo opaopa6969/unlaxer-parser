@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,9 +44,9 @@ import org.unlaxer.dsl.codegen.rust.RustBackend;
 import org.unlaxer.parser.Parser;
 
 /**
- * Differential fuzz of {@code @autoCommit} under the built-in {@code @whitespace: javaStyle} (#728).
+ * Differential fuzz of {@code @autoCommit} under global javaStyle and/or line comments (#728, #745).
  *
- * <p>Each seed of {@link GrammarGenerator} is rendered with {@code @whitespace: javaStyle}, once as
+ * <p>Each seed of {@link GrammarGenerator} is rendered with one of four trivia settings, once as
  * written ("plain") and once with {@code @autoCommit} on every rule ("auto"). Seeds whose rewrite
  * inserts no {@code COMMIT} are skipped until {@code acfuzz.grammars} grammars with insertions are
  * collected. Inputs are the generator's derivations and mutations, plus variants with spaces,
@@ -68,7 +69,7 @@ public class AutoCommitWhitespaceFuzzTest {
     static final int CI_VARIANTS = 3;
     static final int DERIVATIONS = 4, MUTATIONS = 7, RESERVE = 6;
     /** Trivia of javaStyle, and fragments that look like it but are not. */
-    static final String[] TRIVIA = {" ", "\n", "\t", "\r\n", "  ", "/* c */", "/**/", "// c\n", "//", "/", "/*", "*/"};
+    static final String[] TRIVIA = {" ", "\n", "\t", "\r\n", "  ", "/* c */", "/**/", "// c\n", "//", "/", "/*", "*/", "\r", "// 😀\r\n", "// c\r", "// EOF"};
     static final List<Memoization> MEMO = List.of(Memoization.OFF, Memoization.SAFE_FAILURES);
     static final List<ParseOptions.Diagnostics> DIAGNOSTICS = List.of(ParseOptions.Diagnostics.values());
 
@@ -78,26 +79,44 @@ public class AutoCommitWhitespaceFuzzTest {
     }
 
     /** One seed: the plain and the annotated grammar, their inputs and the inserted commit count. */
-    record Pair(long seed, String plain, String auto, GrammarDecl plainGrammar, GrammarDecl autoGrammar,
+    record Pair(long seed, int profile, String plain, String auto, GrammarDecl plainGrammar, GrammarDecl autoGrammar,
             List<String> inputs, int commits) {}
 
-    static String spaced(String rendered) {
+    /** The trivia settings {@link #spaced} renders, by profile. */
+    static final String[] PROFILES = {"javaStyle", "javaStyle+comment", "comment", "none+comment"};
+
+    static String spaced(String rendered, int profile) {
         String text = rendered.replace("  @whitespace: none\n", "");
         int at = text.indexOf('\n', text.indexOf("@package:")) + 1;
-        return text.substring(0, at) + "  @whitespace: javaStyle\n" + text.substring(at);
+        String settings = switch (profile) {
+            case 0 -> "  @whitespace: javaStyle\n";
+            case 1 -> "  @whitespace: javaStyle\n  @comment: { line: '//' }\n";
+            case 2 -> "  @comment: { line: '//' }\n";
+            default -> "  @whitespace: none\n  @comment: { line: '//' }\n";
+        };
+        return text.substring(0, at) + settings + text.substring(at);
     }
 
     /**
      * The generator's literals never start trivia. Two thirds of the seeds rename code points so
      * that literals, lookaheads and inputs also contain {@code /}, {@code *} and a space, the code
-     * points that a bare terminal can take from a comment or from skippable space.
+     * points that a bare terminal can take from a comment or from skippable space. With line
+     * comments only, every seed also renames a code point to LF or CRLF: terminals that the
+     * analysis models there and that can follow a comment whose MatchOnly terminator they are, so
+     * inputs with a comment in the middle are accepted too (#745 review).
      */
-    static String alphabet(long seed, String text, boolean grammar) {
-        String[][] renames = seed % 3 == 1 ? new String[][] {{"y", "/"}, {",", "*"}}
-            : seed % 3 == 2 ? new String[][] {{"y", "/"}, {"x", " "}} : new String[0][];
+    static String alphabet(long seed, int profile, String text, boolean grammar) {
+        // {from, in a UBNF literal, in an input}
+        String[][] renames = seed % 3 == 1 ? new String[][] {{"y", "/", "/"}, {",", "*", "*"}}
+            : seed % 3 == 2 ? new String[][] {{"y", "/", "/"}, {"x", " ", " "}} : new String[0][];
+        if (profile >= 2) {
+            String[] newline = seed % 3 == 2 ? new String[] {",", "\\r\\n", "\r\n"} : new String[] {"x", "\\n", "\n"};
+            renames = java.util.stream.Stream.concat(Arrays.stream(renames), java.util.stream.Stream.<String[]>of(newline))
+                .toArray(String[][]::new);
+        }
         String out = text;
         for (String[] rename : renames) {
-            out = grammar ? out.replace("'" + rename[0] + "'", "'" + rename[1] + "'") : out.replace(rename[0], rename[1]);
+            out = grammar ? out.replace("'" + rename[0] + "'", "'" + rename[1] + "'") : out.replace(rename[0], rename[2]);
         }
         return out;
     }
@@ -106,11 +125,11 @@ public class AutoCommitWhitespaceFuzzTest {
         return plain.replaceAll("\\bR(\\d+) ::=", "@autoCommit R$1 ::=");
     }
 
-    static List<String> inputs(long seed, GrammarGenerator generator, GrammarModel model, int variants) {
+    static List<String> inputs(long seed, int profile, GrammarGenerator generator, GrammarModel model, int variants) {
         var bases = new ArrayList<String>();
-        for (String input : generator.inputs(model, DERIVATIONS, MUTATIONS)) bases.add(alphabet(seed, input, false));
+        for (String input : generator.inputs(model, DERIVATIONS, MUTATIONS)) bases.add(alphabet(seed, profile, input, false));
         for (List<String> group : generator.reserve(model, RESERVE, 1)) {
-            for (String input : group) bases.add(alphabet(seed, input, false));
+            for (String input : group) bases.add(alphabet(seed, profile, input, false));
         }
         var random = new Random(seed * 7_281L + 728L);
         var out = new LinkedHashSet<String>(bases);
@@ -125,6 +144,10 @@ public class AutoCommitWhitespaceFuzzTest {
                 out.add(String.join("", cps));
             }
             out.add(" " + base + "\n");
+            // A comment ended by the input's own line terminator, and one at the end (#745 review).
+            int newline = base.replace('\r', '\n').indexOf('\n');
+            if (newline >= 0) out.add(base.substring(0, newline) + "// c" + base.substring(newline));
+            out.add(base + "// EOF");
         }
         return List.copyOf(out);
     }
@@ -156,8 +179,12 @@ public class AutoCommitWhitespaceFuzzTest {
             corpus.seeds++;
             var generator = new GrammarGenerator(seed, GrammarGenerator.Limits.CI);
             GrammarModel model = generator.grammar();
-            String plain = alphabet(seed, spaced(model.render("P" + seed, "acfuzz.p" + seed)), true);
-            String auto = annotated(alphabet(seed, spaced(model.render("A" + seed, "acfuzz.a" + seed)), true));
+            int profile = corpus.pairs.size() % 4; // Equal coverage, even when seeds without commits are skipped.
+            String plain = alphabet(seed, profile, spaced(model.render("P" + seed, "acfuzz.p" + seed), profile), true);
+            String auto = annotated(alphabet(seed, profile, spaced(model.render("A" + seed, "acfuzz.a" + seed), profile), true));
+            // The rendered settings are the profile's: comment with profiles 1..3, javaStyle with 0..1.
+            assertEquals(PROFILES[profile] + "\n" + auto, profile >= 1, auto.contains("@comment: { line: '//' }"));
+            assertEquals(PROFILES[profile] + "\n" + auto, profile <= 1, auto.contains("@whitespace: javaStyle"));
             GrammarDecl plainGrammar, autoGrammar;
             try {
                 plainGrammar = UBNFMapper.parse(plain).grammars().get(0);
@@ -178,8 +205,8 @@ public class AutoCommitWhitespaceFuzzTest {
                 corpus.withoutCommits++;
                 continue;
             }
-            var list = inputs(seed, generator, model, variants);
-            corpus.pairs.add(new Pair(seed, plain, auto, plainGrammar, autoGrammar, list, commits));
+            var list = inputs(seed, profile, generator, model, variants);
+            corpus.pairs.add(new Pair(seed, profile, plain, auto, plainGrammar, autoGrammar, list, commits));
             corpus.commits += commits;
             corpus.inputs += list.size();
         }
@@ -190,6 +217,9 @@ public class AutoCommitWhitespaceFuzzTest {
     /** acceptance, CST and AST of accepted inputs; kind and offset of rejected ones. */
     static final class Tally {
         long observations, accepted, acceptedWithTrivia, commitRejections;
+        /** Per profile: accepted inputs with a line comment, and inserted-commit rejections (with one). */
+        final long[] acceptedWithComment = new long[PROFILES.length], profileCommitRejections = new long[PROFILES.length],
+            commitRejectionsWithComment = new long[PROFILES.length], acceptedAfterComment = new long[PROFILES.length];
         final List<String> differences = new ArrayList<>();
 
         void compare(String label, Pair pair, List<String> plain, List<String> auto) {
@@ -207,16 +237,46 @@ public class AutoCommitWhitespaceFuzzTest {
                 }
                 if (ok) accepted++;
                 if (ok && hasTrivia(input)) acceptedWithTrivia++;
-                if (a.startsWith("fail\tcommit\t") && !p.startsWith("fail\tcommit\t")) commitRejections++;
+                if (ok && input.contains("//")) acceptedWithComment[pair.profile()]++;
+                if (ok && AFTER_COMMENT.matcher(input).find()) acceptedAfterComment[pair.profile()]++;
+                if (a.startsWith("fail\tcommit\t") && !p.startsWith("fail\tcommit\t")) {
+                    commitRejections++;
+                    profileCommitRejections[pair.profile()]++;
+                    if (input.contains("//")) commitRejectionsWithComment[pair.profile()]++;
+                }
             }
+        }
+
+        /**
+         * Every trivia setting must reach both sides of the property: accepted inputs with a line
+         * comment, and rejections by an inserted commit after a line comment (#745 review).
+         */
+        void requireEveryProfile() {
+            for (int profile = 0; profile < PROFILES.length; profile++) {
+                assertTrue(PROFILES[profile] + ": accepted inputs with a line comment " + this, acceptedWithComment[profile] > 0);
+                assertTrue(PROFILES[profile] + ": inserted commits must reject some inputs " + this,
+                    profileCommitRejections[profile] > 0);
+                assertTrue(PROFILES[profile] + ": an inserted commit must reject an input with a line comment " + this,
+                    commitRejectionsWithComment[profile] > 0);
+            }
+            // With line comments only, a comment ends at a CR / LF that the grammar itself consumes.
+            assertTrue("comment only: accepted inputs with a comment before more input " + this,
+                acceptedAfterComment[2] + acceptedAfterComment[3] > 0);
         }
 
         @Override public String toString() {
             return "observations=" + observations + " accepted=" + accepted + " acceptedWithTrivia=" + acceptedWithTrivia
                 + " commitRejections=" + commitRejections
+                + " acceptedWithComment=" + Arrays.toString(acceptedWithComment)
+                + " acceptedAfterComment=" + Arrays.toString(acceptedAfterComment)
+                + " commitRejectionsByProfile=" + Arrays.toString(profileCommitRejections)
+                + " commitRejectionsWithComment=" + Arrays.toString(commitRejectionsWithComment)
                 + " differences=" + differences.size();
         }
     }
+
+    /** A line comment, its CR / LF / CRLF terminator and more input after it. */
+    static final java.util.regex.Pattern AFTER_COMMENT = java.util.regex.Pattern.compile("//[^\\r\\n]*(\\r\\n|\\r|\\n).");
 
     /** Whether the input has javaStyle trivia: a space character or the start of a comment (a lone {@code /} is not). */
     static boolean hasTrivia(String input) {
@@ -260,6 +320,7 @@ public class AutoCommitWhitespaceFuzzTest {
         assertTrue(String.join("\n", tally.differences), tally.differences.isEmpty());
         assertTrue("accepted inputs with trivia must be exercised", tally.acceptedWithTrivia > 0);
         assertTrue("inserted commits must reject some inputs", tally.commitRejections > 0);
+        tally.requireEveryProfile();
     }
 
     private static List<String> runJava(ClassLoader loader, String pkg, String name, List<String> inputs) throws Exception {
@@ -376,6 +437,7 @@ public class AutoCommitWhitespaceFuzzTest {
         assertTrue(String.join("\n", tally.differences), tally.differences.isEmpty());
         assertTrue("accepted inputs with trivia must be exercised", tally.acceptedWithTrivia > 0);
         assertTrue("inserted commits must reject some inputs", tally.commitRejections > 0);
+        tally.requireEveryProfile();
     }
 
     /** The lint of one source in the format {@link #LINT_PROBE} prints. */

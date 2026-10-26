@@ -7,14 +7,9 @@
   },
   {
     "name": "comment",
-    "note": "@comment: the grammar is outside the analysed subset (#712).",
+    "note": "行コメント単独も解析する（#745）。",
     "grammar": "grammar Commented {\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
-    "warnings": [
-      {
-        "rule": "S",
-        "reason": "grammar"
-      }
-    ]
+    "warnings": []
   },
   {
     "name": "declarative-whitespace",
@@ -108,5 +103,155 @@
     "note": "An analysed rule without a candidate is not a warning (the lint shows why).",
     "grammar": "grammar Kept {\n  @root\n  Root ::= Item 'x' | 'a' 'y' ;\n  @autoCommit\n  Item ::= 'a' B ;\n  B ::= 'b' ;\n}\n",
     "warnings": []
+  },
+  {
+    "name": "comment-javaStyle",
+    "note": "文法既定の trivia で解析する。javaStyle で無効な comment は従来の W-COMMENT-IGNORED のまま（#745）。",
+    "grammar": "grammar Commented {\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": []
+  },
+  {
+    "name": "comment-none",
+    "note": "文法既定の trivia で解析する。javaStyle で無効な comment は従来の W-COMMENT-IGNORED のまま（#745）。",
+    "grammar": "grammar Commented {\n  @whitespace: none\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": []
+  },
+  {
+    "name": "comment-javaStyle-ignored",
+    "note": "文法既定の trivia で解析する。javaStyle で無効な comment は従来の W-COMMENT-IGNORED のまま（#745）。",
+    "grammar": "grammar Commented {\n  @whitespace: javaStyle\n  @comment: { line: '#' }\n  @comment: ignored\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": []
+  },
+  {
+    "name": "comment-invalid",
+    "note": "証明の対象外の comment 設定は具体的な reason で除外（#745）。",
+    "grammar": "grammar Commented {\n  @comment: { line: '#' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-setting",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment requires exactly one { line: '//' } setting without javaStyle"
+      }
+    ]
+  },
+  {
+    "name": "comment-duplicate",
+    "note": "証明の対象外の comment 設定は具体的な reason で除外（#745）。",
+    "grammar": "grammar Commented {\n  @comment: { line: '//' }\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-setting",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment requires exactly one { line: '//' } setting without javaStyle"
+      }
+    ]
+  },
+  {
+    "name": "comment-extra-key",
+    "note": "証明の対象外の comment 設定は具体的な reason で除外（#745）。",
+    "grammar": "grammar Commented {\n  @comment: { line: '//' blockOpen: '/*' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-setting",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment requires exactly one { line: '//' } setting without javaStyle"
+      }
+    ]
+  },
+  {
+    "name": "comment-scalar",
+    "note": "証明の対象外の comment 設定は具体的な reason で除外（#745）。",
+    "grammar": "grammar Commented {\n  @comment: ignored\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-setting",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment requires exactly one { line: '//' } setting without javaStyle"
+      }
+    ]
+  },
+  {
+    "name": "comment-named",
+    "note": "証明の対象外の comment 設定は具体的な reason で除外（#745）。",
+    "grammar": "grammar Commented {\n  @comment: { line: '//' }\n  @whitespace: GAP\n  token GAP ::= '#'+;\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-whitespace",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment with non-built-in whitespace is not modelled"
+      }
+    ]
+  },
+  {
+    "name": "comment-whitespace-rule-none-only",
+    "note": "規則ごとの trivia・lexical context は共通の N(p) で証明しない（#745）。",
+    "grammar": "grammar SpacedRuleNone {\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @whitespace(none)\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-rule-trivia",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment with rule-local trivia or lexical context is not modelled"
+      }
+    ]
+  },
+  {
+    "name": "comment-whitespace-rule-none-javaStyle",
+    "note": "規則ごとの trivia・lexical context は共通の N(p) で証明しない（#745）。",
+    "grammar": "grammar SpacedRuleNone {\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @whitespace(none)\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-rule-trivia",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment with rule-local trivia or lexical context is not modelled"
+      }
+    ]
+  },
+  {
+    "name": "comment-whitespace-interleave-only",
+    "note": "規則ごとの trivia・lexical context は共通の N(p) で証明しない（#745）。",
+    "grammar": "grammar SpacedInterleave {\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @interleave(profile=commentsAndSpaces)\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-rule-trivia",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment with rule-local trivia or lexical context is not modelled"
+      }
+    ]
+  },
+  {
+    "name": "comment-whitespace-interleave-javaStyle",
+    "note": "規則ごとの trivia・lexical context は共通の N(p) で証明しない（#745）。",
+    "grammar": "grammar SpacedInterleave {\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @interleave(profile=commentsAndSpaces)\n  B ::= 'b' ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-rule-trivia",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment with rule-local trivia or lexical context is not modelled"
+      }
+    ]
+  },
+  {
+    "name": "comment-whitespace-lexical-context-only",
+    "note": "規則ごとの trivia・lexical context は共通の N(p) で証明しない（#745）。",
+    "grammar": "grammar SpacedContext {\n  @comment: { line: '//' }\n  token ID ::= 'b';\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @lexicalContext(tokens=['ID'])\n  B ::= ID ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-rule-trivia",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment with rule-local trivia or lexical context is not modelled"
+      }
+    ]
+  },
+  {
+    "name": "comment-whitespace-lexical-context-javaStyle",
+    "note": "規則ごとの trivia・lexical context は共通の N(p) で証明しない（#745）。",
+    "grammar": "grammar SpacedContext {\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  token ID ::= 'b';\n  @root\n  Root ::= { S } ;\n  @autoCommit\n  S ::= 'k' B ;\n  @lexicalContext(tokens=['ID'])\n  B ::= ID ;\n}\n",
+    "warnings": [
+      {
+        "rule": "S",
+        "reason": "comment-rule-trivia",
+        "message": "W-AUTO-COMMIT-SKIPPED: S: @autoCommit inserts nothing: @comment with rule-local trivia or lexical context is not modelled"
+      }
+    ]
   }
 ]

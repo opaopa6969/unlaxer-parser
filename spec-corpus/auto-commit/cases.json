@@ -574,5 +574,697 @@
         "outcome": "syntax"
       }
     ]
+  },
+  {
+    "name": "comment-whitespace-statements",
+    "note": "javaStyle と @comment の併記は javaStyle 単独と同じ挿入・受理・確定エラー位置（#745）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root @mapping(Doc)\n  Root ::= { Statement } ;\n  @autoCommit\n  Statement ::= 'let' Name '=' Value ';' | 'print' Value ';' ;\n  Name ::= 'n' ;\n  @autoCommit\n  Value ::= 'v' | '(' Value ')' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root @mapping(Doc)\n  Root ::= { Statement } ;\n  Statement ::= 'let' COMMIT(Name) '=' COMMIT(Value) ';' | 'print' COMMIT(Value) ';' ;\n  Name ::= 'n' ;\n  Value ::= 'v' | '(' COMMIT(Value) ')' ;\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "   ",
+        "outcome": "success"
+      },
+      {
+        "input": "\n\t\r\n",
+        "outcome": "success"
+      },
+      {
+        "input": "// only a comment",
+        "outcome": "success"
+      },
+      {
+        "input": "/* block */",
+        "outcome": "success"
+      },
+      {
+        "input": "let n = v ;",
+        "outcome": "success"
+      },
+      {
+        "input": " let\tn\n=\r\nv;\n",
+        "outcome": "success"
+      },
+      {
+        "input": "let /* c */ n // c\n = v;",
+        "outcome": "success"
+      },
+      {
+        "input": "print ( ( v ) ) ;  ",
+        "outcome": "success"
+      },
+      {
+        "input": "/* a */ let n=v; print(v); // tail",
+        "outcome": "success"
+      },
+      {
+        "input": "let",
+        "outcome": "commit",
+        "offset": 3,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let   ",
+        "outcome": "commit",
+        "offset": 6,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let x",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let /* c */ x",
+        "outcome": "commit",
+        "offset": 12,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let // c\nx",
+        "outcome": "commit",
+        "offset": 9,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let n = x ;",
+        "outcome": "commit",
+        "offset": 8,
+        "message": "unexpected input"
+      },
+      {
+        "input": "print ( x )",
+        "outcome": "commit",
+        "offset": 8,
+        "message": "unexpected input"
+      },
+      {
+        "input": "print /* unterminated",
+        "outcome": "commit",
+        "offset": 6,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let n = v; print\n(\n",
+        "outcome": "commit",
+        "offset": 19,
+        "message": "unexpected input"
+      },
+      {
+        "input": "let n = v",
+        "outcome": "syntax"
+      },
+      {
+        "input": "lex n = v;",
+        "outcome": "syntax"
+      },
+      {
+        "input": "/ let n = v;",
+        "outcome": "syntax"
+      },
+      {
+        "input": "let n = v ; x",
+        "outcome": "syntax"
+      },
+      {
+        "input": "/* unterminated",
+        "outcome": "syntax"
+      },
+      {
+        "input": "let n = v; /",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "comment-whitespace-expression",
+    "note": "javaStyle と @comment の併記は javaStyle 単独と同じ挿入・受理・確定エラー位置（#745）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root @mapping(Doc)\n  Root ::= Expr ;\n  Expr ::= Term { ( '*' | '-' ) Term } ;\n  @autoCommit\n  Term ::= 'v' | '(' Expr ')' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root @mapping(Doc)\n  Root ::= Expr ;\n  Expr ::= Term { ( '*' | '-' ) Term } ;\n  Term ::= 'v' | '(' COMMIT(Expr) ')' ;\n}\n",
+    "cases": [
+      {
+        "input": "v",
+        "outcome": "success"
+      },
+      {
+        "input": " v - v * v ",
+        "outcome": "success"
+      },
+      {
+        "input": "( v - ( v ) )",
+        "outcome": "success"
+      },
+      {
+        "input": "(\n// c\nv)",
+        "outcome": "success"
+      },
+      {
+        "input": "/* a */ ( v )*v",
+        "outcome": "success"
+      },
+      {
+        "input": "(",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "( )",
+        "outcome": "commit",
+        "offset": 2,
+        "message": "unexpected input"
+      },
+      {
+        "input": "(\n// c\n)",
+        "outcome": "commit",
+        "offset": 7,
+        "message": "unexpected input"
+      },
+      {
+        "input": "v - ( /* c */ - v )",
+        "outcome": "commit",
+        "offset": 14,
+        "message": "unexpected input"
+      },
+      {
+        "input": "v * ( ( * v ) )",
+        "outcome": "commit",
+        "offset": 8,
+        "message": "unexpected input"
+      },
+      {
+        "input": "",
+        "outcome": "syntax"
+      },
+      {
+        "input": "( v",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v -",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v - ( v * )",
+        "outcome": "syntax"
+      },
+      {
+        "input": "( v ) v",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v / v",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "comment-whitespace-slash",
+    "note": "javaStyle と @comment の併記は javaStyle 単独と同じ挿入・受理・確定エラー位置（#745）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root @mapping(Doc)\n  Root ::= Expr ;\n  Expr ::= Term { ( '*' | '/' ) Term } ;\n  @autoCommit\n  Term ::= 'v' | '(' Expr ')' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  @root @mapping(Doc)\n  Root ::= Expr ;\n  Expr ::= Term { ( '*' | '/' ) Term } ;\n  Term ::= 'v' | '(' Expr ')' ;\n}\n",
+    "cases": [
+      {
+        "input": "v / v",
+        "outcome": "success"
+      },
+      {
+        "input": "v // c",
+        "outcome": "success"
+      },
+      {
+        "input": "v /* c */ / v",
+        "outcome": "success"
+      },
+      {
+        "input": "( v / ( v ) )",
+        "outcome": "success"
+      },
+      {
+        "input": "v//c\n/v",
+        "outcome": "success"
+      },
+      {
+        "input": "(",
+        "outcome": "syntax"
+      },
+      {
+        "input": "( )",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v /",
+        "outcome": "syntax"
+      },
+      {
+        "input": "v / / v",
+        "outcome": "syntax"
+      },
+      {
+        "input": "( v",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "comment-whitespace-raw-slash",
+    "note": "javaStyle と @comment の併記は javaStyle 単独と同じ挿入・受理・確定エラー位置（#745）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  token DIGIT = CHAR_RANGE('0','9')\n  @root @mapping(Doc)\n  Root ::= { Item } ;\n  @autoCommit\n  Item ::= DIGIT | 'k' N | '/' | '*' '*' '/' 'k' 'x' ;\n  N ::= 'n' ;\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @whitespace: javaStyle\n  @comment: { line: '//' }\n  token DIGIT = CHAR_RANGE('0','9')\n  @root @mapping(Doc)\n  Root ::= { Item } ;\n  Item ::= DIGIT | 'k' N | '/' | '*' '*' '/' 'k' 'x' ;\n  N ::= 'n' ;\n}\n",
+    "cases": [
+      {
+        "input": "1/**/kx",
+        "outcome": "success"
+      },
+      {
+        "input": "kn",
+        "outcome": "success"
+      },
+      {
+        "input": "1 kn /",
+        "outcome": "success"
+      },
+      {
+        "input": "**/kx",
+        "outcome": "success"
+      },
+      {
+        "input": "1// c\nkn",
+        "outcome": "success"
+      },
+      {
+        "input": "1/**/k",
+        "outcome": "syntax"
+      },
+      {
+        "input": "k",
+        "outcome": "syntax"
+      },
+      {
+        "input": "kx",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "comment-only",
+    "note": "終端の先読みは matched だけ進む。COMMIT は CR/LF の手前の consumed 位置（#745）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S };\n  @autoCommit S ::= 'k' N;\n  N ::= 'n' | '\\n' 'n' | '\\r\\n' 'n' | '\\r' 'n';\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S };\n  S ::= 'k' COMMIT(N);\n  N ::= 'n' | '\\n' 'n' | '\\r\\n' 'n' | '\\r' 'n';\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "// EOF",
+        "outcome": "success"
+      },
+      {
+        "input": "kn",
+        "outcome": "success"
+      },
+      {
+        "input": "kn// tail",
+        "outcome": "success"
+      },
+      {
+        "input": "k// c\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "k// c\rn",
+        "outcome": "success"
+      },
+      {
+        "input": "k// 😀\r\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "k// /* quote ' 😀\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "k",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k// EOF",
+        "outcome": "commit",
+        "offset": 7,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\nx",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\rx",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//😀\r\nx",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\r\n",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k n",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k/* c */n",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k/",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": " ",
+        "outcome": "syntax"
+      },
+      {
+        "input": "// c\n",
+        "outcome": "syntax"
+      },
+      {
+        "input": "// 😀\r\n",
+        "outcome": "syntax"
+      },
+      {
+        "input": "/* c */",
+        "outcome": "syntax"
+      },
+      {
+        "input": "knx",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "comment-none",
+    "note": "終端の先読みは matched だけ進む。COMMIT は CR/LF の手前の consumed 位置（#745）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S };\n  @autoCommit S ::= 'k' N;\n  N ::= 'n' | '\\n' 'n' | '\\r\\n' 'n' | '\\r' 'n';\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @whitespace: none\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S };\n  S ::= 'k' COMMIT(N);\n  N ::= 'n' | '\\n' 'n' | '\\r\\n' 'n' | '\\r' 'n';\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "// EOF",
+        "outcome": "success"
+      },
+      {
+        "input": "kn",
+        "outcome": "success"
+      },
+      {
+        "input": "kn// tail",
+        "outcome": "success"
+      },
+      {
+        "input": "k// c\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "k// c\rn",
+        "outcome": "success"
+      },
+      {
+        "input": "k// 😀\r\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "k// /* quote ' 😀\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "k",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k// EOF",
+        "outcome": "commit",
+        "offset": 7,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\nx",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\rx",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//😀\r\nx",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\r\n",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k n",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k/* c */n",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k/",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": " ",
+        "outcome": "syntax"
+      },
+      {
+        "input": "// c\n",
+        "outcome": "syntax"
+      },
+      {
+        "input": "// 😀\r\n",
+        "outcome": "syntax"
+      },
+      {
+        "input": "/* c */",
+        "outcome": "syntax"
+      },
+      {
+        "input": "knx",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "comment-only-whitespace-terminals",
+    "note": "空白・LF・CRLF は T₀ の外。終端として消費してから cut を入れる（#745）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S };\n  @autoCommit S ::= ' ' N | '\\n' N | '\\r\\n' N | 'k' N;\n  N ::= 'n';\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S };\n  S ::= ' ' COMMIT(N) | '\\n' COMMIT(N) | '\\r\\n' COMMIT(N) | 'k' COMMIT(N);\n  N ::= 'n';\n}\n",
+    "cases": [
+      {
+        "input": " n",
+        "outcome": "success"
+      },
+      {
+        "input": "\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "\r\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "//c\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "//😀\r\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "kn//tail",
+        "outcome": "success"
+      },
+      {
+        "input": " ",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "//c\nx",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "//😀\r\nx",
+        "outcome": "commit",
+        "offset": 5,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\nx",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "\t",
+        "outcome": "syntax"
+      },
+      {
+        "input": "/*c*/",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "comment-only-raw-slash",
+    "note": "素の / が行コメントの先頭を消費する反例。改行後の N を commit すると 1//c\\nkx を拒否してしまう（#745）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  token DIGIT = CHAR_RANGE('0','9')\n  @root @mapping(Doc) Root ::= { Item };\n  @autoCommit Item ::= DIGIT | '\\n' N | '/' | 'c' '\\n' 'k' 'x';\n  N ::= 'n';\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  token DIGIT = CHAR_RANGE('0','9')\n  @root @mapping(Doc) Root ::= { Item };\n  Item ::= DIGIT | '\\n' N | '/' | 'c' '\\n' 'k' 'x';\n  N ::= 'n';\n}\n",
+    "cases": [
+      {
+        "input": "1//c\nkx",
+        "outcome": "success"
+      },
+      {
+        "input": "1//c\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "\nn",
+        "outcome": "success"
+      },
+      {
+        "input": "1/",
+        "outcome": "success"
+      },
+      {
+        "input": "1// EOF",
+        "outcome": "syntax"
+      },
+      {
+        "input": "1//c\nx",
+        "outcome": "syntax"
+      },
+      {
+        "input": "\nx",
+        "outcome": "syntax"
+      }
+    ]
+  },
+  {
+    "name": "comment-only-newline-continuation",
+    "note": "コメントの MatchOnly 終端の CR / LF を外側の続き（{ T }）が消費する。続きの FIRST {LF, CR} は S の FIRST {k} と交わらないので挿入し、kn//c\\nk は受理のまま、k//c\\nk は消費位置4の確定エラーになる（#745 review）。",
+    "grammar": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S } { T };\n  @autoCommit S ::= 'k' N;\n  N ::= 'n';\n  T ::= '\\n' 'k' | '\\r' 'k';\n}\n",
+    "manual": "grammar Cut {\n  @package: cutprobe\n  @comment: { line: '//' }\n  @root @mapping(Doc) Root ::= { S } { T };\n  S ::= 'k' COMMIT(N);\n  N ::= 'n';\n  T ::= '\\n' 'k' | '\\r' 'k';\n}\n",
+    "cases": [
+      {
+        "input": "",
+        "outcome": "success"
+      },
+      {
+        "input": "kn",
+        "outcome": "success"
+      },
+      {
+        "input": "kn\nk",
+        "outcome": "success"
+      },
+      {
+        "input": "kn//c\nk",
+        "outcome": "success"
+      },
+      {
+        "input": "kn//c\rk",
+        "outcome": "success"
+      },
+      {
+        "input": "kn//c\nk\nk",
+        "outcome": "success"
+      },
+      {
+        "input": "kn//c\nk//d\rk",
+        "outcome": "success"
+      },
+      {
+        "input": "k//c\nk",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k\nk",
+        "outcome": "commit",
+        "offset": 1,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\nn",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "k//c\r\nk",
+        "outcome": "commit",
+        "offset": 4,
+        "message": "unexpected input"
+      },
+      {
+        "input": "kn//c\r\nk",
+        "outcome": "syntax"
+      },
+      {
+        "input": "kn//c\nkn",
+        "outcome": "syntax"
+      }
+    ]
   }
 ]

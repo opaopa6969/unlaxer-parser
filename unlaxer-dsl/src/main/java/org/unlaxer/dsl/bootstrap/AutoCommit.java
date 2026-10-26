@@ -34,7 +34,8 @@ import org.unlaxer.dsl.runtime.LexicalExpression;
  *
  * <p>Under the grammar-wide built-in {@code @whitespace: javaStyle} (#728) the same rules apply with
  * code points read after the trivia that sequence boundaries skip; terminals and tokens whose FIRST
- * meets a code point that can start trivia (a space or {@code /}) are not modelled.
+ * meets a code point that can start trivia are not modelled. Global {@code @comment} uses the
+ * same set with javaStyle, or just {@code /} when only line comments are skipped (#745).
  */
 public final class AutoCommit {
     private AutoCommit() {}
@@ -75,7 +76,7 @@ public final class AutoCommit {
     /**
      * An {@code @autoCommit} annotation that the frontend removes without inserting anything
      * because the analysis cannot apply to its rule. {@code span} is the annotation; {@code reason}
-     * is {@code grammar} (outside the analysed subset), {@code opaque} or {@code unreachable}.
+     * is {@code grammar}, a specific {@code comment-*} exclusion, {@code opaque} or {@code unreachable}.
      */
     public record Warning(String rule, Optional<Span> span, String reason) {
         public String code() { return SKIPPED; }
@@ -85,6 +86,9 @@ public final class AutoCommit {
         public String message() {
             String why = switch (reason) {
                 case "grammar" -> "the grammar is outside the analysed subset";
+                case "comment-setting" -> "@comment requires exactly one { line: '//' } setting without javaStyle";
+                case "comment-whitespace" -> "@comment with non-built-in whitespace is not modelled";
+                case "comment-rule-trivia" -> "@comment with rule-local trivia or lexical context is not modelled";
                 case "opaque" -> "the rule has an annotation the analysis does not model";
                 default -> "the rule is not reachable from the root";
             };
@@ -132,8 +136,10 @@ public final class AutoCommit {
             for (Annotation annotation : rule.annotations()) {
                 if (!(annotation instanceof SimpleAnnotation simple && simple.name().equals(ANNOTATION))) continue;
                 String reason;
-                if (analysis == null) reason = "grammar";
-                else if (analysis.opaque[index]) reason = "opaque";
+                if (analysis == null) {
+                    String commentReason = Analysis.commentSkipReason(grammar);
+                    reason = commentReason == null ? "grammar" : commentReason;
+                } else if (analysis.opaque[index]) reason = "opaque";
                 else if (!analysis.reachable[index]) reason = "unreachable";
                 else continue;
                 out.add(new Warning(rule.name(), snapshot == null ? Optional.empty() : snapshot.spanOf(annotation), reason));
@@ -440,12 +446,12 @@ public final class AutoCommit {
         /** FIRST per element node (by identity), once {@code table} is final. */
         final Map<AtomicElement, First> memo = new java.util.IdentityHashMap<>();
         boolean frozen;
-        /** The grammar skips javaStyle trivia at sequence boundaries (#728). */
-        final boolean trivia;
+        /** Code points that can start the grammar-wide trivia (#728, #745). */
+        final Chars triviaStart;
 
-        private Analysis(GrammarDecl grammar, boolean trivia) {
+        private Analysis(GrammarDecl grammar, Chars triviaStart) {
             this.grammar = grammar;
-            this.trivia = trivia;
+            this.triviaStart = triviaStart;
             table = new First[grammar.rules().size()];
             opaque = new boolean[grammar.rules().size()];
             reachable = new boolean[grammar.rules().size()];
@@ -453,7 +459,8 @@ public final class AutoCommit {
 
         /** {@code null} when the grammar is outside the modelled subset as a whole. */
         static Analysis create(GrammarDecl grammar) {
-            if (!grammar.settings().stream().allMatch(Analysis::plainSetting)) return null;
+            if (commentSkipReason(grammar) != null) return null;
+            if (!grammar.settings().stream().allMatch(s -> s.key().equals("comment") || plainSetting(s))) return null;
             boolean ruleTrivia = grammar.rules().stream().flatMap(r -> r.annotations().stream())
                 .anyMatch(a -> a instanceof WhitespaceAnnotation || a instanceof InterleaveAnnotation
                     || a instanceof LexicalContextAnnotation);
@@ -463,13 +470,13 @@ public final class AutoCommit {
                 if (grammar.rules().get(r).annotations().stream().anyMatch(RootAnnotation.class::isInstance)) roots.add(r);
             }
             if (roots.size() != 1) return null;
-            boolean spaced = grammar.settings().stream().anyMatch(setting -> setting.key().equals("whitespace")
-                && setting.value() instanceof StringSettingValue value && javaStyle(value.value()));
-            Analysis analysis = solve(grammar, spaced);
+            Chars triviaStart = hasJavaStyle(grammar) ? TRIVIA_START
+                : grammar.settings().stream().anyMatch(s -> s.key().equals("comment")) ? Chars.of('/') : Chars.NONE;
+            Analysis analysis = solve(grammar, triviaStart);
             // Left recursion is about the parser calling a rule again at the same position, so it
             // uses the FIRST sets of the input as written: a terminal that is unknown under trivia
             // (such as '/') still consumes (#728 review).
-            if ((spaced ? solve(grammar, false) : analysis).leftRecursive()) return null;
+            if ((!triviaStart.equals(Chars.NONE) ? solve(grammar, Chars.NONE) : analysis).leftRecursive()) return null;
             analysis.reach(roots.get(0));
             for (int index = 0; index < grammar.rules().size(); index++) {
                 if (analysis.reachable[index]) {
@@ -480,8 +487,8 @@ public final class AutoCommit {
         }
 
         /** Name tables and the least-fixpoint FIRST table, with or without the trivia rule. */
-        private static Analysis solve(GrammarDecl grammar, boolean trivia) {
-            Analysis analysis = new Analysis(grammar, trivia);
+        private static Analysis solve(GrammarDecl grammar, Chars triviaStart) {
+            Analysis analysis = new Analysis(grammar, triviaStart);
             for (int index = 0; index < grammar.rules().size(); index++) {
                 if (analysis.rules.putIfAbsent(grammar.rules().get(index).name(), index) != null) {
                     analysis.ambiguous.add(grammar.rules().get(index).name());
@@ -510,6 +517,28 @@ public final class AutoCommit {
             }
             analysis.frozen = true;
             return analysis;
+        }
+
+        static boolean hasJavaStyle(GrammarDecl grammar) {
+            return grammar.settings().stream().anyMatch(setting -> setting.key().equals("whitespace")
+                && setting.value() instanceof StringSettingValue value && javaStyle(value.value()));
+        }
+
+        /** Match the global comment contract (#712), without depending on the code generator. */
+        static String commentSkipReason(GrammarDecl grammar) {
+            var comments = grammar.settings().stream().filter(s -> s.key().equals("comment")).toList();
+            if (comments.isEmpty()) return null;
+            // javaStyle ignores even malformed/duplicate @comment; its validator still warns.
+            if (!hasJavaStyle(grammar) && (comments.size() != 1
+                || !(comments.get(0).value() instanceof BlockSettingValue block && block.entries().size() == 1
+                    && block.entries().get(0).key().equals("line") && block.entries().get(0).value().equals("//"))))
+                return "comment-setting";
+            if (grammar.settings().stream().anyMatch(s -> s.key().equals("whitespace") && !plainSetting(s)))
+                return "comment-whitespace";
+            if (grammar.rules().stream().flatMap(r -> r.annotations().stream())
+                .anyMatch(a -> a instanceof WhitespaceAnnotation || a instanceof InterleaveAnnotation
+                    || a instanceof LexicalContextAnnotation)) return "comment-rule-trivia";
+            return null;
         }
 
         /**
@@ -544,7 +573,7 @@ public final class AutoCommit {
          * would have skipped (docs/auto-commit.md, 空白のある文法).
          */
         First atom(First first) {
-            return trivia && !first.unknown() && first.chars().meets(TRIVIA_START) ? First.UNKNOWN : first;
+            return !first.unknown() && first.chars().meets(triviaStart) ? First.UNKNOWN : first;
         }
 
         /** Annotations that leave the rule's recognition as written; anything else makes it opaque. */
