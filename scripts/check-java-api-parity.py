@@ -2,6 +2,7 @@
 """Java 公開 parser 宣言と人が監査した Rust 対応表を照合する（JDK 21+、外部通信なし）。"""
 import argparse
 from collections import Counter
+import copy
 import json
 import os
 from pathlib import Path
@@ -20,6 +21,8 @@ RELATED = ("Name", "Parsed", "Token", "TokenKind", "TokenList", "TokenPredicator
 # 個別ファイル名で選ばず package 全体を走査し、新しい公開型の追加も検出する。
 PACKAGES = ("parser", "context", "capture", "reducer", "listener")
 BLANK_LINES = {"", "{", "}", "},", ")", ");", "*/", "/**"}
+EVIDENCE = ("code", "tests", "fixtures")
+IDENTIFIER = re.compile(r"\w")
 STATUSES = {"verified": "対応済み（記載した共通契約）", "uncorroborated": "対応あり・全API共通検証なし",
             "missing": "未対応（記載した動作）", "language-specific": "言語固有（移植境界あり）"}
 
@@ -53,10 +56,99 @@ def inventory(root, paths=None):
     return sorted(rows, key=lambda r: r["id"])
 
 
+def normalized(text):
+    return " ".join(text.split())
+
+
+def matches(text, anchor):
+    # 行頭からの一致に限り、識別子の途中で切れる一致（宣言名の延長・改名）は通さない。
+    text = normalized(text)
+    if not text.startswith(anchor):
+        return False
+    return len(text) == len(anchor) or not (IDENTIFIER.match(anchor[-1]) and IDENTIFIER.match(text[len(anchor)]))
+
+
+def indentation(text):
+    return len(text) - len(text.lstrip())
+
+
+def resolve(lines, anchor, scope=None):
+    """anchor が一意に一致する行番号を返す。scope があれば、その宣言の字下げブロック内だけを探す。"""
+    start, end = 0, len(lines)
+    if scope is not None:
+        heads = [index for index, text in enumerate(lines) if matches(text, scope)]
+        if len(heads) != 1:
+            raise ValueError(("scope が見つからない" if not heads else "scope が一意でない") + ": " + scope)
+        start = heads[0] + 1
+        depth = indentation(lines[heads[0]])
+        end = next((index for index in range(start, len(lines))
+                    if lines[index].strip() and indentation(lines[index]) <= depth), len(lines))
+    hits = [index + 1 for index in range(start, end) if matches(lines[index], anchor)]
+    if not hits:
+        raise ValueError("anchor が見つからない（宣言の改名・削除は再監査する）")
+    if len(hits) > 1:
+        # 先頭の一致へ黙って割り当てない。anchor を長くするか scope で宣言を絞る。
+        raise ValueError("anchor が一意でない: " + ", ".join(f"L{number}" for number in hits))
+    return hits[0]
+
+
+def locate(root, entry):
+    """行根拠 {location, anchor[, scope]} の現在の行番号を返す。"""
+    path = entry["location"].partition("#L")[0]
+    return resolve((root / path).read_text().splitlines(), entry["anchor"], entry.get("scope"))
+
+
+def well_formed(entry):
+    anchor, scope = entry.get("anchor"), entry.get("scope")
+    return (not set(entry) - {"location", "anchor", "scope"} and type(entry.get("location")) is str
+            and entry["location"].partition("#L")[2].isdigit()
+            and type(anchor) is str and normalized(anchor) == anchor and anchor not in BLANK_LINES
+            and (scope is None or type(scope) is str and normalized(scope) == scope and scope not in BLANK_LINES))
+
+
+def remap(root, data):
+    """anchor から行番号を引き直す。確認できない根拠が一つでもあれば、どの行番号も変えない。"""
+    data = copy.deepcopy(data)
+    changes, errors = [], []
+    for assessment in data["assessments"].values():
+        for key in EVIDENCE:
+            for entry in assessment.get(key, []):
+                if type(entry) is not dict or not well_formed(entry):
+                    continue
+                path, _, line = entry["location"].partition("#L")
+                try:
+                    found = locate(root, entry)
+                except (ValueError, OSError) as error:
+                    errors.append(f"根拠 anchor を確認できない: {entry['location']}（{error}）")
+                    continue
+                if found != int(line):
+                    changes.append(f"{entry['location']} → L{found}")
+                    entry["location"] = f"{path}#L{found}"
+    return data, changes, errors
+
+
+def dump(data):
+    """apis の各行と行根拠は1行に保ち、差分を宣言・根拠の単位で読めるようにする。"""
+    inline = []
+
+    def hold(value):
+        inline.append(json.dumps(value, ensure_ascii=False))
+        return f"\0{len(inline) - 1}\0"
+
+    data = copy.deepcopy(data)
+    data["apis"] = [hold(row) for row in data["apis"]]
+    for assessment in data["assessments"].values():
+        for key in EVIDENCE:
+            if key in assessment:
+                assessment[key] = [hold(entry) if type(entry) is dict else entry for entry in assessment[key]]
+    text = json.dumps(data, ensure_ascii=False, indent=2)
+    return re.sub(r'"\\u0000(\d+)\\u0000"', lambda match: inline[int(match[1])], text) + "\n"
+
+
 def validate(root, data, actual):
     errors = []
-    if data.get("schema_version") != 1:
-        errors.append("schema_version は 1 が必要")
+    if data.get("schema_version") != 2:
+        errors.append("schema_version は 2 が必要")
     expected = data["apis"]
     ids = [row["id"] for row in expected]
     if len(ids) != len(set(ids)):
@@ -93,23 +185,37 @@ def validate(root, data, actual):
             errors.append("対応済みの実装/共通検証根拠がない: " + name)
         if any(type(number) is not int or number <= 0 for number in assessment.get("issues", [])):
             errors.append("issue 番号が不正: " + name)
-        for key in ("code", "tests", "fixtures"):
-            for location in assessment.get(key, []):
-                path, _, anchor = location.partition("#L")
+        for key in EVIDENCE:
+            for entry in assessment.get(key, []):
+                location = entry.get("location", "") if type(entry) is dict else str(entry)
+                path = location.partition("#")[0]
                 target = root / path
                 if Path(path).is_absolute() or ".." in Path(path).parts or not target.is_file():
                     errors.append("根拠ファイルがない: " + location)
-                elif anchor and (not anchor.isdigit() or not 1 <= int(anchor) <= len(target.read_text().splitlines())):
-                    errors.append("根拠行番号が不正: " + location)
-                elif anchor and target.read_text().splitlines()[int(anchor) - 1].strip() in BLANK_LINES:
-                    # 行番号のずれで空行・閉じ括弧を指す根拠は、宣言を確かめていない。
-                    errors.append("根拠行が空行または括弧だけ: " + location)
+                elif type(entry) is not dict:
+                    if "#" in location:
+                        # 行番号だけの根拠は、参照先の行挿入・削除で別の宣言へ黙ってずれる（#859）。
+                        errors.append("行の根拠に anchor がない: " + location)
+                elif any(type(entry.get(key)) is str and entry[key] in BLANK_LINES for key in ("anchor", "scope")):
+                    # 空行・閉じ括弧はどの宣言にも一致し、宣言を確かめない。
+                    errors.append("根拠 anchor が空行または括弧だけ: " + location)
+                elif not well_formed(entry):
+                    errors.append("根拠 anchor の形式が不正: " + location)
+                else:
+                    try:
+                        found = locate(root, entry)
+                    except ValueError as error:
+                        errors.append(f"根拠 anchor を確認できない: {location}（{error}）")
+                        continue
+                    if found != int(location.partition("#L")[2]):
+                        errors.append(f"根拠行が anchor とずれた: {location} → L{found}（--remap で付け替える）")
     if not re.fullmatch(r"[0-9a-f]{40}", data.get("revision", "")):
         errors.append("基準 revision が不正")
     return errors
 
 
-def link(location):
+def link(entry):
+    location = entry["location"] if type(entry) is dict else entry
     return f"[{location}](../{location})"
 
 
@@ -121,10 +227,13 @@ def render(data, actual):
              "第1段は棚卸し・対応表・子 issue 分割。runtime の変更や全API parity の完了宣言ではない。", "",
              "## 列挙範囲と更新", "", *data["scope_notes"], "",
              "```sh", "python3 scripts/check-java-api-parity.py --list", "python3 scripts/check-java-api-parity.py",
-             "python3 scripts/check-java-api-parity.py --write-doc", "python3 -m pytest -q scripts/tests", "```", "",
+             "python3 scripts/check-java-api-parity.py --write-doc", "python3 scripts/check-java-api-parity.py --remap --write-doc",
+             "python3 -m pytest -q scripts/tests", "```", "",
              "JSON の apis は監査済み宣言の固定一覧。--write-doc は未登録宣言を自動承認せず失敗する。",
              "新しい公開型・static overload、削除、signature 変更は実ソースとの集合比較で失敗する。",
-             "line は現行ソースから表示し、宣言の移動だけでは API 変更としない。根拠は監査時のコード・既存テストであり、今回それらを再実行したという意味ではない。", "",
+             "line は現行ソースから表示し、宣言の移動だけでは API 変更としない。根拠は監査時のコード・既存テストであり、今回それらを再実行したという意味ではない。",
+             "行を指す根拠は location と anchor（その行の先頭の宣言文字列。識別子の途中では切らない）を持ち、anchor がファイル内、scope があればその宣言の字下げブロック内で一意に一致する行を指していなければ失敗する。",
+             "参照先の行の挿入・削除でずれたら --remap が anchor から行番号だけを付け替える。anchor が見つからない・複数行に一致する根拠が一つでもあれば何も書き換えず失敗し、宣言の改名・削除は人が再監査する。", "",
              "## 状態と追跡", "", "| 状態 | API 行数 |", "|---|---:|"]
     for status, label in STATUSES.items():
         lines.append(f"| {label} | {counts[status]} |")
@@ -169,6 +278,8 @@ def main():
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--write-doc", action="store_true")
+    parser.add_argument("--remap", action="store_true",
+                        help="anchor が一意に指す行へ根拠の行番号を付け替えて JSON を書き直す（判定・anchor は変えない）")
     args = parser.parse_args()
     try:
         actual = inventory(args.root.resolve())
@@ -176,6 +287,16 @@ def main():
             print(json.dumps(actual, ensure_ascii=False, indent=2))
             return 0
         data = json.loads((args.root / DATA).read_text())
+        if args.remap:
+            data, changes, errors = remap(args.root, data)
+            if errors:
+                for error in errors:
+                    print(error, file=sys.stderr)
+                return 1
+            for change in changes:
+                print("根拠行を付け替え: " + change, file=sys.stderr)
+            if changes:
+                (args.root / DATA).write_text(dump(data), encoding="utf-8")
         errors = validate(args.root, data, actual)
         if errors:
             for error in errors:
