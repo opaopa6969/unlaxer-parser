@@ -87,7 +87,25 @@ public class RustUbnfFrontendConformanceTest {
                 () -> UBNFMapper.parseWithSource(input));
             assertEquals(parts[0], javaError.getClass(), snapshotError.getClass());
             assertEquals(parts[0], javaError.getMessage(), snapshotError.getMessage());
-            if (POSITIONED_REJECTIONS.contains(parts[0])) {
+            if (parts[0].startsWith("non-ascii-")) {
+                // These must fail in grammar recognition, before any numeric conversion.
+                assertEquals(parts[0], IllegalArgumentException.class, javaError.getClass());
+                assertTrue(javaError.getMessage(), javaError.getMessage().startsWith("UBNF パース失敗"));
+                // The native lexer must stop at the first non-ASCII digit itself (CP offset).
+                int firstDigit = input.codePoints().boxed().toList().indexOf(input.codePoints()
+                    .filter(c -> c > '9' && Character.isDigit(c)).findFirst().orElseThrow());
+                assertEquals(parts[0] + " " + nativeResult, firstDigit,
+                    nativeResult.getAsJsonArray("span").get(2).getAsInt());
+                StringBuilder asciiDigits = new StringBuilder();
+                input.codePoints().forEach(c -> asciiDigits.appendCodePoint(
+                    c > '9' && Character.isDigit(c) ? '0' + Character.digit(c, 10) : c));
+                String ascii = asciiDigits.toString();
+                Files.writeString(source, ascii);
+                JsonObject nativeAscii = inspect(binary, source);
+                assertTrue(parts[0] + " " + nativeAscii, nativeAscii.has("ast"));
+                assertEquals(parts[0], canonical(UBNFMapper.parse(ascii)), nativeAscii.get("ast"));
+                report.add(parts[0] + "\treject\t" + javaError.getMessage() + "\t" + nativeResult);
+            } else if (POSITIONED_REJECTIONS.contains(parts[0])) {
                 String position = "line " + nativeResult.get("line").getAsInt()
                     + ", column " + nativeResult.get("column").getAsInt();
                 assertTrue(parts[0] + ": java=" + javaError.getMessage() + " rust=" + nativeResult,
