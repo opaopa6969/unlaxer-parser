@@ -16,9 +16,12 @@ PR_GROUP = '${{ github.workflow }}-${{ github.event.pull_request.number || githu
 PR_CANCEL = "${{ github.event_name == 'pull_request' }}"
 # Network steps that may fail once; the step after each of them repeats it and decides the job.
 RETRIED_ACTIONS = ('actions/configure-pages@', 'actions/deploy-pages@')
+# Also the spellings not used yet (npm install, rustup component add, cargo fetch without
+# --locked, playwright install --with-deps), so a new download step cannot skip the wrapper.
 NETWORK_COMMAND = re.compile(
-    r'\b(?:rustup\s+(?:toolchain\s+install|target\s+add)|'
-    r'cargo\s+(?:\+\S+\s+)?fetch\s+--locked|npm\s+ci|npx\s+playwright\s+install\s+chromium)\b')
+    r'\b(?:rustup\s+(?:toolchain\s+install|install|target\s+add|component\s+add)|'
+    r'cargo\s+(?:\+\S+\s+)?fetch|npm\s+(?:ci|clean-install|install|i)|'
+    r'npx\s+playwright\s+install)(?![\w-])')
 
 
 def workflows():
@@ -75,11 +78,16 @@ class NetworkRetryTest(unittest.TestCase):
                 own = [step.get('with', {}).get('path', '') for step in job.get('steps', [])
                        if str(step.get('uses', '')).startswith('actions/checkout@')
                        and 'repository' not in step.get('with', {})]
+                checked_out = False
                 for step in job.get('steps', []):
+                    if (str(step.get('uses', '')).startswith('actions/checkout@')
+                            and 'repository' not in step.get('with', {})):
+                        checked_out = True
                     script = step.get('run', '')
                     for command in NETWORK_COMMAND.finditer(script):
                         where = f'{name}:{job_name}: {step}'
                         self.assertEqual(len(own), 1, where)
+                        self.assertTrue(checked_out, f'wrapper used before checkout: {where}')
                         prefix = own[0] + '/' if own[0] else ''
                         wrapper = f'bash "$GITHUB_WORKSPACE/{prefix}scripts/ci/retry-network.sh" '
                         self.assertTrue(script[:command.start()].endswith(wrapper), where)

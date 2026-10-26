@@ -39,6 +39,21 @@ TRANSIENT = [
     'npm error code E503',
     "Download failed: server returned code 503 body 'unavailable'. URL: https://cdn.playwright.dev",
     'HTTP 500 Internal Server Error',
+    # Review of #830: real formats the first pattern set missed.
+    'npm error code ECONNREFUSED',
+    'npm error code ERR_SOCKET_TIMEOUT',
+    'npm error network request to https://registry.npmjs.org/x failed, reason: socket hang up',
+    'connect ENETUNREACH 104.16.0.35:443',
+    "[7] Couldn't connect to server (Failed to connect to index.crates.io port 443)",
+    '[56] Failure when receiving data from the peer (Recv failure: Connection reset by peer)',
+    '[55] Failed sending data to the peer (Connection died, tried 5 times before giving up)',
+    '[52] Server returned nothing (no headers, no data)',
+    '[18] Transferred a partial file',
+    '[16] Error in the HTTP2 framing layer',
+    'error decoding response body: connection closed before message completed',
+    'tcp connect error: Connection refused (os error 111)',
+    'dns error: failed to lookup address information: Name or service not known',
+    'Error: Download failed: server closed connection. URL: https://cdn.playwright.dev/x.zip',
 ]
 PERMANENT = [
     'npm error code EUSAGE: package.json and package-lock.json are not in sync',
@@ -136,6 +151,25 @@ sys.exit(code)
         result = self.run_wrapper([(7, 'ECONNRESET'), (41, 'lockfile mismatch')])
         self.assertEqual(result.returncode, 41)
         self.assertEqual(self.attempts(), 2)
+
+    def test_recovered_retry_warning_does_not_retry_a_later_permanent_failure(self):
+        message = ('warning: spurious network error (2 tries remaining): [28] Timeout was reached\n'
+                   'error: the lock file needs to be updated but --locked was passed')
+        result = self.run_wrapper([(101, message)])
+        self.assertEqual(result.returncode, 101)
+        self.assertEqual(self.attempts(), 1)
+
+    def test_only_the_end_of_the_output_is_classified(self):
+        old = 'npm warn ECONNRESET, recovered\n' + 'progress\n' * 60 + 'npm error code EUSAGE'
+        result = self.run_wrapper([(1, old)])
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.attempts(), 1)
+        # A large log is kept in full on the console, and a final diagnostic still counts.
+        noisy = 'progress line\n' * 5000 + 'npm error code ECONNRESET'
+        result = self.run_wrapper([(1, noisy), (0, 'complete')])
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(self.attempts(), 2)
+        self.assertEqual(result.stdout.count('progress line'), 5000)
 
     def test_success_never_retries_even_if_output_mentions_a_network_error(self):
         result = self.run_wrapper([(0, 'recovered from ECONNRESET')])
