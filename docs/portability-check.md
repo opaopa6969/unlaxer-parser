@@ -43,9 +43,13 @@ java -cp "unlaxer-dsl/target/classes:$(tr -d '\n' < unlaxer-dsl/target/rust-clas
   も読む。文字列 API と format 1 の inventory は import 先を開かない。外部 parser class の探索・初期化、
   生成、コンパイル、対象コードの実行、subprocess 起動は行わない。
   Java は class 探索を除いた共通 validator を使う。native CLI は空の `PATH` でも動く。
-- module 解決エラーは `P-MODULE`（終了 3）。複数ファイルを解決した後の診断は `span: null` とする。
-  schemaVersion 1 の単一ファイル offset を別ファイルの位置として返さない。ファイルごとの
-  元の構文位置が必要な場合は文字列 API を使う。独立 grammar の診断まで null 化・dedup される制限と複数ソース provenance は [#776](https://github.com/opaopa6969/unlaxer-parser/issues/776) で追跡する。
+- module 解決エラーは `P-MODULE`（終了 3）。解決後も、診断対象の node が root ソース由来なら
+  元の Unicode CP 範囲を保持する（#776）。import を持つ grammar の作り直された node と、
+  import と無関係な grammar の node の両方が対象。import 由来の合成 token や出典不明の
+  node は `span: null` とし、import 先の offset や呼び出し側の参照位置を借用しない。
+  `P-STRUCTURE` は診断対象が root の grammar 宣言なので、その宣言の範囲を返す。
+  schemaVersion 1 と既存フィールドを維持し、source 識別子は追加しない。root と位置不明の
+  出典区分は内部で管理する。import 先のファイル名・位置の出力は引き続き未対応。
 
 | 終了コード | stdout | stderr |
 |---|---|---|
@@ -79,7 +83,9 @@ LF/CRLF は元入力のまま数え、escape 復号後の長さから逆算し�
 範囲を使う。元位置は [source snapshot](ubnf-source-snapshot.md) から取得する。
 
 順序は `(start, end, code, subject)`、位置不明は末尾。同じ code・範囲・subject の重複だけを
-取り除く。同じ内容が別位置に出現した場合は両方残す。
+取り除く。同じ内容が別位置・別 grammar に出現した場合は両方残す。位置付きの root 診断と
+`span: null` の診断も別件とする。import 由来・出典不明でともに null の同じ code/subject は
+従来どおり一件にまとめる。import のない単一ファイルの出力・件数・順序は変えない。
 JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等の escape 表現の byte 一致は
 要求しない。同じ host・同じ入力の出力は決定的。
 
@@ -162,6 +168,10 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
 18 件の未対応機能を持つ入力、同値の複数出現、Unicode、複数 grammar、構文/構造失敗、
 同一 precedence の左右混在を検査する。13 fixture、5 種類の alias chain、2 種類の括弧の入れ子を
 LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・終了コード一致を残す。
+`imports.json` は Imported + One + Two、複数 import・同じ module の再利用・ネストした import、
+同じ code/subject の root 出現と null 出現、作り直された rule/element、解決失敗と成功を固定する。
+非 BMP 文字を含む8ケースを LF/CRLF で読み、両 host の JSON 全体を固定期待値（配列順・件数・CP 範囲を含む）と照合し、
+`target/rust-portability-imports.tsv` に16ケースの証拠を残す。native の workspace test も同じ fixture を使う。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
 native CLI は `PATH=''` で実行し、入力・手書きファイルが変更されないことも確認する。
 

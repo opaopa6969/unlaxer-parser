@@ -46,4 +46,28 @@ public class UBNFModuleLoaderTest {
             assertFalse(fixture.get("name").getAsString(), PortabilityCheck.checkFile(directory.resolve("root.ubnf")).portable());
         }
     }
+
+    @Test public void linkingCopiesRootOriginsWithoutMutatingTheOriginalSnapshot() throws Exception {
+        Path root = temporary.getRoot().toPath().resolve("main.ubnf");
+        Files.writeString(root.resolveSibling("part.ubnf"),
+            "grammar Part { @ubnf: v2 token X ::= 'x'; }");
+        String source = "// 😀\r\ngrammar Main { @import part from 'part.ubnf' @ubnf: v2 "
+            + "@root @mapping(Value,params=[text]) Root ::= part.X @text; }";
+        var original = UBNFMapper.parseWithSource(source);
+        var linked = UBNFModuleLoader.resolveWithSource(original, root, Files::readString);
+        var grammar = linked.ast().grammars().get(0);
+        var rule = grammar.rules().get(0);
+        var element = ((UBNFAST.ChoiceBody) rule.body()).alternatives().get(0).elements().get(0);
+        var oldRule = original.ast().grammars().get(0).rules().get(0);
+        var oldElement = ((UBNFAST.ChoiceBody) oldRule.body()).alternatives().get(0).elements().get(0);
+        assertEquals(original.spanOf(original.ast()), linked.spanOf(linked.ast()));
+        assertEquals(original.spanOf(oldRule), linked.spanOf(rule));
+        assertEquals(original.captureSpan(oldElement), linked.captureSpan(element));
+        assertEquals("part.X", linked.sourceOf(element.element()).orElseThrow());
+        assertTrue(linked.spanOf(grammar.tokens().get(0)).isEmpty());
+        assertTrue(original.spanOf(grammar).isEmpty());
+        assertEquals(1, original.ast().grammars().get(0).imports().size());
+        assertTrue(original.ast().grammars().get(0).tokens().isEmpty());
+        assertEquals(source, linked.source());
+    }
 }

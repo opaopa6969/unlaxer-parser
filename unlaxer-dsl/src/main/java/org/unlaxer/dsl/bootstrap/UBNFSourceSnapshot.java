@@ -76,6 +76,12 @@ public final class UBNFSourceSnapshot {
 
         Builder(String source) { this.source = source; }
 
+        Builder(UBNFSourceSnapshot snapshot) {
+            source = snapshot.source;
+            origins.putAll(snapshot.origins);
+            captures.putAll(snapshot.captures);
+        }
+
         <T> T bind(T node, Token token) {
             tokenSpan(token).ifPresent(span -> origins.putIfAbsent(node, new Origin(span, Kind.SOURCE)));
             return node;
@@ -91,6 +97,10 @@ public final class UBNFSourceSnapshot {
         <T> T copy(T node, Object from) {
             Origin origin = origins.get(from);
             if (origin != null) origins.put(node, origin);
+            if (node instanceof AnnotatedElement target && from instanceof AnnotatedElement owner) {
+                Span capture = captures.get(owner);
+                if (capture != null) captures.put(target, capture);
+            }
             return node;
         }
 

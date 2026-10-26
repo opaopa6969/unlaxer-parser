@@ -24,8 +24,17 @@ public final class UBNFModuleLoader {
     private final UBNFPackageResolver packages;
     private final Map<Path, Map<String, LexicalExpression>> modules = new LinkedHashMap<>();
     private final Set<Path> stack = new java.util.LinkedHashSet<>();
+    private final UBNFSourceSnapshot.Builder origins;
 
-    private UBNFModuleLoader(UBNFPackageResolver packages) { this.packages = packages; this.reader = packages::read; }
+    private UBNFModuleLoader(UBNFPackageResolver packages, UBNFSourceSnapshot.Builder origins) {
+        this.packages = packages;
+        this.reader = packages::read;
+        this.origins = origins;
+    }
+
+    private <T> T origin(T node, Object from) {
+        return origins == null ? node : origins.copy(node, from);
+    }
 
     public static UBNFFile load(Path path) throws IOException {
         return resolve(UBNFMapper.parse(Files.readString(path)), path, Files::readString);
@@ -40,6 +49,15 @@ public final class UBNFModuleLoader {
         return resolve(snapshot.ast(), path, new UBNFPackageResolver(path, reader), snapshot);
     }
 
+    /** Retain root node identities through linking, without assigning origins to imported tokens. */
+    public static UBNFSourceSnapshot resolveWithSource(UBNFSourceSnapshot snapshot, Path path,
+            SourceReader reader) throws IOException {
+        var origins = new UBNFSourceSnapshot.Builder(snapshot);
+        var file = resolve(snapshot.ast(), path, new UBNFPackageResolver(path, reader), snapshot, origins);
+        origins.copy(file, snapshot.ast());
+        return new UBNFSourceSnapshot(file, origins);
+    }
+
     /** Explicit root selection; imported modules still export declarative tokens only. */
     public static UBNFFile resolve(UBNFFile file, Path path, UBNFPackageResolver packages) throws IOException {
         return resolve(file, path, packages, null);
@@ -47,7 +65,12 @@ public final class UBNFModuleLoader {
 
     private static UBNFFile resolve(UBNFFile file, Path path, UBNFPackageResolver packages,
             UBNFSourceSnapshot snapshot) throws IOException {
-        var loader = new UBNFModuleLoader(packages);
+        return resolve(file, path, packages, snapshot, null);
+    }
+
+    private static UBNFFile resolve(UBNFFile file, Path path, UBNFPackageResolver packages,
+            UBNFSourceSnapshot snapshot, UBNFSourceSnapshot.Builder origins) throws IOException {
+        var loader = new UBNFModuleLoader(packages, origins);
         path = path.toAbsolutePath().normalize();
         loader.stack.add(path);
         var grammars = new ArrayList<GrammarDecl>();
@@ -104,7 +127,7 @@ public final class UBNFModuleLoader {
         var tokens = new ArrayList<TokenDecl>();
         for (var token : grammar.tokens()) {
             tokens.add(token instanceof TokenDecl.Declarative lexical
-                ? new TokenDecl.Declarative(token.name(), externalRefs(lexical.expression(), imported)) : token);
+                ? origin(new TokenDecl.Declarative(token.name(), externalRefs(lexical.expression(), imported)), token) : token);
         }
         var used = new HashSet<String>();
         grammar.tokens().forEach(t -> used.add(t.name()));
@@ -113,20 +136,21 @@ public final class UBNFModuleLoader {
         var settings = new ArrayList<GlobalSetting>();
         for (var setting : grammar.settings()) {
             settings.add(setting.key().equals("whitespace") && setting.value() instanceof StringSettingValue value
-                ? new GlobalSetting(setting.key(), new StringSettingValue(policy(value.value(), imported, tokens, used, synthetic))) : setting);
+                ? origin(new GlobalSetting(setting.key(), origin(new StringSettingValue(
+                    policy(value.value(), imported, tokens, used, synthetic)), value)), setting) : setting);
         }
         var rules = new ArrayList<RuleDecl>();
         for (var rule : grammar.rules()) {
             var annotations = new ArrayList<Annotation>();
             for (var annotation : rule.annotations()) {
                 if (annotation instanceof LexicalContextAnnotation value) {
-                    annotations.add(new LexicalContextAnnotation(value.tokens().stream().map(name -> policy(name, imported, tokens, used, synthetic)).toList(), value.literals()));
+                    annotations.add(origin(new LexicalContextAnnotation(value.tokens().stream().map(name -> policy(name, imported, tokens, used, synthetic)).toList(), value.literals()), annotation));
                 } else annotations.add(annotation instanceof WhitespaceAnnotation value
-                    && value.style().isPresent() ? new WhitespaceAnnotation(java.util.Optional.of(policy(value.style().get(), imported, tokens, used, synthetic))) : annotation);
+                    && value.style().isPresent() ? origin(new WhitespaceAnnotation(java.util.Optional.of(policy(value.style().get(), imported, tokens, used, synthetic))), annotation) : annotation);
             }
-            rules.add(new RuleDecl(annotations, rule.name(), body(rule.body(), imported, tokens, used, synthetic)));
+            rules.add(origin(new RuleDecl(annotations, rule.name(), body(rule.body(), imported, tokens, used, synthetic)), rule));
         }
-        return new GrammarDecl(grammar.name(), List.of(), settings, tokens, rules);
+        return origin(new GrammarDecl(grammar.name(), List.of(), settings, tokens, rules), grammar);
     }
 
     private String policy(String style, Map<String, LexicalExpression> imported, List<TokenDecl> tokens,
@@ -150,14 +174,19 @@ public final class UBNFModuleLoader {
 
     private RuleBody body(RuleBody value, Map<String, LexicalExpression> imported, List<TokenDecl> tokens,
             Set<String> used, Map<String, String> synthetic) {
-        if (value instanceof ChoiceBody choice) return new ChoiceBody(choice.alternatives().stream()
-            .map(s -> (SequenceBody) body(s, imported, tokens, used, synthetic)).toList());
-        return new SequenceBody(((SequenceBody) value).elements().stream().map(item ->
-            new AnnotatedElement(atom(item.element(), imported, tokens, used, synthetic),
-                item.captureName(), item.typeofConstraint())).toList());
+        if (value instanceof ChoiceBody choice) return origin(new ChoiceBody(choice.alternatives().stream()
+            .map(s -> (SequenceBody) body(s, imported, tokens, used, synthetic)).toList()), value);
+        return origin(new SequenceBody(((SequenceBody) value).elements().stream().map(item ->
+            origin(new AnnotatedElement(atom(item.element(), imported, tokens, used, synthetic),
+                item.captureName(), item.typeofConstraint()), item)).toList()), value);
     }
 
     private AtomicElement atom(AtomicElement value, Map<String, LexicalExpression> imported, List<TokenDecl> tokens,
+            Set<String> used, Map<String, String> synthetic) {
+        return origin(linkAtom(value, imported, tokens, used, synthetic), value);
+    }
+
+    private AtomicElement linkAtom(AtomicElement value, Map<String, LexicalExpression> imported, List<TokenDecl> tokens,
             Set<String> used, Map<String, String> synthetic) {
         if (value instanceof RuleRefElement ref && ref.namespace().isPresent()) {
             String qualified = ref.namespace().get() + "." + ref.name();
@@ -183,8 +212,8 @@ public final class UBNFModuleLoader {
             return new UBNFAST.LabelElement(label.label(), body(label.body(), imported, tokens, used, synthetic));
         if (value instanceof UBNFAST.CatchElement caught)
             return new UBNFAST.CatchElement(
-                new GroupElement(body(caught.child().body(), imported, tokens, used, synthetic)),
-                new GroupElement(body(caught.alternative().body(), imported, tokens, used, synthetic)),
+                origin(new GroupElement(body(caught.child().body(), imported, tokens, used, synthetic)), caught.child()),
+                origin(new GroupElement(body(caught.alternative().body(), imported, tokens, used, synthetic)), caught.alternative()),
                 caught.labels());
         if (value instanceof GroupElement group)
             return new GroupElement(body(group.body(), imported, tokens, used, synthetic));
