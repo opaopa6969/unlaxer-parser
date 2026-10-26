@@ -1,0 +1,7 @@
+grammar ChainReset {
+    @package: chainreset
+    @ubnf: v2
+    @whitespace: none
+    @root @lexicalContext(tokens=[], literals=['a','z']) @mapping(Node)
+    Root ::= 'a' 'z';
+}

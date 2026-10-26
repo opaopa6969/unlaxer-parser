@@ -1,0 +1,6 @@
+grammar ChainReset {
+    @package: chainreset
+    @whitespace: none
+    @root @mapping(Node, params=[tag]) @backref(name=tag)
+    Root ::= 'a' @tag 'z' 'a' @tag;
+}

@@ -1196,7 +1196,8 @@ struct FailureDiagnostic {
     classic_max_reached: Option<usize>,
     // Historical name: any syntax failure (Classic or native) overrides a success watermark.
     classic_failure_seen: bool,
-    classic_failure_end: Option<(usize, MatchCursorPolicy)>,
+    // Only failure memo entries: replay owner policy even outside Classic mode (#809).
+    failure_end: Option<(usize, MatchCursorPolicy)>,
     // Only failure memo entries set this: an ordinary (None) versus raised failure (#700).
     raised: Option<Rc<rule_stack::RaisedMemo>>,
     // Selected failed rule invocation inside this frame (#703), absolute; detailed only.
@@ -3093,11 +3094,20 @@ impl<'a> ParseContext<'a> {
     fn memoized_rule(&mut self, id: usize, depth: usize) -> Option<usize> {
         // Java's Chain disables matched-cursor reset before memo lookup. expression()
         // does the same for every Chain counterpart, but waiting until a miss gives
-        // (!Num 'x') | Num two different keys (#794). Metadata adds no parser frame.
+        // (!Num 'x') | Num two different keys (#794). Metadata, lexical policy scopes,
+        // rule effects, back-reference checks and COMMIT/LABEL add no parser frame (#809).
         // Rule/expression depth guards stay intact.
         let parent_reset = self.match_cursor_policy.reset;
         let mut expression = &self.rules[id].expression;
-        while let Expr::MetadataCapture(_, child) = expression {
+        while let Expr::MetadataCapture(_, child)
+        | Expr::TriviaScope { child, .. }
+        | Expr::LexicalTriviaScope { child, .. }
+        | Expr::LexicalContextScope { child, .. }
+        | Expr::RuleEffects { child, .. }
+        | Expr::CaptureEquality { child, .. }
+        | Expr::Commit { child, .. }
+        | Expr::Label { child, .. } = expression
+        {
             expression = child;
         }
         if java_chain_disables_owner_reset(expression) {
@@ -3118,10 +3128,6 @@ impl<'a> ParseContext<'a> {
         .with_state_version(self.scopes.memo_version().expect("memo version checked"));
         let position = self.code_point(self.position);
         if let Some(result) = self.probe_rule_memo(position, &key) {
-            if result.is_none() && self.token_mode.is_none() {
-                // A replayed failure leaves the policy as the evaluation below does.
-                self.match_cursor_policy.reset = parent_reset;
-            }
             return result;
         }
         let success = self.token_trace.is_none();
@@ -3147,9 +3153,9 @@ impl<'a> ParseContext<'a> {
         };
         let result = self.execute_rule(id, depth);
         self.finish_rule_memo(call, result);
-        // Without memo the failed Chain restores its owner's policy outside Classic token
-        // mode, and on a resource failure (expression()); keep memo transparent there.
-        if result.is_none() && (self.token_mode.is_none() || self.resource_failure.is_some()) {
+        // Ordinary Chain failure retains the owner's false policy in both modes (#809).
+        // Resource failure still restores the state from before lookup normalization.
+        if result.is_none() && self.resource_failure.is_some() {
             self.match_cursor_policy.reset = parent_reset;
         }
         result
@@ -3171,7 +3177,7 @@ impl<'a> ParseContext<'a> {
                 self.rule_stacks.raised.clear();
                 self.rule_stacks.raised.extend_from_slice(&raised.rules);
             }
-            if let Some((matched, policy)) = diagnostic.classic_failure_end {
+            if let Some((matched, policy)) = diagnostic.failure_end {
                 self.matched_position = matched;
                 self.match_cursor_policy = policy;
             }
@@ -3203,9 +3209,8 @@ impl<'a> ParseContext<'a> {
         } else {
             FailureDiagnostic::default()
         };
-        if result.is_none() && self.token_mode.is_some() {
-            diagnostic.classic_failure_end =
-                Some((self.matched_position, self.match_cursor_policy));
+        if result.is_none() {
+            diagnostic.failure_end = Some((self.matched_position, self.match_cursor_policy));
         }
         // Resource exhaustion and epoch exhaustion are never cacheable failures.
         if self.resource_failure.is_none() && self.scopes.memo_version().is_some() {
@@ -3460,8 +3465,8 @@ impl<'a> ParseContext<'a> {
         }
         let checkpoint = self.checkpoint();
         let parent_policy = self.match_cursor_policy;
-        // Chain sets the policy before beginning its own transaction, so a successful
-        // Sequence changes the policy for following siblings in the same owner.
+        // Chain sets the policy before beginning its own transaction, so a Sequence
+        // changes the policy for following siblings even when it fails (#809).
         // These built-in lexical parsers are also Chain implementations in Java.
         if java_chain_disables_owner_reset(expression) {
             self.match_cursor_policy.reset = false;
@@ -3712,6 +3717,7 @@ impl<'a> ParseContext<'a> {
             let transparent = self.token_mode.is_some()
                 && matches!(expression, Expr::StopConsume(_) | Expr::StopInvert(_));
             let failed_matched = self.matched_position;
+            let failed_reset = self.match_cursor_policy.reset;
             self.restore(checkpoint);
             if self.resource_failure.is_none() {
                 // Group/choice parsers have frames even without a rule invocation (#793).
@@ -3739,8 +3745,25 @@ impl<'a> ParseContext<'a> {
                 // Java Chain sets this on its owner before beginning the local
                 // transaction, so syntax failure retains it until an enclosing
                 // transaction rolls back. Resource failures keep full rollback.
-                if self.token_mode.is_some() && java_chain_disables_owner_reset(expression) {
+                if java_chain_disables_owner_reset(expression) {
                     self.match_cursor_policy.reset = false;
+                } else if self.token_mode.is_none()
+                    && matches!(
+                        expression,
+                        Expr::Rule(_)
+                            | Expr::TriviaScope { .. }
+                            | Expr::LexicalTriviaScope { .. }
+                            | Expr::LexicalContextScope { .. }
+                            | Expr::RuleEffects { .. }
+                            | Expr::CaptureEquality { .. }
+                            | Expr::Commit { .. }
+                            | Expr::Label { .. }
+                    )
+                {
+                    // Rule references, lexical policies, rule effects (@scopeTree /
+                    // @declares), @backref and Java Commit / Label call their child in the
+                    // owner's transaction: none of them begins a Java transaction.
+                    self.match_cursor_policy.reset = failed_reset;
                 }
                 if self.token_mode.is_some()
                     && (classic_collector_label(expression).is_some()
@@ -3861,6 +3884,7 @@ impl<'a> ParseContext<'a> {
                     continue;
                 }
                 let child_start = self.position;
+                let candidate_reset = self.match_cursor_policy.reset;
                 let checkpoint = self
                     .token_mode
                     .is_some()
@@ -3878,6 +3902,8 @@ impl<'a> ParseContext<'a> {
                     break;
                 }
                 self.finish_classic_candidate(checkpoint, false);
+                // Java rolls back the candidate owner, including a failed Chain's flag.
+                self.match_cursor_policy.reset = candidate_reset;
                 if self.resource_failure.is_some() || self.raised.is_some() {
                     return None;
                 }
@@ -4500,6 +4526,7 @@ impl<'a> ParseContext<'a> {
             } => {
                 let start = self.position;
                 let count = self.nodes.len();
+                let candidate_reset = self.match_cursor_policy.reset;
                 let checkpoint = self
                     .token_mode
                     .is_some()
@@ -4509,6 +4536,7 @@ impl<'a> ParseContext<'a> {
                     return Some(fragment);
                 }
                 self.finish_classic_candidate(checkpoint, false);
+                self.match_cursor_policy.reset = candidate_reset;
                 self.position = start;
                 self.nodes.truncate(count);
                 let caught = self.raised.is_some_and(|raised| {
@@ -5233,6 +5261,7 @@ impl<'a> ParseContext<'a> {
             if self.excludes(alternative, depth) {
                 continue;
             }
+            let candidate_reset = self.match_cursor_policy.reset;
             let checkpoint = self
                 .token_mode
                 .is_some()
@@ -5245,6 +5274,7 @@ impl<'a> ParseContext<'a> {
                 return Some(fragment);
             }
             self.finish_classic_candidate(checkpoint, false);
+            self.match_cursor_policy.reset = candidate_reset;
             self.position = start;
             self.nodes.truncate(count);
             // A committed or labeled failure is not caught by an ordinary choice (#700).
@@ -7212,9 +7242,48 @@ mod tests {
                 let (off, _) = observe(Memoization::Off);
                 let (memo, hits) = observe(Memoization::SafeFailures);
                 assert_eq!(memo, off, "{input}/{rule}/{token_mode:?}");
+                assert!(
+                    off.iter().all(|row| !row.3),
+                    "{input}/{rule}/{token_mode:?}"
+                );
                 if !off[0].0 {
                     assert_eq!(hits, 2, "{input}/{rule}/{token_mode:?}");
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn native_failure_memo_replays_policy_through_rule_references() {
+        let grammar = share_grammar(vec![
+            Rule {
+                name: "alias",
+                expression: Expr::Rule(1),
+            },
+            Rule {
+                name: "chain",
+                expression: Expr::Sequence(vec![Expr::Literal("z")]),
+            },
+        ]);
+        for memo in [Memoization::Off, Memoization::SafeFailures] {
+            let mut context =
+                ParseContext::with_options("ab", ParseOptions::with_memoization(memo));
+            context.rules = Arc::clone(&grammar);
+            context.memo_safe_rules = memo_safe_rules(&grammar);
+            context.matched_position = 1;
+            for expected_hits in 0..3 {
+                context.match_cursor_policy.reset = true;
+                assert!(context.expression(&Expr::Rule(0), 0).is_none());
+                assert!(!context.match_cursor_policy.reset);
+                assert_eq!((context.position, context.matched_position), (0, 1));
+                assert_eq!(
+                    context.memoized_failure_hits(),
+                    if memo == Memoization::Off {
+                        0
+                    } else {
+                        expected_hits
+                    }
+                );
             }
         }
     }

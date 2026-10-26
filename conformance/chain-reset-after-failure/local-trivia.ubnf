@@ -1,0 +1,6 @@
+grammar ChainReset {
+    @package: chainreset
+    @whitespace: none
+    @root @whitespace(none) @mapping(Node)
+    Root ::= 'a' 'z';
+}
