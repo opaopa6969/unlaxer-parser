@@ -116,6 +116,8 @@ public class LineBoundaryConformanceTest {
                                     Integer.toString(failure.getFarthestOffset()), Boolean.toString(!failure.getExpectedTokens().isEmpty()),
                                     forest(tokens, false), forest(tokens, true));
                             var expected = new ArrayList<>(List.of(c).subList(9, 16));
+                            // 末尾列は Java の既知欠陥 #861（FIRST 除外が reset 前の cursor を読む）の現状値。
+                            // Rust はこの列を使わない。#861 の修正時に列を除き、主の期待値へ戻す。
                             if (diagnostics == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) { expected.set(3, "0"); expected.set(4, "false"); if (!c[16].equals("~")) expected = new ArrayList<>(List.of(c[16].split("\\|", -1))); }
                             if (!expected.equals(actual)) failures.add(label + "\nexpected " + expected + "\nactual   " + actual);
                             assertEquals(label, 9, state.value);
@@ -258,6 +260,32 @@ public class LineBoundaryConformanceTest {
                         assertEquals(row, Integer.parseInt(c[4]), context.getMatchedPosition().value());
                     }
         }
+    }
+
+    /** 既存 Repeat による最も近い候補との差を、Java 側の観測として固定する（#846 依存の根拠）。 */
+    @Test public void charClassRepeatMatchesConsumedButNotVirtualTerminatorCommit() throws Exception {
+        int rows = 0;
+        for (String row : Files.readAllLines(ROOT.resolve("conformance/line-boundary/char-class.tsv"))) {
+            if (row.startsWith("#") || row.isBlank()) continue;
+            String[] c = row.split("\t", -1);
+            assertEquals(row, 12, c.length);
+            rows++;
+            for (Memoization memo : List.of(Memoization.OFF, Memoization.SAFE_FAILURES))
+                for (ParseOptions.Diagnostics diagnostics : ParseOptions.Diagnostics.values())
+                    try (var context = ParseContext.withOptions(StringSource.createRootSource(decode(c[2])),
+                            ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                        Parser parser = c[0].equals("empty") ? new EmptyLineParser() : new WildCardLineParser();
+                        Parsed result = parser.parse(context, TokenKind.valueOf(c[1]), false);
+                        assertEquals(row, Boolean.parseBoolean(c[3]), result.isSucceeded());
+                        assertEquals(row, Integer.parseInt(c[4]), context.getConsumedPosition().value());
+                        assertEquals(row, Integer.parseInt(c[5]), context.getMatchedPosition().value());
+                        assertEquals(row, diagnostics == ParseOptions.Diagnostics.DETAILED_ON_FAILURE ? 0 : Integer.parseInt(c[6]),
+                                context.getParseFailureDiagnostics().getFarthestOffset());
+                        if (!c[11].equals("-")) assertEquals(row, c[11], forest(context.getCurrent().getTokens(), false));
+                        assertEquals(1, context.getTokenStack().size());
+                    }
+        }
+        assertEquals(10, rows);
     }
 
     @Test public void rustPublicApiExecutesTheSameIndependentOracle() throws Exception {

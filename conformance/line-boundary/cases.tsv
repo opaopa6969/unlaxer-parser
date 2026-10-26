@@ -1,4 +1,4 @@
-# id	input-utf8-hex	parser	kind	invert	consumed	matched	reset	scenario	accepted	consumed-after	matched-after	farthest-CP	expected-present	original-CST	reduced-CST	deferred-observation
+# id	input-utf8-hex	parser	kind	invert	consumed	matched	reset	scenario	accepted	consumed-after	matched-after	farthest-CP	expected-present	original-CST	reduced-CST	java-deferred-defect
 bol-0-consumed-0-0	~	bol	consumed	false	0	0	false	direct	true	0	0	0	false	~	~	~
 bol-0-consumed-0-1	~	bol	consumed	false	0	0	true	direct	true	0	0	0	false	~	~	~
 bol-0-consumed-1-0	~	bol	consumed	true	0	0	false	direct	false	0	0	0	false	~	~	~

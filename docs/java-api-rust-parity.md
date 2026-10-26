@@ -212,15 +212,15 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 ### line-composition
 
-**対応あり・全API共通検証なし**。EmptyLineParser / WildCardLineParser は任意terminator付き反復に依存し未完了（#846）。guard付きRepeatは通常の受理/cursorを再現するがbodyごとのChainが原CSTへ増える。terminator-first ChoiceのRepeatはmatchOnlyで終端成功後も反復し、Javaと成否/cursorが異なる。独立した2つの反例corpusを両言語で実行した。4型の完了でこの2型や#848をcloseしない。
+**対応あり・全API共通検証なし**。EmptyLineParser / WildCardLineParser は任意terminator付き反復に依存し未完了（#846）。guard付きRepeatは通常の受理/cursorを再現するがbodyごとのChainが原CSTへ増える。terminator-first ChoiceのRepeatはmatchOnlyで終端成功後も反復し、Javaと成否/cursorが異なる。CR/LFを外した文字クラスのRepeatはconsumed/matchOnlyの受理・cursor・原CSTまで揃うが、virtualTokenConsumedでJavaが成功したmatch-only terminatorをcommitしてmatched cursorを進める観測（WildCardLineの CR LF をC=0/M=0のEOFで受理など）と、terminator試行が残す失敗診断を再現しない。3つの反例corpusを両言語で実行した。4型の完了でこの2型や#848をcloseしない。
 
-利用経路: BOL + Repeat(not_ahead(line_end); body) + line_end と、Repeat(Choice(match_only(line_end), body)) を実際に比較したが全観測は再現できない。#846で任意terminatorの成功停止・親kind別commit/rollbackと原CSTを揃えた後、この2型の全kind/invertを検証する。
+利用経路: BOL + Repeat(not_ahead(line_end); body) + line_end、Repeat(Choice(match_only(line_end), body))、CR/LFを除く文字クラスのRepeat + line_end を実際に比較したが全観測は再現できない。#846で任意terminatorの成功停止・親kind別commit/rollbackと原CSTを揃えた後、この2型の全kind/invertを検証する。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyLineParser.java#L12](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyLineParser.java#L12)、[unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardLineParser.java#L7](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardLineParser.java#L7)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67)、[conformance/line-boundary/probe.rs#L423](../conformance/line-boundary/probe.rs#L423)、[conformance/line-boundary/probe.rs#L477](../conformance/line-boundary/probe.rs#L477)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyLineParser.java#L12](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyLineParser.java#L12)、[unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardLineParser.java#L7](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardLineParser.java#L7)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67)、[conformance/line-boundary/probe.rs#L400](../conformance/line-boundary/probe.rs#L400)、[conformance/line-boundary/probe.rs#L454](../conformance/line-boundary/probe.rs#L454)、[conformance/line-boundary/probe.rs#L491](../conformance/line-boundary/probe.rs#L491)
 
 テスト: [unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java)、[rust/unlaxer-runtime/tests/line_boundary.rs](../rust/unlaxer-runtime/tests/line_boundary.rs)
 
-共通 fixture: [conformance/line-boundary/compositions.tsv](../conformance/line-boundary/compositions.tsv)、[conformance/line-boundary/repeat-choice.tsv](../conformance/line-boundary/repeat-choice.tsv)、[conformance/line-boundary/README.md](../conformance/line-boundary/README.md)
+共通 fixture: [conformance/line-boundary/compositions.tsv](../conformance/line-boundary/compositions.tsv)、[conformance/line-boundary/repeat-choice.tsv](../conformance/line-boundary/repeat-choice.tsv)、[conformance/line-boundary/char-class.tsv](../conformance/line-boundary/char-class.tsv)、[conformance/line-boundary/README.md](../conformance/line-boundary/README.md)
 
 追跡: [#848](https://github.com/opaopa6969/unlaxer-parser/issues/848)、[#846](https://github.com/opaopa6969/unlaxer-parser/issues/846)
 
@@ -752,17 +752,17 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 ### line-terminator
 
-**対応済み（記載した共通契約）**。LineTerminatorParser / EndOfLineParserのCRLF→CR→LF→EOFの順序、Classicの4kind/invert、両cursor/reset、原CST/reduced CST、失敗CP、isEndOfSourceとstatic構築経路を独立corpusで比較する。memo OFF/SAFE_FAILURESと診断3モード、choice敗者・先読み・外側失敗後の再試行も比較。遅延診断のJava FIRST候補除外（reset前のcursor）は移植例のadapterに明記し既存runtimeの成功経路は変更しない。
+**対応済み（記載した共通契約）**。LineTerminatorParser / EndOfLineParserのCRLF→CR→LF→EOFの順序、Classicの4kind/invert、両cursor/reset、原CST/reduced CST、失敗CP、isEndOfSourceとstatic構築経路を独立corpusで比較する。memo OFF/SAFE_FAILURESと診断3モード、choice敗者・先読み・外側失敗後の再試行も比較。DETAILED_ON_FAILUREだけに出るJava FIRST候補除外の欠陥（reset前のcursorを読む、#861）はRustへ移植せず、Javaの現状値30行をcases.tsvの別列に分けて固定する。既存runtimeの成功経路は変更しない。
 
-利用経路: `Expr::choice([Literal("\r\n"), Literal("\r"), Literal("\n"), Eof])`。`probe.rs::classic_line_end` がDETAILED_ON_FAILUREかつ非invertのときだけJavaと同じFIRST候補を選んでChoiceへ渡す。既存の語彙EOLは非消費の別契約としてlexical.tsvで比較する。
+利用経路: `Expr::choice([Literal("\r\n"), Literal("\r"), Literal("\n"), Eof])`。`probe.rs::line_end` をそのまま使い、診断モードで分岐するadapterは置かない。既存の語彙EOLは非消費の別契約としてlexical.tsvで比較する。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java#L12](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java#L12)、[unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfLineParser.java#L3](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfLineParser.java#L3)、[rust/unlaxer-runtime/src/lib.rs#L353](../rust/unlaxer-runtime/src/lib.rs#L353)、[conformance/line-boundary/probe.rs#L58](../conformance/line-boundary/probe.rs#L58)、[conformance/line-boundary/probe.rs#L68](../conformance/line-boundary/probe.rs#L68)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java#L12](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java#L12)、[unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfLineParser.java#L3](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfLineParser.java#L3)、[rust/unlaxer-runtime/src/lib.rs#L353](../rust/unlaxer-runtime/src/lib.rs#L353)、[conformance/line-boundary/probe.rs#L58](../conformance/line-boundary/probe.rs#L58)、[conformance/line-boundary/probe.rs#L66](../conformance/line-boundary/probe.rs#L66)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L40](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L40)
 
 テスト: [unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java)、[rust/unlaxer-runtime/tests/line_boundary.rs](../rust/unlaxer-runtime/tests/line_boundary.rs)
 
 共通 fixture: [conformance/line-boundary/cases.tsv](../conformance/line-boundary/cases.tsv)、[conformance/line-boundary/transactions.tsv](../conformance/line-boundary/transactions.tsv)、[conformance/line-boundary/lexical.tsv](../conformance/line-boundary/lexical.tsv)、[conformance/line-boundary/README.md](../conformance/line-boundary/README.md)
 
-追跡: [#848](https://github.com/opaopa6969/unlaxer-parser/issues/848)
+追跡: [#848](https://github.com/opaopa6969/unlaxer-parser/issues/848)、[#861](https://github.com/opaopa6969/unlaxer-parser/issues/861)
 
 ## 全公開 API（機械列挙との一致を検査）
 

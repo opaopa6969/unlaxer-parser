@@ -124,10 +124,13 @@ class Hidden { public static class Leaked {} }
             self.assertEqual('uncorroborated', entry['status'])
             self.assertTrue({846, 848}.issubset(entry['issues']))
             self.assertIn('conformance/line-boundary/repeat-choice.tsv', entry['fixtures'])
+            self.assertIn('conformance/line-boundary/char-class.tsv', entry['fixtures'])
         for name in ('LineTerminatorParser', 'EndOfLineParser'):
             entry = self.data['assessments'][rows['org.unlaxer.parser.elementary.' + name]['assessment']]
             self.assertEqual('verified', entry['status'])
             self.assertIn('conformance/line-boundary/cases.tsv', entry['fixtures'])
+            # Java の DETAILED_ON_FAILURE 限定の FIRST 除外欠陥は別 issue で追跡する。
+            self.assertIn(861, entry['issues'])
 
     def test_every_unverified_row_belongs_to_a_registered_child_issue(self):
         followups = {entry['number'] for entry in self.data['followups'].values()}

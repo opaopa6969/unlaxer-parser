@@ -63,36 +63,12 @@ pub fn line_end() -> Expr {
         Expr::Eof,
     ])
 }
-// Java Choice の遅延診断は begin/reset 前の cursor で FIRST 候補を除外する。
-// Rust Classic は除外しないので、この公開API利用例が Java 固有の境界を保持する。
-fn classic_line_end(context: &mut ParseContext<'_>) -> ParseResult {
-    let mode = context.token_mode();
-    let expression =
-        if context.options().diagnostics == Diagnostics::DetailedOnFailure && !mode.invert {
-            let position = if mode.kind == TokenKind::Consumed {
-                context.position()
-            } else {
-                context.matched_position()
-            };
-            let next = context.source().chars().nth(position);
-            let mut alternatives = Vec::new();
-            for word in ["\r\n", "\r", "\n"] {
-                if next == word.chars().next() {
-                    alternatives.push(Expr::literal(word));
-                }
-            }
-            alternatives.push(Expr::Eof);
-            Expr::choice(alternatives)
-        } else {
-            line_end()
-        };
-    context.parse_with_token_mode(&expression, mode.kind, mode.invert)
-}
 fn parser(name: &str) -> Expr {
     match name {
         "bol" => Expr::Custom(bol),
         "bof" => Expr::Custom(bof),
-        "terminator" | "eol" => Expr::Custom(classic_line_end),
+        // Java の DETAILED_ON_FAILURE だけに出る FIRST 除外の欠陥（#861）は移植しない。
+        "terminator" | "eol" => line_end(),
         _ => panic!("unknown parser {name}"),
     }
 }
@@ -257,7 +233,8 @@ pub fn verify() -> usize {
                     context.failure().offset.to_string(), (!context.failure().expected.is_empty()).to_string(),
                     forest(context, &nodes, false), forest(context, &nodes, true)];
                 let mut expected = c[9..16].iter().map(|s| s.to_string()).collect::<Vec<_>>();
-                if diagnostics == Diagnostics::DetailedOnFailure { expected[3] = "0".into(); expected[4] = "false".into(); if c[16] != "~" { expected = c[16].split('|').map(str::to_owned).collect(); } }
+                // 末尾列は Java の既知欠陥 #861 の現状値。Rust は主の期待値に照合する。
+                if diagnostics == Diagnostics::DetailedOnFailure { expected[3] = "0".into(); expected[4] = "false".into(); }
                 if actual != expected { failures.push(format!("{} {memo:?} {diagnostics:?}\nexpected {expected:?}\nactual   {actual:?}", c[0])); }
                 count += 1;
                 assert_eq!(context.token_info(marker).unwrap().extra("value"), Some("trial"));
@@ -508,11 +485,68 @@ pub fn verify_repeat_choice() {
         }
     }
 }
+// 既存の Repeat で書ける最も近い候補。終端の CR/LF を body の文字クラスから外し、
+// terminator を反復の前に試さない。consumed / matchOnly の受理・cursor・原CSTは揃うが、
+// virtual consumed での terminator commit と、その試行が残す失敗診断は再現しない（#846）。
+fn char_class_line(name: &str) -> Expr {
+    let body = if name == "empty" {
+        Expr::character("SpaceParser", |c| " \t\u{b}\u{c}".contains(c))
+    } else {
+        Expr::character("WildCardStringParser", |c| c != '\r' && c != '\n')
+    };
+    Expr::sequence([Expr::Custom(bol), body.repeat_java(0, None), line_end()])
+}
+pub fn verify_char_class() {
+    for row in include_str!("char-class.tsv")
+        .lines()
+        .filter(|line| !line.starts_with('#') && !line.is_empty())
+    {
+        let c: Vec<_> = row.split('\t').collect();
+        assert_eq!(c.len(), 12, "{row}");
+        let source = decode(c[2]);
+        let (root, repeat) = if c[0] == "empty" {
+            ("EmptyLineParser/", "ZeroOrMore/")
+        } else {
+            ("WildCardLineParser/", "WildCardStringTerminatorParser/")
+        };
+        for memo in [Memoization::Off, Memoization::SafeFailures] {
+            for diagnostics in [
+                Diagnostics::Detailed,
+                Diagnostics::DetailedOnFailure,
+                Diagnostics::Auto,
+            ] {
+                let mut context = ParseContext::with_options(
+                    &source,
+                    ParseOptions::with_memoization(memo).with_diagnostics(diagnostics),
+                );
+                let result =
+                    context.parse_with_token_mode(&char_class_line(c[0]), kind(c[1]), false);
+                assert_eq!(result.is_ok().to_string(), c[7], "{row}");
+                assert_eq!(context.position().to_string(), c[8], "{row}");
+                assert_eq!(context.matched_position().to_string(), c[9], "{row}");
+                let farthest = if diagnostics == Diagnostics::DetailedOnFailure {
+                    "0"
+                } else {
+                    c[10]
+                };
+                assert_eq!(context.failure().offset.to_string(), farthest, "{row}");
+                if c[11] != "-" {
+                    let nodes = result.as_ref().map(|r| r.nodes.clone()).unwrap_or_default();
+                    let cst = forest(&mut context, &nodes, false)
+                        .replacen("Chain/", root, 1)
+                        .replacen("ZeroOrMore/", repeat, 1);
+                    assert_eq!(cst, c[11], "{row}");
+                }
+            }
+        }
+    }
+}
 #[allow(dead_code)]
 fn main() {
     verify_lexical_boundaries();
     verify_repeat_choice();
     verify_transactions();
     verify_compositions();
+    verify_char_class();
     println!("line-boundary observations: {}", verify());
 }

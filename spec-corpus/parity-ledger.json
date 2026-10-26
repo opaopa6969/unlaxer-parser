@@ -414,6 +414,10 @@
     "856": {
       "state": "OPEN",
       "title": "parity: 失敗診断・ParseOptions・RuleStack・RaisedFailureの公開APIを共通corpusで固定する"
+    },
+    "861": {
+      "state": "OPEN",
+      "title": "fix: Java Choice の FIRST 候補除外が reset 前の cursor を読み、DETAILED_ON_FAILURE だけ受理が変わる"
     }
   },
   "entries": [
@@ -1525,11 +1529,29 @@
         848,
         846
       ],
-      "observation": "#848の4型（StartOfLine/StartOfSource/LineTerminator/EndOfLine）は独立corpusで検証。残る2型ではguard付きRepeatにbodyごとのChain CSTが増え、terminator-first ChoiceのRepeatはmatchOnlyで終端後も進む。入力LF LF xでWildCardLineのJava matched=1に対して候補式は3、EmptyLineはJava成功に対して候補式失敗。2案の反例を両言語で実行し、#846の停止/commit/rollback契約に依存する2型だけを未完了とする。runtime変更なし。",
+      "observation": "#848の4型（StartOfLine/StartOfSource/LineTerminator/EndOfLine）は独立corpusで検証。残る2型ではguard付きRepeatにbodyごとのChain CSTが増え、terminator-first ChoiceのRepeatはmatchOnlyで終端後も進む。入力LF LF xでWildCardLineのJava matched=1に対して候補式は3、EmptyLineはJava成功に対して候補式失敗。CR/LFを除く文字クラスのRepeatはconsumed/matchOnlyの受理・cursor・原CSTまで揃うが、virtualTokenConsumedでJavaが成功したmatch-only terminatorをcommitしmatched cursorを進める観測（WildCardLineはCR LFをC=0/M=0のEOFで受理、候補式はC=2/M=2）と、terminator試行の最遠診断位置を再現しない。3案の反例を両言語で実行し、#846の停止/commit/rollback契約に依存する2型だけを未完了とする。runtime変更なし。",
       "evidence": [
         "conformance/line-boundary/README.md",
         "conformance/line-boundary/compositions.tsv",
         "conformance/line-boundary/repeat-choice.tsv",
+        "conformance/line-boundary/char-class.tsv",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
+        "conformance/line-boundary/probe.rs"
+      ]
+    },
+    {
+      "id": "java-first-exclusion-reset",
+      "category": "unresolved",
+      "title": "Java Choice の FIRST 除外が reset 前の cursor を読む",
+      "hosts": "Java Classic（DETAILED_ON_FAILURE） / Rust Classic",
+      "issues": [
+        861,
+        848
+      ],
+      "observation": "Java ChoiceInterfaceは候補のbegin前のcursorでlookaheadを取り、親のresetMatchedWithConsumed=trueでbeginがmatchedをconsumedへ戻すと、実際に読む位置と除外判定の位置がずれる。DETAILED_ON_FAILUREだけで成功する候補が除かれ受理が変わる（x LF、C=1/M=2/reset=true/matchOnlyの行終端はDETAILEDで成功、DETAILED_ON_FAILUREで失敗。除外を無効にすると成功）。Rust Classicはtoken modeで除外せずJava DETAILEDと同じ結果。line-boundaryのcases.tsvのjava-deferred-defect列30行がJavaの現状値をJava側だけの期待値として固定し、Rustは主の期待値へ照合する。#861の修正時に列を除く。",
+      "evidence": [
+        "conformance/line-boundary/README.md",
+        "conformance/line-boundary/cases.tsv",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
         "conformance/line-boundary/probe.rs"
       ]
@@ -1542,7 +1564,7 @@
       "issues": [
         848
       ],
-      "observation": "StartOfLine/StartOfSourceはtokenを作らず4kindの参照cursorを検査するCustom adapterで語彙BOL/BOFと接続する。LineTerminator/EndOfLineはChoice/Literal/Eofを使う。DETAILED_ON_FAILUREのJava FIRST除外がreset前cursorを読む条件をfixtureのadapterが再現する（x LF、C=1/M=2/reset=true/matchOnlyは詳細診断で成功、遅延診断で失敗）。既存runtimeへ処理を追加せず、全ケースを独立oracleへ照合。",
+      "observation": "StartOfLine/StartOfSourceはtokenを作らず4kindの参照cursorを検査するCustom adapterで語彙BOL/BOFと接続する。LineTerminator/EndOfLineはChoice/Literal/Eofをそのまま使い、診断モードで分岐するadapterは置かない。DETAILED_ON_FAILUREだけに出るJavaのFIRST除外の欠陥（#861）はRustへ移植しない。既存runtimeへ処理を追加せず、全ケースを独立oracleへ照合。",
       "evidence": [
         "conformance/line-boundary/README.md",
         "conformance/line-boundary/cases.tsv",
@@ -2072,6 +2094,31 @@
       },
       "entries": [
         "line-boundary-composition"
+      ]
+    },
+    {
+      "path": "conformance/line-boundary/char-class.tsv",
+      "fields": {
+        "javaAccepted": 1,
+        "javaConsumed": 1,
+        "javaFarthest": 1,
+        "javaMatched": 1,
+        "rustAccepted": 1,
+        "rustConsumed": 1,
+        "rustFarthest": 1,
+        "rustMatched": 1
+      },
+      "entries": [
+        "line-boundary-composition"
+      ]
+    },
+    {
+      "path": "conformance/line-boundary/cases.tsv",
+      "fields": {
+        "java-deferred-defect": 1
+      },
+      "entries": [
+        "java-first-exclusion-reset"
       ]
     }
   ],

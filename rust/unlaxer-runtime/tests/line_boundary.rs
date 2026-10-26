@@ -25,3 +25,8 @@ fn lexical_bol_bof_eol_use_the_same_code_point_boundaries() {
 fn repeat_choice_keeps_going_after_a_matched_terminator() {
     probe::verify_repeat_choice();
 }
+
+#[test]
+fn char_class_repeat_matches_consumed_but_not_terminator_commit() {
+    probe::verify_char_class();
+}
