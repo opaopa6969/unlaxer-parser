@@ -1,4 +1,4 @@
-# Chain と name frame の owner reset (#809 / #814)
+# Chain・name frame・値投影境界の owner reset (#809 / #814 / #820)
 
 Java を参照実装とする。`grammar.ubnf` の生成 Root (`'a' 'z'`) は通常の consumed 経路で失敗する。
 同じ context を再利用すると、Java は owner の `resetMatchedWithConsumed=false` を残す。
@@ -23,6 +23,8 @@ Java は成功、consumed CP0 / matched CP2、旧 Rust は失敗、CP0 / CP1。
 | owner の破棄・復元 | Choice / NonOrdered の候補 rollback、明示 transaction rollback、`ParseContext` の例外/資源中断時 publication 復元 | candidate の reset 復元、`restore` / `transaction`、resource failure | Chain の変更はその owner だけ。候補や外側の明示 transaction が rollback すれば元の値に戻る |
 | name frame の開始・終了 | `NameResolutionScope` / `NamePredicateParser` は `begin` → `commit` / `rollback` | 両式を `java_transaction` として扱う | 開始時に true なら matched を consumed へ戻す。子の Chain が false にしても成否どちらでも親の reset を復元する (#814) |
 | Classic の rule 参照・透過 wrapper | 生成 `RootParser` の `parse(context, TokenKind.consumed, false)` → `LazyChain` / `ChainInterface.parse`、`DoConsume` / `InvertMatch` の `PropagationStopper` | `parse_with_token_mode(Expr::Rule)` と生成 rule body、`StopConsume` / `StopInvert` | 参照自体の frame はない。Chain が owner に残す false を通常経路と同じく伝える (#814) |
+| 値投影の失敗 | helper の `LazyChain`、nested mixed 候補の `__CaptureSite extends LazyChain` と子の `LazyChain` | `ValueBoundary` / `TextValue` の子の reset を伝播 | helper の本体で直接観測。TextValue は生成候補を単独で呼び、外側 Choice の復元前に観測する (#820) |
+| lookup と失敗後の透過一覧 | Chain の `begin` 前の owner reset 設定 | 共通の `java_owner_transparent_child` | 値投影2式と StopConsume / StopInvert を含む同じ一覧を辿る。初期 true/false を切り替えても同じ failure memo に hit する (#820) |
 | 公開 getter | `TransactionElement.isResetMatchedWithConsumed` | `ParseContext.reset_matched_with_consumed` | 同じ context を使う caller も値を観測できる |
 
 通常の Rust は全ての Java frame を作るわけではなく、直接の `JavaLookahead` / `JavaEmpty` では
@@ -127,6 +129,71 @@ name scope / name predicate の開始時 matched 復元を個別に外す、の5
 どれも Rust の `name_scope_token_mode_reset` と生成両 host の conformance が失敗する。
 透過 wrapper から `StopConsume` / `StopInvert` を外す変異は Rust の `name_scope_token_mode_reset` が検出する。
 新しいテストクラスの3メソッドを Cross-language CI と `.github/optin-test-contracts.json` に登録する。
+
+## 値投影境界の実測 (#820)
+
+`value-reset.tsv` の48行は生成 Java を実行して採取した期待値。
+`ValueBoundaryResetConformanceTest` は memo OFF / SAFE_FAILURES × 診断3設定で Java の288観測と、
+Java-host / native × 通常 / mapping grammar の Rust の1152観測を照合する。
+生成物の一致、生成ソースの `.value_boundary()` / `.text_value()`、観測する式の位置と子の型も検査する。
+両言語の生成ソースと観測結果は `unlaxer-dsl/target/value-reset-{java,rust}` および同名の TSV に保存する。
+
+### 生成位置と Java の構造
+
+- `value-boundary.ubnf`: `Root` が `Helper @value` を mapping し、`Helper ::= 'a' 'z' Mixed`、
+  `Mixed ::= Leaf | 't'`（Leaf は mapped node）とする。mixed の scalar `Kind::Value` によって
+  `needs_values` が有効になり、`project_helper_value` が mapping のない Helper の本体を
+  `ValueBoundary(Sequence(...))` にする。`Wrapped` は同じ本体に rule-local TriviaScope を加える。
+  Java の両 parser は `ValueResetPlainLazyChain extends LazyChain`。`prepareChildren` は子を直接並べ、
+  値投影のための外側 parser を追加しない。通常 / Classic で helper parser を直接呼ぶ。
+- `text-value.ubnf`: `@nestedCaptures @mapping(Node) Root ::= 'a' 'z' | N`（N は NumberParser）。
+  nested の `body_shape` は Text と Integer を Value にまとめ、`body` は第1候補を
+  `TextValue(Sequence('a','z'))`、第2候補を `ValueBoundary(Number)` にする。
+  Java は `RootParser extends LazyChoice` の候補として
+  `__CaptureSite(ValueResetPlainLazyChain('a','z'), "#nested:text")` を生成する。
+  `__CaptureSite` 自身も LazyChain で、子の Chain と同様に `begin` 前に owner を false にする。
+  候補を `getChildren().get(0)` で取得して単独で呼ぶので、期待値は手組み Java からではない。
+
+**TextValue の生成上の制約:** 現在の lowering は TextValue を mixed Choice の候補か Capture の子に置く。
+`body` の単一選択肢が Text なら `mixed_nested=false`、Value なら候補の kind も Value なので
+Text の腕へ入らない。複数選択肢では必ず外側に Choice がある。`project_text_values` も
+Choice/Capture の内側だけに TextValue を加え、`project_helper_value` が本体に加えるのは ValueBoundary。
+したがって **UBNF から TextValue だけを rule 本体に生成したとは扱わない**。
+両 host の実際の生成候補を変更せず取り出し、単独の式および観測用 rule の本体として呼ぶ。
+後者は memo lookup の検査用にテストが追加した rule であり、生成 rule ではない。
+同時に元の Root 全体も対照として呼び、外側 Choice が policy を復元する一致を固定する。
+生成仕様を変えて本体に TextValue を作る変更は行わない。
+
+| 入力 ab・初期 reset=true | Java と修正後 Rust | 修正前 Rust |
+| --- | --- | --- |
+| Helper / Wrapped または生成 TextValue 候補の失敗 | reset=false、CP0/1。後続成功、CP0/2 | reset=true、CP0/1。後続失敗、CP0/1 |
+| nested mixed の Root 全体の失敗 | reset=true、CP0/1。後続失敗、CP0/1 | 同じ |
+
+CP は consumed / matched。各ケースは先行 LOOKAHEAD と後続 `NonOrdered(LOOKAHEAD('b'))` を同じ context で呼ぶ。
+初期 reset=false、Unicode `a😀b`（先行 `LOOKAHEAD('a😀')`）、通常 / Classic、rule / body を含める。
+helper と候補は3回の呼出しで初期 reset を true/false に切り替え、毎回同じ結果を検査する。
+helper は両言語とも SAFE_FAILURES の failure hit が2回、生成候補の観測用 Rust rule も2回。
+Java の候補は memoizable rule ではないため、その hit 数は比較しない。
+
+### 透過一覧と mutation
+
+`java_owner_transparent_child` を lookup 前と `finish_expression` で共有する。
+MetadataCapture、TriviaScope、LexicalTriviaScope、LexicalContextScope、RuleEffects、CaptureEquality、
+Commit、Label、StopConsume、StopInvert、TextValue、ValueBoundary が同じ一覧に入る。
+MetadataCapture は expression の先頭で専用処理へ進むが、lookup では同じ子を辿る。
+Rule 参照の失敗も子の policy を伝えるが、lookup の正規化は参照先へ再帰しない。
+既存の rule 深さ・再帰上限・key を保ち、参照先自身の lookup で正規化するためである。
+NamePredicate / NameResolutionScope / Choice は Java の frame 境界なので透過させない。
+
+StopConsume / StopInvert は、同じ初期値だけの反復では旧実装も hit して差が隠れた。
+既存の `classic_propagation_stoppers_retain_failed_chain_policy` を初期値が交互になるよう強化し、
+consumed / matchOnly、rule / body の結果を保ったまま rule の failure hit が2回であることを固定する。
+この正規化は生成仕様を広げず、既存の手組み runtime API の同一 Chain owner を揃える。
+
+ValueBoundary / TextValue を透過一覧から個別に外す mutation は共通 corpus の Rust 単体と生成コードの照合で検出する。
+lookup だけで ValueBoundary / TextValue / StopConsume / StopInvert の走査を個別に止める mutation は、
+初期値を切り替えた3回の呼出しが hit 2回にならないことを検出する。
+CI の Cross-language テストと `.github/optin-test-contracts.json` に新クラスの2メソッドを登録する。
 
 性能は #197 の凍結に従う。変更は失敗の復元・再生、候補境界の bool 保存/失敗時復元、
 SAFE_FAILURES の既存 lookup 正規化における透過 wrapper の確認、name frame の既存 policy 保存/復元に限定する。

@@ -147,8 +147,8 @@ fn observe_stopper(context: &mut ParseContext<'_>) -> ParseResult {
     };
     ahead().parse(context).unwrap();
     let mut before = None;
-    for _ in 0..3 {
-        context.set_reset_matched_with_consumed(initial);
+    for attempt in 0..3 {
+        context.set_reset_matched_with_consumed(if attempt == 1 { !initial } else { initial });
         let result = if entry == "rule" {
             context.parse_with_token_mode(&Expr::Rule(0), kind, false)
         } else {

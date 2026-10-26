@@ -1,0 +1,7 @@
+grammar ValueReset {
+    @package: valuereset
+    @whitespace: none
+    token N = NumberParser
+    @root @nestedCaptures @mapping(Node)
+    Root ::= 'a' 'z' | N;
+}
