@@ -148,18 +148,8 @@ pub fn check_file(path: &std::path::Path) -> Report {
             _ => return check(&source),
         }
     }
-    match crate::modules::load(path) {
-        Ok(file) => {
-            let mut report = check_ast(&file);
-            for diagnostic in &mut report.diagnostics {
-                diagnostic.span = None;
-            }
-            report
-                .diagnostics
-                .sort_by(|a, b| a.code.cmp(b.code).then_with(|| a.subject.cmp(&b.subject)));
-            report.diagnostics.dedup();
-            report
-        }
+    match crate::modules::load_for_check(path) {
+        Ok(file) => check_ast(&file),
         Err(_) => Report {
             portable: false,
             structure: "blocked",
@@ -220,6 +210,13 @@ pub fn check_ast(file: &UbnfFile) -> Report {
     } else {
         "blocked"
     };
+    // Normalize provenance before ordering/dedup: root occurrences remain distinct;
+    // imported or unknown occurrences with the same code/subject may still collapse.
+    for diagnostic in &mut inventory.diagnostics {
+        if diagnostic.span == Some(crate::modules::NON_ROOT_SPAN) {
+            diagnostic.span = None;
+        }
+    }
     inventory.diagnostics.sort_by(|a, b| {
         let key = |d: &Diagnostic| {
             d.span.map_or((usize::MAX, usize::MAX), |s| {

@@ -126,6 +126,79 @@ fn supported_nested_groups_are_not_confused_with_alias_depth() {
 }
 
 static NEXT: AtomicUsize = AtomicUsize::new(0);
+
+#[test]
+fn imported_diagnostics_retain_only_root_positions_and_distinct_occurrences() {
+    let cases: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/portability/imports.json")).unwrap();
+    for case in cases.as_array().unwrap() {
+        for ending in ["LF", "CRLF"] {
+            let directory = Directory::new();
+            let files = case["files"].as_object().unwrap();
+            for (name, source) in files {
+                let path = directory.0.join(name);
+                fs::create_dir_all(path.parent().unwrap()).unwrap();
+                let source = source.as_str().unwrap();
+                fs::write(
+                    path,
+                    if ending == "LF" {
+                        source.into()
+                    } else {
+                        source.replace('\n', "\r\n")
+                    },
+                )
+                .unwrap();
+            }
+            let path = directory.0.join("main.ubnf");
+            let report = unlaxer_generator::portability::check_file(&path);
+            let actual: serde_json::Value = serde_json::from_str(&report.to_json()).unwrap();
+            assert_eq!(
+                case["expected"][ending], actual,
+                "{} / {ending}",
+                case["name"]
+            );
+            assert_eq!(report, unlaxer_generator::portability::check_file(&path));
+            let output = run(
+                &directory,
+                &["check", "--target", "rust", "--grammar", "main.ubnf"],
+            );
+            assert_eq!(
+                Some(if report.portable { 0 } else { 3 }),
+                output.status.code()
+            );
+            assert!(output.stderr.is_empty());
+            assert_eq!(
+                actual,
+                serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()
+            );
+            let source = fs::read_to_string(path).unwrap();
+            for diagnostic in &report.diagnostics {
+                if let Some(span) = diagnostic.span {
+                    assert_eq!(
+                        source[span.byte_start..span.byte_end],
+                        source
+                            .chars()
+                            .skip(span.codepoint_start)
+                            .take(span.codepoint_end - span.codepoint_start)
+                            .collect::<String>()
+                    );
+                }
+            }
+            for (name, source) in files {
+                let source = source.as_str().unwrap();
+                assert_eq!(
+                    if ending == "LF" {
+                        source.into()
+                    } else {
+                        source.replace('\n', "\r\n")
+                    },
+                    fs::read_to_string(directory.0.join(name)).unwrap()
+                );
+            }
+        }
+    }
+}
+
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {

@@ -169,9 +169,48 @@ public class RustPortabilityConformanceTest {
         Files.write(Path.of("target/rust-token-adapter-diagnostics.tsv"), report);
     }
 
+    @Test public void importedDiagnosticsRetainOnlyRootPositionsAndDistinctOccurrences() throws Exception {
+        Path binary = binary();
+        Path fixtures = repo.resolve("rust/unlaxer-generator/tests/fixtures/portability/imports.json");
+        var cases = JsonParser.parseString(Files.readString(fixtures)).getAsJsonArray();
+        List<String> report = new ArrayList<>(List.of("case\tline_endings\tstructure\tdiagnostics\tresult"));
+        for (var entry : cases) {
+            var fixture = entry.getAsJsonObject();
+            String name = fixture.get("name").getAsString();
+            for (String ending : List.of("LF", "CRLF")) {
+                Path directory = temporary.newFolder().toPath();
+                for (var file : fixture.getAsJsonObject("files").entrySet()) {
+                    Path path = directory.resolve(file.getKey());
+                    Files.createDirectories(path.getParent());
+                    String source = file.getValue().getAsString();
+                    Files.writeString(path, ending.equals("LF") ? source : source.replace("\n", "\r\n"));
+                }
+                Path input = directory.resolve("main.ubnf");
+                var actual = compareFile(binary, directory, input, Files.readString(input));
+                var expected = fixture.getAsJsonObject("expected").getAsJsonObject(ending);
+                assertEquals(name + " / " + ending, expected, actual);
+                for (var file : fixture.getAsJsonObject("files").entrySet()) {
+                    String source = file.getValue().getAsString();
+                    assertEquals(name, ending.equals("LF") ? source : source.replace("\n", "\r\n"),
+                        Files.readString(directory.resolve(file.getKey())));
+                }
+                try (var files = Files.walk(directory)) {
+                    assertEquals(name, fixture.getAsJsonObject("files").size(), files.filter(Files::isRegularFile).count());
+                }
+                report.add(name + "\t" + ending + "\t" + actual.get("structure").getAsString() + "\t"
+                    + actual.getAsJsonArray("diagnostics").size() + "\tequal");
+            }
+        }
+        Files.write(Path.of("target/rust-portability-imports.tsv"), report);
+    }
+
     private JsonObject compare(Path binary, Path cwd, String source) throws Exception {
         Path input = temporary.newFile().toPath();
         Files.writeString(input, source);
+        return compareFile(binary, cwd, input, source);
+    }
+
+    private JsonObject compareFile(Path binary, Path cwd, Path input, String source) throws Exception {
         String[] options = {"check", "--target", "rust", "--grammar", input.toString(), "--format", "json"};
         Run java = javaRun(options);
         var args = new ArrayList<>(List.of(binary.toString()));

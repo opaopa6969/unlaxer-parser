@@ -62,11 +62,10 @@ public final class PortabilityCheck {
                     && s.value() instanceof StringSettingValue v && v.value().equals("v2"))))
             return check(snapshot, snapshot.ast());
         try {
-            var result = check(snapshot, org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(
-                snapshot.ast(), path, java.nio.file.Files::readString));
-            // A single-file offset must not pretend to identify an imported source.
-            return result(result.portable(), result.structure(), result.diagnostics().stream()
-                .map(d -> new Diagnostic(d.code(), null, d.subject())).toList());
+            var linked = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolveWithSource(
+                snapshot, path, java.nio.file.Files::readString);
+            // Only root identities (including rebuilt nodes) have positions in this snapshot.
+            return check(linked, linked.ast());
         } catch (IllegalArgumentException | java.io.IOException error) {
             return new Result(false, "blocked", List.of(new Diagnostic("P-MODULE", null, "UBNF module resolution")));
         }

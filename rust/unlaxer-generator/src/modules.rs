@@ -4,16 +4,45 @@ use std::path::{Component, Path, PathBuf};
 use unlaxer_ubnf::lexical::{LexicalExpression, Op};
 use unlaxer_ubnf::*;
 
+// Internal marker in the check-only AST: an imported/synthetic declaration has no
+// root position. Never infer provenance by comparing offsets from separate files.
+pub(crate) const NON_ROOT_SPAN: Span = Span {
+    byte_start: usize::MAX,
+    byte_end: usize::MAX,
+    codepoint_start: usize::MAX,
+    codepoint_end: usize::MAX,
+};
+
 pub fn load(path: &Path) -> Result<UbnfFile, String> {
     let path = normalize(path)?;
     let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     resolve(&source, &path, &mut crate::packages::Resolver::new(&path))
 }
 
+pub(crate) fn load_for_check(path: &Path) -> Result<UbnfFile, String> {
+    let path = normalize(path)?;
+    let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    resolve_root(
+        &source,
+        &path,
+        &mut crate::packages::Resolver::new(&path),
+        true,
+    )
+}
+
 pub fn resolve(
     source: &str,
     path: &Path,
     packages: &mut crate::packages::Resolver,
+) -> Result<UbnfFile, String> {
+    resolve_root(source, path, packages, false)
+}
+
+fn resolve_root(
+    source: &str,
+    path: &Path,
+    packages: &mut crate::packages::Resolver,
+    root_spans_only: bool,
 ) -> Result<UbnfFile, String> {
     let path = normalize(path)?;
     let mut file = parse(source).map_err(|e| e.to_string())?;
@@ -24,6 +53,7 @@ pub fn resolve(
     };
     let multiple = file.grammars.len() > 1;
     for grammar in &mut file.grammars {
+        let root_tokens = grammar.tokens.len();
         loader.link(grammar, &path).map_err(|error| {
             if multiple {
                 format!(
@@ -34,6 +64,14 @@ pub fn resolve(
                 error
             }
         })?;
+        if root_spans_only {
+            // Linking mutates root nodes in place and appends only synthetic token
+            // declarations. Imported lexical expressions carry no source spans.
+            // Their generated declarations must not borrow the caller reference span.
+            for token in &mut grammar.tokens[root_tokens..] {
+                token.span = NON_ROOT_SPAN;
+            }
+        }
     }
     Ok(file)
 }

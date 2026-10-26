@@ -1,0 +1,586 @@
+[
+  {
+    "name": "imported-one-two",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar Imported { @import part from 'part.ubnf' @ubnf: v2 @root @mapping(Value,params=[text]) Root ::= part.X @text; }\ngrammar One { @root Root ::= Missing; }\ngrammar Two { @root Root ::= Missing; }\n",
+      "part.ubnf": "grammar Part { @ubnf: v2 token X ::= 'x'; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "failed",
+        "diagnostics": [
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 143,
+              "end": 182
+            },
+            "subject": "Rust structural constraints"
+          },
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 183,
+              "end": 222
+            },
+            "subject": "Rust structural constraints"
+          }
+        ]
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "failed",
+        "diagnostics": [
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 145,
+              "end": 184
+            },
+            "subject": "Rust structural constraints"
+          },
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 186,
+              "end": 225
+            },
+            "subject": "Rust structural constraints"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "linked-root-structure",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar One { @root Root ::= Missing; }\ngrammar Imported { @import part from 'part.ubnf' @ubnf: v2 @root @mapping(Value,params=[text]) Root ::= Missing @text; }\ngrammar Two { @root Root ::= Missing; }\n",
+      "part.ubnf": "grammar Part { @ubnf: v2 token X ::= 'x'; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "failed",
+        "diagnostics": [
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 23,
+              "end": 62
+            },
+            "subject": "Rust structural constraints"
+          },
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 63,
+              "end": 183
+            },
+            "subject": "Rust structural constraints"
+          },
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 184,
+              "end": 223
+            },
+            "subject": "Rust structural constraints"
+          }
+        ]
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "failed",
+        "diagnostics": [
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 24,
+              "end": 63
+            },
+            "subject": "Rust structural constraints"
+          },
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 65,
+              "end": 185
+            },
+            "subject": "Rust structural constraints"
+          },
+          {
+            "code": "P-STRUCTURE",
+            "severity": "error",
+            "span": {
+              "start": 187,
+              "end": 226
+            },
+            "subject": "Rust structural constraints"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "multiple-imports-root-inventory",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar Imported {\n  @import a from 'part.ubnf'\n  @import b from 'parts/second.ubnf'\n  @import again from 'part.ubnf'\n  @ubnf: v2\n  @whitespace: bogus\n  token A = example.ExternalParser\n  token B = example.ExternalParser\n  @root @mapping(Value,params=[text]) @whitespace(bogus) @interleave(profile=bogus)\n  Root ::= (a.X | b.X | again.X) @text;\n  @interleave(profile=bogus) Other ::= '😀';\n}\ngrammar One {\n  token A = example.ExternalParser\n  @root Root ::= A;\n}\n",
+      "part.ubnf": "grammar Part { @ubnf: v2 token X ::= 'x'; }\n",
+      "parts/second.ubnf": "grammar Part { @ubnf: v2 token X ::= 'x'; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "P-WHITESPACE",
+            "severity": "error",
+            "span": {
+              "start": 168,
+              "end": 173
+            },
+            "subject": "bogus"
+          },
+          {
+            "code": "P-EXTERNAL-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 176,
+              "end": 208
+            },
+            "subject": "example.ExternalParser"
+          },
+          {
+            "code": "P-EXTERNAL-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 211,
+              "end": 243
+            },
+            "subject": "example.ExternalParser"
+          },
+          {
+            "code": "P-WHITESPACE",
+            "severity": "error",
+            "span": {
+              "start": 282,
+              "end": 300
+            },
+            "subject": "bogus"
+          },
+          {
+            "code": "P-INTERLEAVE",
+            "severity": "error",
+            "span": {
+              "start": 301,
+              "end": 327
+            },
+            "subject": "bogus"
+          },
+          {
+            "code": "P-INTERLEAVE",
+            "severity": "error",
+            "span": {
+              "start": 370,
+              "end": 396
+            },
+            "subject": "bogus"
+          },
+          {
+            "code": "P-EXTERNAL-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 430,
+              "end": 462
+            },
+            "subject": "example.ExternalParser"
+          }
+        ]
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "P-WHITESPACE",
+            "severity": "error",
+            "span": {
+              "start": 174,
+              "end": 179
+            },
+            "subject": "bogus"
+          },
+          {
+            "code": "P-EXTERNAL-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 183,
+              "end": 215
+            },
+            "subject": "example.ExternalParser"
+          },
+          {
+            "code": "P-EXTERNAL-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 219,
+              "end": 251
+            },
+            "subject": "example.ExternalParser"
+          },
+          {
+            "code": "P-WHITESPACE",
+            "severity": "error",
+            "span": {
+              "start": 291,
+              "end": 309
+            },
+            "subject": "bogus"
+          },
+          {
+            "code": "P-INTERLEAVE",
+            "severity": "error",
+            "span": {
+              "start": 310,
+              "end": 336
+            },
+            "subject": "bogus"
+          },
+          {
+            "code": "P-INTERLEAVE",
+            "severity": "error",
+            "span": {
+              "start": 381,
+              "end": 407
+            },
+            "subject": "bogus"
+          },
+          {
+            "code": "P-EXTERNAL-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 444,
+              "end": 476
+            },
+            "subject": "example.ExternalParser"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "nested-imports-root-and-null-dedup",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar First {\n  @import nested from 'parts/nested.ubnf'\n  @ubnf: v2\n  @tokenStream: enabled\n  token ImportedLexical0 ::= '';\n  @root @mapping(Value,params=[text]) Root ::= (ImportedLexical0 | nested.Empty) @text;\n}\ngrammar Second {\n  @import nested from 'parts/nested.ubnf'\n  @ubnf: v2\n  @tokenStream: enabled\n  @root @mapping(Value,params=[text]) Root ::= nested.Empty @text;\n}\ngrammar Third {\n  @import nested from 'parts/nested.ubnf'\n  @ubnf: v2\n  @tokenStream: enabled\n  @root @mapping(Value,params=[text]) Root ::= nested.Empty @text;\n}\n",
+      "parts/nested.ubnf": "grammar Nested { @import leaf from 'leaf.ubnf' @ubnf: v2 token Empty ::= leaf.Empty; }\n",
+      "parts/leaf.ubnf": "// 😀 imported offsets are not root offsets\ngrammar Leaf { @ubnf: v2 token Empty ::= ''; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "E-TOKEN-STREAM-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 119,
+              "end": 149
+            },
+            "subject": "ImportedLexical0"
+          },
+          {
+            "code": "E-TOKEN-STREAM-TOKEN",
+            "severity": "error",
+            "span": null,
+            "subject": "ImportedLexical0"
+          },
+          {
+            "code": "E-TOKEN-STREAM-TOKEN",
+            "severity": "error",
+            "span": null,
+            "subject": "ImportedLexical1"
+          }
+        ]
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "E-TOKEN-STREAM-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 124,
+              "end": 154
+            },
+            "subject": "ImportedLexical0"
+          },
+          {
+            "code": "E-TOKEN-STREAM-TOKEN",
+            "severity": "error",
+            "span": null,
+            "subject": "ImportedLexical0"
+          },
+          {
+            "code": "E-TOKEN-STREAM-TOKEN",
+            "severity": "error",
+            "span": null,
+            "subject": "ImportedLexical1"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "rebuilt-root-elements",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar Imported {\n  @import part from 'part.ubnf'\n  @ubnf: v2\n  @root @mapping(Value,params=[text]) Root ::= (COMMIT(part.X, '') | COMMIT(part.X, '')) @text;\n}\n",
+      "part.ubnf": "grammar Part { @ubnf: v2 token X ::= 'x'; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "E-COMMIT-EMPTY-MESSAGE",
+            "severity": "error",
+            "span": {
+              "start": 134,
+              "end": 152
+            },
+            "subject": "COMMIT message must not be empty"
+          },
+          {
+            "code": "E-COMMIT-EMPTY-MESSAGE",
+            "severity": "error",
+            "span": {
+              "start": 155,
+              "end": 173
+            },
+            "subject": "COMMIT message must not be empty"
+          }
+        ]
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "E-COMMIT-EMPTY-MESSAGE",
+            "severity": "error",
+            "span": {
+              "start": 138,
+              "end": 156
+            },
+            "subject": "COMMIT message must not be empty"
+          },
+          {
+            "code": "E-COMMIT-EMPTY-MESSAGE",
+            "severity": "error",
+            "span": {
+              "start": 159,
+              "end": 177
+            },
+            "subject": "COMMIT message must not be empty"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "rebuilt-root-rule",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar Invalid {\n @import part from 'part.ubnf'\n @ubnf: v2\n @package: commonprobe @root @mapping(Node) @commonField(value) Root ::= A | B; @nestedCaptures @mapping(A,params=[value]) A ::= 'a' [ {'x'} ] @value; @nestedCaptures @mapping(B,params=[value]) B ::= 'b' { ['x'] } @value;  }\n",
+      "part.ubnf": "grammar Part { @ubnf: v2 token X ::= 'x'; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "failed",
+        "diagnostics": [
+          {
+            "code": "P-COMMONFIELD",
+            "severity": "error",
+            "span": {
+              "start": 106,
+              "end": 162
+            },
+            "subject": "commonField schema"
+          }
+        ]
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "failed",
+        "diagnostics": [
+          {
+            "code": "P-COMMONFIELD",
+            "severity": "error",
+            "span": {
+              "start": 110,
+              "end": 166
+            },
+            "subject": "commonField schema"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "rebuilt-lexical-context",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar Imported {\n  @import part from 'part.ubnf'\n  @ubnf: v2\n  token END = EOF\n  @root @mapping(Value,params=[value])\n  Root ::= (Left | Right) @value END;\n  @lexicalContext(tokens=['part.GT'])\n  Left ::= part.GT;\n  @lexicalContext(tokens=['part.Maybe'])\n  Right ::= part.GT;\n}\ngrammar Plain {\n  @ubnf: v2\n  token GT ::= [ '>' ];\n  token END = EOF\n  @root @mapping(Value,params=[value])\n  @lexicalContext(tokens=['GT'])\n  Root ::= GT @value END;\n}\n",
+      "part.ubnf": "grammar Part { @ubnf: v2 token GT ::= '>'; token Maybe ::= [ '>' ]; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "E-LEXICAL-CONTEXT-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 241,
+              "end": 279
+            },
+            "subject": "ImportedLexical1"
+          },
+          {
+            "code": "E-LEXICAL-CONTEXT-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 414,
+              "end": 444
+            },
+            "subject": "GT"
+          }
+        ]
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "E-LEXICAL-CONTEXT-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 250,
+              "end": 288
+            },
+            "subject": "ImportedLexical1"
+          },
+          {
+            "code": "E-LEXICAL-CONTEXT-TOKEN",
+            "severity": "error",
+            "span": {
+              "start": 431,
+              "end": 461
+            },
+            "subject": "GT"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "missing-module",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar Imported { @import part from 'part.ubnf' @ubnf: v2 @root @mapping(Value,params=[text]) Root ::= part.X @text; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "P-MODULE",
+            "severity": "error",
+            "span": null,
+            "subject": "UBNF module resolution"
+          }
+        ]
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": false,
+        "structure": "blocked",
+        "diagnostics": [
+          {
+            "code": "P-MODULE",
+            "severity": "error",
+            "span": null,
+            "subject": "UBNF module resolution"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "valid-import",
+    "files": {
+      "main.ubnf": "// 😀 root CP positions\ngrammar Imported { @import part from 'part.ubnf' @ubnf: v2 @root @mapping(Value,params=[text]) Root ::= part.X @text; }\n",
+      "part.ubnf": "grammar Part { @ubnf: v2 token X ::= 'x'; }\n"
+    },
+    "expected": {
+      "LF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": true,
+        "structure": "passed",
+        "diagnostics": []
+      },
+      "CRLF": {
+        "schemaVersion": 1,
+        "target": "rust",
+        "portable": true,
+        "structure": "passed",
+        "diagnostics": []
+      }
+    }
+  }
+]
