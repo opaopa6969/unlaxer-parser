@@ -43,9 +43,9 @@ import org.unlaxer.dsl.codegen.rust.RustBackend;
 import org.unlaxer.parser.Parser;
 
 /**
- * Differential fuzz of {@code @autoCommit} under the built-in {@code @whitespace: javaStyle} (#728).
+ * Differential fuzz of {@code @autoCommit} under global javaStyle and/or line comments (#728, #745).
  *
- * <p>Each seed of {@link GrammarGenerator} is rendered with {@code @whitespace: javaStyle}, once as
+ * <p>Each seed of {@link GrammarGenerator} is rendered with one of four trivia settings, once as
  * written ("plain") and once with {@code @autoCommit} on every rule ("auto"). Seeds whose rewrite
  * inserts no {@code COMMIT} are skipped until {@code acfuzz.grammars} grammars with insertions are
  * collected. Inputs are the generator's derivations and mutations, plus variants with spaces,
@@ -68,7 +68,7 @@ public class AutoCommitWhitespaceFuzzTest {
     static final int CI_VARIANTS = 3;
     static final int DERIVATIONS = 4, MUTATIONS = 7, RESERVE = 6;
     /** Trivia of javaStyle, and fragments that look like it but are not. */
-    static final String[] TRIVIA = {" ", "\n", "\t", "\r\n", "  ", "/* c */", "/**/", "// c\n", "//", "/", "/*", "*/"};
+    static final String[] TRIVIA = {" ", "\n", "\t", "\r\n", "  ", "/* c */", "/**/", "// c\n", "//", "/", "/*", "*/", "\r", "// 😀\r\n", "// c\r", "// EOF"};
     static final List<Memoization> MEMO = List.of(Memoization.OFF, Memoization.SAFE_FAILURES);
     static final List<ParseOptions.Diagnostics> DIAGNOSTICS = List.of(ParseOptions.Diagnostics.values());
 
@@ -81,10 +81,16 @@ public class AutoCommitWhitespaceFuzzTest {
     record Pair(long seed, String plain, String auto, GrammarDecl plainGrammar, GrammarDecl autoGrammar,
             List<String> inputs, int commits) {}
 
-    static String spaced(String rendered) {
+    static String spaced(String rendered, int profile) {
         String text = rendered.replace("  @whitespace: none\n", "");
         int at = text.indexOf('\n', text.indexOf("@package:")) + 1;
-        return text.substring(0, at) + "  @whitespace: javaStyle\n" + text.substring(at);
+        String settings = switch (profile) {
+            case 0 -> "  @whitespace: javaStyle\n";
+            case 1 -> "  @whitespace: javaStyle\n  @comment: { line: '//' }\n";
+            case 2 -> "  @comment: { line: '//' }\n";
+            default -> "  @whitespace: none\n  @comment: { line: '//' }\n";
+        };
+        return text.substring(0, at) + settings + text.substring(at);
     }
 
     /**
@@ -156,8 +162,9 @@ public class AutoCommitWhitespaceFuzzTest {
             corpus.seeds++;
             var generator = new GrammarGenerator(seed, GrammarGenerator.Limits.CI);
             GrammarModel model = generator.grammar();
-            String plain = alphabet(seed, spaced(model.render("P" + seed, "acfuzz.p" + seed)), true);
-            String auto = annotated(alphabet(seed, spaced(model.render("A" + seed, "acfuzz.a" + seed)), true));
+            int profile = corpus.pairs.size() % 4; // Equal coverage, even when seeds without commits are skipped.
+            String plain = alphabet(seed, spaced(model.render("P" + seed, "acfuzz.p" + seed), profile), true);
+            String auto = annotated(alphabet(seed, spaced(model.render("A" + seed, "acfuzz.a" + seed), profile), true));
             GrammarDecl plainGrammar, autoGrammar;
             try {
                 plainGrammar = UBNFMapper.parse(plain).grammars().get(0);

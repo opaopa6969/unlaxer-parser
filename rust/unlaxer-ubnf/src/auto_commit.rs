@@ -18,7 +18,8 @@
 //!
 //! Under the grammar-wide built-in `@whitespace: javaStyle` (#728) the same rules apply with
 //! code points read after the trivia that sequence boundaries skip; terminals and tokens whose
-//! FIRST meets a code point that can start trivia (a space or `/`) are not modelled.
+//! FIRST meets a code point that can start trivia are not modelled. Global `@comment` uses the
+//! same set with javaStyle, or just `/` when only line comments are skipped (#745).
 use crate::ast::*;
 use crate::lexical::{LexicalExpression, Op};
 use std::cell::{Cell, RefCell};
@@ -72,7 +73,7 @@ impl Finding {
 pub struct Warning {
     pub rule: String,
     pub span: Span,
-    /// `grammar` (outside the analysed subset), `opaque` or `unreachable`.
+    /// `grammar`, a specific `comment-*` exclusion, `opaque` or `unreachable`.
     pub reason: &'static str,
 }
 
@@ -88,6 +89,13 @@ impl Warning {
     pub fn message(&self) -> String {
         let why = match self.reason {
             "grammar" => "the grammar is outside the analysed subset",
+            "comment-setting" => {
+                "@comment requires exactly one { line: '//' } setting without javaStyle"
+            }
+            "comment-whitespace" => "@comment with non-built-in whitespace is not modelled",
+            "comment-rule-trivia" => {
+                "@comment with rule-local trivia or lexical context is not modelled"
+            }
             "opaque" => "the rule has an annotation the analysis does not model",
             _ => "the rule is not reachable from the root",
         };
@@ -136,7 +144,7 @@ pub fn warnings(grammar: &GrammarDecl) -> Vec<Warning> {
                 continue;
             }
             let reason = match &analysis {
-                None => "grammar",
+                None => comment_skip_reason(grammar).unwrap_or("grammar"),
                 Some(analysis) if analysis.opaque[index] => "opaque",
                 Some(analysis) if !analysis.reachable[index] => "unreachable",
                 Some(_) => continue,
@@ -434,8 +442,8 @@ struct Analysis<'a> {
     /// FIRST per element (by address, valid while the grammar is borrowed), once `table` is final.
     memo: RefCell<HashMap<usize, First>>,
     frozen: Cell<bool>,
-    /// The grammar skips javaStyle trivia at sequence boundaries (#728).
-    trivia: bool,
+    /// Code points that can start the grammar-wide trivia (#728, #745).
+    trivia_start: Chars,
 }
 
 /// Settings the analysis models: those that leave the code-point semantics of terminals and
@@ -446,6 +454,50 @@ fn plain_setting(setting: &GlobalSetting) -> bool {
         ("whitespace", SettingValue::String(value)) => value.trim() == "none" || java_style(value),
         _ => false,
     }
+}
+
+fn has_java_style(grammar: &GrammarDecl) -> bool {
+    grammar.settings.iter().any(|s| {
+        s.key == "whitespace" && matches!(&s.value, SettingValue::String(v) if java_style(v))
+    })
+}
+
+/// Match the global comment contract (#712), without depending on the code generator.
+fn comment_skip_reason(grammar: &GrammarDecl) -> Option<&'static str> {
+    let comments: Vec<_> = grammar
+        .settings
+        .iter()
+        .filter(|s| s.key == "comment")
+        .collect();
+    if comments.is_empty() {
+        return None;
+    }
+    // javaStyle ignores even malformed/duplicate @comment; its validator still warns.
+    if !has_java_style(grammar)
+        && (comments.len() != 1
+            || !matches!(&comments[0].value, SettingValue::Block(entries)
+            if entries.len() == 1 && entries[0].key == "line" && entries[0].value == "//"))
+    {
+        return Some("comment-setting");
+    }
+    if grammar
+        .settings
+        .iter()
+        .any(|s| s.key == "whitespace" && !plain_setting(s))
+    {
+        return Some("comment-whitespace");
+    }
+    if grammar.rules.iter().flat_map(|r| &r.annotations).any(|a| {
+        matches!(
+            a.kind,
+            AnnotationKind::Whitespace { .. }
+                | AnnotationKind::Interleave { .. }
+                | AnnotationKind::LexicalContext { .. }
+        )
+    }) {
+        return Some("comment-rule-trivia");
+    }
+    None
 }
 
 /// The space characters of javaStyle trivia (Java `SpaceParser`, the runtime `skip`).
@@ -482,7 +534,12 @@ fn transparent(annotation: &Annotation) -> bool {
 impl<'a> Analysis<'a> {
     /// `None` when the grammar is outside the modelled subset as a whole.
     fn new(grammar: &'a GrammarDecl) -> Option<Self> {
-        if !grammar.settings.iter().all(plain_setting) {
+        if comment_skip_reason(grammar).is_some()
+            || !grammar
+                .settings
+                .iter()
+                .all(|s| s.key == "comment" || plain_setting(s))
+        {
             return None;
         }
         let trivia = grammar.rules.iter().flat_map(|r| &r.annotations).any(|a| {
@@ -507,16 +564,19 @@ impl<'a> Analysis<'a> {
         let [root] = roots.as_slice() else {
             return None;
         };
-        let spaced = grammar.settings.iter().any(|setting| {
-            setting.key == "whitespace"
-                && matches!(&setting.value, SettingValue::String(value) if java_style(value))
-        });
-        let mut analysis = Self::solve(grammar, spaced);
+        let trivia_start = if has_java_style(grammar) {
+            TRIVIA_START
+        } else if grammar.settings.iter().any(|s| s.key == "comment") {
+            Chars::of('/')
+        } else {
+            Chars::NONE
+        };
+        let mut analysis = Self::solve(grammar, trivia_start);
         // Left recursion is about the parser calling a rule again at the same position, so it
         // uses the FIRST sets of the input as written: a terminal that is unknown under trivia
         // (such as '/') still consumes (#728 review).
-        let left_recursive = if spaced {
-            Self::solve(grammar, false).left_recursive()
+        let left_recursive = if trivia_start != Chars::NONE {
+            Self::solve(grammar, Chars::NONE).left_recursive()
         } else {
             analysis.left_recursive()
         };
@@ -535,7 +595,7 @@ impl<'a> Analysis<'a> {
     }
 
     /// Name tables and the least-fixpoint FIRST table, with or without the trivia rule.
-    fn solve(grammar: &'a GrammarDecl, trivia: bool) -> Self {
+    fn solve(grammar: &'a GrammarDecl, trivia_start: Chars) -> Self {
         let mut rules = HashMap::new();
         let mut ambiguous = HashSet::new();
         for (index, rule) in grammar.rules.iter().enumerate() {
@@ -569,7 +629,7 @@ impl<'a> Analysis<'a> {
             sites: HashMap::new(),
             memo: RefCell::new(HashMap::new()),
             frozen: Cell::new(false),
-            trivia,
+            trivia_start,
         };
         for (index, opaque) in analysis.opaque.iter().enumerate() {
             if *opaque {
@@ -621,7 +681,7 @@ impl<'a> Analysis<'a> {
     /// can start trivia is not modelled: it could consume trivia that the next sequence
     /// boundary would have skipped (docs/auto-commit.md, 空白のある文法).
     fn atom(&self, first: First) -> First {
-        if self.trivia && !first.unknown && first.chars.meets(TRIVIA_START) {
+        if !first.unknown && first.chars.meets(self.trivia_start) {
             First::UNKNOWN
         } else {
             first

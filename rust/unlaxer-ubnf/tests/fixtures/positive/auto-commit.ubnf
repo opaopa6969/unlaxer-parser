@@ -34,7 +34,7 @@ grammar Spaced {
   T ::= 'm' B | '/' B ;
   B ::= 'b' ;
 }
-// Not rewritten: @comment is outside the analysed subset (#712).
+// #745: 行コメント単独も T₀={/} で解析し、S の B を COMMIT で包む。
 grammar Commented {
   @comment: { line: '//' }
   @root

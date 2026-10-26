@@ -148,7 +148,7 @@
   },
   {
     "name": "comment-and-other-warnings",
-    "note": "重複した @comment と未知注釈・autoCommit の3種類を span 順に報告する（#777）。@comment は既存の autoCommit 解析の対象外なので grammar reason を保つ",
+    "note": "重複した @comment と未知注釈・autoCommit の3種類を span 順に報告する（#777）。#745 で javaStyle + comment も解析するため、未知注釈は規則を opaque にし、Lost の reason も opaque になる。",
     "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @whitespace: javaStyle\n  @comment: { line: '#' }\n  @comment: { line: '//' }\n  @root @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @LeftAssoc\n  Item ::= 'n' ;\n  @autoCommit @custom\n  Lost ::= 'l' Item ;\n}\n",
     "warnings": [
       {
@@ -181,8 +181,8 @@
           342,
           352
         ],
-        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @LeftAssoc has no effect; did you mean @leftAssoc?",
-        "line": "warning: CP 342..352: W-ANNOTATION-IGNORED: Item: unknown annotation @LeftAssoc has no effect; did you mean @leftAssoc?"
+        "message": "W-ANNOTATION-IGNORED: Item: unknown annotation @LeftAssoc is not used by the generator, but it excludes rule Item from @autoCommit analysis; did you mean @leftAssoc?",
+        "line": "warning: CP 342..352: W-ANNOTATION-IGNORED: Item: unknown annotation @LeftAssoc is not used by the generator, but it excludes rule Item from @autoCommit analysis; did you mean @leftAssoc?"
       },
       {
         "code": "W-AUTO-COMMIT-SKIPPED",
@@ -192,8 +192,8 @@
           372,
           383
         ],
-        "message": "W-AUTO-COMMIT-SKIPPED: Lost: @autoCommit inserts nothing: the grammar is outside the analysed subset",
-        "line": "warning: CP 372..383: W-AUTO-COMMIT-SKIPPED: Lost: @autoCommit inserts nothing: the grammar is outside the analysed subset"
+        "message": "W-AUTO-COMMIT-SKIPPED: Lost: @autoCommit inserts nothing: the rule has an annotation the analysis does not model",
+        "line": "warning: CP 372..383: W-AUTO-COMMIT-SKIPPED: Lost: @autoCommit inserts nothing: the rule has an annotation the analysis does not model"
       },
       {
         "code": "W-ANNOTATION-IGNORED",
@@ -203,8 +203,26 @@
           384,
           391
         ],
-        "message": "W-ANNOTATION-IGNORED: Lost: unknown annotation @custom has no effect",
-        "line": "warning: CP 384..391: W-ANNOTATION-IGNORED: Lost: unknown annotation @custom has no effect"
+        "message": "W-ANNOTATION-IGNORED: Lost: unknown annotation @custom is not used by the generator, but it excludes rule Lost from @autoCommit analysis",
+        "line": "warning: CP 384..391: W-ANNOTATION-IGNORED: Lost: unknown annotation @custom is not used by the generator, but it excludes rule Lost from @autoCommit analysis"
+      }
+    ]
+  },
+  {
+    "name": "comment-auto-commit-rule-trivia",
+    "note": "#745: 共通の N(p) を証明しない規則 trivia の併記を、3経路の生成 CLI でも具体的な reason / CP span と strict 拒否で固定する。",
+    "grammar": "// 😀 CP spans\ngrammar Commented {\n  @package: org.example.commented\n  @comment: { line: '//' }\n  @root @mapping(Root) @autoCommit\n  Root ::= 'a' N;\n  @whitespace(none) N ::= 'b' 'c';\n}\n",
+    "warnings": [
+      {
+        "code": "W-AUTO-COMMIT-SKIPPED",
+        "grammar": "Commented",
+        "rule": "Root",
+        "span": [
+          118,
+          129
+        ],
+        "message": "W-AUTO-COMMIT-SKIPPED: Root: @autoCommit inserts nothing: @comment with rule-local trivia or lexical context is not modelled",
+        "line": "warning: CP 118..129: W-AUTO-COMMIT-SKIPPED: Root: @autoCommit inserts nothing: @comment with rule-local trivia or lexical context is not modelled"
       }
     ]
   }

@@ -151,6 +151,10 @@ Java-host Rust 生成と native `unlaxer generate` は同じ `warning: CP <start
 stderr に出す。3経路とも `--strict` / `--fail-on warning` では生成物を書かず終了コード 5。
 portability check では portable のままで、diagnostic にも出さない。
 
+`@autoCommit` は全規則がこの既定を使う文法を解析できる（#745）。javaStyle 併記は
+T₀ = {空白6文字, `/`}、comment 単独・none 併記は T₀ = {`/`}。MatchOnly の終端は
+COMMIT の消費位置に足さない。[証明と対象外](auto-commit.md#行コメントのある文法745)。
+
 ### Java の変更と移行
 
 変更前の Java は (1) `line` key があれば値に関わらず `//` を読み飛ばし、`line` が無い block や

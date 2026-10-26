@@ -1,4 +1,4 @@
-# FIRST 集合による cut 位置の lint と `@autoCommit`（#702、#728）
+# FIRST 集合による cut 位置の lint と `@autoCommit`（#702、#728、#745）
 
 [#700](cut-and-labeled-failures.md) の `COMMIT` を入れても意味が変わらない位置を、FIRST 集合から
 求める。位置は lint として報告し、規則に `@autoCommit` を付けたときだけ frontend がそこへ
@@ -6,7 +6,7 @@
 kmizu/yapp の `translator/AutoCutInserterUsingFirstSet.java`（PASTE 2010）である。yapp の
 `truncate`（cut 位置より前の memo を捨てる最適化）は性能目的なので、#197 の凍結に従い扱わない。
 文法全体の `@whitespace: javaStyle`（空白とコメントを自動で読み飛ばす文法）も対象にする（#728、
-下の「空白のある文法」）。
+下の「空白のある文法」）。`@comment: { line: '//' }` の併記・単独にも対応する（#745）。
 
 ```ubnf
 grammar Stmts {
@@ -114,7 +114,10 @@ span は注釈 `@autoCommit` の位置）を返す。`reason` は次のどれか
 
 | reason | 条件 |
 | --- | --- |
-| `grammar` | 文法が解析の対象外（下の「文法全体の前提」：`@comment`・宣言的 token の空白・規則の空白、設定、root が 1 個でない、左再帰） |
+| `grammar` | 文法が解析の対象外（下の「文法全体の前提」：宣言的 token の空白・規則の空白、設定、root が 1 個でない、左再帰） |
+| `comment-setting` | javaStyle が無く、`@comment` が1個の `{ line: '//' }` でない |
+| `comment-whitespace` | `@comment` と解析対象外の全体 whitespace の併記 |
+| `comment-rule-trivia` | `@comment` と規則の `@whitespace` / `@interleave` / `@lexicalContext` の併記 |
 | `opaque` | 規則が不透明（下の「不透明な規則」） |
 | `unreachable` | root からたどれない |
 
@@ -144,7 +147,7 @@ FIRST 集合は runtime の `FirstSet` と同じ表現で持つ。ASCII（0〜12
 | 選択 | 和 |
 | `COMMIT` `LABEL` `CATCH` `CAPTURE` `CAPTURE_SCOPE` `SAME_AS` `ERROR` | unknown（runtime の FIRST 集合による候補除外と同じ扱い） |
 
-`@whitespace: javaStyle` の文法では、上の表で求めた FIRST が空白・コメントの開始（下の T₀）と交わる
+`@whitespace: javaStyle` または `@comment` の文法では、上の表で求めた FIRST が有効な trivia の開始（下の T₀）と交わる
 終端記号と token 参照を unknown にする（下の「空白のある文法」）。
 
 規則表は全規則を「空集合・nullable でない」から始め、変化が無くなるまで本体を計算し直す
@@ -155,7 +158,8 @@ FIRST 集合は runtime の `FirstSet` と同じ表現で持つ。ASCII（0〜12
 次のどれかに当たる文法は解析しない（lint は空、挿入しない）。
 
 - 設定が `@package` `@ubnf` `@memoSafeToken` `@feature` `@whitespace: none` `@whitespace: javaStyle`
-  以外を含む。`@comment`（Java と Rust の意味は #712 で揃ったが、解析への組み込みは #745）、
+  と `@comment: { line: '//' }` 以外を含む。javaStyle と併記する `@comment` は、その内容によらず
+  javaStyle 単独と同じに解析する（不正な形の `W-COMMENT-IGNORED` は従来どおり）。
   宣言的 token を空白にする `@whitespace: 名前`、トークン列の文法（`@tokenStream`）、埋め込み、token adapter / contract は
   トークン境界の位置を変えるので対象外。javaStyle の綴りは、両端の ASCII 空白（空白・tab・改行・
   `\v`・`\f`）を除いて ASCII の大文字小文字を区別せずに比べる。両 generator はこれより広く trim し、
@@ -291,7 +295,7 @@ T の後から始まる。確定エラーの位置は子が始まった位置、
 
 ### 空白を読み飛ばした後の位置で比べる
 
-位置 p から T を当てた終わりを N(p) と書く。根拠に使う T の性質は次の 3 つだけである。
+位置 p から T を当てた**消費位置**を N(p) と書く。根拠に使う T の性質は次の 3 つだけである。
 
 1. T は必ず成功し、同じ位置からは同じ終わりになる（文脈に依らない）。
 2. N(N(p)) = N(p)。T は繰り返せるだけ繰り返すので、終わった位置ではもう何も読まない。
@@ -349,10 +353,44 @@ FIRST が T₀ と交わる終端記号・token は unknown にする。素の�
   入力の終わりの trivia だけが残る場合は N(q) が入力の終わりなので、この状態にはならない
   （`let n = v ;  ` は受理、`let   ` は位置 6 の確定エラー）。
 
+### 行コメントのある文法（#745）
+
+`@whitespace: javaStyle` と `@comment` を併記しても、#712 の契約では T は javaStyle のまま。
+したがって T₀ = {空白6文字, `/`}、FIRST、COMMIT の挿入位置は javaStyle 単独と同じになる。
+javaStyle が無視する不正・重複の `@comment` も同じで、`W-COMMENT-IGNORED` は維持する。
+
+`@comment: { line: '//' }` 単独、または `@whitespace: none` との併記では、
+T は行コメントだけを繰り返す。T₀ = {`/`} とする。空白・改行・block comment は読み飛ばさない。
+T は必ず成功し決定的、終了した**消費位置**ではもうコメントを読めず冪等、`/` 以外からは消費しない。
+上の3性質と FIRST / nullable の命題が成立する。改行や空白で始まる終端は T₀ と交わらないので
+unknown にしない。`/` で始まる終端と、FIRST が `/` を含む token は引き続き unknown にする。
+
+行コメントの CR / LF / CRLF 終端は Java の `CPPComment` と同じ MatchOnly であり、
+消費しないまま matched cursor を終端の後ろへ進める。EOF なら両 cursor は入力の終わりになる。
+**N(p) は matched cursor ではない**。たとえば `k//c\r\nx` で `k` の後の T は消費位置4、
+matched は6に終わる。次の要素は消費位置4の CR から試すため、上の認識の証明はそのまま使える。
+解析対象には matched cursor を認識に使う token mode や lexical context を含めない。
+通常失敗の診断は既存の frontier により matched の位置を使い得るが、挿入した `COMMIT(N)` の
+確定エラーは**COMMIT を開始した消費位置4**である（`Commit.parse` / Rust の Commit 演算子）。
+終端の後ろ6に変えてはならない。終端を文法要素として消費した後の COMMIT はその先から始まる。
+`//c\nx` の LF を先頭要素として消費してから `COMMIT(N)` を試す場合は位置4になる。
+
+COMMIT は T の外側の列に入り、成功した子の消費・matched・CST を変えない。
+従って受理された入力の結果も同じであり、通常失敗を確定エラーに変えるときだけ診断が変わる。
+空・コメントのみ・末尾コメントも前節と同じ証明になる。ただし行末は trivia ではないため、
+コメントと改行だけの入力を空入力と同一視しない（文法が改行を消費しなければ全入力解析で拒否）。
+
+`comment-only-raw-slash` は `/` を unknown にする必要性を固定する。
+`Item ::= DIGIT | '\n' N | '/' | 'c' '\n' 'k' 'x'` の反復は `1//c\nkx` を受理する。
+`'\n' N` がコメントを読み飛ばして失敗した後、素の `/` を2回、続く `c\nkx` を読む経路がある。
+ここに COMMIT を挿入すると受理集合が変わるので、挿入しない。
+
 ### まだ対象にしないもの
 
-- `@comment`：読み飛ばす範囲は #712 で Java と Rust の両生成経路で揃った（[trivia 契約](rule-trivia.md#global-comment712)）。
-  ただし T₀ と命題への組み込みはまだで、`W-AUTO-COMMIT-SKIPPED`（reason=grammar）のまま。#745 で扱う。
+- `@comment` と規則の trivia / lexical context の併記は、全規則に共通の N(p) を使えないため
+  `comment-rule-trivia` で除外する。javaStyle の無い不正な comment は `comment-setting`、
+  名前付きなどの全体 whitespace との併記は `comment-whitespace`。生成器の `E-COMMENT-*` による
+  拒否は変えない。これらは本対応の前提外であり、lint が空、COMMIT は挿入しない。
 - `@whitespace: 名前`（宣言的 token の空白）：T₀ を token ごとに求める必要がある。`@whitespace`
   の値として組み込みの javaStyle だけを対象にした。
 - 規則の `@whitespace` / `@interleave`、`@lexicalContext`、`@tokenStream`、埋め込み、token adapter /
@@ -370,7 +408,7 @@ frontend で UBNF の構文木に対して行うので、次の理由で計算�
    compile する）。
 2. lint は原文の位置を返す。必要なのは構文木の節点ごとの FIRST と、親・兄弟・参照位置を
    たどる文脈の検査で、runtime の表は規則ごとの値しか持たない。
-3. runtime は空白（trivia）を呼び出し側の方針で動的に解く。frontend は文法全体の javaStyle だけを
+3. runtime は空白（trivia）を呼び出し側の方針で動的に解く。frontend は文法全体の javaStyle / 行コメントだけを
    扱い、FIRST を「空白を読み飛ばした後の符号位置」と読み替える（上の「空白のある文法」）。規則ごとの
    空白は対象外にした方が単純で安全である。
 
@@ -390,25 +428,27 @@ runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする�
 
 [`spec-corpus/auto-commit`](../spec-corpus/auto-commit) を両 host が読む。期待値は手書きである。
 
-- `lint.json`: 33 文法、31 件の報告。報告する位置（選択肢と `e1` の原文、包む参照）と、
+- `lint.json`: 42 文法、48 件の報告。報告する位置（選択肢と `e1` の原文、包む参照）と、
   報告しない例（重なる FIRST、外側の選択・optional・`+`・separated list での再開、
   `COMMIT` / `LABEL` / `CATCH` / `CAPTURE`、不透明な規則、到達できない規則、`@recovery`、
   模型化しない token、左再帰、root 2 個、非 ASCII の 1 bit）。javaStyle の文法（#728）は
   `whitespace`、`whitespace-case`（綴りの大文字小文字）、`whitespace-trivia-start`（`'/'`・`' '`・
   `ANY` が unknown になる）と、同じ選択肢を空白なしで解析する `whitespace-trivia-start-none`、
   左再帰の検査で `'/'`・`ANY`・XID 識別子を消費するものとして扱う `whitespace-left-recursion-check`、
-  本当の左再帰がある `whitespace-left-recursion`、まだ対象外の `rule-whitespace`、`comment`、
+  本当の左再帰がある `whitespace-left-recursion`、まだ対象外の `rule-whitespace`、
   `declarative-whitespace`、javaStyle と規則の `@whitespace(none)` / `@interleave` / `@lexicalContext`
   の組み合わせ（`whitespace-rule-none`、`whitespace-interleave`、`whitespace-lexical-context`）。
-- `cases.json`: 10 文法 108 入力。自動挿入の文法、同じ位置に手で `COMMIT` を書いた文法、
+- `cases.json`: 18 文法 230 入力。自動挿入の文法、同じ位置に手で `COMMIT` を書いた文法、
   それぞれの入力の結果（受理・拒否、確定エラーの位置と message）。`group-after-commit` は
   包んだ参照の後ろに group が続き、Java の group helper の番号が変わらないことを CST で確かめる。
   javaStyle の 4 文法（`whitespace-statements`、`whitespace-expression`、`whitespace-slash`、
   `whitespace-raw-slash`）は、空白・tab・CRLF・行コメント・ブロックコメント・閉じていないコメント・
   単独の `/`・末尾の空白・空白だけの入力を含む。
-- `warnings.json`: 11 文法。`W-AUTO-COMMIT-SKIPPED` の規則・reason・位置（`grammar` 6 例（`@comment`、
-  宣言的 token の空白、javaStyle と規則の `@whitespace(none)` / `@interleave` / `@lexicalContext`、
-  root 2 個）、`opaque`、`unreachable`、警告しない例 3 つ（javaStyle の 2 つを含む））。
+  #745 の8実行例では javaStyle 併記・comment 単独・none 併記と、空白・改行の終端、
+  MatchOnly 終端（LF / CR / CRLF / EOF）、補助文字、素の `/` の反例を固定する。
+- `warnings.json`: 25 文法。`W-AUTO-COMMIT-SKIPPED` の規則・reason・位置と、
+  comment に関する具体的な3種類の reason / message、警告しない解析対象を固定する。
+  `generation-warnings/corpus.json` でも規則 trivia 併記の警告を3経路の CLI・strict 拒否で確認する。
 
 `AutoCommitConformanceTest`（Java）は次を確かめる。
 
@@ -422,20 +462,22 @@ runtime と同じにした。`COMMIT` / `LABEL` / `CATCH` を unknown とする�
   （`TokenPrinter`）が一致する。
 - `-DrustConformance=true` のとき、native generator と Java host の Rust 生成物が byte 単位で
   一致し、手書きの文法の生成物とも一致する。両 host の生成物を 6 設定で実行し、同じ比較を
-  CST（`Tree` の節点列）まで行う。
+  CST（`Tree` の節点列）まで行う。#745 の comment corpus は通常失敗を含む診断種別・CP位置を
+  Java と両 Rust host の間でも直接照合する。
 
-`AutoCommitWhitespaceFuzzTest`（Java、#728）は差分 fuzz である。property-based の `GrammarGenerator`
-（#705）の文法に `@whitespace: javaStyle` を付け、全規則に `@autoCommit` を付けた文法と付けない文法を
+`AutoCommitWhitespaceFuzzTest`（Java、#728・#745）は差分 fuzz である。property-based の `GrammarGenerator`
+（#705、`PropertyBasedParityTest` と共用）の文法に javaStyle 単独・javaStyle と comment・
+comment 単独・none と comment の4設定を順番に付け、全規則に `@autoCommit` を付けた文法と付けない文法を
 比べる。`COMMIT` が 1 個以上入った文法だけを使う。生成器の literal は trivia を始めないので、3 分の 2 の
 seed では `y` を `/`、`,` を `*`、`x` を空白に置き換える（文法と入力の両方）。入力は生成器の導出と変異に、
-空白・改行・CRLF・コメント・単独の `/`・`/*`・`*/` を符号位置の間に差し込んだものを加える。
+空白・LF・CR・CRLF・補助文字入りコメント・EOF コメント・単独の `/`・`/*`・`*/` を符号位置の間に差し込んだものを加える。
 
 - Java の生成 parser で、6 設定のすべての入力について、受理・拒否が一致し、受理した入力の CST と
   AST が一致する。
 - `-DrustConformance=true` のとき、native generator と Java host の Rust 生成物が byte 単位で一致し、
   native Rust の parser で同じ比較を行う。両 frontend の lint と警告（位置・件数・inserted）も
   全文法で比べる。
-- 既定（CI）は 24 文法。大きく回すときは `-Dacfuzz.seed=1000 -Dacfuzz.grammars=200 -Dacfuzz.variants=6`。
+- 既定（CI）は各設定6文法ずつの24文法。大きく回すときは `-Dacfuzz.seed=1000 -Dacfuzz.grammars=200 -Dacfuzz.variants=6`。
 
 `rust/unlaxer-ubnf/tests/auto_commit.rs` は同じ `lint.json` と `warnings.json`、書き換えた構文木と手書きの構文木の
 canonical 比較を native frontend で確かめる。`rust/unlaxer-ubnf/tests/fixtures/positive/auto-commit.ubnf`
@@ -450,12 +492,11 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ub
 
 ## 制限事項
 
-- 空白を自動で挟む文法のうち、解析するのは文法全体の `@whitespace: javaStyle` だけである。`@comment`
-  （#745）、宣言的 token の空白（`@whitespace: 名前`）、規則の `@whitespace` /
-  `@interleave` は解析しない。
+- 自動 trivia では文法全体の `@whitespace: javaStyle` と `@comment: { line: '//' }` を解析する。
+  宣言的 token の空白（`@whitespace: 名前`）、規則の `@whitespace` / `@interleave` は解析しない。
 - javaStyle の文法では、空白か `/` で始まり得る終端記号・token（`'/'`、`' '`、`ANY`、`NEGATION`、
   XID 識別子（`XID_IDENTIFIER`。FIRST を全体で近似しているため）、空白を含む `CHAR_RANGE` など）は
-  unknown になる。割り算の `'/'` のような演算子があると、その位置を
+  unknown になる。comment 単独では同じ判定を `/` だけに当てる。割り算の `'/'` のような演算子があると、その位置を
   通る文脈の検査は「不可」になり、挿入されない（corpus の `whitespace-slash`）。`'/='` のように
   2 文字目が `/` でも `*` でもない終端記号はコメントの開始と区別できるが、まだ区別していない。
 - 包むのは規則参照と token 参照だけで、終端記号は包まない（Java の CST が変わるため）。
@@ -469,7 +510,7 @@ RUSTUP_TOOLCHAIN=1.85.0 cargo test --manifest-path rust/Cargo.toml -p unlaxer-ub
 - 非 ASCII の符号位置は 1 bit にまとめるので、非 ASCII で始まる選択肢どうしは常に重なると扱う。
 - 判定は保守的で、意味を変えない位置でも報告しないことがある（例: corpus の
   `separated-trailing`）。
-- 解析の対象外の文法（`@comment`・宣言的 token の空白などのある文法）、不透明な規則、到達できない規則では、frontend は注釈を
+- 解析の対象外の文法（規則ごとの trivia・宣言的 token の空白などのある文法）、不透明な規則、到達できない規則では、frontend は注釈を
   取り除く。警告 `W-AUTO-COMMIT-SKIPPED` は lint の API（`lintWarnings` /
   `lint_warnings`）と、生成の警告（`GenerationWarnings` / `warnings::collect`）から得る。生成の CLI
   （native `unlaxer generate`、Java-host `generate --target rust`、Java の flag CLI）も表示し、

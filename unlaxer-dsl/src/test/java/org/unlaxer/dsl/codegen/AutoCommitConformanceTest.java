@@ -45,7 +45,7 @@ public class AutoCommitConformanceTest {
 
     @Test public void lintReportsTheCorpusPositions() throws Exception {
         var rows = corpus("lint.json");
-        assertEquals(33, rows.size());
+        assertEquals(42, rows.size());
         int reported = 0;
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
@@ -76,13 +76,13 @@ public class AutoCommitConformanceTest {
                 reported++;
             }
         }
-        assertEquals(31, reported);
+        assertEquals(48, reported);
     }
 
     /** {@code W-AUTO-COMMIT-SKIPPED} for annotations the analysis cannot use, located at the annotation. */
     @Test public void skippedAnnotationsAreWarnedAbout() throws Exception {
         var rows = corpus("warnings.json");
-        assertEquals(11, rows.size());
+        assertEquals(25, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String name = row.get("name").getAsString(), source = row.get("grammar").getAsString();
@@ -97,6 +97,7 @@ public class AutoCommitConformanceTest {
                 assertEquals(name, want.get("reason").getAsString(), warning.reason());
                 assertEquals("W-AUTO-COMMIT-SKIPPED", warning.code());
                 assertEquals("warning", warning.severity());
+                if (want.has("message")) assertEquals(name, want.get("message").getAsString(), warning.message());
                 assertEquals(name, "@autoCommit", snapshot.slice(warning.span().orElseThrow()));
                 assertTrue(name, warning.message().startsWith("W-AUTO-COMMIT-SKIPPED: "));
             }
@@ -151,7 +152,7 @@ public class AutoCommitConformanceTest {
     /** The rewrite equals the hand-written grammar and generates byte-identical code on every path. */
     @Test public void rewriteEqualsTheHandWrittenCommits() throws Exception {
         var rows = corpus("cases.json");
-        assertEquals(10, rows.size());
+        assertEquals(18, rows.size());
         for (var raw : rows) {
             var row = raw.getAsJsonObject();
             String name = row.get("name").getAsString();
@@ -231,7 +232,7 @@ public class AutoCommitConformanceTest {
                         @SuppressWarnings("unchecked")
                         var hints = (List<String>) record.getClass().getMethod("expected").invoke(record);
                         line = kind.equals("commit") || kind.equals("label")
-                            ? kind + "\t" + offset + "\t" + String.join("|", hints) + "\t" : "syntax\t\t\t";
+                            ? kind + "\t" + offset + "\t" + String.join("|", hints) + "\t" : "syntax\t" + offset + "\t\t";
                     }
                     assertEquals(input + " " + memo + " " + mode, line.startsWith("success"), !cst.isEmpty());
                     lines.add(line + "\t" + cst);
@@ -251,8 +252,10 @@ public class AutoCommitConformanceTest {
         for (var value : cases) {
             for (int option = 0; option < 6; option++, index++) {
                 String line = auto.get(index), before = plain.get(index);
+                var fields = new ArrayList<>(Arrays.asList(line.split("\t", 5)).subList(0, 4));
+                if (!value.getAsJsonObject().has("offset")) fields.set(1, "");
                 assertEquals(label + " " + value + " option=" + option, expected(value.getAsJsonObject()),
-                    String.join("\t", Arrays.asList(line.split("\t", 5)).subList(0, 4)));
+                    String.join("\t", fields));
                 boolean success = line.startsWith("success");
                 assertEquals(label + " acceptance before insertion " + value, success, before.startsWith("success"));
                 if (success) {
@@ -276,8 +279,8 @@ public class AutoCommitConformanceTest {
                 runJava(row.get("manual").getAsString(), cases), runJava(plain(grammar), cases));
             observations += auto.size();
         }
-        assertEquals(108 * 6, observations);
-        assertEquals(40 * 6, accepted);
+        assertEquals(230 * 6, observations);
+        assertEquals(91 * 6, accepted);
     }
 
     @Test public void bothRustHostsMatchTheOracleAndTheUnannotatedGrammar() throws Exception {
@@ -330,8 +333,17 @@ public class AutoCommitConformanceTest {
                 accepted += compare(name + " Rust" + host, cases, outputs.get("auto" + host), outputs.get("manual" + host), outputs.get("plain" + host));
             }
             assertEquals(name + " independently executed Rust hosts", outputs.get("auto"), outputs.get("auto-java"));
+            if (name.startsWith("comment-")) {
+                // Compare every failure position, including ordinary syntax failures; CST formats differ.
+                var java = runJava(sources.get("auto"), cases);
+                for (int i = 0; i < java.size(); i++) {
+                    assertEquals(name + " Java/Rust outcome and position " + i,
+                        Arrays.asList(java.get(i).split("\t", 5)).subList(0, 4),
+                        Arrays.asList(outputs.get("auto").get(i).split("\t", 5)).subList(0, 4));
+                }
+            }
         }
-        assertEquals(2 * 40 * 6, accepted);
+        assertEquals(2 * 91 * 6, accepted);
     }
 
     private static final String RUST_PROBE = """
@@ -348,7 +360,7 @@ public class AutoCommitConformanceTest {
                             Err(error) if error.kind == "commit" || error.kind == "label" => {
                                 format!("{}\\t{}\\t{}\\t\\t", error.kind, error.offset, error.expected.join("|"))
                             }
-                            Err(_) => "syntax\\t\\t\\t\\t".to_owned(),
+                            Err(error) => format!("syntax\\t{}\\t\\t\\t", error.offset),
                         };
                         println!("{line}");
                     }
