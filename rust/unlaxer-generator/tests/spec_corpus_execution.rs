@@ -86,6 +86,7 @@ fn receipt(scope: &str, row: &Value, original: &Value, checks: usize, observed: 
 
 #[test]
 fn validate_corpus_on_native() {
+    declaration_diagnostic_priority();
     let mut executed = BTreeSet::new();
     let rows = rows("validate");
     assert!(!rows.is_empty());
@@ -124,8 +125,65 @@ fn validate_corpus_on_native() {
         assert_eq!(checks, 2, "{id}: lowering と generate の両方が必要");
         assert!(executed.insert(id));
         receipt("validate", row, original, checks, observed);
+        if row.get("cp").is_none() {
+            let input = format!(
+                "{} @root @mapping(Entry) Entry ::= 'z'; }}",
+                source.strip_suffix('}').unwrap()
+            );
+            let rooted = &unlaxer_ubnf::parse(&input).unwrap().grammars[0];
+            for message in [
+                unlaxer_generator::lowering::lower(rooted).unwrap_err(),
+                unlaxer_generator::generate(&input).unwrap_err(),
+            ] {
+                assert_eq!(
+                    message.split(':').next().unwrap(),
+                    code,
+                    "{id} / root: {message}"
+                );
+            }
+        }
     }
     assert_eq!(executed.len(), rows.len());
+}
+
+fn declaration_diagnostic_priority() {
+    let cases: Value = serde_json::from_str(
+        &std::fs::read_to_string(root().join("spec-corpus/execution/diagnostic-priority.json"))
+            .unwrap(),
+    )
+    .unwrap();
+    for fixture in cases.as_array().unwrap() {
+        let source = fixture["source"].as_str().unwrap();
+        let code = fixture["code"].as_str().unwrap();
+        for with_root in [false, true] {
+            let input = if with_root {
+                format!(
+                    "{} @root @mapping(Entry) Entry ::= 'z'; }}",
+                    source.strip_suffix('}').unwrap()
+                )
+            } else {
+                source.to_owned()
+            };
+            let grammar = &unlaxer_ubnf::parse(&input).unwrap().grammars[0];
+            for message in [
+                unlaxer_generator::lowering::lower(grammar).unwrap_err(),
+                unlaxer_generator::generate(&input).unwrap_err(),
+            ] {
+                assert_eq!(
+                    message.split(':').next().unwrap(),
+                    code,
+                    "{} / root={with_root}: {message}",
+                    fixture["name"]
+                );
+            }
+        }
+    }
+    let input = "grammar G { @mapping(X) R ::= 'x'; }";
+    assert_eq!(
+        unlaxer_generator::generate(input).unwrap_err(),
+        "exactly one @root is required"
+    );
+    assert!(unlaxer_generator::generate("grammar G { @root @mapping(X) R ::= 'x'; }").is_ok());
 }
 
 struct Work(PathBuf);

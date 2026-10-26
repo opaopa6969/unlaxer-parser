@@ -25,14 +25,31 @@ Rust の generator は root AST node を必須とするため、指定 entry に
 元の rule body・token・入力は変更しない。実行記録には補う前の原文を記録する。
 
 validate は元入力のまま、syntax 受理後に validator / lowering / generator の拒否を検査する。
-2 件の量指定子は同じ診断コード（overflow は CP も）に一致する。残る 16 件は
-診断優先順位・root 前提・診断コードの差があるため、#833（参照/mapping 4 件）、
-#834（whitespace 5 件）、#835（その他 annotation 7 件）で追跡する。
-Java の仕様期待値は残し、各 Rust host の旧診断を完全一致で検査する。
-未知の変化・解消済みの差は失敗する。コードだけの仕様に新しい CP 契約は推測で追加しない。
-既知差は `parity-ledger.json` の対応する未修正項目・OPEN issue への参照も必須。
-未修正項目の `observation` には許可する corpus ID を backtick で列挙し、manifest の既知差の集合と
-完全一致させる。manifest だけで既知差を増やすこと、解消後に未修正項目だけ残すことは検査で落ちる。
+全 18 件が Java validator と同じ独立診断コードに一致する（#833/#834/#835）。
+量指定子 overflow は元入力の CP 範囲も比較する。コードだけの仕様に新しい CP 契約は推測で追加しない。
+16 件の旧診断は manifest から削除した。位置付きでない元 corpus には独立した有効な root を
+追加する別検査も行い、元入力の実行記録とは別に同じコードを確認する。将来差を登録する場合も `parity-ledger.json` の未修正項目・
+OPEN issue を必須とし、`observation` の backtick で列挙する corpus ID と既知差の集合を完全一致させる。
+解消後に未修正項目だけ残すことも検査で落ちる。
+
+`diagnostic-priority.json` は別途、複数エラーを持つ 18 入力を root なし／独立した有効な root 付きで
+実行する。Java validator の最初の ERROR と独立期待値を照合し、両 Rust host の lowering / generator が
+同じコードを選ぶことを確認する。対象コードの順序は global whitespace（重複→style）、規則の宣言順に
+whitespace（style→重複）→mapping（重複param→欠落→未列挙）→左右の結合性競合→precedence→
+interleave→scopeTree、その後に全規則の precedence 欠如→未定義参照。
+Java の root 欠如は `W-GENERAL-NO-ROOT` なのでこれらを遮らない。Rust の root 必須エラーは
+対象診断が無い場合の従来の説明を保つ。
+
+これは #833–#835 の診断群の順序であり、Java validator 全体を Rust lowering に移したものではない。
+例えば元の `annotation/assoc-without-precedence` では Java は mapping 欠如も列挙するが、
+corpus が指定する `E-ASSOC-NO-PRECEDENCE` を引き続き独立期待値とする。
+生成前の bounded/precedence overflow・nested・commonField 等の先行検証は #825 のまま。
+Java generator API は全 validator の代替ではなく、通常 frontend が共通 validator を先に呼ぶ。
+Java-host の既存 `Rust subset: ` は説明内へ残し、対象コードを先頭に置く。
+既存 choice profile の失敗は precedence より先の従来経路へ委ね、説明文を維持する。
+名前述語の capture 検証が mapping 診断に先行する契約も保持する。native はその検証に必要な
+body を構築する間だけ mapping 診断を保留し、検証後は root 欠如より先に返す。
+check JSON は説明文を公開せず、従来の inventory code / `P-STRUCTURE` と CP span・終了コードを維持する。
 
 Rust は照合後に `SPEC-CORPUS` 実行記録を出力し、Java は native テストを `--exact` で
 呼んで記録を照合する。cargo は存在しない test 名でも exit 0 になるので、終了コードに加えて

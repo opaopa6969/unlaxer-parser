@@ -33,6 +33,7 @@ public class SpecCorpusExecutionConformanceTest {
 
     @Test public void validationCorpusRunsOnEveryHost() throws Exception {
         requireRust();
+        declarationDiagnosticPriority();
         Path report = Path.of("target/spec-corpus-validate.json");
         Files.deleteIfExists(report);
         var receipts = new JsonArray();
@@ -75,9 +76,46 @@ public class SpecCorpusExecutionConformanceTest {
             }
             assertEquals(id, 2, checks);
             record(receipts, "java-host-validate", row, original, checks, hostObserved);
+            if (!row.has("cp")) {
+                String source = original.get("input").getAsString();
+                var rooted = UBNFMapper.parse(source.substring(0, source.length() - 1)
+                    + " @root @mapping(Entry) Entry ::= 'z'; }").grammars().get(0);
+                for (String message : List.of(
+                        assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(rooted)).getMessage(),
+                        assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(rooted)).getMessage()))
+                    assertEquals(id + " / root: " + message, code, message.split(":", 2)[0]);
+            }
         }
         receipts.addAll(nativeReceipts("validate"));
         verifyAndWrite("validate", receipts, report);
+    }
+
+    private void declarationDiagnosticPriority() throws Exception {
+        var cases = JsonParser.parseString(Files.readString(ROOT.resolve(
+            "spec-corpus/execution/diagnostic-priority.json"))).getAsJsonArray();
+        for (var raw : cases) {
+            var fixture = raw.getAsJsonObject();
+            String source = fixture.get("source").getAsString();
+            String code = fixture.get("code").getAsString();
+            for (boolean root : List.of(false, true)) {
+                String input = root ? source.substring(0, source.length() - 1)
+                    + " @root @mapping(Entry) Entry ::= 'z'; }" : source;
+                var grammar = UBNFMapper.parse(input).grammars().get(0);
+                // Independent expected code, and the actual Java validator's first error.
+                assertEquals(fixture.toString(), code, GrammarValidator.validate(grammar).stream()
+                    .filter(issue -> issue.severity().equals("ERROR")).findFirst().orElseThrow().code());
+                for (String message : List.of(
+                        assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(grammar)).getMessage(),
+                        assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(grammar)).getMessage())) {
+                    assertEquals(fixture + " / root=" + root + ": " + message, code, message.split(":", 2)[0]);
+                }
+            }
+        }
+        var noRoot = UBNFMapper.parse("grammar G { @mapping(X) R ::= 'x'; }").grammars().get(0);
+        assertEquals("Rust subset: exactly one @root is required",
+            assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(noRoot)).getMessage());
+        assertFalse(new RustBackend().generate(UBNFMapper.parse(
+            "grammar G { @root @mapping(X) R ::= 'x'; }").grammars().get(0)).isEmpty());
     }
 
     private static String cpSuffix(JsonObject row) {

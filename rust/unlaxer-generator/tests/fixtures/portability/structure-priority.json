@@ -566,5 +566,61 @@
       "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 13, "end": 66}, "subject": "commonField schema"}]},
       "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 68}, "subject": "commonField schema"}]}
     }
+  },
+  {
+    "name": "spec-rootless-mapping",
+    "source": "// 😀\ngrammar G {\n  @mapping(X, params=[a]) R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 55}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 58}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "spec-rooted-mapping",
+    "source": "// 😀\ngrammar G {\n  @root @mapping(X, params=[a]) R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 61}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 64}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "spec-rootless-precedence",
+    "source": "// 😀\ngrammar G {\n  @precedence(level=1) R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 52}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 55}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "spec-rooted-precedence",
+    "source": "// 😀\ngrammar G {\n  @root @precedence(level=1) R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 58}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 61}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "spec-rootless-reference",
+    "source": "// 😀\ngrammar G {\n  R ::= Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 35}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 38}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "spec-rooted-reference",
+    "source": "// 😀\ngrammar G {\n  @root R ::= Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 41}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 44}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "spec-common-before-mapping",
+    "source": "// 😀\ngrammar G {\n  @mapping(X, params=[a]) R ::= 'x';\n  @commonField(left) B ::= 'y';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 56, "end": 85}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 59, "end": 88}, "subject": "commonField schema"}]}
+    }
   }
 ]

@@ -305,6 +305,8 @@ public class RustBackendTest {
               @mapping(Leaf) Leaf ::= 'b';
             }
             """;
+        reject(source, "E-ASSOC-NO-PRECEDENCE");
+        source = source.replace("@leftAssoc", "@leftAssoc @precedence(level=10)");
         var ir = RustGrammarLowering.lower(UBNFMapper.parse(source).grammars().get(0));
         assertEquals(ir.rules().get(1).mapping(), ir.rules().get(2).mapping());
         assertEquals(List.of(GrammarIR.Kind.NULLABLE_NODE, GrammarIR.Kind.TEXT, GrammarIR.Kind.NODE),
@@ -321,6 +323,8 @@ public class RustBackendTest {
               Expr ::= 'x' @left {'^' @op Expr @right};
             }
             """;
+        reject(source, "E-ASSOC-NO-PRECEDENCE");
+        source = source.replace("@rightAssoc", "@rightAssoc @precedence(level=10)");
         String parser = new RustBackend().generate(UBNFMapper.parse(source).grammars().get(0)).get(2).content();
         assertTrue(parser.contains("Expr::Literal(\"z\").text_value()"));
         String power = parser.lines().filter(line -> line.contains("Rule { name: \"Expr\"")).findFirst().orElseThrow();
@@ -349,10 +353,8 @@ public class RustBackendTest {
         assertEquals(plain.get(3).content().split("\\nconst __PREFERRED_ROOT:",2)[0], files.get(3).content().split("\\nconst __PREFERRED_ROOT:",2)[0]);
         assertEquals(plain.get(4), files.get(4));
         assertTrue(files.get(2).content().contains("precedence: 10, associativity: Associativity::Left"));
-        var defaults = new RustBackend().generate(UBNFMapper.parse(source.replace("@precedence(level=10)", "")).grammars().get(0));
-        assertTrue(defaults.get(2).content().contains("precedence: -1, associativity: Associativity::Left"));
-        var precedenceOnly = new RustBackend().generate(UBNFMapper.parse(source.replace("@leftAssoc", "")).grammars().get(0));
-        assertTrue(precedenceOnly.get(2).content().contains("precedence: 10, associativity: Associativity::None"));
+        reject(source.replace("@precedence(level=10)", ""), "E-ASSOC-NO-PRECEDENCE");
+        reject(source.replace("@leftAssoc", ""), "E-PRECEDENCE-NO-ASSOC");
         reject(source.replace("@leftAssoc", "@leftAssoc @leftAssoc"), "duplicate/conflicting associativity");
         reject(source.replace("@precedence(level=10)", "@precedence(level=10) @precedence(level=20)"), "duplicate @precedence");
         reject(source.replace("@leftAssoc", "@rightAssoc"), "@rightAssoc requires");

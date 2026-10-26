@@ -1,0 +1,92 @@
+[
+  {
+    "name": "mapping-duplicate-before-missing-extra",
+    "source": "grammar G { @mapping(X, params=[a,a,b]) R ::= 'x' @a 'y' @c; }",
+    "code": "E-MAPPING-DUPLICATE-PARAM"
+  },
+  {
+    "name": "mapping-missing-before-extra",
+    "source": "grammar G { @mapping(X, params=[a,b]) R ::= 'x' @a 'y' @c; }",
+    "code": "E-MAPPING-MISSING-CAPTURE"
+  },
+  {
+    "name": "global-duplicate-before-style",
+    "source": "grammar G { @whitespace: bogus @whitespace: none @mapping(X, params=[a]) R ::= 'x'; }",
+    "code": "E-WHITESPACE-GLOBAL-DUPLICATE"
+  },
+  {
+    "name": "global-style-before-rule",
+    "source": "grammar G { @whitespace: bogus @mapping(X, params=[a]) R ::= 'x'; }",
+    "code": "E-WHITESPACE-GLOBAL-STYLE"
+  },
+  {
+    "name": "rule-style-before-duplicate",
+    "source": "grammar G { @whitespace(none) @whitespace(bogus) R ::= 'x'; }",
+    "code": "E-WHITESPACE-RULE-STYLE"
+  },
+  {
+    "name": "whitespace-before-mapping",
+    "source": "grammar G { @mapping(X, params=[a]) @whitespace(none) @whitespace(javaStyle) R ::= 'x'; }",
+    "code": "E-WHITESPACE-RULE-DUPLICATE"
+  },
+  {
+    "name": "mapping-before-precedence",
+    "source": "grammar G { @precedence(level=1) @mapping(X, params=[a]) R ::= 'x'; }",
+    "code": "E-MAPPING-MISSING-CAPTURE"
+  },
+  {
+    "name": "mapping-before-profile",
+    "source": "grammar G { @scopeTree(mode=bogus) @mapping(X, params=[a]) R ::= 'x'; }",
+    "code": "E-MAPPING-MISSING-CAPTURE"
+  },
+  {
+    "name": "assoc-before-precedence",
+    "source": "grammar G { @precedence(level=1) @precedence(level=2) @leftAssoc @rightAssoc R ::= 'x'; }",
+    "code": "E-ASSOC-BOTH"
+  },
+  {
+    "name": "precedence-duplicate-before-no-assoc",
+    "source": "grammar G { @precedence(level=1) @precedence(level=2) R ::= 'x'; }",
+    "code": "E-PRECEDENCE-DUPLICATE"
+  },
+  {
+    "name": "precedence-before-profile",
+    "source": "grammar G { @interleave(profile=bogus) @precedence(level=1) R ::= 'x'; }",
+    "code": "E-PRECEDENCE-NO-ASSOC"
+  },
+  {
+    "name": "interleave-before-scope",
+    "source": "grammar G { @scopeTree(mode=bogus) @interleave(profile=bogus) R ::= 'x'; }",
+    "code": "E-ANNOTATION-INTERLEAVE-PROFILE"
+  },
+  {
+    "name": "earlier-rule-before-later-rule",
+    "source": "grammar G { @mapping(X, params=[a]) R ::= 'x'; @whitespace(bogus) Later ::= 'y'; }",
+    "code": "E-MAPPING-MISSING-CAPTURE"
+  },
+  {
+    "name": "later-mapping-before-undefined",
+    "source": "grammar G { R ::= Missing; @mapping(X, params=[a]) Later ::= 'y'; }",
+    "code": "E-MAPPING-MISSING-CAPTURE"
+  },
+  {
+    "name": "later-profile-before-assoc-consistency",
+    "source": "grammar G { @leftAssoc @mapping(X, params=[left,op,right]) R ::= 'x' @left { '+' @op 'y' @right }; @scopeTree(mode=bogus) Later ::= 'y'; }",
+    "code": "E-ANNOTATION-SCOPETREE-MODE"
+  },
+  {
+    "name": "assoc-consistency-before-undefined",
+    "source": "grammar G { R ::= Missing; @leftAssoc @mapping(X, params=[left,op,right]) Later ::= 'x' @left { '+' @op 'y' @right }; }",
+    "code": "E-ASSOC-NO-PRECEDENCE"
+  },
+  {
+    "name": "valid-name-predicate-before-mapping",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n,missing]) R ::= 'x' @n; }",
+    "code": "E-MAPPING-MISSING-CAPTURE"
+  },
+  {
+    "name": "name-predicate-capture-before-mapping",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n,missing]) R ::= 'x' @n 'y' @n; }",
+    "code": "E-NAME-PREDICATE-CAPTURE"
+  }
+]
