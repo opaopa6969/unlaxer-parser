@@ -263,7 +263,15 @@ fn spans_are_utf8_and_codepoint_ranges_and_diagnostics_use_crlf_lines() {
 fn malformed_or_unknown_constructs_are_explicit_errors() {
     for line in include_str!("fixtures/negative.tsv").lines() {
         let (name, source) = line.split_once('\t').unwrap_or((line, ""));
-        parse(source).expect_err(name);
+        let error = parse(source).expect_err(name);
+        if name.starts_with("non-ascii-") {
+            // #811: grammar digits are ASCII only, so the lexer stops at the first other digit.
+            let digit = source
+                .chars()
+                .position(|c| c.is_numeric() && !c.is_ascii_digit())
+                .expect(name);
+            assert_eq!(error.span.codepoint_start, digit, "{name}: {error:?}");
+        }
     }
     for source in [
         "",

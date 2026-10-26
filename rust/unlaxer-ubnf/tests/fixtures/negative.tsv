@@ -71,5 +71,6 @@ non-ascii-mixed-bound	grammar G { R ::= 'x'{1２}; }
 non-ascii-adapter-version	grammar G { token T = ADAPTER('tinyexpression.string', version=１) R ::= T; }
 non-ascii-adapter-version-mixed	grammar G { token T = ADAPTER('tinyexpression.string', version=1１) R ::= T; }
 non-ascii-arabic-indic-bound	grammar G { R ::= 'x'{٣}; }
+non-ascii-math-bold-bound	grammar G { R ::= 'x'{1,𝟐}; }
 non-ascii-lexical-bound	grammar G { token T ::= 'x'{２}; R ::= T; }
 non-ascii-lexical-upper-bound	grammar G { token T ::= 'x'{1,２}; R ::= T; }

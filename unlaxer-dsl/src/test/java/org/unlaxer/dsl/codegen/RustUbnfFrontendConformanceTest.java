@@ -91,7 +91,15 @@ public class RustUbnfFrontendConformanceTest {
                 // These must fail in grammar recognition, before any numeric conversion.
                 assertEquals(parts[0], IllegalArgumentException.class, javaError.getClass());
                 assertTrue(javaError.getMessage(), javaError.getMessage().startsWith("UBNF パース失敗"));
-                String ascii = input.replace('１', '1').replace('２', '2').replace('٣', '3');
+                // The native lexer must stop at the first non-ASCII digit itself (CP offset).
+                int firstDigit = input.codePoints().boxed().toList().indexOf(input.codePoints()
+                    .filter(c -> c > '9' && Character.isDigit(c)).findFirst().orElseThrow());
+                assertEquals(parts[0] + " " + nativeResult, firstDigit,
+                    nativeResult.getAsJsonArray("span").get(2).getAsInt());
+                StringBuilder asciiDigits = new StringBuilder();
+                input.codePoints().forEach(c -> asciiDigits.appendCodePoint(
+                    c > '9' && Character.isDigit(c) ? '0' + Character.digit(c, 10) : c));
+                String ascii = asciiDigits.toString();
                 Files.writeString(source, ascii);
                 JsonObject nativeAscii = inspect(binary, source);
                 assertTrue(parts[0] + " " + nativeAscii, nativeAscii.has("ast"));
