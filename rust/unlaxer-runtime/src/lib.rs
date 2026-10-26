@@ -3736,20 +3736,13 @@ impl<'a> ParseContext<'a> {
             let failed_reset = self.match_cursor_policy.reset;
             self.restore(checkpoint);
             if self.resource_failure.is_none() {
-                // Group/choice parsers have frames even without a rule invocation (#793).
-                // A bounded repeat (`'x'{2}`) is a Java Repeat frame that fails after its
-                // earlier iterations consumed. Reuse the restored cursors; successful
-                // expressions and the deferred pass need no frame bookkeeping. Classic
-                // records its frames below.
+                // Java startParse precedes begin's matched reset (#793, #838).
+                // CatchLabels has a transaction but no startParse/endParse notification.
+                // Reuse the restored entry cursors only on failure; Classic records its
+                // failed frames below and deferred diagnostics need no bookkeeping.
                 if self.options.diagnostics == Diagnostics::Detailed
-                    && matches!(
-                        expression,
-                        Expr::Sequence(_)
-                            | Expr::Choice(_)
-                            | Expr::PredictiveChoice { .. }
-                            | Expr::Repeat { .. }
-                            | Expr::JavaRepeat { .. }
-                    )
+                    && ((java_transaction && !matches!(expression, Expr::CatchLabels { .. }))
+                        || matches!(expression, Expr::Sequence(_) | Expr::Repeat { .. }))
                 {
                     self.fail_parser_frame();
                 }
@@ -3793,6 +3786,37 @@ impl<'a> ParseContext<'a> {
                 }
             }
         } else {
+            // A successful Not discards its child's failures. Java then falls back to
+            // trackCursorProgress at startParse, before begin reset matched (#838).
+            // Carry that fallback through enclosing frames (e.g. Choice resetting before
+            // Not). Do not turn it into a failure: a later failure behind it must win.
+            // Reuse the checkpoint/watermark, also retained by memo diagnostics. The first
+            // guard skips all bookkeeping for DetailedOnFailure; there is no allocation.
+            if self.options.diagnostics == Diagnostics::Detailed
+                && java_transaction
+                && !matches!(expression, Expr::CatchLabels { .. })
+                && self.token_mode.is_none()
+                && self.grammar_frontier
+                && self.lexing.is_none()
+                && (matches!(
+                    expression,
+                    Expr::JavaLookahead {
+                        positive: false,
+                        ..
+                    }
+                ) || self.classic_max_reached.is_some())
+            {
+                let reached = checkpoint
+                    .position
+                    .max(checkpoint.matched_position)
+                    .max(self.position)
+                    .max(self.matched_position);
+                self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+                if let Some(frame) = self.diagnostic_frames.last_mut() {
+                    frame.classic_max_reached =
+                        Some(frame.classic_max_reached.unwrap_or(0).max(reached));
+                }
+            }
             if self.token_mode.is_some()
                 && (classic_collector_label(expression).is_some()
                     || matches!(
