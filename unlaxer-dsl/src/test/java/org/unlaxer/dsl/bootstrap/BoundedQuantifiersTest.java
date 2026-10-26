@@ -27,13 +27,14 @@ public class BoundedQuantifiersTest {
     @Test public void sharedWhitespaceFixtureKeepsBoundsSpansAndJavaHostRustOutput() throws Exception {
         String fixture = Files.readString(Path.of("../rust/unlaxer-ubnf/tests/fixtures/positive/quantifier-whitespace.ubnf"));
         String[] names = {"Exact", "BeforeComma", "BeforeClose", "AfterComma", "AllSpaces", "Open",
-            "ExactComments", "RangeComments", "OpenComments", "LineBreaks", "Whitespace", "MultipleDigits"};
-        String[] bounds = {"2", "2,3", "2,3", "2,3", "2,3", "2,", "2", "2,3", "2,", "2,3", "2,3", "10,12"};
+            "ExactComments", "RangeComments", "OpenComments", "LineBreaks", "Whitespace", "MultipleDigits", "BeforeOpen"};
+        String[] bounds = {"2", "2,3", "2,3", "2,3", "2,3", "2,", "2", "2,3", "2,", "2,3", "2,3", "10,12", "2,3"};
         StringBuilder compact = new StringBuilder("grammar QuantifierWhitespace { @root @mapping(ExactNode) ");
         for (int i = 0; i < names.length; i++) compact.append(names[i]).append(" ::= 'x'{").append(bounds[i]).append("}; ");
         var expected = UBNFMapper.parse(compact.append("}").toString());
         var expectedRust = new RustBackend().generate(expected.grammars().get(0));
-        for (String source : List.of(fixture, fixture.replace("\n", "\r\n"))) {
+        // LF, CRLF and CR-only line endings all end a // comment inside the quantifier.
+        for (String source : List.of(fixture, fixture.replace("\n", "\r\n"), fixture.replace("\n", "\r"))) {
             var snapshot = UBNFMapper.parseWithSource(source);
             assertEquals(expected, UBNFMapper.parse(source));
             assertEquals(expected, snapshot.ast());

@@ -64,8 +64,14 @@ fn bounded_quantifier_trivia_keeps_values_and_source_spans() {
         ("LineBreaks", 2, Some(3)),
         ("Whitespace", 2, Some(3)),
         ("MultipleDigits", 10, Some(12)),
+        ("BeforeOpen", 2, Some(3)),
     ];
-    for source in [fixture.to_owned(), fixture.replace('\n', "\r\n")] {
+    // LF, CRLF and CR-only line endings all end a // comment inside the quantifier.
+    for source in [
+        fixture.to_owned(),
+        fixture.replace('\n', "\r\n"),
+        fixture.replace('\n', "\r"),
+    ] {
         let ast = parse(&source).unwrap();
         let rules = &ast.grammars[0].rules;
         assert_eq!(rules.len(), expected.len());

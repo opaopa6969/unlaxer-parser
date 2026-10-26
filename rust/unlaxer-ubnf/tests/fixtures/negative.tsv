@@ -80,3 +80,4 @@ split-upper-bound	grammar G { R ::= 'x'{2,1 0}; }
 quantifier-block-comment	grammar G { R ::= 'x'{2,/* comment */3}; }
 quantifier-nbsp	grammar G { R ::= 'x'{2, 3}; }
 quantifier-em-space	grammar G { R ::= 'x'{2, 3}; }
+quantifier-ideographic-space	grammar G { R ::= 'x'{2,　3}; }
