@@ -57,7 +57,7 @@ public class UbnfSpecCorpusTest {
      * corpus 側で {@code scope: runtime} かつ {@code verdict: undetermined} として明示されている。
      */
     private static final Set<String> RUNTIME_SCOPE_IDS =
-        Set.of("char-range/inclusive-bounds", "separator/expansion", "error/hint-is-last-alternative");
+        SpecCorpusExecutions.runtimeIds();
 
     private record SpecCase(
             String file, String id, String scope, String input,
@@ -223,7 +223,7 @@ public class UbnfSpecCorpusTest {
         for (SpecCase specCase : cases) {
             if (RUNTIME_SCOPE_IDS.contains(specCase.id())) {
                 // 生成パーサの実行時挙動。UBNF を読む処理系の入出力からは観測できない。
-                verdicts.put(specCase.id(), "skipped(runtime)");
+                verdicts.put(specCase.id(), "delegated(runtime): spec-corpus/execution/manifest.json");
                 continue;
             }
             driven++;
