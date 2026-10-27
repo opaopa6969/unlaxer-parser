@@ -34,6 +34,100 @@ fn whitespace_style(style: &str) -> Result<bool> {
     }
 }
 
+/// Validate source-level name predicates before declaration/lowering errors (#858).
+/// Share Java's SemanticCardinality-equivalent capture analysis with common fields;
+/// it does not require a successfully lowered body (undefined refs are text here).
+fn validate_name_predicates(grammar: &ast::GrammarDecl) -> Result<Vec<(String, String)>> {
+    if !grammar.rules.iter().any(|rule| {
+        rule.annotations
+            .iter()
+            .any(|annotation| matches!(annotation.kind, AnnotationKind::NamePredicate { .. }))
+    }) {
+        return Ok(Vec::new());
+    }
+    let recursive = crate::preferred_plan::RecursiveShapes::new(grammar);
+    for rule in &grammar.rules {
+        let predicates = rule
+            .annotations
+            .iter()
+            .filter_map(|a| {
+                if let AnnotationKind::NamePredicate {
+                    snapshot,
+                    version,
+                    name,
+                    kind,
+                } = &a.kind
+                {
+                    Some((snapshot, version, name, kind))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        if predicates.len() > 1 {
+            return Err(format!("E-NAME-PREDICATE-DUPLICATE: {}", rule.name));
+        }
+        let Some((snapshot, version, name, kind)) = predicates.first().copied() else {
+            continue;
+        };
+        let bytes = snapshot.as_bytes();
+        if bytes.is_empty()
+            || bytes.len() > 128
+            || !bytes[0].is_ascii_alphabetic()
+            || bytes
+                .iter()
+                .any(|c| !(c.is_ascii_alphanumeric() || b"_./-".contains(c)))
+            || version.is_empty()
+            || version.len() > 128
+            || version.bytes().any(|c| !(33..=126).contains(&c))
+        {
+            return Err(format!("E-NAME-PREDICATE-IDENTITY: {}", rule.name));
+        }
+        if !["type", "value", "resolved"].contains(&kind.as_str()) {
+            return Err(format!("E-NAME-PREDICATE-KIND: {}", rule.name));
+        }
+        if rule.annotations.iter().any(|a| {
+            matches!(
+                a.kind,
+                AnnotationKind::LeftAssoc
+                    | AnnotationKind::RightAssoc
+                    | AnnotationKind::Recovery { .. }
+            )
+        }) {
+            return Err(format!("E-NAME-PREDICATE-CONFLICT: {}", rule.name));
+        }
+        if crate::preferred_plan::capture_contract(grammar, rule, name, &recursive)?
+            != Some((false, Cardinality::One))
+        {
+            return Err(format!("E-NAME-PREDICATE-CAPTURE: {}", rule.name));
+        }
+    }
+    // Java checks every rule first, then resolves grammar-wide snapshot versions.
+    // A later invalid capture/kind must precede an earlier version conflict.
+    let mut name_versions = Vec::<(String, String)>::new();
+    for rule in &grammar.rules {
+        for annotation in &rule.annotations {
+            let AnnotationKind::NamePredicate {
+                snapshot, version, ..
+            } = &annotation.kind
+            else {
+                continue;
+            };
+            if let Some((_, previous)) = name_versions.iter().find(|(id, _)| id == snapshot) {
+                if previous != version {
+                    return Err(format!("E-NAME-PREDICATE-VERSION: {}", rule.name));
+                }
+            } else {
+                name_versions.push((snapshot.clone(), version.clone()));
+            }
+        }
+    }
+    if name_versions.len() > 64 {
+        return Err("E-NAME-PREDICATE-LIMIT: at most 64 snapshots".into());
+    }
+    Ok(name_versions)
+}
+
 /// The syntax-only diagnostics from Java GrammarValidator, in validator order.
 /// Run after the existing schema checks (#825), before Rust's root requirement.
 fn validate_declarations(
@@ -707,35 +801,20 @@ impl Lowering<'_> {
         if let Some(issue) = crate::global_comment::problems(self.grammar).first() {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
+        let name_versions = validate_name_predicates(self.grammar)?;
         let declaration_error = match validate_declarations(self.grammar, &lexical) {
             // Preserve the existing root-projection explanation when it fails;
             // otherwise use the assoc explanation, still before undefined refs.
             Err(error) if error.starts_with("E-ASSOC-NO-MAPPING:") => Some(error),
-            // Java validates name predicates before mapping params and assoc shape.
-            // Native needs lowered bodies for that check, so retain the diagnostic
-            // until then instead of letting the new preflight mask it.
-            Err(error)
-                if (error.starts_with("E-MAPPING-")
-                    || error.starts_with("E-ASSOC-MAPPING-PARAM:")
-                    || error.starts_with("E-ASSOC-NO-REPEAT:")
-                    || error.starts_with("E-RIGHTASSOC-NONCANONICAL:"))
-                    && self.grammar.rules.iter().any(|rule| {
-                        rule.annotations
-                            .iter()
-                            .any(|a| matches!(a.kind, AnnotationKind::NamePredicate { .. }))
-                    }) =>
-            {
-                Some(error)
-            }
             result => {
                 result?;
                 None
             }
         };
-        // Java-host runs only name-predicate checks before this diagnostic, so a
-        // retained one still precedes every other lowering error (#833).
+        // Preserve the existing assoc root-projection explanation (#833); name
+        // predicates have already been checked against the source syntax.
         let deferred = declaration_error.clone();
-        self.run_after_declarations(lexical, adapter_registry, declaration_error)
+        self.run_after_declarations(lexical, adapter_registry, declaration_error, name_versions)
             .map_err(|error| match deferred {
                 Some(deferred)
                     if deferred.starts_with("E-ASSOC-NO-MAPPING:")
@@ -753,6 +832,7 @@ impl Lowering<'_> {
         mut lexical: HashMap<String, unlaxer_codegen::lexical::LexicalExpression>,
         adapter_registry: AdapterRegistry,
         declaration_error: Option<String>,
+        name_versions: Vec<(String, String)>,
     ) -> Result<GrammarIr> {
         let line_comments = crate::global_comment::line_comments(self.grammar);
         let whitespace_definitions = lexical.clone();
@@ -1124,76 +1204,6 @@ impl Lowering<'_> {
                 }
                 return Err("root must resolve to exactly one AST node".into());
             }
-        }
-        let mut name_versions = Vec::<(String, String)>::new();
-        for (i, rule) in self.grammar.rules.iter().enumerate() {
-            let predicates = rule
-                .annotations
-                .iter()
-                .filter_map(|a| {
-                    if let AnnotationKind::NamePredicate {
-                        snapshot,
-                        version,
-                        name,
-                        kind,
-                    } = &a.kind
-                    {
-                        Some((snapshot, version, name, kind))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-            if predicates.len() > 1 {
-                return Err(format!("E-NAME-PREDICATE-DUPLICATE: {}", rule.name));
-            }
-            let Some((snapshot, version, name, kind)) = predicates.first().copied() else {
-                continue;
-            };
-            let bytes = snapshot.as_bytes();
-            if bytes.is_empty()
-                || bytes.len() > 128
-                || !bytes[0].is_ascii_alphabetic()
-                || bytes
-                    .iter()
-                    .any(|c| !(c.is_ascii_alphanumeric() || b"_./-".contains(c)))
-                || version.is_empty()
-                || version.len() > 128
-                || version.bytes().any(|c| !(33..=126).contains(&c))
-            {
-                return Err(format!("E-NAME-PREDICATE-IDENTITY: {}", rule.name));
-            }
-            if !["type", "value", "resolved"].contains(&kind.as_str()) {
-                return Err(format!("E-NAME-PREDICATE-KIND: {}", rule.name));
-            }
-            if rule.annotations.iter().any(|a| {
-                matches!(
-                    a.kind,
-                    AnnotationKind::LeftAssoc
-                        | AnnotationKind::RightAssoc
-                        | AnnotationKind::Recovery { .. }
-                )
-            }) {
-                return Err(format!("E-NAME-PREDICATE-CONFLICT: {}", rule.name));
-            }
-            if self.captures(&self.bodies[i])?.get(name)
-                != Some(&Shape {
-                    kind: Kind::Text,
-                    cardinality: Cardinality::One,
-                })
-            {
-                return Err(format!("E-NAME-PREDICATE-CAPTURE: {}", rule.name));
-            }
-            if let Some((_, previous)) = name_versions.iter().find(|(id, _)| id == snapshot) {
-                if previous != version {
-                    return Err(format!("E-NAME-PREDICATE-VERSION: {}", rule.name));
-                }
-            } else {
-                name_versions.push((snapshot.clone(), version.clone()));
-            }
-        }
-        if name_versions.len() > 64 {
-            return Err("E-NAME-PREDICATE-LIMIT: at most 64 snapshots".into());
         }
         if let Some(error) = declaration_error {
             return Err(error);
