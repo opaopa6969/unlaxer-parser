@@ -843,6 +843,24 @@
     "generation": {"rust": 3}
   },
   {
+    "name": "issue-869-many-node",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' { X } @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ( X )+ @value;\n @mapping(X,params=[t]) X ::= 'x' @t;\n @mapping(Y,params=[t]) Y ::= 'x' @t;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "Vec<Box<generated::ast::Ast>>", "samples": [["a", [], [0, 1], "A"], ["axx", [{"type": "X", "span": [1, 2], "fields": {"t": "x"}}, {"type": "X", "span": [2, 3], "fields": {"t": "x"}}], [0, 3], "A"], ["bx", [{"type": "X", "span": [1, 2], "fields": {"t": "x"}}], [0, 2], "B"], ["bxxx", [{"type": "X", "span": [1, 2], "fields": {"t": "x"}}, {"type": "X", "span": [2, 3], "fields": {"t": "x"}}, {"type": "X", "span": [3, 4], "fields": {"t": "x"}}], [0, 4], "B"]], "invalidInputs": ["b", "ay", "by"]}
+  },
+  {
+    "name": "issue-869-many-node-reference",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' { X } @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ( Y )+ @value;\n @mapping(X,params=[t]) X ::= 'x' @t;\n @mapping(Y,params=[t]) Y ::= 'x' @t;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 69, "end": 126}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 71, "end": 129}, "subject": "commonField schema"}]}
+    },
+    "generation": {"rust": 3}
+  },
+  {
     "name": "issue-869-optional",
     "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' [ 'x' ] @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ('x')? @value;\n}\n",
     "expected": {

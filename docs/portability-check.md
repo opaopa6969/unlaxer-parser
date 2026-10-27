@@ -230,6 +230,8 @@ native の source 検証は nested の構造・leaf kind・mapped node の名義
 通常 leaf の `{ 'x' }` / `('x')+` と `[ 'x' ]` / `('x')?`、および nested leaf の
 `(NUM | NUM)` / `('x' | 'y')` は異なる型なので、従来どおり `P-COMMONFIELD`・終了コード 3 となる。
 #832 の nested / 通常 field の直接混在の拒否も維持する。
+正規化した shape が同じでも、`{ X }` と `( Y )+` のように mapped node の名義型が違えば
+`P-COMMONFIELD` となる（`{ X }` と `( X )+` は受理し、両 host の Rust 型は `Vec<Box<Ast>>`）。
 
 ## 境界と回帰修正
 
@@ -260,21 +262,22 @@ LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・
 同じ code/subject の root 出現と null 出現、作り直された rule/element/@lexicalContext、解決失敗と成功を固定する。
 非 BMP 文字を含む9ケースを LF/CRLF で読み、両 host の JSON 全体を固定期待値（配列順・件数・CP 範囲を含む）と照合し、
 `target/rust-portability-imports.tsv` に18ケースの証拠を残す。native の workspace test も同じ fixture を使う。
-`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む112ケースを
+`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む114ケースを
 LF/CRLF で検証する。enum・eval・embedding・typeof・未定義参照・IR 検証のエラー、
 前段の syntax/module/inventory、bounded/precedence/nested、二規則の schema エラー、
 複数 grammar の順序、既存 commonField corpus の型・cardinality、共有 mapping の不一致が
 後の field・leaf・規則の schema エラーより先に `P-STRUCTURE` になることも固定する。
 annotation・capture・再帰を持つ正常な enum alias も受理し、別の eval エラーを隠さないことを確認する。
 両 host の JSON 全体と終了コードを比較し、`target/rust-portability-structure-priority.tsv`
-に224ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
+に228ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
 #832 の8入力は直接混在の拒否・choice 順の反転・正常な3構成・eval/後続 schema との競合・
 非 BMP 文字を含む複数 grammar の診断順を固定する。うち7入力は Rust 生成の終了コードと
 失敗時の無出力、正常な3構成は両 host の全5生成ファイルの byte 一致も確認する。
 直接混在の2入力と正常な3構成は Java 向け生成の成功も固定する。
-#869 の12入力は3再現例・choice 順反転・非 BMP 文字の各3例と、従来の拒否を維持する3例。
-LF/CRLF の全 JSON・終了コード・生成可否を検査する。成功する9入力では全5ファイルの byte 一致に加え、
-両 host の生成物をそれぞれ compile・実行し、common accessor の Rust 型、空/複数/optional/choice の値、
+#869 の14入力は3再現例・choice 順反転・非 BMP 文字の各3例と、従来の拒否を維持する3例、
+mapped node の受理例とその名義型違いの拒否例。
+LF/CRLF の全 JSON・終了コード・生成可否を検査する。成功する10入力では全5ファイルの byte 一致に加え、
+両 host の生成物をそれぞれ compile・実行し、common accessor の Rust 型、空/複数/optional/choice/node の値、
 AST variant と CP span、無効入力の拒否を共通の固定期待値に照合する。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
 native CLI は `PATH=''` で実行し、入力・手書きファイルが変更されないことも確認する。
