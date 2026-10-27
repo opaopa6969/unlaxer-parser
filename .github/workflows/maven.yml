@@ -733,7 +733,8 @@ jobs:
         name: ubnf-authoring-protocol
         path: |
           target/optin-evidence/ubnf-authoring/
-          unlaxer-dsl/ubnf-vscode/target/ubnf-authoring-protocol.json
+          unlaxer-dsl/ubnf-vscode/target/ubnf-authoring-*-protocol.json
+          unlaxer-dsl/ubnf-vscode/target/ubnf-authoring-*-wire.log
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4

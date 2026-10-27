@@ -2,15 +2,21 @@ use crate::text::{self, Lexeme};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use unlaxer_generator::{modules, packages::Resolver};
 use unlaxer_ubnf::*;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Symbol {
     pub name: String,
     pub kind: &'static str,
     pub detail: String,
     pub origin: String,
+    pub uri: String,
+    pub source: Arc<str>,
+    pub start: usize,
+    pub end: usize,
+    pub exported: bool,
 }
 pub struct Scope {
     pub start: usize,
@@ -23,6 +29,9 @@ pub struct Index {
     pub diagnostics: Vec<Value>,
     pub valid: bool,
     pub error_offset: usize,
+    pub declarations: Vec<Symbol>,
+    pub safe: bool,
+    pub virtual_sources: BTreeMap<String, String>,
 }
 impl Scope {
     pub fn unique(&self, name: &str) -> Option<&Symbol> {
@@ -34,44 +43,21 @@ impl Scope {
             Some(first)
         }
     }
-    fn declare(
-        &mut self,
-        source: &str,
-        lex: &[Lexeme],
-        uri: &str,
-        name: &str,
-        kind: &'static str,
-        span: Span,
-    ) {
-        let candidate = lex.iter().enumerate().find(|(i, t)| {
-            t.start >= span.byte_start
-                && t.end <= span.byte_end
-                && t.text == name
-                && (kind != "rule" || lex.get(i + 1).is_some_and(|v| v.text == "::="))
-        });
-        if let Some((_, t)) = candidate {
-            self.symbols.push((
-                name.into(),
-                Symbol {
-                    name: name.into(),
-                    kind,
-                    detail: source[span.byte_start..span.byte_end].into(),
-                    origin: uri.into(),
-                },
-            ));
-            self.uses.push((name.into(), t.start, t.end));
-        }
-    }
 }
 impl Index {
     pub fn new(uri: &str, source: &str, sources: BTreeMap<PathBuf, String>) -> Self {
         let lex = text::scan(source);
-        let parsed = parse(source);
+        // Every binding owns its source lifetime, but shares the immutable text.
+        let shared_source: Arc<str> = source.into();
+        let parsed = authoring_parse(source);
         let mut result = Self {
             scopes: Vec::new(),
             diagnostics: Vec::new(),
             valid: parsed.is_ok(),
             error_offset: 0,
+            declarations: Vec::new(),
+            safe: parsed.is_ok(),
+            virtual_sources: BTreeMap::new(),
         };
         let mut file = match parsed {
             Ok(file) => file,
@@ -84,25 +70,49 @@ impl Index {
                     symbols: Vec::new(),
                     uses: Vec::new(),
                 };
-                for (i, t) in lex.iter().enumerate() {
-                    let kind = if i > 0 && lex[i - 1].text == "grammar" {
-                        "grammar"
-                    } else if i > 0 && lex[i - 1].text == "token" {
-                        "token"
-                    } else if lex.get(i + 1).is_some_and(|t| t.text == "::=") {
-                        "rule"
+                // Java's recovery regex consumes a declaration before searching
+                // again; keywords used as names cannot start overlapping matches.
+                let code = text::mask(source);
+                let mut cursor = 0;
+                while cursor + 1 < lex.len() {
+                    let first = &lex[cursor];
+                    let next = &lex[cursor + 1];
+                    let gap = &code[first.end..next.start];
+                    let (t, kind) = if !gap.chars().all(text::regex_space) {
+                        cursor += 1;
+                        continue;
+                    } else if matches!(first.text.as_str(), "grammar" | "token")
+                        && text::identifier(&next.text)
+                        && !gap.is_empty()
+                    {
+                        (
+                            next,
+                            if first.text == "grammar" {
+                                "grammar"
+                            } else {
+                                "token"
+                            },
+                        )
+                    } else if text::identifier(&first.text) && next.text == "::=" {
+                        (first, "rule")
                     } else {
+                        cursor += 1;
                         continue;
                     };
-                    scope.symbols.push((
-                        t.text.clone(),
-                        Symbol {
-                            name: t.text.clone(),
-                            kind,
-                            detail: String::new(),
-                            origin: uri.into(),
-                        },
-                    ));
+                    cursor += 2;
+                    let symbol = Symbol {
+                        name: t.text.clone(),
+                        kind,
+                        detail: String::new(),
+                        origin: uri.into(),
+                        uri: uri.into(),
+                        source: shared_source.clone(),
+                        start: t.start,
+                        end: t.end,
+                        exported: false,
+                    };
+                    scope.symbols.push((t.text.clone(), symbol.clone()));
+                    result.declarations.push(symbol);
                 }
                 result.scopes.push(scope);
                 // Recover complete import declarations only; the real frontend validates each.
@@ -141,34 +151,41 @@ impl Index {
                 symbols: Vec::new(),
                 uses: Vec::new(),
             };
-            for token in &grammar.tokens {
-                scope.declare(source, &lex, uri, &token.name, "token", token.span);
-                if let TokenKind::Declarative { expression } = &token.kind {
-                    let mut refs = Vec::new();
-                    lexical_refs(expression, &mut refs);
-                    let mut cursor = lex
-                        .iter()
-                        .position(|t| t.start >= token.span.byte_start && t.text == "::=")
-                        .map_or(lex.len(), |i| i + 1);
-                    for name in refs {
-                        while cursor < lex.len() && lex[cursor].start < token.span.byte_end {
-                            let (found, end) = qualified(&lex, cursor);
-                            let start = lex[cursor].start;
-                            cursor = end;
-                            if found == name {
-                                scope.uses.push((name, start, lex[end - 1].end));
-                                break;
-                            }
-                        }
+            for (name, kind, span, exported) in
+                std::iter::once((&grammar.name, "grammar", grammar.span, false))
+                    .chain(
+                        grammar
+                            .tokens
+                            .iter()
+                            .map(|t| (&t.name, "token", t.span, grammar.rules.is_empty())),
+                    )
+                    .chain(
+                        grammar
+                            .rules
+                            .iter()
+                            .map(|r| (&r.name, "rule", r.span, false)),
+                    )
+            {
+                if let Some(symbol) = symbol(&shared_source, &lex, uri, name, kind, span, exported)
+                {
+                    result.declarations.push(symbol.clone());
+                    if kind != "grammar" {
+                        scope.uses.push((name.clone(), symbol.start, symbol.end));
+                        scope.symbols.push((name.clone(), symbol));
                     }
+                } else {
+                    result.safe = false;
                 }
             }
-            for rule in &grammar.rules {
-                scope.declare(source, &lex, uri, &rule.name, "rule", rule.span);
-                body_uses(&rule.body, &mut scope.uses);
-                for annotation in &rule.annotations {
-                    if let AnnotationKind::Whitespace { style: Some(style) } = &annotation.kind {
-                        policy(&lex, &mut scope, annotation.span, style);
+            for token in &grammar.tokens {
+                if let TokenKind::Declarative { expression } = &token.kind {
+                    let mut expected = Vec::new();
+                    lexical_refs(expression, &mut expected);
+                    let actual = lexical_uses(source, &lex, token.span);
+                    if expected.iter().eq(actual.iter().map(|u| &u.0)) {
+                        scope.uses.extend(actual);
+                    } else {
+                        result.safe = false;
                     }
                 }
             }
@@ -176,6 +193,25 @@ impl Index {
                 if setting.key == "whitespace" {
                     if let SettingValue::String(style) = &setting.value {
                         policy(&lex, &mut scope, setting.span, style);
+                    }
+                }
+            }
+            for rule in &grammar.rules {
+                let mut uses = Vec::new();
+                body_uses(&rule.body, &mut uses);
+                for (name, start, end) in uses {
+                    // Expansion/rewrite may retain a span that does not spell a reference.
+                    // Like Java, only the AST name plus its real source origin authorizes edits.
+                    let word = word_in(&lex, start, end);
+                    if let Some((found, from, to)) = word.filter(|w| w.0 == name) {
+                        scope.uses.push((found, from, to));
+                    } else {
+                        result.safe = false;
+                    }
+                }
+                for annotation in &rule.annotations {
+                    if let AnnotationKind::Whitespace { style: Some(style) } = &annotation.kind {
+                        policy(&lex, &mut scope, annotation.span, style);
                     }
                 }
             }
@@ -257,30 +293,45 @@ impl Index {
             )?;
             let module = resolver.import_path(&path, &import.path)?;
             let text = resolver.read(&module)?;
-            let origin = match resolver.identity(&module)? {
-                Some(id) => format!(
-                    "{}@{} · sha256 {} · {}",
-                    id["id"].as_str().unwrap(),
-                    id["version"].as_str().unwrap(),
-                    id["sha256"].as_str().unwrap(),
-                    id["file"].as_str().unwrap()
-                ),
-                None => text::file_uri(&module),
+            let identity = resolver.identity(&module)?;
+            let module_uri = identity.as_ref().map_or_else(
+                || text::file_uri(&module),
+                |id| {
+                    text::package_uri(id["sha256"].as_str().unwrap(), id["file"].as_str().unwrap())
+                },
+            );
+            let origin = match identity {
+                Some(id) => {
+                    self.virtual_sources
+                        .insert(module_uri.clone(), text.clone());
+                    format!(
+                        "{}@{} · sha256 {} · {}",
+                        id["id"].as_str().unwrap(),
+                        id["version"].as_str().unwrap(),
+                        id["sha256"].as_str().unwrap(),
+                        id["file"].as_str().unwrap()
+                    )
+                }
+                None => module_uri.clone(),
             };
             let parsed = parse(&text).map_err(|e| e.to_string())?;
+            let module_lex = text::scan(&text);
+            let text: Arc<str> = text.into();
             Ok(parsed.grammars[0]
                 .tokens
                 .iter()
-                .map(|t| {
-                    (
-                        format!("{}.{}", import.alias, t.name),
-                        Symbol {
-                            name: t.name.clone(),
-                            kind: "token",
-                            detail: text[t.span.byte_start..t.span.byte_end].into(),
-                            origin: origin.clone(),
-                        },
-                    )
+                .filter_map(|t| {
+                    let mut s = symbol(
+                        &text,
+                        &module_lex,
+                        &module_uri,
+                        &t.name,
+                        "token",
+                        t.span,
+                        true,
+                    )?;
+                    s.origin = origin.clone();
+                    Some((format!("{}.{}", import.alias, t.name), s))
                 })
                 .collect())
         })();
@@ -307,10 +358,161 @@ impl Index {
             .find(|s| s.start <= offset && offset <= s.end)
     }
 }
+/// Java's namespace prefix is a plain LazyChain (no inter-token trivia); only
+/// the final identifier may have leading whitespace. The native frontend accepts
+/// more spacing. Recover those documents instead of granting AST edit authority.
+fn authoring_parse(source: &str) -> Result<UbnfFile, Diagnostic> {
+    fn body(source: &str, value: &RuleBody) -> Option<Span> {
+        value
+            .alternatives
+            .iter()
+            .flat_map(|s| &s.elements)
+            .find_map(|e| atom(source, &e.element))
+    }
+    fn atom(source: &str, value: &AtomicElement) -> Option<Span> {
+        match &value.kind {
+            ElementKind::RuleRef {
+                namespace: Some(namespace),
+                ..
+            } => {
+                let raw = &source[value.span.byte_start..value.span.byte_end];
+                let prefix = format!("{namespace}.");
+                // A synthetic reference with an unrelated source span is handled
+                // by the binding guard, not reclassified as a syntax error here.
+                let normalized: String = raw.chars().filter(|c| !text::regex_space(*c)).collect();
+                (normalized.starts_with(&prefix) && !raw.starts_with(&prefix)).then_some(value.span)
+            }
+            ElementKind::Group(b)
+            | ElementKind::Optional(b)
+            | ElementKind::Repeat(b)
+            | ElementKind::OwnedCapture { body: b, .. }
+            | ElementKind::CaptureScope(b)
+            | ElementKind::Commit { body: b, .. }
+            | ElementKind::Label { body: b, .. }
+            | ElementKind::Catch { choice: b, .. } => body(source, b),
+            ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
+                atom(source, a)
+            }
+            ElementKind::Separated { element, separator } => {
+                atom(source, element).or_else(|| atom(source, separator))
+            }
+            _ => None,
+        }
+    }
+    let file = parse(source)?;
+    if let Some(span) = file
+        .grammars
+        .iter()
+        .flat_map(|g| &g.rules)
+        .find_map(|r| body(source, &r.body))
+    {
+        let position = text::position(source, span.byte_start);
+        return Err(Diagnostic {
+            kind: DiagnosticKind::Syntax,
+            message: "namespace prefix must be contiguous".into(),
+            span,
+            line: position["line"].as_u64().unwrap() as usize + 1,
+            column: source[..span.byte_start]
+                .rsplit('\n')
+                .next()
+                .unwrap()
+                .chars()
+                .count()
+                + 1,
+        });
+    }
+    Ok(file)
+}
+
+fn symbol(
+    source: &Arc<str>,
+    lex: &[Lexeme],
+    uri: &str,
+    name: &str,
+    kind: &'static str,
+    span: Span,
+    exported: bool,
+) -> Option<Symbol> {
+    let (_, t) = lex.iter().enumerate().find(|(i, t)| {
+        t.start >= span.byte_start
+            && t.end <= span.byte_end
+            && t.text == name
+            && if kind == "rule" {
+                lex.get(i + 1).is_some_and(|v| v.text == "::=")
+            } else {
+                *i > 0 && lex[i - 1].start >= span.byte_start && lex[i - 1].text == kind
+            }
+    })?;
+    Some(Symbol {
+        name: name.into(),
+        kind,
+        detail: source[span.byte_start..span.byte_end].into(),
+        origin: uri.into(),
+        uri: uri.into(),
+        source: source.clone(),
+        start: t.start,
+        end: t.end,
+        exported,
+    })
+}
+fn word_in(lex: &[Lexeme], start: usize, end: usize) -> Option<(String, usize, usize)> {
+    let (i, t) = lex
+        .iter()
+        .enumerate()
+        .find(|(_, t)| t.start >= start && t.end <= end && text::identifier(&t.text))?;
+    let (name, after) = qualified(lex, i);
+    (lex[after - 1].end <= end).then_some((name, t.start, lex[after - 1].end))
+}
+fn lexical_uses(source: &str, lex: &[Lexeme], span: Span) -> Vec<(String, usize, usize)> {
+    let Some(mut i) = lex
+        .iter()
+        .position(|t| t.start >= span.byte_start && t.text == "::=")
+        .map(|i| i + 1)
+    else {
+        return vec![];
+    };
+    let begin = lex[i - 1].end;
+    let code = text::mask(source);
+    let mut out = Vec::new();
+    while i < lex.len() && lex[i].start < span.byte_end {
+        let t = &lex[i];
+        if !text::identifier(&t.text) {
+            i += 1;
+            continue;
+        }
+        let (name, end) = qualified(lex, i);
+        i = end;
+        if ["ANY", "EOF", "BOF", "BOL", "EOL"].contains(&name.as_str()) {
+            continue;
+        }
+        let before = code[begin..t.start].trim_end_matches(text::regex_space);
+        if before.strip_suffix('(').is_some_and(|s| {
+            let s = s.trim_end_matches(text::regex_space);
+            s.ends_with("CAPTURE") || s.ends_with("SAME_AS")
+        }) {
+            continue;
+        }
+        if lex.get(end).is_some_and(|v| v.text == "(")
+            && [
+                "CAPTURE",
+                "SAME_AS",
+                "LOOKAHEAD",
+                "NEGATIVE_LOOKAHEAD",
+                "CHAR_RANGE",
+                "NEGATION",
+            ]
+            .contains(&name.as_str())
+        {
+            continue;
+        }
+        out.push((name, t.start, lex[end - 1].end));
+    }
+    out
+}
 fn qualified(lex: &[Lexeme], start: usize) -> (String, usize) {
     let mut name = lex[start].text.clone();
     let mut end = start + 1;
-    while end + 1 < lex.len() && lex[end].text == "." {
+    while end + 1 < lex.len() && lex[end].text == "." && text::identifier(&lex[end + 1].text) {
         name.push('.');
         name.push_str(&lex[end + 1].text);
         end += 2;
@@ -357,9 +559,17 @@ fn atom_uses(atom: &AtomicElement, out: &mut Vec<(String, usize, usize)>) {
             atom.span.byte_start,
             atom.span.byte_end,
         )),
-        ElementKind::Group(b) | ElementKind::Optional(b) | ElementKind::Repeat(b) => {
-            body_uses(b, out)
-        }
+        // Java TransparentElement: COMMIT/LABEL/CATCH/CAPTURE/CAPTURE_SCOPE (and the COMMIT
+        // inserted by @autoCommit) hold references like a group. Skipping them let rename
+        // leave stale references behind (#886).
+        ElementKind::Group(b)
+        | ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b)
+        | ElementKind::Commit { body: b, .. }
+        | ElementKind::Label { body: b, .. }
+        | ElementKind::Catch { choice: b, .. }
+        | ElementKind::Optional(b)
+        | ElementKind::Repeat(b) => body_uses(b, out),
         ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
             atom_uses(a, out)
         }

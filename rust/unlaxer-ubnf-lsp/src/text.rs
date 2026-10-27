@@ -131,14 +131,110 @@ pub fn file_path(uri: &str) -> Result<PathBuf, String> {
     }
     Ok(PathBuf::from(text))
 }
+/// Java `UnixPath.toUri()` (UnixUriUtils): RFC 2396 path characters, i.e. unreserved
+/// `-_.!~*'()` plus `:@&=+$,;/`, stay literal; every other byte is `%XX` (#886).
 pub fn file_uri(path: &std::path::Path) -> String {
     let mut uri = String::from("file://");
     for b in path.to_string_lossy().bytes() {
-        if b.is_ascii_alphanumeric() || b"/-._~".contains(&b) {
+        if b.is_ascii_alphanumeric() || b"/-_.!~*'():@&=+$,;".contains(&b) {
             uri.push(b as char);
         } else {
             uri.push_str(&format!("%{b:02X}"));
         }
     }
     uri
+}
+
+pub fn identifier(s: &str) -> bool {
+    s.as_bytes()
+        .first()
+        .is_some_and(|b| b.is_ascii_alphabetic() || *b == b'_')
+        && s.chars().all(word)
+}
+pub fn regex_space(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\n' | '\r' | '\u{b}' | '\u{c}')
+}
+/// Byte-preserving analogue of UbnfEditorIndex.mask. Only ASCII identifiers are
+/// searched in this view; ranges always refer to the original UTF-8 source.
+pub fn mask(source: &str) -> String {
+    let mut bytes = source.as_bytes().to_vec();
+    let mut i = 0;
+    while i < bytes.len() {
+        let start = i;
+        if matches!(bytes[i], b'\'' | b'"') {
+            let quote = bytes[i];
+            i += 1;
+            while i < bytes.len() {
+                let c = bytes[i];
+                i += 1;
+                if c == b'\\' {
+                    i = (i + 1).min(bytes.len());
+                } else if c == quote {
+                    break;
+                }
+            }
+        } else if bytes[i..].starts_with(b"//") {
+            i += 2;
+            while i < bytes.len() && !matches!(bytes[i], b'\r' | b'\n') {
+                i += 1;
+            }
+        } else if bytes[i..].starts_with(b"/*") {
+            i += 2;
+            while i < bytes.len() && !bytes[i..].starts_with(b"*/") {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len());
+        } else {
+            i += 1;
+            continue;
+        }
+        for b in &mut bytes[start..i] {
+            if !matches!(*b, b'\r' | b'\n') {
+                *b = b' ';
+            }
+        }
+    }
+    String::from_utf8(bytes).expect("mask retains unquoted UTF-8")
+}
+/// java.net.URI(scheme, null, path, null).toASCIIString() preserves legal path
+/// punctuation; the package hash and file name are supplied by the verified resolver.
+pub fn package_uri(hash: &str, file: &str) -> String {
+    let mut uri = format!("ubnf-package:/{hash}/");
+    for b in file.bytes() {
+        if b.is_ascii_alphanumeric() || b"/-._~!$&'()*+,;=:@".contains(&b) {
+            uri.push(b as char);
+        } else {
+            uri.push_str(&format!("%{b:02X}"));
+        }
+    }
+    uri
+}
+/// Navigation uses ASCII binding spans. At an interior UTF-16 surrogate unit no
+/// binding can occur, so mapping to that scalar's start preserves Java useAt.
+pub fn binding_offset(text: &str, pos: &Value) -> Option<usize> {
+    let line = pos["line"].as_u64()? as usize;
+    let column = pos["character"].as_u64()? as usize;
+    let start = if line == 0 {
+        0
+    } else {
+        match text.match_indices('\n').nth(line - 1) {
+            Some((i, _)) => i + 1,
+            None => return Some(text.len()),
+        }
+    };
+    let end = text[start..].find('\n').map_or(text.len(), |i| start + i);
+    let mut units = 0;
+    for (i, c) in text[start..end].char_indices() {
+        if units + c.len_utf16() > column {
+            return Some(start + i);
+        }
+        units += c.len_utf16();
+    }
+    Some(end)
+}
+
+/// Character.isWhitespace(char), used by Java String.strip (not regex \s).
+pub fn java_whitespace(c: char) -> bool {
+    matches!(c, '\u{9}'..='\u{d}' | '\u{1c}'..='\u{20}' | '\u{1680}' |
+        '\u{2000}'..='\u{2006}' | '\u{2008}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{205f}' | '\u{3000}')
 }

@@ -2,6 +2,7 @@
 //! docs/ubnf-authoring-lsp.md; generated-language LSPs keep their own backend.
 mod features;
 mod index;
+mod navigation;
 mod text;
 use index::Index;
 use serde_json::{json, Value};
@@ -15,6 +16,9 @@ struct Document {
 #[derive(Default)]
 pub struct Server {
     documents: BTreeMap<String, Document>,
+    // Only snapshots verified during prior indexing. packageSource must never
+    // build an index, resolve a URI, read a file, or mutate this cache.
+    package_indexes: BTreeMap<String, BTreeMap<String, String>>,
     initialized: bool,
     shutdown: bool,
     exited: bool,
@@ -24,7 +28,7 @@ fn invalid(message: &str) -> Error {
     (-32602, message.into())
 }
 impl Server {
-    fn index(&self, uri: &str) -> Option<Index> {
+    fn index(&mut self, uri: &str) -> Option<Index> {
         let source = &self.documents.get(uri)?.source;
         let buffers = self
             .documents
@@ -35,9 +39,12 @@ impl Server {
                     .map(|path| (path, doc.source.clone()))
             })
             .collect();
-        Some(Index::new(uri, source, buffers))
+        let index = Index::new(uri, source, buffers);
+        self.package_indexes
+            .insert(uri.into(), index.virtual_sources.clone());
+        Some(index)
     }
-    fn publish(&self, uri: &str, out: &mut Vec<Value>) {
+    fn publish(&mut self, uri: &str, out: &mut Vec<Value>) {
         if let Some(index) = self.index(uri) {
             out.push(json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"diagnostics":index.diagnostics}}));
         }
@@ -76,7 +83,7 @@ impl Server {
                 }
                 self.initialized = true;
                 return Ok(
-                    json!({"capabilities":{"textDocumentSync":1,"hoverProvider":true,"completionProvider":{"resolveProvider":false,"triggerCharacters":["@","=","."]}}}),
+                    json!({"capabilities":{"textDocumentSync":1,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"documentSymbolProvider":true,"foldingRangeProvider":true,"linkedEditingRangeProvider":true,"completionProvider":{"resolveProvider":false,"triggerCharacters":["@","=","."]}}}),
                 );
             }
             if !self.initialized {
@@ -147,10 +154,19 @@ impl Server {
                         }
                         _ => {}
                     }
-                    for (other, doc) in &self.documents {
-                        if other != uri && doc.source.contains("@import") {
-                            self.publish(other, &mut out);
-                        }
+                    // Java refreshImporters clears all index snapshots after each
+                    // document notification, then indexes the other importers.
+                    self.package_indexes.clear();
+                    let importers: Vec<_> = self
+                        .documents
+                        .iter()
+                        .filter(|(other, doc)| {
+                            other.as_str() != uri && doc.source.contains("@import")
+                        })
+                        .map(|(other, _)| other.clone())
+                        .collect();
+                    for other in importers {
+                        self.publish(&other, &mut out);
                     }
                     Ok(Value::Null)
                 }
@@ -167,12 +183,74 @@ impl Server {
                     };
                     let offset = text::offset(&doc.source, &params["position"])
                         .ok_or_else(|| invalid("invalid UTF-16 position"))?;
+                    let source = doc.source.clone();
                     let index = self.index(uri).unwrap();
                     Ok(if method.ends_with("completion") {
-                        features::completion(&doc.source, &index, offset)
+                        features::completion(&source, &index, offset)
                     } else {
-                        features::hover(&doc.source, &index, offset)
+                        features::hover(&source, &index, offset)
                     })
+                }
+                "ubnf/packageSource" if request => {
+                    let uri = params["uri"].as_str().unwrap_or("");
+                    Ok(if uri.starts_with("ubnf-package:/") {
+                        self.package_indexes
+                            .values()
+                            .find_map(|sources| sources.get(uri))
+                            .map_or(Value::Null, |source| json!(source))
+                    } else {
+                        Value::Null
+                    })
+                }
+                "textDocument/definition"
+                | "textDocument/references"
+                | "textDocument/rename"
+                | "textDocument/linkedEditingRange"
+                | "textDocument/documentSymbol"
+                | "textDocument/foldingRange"
+                    if request =>
+                {
+                    let uri = params["textDocument"]["uri"]
+                        .as_str()
+                        .ok_or_else(|| invalid("document URI required"))?;
+                    let Some(source) = self.documents.get(uri).map(|d| d.source.clone()) else {
+                        return Ok(match method {
+                            "textDocument/rename" => json!({"changes":{}}),
+                            "textDocument/linkedEditingRange" => Value::Null,
+                            _ => json!([]),
+                        });
+                    };
+                    if method == "textDocument/foldingRange" {
+                        return Ok(navigation::folding(&source));
+                    }
+                    let index = self.index(uri).unwrap();
+                    if method == "textDocument/documentSymbol" {
+                        return Ok(navigation::symbols(&source, &index));
+                    }
+                    let offset = text::binding_offset(&source, &params["position"])
+                        .ok_or_else(|| invalid("invalid UTF-16 position"))?;
+                    match method {
+                        "textDocument/definition" => Ok(navigation::definition(&index, offset)),
+                        "textDocument/references" => Ok(navigation::reference_locations(
+                            &source,
+                            uri,
+                            &index,
+                            offset,
+                            params["context"]["includeDeclaration"]
+                                .as_bool()
+                                .unwrap_or(false),
+                        )),
+                        "textDocument/rename" => navigation::rename(
+                            &source,
+                            uri,
+                            &index,
+                            offset,
+                            params["newName"]
+                                .as_str()
+                                .ok_or_else(|| invalid("newName required"))?,
+                        ),
+                        _ => Ok(navigation::linked(&source, uri, &index, offset)),
+                    }
                 }
                 _ => Err((-32601, "Method not found".into())),
             }

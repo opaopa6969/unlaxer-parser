@@ -88,7 +88,7 @@ def position(source, offset):
     return {'line': before.count('\n'), 'character': len(before.rsplit('\n', 1)[-1].encode('utf-16-le')) // 2}
 
 
-def run(java, native, directory):
+def initialize(java, native):
     clients = [java, native]
     for client in clients:
         assert client.request('textDocument/hover')['error']['code'] == -32002
@@ -96,7 +96,9 @@ def run(java, native, directory):
         assert cap['textDocumentSync'] == 1 and cap['hoverProvider'] is True, cap
         assert cap['completionProvider'] == {'resolveProvider': False, 'triggerCharacters': ['@', '=', '.']}, cap
         if client is native:
-            assert set(cap) == {'textDocumentSync', 'hoverProvider', 'completionProvider'}, cap
+            assert set(cap) == {'textDocumentSync', 'hoverProvider', 'completionProvider', 'definitionProvider', 'referencesProvider', 'renameProvider', 'documentSymbolProvider', 'foldingRangeProvider', 'linkedEditingRangeProvider'}, cap
+            for key in ['definitionProvider', 'referencesProvider', 'renameProvider', 'documentSymbolProvider', 'foldingRangeProvider', 'linkedEditingRangeProvider']:
+                assert cap[key] is True, cap
         else:
             for key in ['definitionProvider', 'referencesProvider', 'renameProvider', 'documentSymbolProvider', 'codeActionProvider', 'foldingRangeProvider', 'linkedEditingRangeProvider']:
                 assert cap[key] is True, cap
@@ -106,7 +108,14 @@ def run(java, native, directory):
         assert client.request('initialize')['error']['code'] == -32600
         client.send('initialized')
     assert native.request('unlaxer/configure')['error']['code'] == -32601
-    assert native.request('ubnf/packageSource', {'uri': 'ubnf-package:/unknown'})['error']['code'] == -32601
+    assert native.result('ubnf/packageSource', {'uri': 'ubnf-package:/unknown'}) is None
+    for method in ['codeAction', 'signatureHelp', 'semanticTokens/full']:
+        assert native.request('textDocument/' + method)['error']['code'] == -32601
+
+
+def run(java, native, directory):
+    initialize(java, native)
+    clients = [java, native]
     cases = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/cases.json').read_text())
     evidence = []
     for case in cases:
@@ -294,12 +303,22 @@ def main():
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
     parser.add_argument('--output', required=True)
+    parser.add_argument('--suite', choices=['baseline', 'navigation'], default='baseline')
     args = parser.parse_args()
     java = Client([args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.lsp.ubnf.UBNFLspLauncherExt'])
     native = Client([args.rust], native=True)
     try:
         with tempfile.TemporaryDirectory(prefix='ubnf-authoring-', dir=os.environ.get('TMPDIR')) as directory:
-            evidence = run(java, native, Path(directory))
+            if args.suite == 'navigation':
+                from ubnf_authoring_navigation import run_navigation
+                initialize(java, native)
+                evidence = run_navigation([java, native], Path(directory))
+                for client in [java, native]:
+                    assert client.result('shutdown') is None
+                    client.send('exit')
+                    assert client.process.wait(timeout=5) == 0
+            else:
+                evidence = run(java, native, Path(directory))
         Path(args.output).write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n')
         print(f'Java/Rust authoring stdio: {len(evidence)} shared cases passed')
     finally:
