@@ -94,7 +94,7 @@ process.on('SIGTERM',()=>record('sigterm'));
       try {
         await runTests({version, extensionDevelopmentPath: packaged, extensionTestsPath: path.join(root, 'scripts/vsix-suite.cjs'),
           extensionTestsEnv: {TINYCALC_PACKAGED_ROOT: packaged, TINYCALC_SCRATCH: folder, TINYCALC_SETTINGS: JSON.stringify(settings), TINYCALC_PIDS: pids, TINYCALC_UNRESPONSIVE: unresponsive, TINYCALC_RESULT: result, TINYCALC_TIMELINE: timeline},
-          launchArgs: ['--disable-extensions', '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes', '--no-sandbox', `--user-data-dir=${path.join(folder, 'user')}`, `--extensions-dir=${path.join(folder, 'extensions')}`]});
+          launchArgs: ['--password-store=basic', '--disable-extensions', '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes', '--no-sandbox', `--user-data-dir=${path.join(folder, 'user')}`, `--extensions-dir=${path.join(folder, 'extensions')}`]});
         const observation = JSON.parse(await readFile(result, 'utf8'));
         await writeFile(path.join(output, `ide-${label}.json`), JSON.stringify(observation, null, 2));
         if (scenario === 'normal') normalObservations.set(backend, observation);

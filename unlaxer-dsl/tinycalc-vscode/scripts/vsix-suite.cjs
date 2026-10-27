@@ -92,7 +92,10 @@ const run = async () => {
   assert.ok(unresponsive, 'actual unresponsive executable fixture is configured');
   const restart = () => vscode.commands.executeCommand('tinycalcLsp.restartServer');
   const healthy = async () => {
-    await bounded(restart(), 'healthy explicit restart');
+    trace('healthy-restart-start', {timeout: vscode.workspace.getConfiguration('tinycalcLsp').get('server.startupTimeoutMs')});
+    try { await bounded(restart(), 'healthy explicit restart'); }
+    catch (error) { trace('healthy-restart-failed', {error: String(error)}); throw error; }
+    trace('healthy-restart-complete');
     await until(async () => {
       const hover = await vscode.commands.executeCommand('vscode.executeHoverProvider', uri, new vscode.Position(1, 0));
       return hover?.some(item => item.contents.some(content => content.value.includes('Valid')));
@@ -145,7 +148,10 @@ const run = async () => {
   }
   await healthy();
   observations.initializationFailure = {rejected: true, prematureShutdowns, recovered: true, normalShutdownCompleted: true};
+  const startupTimeoutMs = vscode.workspace.getConfiguration('tinycalcLsp').get('server.startupTimeoutMs', 30000);
   const restore = async () => {
+    // Restore the normal startup budget before any setting can launch a healthy backend.
+    await config.update('server.startupTimeoutMs', startupTimeoutMs, vscode.ConfigurationTarget.Global);
     await config.update('server.javaPath', settings['server.javaPath'] ?? 'java', vscode.ConfigurationTarget.Global);
     await config.update('server.rustLspPath', settings['server.rustLspPath'] ?? '', vscode.ConfigurationTarget.Global);
     await config.update('server.backend', settings['server.backend'], vscode.ConfigurationTarget.Global);
@@ -159,11 +165,21 @@ const run = async () => {
   };
   const stoppedHangs = async () => until(async () => (await journal()).filter(row => row.fixture === 'unresponsive').every(({pid}) => dead(pid)), 'all unresponsive children terminate', 10000);
   // No initialize response: explicit startup fails with the configured timeout, not an unrelated error.
+  trace('timeout-test-start');
   await hang(1000);
-  await assert.rejects(bounded(restart(), 'unresponsive startup timeout'), /initialization exceeded/);
+  await assert.rejects(bounded(restart(), 'unresponsive startup timeout'), /Server initialization exceeded 1000 ms\./);
+  trace('timeout-test-rejected');
   await stoppedHangs();
   assert.ok((await journal()).some(row => row.fixture === 'unresponsive' && row.event === 'sigterm'), 'fixture ignores TERM and exercises bounded force cleanup');
-  await restore(); await healthy();
+  // A healthy start may take longer than the timeout deliberately used above. Hold
+  // completion of the real LanguageClient start past 1000 ms on both backends so
+  // forgetting to restore the normal budget fails deterministically, even on fast CI.
+  const originalStart = LanguageClient.prototype.start;
+  LanguageClient.prototype.start = function() {
+    return Promise.all([originalStart.call(this), delay(1500)]).then(() => {});
+  };
+  try { await restore(); await healthy(); }
+  finally { LanguageClient.prototype.start = originalStart; }
   // A configuration correction interrupts a 30-second pending start instead of waiting for it.
   await hang(30000);
   await bounded(restore(), 'configuration update during startup');
