@@ -78,6 +78,8 @@ public class ProjectedTokenDapProtocolConformanceTest {
     }
 
     private void exercise(Wire wire, String backend, List<String> evidence) throws Exception {
+        wire.failures = new DapFailureConformance("projected", backend);
+        wire.probeFailures("fresh");
         assertEquals(8, rows().size());
         for (boolean base : List.of(true, false)) for (int offset : List.of(0, 7)) {
             wire.request("initialize", Map.of("adapterID", "projected", "linesStartAt1", base, "columnsStartAt1", base));
@@ -107,7 +109,7 @@ public class ProjectedTokenDapProtocolConformanceTest {
                 }
                 assertTrue(wire.request("stackTrace", Map.of("threadId", 1)).getAsJsonArray("stackFrames").isEmpty());
                 assertTrue(wire.request("scopes", Map.of("frameId", 0)).getAsJsonArray("scopes").isEmpty());
-                assertFalse(wire.response("next", Map.of("threadId", 1)).get("success").getAsBoolean());
+                DapFailureConformance.invalidRequest(wire.response("next", Map.of("threadId", 1)));
             }
             Path program = launch(wire, "trace-order", offset);
             wire.request("setBreakpoints", Map.of("source", Map.of("path", program.toString()), "breakpoints", List.of(Map.of("line", 2+offset-(base ? 0 : 1)))));
@@ -154,6 +156,7 @@ public class ProjectedTokenDapProtocolConformanceTest {
         var stopped = wire.oneOf("stopped", "terminated");
         assertEquals(stopped.toString(), "stopped", stopped.get("event").getAsString());
         assertEquals("entry", stopped.getAsJsonObject("body").get("reason").getAsString());
+        wire.probeFailures("stopped");
         return program;
     }
     private static JsonArray rows() throws Exception { return JsonParser.parseString(Files.readString(FIXTURES.resolve("cases.json"))).getAsJsonArray(); }
@@ -267,13 +270,113 @@ public class ProjectedTokenDapProtocolConformanceTest {
                 assertEquals(Set.of("runtimeMode", "steppingMode"), ended.keySet());
                 assertEquals("inspection-token", ended.get("runtimeMode").get("value").getAsString());
                 assertEquals("token", ended.get("steppingMode").get("value").getAsString());
-                for (String command : List.of("next", "continue")) assertFalse(wire.response(command, Map.of("threadId", 1)).get("success").getAsBoolean());
+                for (String command : List.of("next", "continue")) DapFailureConformance.invalidRequest(wire.response(command, Map.of("threadId", 1)));
                 assertTrue("unexpected lifecycle event: "+wire.pending, wire.pending.isEmpty());
                 evidence.add(prefix+"end\tterminated/exited:0; empty frames/scopes; no token; next/continue rejected");
             }
         }
         wire.request("disconnect", Map.of());
     }
+    @Test public void crlfInteriorPositionsFailOnlyTheJavaRequestsOverStdio() throws Exception {
+        Assume.assumeTrue("[assumption] CRLF DAP requires -DrustConformance=true", Boolean.getBoolean("rustConformance"));
+        Path evidenceFile = Path.of("target/token-dap-crlf.tsv");
+        Files.deleteIfExists(evidenceFile);
+        var javaEvidence = new ArrayList<String>(); var rustEvidence = new ArrayList<String>();
+        try (var wire = javaWire("crlf.json")) { exerciseCrlf(wire, javaEvidence); }
+        try (var wire = rustWire("crlf.json")) { exerciseCrlf(wire, rustEvidence); }
+        assertEquals(javaEvidence, rustEvidence);
+        assertEquals(100, javaEvidence.stream().filter(line -> line.contains("\tend\t")).count());
+        var evidence = new ArrayList<String>(List.of("backend\tfixture\tbase\toffset\tmode\tstep\tobservation"));
+        javaEvidence.forEach(line -> evidence.add("java\t"+line));
+        rustEvidence.forEach(line -> evidence.add("rust\t"+line));
+        Files.write(evidenceFile, evidence);
+    }
+
+    private void exerciseCrlf(Wire wire, List<String> evidence) throws Exception {
+        var rows = JsonParser.parseString(Files.readString(FIXTURES.resolve("crlf.json"))).getAsJsonArray();
+        assertEquals(5, rows.size());
+        String diagnostic = "java.lang.IllegalArgumentException: inside CRLF";
+        for (boolean base : List.of(true, false)) for (int offset : List.of(0, 7)) {
+            wire.request("initialize", Map.of("linesStartAt1", base, "columnsStartAt1", base));
+            for (var element : rows) for (String mode : List.of("next", "continue", "breakpoints", "configuration-breakpoints", "run")) {
+                var row = element.getAsJsonObject(); var steps = row.getAsJsonArray("steps");
+                var starts = row.getAsJsonArray("startLines");
+                boolean configuration = mode.equals("configuration-breakpoints") || mode.equals("run");
+                boolean breakpoints = mode.contains("breakpoints");
+                String prefix = row.get("name").getAsString()+"\t"+base+"\t"+offset+"\t"+mode+"\t";
+                Path program = temporary.newFile().toPath(); Files.writeString(program, "outer\n".repeat(offset)+row.get("input").getAsString());
+                wire.request("launch", Map.of("program", program.toString(), "fixture", row.get("name").getAsString(), "stopOnEntry", !configuration, "runtimeMode", "inspection-token", "lineOffset", offset));
+                wire.event("initialized");
+                wire.request("setBreakpoints", Map.of("source", Map.of("path", program.toString()), "breakpoints", breakpoints ? List.of(Map.of("line", 2+offset-(base ? 0 : 1))) : List.of()));
+                var configured = wire.response("configurationDone", Map.of());
+                boolean badStart = starts.asList().stream().anyMatch(JsonElement::isJsonNull);
+                if (configuration && breakpoints && badStart) {
+                    DapFailureConformance.assertError(configured, diagnostic);
+                    DapFailureConformance.assertError(wire.response("configurationDone", Map.of()), "java.util.concurrent.CompletionException: java.lang.IllegalStateException: configurationDone requires a new launch");
+                } else {
+                    assertTrue(configured.toString(), configured.get("success").getAsBoolean());
+                    if (!configuration) assertEquals("entry", wire.event("stopped").get("reason").getAsString());
+                }
+                evidence.add(prefix+"configurationDone\t"+DapFailureConformance.shape(configured));
+                if (!configuration || (breakpoints && badStart)) for (int i = 0; i < steps.size(); i++) {
+                    var step = steps.get(i).getAsJsonArray();
+                    var response = wire.response("stackTrace", Map.of("threadId", 1));
+                    var observation = DapFailureConformance.shape(response);
+                    if (step.get(4).isJsonNull()) {
+                        DapFailureConformance.assertError(response, diagnostic);
+                        assertEquals(observation, DapFailureConformance.shape(wire.response("stackTrace", Map.of("threadId", 1))));
+                    } else {
+                        assertTrue(response.toString(), response.get("success").getAsBoolean());
+                        var frame = response.getAsJsonObject("body").getAsJsonArray("stackFrames").get(0).getAsJsonObject();
+                        assertEquals(step.get(0).getAsString()+" ("+(i+1)+"/"+steps.size()+")", frame.get("name").getAsString());
+                        assertEquals(program.toString(), frame.getAsJsonObject("source").get("path").getAsString());
+                        var keys = List.of("line", "column", "endLine", "endColumn");
+                        for (int k = 0; k < keys.size(); k++) assertEquals(step.get(4+k).getAsInt()+(k%2 == 0 ? offset : 0)-(base ? 0 : 1), frame.get(keys.get(k)).getAsInt());
+                        var position = new JsonObject();
+                        for (String key : keys) position.add(key, frame.get(key));
+                        observation.add("position", position);
+                    }
+                    var vars = variables(wire); assertEquals(5, vars.size());
+                    assertEquals("\""+step.get(1).getAsString().strip()+"\"", vars.get(step.get(0).getAsString()).get("value").getAsString());
+                    var observed = new TreeMap<String,List<Object>>();
+                    vars.forEach((name, v) -> observed.put(name, List.of(v.get("value").getAsString(), v.get("type").getAsString(), v.get("variablesReference").getAsInt())));
+                    observation.add("variables", new Gson().toJsonTree(observed));
+                    assertEquals("Current Token", wire.request("scopes", Map.of("frameId", 0)).getAsJsonArray("scopes").get(0).getAsJsonObject().get("name").getAsString());
+                    evidence.add(prefix+i+"\t"+observation);
+                    boolean next = mode.equals("next");
+                    boolean fails = !next && starts.asList().subList(i+1, starts.size()).stream().anyMatch(JsonElement::isJsonNull);
+                    if (fails) {
+                        var failed = wire.response("continue", Map.of("threadId", 1));
+                        DapFailureConformance.assertError(failed, diagnostic);
+                        DapFailureConformance.assertError(wire.response("continue", Map.of("threadId", 1)), diagnostic);
+                        assertEquals(vars, variables(wire));
+                        assertEquals(DapFailureConformance.shape(response), DapFailureConformance.shape(wire.response("stackTrace", Map.of("threadId", 1))));
+                        evidence.add(prefix+i+"-continue\t"+DapFailureConformance.shape(failed));
+                        next = true; // Recover from the unchanged current step.
+                    }
+                    var resumed = wire.response(next ? "next" : "continue", Map.of("threadId", 1));
+                    assertTrue(resumed.toString(), resumed.get("success").getAsBoolean());
+                    if (!next) assertTrue(resumed.getAsJsonObject("body").get("allThreadsContinued").getAsBoolean());
+                    evidence.add(prefix+i+"-resume\t"+DapFailureConformance.shape(resumed));
+                    if (!next || i+1 == steps.size()) break;
+                    assertEquals("step", wire.event("stopped").get("reason").getAsString());
+                }
+                var output = wire.event("output"); assertEquals("stdout", output.get("category").getAsString());
+                assertEquals((configuration && !(breakpoints && badStart) ? "Parsed successfully: " : "Completed: ")+program+"\n", output.get("output").getAsString());
+                wire.event("terminated"); assertEquals(0, wire.event("exited").get("exitCode").getAsInt());
+                assertTrue(wire.request("stackTrace", Map.of("threadId", 1)).getAsJsonArray("stackFrames").isEmpty());
+                assertTrue(wire.request("scopes", Map.of("frameId", 0)).getAsJsonArray("scopes").isEmpty());
+                var ended = variables(wire); assertEquals(Set.of("runtimeMode", "steppingMode"), ended.keySet());
+                assertEquals("inspection-token", ended.get("runtimeMode").get("value").getAsString());
+                assertEquals("token", ended.get("steppingMode").get("value").getAsString());
+                for (String command : List.of("next", "continue")) DapFailureConformance.invalidRequest(wire.response(command, Map.of("threadId", 1)));
+                wire.request("threads", Map.of()); assertTrue("unexpected events: "+wire.pending, wire.pending.isEmpty());
+                evidence.add(prefix+"end\tterminated/exited:0; runtimeMode=inspection-token; steppingMode=token");
+            }
+        }
+        wire.request("disconnect", Map.of());
+    }
+
     private static Map<String,JsonObject> variables(Wire wire) throws Exception {
         var out = new HashMap<String,JsonObject>();
         for (var item : wire.request("variables", Map.of("variablesReference", 1)).getAsJsonArray("variables")) {

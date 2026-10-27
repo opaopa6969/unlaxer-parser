@@ -154,14 +154,10 @@ impl Backend for FailureBackend {
     }
     fn steps(&mut self, snapshot: &Snapshot, args: &Value) -> Result<Vec<Step>, String> {
         let case = args["failure"].as_str().unwrap();
-        if case == "bad-extent" || case == "crlf-anchor" {
+        if case == "bad-extent" {
             return Ok(vec![Step {
                 label: "GeneratedToken".into(),
-                span: if case == "bad-extent" {
-                    Span { start: 0, end: 1 }
-                } else {
-                    Span { start: 2, end: 2 }
-                },
+                span: Span { start: 0, end: 1 },
                 generated_text: Some("repair".into()),
                 projected_text: None,
             }]);
@@ -209,7 +205,6 @@ fn trace_limit_resource_and_incomplete_failures_terminate_without_stopping() {
         ("incomplete", "Unsupported"),
         ("resource", "256"),
         ("bad-extent", "zero-width"),
-        ("crlf-anchor", "CRLF"),
     ] {
         assert_eq!(
             server.handle(request(

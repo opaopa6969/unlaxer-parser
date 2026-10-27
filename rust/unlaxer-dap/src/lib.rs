@@ -19,7 +19,23 @@ pub struct Step {
 
 enum RequestError {
     Message(String),
-    ProjectedSpanOutsideSnapshot,
+    Internal(String),
+}
+impl RequestError {
+    fn unavailable() -> Self {
+        Self::failed_future(
+            "IllegalArgumentException",
+            "invalid or unavailable debug request",
+        )
+    }
+    fn failed_future(kind: &str, message: &str) -> Self {
+        Self::Internal(format!(
+            "java.util.concurrent.CompletionException: java.lang.{kind}: {message}"
+        ))
+    }
+    fn position(message: &str) -> Self {
+        Self::Internal(format!("java.lang.IllegalArgumentException: {message}"))
+    }
 }
 impl From<String> for RequestError {
     fn from(message: String) -> Self {
@@ -137,7 +153,6 @@ pub fn token_steps(tree: &unlaxer_runtime::Tree) -> Result<Vec<Step>, String> {
 pub struct Server<B> {
     backend: B,
     seq: i64,
-    initialized: bool,
     configuration_pending: bool,
     terminated: bool,
     disconnected: bool,
@@ -160,7 +175,6 @@ impl<B: Backend> Server<B> {
         Self {
             backend,
             seq: 0,
-            initialized: false,
             configuration_pending: false,
             terminated: false,
             disconnected: false,
@@ -186,10 +200,7 @@ impl<B: Backend> Server<B> {
             .filter(|seq| *seq > 0 && *seq <= i32::MAX as i64)
             .unwrap_or(0);
         let command = message["command"].as_str().unwrap_or("").to_owned();
-        let arguments = message
-            .get("arguments")
-            .cloned()
-            .unwrap_or_else(|| json!({}));
+        let arguments = message.get("arguments").cloned().unwrap_or(Value::Null);
         let mut events = vec![];
         let result: Result<Value, RequestError> = (|| {
             if request_seq == 0 || message["type"] != "request" || command.is_empty() {
@@ -202,27 +213,31 @@ impl<B: Backend> Server<B> {
                 return Err("disconnected".into());
             }
             if command == "initialize" {
-                self.initialized = true;
                 self.line_base = usize::from(arguments["linesStartAt1"] != false);
                 self.column_base = usize::from(arguments["columnsStartAt1"] != false);
                 return Ok(json!({"supportsConfigurationDoneRequest":true}));
             }
-            // Cancellation may arrive before initialize completes. Disconnect still
-            // acknowledges and closes this transport, matching generated Java launchers.
-            if !self.initialized && command != "disconnect" {
-                return Err("not initialized".into());
-            }
+            // Generated Java adapters accept requests before initialize; each request
+            // validates its own arguments and lifecycle state.
             match command.as_str() {
                 "launch" => {
                     let program = ["program", "formulaSource"]
                         .into_iter()
                         .filter_map(|key| arguments[key].as_str())
                         .find(|s| !s.trim().is_empty())
-                        .ok_or("no program specified")?;
+                        .ok_or_else(|| {
+                            RequestError::failed_future(
+                                "IllegalArgumentException",
+                                "invalid program or stepping mode",
+                            )
+                        })?;
                     let runtime = arguments["runtimeMode"].as_str().unwrap_or("token");
                     let mode = stepping_mode(&arguments);
                     if !mode.eq_ignore_ascii_case("ast") && !mode.eq_ignore_ascii_case("token") {
-                        return Err("unsupported stepping mode".into());
+                        return Err(RequestError::failed_future(
+                            "IllegalArgumentException",
+                            "invalid program or stepping mode",
+                        ));
                     }
                     if mode.eq_ignore_ascii_case("token") && !self.backend.supports_token_trace() {
                         return Err("backend does not provide parser token tracing".into());
@@ -245,6 +260,12 @@ impl<B: Backend> Server<B> {
                     Ok(Value::Null)
                 }
                 "setBreakpoints" => {
+                    if arguments.is_null() {
+                        return Err(RequestError::Internal(
+                            "java.lang.NullPointerException: missing setBreakpoints arguments"
+                                .into(),
+                        ));
+                    }
                     let target = normalized_debug_path(&self.program);
                     let requested_path = match arguments.get("source") {
                         None | Some(Value::Null) => target.clone(),
@@ -260,12 +281,23 @@ impl<B: Backend> Server<B> {
                     let mut lines = BTreeSet::new();
                     let mut results = vec![];
                     for breakpoint in requested {
-                        let line = breakpoint["line"]
-                            .as_u64()
-                            .and_then(|line| usize::try_from(line).ok())
-                            .filter(|line| *line >= self.line_base)
-                            .ok_or("invalid breakpoint line")?;
-                        lines.insert(line);
+                        if breakpoint.is_null() {
+                            return Err(RequestError::Internal(
+                                "java.lang.NullPointerException: null breakpoint".into(),
+                            ));
+                        }
+                        // LSP4J accepts signed lines and defaults a missing primitive to 0.
+                        // Negative lines are reported but cannot match a source position.
+                        let line = match breakpoint.get("line") {
+                            None | Some(Value::Null) => 0,
+                            Some(line) => line
+                                .as_i64()
+                                .filter(|line| i32::try_from(*line).is_ok())
+                                .ok_or("invalid breakpoint line")?,
+                        };
+                        if let Ok(line) = usize::try_from(line) {
+                            lines.insert(line);
+                        }
                         let mut result = json!({"verified":same_source,"line":line});
                         if !same_source {
                             result["message"] = json!("source does not match launch program");
@@ -279,7 +311,10 @@ impl<B: Backend> Server<B> {
                 }
                 "configurationDone" => {
                     if !self.configuration_pending {
-                        return Err("configurationDone requires a new launch".into());
+                        return Err(RequestError::failed_future(
+                            "IllegalStateException",
+                            "configurationDone requires a new launch",
+                        ));
                     }
                     self.configuration_pending = false;
                     match self.prepare() {
@@ -287,7 +322,11 @@ impl<B: Backend> Server<B> {
                             if self.stop_on_entry {
                                 self.index = 0;
                                 events.push(stopped("entry"));
-                            } else if let Some(index) = self.breakpoint_after(None) {
+                            } else if let Some(index) = if self.breakpoints.is_empty() {
+                                None
+                            } else {
+                                self.breakpoint_after(None)?
+                            } {
                                 self.index = index;
                                 events.push(stopped("breakpoint"));
                             } else {
@@ -307,14 +346,12 @@ impl<B: Backend> Server<B> {
                     let frames = if self.current().is_some() {
                         let step = self.current().unwrap();
                         let snapshot = self.snapshot.as_ref().unwrap();
-                        let position = snapshot.lsp(step.span.start).map_err(str::to_owned)?;
-                        let end = snapshot.lsp(step.span.end).map_err(|error| {
-                            if step.projected_text.is_some() && error == "outside snapshot" {
-                                RequestError::ProjectedSpanOutsideSnapshot
-                            } else {
-                                error.into()
-                            }
-                        })?;
+                        let position = snapshot
+                            .lsp(step.span.start)
+                            .map_err(RequestError::position)?;
+                        let end = snapshot
+                            .lsp(step.span.end)
+                            .map_err(RequestError::position)?;
                         vec![
                             json!({"id":0,"name":format!("{} ({}/{})",step.label,self.index+1,self.steps.len()),"line":position.line+self.line_offset+self.line_base,"column":position.character+self.column_base,"endLine":end.line+self.line_offset+self.line_base,"endColumn":end.character+self.column_base,"source":{"path":self.program,"name":std::path::Path::new(&self.program).file_name().unwrap_or_default().to_string_lossy()}}),
                         ]
@@ -324,8 +361,12 @@ impl<B: Backend> Server<B> {
                     Ok(json!({"stackFrames":frames,"totalFrames":frames.len()}))
                 }
                 "scopes" => {
-                    if arguments["frameId"] != 0 {
-                        return Err("invalid frame".into());
+                    if !arguments.is_object()
+                        || arguments
+                            .get("frameId")
+                            .is_some_and(|id| id != 0 && !id.is_null())
+                    {
+                        return Err(RequestError::unavailable());
                     }
                     Ok(
                         json!({"scopes":if self.current().is_some(){vec![json!({"name":if self.ast_mode {"Current AST Node"}else{"Current Token"},"variablesReference":1,"expensive":false})]}else{vec![]}}),
@@ -333,7 +374,7 @@ impl<B: Backend> Server<B> {
                 }
                 "variables" => {
                     if arguments["variablesReference"] != 1 {
-                        return Err("invalid variables reference".into());
+                        return Err(RequestError::unavailable());
                     }
                     let mut variables = vec![];
                     if let Some(step) = self.current() {
@@ -373,7 +414,11 @@ impl<B: Backend> Server<B> {
                 }
                 "next" => {
                     self.check_thread(&arguments)?;
-                    let label = self.current().ok_or("notStopped")?.label.clone();
+                    let label = self
+                        .current()
+                        .ok_or_else(RequestError::unavailable)?
+                        .label
+                        .clone();
                     self.backend.before_step(self.index + 1, &label);
                     self.index += 1;
                     let label = self
@@ -391,9 +436,9 @@ impl<B: Backend> Server<B> {
                 "continue" => {
                     self.check_thread(&arguments)?;
                     if self.current().is_none() {
-                        return Err("notStopped".into());
+                        return Err(RequestError::unavailable());
                     }
-                    if let Some(index) = self.breakpoint_after(Some(self.index)) {
+                    if let Some(index) = self.breakpoint_after(Some(self.index))? {
                         self.index = index;
                         events.push(stopped("breakpoint"));
                     } else {
@@ -410,7 +455,41 @@ impl<B: Backend> Server<B> {
                     self.variables.clear();
                     Ok(Value::Null)
                 }
-                _ => Err("unsupported command".into()),
+                // Default IDebugProtocolServer methods throw synchronously in LSP4J 0.23.1.
+                "cancel"
+                | "attach"
+                | "restart"
+                | "terminate"
+                | "breakpointLocations"
+                | "setFunctionBreakpoints"
+                | "setExceptionBreakpoints"
+                | "dataBreakpointInfo"
+                | "setDataBreakpoints"
+                | "setInstructionBreakpoints"
+                | "stepIn"
+                | "stepOut"
+                | "stepBack"
+                | "reverseContinue"
+                | "restartFrame"
+                | "goto"
+                | "pause"
+                | "setVariable"
+                | "source"
+                | "terminateThreads"
+                | "modules"
+                | "loadedSources"
+                | "evaluate"
+                | "setExpression"
+                | "stepInTargets"
+                | "gotoTargets"
+                | "completions"
+                | "exceptionInfo"
+                | "readMemory"
+                | "writeMemory"
+                | "disassemble" => Err(RequestError::Internal(
+                    "java.lang.UnsupportedOperationException".into(),
+                )),
+                _ => Err(format!("Unsupported request method: {command}").into()),
             }
         })();
         let mut output = vec![];
@@ -425,11 +504,11 @@ impl<B: Backend> Server<B> {
             Err(RequestError::Message(message)) => {
                 response["message"] = json!(message);
             }
-            Err(RequestError::ProjectedSpanOutsideSnapshot) => {
+            Err(RequestError::Internal(diagnostic)) => {
                 // LSP4J's generated Java adapter returns a string body, not an ErrorResponse.
                 // Preserve its diagnostic without fabricating JVM-specific stack frames.
                 response["message"] = json!("Internal error.");
-                response["body"] = json!("java.lang.IllegalArgumentException: outside snapshot\n");
+                response["body"] = json!(format!("{diagnostic}\n"));
             }
         }
         output.push(response);
@@ -446,11 +525,11 @@ impl<B: Backend> Server<B> {
         self.seq += 1;
         self.seq
     }
-    fn check_thread(&self, arguments: &Value) -> Result<(), String> {
+    fn check_thread(&self, arguments: &Value) -> Result<(), RequestError> {
         if arguments["threadId"] == 1 {
             Ok(())
         } else {
-            Err("invalid thread".into())
+            Err(RequestError::unavailable())
         }
     }
     fn current(&self) -> Option<&Step> {
@@ -460,16 +539,24 @@ impl<B: Backend> Server<B> {
             self.steps.get(self.index)
         }
     }
-    fn breakpoint_after(&self, from: Option<usize>) -> Option<usize> {
-        let snapshot = self.snapshot.as_ref()?;
-        ((from.map_or(0, |i| i + 1))..self.steps.len()).find(|&index| {
-            snapshot
+    fn breakpoint_after(&self, from: Option<usize>) -> Result<Option<usize>, RequestError> {
+        let Some(snapshot) = self.snapshot.as_ref() else {
+            return Ok(None);
+        };
+        // Java evaluates each start position even when continue has no breakpoints.
+        // Do not skip invalid positions: the failed request must leave index intact.
+        for index in from.map_or(0, |i| i + 1)..self.steps.len() {
+            let position = snapshot
                 .lsp(self.steps[index].span.start)
-                .is_ok_and(|position| {
-                    self.breakpoints
-                        .contains(&(position.line + self.line_offset + self.line_base))
-                })
-        })
+                .map_err(RequestError::position)?;
+            if self
+                .breakpoints
+                .contains(&(position.line + self.line_offset + self.line_base))
+            {
+                return Ok(Some(index));
+            }
+        }
+        Ok(None)
     }
     fn prepare(&mut self) -> Result<(), String> {
         let metadata = std::fs::metadata(&self.program).map_err(|e| e.to_string())?;
@@ -500,7 +587,7 @@ impl<B: Backend> Server<B> {
                 return Err("generated text requires a zero-width token anchor".into());
             }
             // Java retains concatenated terminals whose logical end exceeds the input.
-            // Only stackTrace fails for that step; text and stepping remain available.
+            // The end fails in stackTrace; a CRLF-interior start also fails breakpoint search.
             // Keep rejecting malformed hand-built spans and every other source kind.
             let projected_overflow = step.projected_text.as_ref().is_some_and(|text| {
                 step.span.end > snapshot.len()
@@ -509,8 +596,16 @@ impl<B: Backend> Server<B> {
             if !projected_overflow {
                 snapshot.check(step.span).map_err(str::to_owned)?;
             }
-            snapshot.lsp(step.span.start).map_err(str::to_owned)?;
-            if !projected_overflow {
+            // CP ranges may straddle CRLF. Java defers line/column conversion to
+            // stackTrace and breakpoint search; keep the token text and range intact.
+            snapshot
+                .check(unlaxer_runtime::Span {
+                    start: step.span.start,
+                    end: step.span.start,
+                })
+                .map_err(str::to_owned)?;
+            if self.ast_mode {
+                snapshot.lsp(step.span.start).map_err(str::to_owned)?;
                 snapshot.lsp(step.span.end).map_err(str::to_owned)?;
             }
             if step.label.is_empty() {

@@ -76,6 +76,8 @@ public class GeneratedTokenDapProtocolConformanceTest {
     }
 
     private void exercise(Wire wire, String backend, List<String> evidence) throws Exception {
+        wire.failures = new DapFailureConformance("generated", backend);
+        wire.probeFailures("fresh");
         assertEquals(6, rows().size());
         for (boolean base : List.of(true, false)) for (int offset : List.of(0, 7)) {
             wire.request("initialize", Map.of("adapterID", "generated", "linesStartAt1", base, "columnsStartAt1", base));
@@ -105,7 +107,7 @@ public class GeneratedTokenDapProtocolConformanceTest {
                 }
                 assertTrue(wire.request("stackTrace", Map.of("threadId", 1)).getAsJsonArray("stackFrames").isEmpty());
                 assertTrue(wire.request("scopes", Map.of("frameId", 0)).getAsJsonArray("scopes").isEmpty());
-                assertFalse(wire.response("next", Map.of("threadId", 1)).get("success").getAsBoolean());
+                DapFailureConformance.invalidRequest(wire.response("next", Map.of("threadId", 1)));
             }
             Path program = launch(wire, "trace-order", offset);
             wire.request("setBreakpoints", Map.of("source", Map.of("path", program.toString()), "breakpoints", List.of(Map.of("line", 2+offset-(base ? 0 : 1)))));

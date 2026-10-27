@@ -57,6 +57,8 @@ public class ClassicTokenDapProtocolConformanceTest {
   Files.createDirectories(Path.of("target"));Files.write(Path.of("target/classic-token-dap-protocol.tsv"),evidence);
  }
  private void exercise(Wire wire,String backend)throws Exception {
+        wire.failures = new DapFailureConformance("classic-token", backend);
+        wire.probeFailures("fresh");
   var rows=JsonParser.parseString(Files.readString(ROOT.resolve("docs/fixtures/classic-token-dap/steps.json"))).getAsJsonArray();assertEquals(8,rows.size());
   for(boolean base:List.of(true,false))for(int offset:List.of(0,7)){
    wire.request("initialize",Map.of("adapterID","token-fixture","linesStartAt1",base,"columnsStartAt1",base));
@@ -73,7 +75,7 @@ public class ClassicTokenDapProtocolConformanceTest {
      assertEquals("Current Token",wire.request("scopes",Map.of("frameId",0)).getAsJsonArray("scopes").get(0).getAsJsonObject().get("name").getAsString());
      var variables=new HashMap<String,JsonObject>();for(var item:wire.request("variables",Map.of("variablesReference",1)).getAsJsonArray("variables")){var v=item.getAsJsonObject();variables.put(v.get("name").getAsString(),v);}
      var variable=variables.get(expected.get("label").getAsString());assertEquals("Token",variable.get("type").getAsString());assertEquals(name,"\""+expected.get("text").getAsString().strip().replace("\"","\\\"")+"\"",variable.get("value").getAsString());assertEquals("0",variables.get("astNodeCount").get("value").getAsString());assertEquals("",variables.get("astCurrentNode").get("value").getAsString());
-     if(index==0){assertFalse(wire.response("next",Map.of("threadId",99)).get("success").getAsBoolean());assertFalse(wire.response("launch",Map.of("program","unused","steppingMode","unsupported")).get("success").getAsBoolean());assertEquals(frame,wire.request("stackTrace",Map.of("threadId",1)).getAsJsonArray("stackFrames").get(0));}
+     if(index==0){DapFailureConformance.invalidRequest(wire.response("next",Map.of("threadId",99)));DapFailureConformance.assertError(wire.response("launch",Map.of("program","unused","steppingMode","unsupported")), "java.util.concurrent.CompletionException: java.lang.IllegalArgumentException: invalid program or stepping mode");assertEquals(frame,wire.request("stackTrace",Map.of("threadId",1)).getAsJsonArray("stackFrames").get(0));}
      wire.request("next",Map.of("threadId",1));if(index+1<steps.size())assertEquals("step",wire.event("stopped").get("reason").getAsString());else{wire.event("output");wire.event("terminated");wire.event("exited");}
     }
     // A breakpoint on the EOF line reaches the real zero-width EOF token.

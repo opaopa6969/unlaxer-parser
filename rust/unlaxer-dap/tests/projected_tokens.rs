@@ -258,6 +258,109 @@ fn projected_overflow_fails_only_stack_trace_and_preserves_lifecycle() {
     std::fs::remove_file(file).unwrap();
 }
 
+#[test]
+fn crlf_interior_failure_preserves_step_and_can_resume() {
+    static ROWS: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+    let rows = ROWS.get_or_init(|| {
+        serde_json::from_str(include_str!(
+            "../../../docs/fixtures/projected-token-dap/crlf.json"
+        ))
+        .unwrap()
+    });
+    let file = std::env::temp_dir().join(format!("crlf-token-{}.txt", std::process::id()));
+    let mut server = Server::new(SharedFixtureBackend(rows));
+    let mut seq = 0;
+    let mut send = |command: &str, args: Value| {
+        seq += 1;
+        server.handle(request(seq, command, args))
+    };
+    for row in rows.as_array().unwrap() {
+        std::fs::write(&file, row["input"].as_str().unwrap()).unwrap();
+        for stop_on_entry in [true, false] {
+            // Launch is accepted even before initialize, matching the Java adapter.
+            assert_eq!(
+                send(
+                    "launch",
+                    json!({"program":file,"fixture":row["name"],"stopOnEntry":stop_on_entry})
+                )[0]["success"],
+                true
+            );
+            send("setBreakpoints", json!({"breakpoints":[{"line":2}]}));
+            let configured = send("configurationDone", json!({}));
+            let bad_start = row["startLines"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(Value::is_null);
+            if !stop_on_entry && !bad_start {
+                assert_eq!(configured[0]["success"], true);
+                assert_eq!(configured[2]["event"], "terminated");
+                continue;
+            }
+            if stop_on_entry {
+                assert_eq!(configured[1]["event"], "stopped");
+            } else {
+                assert_crlf_error(&configured);
+            }
+            for (i, step) in row["steps"].as_array().unwrap().iter().enumerate() {
+                let trace = send("stackTrace", json!({"threadId":1}));
+                if step[4].is_null() {
+                    assert_crlf_error(&trace);
+                } else {
+                    assert_eq!(trace[0]["success"], true);
+                }
+                let variables = send("variables", json!({"variablesReference":1}));
+                assert_eq!(
+                    variables[0]["body"]["variables"][0]["value"],
+                    format!(
+                        "\"{}\"",
+                        unlaxer_runtime::strip_capture(step[1].as_str().unwrap())
+                    )
+                );
+                if row["startLines"].as_array().unwrap()[i + 1..]
+                    .iter()
+                    .any(Value::is_null)
+                {
+                    for _ in 0..2 {
+                        assert_crlf_error(&send("continue", json!({"threadId":1})));
+                    }
+                    assert_eq!(
+                        send("variables", json!({"variablesReference":1}))[0]["body"],
+                        variables[0]["body"]
+                    );
+                }
+                let moved = send("next", json!({"threadId":1}));
+                assert_eq!(moved[0]["success"], true);
+                if i + 1 == row["steps"].as_array().unwrap().len() {
+                    assert_eq!(moved[2]["event"], "terminated");
+                } else {
+                    assert_eq!(moved[1]["event"], "stopped");
+                }
+            }
+            for command in ["next", "continue"] {
+                let failed = send(command, json!({"threadId":1}));
+                assert_eq!(failed.len(), 1);
+                assert_eq!(failed[0]["message"], "Internal error.");
+                assert_eq!(failed[0]["body"], "java.util.concurrent.CompletionException: java.lang.IllegalArgumentException: invalid or unavailable debug request\n");
+            }
+        }
+    }
+    std::fs::remove_file(file).unwrap();
+}
+fn assert_crlf_error(messages: &[Value]) {
+    assert_eq!(
+        messages.len(),
+        1,
+        "failed request emits no lifecycle events"
+    );
+    assert_eq!(messages[0]["success"], false);
+    assert_eq!(messages[0]["message"], "Internal error.");
+    assert_eq!(
+        messages[0]["body"],
+        "java.lang.IllegalArgumentException: inside CRLF\n"
+    );
+}
+
 fn projected(context: &mut ParseContext<'_>) -> ParseResult {
     context.declare_complete_token_trace();
     let span = Span { start: 0, end: 2 };
@@ -374,8 +477,6 @@ impl Backend for FailureBackend {
         if matches!(
             case,
             "dual-source"
-                | "crlf-span"
-                | "crlf-end"
                 | "outside"
                 | "outside-start"
                 | "reversed"
@@ -386,8 +487,6 @@ impl Backend for FailureBackend {
             return Ok(vec![Step {
                 label: "ProjectedToken".into(),
                 span: match case {
-                    "crlf-span" => Span { start: 2, end: 3 },
-                    "crlf-end" => Span { start: 0, end: 2 },
                     "outside" => Span { start: 0, end: 20 },
                     "outside-start" => Span { start: 5, end: 6 },
                     "input-overflow" => Span { start: 3, end: 5 },
@@ -445,8 +544,6 @@ fn trace_limit_resource_and_incomplete_failures_terminate_without_stopping() {
         ("resource", "256"),
         ("dual-source", "unambiguous"),
         ("ast", "unambiguous"),
-        ("crlf-span", "CRLF"),
-        ("crlf-end", "CRLF"),
         ("outside", "outside snapshot"),
         ("outside-start", "outside snapshot"),
         ("input-overflow", "outside snapshot"),
