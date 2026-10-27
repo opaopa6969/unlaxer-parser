@@ -16,7 +16,7 @@ Java の既存経路は維持し、Rust は対応した capability だけを広�
 | `initialize`, `initialized`, `shutdown`, `exit` | Full sync、UTF-16、初期化前/終了後 request を拒否 | 実 stdio 共通 fixture |
 | `textDocument/didOpen`, `didChange`, `didClose`, `didSave` | open buffer を索引化し import 元を更新。Full change、close 後は disk に戻る | 実 stdio 共通 fixture |
 | `$/setTrace`, `$/cancelRequest`, workspace configuration / watched files | 標準通知（基準 server の no-op を含む） | no-op、同期処理 |
-| `textDocument/publishDiagnostics` | parse `ULX-PARSE-001`、GrammarValidator、GenerationWarnings、module error | syntax / generation warnings / module error。完全な validator と syntax expected/stack は未対応 |
+| `textDocument/publishDiagnostics` | parse `ULX-PARSE-001`、GrammarValidator、GenerationWarnings、module error | syntax / generation warnings / module error、validatorの接続済み範囲は後述。全 validator と syntax expected/stack は未完了 |
 | `hoverProvider`: `textDocument/hover` | catalog/annotation、宣言・由来・文書内参照数、parse status | catalog/annotation、ローカル/直接 import token の hover、共通 fixture |
 | `completionProvider`: `textDocument/completion` | resolve=false、trigger `@`, `=`, `.`。annotation/FQN/snippet、lexical/whitespace/scope別候補と textEdit | 同じ data と scope/直接 import 候補、共通 fixture |
 | `definitionProvider`: `textDocument/definition` | AST の binding、外部 token / package URI | 未対応 |
@@ -68,12 +68,12 @@ completion は順序・snippet・documentation・textEdit を含む全 JSON、�
 `past-line-end`・`non-ascii-prefix`・`leading-dot`・`nested-qualifier`・`supplementary-letter-hover` で固定した。
 残差: サロゲートペアの内側を指す位置は Rust が `-32602` で拒否し、Java は UTF-16 の途中 offset のまま処理する。
 BMP 内の Unicode 分類は `char::is_alphanumeric` による近似で、結合文字（Mn/Mc）と Nl/No は未照合（#886）。
-同じ version 以下の `didChange` を Rust は無視し、Java は適用する（#885）。
+同じ version 以下の `didChange` も Java と同じく適用する（#885 の診断67文法で検証）。
 
 構文エラー時の fallback hover は Java の consumed offset と Rust の最初の error offset を区別する（#885）。
 構文エラーは両方の拒否を確認するが、native frontend の最初のエラー位置と
 Java の farthest failure / expected / rule stack の同値性は未達成（#885）。
-重複宣言の fixture では補完候補の抑制を比較し、validator 診断は未対応と明記する。
+重複ルール宣言の fixture は補完候補の抑制と、両validatorが診断しないことを全JSONで比較する。
 module error は共通 fixture の code/severity/source/range を比較し、resolver の説明文は別契約として残す。
 
 ローカル module の未保存変更、change/close/save 後の再通知、percent encoded URI、
@@ -82,7 +82,7 @@ virtual package path に開いた偽 buffer が検証済み source を置換で�
 server が manifest/lock/cache を書き換えないことも両版で検証する。
 現時点の native file URI は Linux のローカル絶対パスを検証対象とし、UNC/Windows 等は #886 に残す。
 
-CI は `ubnf-authoring` 必須契約の2メソッドと27件の実行件数を検査する。
+CI は `ubnf-authoring` 必須契約の3メソッドと94件（従来27＋診断67）の実行件数を検査する。
 packaged VSIX は従来 Java smoke を保持し、別の隔離 profile で Java executable を不存在に設定して
 Rust の completion/hover/診断と変更後の修復、未広告 definition を確認する。最後に拡張の `deactivate` で
 native server の子プロセスが終了し、残らないことを確認する（tinycalc-vscode #874/#880 と同じ後始末の水準）。
@@ -91,7 +91,7 @@ native executable 自体は外部パスを指定し、VSIX 内に同梱したと
 ## 検証コマンドと mutation
 
 - `cd rust && RUSTUP_TOOLCHAIN=1.85.0 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`
-- 隔離 Maven repository と JDK21 で `-pl unlaxer-dsl/ubnf-vscode -am test -Dtest=UbnfAuthoringProtocolConformanceTest,UBNFLanguageServerExtTest,UbnfImportEditorTest,UBNFLanguageServerTest,RustUbnfFrontendConformanceTest,PackageResolverConformanceTest,GenerationWarningsConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false`。
+- 隔離 Maven repository と JDK21 で `-pl unlaxer-dsl/ubnf-vscode -am test -Dtest=UbnfAuthoringProtocolConformanceTest,UBNFLanguageServerExtTest,UbnfImportEditorTest,UBNFLanguageServerTest,GrammarValidatorTest,RustUbnfFrontendConformanceTest,PackageResolverConformanceTest,GenerationWarningsConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false`。
 - `python3 scripts/verify-optin-tests.py ubnf-authoring`、`python3 -m pytest -q scripts/tests`、両 parity checker、`actionlint .github/workflows/maven.yml`。
 - VSIX 作成後 `node scripts/vsix-smoke.mjs target/ubnf-lsp-authoring.vsix` を Java と `UBNF_TEST_BACKEND=rust UBNF_TEST_RUST_PATH=<絶対パス>` の2経路で実行。headless 環境は `xvfb-run -a`、Chrome/Electron は `--password-store=basic`。
 
@@ -100,3 +100,89 @@ UTF-16 を CP 数に変える、local buffer overlay を外す、generation warn
 修飾子を最初の区切りに戻す、hover の単語に補助文字を含める、importer の再通知を外す、VSIX suite の `deactivate` を外す
 6変異でも、それぞれ共通 fixture・Rust テスト・packaged VSIX が失敗することを確認した。protocol テストの `@Test` を外すと、
 残ったテスト自体が成功しても必須メソッド検査が失敗する。全変異を復元して再検証する。
+
+## #885: validator 診断の接続（全条件の完了ではない）
+
+Java 基準は PR #888 merge 後の `d8af6d9be6ad45cdad5eddf0a040cd5ce80d0602`。
+`GrammarValidator.validate` の全 1624 行と `detectLeftRecursionIssues`、呼出先を調べた上で、
+構文成功後の診断収集を `unlaxer_generator::validation::collect` に接続した。
+既存 lowering は root/schema を前提とする fail-fast API なので、LSP の全診断収集には直接使わない。
+lexical / adapter / token-contract / feature / token-stream / comment / lexical-context / embedding /
+raising の解析は既存実装を再利用し、Java の authoring message/hint の組立てを分離する。
+通常 parser、frontend の受理条件、Java validator、公開済み3.3.0は変更しない。
+
+`spec-corpus/ubnf-authoring-lsp/diagnostics.json` は67文法の手書き全 JSON oracle。
+従来27件と合わせ94件を両実 stdio で実行する。両 server を比較するだけでなく、各結果を独立期待値へ照合する。
+`code` / `severity` / `source` / `message` / `range` とキーの有無・診断配列の順序を検査し、診断や位置のフィルタ・正規化はしない。
+Java validator 診断には `data` と `relatedInformation` が**存在しない**ため、Rust も省略し、全 JSON 検査でこれも固定する。
+これは `ULX-PARSE-001` の data を省略してよいという意味ではない（#894）。
+
+range は rule 所属がある場合、Java の文書全体の最初の同名宣言（grammar 名も含む）を指す。
+一般診断は `0:0–0:1`。`W-TOKEN-UNRESOLVED` は token の宣言行にある parserClass detail を指す。
+Rust の byte span を UTF-16 に変換し、CRLF と非BMPの後、複数 grammar の同名宣言も固定した。
+生成警告→各 grammar の validate→advisory 左再帰という Java の順序を保持する。
+同じ・小さい version の Full `didChange` も Java に従って適用し、全67文法で診断の置換・修復と
+別文書の open/close、save、close 後の query、session の shutdown/exit を検査する。
+
+### validate の呼出順と Rust 利用経路
+
+以下は全呼出先の棚卸しであり、全行の完全一致宣言ではない。`接続` は実装済み、
+`残差` は受け入れ条件付き #893 で未完了。個別入力の完全一致は上の corpus の範囲に限る。
+`W-` の severity は Warning (=2)、その他（`P-` を含む）は Error (=1)。source は `ubnf-validator`。
+message は Java の `message + " — " + hint`。hint を捨てたり、CLI の短い message に置換したりしない。
+
+| 順序・Java 検査 | code / Rust 利用経路 | 状態 |
+|---|---|---|
+| RegexRetirement | `E-REGEX-RETIRED` / `validation::collect` | AST 接続。旧構文の frontend 拒否との合成は未検証 #893 |
+| LeftRecursionAnalysis.requireValid | `E-LEFT-RECURSION`, `E-LEFT-RECURSION-LIMIT` / `validation::recursion` | 接続。lowering は全 cycle を公開しないため source-level query を移植。token 優先、nullable、256深さ/1M work を維持 |
+| NestedCaptures.problems | `E-NESTED-SHAPE` / 既存 `nested_captures::validate` は fail-fast | 残差。rule ごとの収集、共有 schema、hint/所属が未接続 #893 |
+| validateScalarRanges / validateCaseInsensitiveTokens | `E-TOKEN-RANGE-SURROGATE`, `E-CI-EMPTY`, `E-CI-SCALAR` | 範囲/empty は接続。不対 surrogate を表せない Rust AST 入力の照合は残差 #893 |
+| LexicalCompiler.compile | `E-LEXICAL` / `lexical::compile_syntax` | 接続。Java message の `E-LEXICAL:` prefix を付ける。duplicate/undefined/cycle/version/SAME_AS を比較 |
+| TokenAdapterRegistry.build | `P-ADAPTER-DEFINITION`, `P-ADAPTER-DUPLICATE` / `adapters::AdapterRegistry::from_grammar` | 接続。token参照解決を追加せず Java の宣言検査範囲を維持 |
+| TokenContractRegistry.build | `P-TOKEN-CONTRACT-{VERSION,DEFINITION,DUPLICATE}` / `adapters::token_contract_diagnostics` | 接続 |
+| UBNFFeatures.validate | `E-FEATURE-{VERSION,UNKNOWN,DUPLICATE}` / `adapters::feature_diagnostics` + authoring adapter | 接続。Java は VERSION/UNKNOWN subject を `feature` にし、非v2を最優先する。CLI の value subject との違いを実装で明示 |
+| TokenStreamGrammar.problems | `E-TOKEN-STREAM-{SETTING,VERSION,TRIVIA,TOKEN,ANNOTATION}` / `token_stream::problems` | 接続 |
+| GlobalComment.problems / warnings | `E-COMMENT-{SETTING,WHITESPACE}` / `global_comment::problems` | 接続。`W-COMMENT-IGNORED` は Java LSP と同じく GenerationWarnings だけから出す |
+| LexicalContexts.requireValid | `E-LEXICAL-CONTEXT[-VERSION,-DUPLICATE,-TOKEN,-LITERAL,-LIMIT]` / `lexical_contexts::validate` | 接続。既存 lexical error を合成した message の全入力域は #893 |
+| NamePredicates.requireValid | `E-NAME-PREDICATE-{DUPLICATE,IDENTITY,KIND,CONFLICT,CAPTURE,VERSION,LIMIT,LEFT-RECURSION}` / 既存 lowering の capture shape 検査 | 残差。独立した collect 経路なし #893 |
+| EmbeddedGrammarEmitter.declarations | `E-EMBEDDING` / `embedded::validate` | 接続 |
+| RaisingOperators.problems | `E-COMMIT-EMPTY-MESSAGE`, `E-CATCH-{EMPTY,DUPLICATE-LABEL,UNKNOWN-LABEL}`, `E-RAISING-REPETITION` / `raising::problems` | 接続。Java LSP は message に CP suffix を含めない。Rust CLI 用 `Problem::message` を流用せず code/rule/subject から組み立てる |
+| validateGlobalWhitespace | `E-WHITESPACE-GLOBAL-{DUPLICATE,STYLE}` / `validation::globals` + 既存 lexical compiler | 接続 |
+| validateUbnfFormat / validateMemoSafeTokens | `E-UBNF-VERSION[-DUPLICATE]`, `E-MEMO-SAFE-TOKEN-{VALUE,DUPLICATE,UNDEFINED,KIND}` / `validation::globals` + builtin registry | 接続 |
+| validateRootPresence | `W-GENERAL-NO-ROOT` / `validation::globals` | 接続。Java LSP の declarative token library 例外を保持 |
+| validateTokens | `W-TOKEN-UNRESOLVED` / `validation::tokens` | bundled候補は接続。Java の同梱5 packageのclass一覧を必須Javaテストで照合。追加classpath候補は #893 |
+| validateJavaTokenBindings | `E-JAVA-TOKEN-FINAL` / 対応経路なし | 残差。任意class resolution/final/nested canonical名 #893 |
+| validateRuleTokenParserNameCollisions / validateAdapterTokenParserNameCollisions | `E-RULE-TOKEN-NAME-COLLISION`, `E-TOKEN-ADAPTER-NAME-COLLISION` / `validation::tokens` | 接続 |
+| validateBoundedRepeatElements | `E-BOUNDED-{OVERFLOW,INVALID}` / `validation::rules::bounded` | 接続。dead zero-count内部も走査 |
+| validateCommonFields | `E-COMMONFIELD-MISMATCH` / 既存 `common_fields::families` | 残差。schema exceptionのruleと全message接続 #893 |
+| validateEnumRules | `E-ENUM` / 既存 lowering enum validator | 残差。Javaの検査順・literal名・root projection・共有schemaが未接続 #893 |
+| rule whitespace / mapping | `E-WHITESPACE-RULE-{STYLE,DUPLICATE}`, `E-MAPPING-{DUPLICATE-PARAM,MISSING-CAPTURE,UNLISTED-CAPTURE}` / `validation::rules::collect` | 接続。capture/typeofを含め収集 |
+| validateAssoc | `E-ASSOC-{BOTH,NO-MAPPING,MAPPING-PARAM,MISSING-CAPTURE,NO-REPEAT}`, `E-RIGHTASSOC-NONCANONICAL` / 同上 | 接続。欠落した3captureを個別に報告 |
+| choice profiles | `E-UNIQUE-LONGEST-{DUPLICATE,SHAPE,LIMIT,CONFLICT}`, `E-LONGEST-CHOICE-{DUPLICATE,SHAPE,ASSOC}`, `E-PREDICTIVE-CHOICE-{DUPLICATE,SHAPE,ASSOC,CONFLICT}` / 同上 | 接続 |
+| validatePrecedence | `E-PRECEDENCE-{DUPLICATE,OVERFLOW,NEGATIVE,NO-ASSOC}` / 同上 | 接続。sourceからの負数受理はfrontend契約で別検査 |
+| validateAdvancedAnnotations / validateScopeCaptures / validateCatalogAnnotations | `E-ANNOTATION-DUPLICATE-{INTERLEAVE,BACKREF,SCOPETREE,DECLARES}`, `E-ANNOTATION-{INTERLEAVE-PROFILE,SCOPETREE-MODE,DECLARES-CAPTURE,BACKREF-CAPTURE,CATALOG-NO-CAPTURE}` / 同上 | 接続 |
+| validateTypeofElements | `E-TYPEOF-{MAPPING,MISSING-CAPTURE,UNKNOWN-CAPTURE}` / 同上 | 接続 |
+| validatePrecedenceTopology / validateAssociativityConsistency | `E-PRECEDENCE-{ORDER,MIXED-ASSOC}`, `E-ASSOC-NO-PRECEDENCE` / 同上 | 接続 |
+| validateUndefinedRuleRefs | `E-RULE-UNDEFINED` / 同上 | 接続。宣言順の候補、UTF-16 Levenshtein<=2、重複参照抑制。Java legacy query が postfix/separated を辿らない点も保持 |
+| unique-longest cycle branch / detectLeftRecursionIssues | `E-UNIQUE-LONGEST-LEFT-RECURSION`, `W-LEFT-RECURSION[-LIMIT]` / `validation::recursion` + `collect` | 接続。advisoryは最後に追加 |
+
+`validateRustDeclarations` は生成器向け別APIであり、この Java LSP は呼ばない。
+単なる rule 名重複（従来 `duplicate` fixture）では Java validator は診断しないため、独自の重複エラーを足さない。
+このfixtureは両serverで `[]` を確認し、以前の `validatorGap` ラベルだけを完全一致へ変更した。
+
+### 分割と残る受け入れ条件
+
+- [#893](https://github.com/opaopa6969/unlaxer-parser/issues/893): 上表の未接続意味解析・Java classpath・表現境界を含む validator 全診断。
+- [#894](https://github.com/opaopa6969/unlaxer-parser/issues/894): `ULX-PARSE-001` の expected/stack/data/relatedInformation、consumedLength hover、module全文/複数失敗/URI位置。
+- [#895](https://github.com/opaopa6969/unlaxer-parser/issues/895): initialize options と `unlaxer/configure`、experimental profile / languageQueryConsumer、cache/lifecycle。
+
+既存の型解析に依存する全診断と、parser failure provenance、session profile は別の契約である。
+一つの巨大な移植で Java の機能を省く代わりに、今回の診断接続を独立して revert できる単位とし、
+未達の条件を各子 issue に残した。PR は `Refs #885`。#885 / #864 / #111 は open のまま。
+CI は既存 `UbnfAuthoringProtocolConformanceTest` の3メソッドを必須化するため、新規クラスの `-Dtest` 追加は不要。
+packaged VSIX は Java/Rust 両方で共通の `vsix-diagnostics.cjs` を実行し、Warning/Error のコード・message・rangeと修復を確認する。
+
+#885 の追加 mutation は、validator 収集を空にする、rule range を `0:0–0:1` にする、
+message から hint を外す、同じ/減少 version を拒否する4変異で共通実 stdio が失敗した。
+新規 bundled class 候補テストの `@Test` を外す変異では Maven の残り2メソッドが成功しても、
+`verify-optin-tests.py ubnf-authoring` が必須メソッド欠落を拒否した。変異を復元し3メソッドを再検証した。

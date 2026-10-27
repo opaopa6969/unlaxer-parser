@@ -138,9 +138,6 @@ impl Server {
                                 .documents
                                 .get_mut(uri)
                                 .ok_or_else(|| invalid("document not open"))?;
-                            if version <= state.version {
-                                return Err(invalid("stale document version"));
-                            }
                             state.source = source;
                             state.version = version;
                             self.publish(uri, &mut out);

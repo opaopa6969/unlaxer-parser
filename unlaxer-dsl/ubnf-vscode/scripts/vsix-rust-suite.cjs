@@ -52,6 +52,7 @@ exports.run = async function () {
   await waitFor(() => vscode.languages.getDiagnostics(file), ds => ds.some(d => d.code === 'ULX-PARSE-001'), 'native diagnostics');
   await editor.edit(edit => edit.replace(new vscode.Range(0, 0, document.lineCount, 0), source));
   await waitFor(() => vscode.languages.getDiagnostics(file), ds => ds.length === 0, 'diagnostics after repair');
+  await require('./vsix-diagnostics.cjs').verify();
   // Same cleanup bar as tinycalc-vscode (#874/#880): deactivate stops the owned process.
   await require(path.join(extension.extensionPath, 'out/extension.js')).deactivate();
   await waitFor(() => dead(server), Boolean, 'native server exit after deactivate');

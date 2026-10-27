@@ -19,6 +19,31 @@ public class UbnfAuthoringProtocolConformanceTest {
         assertEquals(gson.toJsonTree(UBNFLanguageServerExt.KNOWN_PARSER_CLASSES), data.get("parsers"));
     }
 
+    @Test public void bundledParserCandidatesMatchJavaClasspath() throws Exception {
+        var actual = new java.util.TreeSet<String>();
+        var classes = Path.of(org.unlaxer.parser.Parser.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        var entries = new java.util.ArrayList<String>();
+        if (Files.isDirectory(classes)) {
+            try (var paths = Files.walk(classes.resolve("org/unlaxer/parser"))) {
+                paths.filter(Files::isRegularFile).forEach(path -> entries.add(classes.relativize(path).toString().replace('\\', '/')));
+            }
+        } else {
+            try (var jar = new java.util.jar.JarFile(classes.toFile())) {
+                jar.stream().forEach(entry -> entries.add(entry.getName()));
+            }
+        }
+        for (var entry : entries) {
+            if (!entry.matches("org/unlaxer/parser/(elementary|posix|clang|combinator|ascii)/[^/$]+\\.class")) continue;
+            var name = entry.replace('/', '.').replace(".class", "");
+            Class.forName(name, false, getClass().getClassLoader());
+            actual.add(name);
+        }
+        var expected = new java.util.TreeSet<String>();
+        JsonParser.parseString(Files.readString(root().resolve("rust/unlaxer-generator/src/validation/java-classes.json")))
+            .getAsJsonArray().forEach(name -> expected.add(name.getAsString()));
+        assertEquals("native suggestions must follow the bundled reference classes", actual, expected);
+    }
+
     @Test(timeout=240000) public void nativeAndJavaServersShareAuthoringFixtures() throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] rustConformance=true is required for native authoring stdio");
         Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
@@ -32,6 +57,6 @@ public class UbnfAuthoringProtocolConformanceTest {
             "--rust", root().resolve("rust/target/debug/ubnf-language-server").toString(), "--output", output.toString()).redirectErrorStream(true).redirectOutput(Path.of("target/ubnf-authoring-wire.log").toFile()).start();
         try { assertTrue("protocol timeout", process.waitFor(100, TimeUnit.SECONDS)); assertEquals(0, process.exitValue()); }
         finally { process.descendants().forEach(child -> child.destroyForcibly()); process.destroyForcibly(); System.out.print(Files.readString(Path.of("target/ubnf-authoring-wire.log"))); }
-        assertEquals("all authored cases and import/package scenarios executed", 27, JsonParser.parseString(Files.readString(output)).getAsJsonArray().size());
+        assertEquals("all authored cases and import/package scenarios executed", 94, JsonParser.parseString(Files.readString(output)).getAsJsonArray().size());
     }
 }

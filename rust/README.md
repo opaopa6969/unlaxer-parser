@@ -14,7 +14,7 @@ full-specの進捗は[対応表と受け入れ条件](FULL-SPEC.md)で追跡す�
 
 3.3.0公開後の開発版では [`CI('word')`](../docs/case-insensitive-tokens.md) を両hostから生成できる。Unicode17固定のsimple upper→lower比較で、原文とCP位置を保持する。Rustでは `Expr::CaseInsensitive("select")`、Java生成先は `UnicodeIgnoreCaseWordParser`。公開済み3.3.0には含まれず、汎用 `REGEX` は引き続き未対応。
 
-文法編集用には別の [`unlaxer-ubnf-lsp`](../docs/ubnf-authoring-lsp.md) を追加しました（#864 第一段）。`cargo build -p unlaxer-ubnf-lsp --release` で `ubnf-language-server` を作り、VSIX の `ubnfLsp.server.backend=rust` と `ubnfLsp.server.rustPath` で選びます。診断の一部・hover・completion に対応し、全診断/profile は #885、残る IDE capability と配布は #886 で継続します。
+文法編集用には別の [`unlaxer-ubnf-lsp`](../docs/ubnf-authoring-lsp.md) を追加しました（#864 第一段）。`cargo build -p unlaxer-ubnf-lsp --release` で `ubnf-language-server` を作り、VSIX の `ubnfLsp.server.backend=rust` と `ubnfLsp.server.rustPath` で選びます。診断67文法の全JSONを含む実stdio94件を照合し、hover・completion に対応します。残るvalidator意味解析/classpathは #893、syntax/moduleは #894、profileは #895（親 #885）、残る IDE capability と配布は #886 で継続します。
 
 ## すぐ動かす
 

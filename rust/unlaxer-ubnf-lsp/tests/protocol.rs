@@ -53,7 +53,8 @@ fn rejected_lifecycle_and_changes_leave_the_document_unchanged() {
         "textDocument/didChange",
         json!({"textDocument":{"uri":"file:///test.ubnf","version":1},"contentChanges":[{"text":"broken"}]}),
     );
-    assert_eq!(
+    // The Java authoring server applies Full changes regardless of version order.
+    assert_ne!(
         request(&mut server, "textDocument/hover", params.clone()),
         before
     );

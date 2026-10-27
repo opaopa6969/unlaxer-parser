@@ -73,7 +73,7 @@ impl Index {
             valid: parsed.is_ok(),
             error_offset: 0,
         };
-        let file = match parsed {
+        let mut file = match parsed {
             Ok(file) => file,
             Err(error) => {
                 result.error_offset = source[..error.span.byte_start].encode_utf16().count();
@@ -191,13 +191,14 @@ impl Index {
         }
         if file.grammars.iter().any(|g| !g.imports.is_empty()) && result.diagnostics.is_empty() {
             if let (Ok(path), Some(resolver)) = (path, resolver.as_mut()) {
-                if let Err(error) = modules::resolve(source, &path, resolver) {
-                    result.module_error(
+                match modules::resolve(source, &path, resolver) {
+                    Ok(linked) => file = linked,
+                    Err(error) => result.module_error(
                         source,
                         0,
                         source.chars().next().map_or(0, char::len_utf8),
                         error,
-                    );
+                    ),
                 }
             }
         }
@@ -209,6 +210,19 @@ impl Index {
                         (s.byte_start, s.byte_end)
                     });
                 result.diagnostics.push(json!({"range":text::range(source,start,end),"severity":2,"code":warning.code,"source":"ubnf-generator","message":warning.line()}));
+            }
+        }
+        // Java suppresses validation after a module failure.
+        if !result.diagnostics.iter().any(|d| d["code"] == "E-MODULE") {
+            for grammar in &file.grammars {
+                for issue in unlaxer_generator::validation::collect(grammar) {
+                    result.diagnostics.push(validation_diagnostic(
+                        source,
+                        &lex,
+                        &result.scopes,
+                        &issue,
+                    ));
+                }
             }
         }
         result
@@ -356,4 +370,64 @@ fn atom_uses(atom: &AtomicElement, out: &mut Vec<(String, usize, usize)>) {
         }
         _ => {}
     }
+}
+
+fn validation_diagnostic(
+    source: &str,
+    lex: &[Lexeme],
+    scopes: &[Scope],
+    issue: &unlaxer_generator::validation::Issue,
+) -> Value {
+    // Match Java's document-wide first declaration, even across grammars.
+    let mut range = json!({"start":{"line":0,"character":0},"end":{"line":0,"character":1}});
+    let declaration = |name: &str| {
+        lex.iter()
+            .enumerate()
+            .find(|(i, t)| {
+                t.text == name
+                    && (*i > 0 && matches!(lex[*i - 1].text.as_str(), "token" | "grammar")
+                        || lex.get(*i + 1).is_some_and(|t| t.text == "::="))
+            })
+            .map(|(_, t)| t)
+    };
+    if let Some(name) = &issue.rule {
+        if let Some(site) = declaration(name) {
+            range = text::range(source, site.start, site.end);
+        }
+    }
+    if issue.code == "W-TOKEN-UNRESOLVED" {
+        if let Some((name, _)) = issue
+            .message
+            .strip_prefix("token ")
+            .and_then(|m| m.split_once(" references unresolved parser class: "))
+        {
+            if let Some(site) = declaration(name).filter(|site| {
+                lex.iter()
+                    .position(|t| t.start == site.start)
+                    .is_some_and(|i| i > 0 && lex[i - 1].text == "token")
+            }) {
+                let line_start = source[..site.start].rfind('\n').map_or(0, |i| i + 1);
+                let line_end = source[site.start..]
+                    .find('\n')
+                    .map_or(source.len(), |i| site.start + i);
+                if let Some((_, symbol)) = scopes
+                    .iter()
+                    .flat_map(|s| &s.symbols)
+                    .find(|(n, _)| n == name)
+                {
+                    if let Some((_, detail)) = symbol.detail.split_once('=') {
+                        let detail = detail.trim();
+                        if let Some(col) = source[line_start..line_end].find(detail) {
+                            range = text::range(
+                                source,
+                                line_start + col,
+                                line_start + col + detail.len(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    json!({"range":range,"severity":if issue.code.starts_with("W-"){2}else{1},"code":issue.code,"source":"ubnf-validator","message":format!("{} — {}",issue.message,issue.hint)})
 }
