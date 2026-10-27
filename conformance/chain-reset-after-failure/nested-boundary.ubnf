@@ -3,6 +3,7 @@ grammar NestedBoundary {
     @whitespace: none
     token N = NumberParser
     token B = LOOKAHEAD('b')
+    token U = UNTIL('b')
     @root @nestedCaptures @mapping(TextNode)
     Root ::= ('a' 'z' | 'q') | N;
     @nestedCaptures @mapping(IntegerNode)
@@ -38,4 +39,19 @@ grammar NestedBoundary {
     @uniqueLongestChoice
     UniqueHelper ::= Helper 'x' | Helper;
     OuterOuter ::= Outer 'y' | Outer | Mix 'x';
+    PlainSeq2 ::= 'a' 'z';
+    TailSeq ::= ('a' | 'h') 'z';
+    LiteralOnly ::= 'az';
+    UnicodeSeq ::= 'a' '😀';
+    UnicodeTail ::= ('a' | 'h') '😀';
+    UnicodeLiteral ::= 'a😀';
+    LastChoice ::= 'a' ('z' | 'q');
+    UntilOnly ::= U;
+    UntilChoice ::= U | 'q';
+    UntilTail ::= U 'b';
+    OptionalTail ::= ['q'] 'a' 'z';
+    FailedFirst ::= 'a' 'b' | 'a' 'z' 'z';
+    RepeatedA ::= { 'a' };
+    PlainAlias ::= PlainSeq2;
+    NestedTail ::= LiteralOnly 'z';
 }
