@@ -200,7 +200,7 @@ Java-host の `check --target rust` は、Rust emitter と同じ commonField の
 Java 型が等しくても、Rust の nested field は recursive schema を持つ別の内部表現なので、
 nested leaf と通常 leaf を同じ common field に直接混ぜると `P-COMMONFIELD` を返す。
 この判定は #825 の commonField 検証段階で行い、後段の eval や別規則の schema エラーで
-隠さない。IR ができた後にも emitter と共通の field 比較を行う。native の受理・拒否は変えない。
+隠さない。IR ができた後にも emitter と共通の field 比較を行う。#832 では native の受理・拒否を維持する。
 
 issue の入力（`A` だけに `@nestedCaptures`、両 leaf が scalar text `value` を持つ）では、
 両 host とも `portable: false` / `structure: failed` / 終了コード 3、subject は
@@ -216,6 +216,20 @@ Java 向けの適否を表すものではない。
 正常例として、両 leaf の nested schema が等しい family、nested な sum 規則の下に通常 leaf を
 置く family、通常 leaf の common field が同じ nested node を参照する family は引き続き
 `passed` となり、両 Rust host の生成が成功する。共有 fixture でこれらを LF/CRLF とも確認する。
+
+## commonField の正規化した型比較（#869）
+
+両 leaf が `@nestedCaptures` の場合、`{ 'x' }` と `('x')+` は同じ `MANY TEXT`、
+`[ 'x' ]` と `('x')?` は同じ `OPTIONAL TEXT` として比較する。通常 field の場合、
+`(NUM | NUM)` と `('x' | 'y')` はどちらも Java の `Object` / Rust の `String` になる。
+これら3入力の `check --target rust` は両 host とも `portable: true`、`structure: passed`、
+診断なし、終了コード 0 を返し、`generate --target rust` の全生成ファイルも byte 一致する。
+
+native の source 検証は nested の構造・leaf kind・mapped node の名義型を比較し、
+生成直前には Rust IR field の一致を確認する。通常 group の子要素を再び名義型として比較しない。
+通常 leaf の `{ 'x' }` / `('x')+` と `[ 'x' ]` / `('x')?`、および nested leaf の
+`(NUM | NUM)` / `('x' | 'y')` は異なる型なので、従来どおり `P-COMMONFIELD`・終了コード 3 となる。
+#832 の nested / 通常 field の直接混在の拒否も維持する。
 
 ## 境界と回帰修正
 
@@ -246,18 +260,22 @@ LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・
 同じ code/subject の root 出現と null 出現、作り直された rule/element/@lexicalContext、解決失敗と成功を固定する。
 非 BMP 文字を含む9ケースを LF/CRLF で読み、両 host の JSON 全体を固定期待値（配列順・件数・CP 範囲を含む）と照合し、
 `target/rust-portability-imports.tsv` に18ケースの証拠を残す。native の workspace test も同じ fixture を使う。
-`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む100ケースを
+`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む112ケースを
 LF/CRLF で検証する。enum・eval・embedding・typeof・未定義参照・IR 検証のエラー、
 前段の syntax/module/inventory、bounded/precedence/nested、二規則の schema エラー、
 複数 grammar の順序、既存 commonField corpus の型・cardinality、共有 mapping の不一致が
 後の field・leaf・規則の schema エラーより先に `P-STRUCTURE` になることも固定する。
 annotation・capture・再帰を持つ正常な enum alias も受理し、別の eval エラーを隠さないことを確認する。
 両 host の JSON 全体と終了コードを比較し、`target/rust-portability-structure-priority.tsv`
-に200ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
+に224ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
 #832 の8入力は直接混在の拒否・choice 順の反転・正常な3構成・eval/後続 schema との競合・
 非 BMP 文字を含む複数 grammar の診断順を固定する。うち7入力は Rust 生成の終了コードと
 失敗時の無出力、正常な3構成は両 host の全5生成ファイルの byte 一致も確認する。
 直接混在の2入力と正常な3構成は Java 向け生成の成功も固定する。
+#869 の12入力は3再現例・choice 順反転・非 BMP 文字の各3例と、従来の拒否を維持する3例。
+LF/CRLF の全 JSON・終了コード・生成可否を検査する。成功する9入力では全5ファイルの byte 一致に加え、
+両 host の生成物をそれぞれ compile・実行し、common accessor の Rust 型、空/複数/optional/choice の値、
+AST variant と CP span、無効入力の拒否を共通の固定期待値に照合する。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
 native CLI は `PATH=''` で実行し、入力・手書きファイルが変更されないことも確認する。
 
