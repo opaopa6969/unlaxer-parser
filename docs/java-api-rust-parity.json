@@ -8,7 +8,8 @@
     "- 公開 static method は factory の命名を推測せず utility も全件列挙。interfaceの暗黙publicも含み、overloadは引数型で分ける。constructor・instance method・field・合成enum values等は型行の動作監査に含め、個別宣言行は作らない。非公開outer内のpublic型、private/protected、コメント、文字列内の偽宣言は除く。",
     "- JDK 21+ の javac parse-only AST を使用し、依存解決・ビルド・annotation processor・外部取得を行わない。追加ファイルは実ソースの再走査で検出する。判定は名前検索ではなくJava parse/構築処理とRust Expr/実行処理を読み、共通corpusと実行testの対応範囲を区別した。",
     "- 初期機能群表は `79975781` 時点の `rust/FULL-SPEC.md`。これは機能単位の記録であり、この全宣言表による個別監査へ接続する。",
-    "- [機能群表](../rust/FULL-SPEC.md)・[既知差台帳](parity-ledger.md)の既存契約と未解決差も併読する。言語固有は検証不要という意味ではない。"
+    "- [機能群表](../rust/FULL-SPEC.md)・[既知差台帳](parity-ledger.md)の既存契約と未解決差も併読する。言語固有は検証不要という意味ではない。",
+    "- #848: master `6bc349c1`（#855 merge）を基準に行境界4型の共通契約を検証。EmptyLine / WildCardLine の2型は #846 依存のまま残し、#848 は未完了。詳細は conformance/line-boundary/README.md。宣言の棚卸し基準revisionは据え置く。"
   ],
   "assessments": {
     "construction": {
@@ -179,22 +180,29 @@
       "issues": []
     },
     "start-of-line": {
-      "status": "uncorroborated",
-      "reason": "StartOfLineParser は CP0 または直前1CPが CR/LF の位置を認識し消費しない。CRLF の CR直後も対象で、非行頭で invert=true でも最後は FAILED。Rust/UBNF には宣言的 token の零幅検査 `BOL`（入力先頭または直前が CR/LF。CRLF 途中も真）があり、Rust runtime からは `Expr::Lexical` で使える。declarative-tokens（POSITION・fence）と contextual-lexing の共通 corpus は LF/CR/CRLF 後の BOL を Java/Rust 両方で比較する。ただし StartOfLineParser 自体の4 token kind・invert・CRLF途中・Classic 呼出しの oracle はない。CodeStart/CodeEnd の行境界は fence 専用で別契約。",
-      "route": "UBNF `token SOL ::= BOL;`、Rust `Expr::Lexical(\"SOL\", LexicalExpression { op: Op::BOL, .. })`。Classic の token kind・invert を保つ必要がある呼出しは `Expr::Custom` で position/matched_position を読む adapter を用意し、BOL と同じ境界であることを共通 fixture で示す。",
+      "status": "verified",
+      "reason": "CP0 または直前CR/LFを認識し、CRLF途中も真。invert=trueは非行頭でも失敗する。独立した line-boundary corpus で4 token kind（virtual consumedはmatchedを参照）・invert・両cursor・CST・失敗CP・二重rollbackと同一instance再試行をmemo2×診断3モードで比較する。新しいruntime APIは追加せず、Classicはtokenを作らないadapterを使う。関連static factoryの4経路とcache/独立instanceも実行する。",
+      "route": "既存UBNF `token Boundary ::= BOL;` / `Expr::Lexical(.., LexicalExpression { op: Op::BOL, .. })`。Classicは `conformance/line-boundary/probe.rs` の `Expr::Custom` adapterがtoken_modeとposition/matched_positionを読み、同じLexicalExpression境界を検査する。語彙tokenとは零幅tokenの生成とinvertの契約を分ける。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/StartOfLineParser.java#L15", "anchor": "public class StartOfLineParser extends AbstractParser"},
         {"location": "rust/unlaxer-runtime/src/lexical.rs#L64", "anchor": "Op::BOL =>"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L101", "anchor": "Lexical(&'static str, lexical::LexicalExpression),"}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L101", "anchor": "Lexical(&'static str, lexical::LexicalExpression),"},
+        {"location": "conformance/line-boundary/probe.rs#L20", "anchor": "fn boundary(context: &mut ParseContext<'_>, op: Op) -> ParseResult {"}
       ],
       "tests": [
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/DeclarativeTokenConformanceTest.java",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ContextualLexingConformanceTest.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ContextualLexingConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
+        "rust/unlaxer-runtime/tests/line_boundary.rs"
       ],
       "fixtures": [
         "spec-corpus/declarative-tokens/tokens.ubnf",
         "spec-corpus/declarative-tokens/runtime.json",
-        "spec-corpus/contextual-lexing/corpus.json"
+        "spec-corpus/contextual-lexing/corpus.json",
+        "conformance/line-boundary/cases.tsv",
+        "conformance/line-boundary/transactions.tsv",
+        "conformance/line-boundary/lexical.tsv",
+        "conformance/line-boundary/README.md"
       ],
       "issues": [
         848
@@ -203,24 +211,29 @@
     },
     "line-composition": {
       "status": "uncorroborated",
-      "reason": "LineTerminatorParser/EndOfLineParser は CRLF→CR→LF→EOF の consuming choice。EmptyLine/WildCardLine は行頭と任意 terminator も使う。Rust の Choice/Literal/Eof と宣言的 token の `BOL`/`EOL`/明示改行式（fence 例）は部品としてあり declarative-tokens で両 host 比較されるが、これら Java parser の合成全体の共通 corpus はない。",
-      "route": "`Expr::choice([Literal(\"\\r\\n\"), Literal(\"\\r\"), Literal(\"\\n\"), Eof])`、UBNF `token NL ::= '\\r\\n' | '\\r' | '\\n';` と `BOL`/`EOL`。EmptyLine/WildCardLine は start-of-line / terminated-repeat 完了に依存する。",
+      "reason": "EmptyLineParser / WildCardLineParser は任意terminator付き反復に依存し未完了（#846）。guard付きRepeatは通常の受理/cursorを再現するがbodyごとのChainが原CSTへ増える。terminator-first ChoiceのRepeatはmatchOnlyで終端成功後も反復し、Javaと成否/cursorが異なる。CR/LFを外した文字クラスのRepeatはconsumed/matchOnlyの受理・cursor・原CSTまで揃うが、virtualTokenConsumedでJavaが成功したmatch-only terminatorをcommitしてmatched cursorを進める観測（WildCardLineの CR LF をC=0/M=0のEOFで受理など）と、terminator試行が残す失敗診断を再現しない。3つの反例corpusを両言語で実行した。4型の完了でこの2型や#848をcloseしない。",
+      "route": "BOL + Repeat(not_ahead(line_end); body) + line_end、Repeat(Choice(match_only(line_end), body))、CR/LFを除く文字クラスのRepeat + line_end を実際に比較したが全観測は再現できない。#846で任意terminatorの成功停止・親kind別commit/rollbackと原CSTを揃えた後、この2型の全kind/invertを検証する。",
       "code": [
-        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java#L12", "anchor": "public class LineTerminatorParser extends LazyChoice"},
-        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/StartOfSourceParser.java#L13", "anchor": "public class StartOfSourceParser extends AbstractParser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyLineParser.java#L12", "anchor": "public class EmptyLineParser extends LazyChain"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/WildCardLineParser.java#L7", "anchor": "public class WildCardLineParser extends LazyChain"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L353", "anchor": "pub fn choice(alternatives: impl IntoIterator<Item = Self>) -> Self"}
+        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67", "anchor": "if(terminator.isPresent())"},
+        {"location": "conformance/line-boundary/probe.rs#L400", "anchor": "fn composition(name: &str) -> Expr {"},
+        {"location": "conformance/line-boundary/probe.rs#L454", "anchor": "pub fn verify_repeat_choice() {"},
+        {"location": "conformance/line-boundary/probe.rs#L491", "anchor": "fn char_class_line(name: &str) -> Expr {"}
       ],
       "tests": [
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/DeclarativeTokenConformanceTest.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
+        "rust/unlaxer-runtime/tests/line_boundary.rs"
       ],
       "fixtures": [
-        "spec-corpus/declarative-tokens/tokens.ubnf",
-        "spec-corpus/declarative-tokens/runtime.json"
+        "conformance/line-boundary/compositions.tsv",
+        "conformance/line-boundary/repeat-choice.tsv",
+        "conformance/line-boundary/char-class.tsv",
+        "conformance/line-boundary/README.md"
       ],
       "issues": [
-        848
+        848,
+        846
       ],
       "followup_group": "line"
     },
@@ -861,21 +874,28 @@
       "followup_group": "context"
     },
     "start-of-source": {
-      "status": "uncorroborated",
-      "reason": "StartOfSourceParser は tokenKind の cursor が CP0 かを invert と XOR して判定するゼロ幅 parser。Rust/UBNF の宣言的 token `BOF` は入力位置0の零幅検査で、declarative-tokens の POSITION 例を Java/Rust 両方で比較する。Classic の token kind 別 cursor・invert・途中位置からの呼出しは共通検証がない。Rust Eof は末尾検査で別。",
-      "route": "UBNF `token SOS ::= BOF;`、Rust `Expr::Lexical(.., LexicalExpression { op: Op::BOF, .. })`。TokenMode 別の cursor が要る場合は Custom adapter で BOF と同じ境界を共通検証する。",
+      "status": "verified",
+      "reason": "tokenKindの参照cursorがCP0かをinvertとXORして認識する。独立した line-boundary corpus で4 token kind（virtual consumedはmatchedを参照）・invert・両cursor・CST・失敗CP・二重rollbackと同一instance再試行をmemo2×診断3モードで比較する。新しいruntime APIは追加せず、Classicはtokenを作らないadapterを使う。関連static factoryの4経路とcache/独立instanceも実行する。",
+      "route": "既存UBNF `token Boundary ::= BOF;` / `Expr::Lexical(.., LexicalExpression { op: Op::BOF, .. })`。Classicは `conformance/line-boundary/probe.rs` の `Expr::Custom` adapterがtoken_modeとposition/matched_positionを読み、同じLexicalExpression境界を検査する。語彙tokenとは零幅tokenの生成とinvertの契約を分ける。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/StartOfSourceParser.java#L13", "anchor": "public class StartOfSourceParser extends AbstractParser"},
         {"location": "rust/unlaxer-runtime/src/lexical.rs#L63", "anchor": "Op::BOF => (p == 0).then_some(p),"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L101", "anchor": "Lexical(&'static str, lexical::LexicalExpression),"}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L101", "anchor": "Lexical(&'static str, lexical::LexicalExpression),"},
+        {"location": "conformance/line-boundary/probe.rs#L20", "anchor": "fn boundary(context: &mut ParseContext<'_>, op: Op) -> ParseResult {"}
       ],
       "tests": [
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/DeclarativeTokenConformanceTest.java",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ContextualLexingConformanceTest.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ContextualLexingConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
+        "rust/unlaxer-runtime/tests/line_boundary.rs"
       ],
       "fixtures": [
         "spec-corpus/declarative-tokens/tokens.ubnf",
-        "spec-corpus/declarative-tokens/runtime.json"
+        "spec-corpus/declarative-tokens/runtime.json",
+        "conformance/line-boundary/cases.tsv",
+        "conformance/line-boundary/transactions.tsv",
+        "conformance/line-boundary/lexical.tsv",
+        "conformance/line-boundary/README.md"
       ],
       "issues": [
         848
@@ -1005,6 +1025,34 @@
         854
       ],
       "followup_group": "context"
+    },
+    "line-terminator": {
+      "status": "verified",
+      "reason": "LineTerminatorParser / EndOfLineParserのCRLF→CR→LF→EOFの順序、Classicの4kind/invert、両cursor/reset、原CST/reduced CST、失敗CP、isEndOfSourceとstatic構築経路を独立corpusで比較する。memo OFF/SAFE_FAILURESと診断3モード、choice敗者・先読み・外側失敗後の再試行も比較。DETAILED_ON_FAILUREだけに出るJava FIRST候補除外の欠陥（reset前のcursorを読む、#861）はRustへ移植せず、Javaの現状値30行をcases.tsvの別列に分けて固定する。既存runtimeの成功経路は変更しない。",
+      "route": "`Expr::choice([Literal(\"\\r\\n\"), Literal(\"\\r\"), Literal(\"\\n\"), Eof])`。`probe.rs::line_end` をそのまま使い、診断モードで分岐するadapterは置かない。既存の語彙EOLは非消費の別契約としてlexical.tsvで比較する。",
+      "code": [
+        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java#L12", "anchor": "public class LineTerminatorParser extends LazyChoice"},
+        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfLineParser.java#L3", "anchor": "public class EndOfLineParser extends LineTerminatorParser{"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L353", "anchor": "pub fn choice(alternatives: impl IntoIterator<Item = Self>) -> Self"},
+        {"location": "conformance/line-boundary/probe.rs#L58", "anchor": "pub fn line_end() -> Expr {"},
+        {"location": "conformance/line-boundary/probe.rs#L66", "anchor": "fn parser(name: &str) -> Expr {"},
+        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L40", "anchor": "int lookahead = excludeCandidates ? parseContext.lookaheadCodePoint(tokenKind) : 0;"}
+      ],
+      "tests": [
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
+        "rust/unlaxer-runtime/tests/line_boundary.rs"
+      ],
+      "fixtures": [
+        "conformance/line-boundary/cases.tsv",
+        "conformance/line-boundary/transactions.tsv",
+        "conformance/line-boundary/lexical.tsv",
+        "conformance/line-boundary/README.md"
+      ],
+      "issues": [
+        848,
+        861
+      ],
+      "followup_group": "line"
     }
   },
   "followups": {
@@ -1436,13 +1484,13 @@
     {"id": "org.unlaxer.parser.elementary.EParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EParser.java", "assessment": "character-recipes"},
     {"id": "org.unlaxer.parser.elementary.EmptyLineParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyLineParser.java", "assessment": "line-composition"},
     {"id": "org.unlaxer.parser.elementary.EmptyParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EmptyParser.java", "assessment": "empty-eof"},
-    {"id": "org.unlaxer.parser.elementary.EndOfLineParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfLineParser.java", "assessment": "line-composition"},
+    {"id": "org.unlaxer.parser.elementary.EndOfLineParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfLineParser.java", "assessment": "line-terminator"},
     {"id": "org.unlaxer.parser.elementary.EndOfSourceParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EndOfSourceParser.java", "assessment": "empty-eof"},
     {"id": "org.unlaxer.parser.elementary.EscapeInQuotedParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EscapeInQuotedParser.java", "assessment": "escape-in-quoted"},
     {"id": "org.unlaxer.parser.elementary.ExponentParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ExponentParser.java", "assessment": "lexical-composites"},
     {"id": "org.unlaxer.parser.elementary.GraphemeParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/GraphemeParser.java", "assessment": "grapheme"},
     {"id": "org.unlaxer.parser.elementary.IgnoreCaseWordParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/IgnoreCaseWordParser.java", "assessment": "word-transforms"},
-    {"id": "org.unlaxer.parser.elementary.LineTerminatorParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java", "assessment": "line-composition"},
+    {"id": "org.unlaxer.parser.elementary.LineTerminatorParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java", "assessment": "line-terminator"},
     {"id": "org.unlaxer.parser.elementary.MappedSingleCharacterParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/MappedSingleCharacterParser.java", "assessment": "character-recipes"},
     {"id": "org.unlaxer.parser.elementary.MultipleParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/MultipleParser.java", "assessment": "character-recipes"},
     {"id": "org.unlaxer.parser.elementary.NamedParenthesesParser", "kind": "type", "signature": "CLASS", "path": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/NamedParenthesesParser.java", "assessment": "parentheses"},

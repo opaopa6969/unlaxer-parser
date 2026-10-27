@@ -1,0 +1,11 @@
+# parser	kind	input-hex	javaAccepted	javaConsumed	javaMatched	javaFarthest	rustAccepted	rustConsumed	rustMatched	rustFarthest	original-CST
+wild	consumed	61620a6364	true	3	3	3	true	3	3	2	WildCardLineParser/consumed@0:3=61620a[WildCardStringTerminatorParser/consumed@0:2=6162[WildCardStringParser/consumed@0:1=61[],WildCardStringParser/consumed@1:2=62[]],Line/consumed@2:3=0a[WordParser/consumed@2:3=0a[]]]
+wild	consumed	f09f9880780d0a3f	true	4	4	1	true	4	4	2	WildCardLineParser/consumed@0:4=f09f9880780d0a[WildCardStringTerminatorParser/consumed@0:2=f09f988078[WildCardStringParser/consumed@0:1=f09f9880[],WildCardStringParser/consumed@1:2=78[]],Line/consumed@2:4=0d0a[WordParser/consumed@2:4=0d0a[]]]
+wild	consumed	7461696c	true	4	4	4	true	4	4	4	WildCardLineParser/consumed@0:4=7461696c[WildCardStringTerminatorParser/consumed@0:4=7461696c[WildCardStringParser/consumed@0:1=74[],WildCardStringParser/consumed@1:2=61[],WildCardStringParser/consumed@2:3=69[],WildCardStringParser/consumed@3:4=6c[]],Line/consumed@4:4=~[EndOfSourceParser/consumed@4:4=~[]]]
+empty	consumed	20090d0a78	true	4	4	1	true	4	4	2	EmptyLineParser/consumed@0:4=20090d0a[ZeroOrMore/consumed@0:2=2009[SpaceParser/consumed@0:1=20[],SpaceParser/consumed@1:2=09[]],Line/consumed@2:4=0d0a[WordParser/consumed@2:4=0d0a[]]]
+empty	consumed	0a	true	1	1	1	true	1	1	0	EmptyLineParser/consumed@0:1=0a[ZeroOrMore/consumed@0:0=~[],Line/consumed@0:1=0a[WordParser/consumed@0:1=0a[]]]
+wild	matchOnly	0a0a78	true	0	1	0	true	0	1	0	WildCardLineParser/matchOnly@0:1=0a[WildCardStringTerminatorParser/matchOnly@0:0=~[],Line/matchOnly@0:1=0a[WordParser/matchOnly@0:1=0a[]]]
+empty	matchOnly	0a0a78	true	0	1	0	true	0	1	0	EmptyLineParser/matchOnly@0:1=0a[ZeroOrMore/matchOnly@0:0=~[],Line/matchOnly@0:1=0a[WordParser/matchOnly@0:1=0a[]]]
+empty	virtualTokenConsumed	0a	true	0	0	1	true	1	1	0	-
+wild	virtualTokenConsumed	0d0a	true	0	0	2	true	2	2	0	-
+wild	virtualTokenConsumed	f09f9880780d0a3f	false	0	0	4	true	4	4	2	-
