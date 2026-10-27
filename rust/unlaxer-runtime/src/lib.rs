@@ -3107,7 +3107,7 @@ impl<'a> ParseContext<'a> {
         self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
     }
 
-    /// Java's fallback reach after a successful Not (#838): its startParse
+    /// Java's fallback reach after a successful MatchOnly or Not (#826, #838): its startParse
     /// max(consumed, matched), recorded before begin reset matched, and that of every
     /// enclosing frame (e.g. a Choice that reset before the Not or a MatchOnly around it).
     /// This is not a failure: a later real failure behind it still wins. The successful
@@ -3116,18 +3116,55 @@ impl<'a> ParseContext<'a> {
     /// native frames carry it. A token-stream session keeps the consumed frontier.
     #[cold]
     #[inline(never)]
-    fn note_success_frame_start(&mut self, expression: &Expr, start: usize) {
+    fn note_success_frame_start(&mut self, expression: &Expr, checkpoint: &Checkpoint) {
         if matches!(expression, Expr::CatchLabels { .. })
             || !self.grammar_frontier
             || self.lexing.is_some()
         {
             return;
         }
-        let reached = start.max(self.position).max(self.matched_position);
+        if let Expr::JavaUntil(terminator) = expression {
+            self.note_until_failures(terminator, checkpoint);
+        }
+        let reached = checkpoint
+            .position
+            .max(checkpoint.matched_position)
+            .max(self.position)
+            .max(self.matched_position);
         self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
         if let Some(frame) = self.diagnostic_frames.last_mut() {
             frame.classic_max_reached = Some(frame.classic_max_reached.unwrap_or(0).max(reached));
         }
+    }
+
+    /// Summarize native UNTIL's rejected MatchOnly probes in the existing Detailed
+    /// recorder, without adding work to its scan loop or diagnostics-off path (#826).
+    /// After consuming, the last rejection precedes a matched terminator by one CP;
+    /// without a terminator the EOF probe itself failed. An immediate match rejects
+    /// nothing. Record the historical offset directly, not the current matched frontier.
+    #[cold]
+    #[inline(never)]
+    fn note_until_failures(&mut self, terminator: &str, checkpoint: &Checkpoint) {
+        let failed_at = if self.matched_position == self.position {
+            self.position
+        } else if self.position > checkpoint.position {
+            self.byte_offsets[self.position() - 1]
+        } else {
+            return;
+        };
+        // The first rejected probe can be ahead of every later one when owner reset
+        // is false and a preceding lookahead passed the eventual terminator.
+        let first = if checkpoint.match_cursor_policy.reset {
+            checkpoint.position
+        } else {
+            checkpoint.position.max(checkpoint.matched_position)
+        };
+        self.classic_failure_seen = true;
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.classic_failure_seen = true;
+        }
+        let expected = self.expected_names.intern(terminator);
+        self.record_failure(failed_at.max(first), expected);
     }
 
     // A no-cache recursive rule must not retain the large memo snapshot/key
@@ -3805,6 +3842,8 @@ impl<'a> ParseContext<'a> {
                             expression,
                             Expr::CaptureBoundary(_, _)
                                 | Expr::InputCaptureBoundary(_, _)
+                                | Expr::OwnedCapture(_, _)
+                                | Expr::CaptureScope(_)
                                 | Expr::Rule(_)
                                 | Expr::MatchOnly(_)
                                 | Expr::InvertMatch(_)
@@ -3822,24 +3861,16 @@ impl<'a> ParseContext<'a> {
                 }
             }
         } else {
-            // A successful Not discards its child's failures; Java then falls back to the
-            // startParse reach recorded before begin reset matched (#838). Only Detailed
-            // transactions that start or carry that fallback reach the cold recorder; a
-            // Classic call carries its own watermark.
+            // Both successful Java lookahead polarities establish a fallback reach.
+            // MatchOnly advances matched; Not discards the child's failures (#826, #838).
+            // Reuse the existing Detailed transaction gate and cold recorder: removing
+            // the polarity test adds no success-path branch or diagnostic-off work.
             if java_transaction
                 && self.options.diagnostics == Diagnostics::Detailed
-                && (matches!(
-                    expression,
-                    Expr::JavaLookahead {
-                        positive: false,
-                        ..
-                    }
-                ) || (self.token_mode.is_none() && self.classic_max_reached.is_some()))
+                && (matches!(expression, Expr::JavaLookahead { .. })
+                    || (self.token_mode.is_none() && self.classic_max_reached.is_some()))
             {
-                self.note_success_frame_start(
-                    expression,
-                    checkpoint.position.max(checkpoint.matched_position),
-                );
+                self.note_success_frame_start(expression, &checkpoint);
             }
             if self.token_mode.is_some()
                 && (classic_collector_label(expression).is_some()

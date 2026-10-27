@@ -17,7 +17,8 @@
     "2026-10-26 #784: 条件付き除外の宣言・元corpus・実行記録を照合する検査を追加。共通scopeの新規case/driver削除はmutation検査で検知する。root/診断優先順位に跨る16件の差は#833/#834/#835へ分離し、性能作業は行わない。",
     "2026-10-27 #833/#834/#835: spec corpusの診断差16件を両Rust hostで修正し契約へ移した（issueは本PRのmerge待ちでOPEN）。#784の実行先・独立期待値を維持し、rootあり/なしと複数不正の順序を追加検証する。 前提の#784（PR #836）・#825（PR #831）はmerge済み/CLOSEDを確認した。",
     "2026-10-27 #843: 残る7入力の診断コード・順序を両Rust hostでJava validatorに揃えた。rootあり/なし、単一エラー説明とcheck JSONを共通fixtureで固定する。precedence欠如・重複の#835契約は維持する。性能作業・parser実行経路は対象外。 レビューでvalidateAssocのparams欠落・repeat欠如もJavaの最初のERRORに揃え、nativeの名前述語の隠れは#858へ分離した。",
-    "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。"
+    "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。",
+    "2026-10-27 #826: 正の先読みの到達位置、Classic capture の失敗 frame、native UNTIL の失敗した終端候補を記録。既存の Java oracle 値は変更せず nested/frame-start の全診断列を両Rust host・通常/mappingで一致させる。差分表は実測に一致する memo 会計差だけを保持する。個別修正であり台帳全体の監査日・revision は更新しない。"
   ],
   "issues": {
     "111": {
@@ -905,9 +906,10 @@
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         823,
-        829
+        829,
+        826
       ],
-      "observation": "生成 Java の __CaptureSite は LazyChain、Rust の nested TextValue / ValueBoundary は透過。子が Choice の候補を単独で呼ぶと ab・先行 LOOKAHEAD(a)・初期 reset=true で Java は失敗後 false、Rust は true。後続 NonOrdered(LOOKAHEAD(b)) も成功/失敗に分かれる。lowering の単一候補省略では Text/Integer の mixed 境界を生成できず、候補は Choice 内に残る。75入力経路×通常/Classic×初期reset×memo2×診断3のJava1800観測を両Rust host・通常/mapping grammarで比較。候補内の先読み（(B | 'q') | N、B | N）と@longestChoice / @uniqueLongestChoice / @predictiveChoiceも実行し、3 profileの復元を外す変異は追加行で検出する。外部からの成否・両cursor・reset・後続成否は一致。nested候補だけにSequenceを付ける対照は、候補単独の差を消す一方、外部観測全項目を変えない。PR #828ではruntime/IRを変更せず内部差を記録した。通常の呼出で先読み後に直接呼ぶ経路の成否差はnestedなしでも出る別の差で#829に分離し、同issueで通常のframe開始を修正した。診断位置とmemo hitの別の残差は#826/#827と別項目で追跡し、全面一致を主張しない。",
+      "observation": "生成 Java の __CaptureSite は LazyChain、Rust の nested TextValue / ValueBoundary は透過。子が Choice の候補を単独で呼ぶと ab・先行 LOOKAHEAD(a)・初期 reset=true で Java は失敗後 false、Rust は true。後続 NonOrdered(LOOKAHEAD(b)) も成功/失敗に分かれる。lowering の単一候補省略では Text/Integer の mixed 境界を生成できず、候補は Choice 内に残る。75入力経路×通常/Classic×初期reset×memo2×診断3のJava1800観測を両Rust host・通常/mapping grammarで比較。候補内の先読み（(B | 'q') | N、B | N）と@longestChoice / @uniqueLongestChoice / @predictiveChoiceも実行し、3 profileの復元を外す変異は追加行で検出する。外部からの成否・両cursor・reset・後続成否は一致。nested候補だけにSequenceを付ける対照は、候補単独の差を消す一方、外部観測全項目を変えない。PR #828ではruntime/IRを変更せず内部差を記録した。通常の呼出で先読み後に直接呼ぶ経路の成否差はnestedなしでも出る別の差で#829に分離し、同issueで通常のframe開始を修正した。診断位置とmemo hitの別の残差は#826/#827と別項目で追跡し、全面一致を主張しない。 #826で正の先読みと失敗候補の診断記録を補い、既存nested/frame-start corpusの診断差は全て解消した。差分表はnested232行・frame-start81行で、#827のmemo会計差だけを元の値のまま保持する。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/nested-boundary.ubnf",
@@ -919,8 +921,8 @@
     },
     {
       "id": "nested-boundary-diagnostics",
-      "category": "unresolved",
-      "title": "nested mixed rule と後続先読みの診断位置",
+      "category": "contract",
+      "title": "nested mixed rule と後続先読みの診断位置（#826 修正）",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         826,
@@ -928,7 +930,7 @@
         829,
         838
       ],
-      "observation": "nested-boundary-differences.tsv にJava実測oracleからの4列差分を全行キー付きで明示。Root成功入力azb・先行a・通常・初期falseの最遠CPはJava2/Rust0。IntegerをNonOrdered内でab・先行a・初期falseにより失敗させるとCP1/0。成功後のNonOrdered(LOOKAHEAD(b))→NonOrdered(LOOKAHEAD(x))でJavaの最終matched CPにRustの診断が届かない例もある。両host・通常/mapping・memo/診断設定を検証し、nested候補のChain対照でも変化しない。#823のowner resetとは分離して#826で追跡する。 #829のframe-start corpusでも同じ診断記録の差を全行キー付きで固定。nested既存corpusのLongest-partial/Unique-partialの通常・初期true・AUTO/DETAILEDの8行は、候補開始のresetによりRust診断CP1→0となりJava CP0と一致する。後続診断CP3/2の差は残る。成否/cursor/resetとChain対照の一致は維持。 #838のframe開始記録で初期true の後続診断CPと Integer/Ahead/AheadToken-nonordered-failure の通常診断CPがJavaに一致し、差分表を実測へ更新（全列一致168行を除去・44行を更新、456→288行）。残る診断差は#826で追跡する。",
+      "observation": "Java startParse/endParse の成功到達位置は実失敗がない場合だけ診断fallbackになる。#838のcold recorderを正のJavaLookaheadにも適用し、既存のnative frameとmemo diagnosticに開始/終了位置を伝える。nestedの残る56行は全て通常呼出の成功診断で、Root/Predictive-partialとAhead/AheadTokenの直接/NonOrdered経路が一致する。Integer-nonordered-failureの初期falseと後続MatchOnlyの診断は#838後には既に一致しており維持する。frame-startの成功340行も一致。Classic OwnedCapture/CaptureScopeの失敗開始32行は既存の失敗分岐で記録する。native UNTILの失敗した終端試行は既存の診断用cold関数内でcheckpointと終了位置から集約し、走査ループや診断OFFには処理を足さず、PlainSeq-until-frameの4行のCP0を成功fallback CP2で上書きしない。Java実測oracle1800/2760行（frame-startの既存2688行は不変、UNTILのUnicode/EOF/先読みより手前の終端の3経路72行を追加）、両host・通常/mapping・通常/Classic・初期reset2・memo2・診断3とnested Chain対照で診断2列が全行一致。差分表はnested288→232行、frame-start453→81行へ整理し、残る#827のmemo会計行はbyte単位で不変。成否・両cursor・reset・後続成否・memo hitは変更しない。任意IRや成功履歴全般の全面一致は主張せず、#823の候補単独reset差は対象外。成功側は既存Detailed transactionガード内の極性制限の除去と最大値計算のcold関数内への移動のみで分岐・確保・field/cacheを増やさず、診断OFFの呼出しも増やさない。#197に従い性能再計測なし。修正全体/正の先読み/UNTIL/UNTIL初回試行位置/Classic captureを外すmutationを共通corpusで検出する。issueはPRのmerge待ちでOPEN。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/nested-boundary.ubnf",
@@ -939,7 +941,8 @@
         "conformance/chain-reset-after-failure/nested-boundary-differences.tsv",
         "conformance/chain-reset-after-failure/frame-start-differences.tsv",
         "conformance/chain-reset-after-failure/frame-start.tsv",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/FrameStartMatchedResetConformanceTest.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/FrameStartMatchedResetConformanceTest.java",
+        "rust/unlaxer-runtime/src/lib.rs"
       ]
     },
     {
@@ -974,9 +977,10 @@
       "issues": [
         829,
         823,
-        838
+        838,
+        826
       ],
-      "observation": "JavaのTransaction.begin → createNew → ParserCursor(cursor, reset)に合わせ、Rustの通常呼出もowner reset=trueならmatchedをconsumedへ戻す。Chainはbegin前にfalse、回数0/不正boundsの反復はbeginPreservingMatchedを維持する。Choice/PredictiveChoiceとLongest/Uniqueの候補開始も同じ規則。abにLOOKAHEAD(a)後、Root/PlainTok/PlainGroup/Choice(PlainSeq,fallback)は旧Rustの成功CP0/2からJavaと同じ失敗CP0/1へ変わる。PlainSeqは成功CP0/2を維持。104経路（Java で transaction を持たない Commit/Label/StopConsume/StopInvert の対照8経路を含む）×通常/Classic×初期reset×memo2×診断3のJava実測2496行と、両Rust host×通常/mappingの9984行を比較（#838で入れ子8経路を追加し2688行/10752行）。成否・両cursor・reset・後続成否は全行共通。#829時点の診断とmemo hitの606行の残差のうち、#838で156行を解消し68行の診断列をJavaへ揃えた。残る450行（#838の入れ子経路の#827型3行を加えて453行）はframe-start-differences.tsvと#826/#827で追跡し、全面一致を主張しない。うち42行は修正前Rustが誤った位置で失敗してたまたま一致していた行で、診断36行はJavaがbegin前にframe開始max(consumed, matched)を記録しRustのrule以外のframeが記録しない差で#838により解消、failure hit 6行は#827の型。新しい確保やcacheは追加せず、#197に従い既存Rust benchmarkの修正前後各3回の中央値で退行のみ検査。#829はPR #837でmerge済み。",
+      "observation": "JavaのTransaction.begin → createNew → ParserCursor(cursor, reset)に合わせ、Rustの通常呼出もowner reset=trueならmatchedをconsumedへ戻す。Chainはbegin前にfalse、回数0/不正boundsの反復はbeginPreservingMatchedを維持する。Choice/PredictiveChoiceとLongest/Uniqueの候補開始も同じ規則。abにLOOKAHEAD(a)後、Root/PlainTok/PlainGroup/Choice(PlainSeq,fallback)は旧Rustの成功CP0/2からJavaと同じ失敗CP0/1へ変わる。PlainSeqは成功CP0/2を維持。104経路（Java で transaction を持たない Commit/Label/StopConsume/StopInvert の対照8経路を含む）×通常/Classic×初期reset×memo2×診断3のJava実測2496行と、両Rust host×通常/mappingの9984行を比較（#838で入れ子8経路を追加し2688行/10752行）。成否・両cursor・reset・後続成否は全行共通。#829時点の診断とmemo hitの606行の残差のうち、#838で156行を解消し68行の診断列をJavaへ揃えた。残る450行（#838の入れ子経路の#827型3行を加えて453行）はframe-start-differences.tsvと#826/#827で追跡し、全面一致を主張しない。うち42行は修正前Rustが誤った位置で失敗してたまたま一致していた行で、診断36行はJavaがbegin前にframe開始max(consumed, matched)を記録しRustのrule以外のframeが記録しない差で#838により解消、failure hit 6行は#827の型。新しい確保やcacheは追加せず、#197に従い既存Rust benchmarkの修正前後各3回の中央値で退行のみ検査。#829はPR #837でmerge済み。 #826で正の先読みと失敗候補の診断記録を補い、既存nested/frame-start corpusの診断差は全て解消した。差分表はnested232行・frame-start81行で、#827のmemo会計差だけを元の値のまま保持する。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "docs/nonordered-runtime.md",
@@ -1000,7 +1004,7 @@
         827,
         197
       ],
-      "observation": "Java startParseはbegin前のmax(consumed, matched)を保持する。低水準AUTO/DETAILEDはParseFrameの失敗候補、DETAILED_ON_FAILUREはdeferredFrameStartsを積むが診断CP0。Rustは失敗後の既存checkpointからJava診断frameの開始位置を記録する。CatchLabelsはtransactionのみでparse通知がないため対象外。成功したNotは子の失敗を破棄するので、既存の到達位置fallbackを利用し外側のnative frameの開始位置も伝える。MatchOnly直下のNotはtoken modeでfallbackを開始し、暗黙のClassic入口もparse_with_token_modeと同じく入口の到達位置を記録する。後続の実失敗が優先し、memo diagnosticにも同じfallbackを保持する。成功側は成功したtransaction frameでだけ診断設定等を判定し、記録本体はcold helperに置く。新しい確保・fieldはなく診断OFFでは保存・最大値計算・呼出しを行わない。性能再計測なし。入れ子8経路（MatchOnly内のLongest、Unique内のMatchOnly、MatchOnly内のNot、Longest(Not, rule)、Chain(Not, rule)、Choice(Chain(Not, zz), rule)）を加えた共通2688行と両host・両grammarの10752観測で対象36行を解消。frame-start差分表から156行を除き68行の診断列を更新し、#827型のsuccess hit 3行（Root-longest-negative）を加えた453行の#826/#827差は残す。成否/cursor/reset/後続成否/memo hitは維持。nested差分表は#826の対象のまま、同じ記録で一致した168行を除き44行のRust値を実測に合わせた（456→288行）。修正全体・失敗記録・成功fallback・暗黙Classic入口を外すmutationを同じcorpusで検出する。",
+      "observation": "Java startParseはbegin前のmax(consumed, matched)を保持する。低水準AUTO/DETAILEDはParseFrameの失敗候補、DETAILED_ON_FAILUREはdeferredFrameStartsを積むが診断CP0。Rustは失敗後の既存checkpointからJava診断frameの開始位置を記録する。CatchLabelsはtransactionのみでparse通知がないため対象外。成功したNotは子の失敗を破棄するので、既存の到達位置fallbackを利用し外側のnative frameの開始位置も伝える。MatchOnly直下のNotはtoken modeでfallbackを開始し、暗黙のClassic入口もparse_with_token_modeと同じく入口の到達位置を記録する。後続の実失敗が優先し、memo diagnosticにも同じfallbackを保持する。成功側は成功したtransaction frameでだけ診断設定等を判定し、記録本体はcold helperに置く。新しい確保・fieldはなく診断OFFでは保存・最大値計算・呼出しを行わない。性能再計測なし。入れ子8経路（MatchOnly内のLongest、Unique内のMatchOnly、MatchOnly内のNot、Longest(Not, rule)、Chain(Not, rule)、Choice(Chain(Not, zz), rule)）を加えた共通2688行と両host・両grammarの10752観測で対象36行を解消。frame-start差分表から156行を除き68行の診断列を更新し、#827型のsuccess hit 3行（Root-longest-negative）を加えた453行の#826/#827差は残す。成否/cursor/reset/後続成否/memo hitは維持。nested差分表は#826の対象のまま、同じ記録で一致した168行を除き44行のRust値を実測に合わせた（456→288行）。修正全体・失敗記録・成功fallback・暗黙Classic入口を外すmutationを同じcorpusで検出する。 #826で正の先読みと失敗候補の診断記録を補い、既存nested/frame-start corpusの診断差は全て解消した。差分表はnested232行・frame-start81行で、#827のmemo会計差だけを元の値のまま保持する。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "rust/unlaxer-runtime/src/lib.rs",
