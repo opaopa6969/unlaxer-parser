@@ -224,11 +224,44 @@ public class RustPortabilityConformanceTest {
                 assertEquals(name + " / " + ending,
                     fixture.getAsJsonObject("expected").getAsJsonObject(ending), actual);
                 try (var files = Files.list(directory)) { assertEquals(name, 1, files.count()); }
+                if (fixture.has("generation")) {
+                    compareGeneration(binary, directory, input, fixture.getAsJsonObject("generation"));
+                    assertEquals(text, Files.readString(input));
+                }
                 report.add(name + "\t" + ending + "\t" + actual.get("structure").getAsString() + "\t"
                     + actual.getAsJsonArray("diagnostics").size() + "\tequal");
             }
         }
         Files.write(Path.of("target/rust-portability-structure-priority.tsv"), report);
+    }
+
+    private void compareGeneration(Path binary, Path directory, Path input, JsonObject expected) throws Exception {
+        Path javaRust = directory.resolve("java-rust"), nativeRust = directory.resolve("native-rust");
+        Run java = javaRun("generate", "--target", "rust", "--grammar", input.toString(),
+            "--output", javaRust.toString());
+        Run rust = nativeRun(List.of(binary.toString(), "generate", "--grammar", input.toString(),
+            "--output", nativeRust.toString()), true, directory);
+        int code = expected.get("rust").getAsInt();
+        assertEquals(java.err(), code, java.code());
+        assertEquals(rust.err(), code, rust.code());
+        if (code == 0) {
+            for (String file : List.of("ast.rs", "parser.rs", "mapper.rs", "evaluator.rs", "mod.rs"))
+                assertEquals(file, Files.readString(javaRust.resolve(file)), Files.readString(nativeRust.resolve(file)));
+        } else {
+            assertTrue(java.err(), java.err().contains("E-COMMONFIELD-MISMATCH"));
+            assertTrue(rust.err(), rust.err().contains("E-COMMONFIELD-MISMATCH"));
+            assertFalse(Files.exists(javaRust));
+            assertFalse(Files.exists(nativeRust));
+        }
+        if (expected.has("java")) {
+            Path output = directory.resolve("java");
+            Run generated = javaRun("--grammar", input.toString(), "--output", output.toString(),
+                "--generators", "Parser,AST,Mapper,Evaluator");
+            assertEquals(generated.err(), expected.get("java").getAsInt(), generated.code());
+            try (var files = Files.walk(output)) {
+                assertTrue(files.anyMatch(path -> path.toString().endsWith("AST.java")));
+            }
+        }
     }
 
     private JsonObject compare(Path binary, Path cwd, String source) throws Exception {

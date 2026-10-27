@@ -18,6 +18,13 @@ public final class CommonFieldSchema {
     }
 
     public static List<Family> build(GrammarDecl grammar) {
+        return build(grammar, (leaf, field) -> null);
+    }
+
+    /** Additional target representation, compared in the same field/leaf order as Java types. */
+    public static List<Family> build(
+            GrammarDecl grammar,
+            java.util.function.BiFunction<RuleDecl, String, ?> targetType) {
         var result = new ArrayList<Family>();
         var normalized = new HashMap<String, String>();
         for (var candidate : grammar.rules()) {
@@ -84,6 +91,7 @@ public final class CommonFieldSchema {
                                 .contains(name))
                     throw invalid(rule, "duplicate or reserved field " + name);
                 String type = null;
+                Object representation = null;
                 for (var leaf : leaves.values()) {
                     var lm = MapperElementUtil.getMappingAnnotation(leaf).orElseThrow();
                     if (!lm.paramNames().contains(name))
@@ -104,9 +112,12 @@ public final class CommonFieldSchema {
                                     rule, "missing capture " + name + " on " + contributor.name());
                     }
                     String actual = new ASTGenerator().inferType(grammar, leaf, name);
-                    if (type != null && !type.equals(actual))
+                    Object actualRepresentation = targetType.apply(leaf, name);
+                    if (type != null && (!type.equals(actual)
+                            || !Objects.equals(representation, actualRepresentation)))
                         throw invalid(rule, "incompatible field " + name + " on " + lm.className());
                     type = actual;
+                    representation = actualRepresentation;
                 }
                 fields.add(new Field(name, type));
             }
@@ -158,6 +169,11 @@ public final class CommonFieldSchema {
         return error instanceof SchemaException schema
                 ? Optional.of(schema.rule)
                 : Optional.empty();
+    }
+
+    /** Preserve the family rule origin when a target-specific field check fails. */
+    public static IllegalArgumentException mismatch(String rule, String detail) {
+        return new SchemaException(rule, detail);
     }
 
     static final class SchemaException extends IllegalArgumentException {

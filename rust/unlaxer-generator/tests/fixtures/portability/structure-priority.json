@@ -734,5 +734,76 @@
       "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-QUALIFIED-REFERENCE", "severity": "error", "span": {"start": 47, "end": 57}, "subject": "ns.Missing"}]},
       "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-QUALIFIED-REFERENCE", "severity": "error", "span": {"start": 49, "end": 59}, "subject": "ns.Missing"}]}
     }
+  },
+  {
+    "name": "issue-832",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' 'x' @value;\n @mapping(B,params=[value]) B ::= 'b' 'y' @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 13, "end": 70}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 72}, "subject": "commonField schema"}]}
+    },
+    "generation": {"rust": 3, "java": 0}
+  },
+  {
+    "name": "issue-832-ordinary-first",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(value)\n Root ::= B | A;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' 'x' @value;\n @mapping(B,params=[value]) B ::= 'b' 'y' @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 13, "end": 70}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 72}, "subject": "commonField schema"}]}
+    },
+    "generation": {"rust": 3, "java": 0}
+  },
+  {
+    "name": "issue-832-matching-nested-leaves",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' 'x' @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' 'y' @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "java": 0}
+  },
+  {
+    "name": "issue-832-nested-family-ordinary-leaves",
+    "source": "grammar G {\n @nestedCaptures @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' 'x' @value;\n @mapping(B,params=[value]) B ::= 'b' 'y' @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "java": 0}
+  },
+  {
+    "name": "issue-832-ordinary-leaves-reference-nested-node",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' Value @value;\n @mapping(B,params=[value]) B ::= 'b' Value @value;\n @nestedCaptures @mapping(Value,params=[text]) Value ::= 'x' @text;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "java": 0}
+  },
+  {
+    "name": "issue-832-before-eval",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' 'x' @value;\n @mapping(B,params=[value]) B ::= 'b' 'y' @value;\n @eval(kind='variable_ref', strip_prefix='$') Bad ::= 'z';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 13, "end": 70}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 72}, "subject": "commonField schema"}]}
+    },
+    "generation": {"rust": 3}
+  },
+  {
+    "name": "issue-832-before-later-schema",
+    "source": "grammar G {\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' 'x' @value;\n @mapping(B,params=[value]) B ::= 'b' 'y' @value;\n @commonField(missing) Bad ::= 'z';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 13, "end": 70}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 14, "end": 72}, "subject": "commonField schema"}]}
+    },
+    "generation": {"rust": 3}
+  },
+  {
+    "name": "issue-832-multiple-grammars",
+    "source": "// 😀\ngrammar G {\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' 'x' @value;\n @mapping(B,params=[value]) B ::= 'b' 'y' @value;\n}\ngrammar H {\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' 'x' @value;\n @mapping(B,params=[value]) B ::= 'b' 'y' @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 18, "end": 75}, "subject": "commonField schema"}, {"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 207, "end": 264}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 20, "end": 78}, "subject": "commonField schema"}, {"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 215, "end": 273}, "subject": "commonField schema"}]}
+    }
   }
 ]
