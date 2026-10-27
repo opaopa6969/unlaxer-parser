@@ -1103,11 +1103,14 @@
         846,
         716
       ],
-      "observation": "Java の ChildOccursWithTerminator / Lazy* / Optional / ZeroOrOne / Repeat#newWithTerminator / WildCardStringTerminatorParser は Rust `Expr::repeat_java_until(terminator, min, max)` へ移し、terminated-repeat corpus（732行・所有状態24行）で受理・両cursor・原tokenとkind別CST・失敗CP・capture/user state・rollbackを両言語で比較する。意図した差は表現だけ: Class/Supplier/Lazy・Name・ASTNodeKind は Expr 値と Rule 名（#845）、Rust には token stack がなく常に1、Classic label は比較しない、Rule を terminator にした場合は Java の parser class による二重収集を写さない。新しい式は memo 不安全・snapshot cache 非承認（#184）。既存 JavaUntil の Classic CST で終端 Choice が1段浅かった差はこの変更で解消した。",
+      "observation": "Java の ChildOccursWithTerminator / Lazy* / Optional / ZeroOrOne / Repeat#newWithTerminator / WildCardStringTerminatorParser は Rust `Expr::repeat_java_until(terminator, min, max)` へ移し、terminated-repeat corpus（732行・所有状態24行）で受理・両cursor・原tokenとkind別CST・失敗CP・capture/user state・rollbackを両言語で比較する。wrappers（2342行・23 scenario）で Commit/Label/伝播 wrapper/Not/PegLookahead など CollectingParser の terminator の二重収集、cut/label 後の失敗と Choice/MatchOnly 越しの raise、生成形 rule、token trace の葉を、raised-state（112行）で cut/label/CatchLabels 下の state rollback を、resource-abort の4行で資源失敗の復元を比べる。意図した差は表現だけ: Class/Supplier/Lazy・Name・ASTNodeKind は Expr 値と Rule 名（#845）、Rust には token stack がなく常に1、Classic label は比較しない。生成形（LazyChain/LazyChoice）の rule terminator は Java の二重収集と Rust の Rule node の段数が一致し、手書きの非 collecting rule class が1段深いのは terminator 以外と同じ既存の #845 境界。ParserWrapper/ParserHolder など Rust に専用式がない CollectingParser の terminator は未検証（graph-utilities）。Java だけ DETAILED_ON_FAILURE で受理が変わる1行は #861 で、Java テストに既知差として明示する。新しい式は memo 不安全・snapshot cache 非承認（#184）。既存 JavaUntil の Classic CST で終端 Choice が1段浅かった差はこの変更で解消した。",
       "evidence": [
         "conformance/terminated-repeat/README.md",
         "conformance/terminated-repeat/cases.tsv",
         "conformance/terminated-repeat/state.tsv",
+        "conformance/terminated-repeat/wrappers.tsv",
+        "conformance/terminated-repeat/raised-state.tsv",
+        "conformance/resource-abort/cases.tsv",
         "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/TerminatedRepeatParityTest.java",
         "rust/unlaxer-runtime/tests/terminated_repeat.rs"
       ]

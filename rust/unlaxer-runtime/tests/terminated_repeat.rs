@@ -5,14 +5,18 @@ use unlaxer_runtime::{
     editor_cst::literal_completions,
     grammar_allows_deferred_diagnostics,
     incremental::grammar_is_snapshot_cacheable,
-    parse_detailed_shared_with_options, set_candidate_exclusion_for_current_thread, share_grammar,
+    names, parse_detailed_shared_with_options, set_candidate_exclusion_for_current_thread,
+    share_grammar,
     token::{TokenKind, TokenSource},
+    token_trace::Limits,
     CandidateExclusion, Diagnostics, Expr, Memoization, ParseContext, ParseOptions, ParseResult,
-    Rule,
+    Parser, RaisedKind, Rule, SharedGrammar,
 };
 
 const CASES: &str = include_str!("../../../conformance/terminated-repeat/cases.tsv");
 const STATE: &str = include_str!("../../../conformance/terminated-repeat/state.tsv");
+const WRAPPERS: &str = include_str!("../../../conformance/terminated-repeat/wrappers.tsv");
+const RAISED_STATE: &str = include_str!("../../../conformance/terminated-repeat/raised-state.tsv");
 
 fn rows(corpus: &str) -> Vec<Vec<&str>> {
     corpus
@@ -495,4 +499,277 @@ fn deeply_nested_terminators_fail_safely_on_a_standard_stack() {
         .unwrap()
         .join()
         .unwrap();
+}
+
+/// A two-rule grammar whose root is the terminated repetition and whose rule 1 is the
+/// terminator: the generated Java rule shape (`LazyChain`/`LazyChoice` + `GrammarRule`).
+struct Grammar(SharedGrammar);
+impl Parser for Grammar {
+    fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {
+        context.parse_shared_grammar(&self.0, 0, false)
+    }
+}
+enum Wrapper {
+    Expression(Expr),
+    Grammar(Grammar),
+}
+fn semi_cut() -> Expr {
+    w("a").repeat_java_until(Expr::sequence([w(";"), w("x").commit()]), 0, None)
+}
+fn rule_terminator(rule: Expr) -> Wrapper {
+    Wrapper::Grammar(Grammar(share_grammar(vec![
+        Rule {
+            name: "Root",
+            expression: w("a").repeat_java_until(Expr::Rule(1), 0, None),
+        },
+        Rule {
+            name: "R1",
+            expression: rule,
+        },
+    ])))
+}
+/// The Rust port of each Java construction of `wrappers.tsv` (see README).
+fn wrapper_parser(scenario: &str) -> Wrapper {
+    let until =
+        |terminator: Expr| Wrapper::Expression(w("a").repeat_java_until(terminator, 0, None));
+    let semi_x = || Expr::sequence([w(";"), w("x")]);
+    match scenario {
+        "commit-term" => until(semi_x().commit()),
+        "commit-word-term" => until(w(";").commit()),
+        "label-term" => until(semi_x().label("L")),
+        "label-word-term" => until(w(";").label("L")),
+        "stopconsume-term" => until(w(";").stop_consume()),
+        "stopinvert-term" => until(w(";").stop_invert()),
+        "invert-term" => until(w(";").invert_match()),
+        "commit-inner-term" => Wrapper::Expression(semi_cut()),
+        "label-inner-term" => until(Expr::sequence([w(";"), w("x").label("L")])),
+        "commit-body" => Wrapper::Expression(
+            Expr::sequence([w("a"), w("b").commit()]).repeat_java_until(w(";"), 0, None),
+        ),
+        "raise-choice" => Wrapper::Expression(Expr::choice([
+            Expr::sequence([semi_cut(), w("!")]),
+            w("a;y"),
+        ])),
+        "raise-matchonly" => Wrapper::Expression(semi_cut().match_only()),
+        "capture-term" => until(semi_x().capture_owned("t")),
+        "matchonly-chain-term" => until(semi_x().match_only()),
+        "until-term" => until(Expr::JavaUntil(";")),
+        "zom-term" => until(w(";").repeat_java(0, None)),
+        "rule-chain-term" => rule_terminator(semi_x()),
+        "rule-choice-term" => rule_terminator(Expr::choice([w(";"), w("\n")])),
+        "not-term" => until(Expr::JavaLookahead {
+            pattern: ";",
+            positive: false,
+        }),
+        "lookahead-term" => until(Expr::JavaLookahead {
+            pattern: ";",
+            positive: true,
+        }),
+        "peg-ahead-term" => until(w(";").ahead()),
+        "peg-not-term" => until(w(";").not_ahead()),
+        "name-scope-term" => until(Expr::NameResolutionScope {
+            child: Box::new(w(";")),
+            requirements: Vec::<names::Requirement>::new(),
+        }),
+        _ => panic!("{scenario}"),
+    }
+}
+fn raised(context: &ParseContext<'_>) -> String {
+    match context.raised_failure() {
+        None => "~".into(),
+        Some(raised) => match raised.kind {
+            RaisedKind::Commit => format!("commit@{}", raised.offset),
+            RaisedKind::Label => format!("label:{}@{}", raised.label.unwrap(), raised.offset),
+        },
+    }
+}
+
+/// One Classic parse of a `wrappers.tsv` row; the column order from `success`.
+fn observe_wrapper(parser: &Wrapper, row: &[&str], options: ParseOptions) -> Vec<String> {
+    let input = decode(row[1]);
+    let options = options.with_token_trace(Limits::default());
+    let mut context = ParseContext::with_options(&input, options);
+    context.set_reset_matched_with_consumed(false);
+    let mut committed = Vec::new();
+    if row[4] != "~" {
+        let prior: &'static str = Box::leak(decode(row[4]).into_boxed_str());
+        committed.extend(
+            context
+                .parse_with_token_mode(&w(prior), TokenKind::MatchOnly, false)
+                .unwrap()
+                .nodes,
+        );
+    }
+    context.set_reset_matched_with_consumed(row[5] == "true");
+    let (kind, invert) = (kind(row[2]), row[3] == "true");
+    let parsed = match parser {
+        Wrapper::Expression(expression) => context.parse_with_token_mode(expression, kind, invert),
+        // The Rust root rule node is the existing construction boundary (#845): the Java
+        // root is the repetition itself, so the comparison starts below the rule node.
+        Wrapper::Grammar(grammar) => {
+            context
+                .parse_with_token_mode(grammar, kind, invert)
+                .map(|mut parsed| {
+                    parsed.nodes = parsed
+                        .nodes
+                        .iter()
+                        .flat_map(|&node| context.node(node).unwrap().children.clone())
+                        .collect();
+                    parsed
+                })
+        }
+    };
+    let failure = context.failure();
+    let mut values = vec![
+        parsed.is_ok().to_string(),
+        context.position().to_string(),
+        context.matched_position().to_string(),
+        failure.offset.to_string(),
+        (!failure.expected.is_empty()).to_string(),
+        raised(&context),
+    ];
+    let mut originals = Vec::new();
+    if let Ok(parsed) = &parsed {
+        for &node in &parsed.nodes {
+            let id = context.token_node_id(node).unwrap();
+            match context.token_info(id).unwrap().original_tokens() {
+                Some(raw) => originals.extend(raw.to_vec()),
+                None => originals.push(node),
+            }
+        }
+        committed.extend(parsed.nodes.iter().copied());
+    }
+    let originals = originals
+        .iter()
+        .map(|&node| signature(&mut context, node))
+        .collect();
+    values.push(joined(originals));
+    let committed = committed
+        .iter()
+        .map(|&node| tree(&mut context, node))
+        .collect();
+    values.push(joined(committed));
+    let leaves = match context.token_trace() {
+        Some(Ok(leaves)) => leaves
+            .iter()
+            .map(|leaf| {
+                let span = leaf.span();
+                format!(
+                    "{},{},{},{}",
+                    kind_name(leaf.kind),
+                    span.start,
+                    span.end,
+                    encode(leaf.text(&input).unwrap())
+                )
+            })
+            .collect(),
+        other => panic!("{other:?}"),
+    };
+    values.push(joined(leaves));
+    values.push("1".into());
+    values.push(context.reset_matched_with_consumed().to_string());
+    values
+}
+
+#[test]
+fn shared_wrapper_rule_and_lookahead_terminator_oracle_in_every_mode() {
+    let rows = rows(WRAPPERS);
+    assert_eq!(rows.len(), 2342);
+    let mut parsers = std::collections::HashMap::new();
+    let mut failures = Vec::new();
+    for (memo, diagnostics) in MODES {
+        for row in &rows {
+            assert_eq!(row.len(), 17);
+            let options = ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+            let parser = parsers
+                .entry(row[0])
+                .or_insert_with(|| wrapper_parser(row[0]));
+            let actual = observe_wrapper(parser, row, options);
+            let mut expected = row[6..].iter().map(|v| v.to_string()).collect::<Vec<_>>();
+            // A raised failure (#700) keeps its diagnostics under DetailedOnFailure.
+            if diagnostics == Diagnostics::DetailedOnFailure && row[11] == "~" {
+                expected[3] = "0".into();
+                expected[4] = "false".into();
+            }
+            if actual != expected {
+                failures.push(format!(
+                    "{:?}/{memo:?}/{diagnostics:?}\n expected {expected:?}\n actual   {actual:?}",
+                    &row[..6]
+                ));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} failures\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+    assert_eq!(parsers.len(), 23);
+}
+
+fn raised_state_parser(scenario: &str) -> Expr {
+    let terminator = || Expr::Custom(mutating_semicolon).capture_owned("t");
+    let cut = || w("a").repeat_java_until(Expr::sequence([terminator(), w("x").commit()]), 0, None);
+    match scenario {
+        "commit-chain" => {
+            w("a").repeat_java_until(Expr::sequence([terminator(), w("x")]).commit(), 0, None)
+        }
+        "chain-commit" => cut(),
+        "chain-label" => {
+            w("a").repeat_java_until(Expr::sequence([terminator(), w("x").label("L")]), 0, None)
+        }
+        "choice-raise" => Expr::choice([Expr::sequence([cut(), w("z")]), w("a;y")]),
+        "catch-label" => Expr::sequence([
+            w("a").repeat_java_until(Expr::sequence([terminator(), w("x").label("L")]), 0, None),
+            w("z"),
+        ])
+        .catch_labels(w("a;y"), ["L"]),
+        "matchonly-raise" => cut().match_only(),
+        "outer-fail" => Expr::sequence([cut(), w("z")]),
+        _ => panic!("{scenario}"),
+    }
+}
+
+#[test]
+fn shared_raised_terminator_state_and_rollback_oracle() {
+    let rows = rows(RAISED_STATE);
+    assert_eq!(rows.len(), 112);
+    for (memo, diagnostics) in MODES {
+        for row in &rows {
+            let input = decode(row[1]);
+            let options = ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+            let mut context = ParseContext::with_options(&input, options);
+            context.set_state("value", 7u32);
+            CALLS.with(|calls| calls.set(0));
+            let result =
+                context.parse_with_token_mode(&raised_state_parser(row[0]), kind(row[2]), false);
+            let capture = match context.capture_sources("t").last() {
+                Some(TokenSource::Input(span)) => {
+                    format!("{}:{}", span.start, encode(context.text(*span).unwrap()))
+                }
+                Some(other) => panic!("{other:?}"),
+                None => "~".into(),
+            };
+            let actual = [
+                result.is_ok().to_string(),
+                context.position().to_string(),
+                context.matched_position().to_string(),
+                context.state::<u32>("value").unwrap().to_string(),
+                capture,
+                CALLS.with(Cell::get).to_string(),
+                context.failure().offset.to_string(),
+                raised(&context),
+            ];
+            let mut expected = row[3..].iter().map(|v| v.to_string()).collect::<Vec<_>>();
+            if diagnostics == Diagnostics::DetailedOnFailure && row[10] == "~" {
+                expected[6] = "0".into();
+            }
+            assert_eq!(
+                actual.to_vec(),
+                expected,
+                "{row:?} {memo:?} {diagnostics:?}"
+            );
+        }
+    }
 }

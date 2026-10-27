@@ -11,8 +11,13 @@ UBNF 構文は追加しない（生成器・frontend は不変）。
 - terminator は `Transaction.begin` で独自の transaction を開き（reset 方針が有効なら matched を
   consumed に戻す）、呼出し元の kind・invert に関係なく `parse(context)`、つまり consumed・非反転で解析する。
 - 成功した terminator は、呼出し元の kind が consumed 系（consumed / virtualTokenConsumed）のときだけ
-  commit され反復の token に入る。`CollectingParser`（Chain・Choice・Occurs 系・EndOfSource・Empty）は
-  commit でもう一度収集されるので二重の token になり、Word・MatchOnly・stopper・capture はそのまま追加される。
+  `commit(terminator, terminator.getTokenKind())` され反復の token に入る。`CollectingParser` はここで
+  もう一度収集されるので二重の token になる。該当するのは Chain・Choice・Occurs 系・EndOfSource・Empty と、
+  `ConstructedSingleChildParser` を継承する単一子 wrapper 全部（Commit・Label・DoConsumePropagationStopper・
+  InvertMatchPropagationStopper・NotPropagatableSource・Not・PegLookahead など）。Not / PegLookahead は
+  子の token を残さないので、空の consumed token が1つ増える。MatchOnly も CollectingParser だが
+  `getTokenKind()` が matchOnly なので、収集された token は consumed の反復では落ちる。Word・NamedCapture・
+  NameResolutionScope・CatchLabels は CollectingParser ではないので、その token がそのまま追加される。
   matchOnly 系の呼出し元では成功しても rollback し、どちらでも反復はそこで終わる。
 - terminator の失敗は rollback して body へ進む。raised failure（#700）は反復の失敗。
 - body は反復自身の transaction の中で呼出し元の kind・invert で解析する。成功しても cursor が
@@ -36,8 +41,28 @@ UBNF 構文は追加しない（生成器・frontend は不変）。
 
 Java の `Class` / `Supplier` / Lazy 指定、`Name`、`ASTNodeKind` は Rust の `Expr` 値と `Rule` 名へ移す
 （構築境界は #845）。Rust には parser の反射 identity や token stack がなく、`tokenStack` 列は常に 1。
-Classic label（`parser_label`）は診断用で比較しない。`Rule` を terminator にした場合は Rust の rule node のまま
-で、Java の parser class 階層による二重収集は写さない。
+Classic label（`parser_label`）は診断用で比較しない。
+
+Rust の terminator commit は、Java で CollectingParser になる式（`java_collector_label`）だけを Classic node で
+もう一度包む: `classic_collector_label` の collector（Sequence・Choice 系・Optional・反復系など）・Eof・
+JavaEmpty・JavaUntil に加え、`commit()`・`label()`・
+`stop_consume()`・`stop_invert()`・`invert_match()`・`Expr::JavaLookahead { positive: false, .. }`
+（UBNF `!'x'` の生成形 `Not(Word)`）・`ahead()` / `not_ahead()`（PegLookahead）。
+`Expr::JavaLookahead { positive: true, .. }`（`&'x'` の生成形 `MatchOnly(Word)`）と `match_only()` は包まない。
+
+`Rule` を terminator にした場合: 生成器と同じ形（`LazyChain` / `LazyChoice` + `GrammarRule`）の rule では、
+Java の二重収集（rule class の token をもう一度 rule class で収集）と、Rust の Rule node + 本体 node の段数が
+一致する（`wrappers.tsv` の `rule-chain-term` / `rule-choice-term`）。WordParser などを継承した非 collecting の
+手書き rule class は、terminator でない位置でも Rust の Rule node が1段深い既存の構築境界（#845）に従い、
+terminator 位置でも同じく1段深い。この差は #846 固有ではないので fixture に入れていない。UBNF には terminator
+構文がないので、生成 parser からこの位置には到達しない。比較では Rust の root rule node（Java の root は
+反復そのもの）を外し、その子から比べる。
+
+Rust に専用の式がない Java の CollectingParser（ParserWrapper・ParserHolder・MappedSingleCharacterParserHolder・
+PredicateAnyMatchForParsedParser・OldMatchedTokenParser・TagWrapper 系）は、terminator にすると Java では
+二重収集される。Rust の対応経路は custom parser（`Expr::Custom` / `parse_classic`）か未移植で、custom parser の
+terminator は Classic node で包まない。共通 fixture はなく、対応表の `graph-utilities`（ParserWrapper/Holder）と
+`legacy-not`（任意 child の Not）は未検証のまま、TagWrapper 系は reduced CST の #851 に残す。
 
 ## fixture
 
@@ -51,12 +76,35 @@ Classic label（`parser_label`）は診断用で比較しない。`Rule` を ter
 - `state.tsv`（24行）: `NamedCapture("t", ;)`（Rust `capture_owned`）で包んだ、user state を書き換える
   `;` terminator。成否・両 cursor・state・最後の capture・terminator 呼出し回数・失敗 CP。
   終端成功の commit / rollback、Chain の途中失敗、外側失敗、choice 後の再試行、先読み、同一 parser の再利用。
+- `wrappers.tsv`（2342行、23 scenario）: wrapper・cut/label・生成形 rule・先読みを terminator にした反復。
+  各入力（`a;xb`・`a;y`・`aa;x`・`a;`・`a`・空・`😀;x`・`;x`、scenario により `ab;`・`abac`・`a\n` を追加）で、
+  4 token kind × invert 2（prior なし・reset=true）と、consumed / matchOnly の非反転で prior matched `a` と
+  reset 方針の残り3組合せ。列は `cases.tsv` に加え、raised failure（`commit@CP` / `label:L@CP`）と、確定 root の
+  kind 別 CST の葉（Rust は token trace の葉）。scenario: Commit / Label（Chain と Word）・3つの stopper/invert・
+  Chain 内の Commit / Label（cut 後の失敗）・body 内の Commit・Choice 越しと MatchOnly 越しの raise・
+  NamedCapture・MatchOnly(Chain)・WildCardStringTerminatorParser・ZeroOrMore・生成形 rule（Chain / Choice）・
+  Not・MatchOnly(Word)・PegLookahead（正/負）・NameResolutionScope。
+- `raised-state.tsv`（112行）: `state.tsv` と同じ capture 付き state 書換え terminator を、Commit(Chain)・
+  Chain 内 Commit / Label・Choice 越しの raise・CatchLabels による捕捉と代替の再解析・MatchOnly 越し・外側失敗に
+  置き、4 token kind で成否・両 cursor・state・capture・呼出し回数・失敗 CP・raised failure を比べる。
+- `../resource-abort/cases.tsv` の `terminator` / `terminated-body` 行（4行）: 資源失敗が terminator と body の
+  中で起きたとき、公開入口と外側の手動 transaction の復元が他の wrapper と同じになること。
 
 期待値は Java21 の unlaxer-common（基準 commit）で実測し、上の規則に照らして見直した（例: matchOnly の
 until は terminator の begin が matched を consumed へ戻すので `;` を越えて読み進む、invert の nullable body は
 Optional の begin で同じ位置を2回読む）。Rust 実装はこの表を参照せずに書き、表と突き合わせた。
 reduced CST（tag による AST 射影）は #851 の範囲で、ここの構成は tag を付けないので Java の
 `filteredChildren` は原 CST と同じであることを Java 側で検査する。
+`wrappers.tsv` / `raised-state.tsv` は Java21 の probe（memo OFF・DETAILED）で生成し、Occurs の規則と照らして
+見直した（例: matchOnly の呼出しでは terminator の begin が matched を consumed へ戻すので、cut の後ろに届かず
+raise しない）。Rust の出力からは作っていない。
+
+DETAILED_ON_FAILURE では、成功または通常失敗の行は失敗 CP=0・expected なしになるが、raised failure の行は
+DETAILED と同じ診断を保つ（両言語）。`wrappers.tsv` の1行（`raise-choice`・`a;y`・matchOnly・prior `a`・
+reset=true）は、Java だけ DETAILED_ON_FAILURE で失敗する。これは #861（Choice の FIRST 除外が reset 前の
+cursor を読む。修正は PR #862）で、terminator がない `Choice(Chain(a, !), "a;y")` でも再現する。Java の
+テストはこの1行・このモードだけ #861 の実測値を期待し（使用回数も検査）、#862 と一緒に外す。Rust と Java の
+他のモードは共通の期待値で比べる。
 
 ## 実行
 
@@ -64,4 +112,8 @@ reduced CST（tag による AST 射影）は #851 の範囲で、ここの構成
   同じ行で実行し、Memoization 全値 × Diagnostics 全値で比較する。
 - Rust: `rust/unlaxer-runtime/tests/terminated_repeat.rs`。memo 2 × 診断 3 モード、通常入口と共有 grammar 入口、
   FIRST 除外の Off / On / Audit 同値性、memo・snapshot cache を承認しないこと、1500 段の入れ子が
-  2 MiB stack で資源失敗になることを検査する。
+  2 MiB stack で資源失敗になることを検査する。`wrappers.tsv` は token trace（既定の上限）を有効にして葉を比べる。
+- 資源失敗: Java `ResourcePublicationTest` と Rust `tests/resource_publication.rs` が `resource-abort/cases.tsv` を実行する。
+
+trace 上限の扱い（Classic の collect が後で除外する葉も上限に数える）は terminator がない `seq + match_only` でも
+起きる既存の問題で、ここでは既定の上限だけを使い、別 issue で扱う。

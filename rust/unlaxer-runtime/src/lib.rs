@@ -7730,12 +7730,24 @@ enum Terminator {
 }
 
 /// Classic collectors whose Java parsers are `CollectingParser`s: committing such a
-/// terminator wraps its token once more. Word/MatchOnly/stoppers/captures only append.
+/// terminator wraps its token once more. Word, captures and name scopes only append.
 fn java_collector_label(expression: &Expr) -> Option<&'static str> {
     classic_collector_label(expression).or(match expression {
         Expr::JavaUntil(_) => Some("WildCardStringTerminatorParser"),
         Expr::Eof => Some("EndOfSourceParser"),
         Expr::JavaEmpty => Some("EmptyParser"),
+        // Every ConstructedSingleChildParser is a CollectingParser: Commit/Label and the
+        // propagation wrappers, Not (`!'x'`) and PegLookahead. `&'x'` is a MatchOnly whose
+        // match-only token the consumed collection filters out.
+        Expr::Commit { .. } => Some("Commit"),
+        Expr::Label { .. } => Some("Label"),
+        Expr::StopConsume(_) => Some("DoConsumePropagationStopper"),
+        Expr::StopInvert(_) => Some("InvertMatchPropagationStopper"),
+        Expr::InvertMatch(_) => Some("NotPropagatableSource"),
+        Expr::JavaLookahead {
+            positive: false, ..
+        } => Some("Not"),
+        Expr::Lookahead { .. } => Some("PegLookahead"),
         _ => None,
     })
 }

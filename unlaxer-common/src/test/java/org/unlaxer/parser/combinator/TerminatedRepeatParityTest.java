@@ -23,6 +23,8 @@ import org.unlaxer.parser.elementary.*;
 public class TerminatedRepeatParityTest {
     private static final Path CASES = Path.of("../conformance/terminated-repeat/cases.tsv");
     private static final Path STATE = Path.of("../conformance/terminated-repeat/state.tsv");
+    private static final Path WRAPPERS = Path.of("../conformance/terminated-repeat/wrappers.tsv");
+    private static final Path RAISED_STATE = Path.of("../conformance/terminated-repeat/raised-state.tsv");
 
     public static class A extends WordParser { private static final long serialVersionUID = 1L; public A() { super("a"); } }
     public static class Semi extends WordParser { private static final long serialVersionUID = 1L; public Semi() { super(";"); } }
@@ -248,6 +250,170 @@ public class TerminatedRepeatParityTest {
                             String.valueOf(context.getParseFailureDiagnostics().getFarthestOffset()));
                     List<String> expected = new ArrayList<>(Arrays.asList(row).subList(3, 10));
                     if (mode == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) expected.set(6, "0");
+                    assertEquals(Arrays.toString(row) + "/" + memo + "/" + mode, expected, actual);
+                }
+            }
+        }
+    }
+
+    /** The generated rule shape (ParserRuleEmitter): a LazyChain/LazyChoice marked as GrammarRule. */
+    public static class SemiXParser extends LazyChain implements DiagnosticsAgnostic, GrammarRule {
+        private static final long serialVersionUID = 1L;
+        @Override public String grammarRuleName() { return "SemiX"; }
+        @Override public Parsers getLazyParsers() { return new Parsers(w(";"), w("x")); }
+    }
+    public static class EndParser extends LazyChoice implements DiagnosticsAgnostic, GrammarRule {
+        private static final long serialVersionUID = 1L;
+        @Override public String grammarRuleName() { return "End"; }
+        @Override public Parsers getLazyParsers() { return new Parsers(w(";"), w("\n")); }
+    }
+
+    private static Parser semiCut() { return new ZeroOrMore(w("a"), new Chain(w(";"), new Commit(w("x")))); }
+
+    /** Wrapper, cut/label, generated-rule and lookahead terminators; see README.md for the Rust ports. */
+    static Parser wrapperParser(String scenario) {
+        return switch (scenario) {
+            case "commit-term" -> new ZeroOrMore(w("a"), new Commit(new Chain(w(";"), w("x"))));
+            case "commit-word-term" -> new ZeroOrMore(w("a"), new Commit(w(";")));
+            case "label-term" -> new ZeroOrMore(w("a"), new Label("L", new Chain(w(";"), w("x"))));
+            case "label-word-term" -> new ZeroOrMore(w("a"), new Label("L", w(";")));
+            case "stopconsume-term" -> new ZeroOrMore(w("a"), new DoConsumePropagationStopper(w(";")));
+            case "stopinvert-term" -> new ZeroOrMore(w("a"), new InvertMatchPropagationStopper(w(";")));
+            case "invert-term" -> new ZeroOrMore(w("a"), new NotPropagatableSource(w(";")));
+            case "commit-inner-term" -> semiCut();
+            case "label-inner-term" -> new ZeroOrMore(w("a"), new Chain(w(";"), new Label("L", w("x"))));
+            case "commit-body" -> new ZeroOrMore(new Chain(w("a"), new Commit(w("b"))), w(";"));
+            case "raise-choice" -> new Choice(new Chain(semiCut(), w("!")), w("a;y"));
+            case "raise-matchonly" -> new MatchOnly(semiCut());
+            case "capture-term" -> new ZeroOrMore(w("a"), new NamedCapture("t", new Chain(w(";"), w("x"))));
+            case "matchonly-chain-term" -> new ZeroOrMore(w("a"), new MatchOnly(new Chain(w(";"), w("x"))));
+            case "until-term" -> new ZeroOrMore(w("a"), new WildCardStringTerminatorParser(";"));
+            case "zom-term" -> new ZeroOrMore(w("a"), new ZeroOrMore(w(";")));
+            case "rule-chain-term" -> new ZeroOrMore(w("a"), new SemiXParser());
+            case "rule-choice-term" -> new ZeroOrMore(w("a"), new EndParser());
+            case "not-term" -> new ZeroOrMore(w("a"), new Not(w(";")));
+            case "lookahead-term" -> new ZeroOrMore(w("a"), new MatchOnly(w(";")));
+            case "peg-ahead-term" -> new ZeroOrMore(w("a"), new PegLookahead(w(";")));
+            case "peg-not-term" -> new ZeroOrMore(w("a"), new PegLookahead(w(";"), false));
+            case "name-scope-term" -> new ZeroOrMore(w("a"), new NameResolutionScope(w(";"), List.of()));
+            default -> throw new AssertionError(scenario);
+        };
+    }
+
+    private static String raised(ParseContext context) {
+        if (false == context.hasRaisedFailure()) return "~";
+        RaisedFailure raised = context.raisedFailure();
+        return (raised.isCommit() ? "commit" : "label:" + raised.label()) + "@" + raised.offset();
+    }
+    /** Leaves of the kind-filtered CST, the Rust token trace's view. */
+    private static void leaves(Token token, List<String> out) {
+        if (token.filteredChildren.isEmpty()) {
+            int start = token.source.offsetFromRoot().value();
+            out.add(token.tokenKind + "," + start + "," + (start + token.source.codePointLength().value())
+                    + "," + encode(token.source.sourceAsString()));
+        } else for (Token child : token.filteredChildren) leaves(child, out);
+    }
+
+    /**
+     * #861 (fix PR #862, not in this base): Java DETAILED_ON_FAILURE excludes Choice candidates by the
+     * matched cursor before the reset, so this one row fails only in that mode. It is not a terminator
+     * difference (it reproduces with Choice(Chain(a, !), "a;y")); the Rust row and every other Java mode
+     * follow the shared expectation. Remove this entry together with the #862 fix.
+     */
+    private static final Map<String, List<String>> ISSUE_861_DETAILED_ON_FAILURE = Map.of(
+            "raise-choice\t613b79\tmatchOnly\tfalse\t61\ttrue",
+            List.of("false", "0", "1", "0", "false", "~", "~", "matchOnly@0:1:61", "matchOnly,0,1,61", "1", "true"));
+
+    @Test public void sharedWrapperRuleAndLookaheadTerminatorOracleInEveryMode() throws Exception {
+        List<String[]> rows = rows(WRAPPERS);
+        assertEquals(2342, rows.size());
+        Map<String, Parser> parsers = new HashMap<>();
+        var failures = new ArrayList<String>();
+        int issue861 = 0;
+        for (Memoization memo : Memoization.values()) for (ParseOptions.Diagnostics mode : ParseOptions.Diagnostics.values()) {
+            for (String[] row : rows) {
+                assertEquals(17, row.length);
+                List<String> expected = new ArrayList<>(Arrays.asList(row).subList(6, 17));
+                // A raised failure (#700) keeps its diagnostics when DETAILED_ON_FAILURE records lazily.
+                if (mode == ParseOptions.Diagnostics.DETAILED_ON_FAILURE && row[11].equals("~")) {
+                    expected.set(3, "0");
+                    expected.set(4, "false");
+                }
+                List<String> known = ISSUE_861_DETAILED_ON_FAILURE.get(String.join("\t", Arrays.copyOf(row, 6)));
+                if (mode == ParseOptions.Diagnostics.DETAILED_ON_FAILURE && known != null) {
+                    expected = known;
+                    issue861++;
+                }
+                Parser parser = parsers.computeIfAbsent(row[0], TerminatedRepeatParityTest::wrapperParser);
+                try (var context = ParseContext.withOptions(StringSource.createRootSource(decode(row[1])),
+                        ParseOptions.withMemoization(memo).withDiagnostics(mode))) {
+                    context.getCurrent().setResetMatchedWithConsumed(false);
+                    if (!row[4].equals("~")) assertTrue(w(decode(row[4])).parse(context, TokenKind.matchOnly, false).isSucceeded());
+                    context.getCurrent().setResetMatchedWithConsumed(Boolean.parseBoolean(row[5]));
+                    Parsed parsed = parser.parse(context, TokenKind.valueOf(row[2]), Boolean.parseBoolean(row[3]));
+                    var diagnostic = context.getParseFailureDiagnostics();
+                    List<String> leaves = new ArrayList<>();
+                    for (Token token : context.getCurrent().getTokens()) leaves(token, leaves);
+                    List<String> actual = List.of(String.valueOf(parsed.isSucceeded()),
+                            String.valueOf(context.getConsumedPosition().value()),
+                            String.valueOf(context.getMatchedPosition().value()),
+                            String.valueOf(diagnostic.getFarthestOffset()),
+                            String.valueOf(!diagnostic.getExpectedTokens().isEmpty()), raised(context),
+                            parsed.isSucceeded() ? joined(parsed.getOriginalTokens().stream().map(TerminatedRepeatParityTest::signature).toList()) : "~",
+                            joined(context.getCurrent().getTokens().stream().map(TerminatedRepeatParityTest::tree).toList()),
+                            joined(leaves), String.valueOf(context.getTokenStack().size()),
+                            String.valueOf(context.getCurrent().isResetMatchedWithConsumed()));
+                    if (false == actual.equals(expected)) {
+                        failures.add(Arrays.toString(Arrays.copyOf(row, 6)) + "/" + memo + "/" + mode
+                                + "\n expected " + expected + "\n actual   " + actual);
+                    }
+                }
+            }
+        }
+        assertTrue(String.join("\n", failures), failures.isEmpty());
+        assertEquals(23, parsers.size());
+        assertEquals(Memoization.values().length, issue861);
+    }
+
+    @Test public void sharedRaisedTerminatorStateAndRollbackOracle() throws Exception {
+        List<String[]> rows = rows(RAISED_STATE);
+        assertEquals(112, rows.size());
+        for (Memoization memo : Memoization.values()) for (ParseOptions.Diagnostics mode : ParseOptions.Diagnostics.values()) {
+            for (String[] row : rows) {
+                State state = new State();
+                AtomicInteger calls = new AtomicInteger();
+                Parser semi = new WordParser(";") {
+                    private static final long serialVersionUID = 1L;
+                    @Override public Token getToken(ParseContext context, TokenKind kind, boolean invert) {
+                        calls.incrementAndGet();
+                        state.value = 99;
+                        return super.getToken(context, kind, invert);
+                    }
+                };
+                Parser terminator = new NamedCapture("t", semi);
+                Parser cut = new ZeroOrMore(w("a"), new Chain(terminator, new Commit(w("x"))));
+                Parser parser = switch (row[0]) {
+                    case "commit-chain" -> new ZeroOrMore(w("a"), new Commit(new Chain(terminator, w("x"))));
+                    case "chain-commit" -> cut;
+                    case "chain-label" -> new ZeroOrMore(w("a"), new Chain(terminator, new Label("L", w("x"))));
+                    case "choice-raise" -> new Choice(new Chain(cut, w("z")), w("a;y"));
+                    case "catch-label" -> new CatchLabels(new Chain(new ZeroOrMore(w("a"),
+                            new Chain(terminator, new Label("L", w("x")))), w("z")), w("a;y"), "L");
+                    case "matchonly-raise" -> new MatchOnly(cut);
+                    case "outer-fail" -> new Chain(cut, w("z"));
+                    default -> throw new AssertionError(row[0]);
+                };
+                try (var context = ParseContext.withOptions(StringSource.createRootSource(decode(row[1])),
+                        ParseOptions.withMemoization(memo).withDiagnostics(mode))) {
+                    context.registerTransactionalState(state);
+                    Parsed parsed = parser.parse(context, TokenKind.valueOf(row[2]), false);
+                    String captured = context.captured("t").map(value -> value.start() + ":" + encode(value.text())).orElse("~");
+                    List<String> actual = List.of(String.valueOf(parsed.isSucceeded()),
+                            String.valueOf(context.getConsumedPosition().value()), String.valueOf(context.getMatchedPosition().value()),
+                            String.valueOf(state.value), captured, String.valueOf(calls.get()),
+                            String.valueOf(context.getParseFailureDiagnostics().getFarthestOffset()), raised(context));
+                    List<String> expected = new ArrayList<>(Arrays.asList(row).subList(3, 11));
+                    if (mode == ParseOptions.Diagnostics.DETAILED_ON_FAILURE && row[10].equals("~")) expected.set(6, "0");
                     assertEquals(Arrays.toString(row) + "/" + memo + "/" + mode, expected, actual);
                 }
             }
