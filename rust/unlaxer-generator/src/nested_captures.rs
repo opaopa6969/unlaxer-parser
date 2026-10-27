@@ -249,7 +249,7 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
     Ok(())
 }
 // Rust stores every mapped node in Ast; sharing must still respect Java's nominal leaf type.
-fn nominal_leaf(grammar: &GrammarDecl, atom: &AtomicElement) -> Option<String> {
+pub(crate) fn nominal_leaf(grammar: &GrammarDecl, atom: &AtomicElement) -> Option<String> {
     if let Some(element) = inlined_alias(grammar, atom) {
         return nominal_leaf(grammar, element);
     }

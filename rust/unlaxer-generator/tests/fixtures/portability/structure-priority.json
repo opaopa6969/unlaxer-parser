@@ -805,5 +805,131 @@
       "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 18, "end": 75}, "subject": "commonField schema"}, {"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 207, "end": 264}, "subject": "commonField schema"}]},
       "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 20, "end": 78}, "subject": "commonField schema"}, {"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 215, "end": 273}, "subject": "commonField schema"}]}
     }
+  },
+  {
+    "name": "issue-869-many",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' { 'x' } @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ('x')+ @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "Vec<String>", "samples": [["a", [], [0, 1], "A"], ["axx", ["x", "x"], [0, 3], "A"], ["bx", ["x"], [0, 2], "B"], ["bxxx", ["x", "x", "x"], [0, 4], "B"]], "invalidInputs": ["b", "ay", "by"]}
+  },
+  {
+    "name": "issue-869-many-unicode",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= '😀a' { 'x' } @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= '😀b' ('x')+ @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "Vec<String>", "samples": [["😀a", [], [0, 2], "A"], ["😀axx", ["x", "x"], [0, 4], "A"], ["😀bx", ["x"], [0, 3], "B"], ["😀bxxx", ["x", "x", "x"], [0, 5], "B"]], "invalidInputs": ["😀b", "😀ay", "😀by"]}
+  },
+  {
+    "name": "issue-869-many-reversed",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= B | A;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' { 'x' } @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ('x')+ @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "Vec<String>", "samples": [["a", [], [0, 1], "A"], ["axx", ["x", "x"], [0, 3], "A"], ["bx", ["x"], [0, 2], "B"], ["bxxx", ["x", "x", "x"], [0, 4], "B"]], "invalidInputs": ["b", "ay", "by"]}
+  },
+  {
+    "name": "issue-869-many-reference",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' { 'x' } @value;\n @mapping(B,params=[value]) B ::= 'b' ('x')+ @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 69, "end": 126}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 71, "end": 129}, "subject": "commonField schema"}]}
+    },
+    "generation": {"rust": 3}
+  },
+  {
+    "name": "issue-869-many-node",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' { X } @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ( X )+ @value;\n @mapping(X,params=[t]) X ::= 'x' @t;\n @mapping(Y,params=[t]) Y ::= 'x' @t;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "Vec<Box<generated::ast::Ast>>", "samples": [["a", [], [0, 1], "A"], ["axx", [{"type": "X", "span": [1, 2], "fields": {"t": "x"}}, {"type": "X", "span": [2, 3], "fields": {"t": "x"}}], [0, 3], "A"], ["bx", [{"type": "X", "span": [1, 2], "fields": {"t": "x"}}], [0, 2], "B"], ["bxxx", [{"type": "X", "span": [1, 2], "fields": {"t": "x"}}, {"type": "X", "span": [2, 3], "fields": {"t": "x"}}, {"type": "X", "span": [3, 4], "fields": {"t": "x"}}], [0, 4], "B"]], "invalidInputs": ["b", "ay", "by"]}
+  },
+  {
+    "name": "issue-869-many-node-reference",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' { X } @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ( Y )+ @value;\n @mapping(X,params=[t]) X ::= 'x' @t;\n @mapping(Y,params=[t]) Y ::= 'x' @t;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 69, "end": 126}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 71, "end": 129}, "subject": "commonField schema"}]}
+    },
+    "generation": {"rust": 3}
+  },
+  {
+    "name": "issue-869-optional",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' [ 'x' ] @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ('x')? @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "Option<String>", "samples": [["a", null, [0, 1], "A"], ["ax", "x", [0, 2], "A"], ["b", null, [0, 1], "B"], ["bx", "x", [0, 2], "B"]], "invalidInputs": ["axx", "bxx", "by"]}
+  },
+  {
+    "name": "issue-869-optional-unicode",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= '😀a' [ 'x' ] @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= '😀b' ('x')? @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "Option<String>", "samples": [["😀a", null, [0, 2], "A"], ["😀ax", "x", [0, 3], "A"], ["😀b", null, [0, 2], "B"], ["😀bx", "x", [0, 3], "B"]], "invalidInputs": ["😀axx", "😀bxx", "😀by"]}
+  },
+  {
+    "name": "issue-869-optional-reversed",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= B | A;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' [ 'x' ] @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ('x')? @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "Option<String>", "samples": [["a", null, [0, 1], "A"], ["ax", "x", [0, 2], "A"], ["b", null, [0, 1], "B"], ["bx", "x", [0, 2], "B"]], "invalidInputs": ["axx", "bxx", "by"]}
+  },
+  {
+    "name": "issue-869-optional-reference",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' [ 'x' ] @value;\n @mapping(B,params=[value]) B ::= 'b' ('x')? @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 69, "end": 126}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 71, "end": 129}, "subject": "commonField schema"}]}
+    },
+    "generation": {"rust": 3}
+  },
+  {
+    "name": "issue-869-choice",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= 'a' (NUM | NUM) @value;\n @mapping(B,params=[value]) B ::= 'b' ('x' | 'y') @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "String", "samples": [["a12", "12", [0, 3], "A"], ["a007", "007", [0, 4], "A"], ["bx", "x", [0, 2], "B"], ["by", "y", [0, 2], "B"]], "invalidInputs": ["a", "ax", "b12", "bz"]}
+  },
+  {
+    "name": "issue-869-choice-unicode",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @mapping(A,params=[value]) A ::= '😀a' (NUM | NUM) @value;\n @mapping(B,params=[value]) B ::= '😀b' ('x' | 'y') @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "String", "samples": [["😀a12", "12", [0, 4], "A"], ["😀a007", "007", [0, 5], "A"], ["😀bx", "x", [0, 3], "B"], ["😀by", "y", [0, 3], "B"]], "invalidInputs": ["😀a", "😀ax", "😀b12", "😀bz"]}
+  },
+  {
+    "name": "issue-869-choice-reversed",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= B | A;\n @mapping(A,params=[value]) A ::= 'a' (NUM | NUM) @value;\n @mapping(B,params=[value]) B ::= 'b' ('x' | 'y') @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}
+    },
+    "generation": {"rust": 0, "fieldType": "String", "samples": [["a12", "12", [0, 3], "A"], ["a007", "007", [0, 4], "A"], ["bx", "x", [0, 2], "B"], ["by", "y", [0, 2], "B"]], "invalidInputs": ["a", "ax", "b12", "bz"]}
+  },
+  {
+    "name": "issue-869-choice-reference",
+    "source": "grammar G {\n token NUM = org.unlaxer.parser.elementary.NumberParser\n @root @mapping(Node) @commonField(value)\n Root ::= A | B;\n @nestedCaptures @mapping(A,params=[value]) A ::= 'a' (NUM | NUM) @value;\n @nestedCaptures @mapping(B,params=[value]) B ::= 'b' ('x' | 'y') @value;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 69, "end": 126}, "subject": "commonField schema"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 71, "end": 129}, "subject": "commonField schema"}]}
+    },
+    "generation": {"rust": 3}
   }
 ]

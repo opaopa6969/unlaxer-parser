@@ -11,7 +11,7 @@
     "CLOSED #713/#717/#730/#740はそれぞれ空literal/不完全指数/生成物/解析深さの限定修正。後続のCST #767（PR #797）、Number #752（PR #792）、Java生成 #754（PR #804）、数値判定の作業量差 #758（PR #803）もCLOSEDで、それぞれchoice-root-cst / number-internal-failures / java-generation-depth / analysis-work-limitの契約として記録する。#741の境界差は契約化済み。",
     "CLOSED #331/#545/#571/#176/#537の後に残った旧未対応記述（回復内match-only、汎用伝播、Rust LSP/DAP、scopeTree、enum/eval、Backreference）は現行契約へ訂正する。未解決範囲はOPEN #111と個別子issueで追跡する。",
     "2026-10-24の監査で作成した量指定子overflow #783はPR #801で修正してCLOSED（bounded-overflow）。内部条件付き除外 #784 は本PRで実行先と実行記録を接続し、発見した診断差はOPEN #833/#834/#835へ分離する。個別issueのない残機能群は既存全仕様issue #111の受け入れ範囲に結ぶ。",
-    "2026-10-26の再監査で、2026-10-24〜26にmergeされたPR（#766/#772/#778/#785/#787/#791/#796/#797/#799/#800/#801/#803/#804/#806/#807/#808/#810/#813）とissueの状態を反映した。未修正の差だったglobal-comment / multi-grammar / simple-annotation / capture-generated-source / capture-resetは、対応issueがすべてCLOSEDで、両言語の挙動を共通corpusとテストで固定したため契約へ移した。OPENのまま残る追跡issueは#111・#716・#784と、両Rust hostのcheck構造診断を追跡する#832（本変更で回帰修正、merge待ち）。構造診断の#825はPR #831、import診断の#776はPR #824でmerge済み。",
+    "2026-10-26の再監査で、2026-10-24〜26にmergeされたPR（#766/#772/#778/#785/#787/#791/#796/#797/#799/#800/#801/#803/#804/#806/#807/#808/#810/#813）とissueの状態を反映した。未修正の差だったglobal-comment / multi-grammar / simple-annotation / capture-generated-source / capture-resetは、対応issueがすべてCLOSEDで、両言語の挙動を共通corpusとテストで固定したため契約へ移した。OPENのまま残る追跡issueは#111・#716・#784と、両Rust hostのcommonField型比較を追跡する#869（本変更で回帰修正、merge待ち）。#832はPR #868でmerge済み。構造診断の#825はPR #831、import診断の#776はPR #824でmerge済み。",
     "catalog/corpus.jsonのGsonが許していた単引用符escapeを同じ復号値の標準JSONへ訂正した。JSONの不正構文を黙って走査から除外しない。",
     "host別corpusの値の一致/差と未対応の意味分類は人が監査する。検査は新しいファイル/キー/出現数と台帳参照の欠落を落とすが、任意の新規skip条件や文書の意味を自動分類しない。",
     "2026-10-26 #784: 条件付き除外の宣言・元corpus・実行記録を照合する検査を追加。共通scopeの新規case/driver削除はmutation検査で検知する。root/診断優先順位に跨る16件の差は#833/#834/#835へ分離し、性能作業は行わない。",
@@ -360,7 +360,7 @@
       "title": "通常の呼出で matched が consumed より先にあるときの frame 開始時の matched 巻き戻し差"
     },
     "832": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "check: nestedCaptures と通常 leaf を混ぜた commonField family を Java-host は passed、native は P-COMMONFIELD にする（#831 レビュー）"
     },
     "833": {
@@ -435,6 +435,10 @@
       "state": "OPEN",
       "title": "fix: Java Choice の FIRST 候補除外が reset 前の cursor を読み、DETAILED_ON_FAILURE だけ受理が変わる"
     },
+    "869": {
+      "state": "OPEN",
+      "title": "check: commonField の容器の綴り違いと通常 choice の型比較を Java-host に揃える"
+    },
     "872": {
       "state": "OPEN",
       "title": "parity: 先行する先読みのない native UNTIL の成功時診断 CP が Java と違う（#871 レビューで分離）"
@@ -500,9 +504,10 @@
         592,
         593,
         825,
-        832
+        832,
+        869
       ],
-      "observation": "nativeError/nativeMessage/javaGeneratorError は構造検証の fail-first 順序・説明文を区別する。例: family cyclic-sum の Java generator は E-LEFT-RECURSION、schema validator は E-COMMONFIELD-MISMATCH。受理してよい差ではなく、両経路の拒否を固定する。公開 check の共通診断契約とは区別する。 #825では公開checkをJava-hostの優先順位に揃える。syntax/module/inventoryで前段が失敗したら構造検証しない。grammarごとにbounded/precedence/nested検証がcommonField schemaに先行し、schemaエラーはeval/enum/embedding/通常lowering/IR検証より先に問題ruleのCP spanで返す。schemaの宣言順と複数grammarの診断順を固定し、単一エラーとJSON schemaVersion 1は維持する。共通structure-priority.jsonの100ケースをLF/CRLFでJSON全体・終了コードに照合する。issue #825はPR #831でmerge済み/CLOSED。#833/#834/#835のroot有無・参照・mappingとcommonField競合の7入力も同じ公開check契約で検証する。 #843の残る宣言診断7入力のrootあり/なし14変種も、変更前のcheck JSONを固定して検証する。 #832ではJava-hostのcheckとRust emitterがnested representationとIR fieldの型比較を共有し、直接混在の不一致をnativeと同じP-COMMONFIELD・rule span・subject・終了コード3で拒否する。Java向け生成は維持する。8入力を追加し、LF/CRLFのJSON全体・診断順、7入力のRust生成の可否、正常な3構成の全5ファイル一致、5入力のJava生成成功を固定する。直接混在でRust field型が一致する例は現行契約にないため、同じnested schema・nested sumと通常leaf・通常leafから同じnested node参照を正常例とする。issue #832はレビュー・merge待ち。",
+      "observation": "nativeError/nativeMessage/javaGeneratorError は構造検証の fail-first 順序・説明文を区別する。例: family cyclic-sum の Java generator は E-LEFT-RECURSION、schema validator は E-COMMONFIELD-MISMATCH。受理してよい差ではなく、両経路の拒否を固定する。公開 check の共通診断契約とは区別する。 #825では公開checkをJava-hostの優先順位に揃える。syntax/module/inventoryで前段が失敗したら構造検証しない。grammarごとにbounded/precedence/nested検証がcommonField schemaに先行し、schemaエラーはeval/enum/embedding/通常lowering/IR検証より先に問題ruleのCP spanで返す。schemaの宣言順と複数grammarの診断順を固定し、単一エラーとJSON schemaVersion 1は維持する。共通structure-priority.jsonの114ケースをLF/CRLFでJSON全体・終了コードに照合する。issue #825はPR #831でmerge済み/CLOSED。#833/#834/#835のroot有無・参照・mappingとcommonField競合の7入力も同じ公開check契約で検証する。 #843の残る宣言診断7入力のrootあり/なし14変種も、変更前のcheck JSONを固定して検証する。 #832ではJava-hostのcheckとRust emitterがnested representationとIR fieldの型比較を共有し、直接混在の不一致をnativeと同じP-COMMONFIELD・rule span・subject・終了コード3で拒否する。Java向け生成は維持する。8入力を追加し、LF/CRLFのJSON全体・診断順、7入力のRust生成の可否、正常な3構成の全5ファイル一致、5入力のJava生成成功を固定する。直接混在でRust field型が一致する例は現行契約にないため、同じnested schema・nested sumと通常leaf・通常leafから同じnested node参照を正常例とする。issue #832はPR #868でmerge済み/CLOSED。 #869ではnativeのnested型比較を正規化したshapeとmapped nominalに揃え、通常groupの子の名義型を生成時に再比較しない。3再現例は両hostともpassed・終了コード0に揃え、通常leafの容器の綴り違いとnestedの数値/text不一致は拒否を維持する。14入力（再現例・順反転・非BMP各3、拒否3、mapped nodeの受理と名義型違いの拒否）をLF/CRLFで検証し、成功する10入力は全5生成ファイルのbyte一致と両生成物のcompile・AST型/値/CP span・無効入力拒否を固定する。issue #869はレビュー・merge待ち。",
       "evidence": [
         "docs/portability-check.md",
         "spec-corpus/associative-projection/invalid-cases.json",

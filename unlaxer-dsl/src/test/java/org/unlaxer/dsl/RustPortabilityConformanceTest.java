@@ -21,6 +21,7 @@ import org.junit.rules.TemporaryFolder;
 public class RustPortabilityConformanceTest {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
+    private Path runtime;
     private record Run(int code, String out, String err) {}
 
     private Path binary() throws Exception {
@@ -246,7 +247,10 @@ public class RustPortabilityConformanceTest {
         assertEquals(rust.err(), code, rust.code());
         if (code == 0) {
             for (String file : List.of("ast.rs", "parser.rs", "mapper.rs", "evaluator.rs", "mod.rs"))
-                assertEquals(file, Files.readString(javaRust.resolve(file)), Files.readString(nativeRust.resolve(file)));
+                assertArrayEquals(file, Files.readAllBytes(javaRust.resolve(file)), Files.readAllBytes(nativeRust.resolve(file)));
+            if (expected.has("samples")) {
+                assertEquals(compileAndObserve(javaRust, expected), compileAndObserve(nativeRust, expected));
+            }
         } else {
             assertTrue(java.err(), java.err().contains("E-COMMONFIELD-MISMATCH"));
             assertTrue(rust.err(), rust.err().contains("E-COMMONFIELD-MISMATCH"));
@@ -262,6 +266,49 @@ public class RustPortabilityConformanceTest {
                 assertTrue(files.anyMatch(path -> path.toString().endsWith("AST.java")));
             }
         }
+    }
+
+    private String compileAndObserve(Path generated, JsonObject expected) throws Exception {
+        if (runtime == null) {
+            runtime = temporary.getRoot().toPath().resolve("libunlaxer_runtime.rlib");
+            Run build = nativeRun(List.of("rustc", "--edition=2021", "--crate-type=rlib",
+                "--crate-name=unlaxer_runtime", repo.resolve("rust/unlaxer-runtime/src/lib.rs").toString(),
+                "-o", runtime.toString()), false, generated);
+            assertEquals(build.err(), 0, build.code());
+        }
+        StringBuilder probe = new StringBuilder(
+            "#[path=\"mod.rs\"] mod generated; use generated::{parser, mapper}; fn main() {\n");
+        for (var entry : expected.getAsJsonArray("samples")) {
+            var sample = entry.getAsJsonArray();
+            probe.append("{let tree=parser::parse_tree(").append(sample.get(0))
+                .append(").unwrap();let ast=mapper::map(&tree).unwrap();let _: &")
+                .append(expected.get("fieldType").getAsString())
+                .append("=ast.common_node().unwrap().value;println!(\"{}\",ast.canonical_json());}\n");
+        }
+        for (var input : expected.getAsJsonArray("invalidInputs"))
+            probe.append("assert!(parser::parse_tree(").append(input).append(").is_err());\n");
+        probe.append("}\n");
+        Path source = generated.resolve("probe.rs"), executable = generated.resolve("probe");
+        Files.writeString(source, probe);
+        Run compile = nativeRun(List.of("rustc", "--edition=2021", "--extern",
+            "unlaxer_runtime=" + runtime, source.toString(), "-o", executable.toString()), false, generated);
+        assertEquals(compile.err(), 0, compile.code());
+        Run observed = nativeRun(List.of(executable.toString()), true, generated);
+        assertEquals(observed.err(), 0, observed.code());
+        String[] lines = observed.out().lines().toArray(String[]::new);
+        var samples = expected.getAsJsonArray("samples");
+        assertEquals(samples.size(), lines.length);
+        for (int i = 0; i < samples.size(); i++) {
+            var sample = samples.get(i).getAsJsonArray();
+            var ast = new JsonObject();
+            ast.add("type", sample.get(3));
+            ast.add("span", sample.get(2));
+            var fields = new JsonObject();
+            fields.add("value", sample.get(1));
+            ast.add("fields", fields);
+            assertEquals(sample.get(0).toString(), ast, JsonParser.parseString(lines[i]));
+        }
+        return observed.out();
     }
 
     private JsonObject compare(Path binary, Path cwd, String source) throws Exception {
