@@ -116,15 +116,21 @@ pub fn completion(source: &str, index: &Index, offset: usize) -> Value {
     });
     let mut start = offset;
     while let Some((i, c)) = source[..start].char_indices().next_back() {
-        if text::word(c) || c == '.' {
+        if text::java_letter_or_digit(c) || c == '_' || c == '.' {
             start = i;
         } else {
             break;
         }
     }
-    let qualifier = source[start..offset]
-        .split_once('.')
-        .map(|(name, _)| format!("{name}."));
+    // Java: `([A-Za-z_]\w*\.)\w*$` on the line prefix (ASCII \w, last qualifier only).
+    let qualifier = prefix
+        .trim_end_matches(text::word)
+        .strip_suffix('.')
+        .and_then(|before| {
+            let run = &before[before.trim_end_matches(text::word).len()..];
+            let first = run.find(|c: char| c.is_ascii_alphabetic() || c == '_')?;
+            Some(format!("{}.", &run[first..]))
+        });
     let lex = text::scan(&source[..offset]);
     let lexical = lex.iter().rposition(|t| t.text == "::=").is_some_and(|i| {
         i >= 2 && lex[i - 2].text == "token" && !lex[i + 1..].iter().any(|t| t.text == ";")
@@ -191,14 +197,14 @@ pub fn hover(source: &str, index: &Index, offset: usize) -> Value {
     let mut start = offset;
     let mut end = offset;
     while let Some((i, c)) = source[..start].char_indices().next_back() {
-        if c.is_alphanumeric() || c == '_' {
+        if text::java_letter_or_digit(c) || c == '_' {
             start = i;
         } else {
             break;
         }
     }
     for (i, c) in source[offset..].char_indices() {
-        if c.is_alphanumeric() || c == '_' {
+        if text::java_letter_or_digit(c) || c == '_' {
             end = offset + i + c.len_utf8();
         } else {
             break;

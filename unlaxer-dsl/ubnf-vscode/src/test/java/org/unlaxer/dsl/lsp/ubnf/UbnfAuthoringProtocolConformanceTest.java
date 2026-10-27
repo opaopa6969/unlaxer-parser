@@ -32,6 +32,6 @@ public class UbnfAuthoringProtocolConformanceTest {
             "--rust", root().resolve("rust/target/debug/ubnf-language-server").toString(), "--output", output.toString()).redirectErrorStream(true).redirectOutput(Path.of("target/ubnf-authoring-wire.log").toFile()).start();
         try { assertTrue("protocol timeout", process.waitFor(100, TimeUnit.SECONDS)); assertEquals(0, process.exitValue()); }
         finally { process.descendants().forEach(child -> child.destroyForcibly()); process.destroyForcibly(); System.out.print(Files.readString(Path.of("target/ubnf-authoring-wire.log"))); }
-        assertEquals("all authored cases and import/package scenarios executed", 22, JsonParser.parseString(Files.readString(output)).getAsJsonArray().size());
+        assertEquals("all authored cases and import/package scenarios executed", 27, JsonParser.parseString(Files.readString(output)).getAsJsonArray().size());
     }
 }

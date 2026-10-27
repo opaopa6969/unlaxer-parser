@@ -94,3 +94,30 @@ fn transport_recovers_from_invalid_json_and_requires_shutdown_before_exit() {
         assert_eq!(error["error"]["code"], -32700);
     }
 }
+#[test]
+fn positions_past_line_or_document_end_clamp_like_java() {
+    let mut server = Server::default();
+    assert!(request(&mut server, "initialize", json!({}))["result"].is_object());
+    let uri = "file:///clamp.ubnf";
+    let text = "grammar T {\r\n A ::= '😀';\r\n}";
+    notify(
+        &mut server,
+        "textDocument/didOpen",
+        json!({"textDocument":{"uri":uri,"version":1,"text":text}}),
+    );
+    for position in [
+        json!({"line":1,"character":99}),
+        json!({"line":9,"character":0}),
+    ] {
+        let params = json!({"textDocument":{"uri":uri},"position":position});
+        let hover = request(&mut server, "textDocument/hover", params.clone());
+        assert!(hover["result"]["contents"].is_object(), "{hover}");
+        let completion = request(&mut server, "textDocument/completion", params);
+        assert!(completion["result"].is_array(), "{completion}");
+    }
+    let inside_pair = json!({"textDocument":{"uri":uri},"position":{"line":1,"character":9}});
+    assert_eq!(
+        request(&mut server, "textDocument/hover", inside_pair)["error"]["code"],
+        -32602
+    );
+}

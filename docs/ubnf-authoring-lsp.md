@@ -45,7 +45,8 @@ VSIX は `ubnfLsp.server.backend=rust` と `ubnfLsp.server.rustPath`（実行フ
 Playground の生成は従来どおり Java/Node/Rust toolchain を使う。
 
 import は既存 `modules::resolve` / `packages::Resolver` を通す。package の lock/hash/依存/境界を検証し、
-自動取得・resolve・書込み・コード実行はしない。開いたローカル `.ubnf` buffer は disk より優先し、
+自動取得・resolve・書込み・コード実行はしない。local import が `/dev/stdin`・FIFO 等の通常ファイル以外を読んで止まる問題は
+Java/Rust 共通の既存挙動で、[#890](https://github.com/opaopa6969/unlaxer-parser/issues/890) で直す。開いたローカル `.ubnf` buffer は disk より優先し、
 package の検証済み source を editor buffer で上書きしない。URI は percent encoding を復号して local file を読む。
 位置は frontend の UTF-8 byte / CP span を編集時に UTF-16 へ変換し、parser 本体は変更しない。
 
@@ -54,11 +55,20 @@ package の検証済み source を editor buffer で上書きしない。URI は
 
 ## 第一段の検証範囲
 
-共通 17 文書と 5 import/package シナリオ（計22件）を両実 stdio server へ送る。
+共通 22 文書と 5 import/package シナリオ（計27件）を両実 stdio server へ送る。
 completion は順序・snippet・documentation・textEdit を含む全 JSON、対象 hover と
 生成警告は全 JSON を比較する。CRLF、非BMP直後の UTF-16 textEdit、同名宣言衝突、
 複数 grammar、コメント中の偽宣言、不完全 annotation/FQN/qualified import を含む。
 独立期待値のラベル・除外ラベル・説明・診断コードを確認してから Java/Rust を比較する。
+
+位置は LSP 仕様と Java `UbnfEditorIndex.offset` に合わせ、行末を超える character は行末（`\n` の直前）、
+文書末を超える line は文書末に丸める。completion の置換範囲と hover の単語は Java の
+`Character.isLetterOrDigit`（UTF-16 単位なので補助文字は単語に含めない）に合わせ、修飾子は Java の
+`([A-Za-z_]\w*\.)\w*$` と同じく最後の `alias.` だけを使う（先頭が `.` なら修飾なし）。共通 fixture の
+`past-line-end`・`non-ascii-prefix`・`leading-dot`・`nested-qualifier`・`supplementary-letter-hover` で固定した。
+残差: サロゲートペアの内側を指す位置は Rust が `-32602` で拒否し、Java は UTF-16 の途中 offset のまま処理する。
+BMP 内の Unicode 分類は `char::is_alphanumeric` による近似で、結合文字（Mn/Mc）と Nl/No は未照合（#886）。
+同じ version 以下の `didChange` を Rust は無視し、Java は適用する（#885）。
 
 構文エラー時の fallback hover は Java の consumed offset と Rust の最初の error offset を区別する（#885）。
 構文エラーは両方の拒否を確認するが、native frontend の最初のエラー位置と
@@ -72,9 +82,10 @@ virtual package path に開いた偽 buffer が検証済み source を置換で�
 server が manifest/lock/cache を書き換えないことも両版で検証する。
 現時点の native file URI は Linux のローカル絶対パスを検証対象とし、UNC/Windows 等は #886 に残す。
 
-CI は `ubnf-authoring` 必須契約の2メソッドと22件の実行件数を検査する。
+CI は `ubnf-authoring` 必須契約の2メソッドと27件の実行件数を検査する。
 packaged VSIX は従来 Java smoke を保持し、別の隔離 profile で Java executable を不存在に設定して
-Rust の completion/hover/診断と変更後の修復、未広告 definition を確認する。
+Rust の completion/hover/診断と変更後の修復、未広告 definition を確認する。最後に拡張の `deactivate` で
+native server の子プロセスが終了し、残らないことを確認する（tinycalc-vscode #874/#880 と同じ後始末の水準）。
 native executable 自体は外部パスを指定し、VSIX 内に同梱したとは扱わない。
 
 ## 検証コマンドと mutation
@@ -85,5 +96,7 @@ native executable 自体は外部パスを指定し、VSIX 内に同梱したと
 - VSIX 作成後 `node scripts/vsix-smoke.mjs target/ubnf-lsp-authoring.vsix` を Java と `UBNF_TEST_BACKEND=rust UBNF_TEST_RUST_PATH=<絶対パス>` の2経路で実行。headless 環境は `xvfb-run -a`、Chrome/Electron は `--password-store=basic`。
 
 UTF-16 を CP 数に変える、local buffer overlay を外す、generation warning を空にする3変異で、
-それぞれ共通 stdio fixture が失敗することを確認した。protocol テストの `@Test` を外すと、
+それぞれ共通 stdio fixture が失敗することを確認した。PR #888 のレビューで、位置の丸めを外す、置換範囲を ASCII に戻す、
+修飾子を最初の区切りに戻す、hover の単語に補助文字を含める、importer の再通知を外す、VSIX suite の `deactivate` を外す
+6変異でも、それぞれ共通 fixture・Rust テスト・packaged VSIX が失敗することを確認した。protocol テストの `@Test` を外すと、
 残ったテスト自体が成功しても必須メソッド検査が失敗する。全変異を復元して再検証する。

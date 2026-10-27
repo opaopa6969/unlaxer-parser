@@ -472,7 +472,7 @@
         885,
         886
       ],
-      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通22件で検証。全 GrammarValidator・syntax expected/stack・profile 再設定は #885、navigation/rename/outline/folding/linked editing/quick fix/signature/semantic tokens/packageSource/native 配布は #886 で未対応のまま追跡。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。",
+      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通27件で検証。全 GrammarValidator・syntax expected/stack・profile 再設定は #885、navigation/rename/outline/folding/linked editing/quick fix/signature/semantic tokens/packageSource/native 配布は #886 で未対応のまま追跡。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。",
       "evidence": [
         "docs/ubnf-authoring-lsp.md",
         "spec-corpus/ubnf-authoring-lsp/cases.json",

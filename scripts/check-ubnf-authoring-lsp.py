@@ -118,7 +118,9 @@ def run(java, native, directory):
         source = case['source']
         offset = source.index(case['marker']) + (len(case['marker']) if case.get('after') else max(1, len(case['marker'].split()[0].rstrip('.'))))
         hover_offset = source.index(case['marker'])
-        params = {'textDocument': {'uri': uri}, 'position': position(source, offset)}
+        # Explicit LSP positions cover inputs a marker cannot name (past line/document end).
+        params = {'textDocument': {'uri': uri}, 'position': case.get('position', position(source, offset))}
+        hover_position = case.get('hoverPosition', position(source, hover_offset))
         completions, hovers, diagnostics = [], [], []
         for client in clients:
             client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'languageId': 'ubnf', 'version': 1, 'text': source}})
@@ -136,7 +138,7 @@ def run(java, native, directory):
             elif 'diagnostics' in case:
                 assert [d['code'] for d in diagnostic] == case['diagnostics'], (case['id'], diagnostic)
             if 'hoverContains' in case:
-                hover = client.result('textDocument/hover', {**params, 'position': position(source, hover_offset)})
+                hover = client.result('textDocument/hover', {**params, 'position': hover_position})
                 hovers.append(hover)
                 expected = case.get('nativeHoverContains', case['hoverContains']) if client is native else case['hoverContains']
                 assert expected in hover['contents']['value'], (case['id'], hover)

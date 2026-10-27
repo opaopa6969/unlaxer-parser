@@ -16,28 +16,41 @@ pub fn position(text: &str, byte: usize) -> Value {
 pub fn range(text: &str, start: usize, end: usize) -> Value {
     json!({"start":position(text,start),"end":position(text,end)})
 }
+/// LSP position to byte offset. As in the LSP spec and Java `UbnfEditorIndex.offset`,
+/// a line past the end is the document end and a character past the line end is the
+/// line end (before `\n`). A position inside a surrogate pair is rejected.
 pub fn offset(text: &str, pos: &Value) -> Option<usize> {
     let line = pos["line"].as_u64()? as usize;
     let column = pos["character"].as_u64()? as usize;
     let start = if line == 0 {
         0
     } else {
-        text.match_indices('\n').nth(line - 1)?.0 + 1
+        match text.match_indices('\n').nth(line - 1) {
+            Some((i, _)) => i + 1,
+            None => return Some(text.len()),
+        }
     };
+    let end = text[start..].find('\n').map_or(text.len(), |i| start + i);
     let mut units = 0;
-    for (index, c) in text[start..].char_indices() {
+    for (index, c) in text[start..end].char_indices() {
         if units == column {
             return Some(start + index);
         }
-        if c == '\n' || units > column {
+        if units > column {
             return None;
         }
         units += c.len_utf16();
     }
-    (units == column).then_some(text.len())
+    (units <= column).then_some(end)
 }
 pub fn word(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
+}
+/// Java `Character.isLetterOrDigit(char)` scans UTF-16 units, so supplementary
+/// characters (surrogates) never match. Unicode categories are approximated by
+/// `char::is_alphanumeric` (docs/ubnf-authoring-lsp.md).
+pub fn java_letter_or_digit(c: char) -> bool {
+    c.len_utf16() == 1 && c.is_alphanumeric()
 }
 #[derive(Clone, Debug)]
 pub struct Lexeme {
