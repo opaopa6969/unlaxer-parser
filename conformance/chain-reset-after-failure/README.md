@@ -810,17 +810,83 @@ Unicode・EOF・空入力・先行先読みも検査する。成否・両 cursor
 - Classic、`grammar_frontier=false` の native PEG 式入口、lexing session を helper 内で除外する。
   通知なしの CatchLabels も除外し、`peg-frontier` の別列は維持する。
 
-### 入口が戻る前の観測の制限 (#881)
+### 途中診断の観測時点の契約 (#881)
 
-外部入口の成功後の最終到達位置を対象とし、その入口が戻る前のすべての消費履歴を保証しない。
-実測した例は、`Root = Sequence([Literal(head), Rule(Inner)])` の Inner 内の custom parser が
-診断を読む経路である。Java の対照は `Chain(WordParser(head), Chain(observerWordZ))` で、
-`observerWordZ.getToken` が診断を読み `super.getToken` を呼ぶ。入力は `head + "zb"`。
-AUTO / DETAILED では head=`a` の途中 CP が Java1 / Rust0、head=`a😀` は Java2 / Rust0。
-入口の成功後はそれぞれ CP2 / CP3 で一致し、成否・両 cursor と DETAILED_ON_FAILURE の CP0 も一致する。
-ノード処理へ追加しない指示に従い、この観測時点の差を
-[#881](https://github.com/opaopa6969/unlaxer-parser/issues/881) の受け入れ条件付き課題に分離した。
+**結論:** Java 互換 grammar の外部入口から戻る前に custom parser が読む成功診断 CP は、
+Rust では、その時点までに記録済みの transaction frame（および戻った入れ子入口）と実失敗だけを
+反映する下限であり、対応する Java の値以下になる。外部入口から戻った後の診断 CP は Java と
+一致する。これは公開 API の**観測時点の意図した差**であり、途中値を現在の cursor や最終診断と
+同一視しない。実失敗が既に記録されていれば成功時の最大到達位置より失敗が優先され、途中値も
+Java と一致する。成功時の下限は、その後の実失敗を含む最終 CP の下限を意味しない。
 
+Java の `trackCursorProgress` は `consume` / `matchOnly` / `startParse` / `endParse` で
+`max(consumed, matched)` を記録する。Rust の成功記録点は対応する Java の到達履歴の部分集合で、
+未記録の Chain / literal の消費を加えても最大値は減らないため、実失敗のない途中値は
+`Rust ≤ Java` となる。両者とも実失敗を成功 fallback より優先するので、例えば CP0 の実失敗後に
+2 CP 消費しても途中・最終の診断は CP0 になる。この根拠は Java 互換の構文診断についてのもので、
+任意の手組み IR・独自エラー・resource/name/raised failure の優先順位全般の新しい保証ではない。
+
+`ParseContext::failure(&self)` は読み取りだけで、cursor / reset / transaction / memo を更新せず、
+再解析もしない。Java の accessor も解析状態を進めない。途中値を読むだけなら後続の結果は不変だが、
+利用側が異なる途中値を条件に受理や消費を変える custom parser の同値性は保証しない。
+低水準 context の DETAILED_ON_FAILURE は途中・最終とも空診断（CP0）のまま、読み取りで retry しない。
+独立 native PEG の `context.parse(&expr)` と lexing は従来の別契約を維持する。
+
+完全な途中一致には Java と同様の更新を Rust のノード単位の処理へ追加する必要がある。
+[#878 の指示役判断](https://github.com/opaopa6969/unlaxer-parser/issues/878#issuecomment-6442006064) が
+#197 の範囲内で許可したのは外部入口ごとの比較と cold helper だけなので、その追加はしない。
+Java/Rust runtime の実行コード・cache・生成器は変更せず、rustdoc と共通 probe で契約を固定する。
+性能の再計測も行わない。
+
+#### 共通 probe と実測 oracle
+
+`MidParseDiagnosticsConformanceTest` と `rust/unlaxer-runtime/tests/mid_parse_diagnostics.rs` は
+`mid-parse-inputs.tsv` を共有する。Java の `Chain(head, Chain(observerWordZ))` と、Rust の
+`parse_shared_grammar` 内 `Root = Sequence(head, Rule(Inner))`、
+`Inner = Sequence(Custom(observer), Literal("z"))` を対応させる。Java は `getToken` の先頭、
+Rust は空成功の callback 内で、同じ `z` の消費前に診断を2回読む。
+observer の記録は context の外に置き、state epoch / memo key を変えない。
+
+8経路 × ASCII / Unicode × 通常 / Classic × 初期 reset 2設定 × memo OFF / SAFE_FAILURES ×
+診断3設定 = **384行**。各行で観測する実行と観測しない対照を別 context で実行する。
+Java の実測全41列を `mid-parse-java.tsv` に固定し、途中の両言語の値は等しい行も含め
+`mid-parse-observations.tsv` の384行に固定する。差分は次の**途中 CP の48行だけ**である。
+
+| 経路（通常、AUTO / DETAILED） | ASCII 途中 Java / Rust | Unicode 途中 Java / Rust | 最終 CP（両言語、ASCII / Unicode） |
+| --- | --- | --- | --- |
+| plain / EOF | 1 / 0 | 2 / 0 | 2 / 3 |
+| 読み取り後、`z` を消費して後続 `!` が失敗 | 1 / 0 | 2 / 0 | 2 / 3（解析失敗・cursor は0へ rollback） |
+| head を NonOrdered で包む（完了済み frame） | 1 / 1 | 2 / 2 | 2 / 3 |
+| `head + z` の先行 MatchOnly | 2 / 2 | 3 / 3 | 2 / 3 |
+| head 前の失敗候補 | 0 / 0 | 0 / 0 | 0 / 0 |
+| head 後の Optional 内の実失敗 | 1 / 1 | 2 / 2 | 1 / 2 |
+| `head + z` 後の失敗候補から rollback | 2 / 2 | 3 / 3 | 2 / 3 |
+
+Classic の途中値はこの corpus の全行で一致する。DETAILED_ON_FAILURE は全行 CP0。
+実失敗済みの3経路・144行では、途中も必ず完全一致を assert する。
+全行で `Rust ≤ Java` を assert し、途中列だけを差分表で置換して全行を比較する。
+最終 CP・成否・両 cursor・reset は緩和せず完全一致。後続の NonOrdered(MatchOnly("b")) と
+同一の安全な失敗 rule の3回呼出しでも全列を照合する。Java ではその rule の exact class に
+`SafeSuccessMemoizable` を宣言し、Rust は同一 grammar session の rule memo を使う。
+SAFE_FAILURES の failure hit は両言語とも0→1→2（OFF は0）、success hit はこの probe では0。
+読み取り有無でこれらの全列が同じであり、memo OFF / SAFE_FAILURES でも解析結果は変わらない。
+
+この probe は issue の手組み公開 grammar API の契約を扱う。**生成 rule 内の custom adapter の
+lowering は対象に含めない**ため、新 probe に生成 host / mapping の組はない。
+既存の `NestedCandidateBoundaryConformanceTest`（両 Rust host × 通常/mapping × Chain 対照）の
+4224行 oracle と差分表は変更せず、診断差0行を回帰確認する。
+ChainReset / FrameStart / PriorMatchedDiagnostics と Rust workspace、native PEG の対照も実行する。
+調査した範囲では (a) 下限、(b) 読み取り無作用、(c) 実失敗時の一致を破る反例は見つからなかった。
+反例が見つかった場合はこの差分表の許容範囲へ追加せず、受け入れ条件付きの不具合 issue に分離する。
+
+#### #881 の照合 mutation
+
+runtime の修正を外す代わりに、同じ Rust 共通 oracle テストへ次の変異を順に与え、
+両方とも失敗を確認してから fixture を byte 単位で復元する。
+
+- `mid-parse-java.tsv` の先頭行の外部入口直後 CP を2→3に変更: `final oracle` の完全一致で失敗。
+- `mid-parse-observations.tsv` の先頭行の Rust 途中 CP を0→2（Java は1）に変更:
+  `intermediate lower bound` の不等式で失敗。
 
 ### #878 の mutation
 

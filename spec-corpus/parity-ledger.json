@@ -21,7 +21,8 @@
     "2026-10-27 #826: 正の先読みの到達位置、Classic capture の失敗 frame、native UNTIL の失敗した終端候補を記録。既存の Java oracle 値は変更せず nested/frame-start の全診断列を両Rust host・通常/mappingで一致させる。差分表は実測に一致する memo 会計差だけを保持する。個別修正であり台帳全体の監査日・revision は更新しない。",
     "2026-10-27 #827: failure/success hit は公開 context API と Classic harness に現れる host 依存の内部会計であり、Java/Rust 間の数値一致を契約しないと決定。marker・rule/inline group の cache 粒度と Chain 対照を確認し、非nested Outer を追加。runtime/生成器を変えず、実測全行と memo OFF/SAFE_FAILURES の結果不変を検証する。個別の契約判断であり台帳全体の監査日・revision は更新しない。",
     "2026-10-27 #872/#876: 先行先読みのない通常呼出の成功診断をJava実測に揃える。両issueは成功記録の既存watermark必須条件が共通原因。生成grammarのJava互換経路と独立native PEG式入口を区別し、後者の別診断列を維持する。個別修正であり台帳全体の監査日・revisionは更新しない。",
-    "2026-10-27 #878: 外部入口の成功時に transaction frame 外の最終消費を記録し、Java 実測の nested-boundary 47経路1128行を追加。#197 は入口ごとの比較1つを指示役が許可し、ノードごとの処理は不変。入口が戻る前の custom parser の途中診断は #881 に分離する。#826/#872/#876 の CLOSED を確認。個別修正であり台帳全体の監査日・revision は更新しない。"
+    "2026-10-27 #878: 外部入口の成功時に transaction frame 外の最終消費を記録し、Java 実測の nested-boundary 47経路1128行を追加。#197 は入口ごとの比較1つを指示役が許可し、ノードごとの処理は不変。入口が戻る前の custom parser の途中診断は #881 に分離する。#826/#872/#876 の CLOSED を確認。個別修正であり台帳全体の監査日・revision は更新しない。",
+    "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
     "111": {
@@ -449,7 +450,7 @@
       "title": "parity: 先読みが先行しない通常呼出で失敗のない成功の診断 CP が Java と違う（#875 レビュー、#872 の一般形）"
     },
     "878": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity: transaction frame の外で消費した Chain / literal の成功到達位置が診断 CP に入らない（#877 レビュー、#876 の残り）"
     },
     "881": {
@@ -1674,7 +1675,7 @@
     {
       "id": "plain-success-diagnostics",
       "category": "contract",
-      "title": "生成grammarの成功診断と transaction frame 外の最終消費（#872 / #876 / #878）",
+      "title": "生成grammarの成功診断と途中観測の下限（#872 / #876 / #878 / #881）",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         872,
@@ -1685,7 +1686,7 @@
         878,
         881
       ],
-      "observation": "JavaのgetParseFailureDiagnosticsは実失敗のfarthestFailureOffsetを優先し、なければstartParse/endParse/consume/matchOnlyが保存したmaxReachedOffsetを返す。#877ではRustの成功記録からclassic_max_reached.is_some()の条件を除き、native UNTILの失敗試行も既存cold helperで集約した。aab/bbはCP1、a😀のEOFはCP2、Helper2+azbはCP2、Outer2+azxはCP3。Java runtimeは不変。frame-startに5経路120行、nestedに32経路768行をJava実測から追加し、既存oracle2760/1896行を維持した。#877時点の記録点は成功したtransaction frameだけで、その外のChain/literalの最終消費は#878で外部入口parse_expressionの成功時にcold helperへ記録する。PlainSeq2 direct/prior・TailSeq direct・literal単独・Unicodeと対照47経路1128行をJava実測から追加し、既存2664行は不変。nestedは計158経路3792行、両host・通常/mapping・Chain対照の30336観測で診断差0行。差分表316行はbyte単位で不変、frame-start2880行と差分表81行も維持する。全入力に通常/Classic・初期reset2・memo2・診断3を含む。成否・両cursor・reset・後続診断/成否・memo hitは修正前後で全行不変。#877は既存Detailed transactionガード内の比較除去のみだったが、#878では入口ごとに分岐1つ増える（DETAILED_ON_FAILUREも比較1つ増加）。既存入口の診断分岐はClassic切替専用のため通常呼出には流用できない。解析長に比例しない外部入口の費用として指示役が#197の範囲内と許可した。ノードごとの走査・照合・transactionは不変、Classic・native PEG式入口・lexing・CatchLabelsはcold helperで除外、DETAILED_ON_FAILUREの結果も不変。新しいfield/cache/割当/再帰経路はなく性能再計測なし。生成器nativeと独立native PEG入口を区別し、peg-frontierの別列は維持する。入口が戻る前に入れ子ruleのcustom parserが途中診断を読む経路（ASCIIはJava CP1/Rust CP0、UnicodeはCP2/0）は#881に分離し、成功後はCP2/CP3で一致する。任意IRの成功履歴全般の全面一致は主張しない。#826/#872/#876はCLOSEDを確認、#878はmerge待ちでOPEN。#878のmutationは隔離worktreeの修正前runtimeと更新後corpusでJava oracleテストは成功、Rust照合は両hostともPlainSeq2-directのCP2→0で失敗。各host15168観測中512行の成功直後の診断CPだけが変わり、修正済みの診断差は0行。PR #882のレビューでJava実測18経路432行（'a'単独rule・EOF、literal後のrule呼出し、末尾optional/反復/先読み、@longestChoice/@predictiveChoice、Unicode反復）を追加し、計176経路4224行・33792観測で診断差0行。修正の呼出しを外すと各host16896観測中19経路608行が変わる。",
+      "observation": "JavaのgetParseFailureDiagnosticsは実失敗のfarthestFailureOffsetを優先し、なければstartParse/endParse/consume/matchOnlyが保存したmaxReachedOffsetを返す。#877ではRustの成功記録からclassic_max_reached.is_some()の条件を除き、native UNTILの失敗試行も既存cold helperで集約した。aab/bbはCP1、a😀のEOFはCP2、Helper2+azbはCP2、Outer2+azxはCP3。Java runtimeは不変。frame-startに5経路120行、nestedに32経路768行をJava実測から追加し、既存oracle2760/1896行を維持した。#877時点の記録点は成功したtransaction frameだけで、その外のChain/literalの最終消費は#878で外部入口parse_expressionの成功時にcold helperへ記録する。PlainSeq2 direct/prior・TailSeq direct・literal単独・Unicodeと対照47経路1128行をJava実測から追加し、既存2664行は不変。nestedは計158経路3792行、両host・通常/mapping・Chain対照の30336観測で診断差0行。差分表316行はbyte単位で不変、frame-start2880行と差分表81行も維持する。全入力に通常/Classic・初期reset2・memo2・診断3を含む。成否・両cursor・reset・後続診断/成否・memo hitは修正前後で全行不変。#877は既存Detailed transactionガード内の比較除去のみだったが、#878では入口ごとに分岐1つ増える（DETAILED_ON_FAILUREも比較1つ増加）。既存入口の診断分岐はClassic切替専用のため通常呼出には流用できない。解析長に比例しない外部入口の費用として指示役が#197の範囲内と許可した。ノードごとの走査・照合・transactionは不変、Classic・native PEG式入口・lexing・CatchLabelsはcold helperで除外、DETAILED_ON_FAILUREの結果も不変。新しいfield/cache/割当/再帰経路はなく性能再計測なし。生成器nativeと独立native PEG入口を区別し、peg-frontierの別列は維持する。入口が戻る前に入れ子ruleのcustom parserが途中診断を読む経路は#881で観測時点の意図した差と決定。Rustは記録済みtransaction frame/入れ子入口と実失敗だけを反映する下限（Rust≤Java）で、外部入口から戻った後は一致する。Javaはconsume/startParse等で全消費を追跡し、Rustの記録点はその部分集合である。実失敗済みなら途中も一致し、読み取り自体は後続結果を変えない。値で受理を変えるcustom parser・native PEG式入口・lexingの全面一致はこの契約に含めない。任意IRの成功履歴全般の全面一致は主張しない。#826/#872/#876はCLOSEDを確認、#878はCLOSED。#878のmutationは隔離worktreeの修正前runtimeと更新後corpusでJava oracleテストは成功、Rust照合は両hostともPlainSeq2-directのCP2→0で失敗。各host15168観測中512行の成功直後の診断CPだけが変わり、修正済みの診断差は0行。PR #882のレビューでJava実測18経路432行（'a'単独rule・EOF、literal後のrule呼出し、末尾optional/反復/先読み、@longestChoice/@predictiveChoice、Unicode反復）を追加し、計176経路4224行・33792観測で診断差0行。修正の呼出しを外すと各host16896観測中19経路608行が変わる。 #881の手組み公開grammar probeは8経路×ASCII/Unicode×通常/Classic×reset2×memo2×診断3の384行。Java実測oracleと途中CP全行表を固定し、途中48行だけ異なる（全行Rust≤Java、実失敗済み144行は同値）。最終CP/成否/両cursor/reset/後続解析とmemo hitは全列完全一致。各hostで読み取りあり/なしを比較し、failure hitはSAFE_FAILURESで0→1→2、success hitは0。oracle最終CP+1とRust途中値>Javaの2mutationを検出。生成custom adapter loweringは新probeの対象外、既存nestedの両host×通常/mapping対照を維持。runtimeはdoc commentだけを変更しノード処理追加なし。反例なし、新issueなし。#881はmerge待ちでOPEN。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/frame-start-inputs.tsv",
@@ -1700,7 +1701,13 @@
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NestedCandidateBoundaryConformanceTest.java",
         "rust/unlaxer-runtime/src/lib.rs",
         "docs/peg-assertions.md",
-        "rust/unlaxer-runtime/tests/prior_matched_diagnostics.rs"
+        "rust/unlaxer-runtime/tests/prior_matched_diagnostics.rs",
+        "conformance/chain-reset-after-failure/mid-parse-inputs.tsv",
+        "conformance/chain-reset-after-failure/mid-parse-java.tsv",
+        "conformance/chain-reset-after-failure/mid-parse-observations.tsv",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/MidParseDiagnosticsConformanceTest.java",
+        "rust/unlaxer-runtime/tests/mid_parse_diagnostics.rs",
+        "rust/unlaxer-runtime/tests/support/mid_parse_diagnostics.rs"
       ]
     }
   ],
@@ -2250,6 +2257,16 @@
       },
       "entries": [
         "java-first-exclusion-reset"
+      ]
+    },
+    {
+      "path": "conformance/chain-reset-after-failure/mid-parse-observations.tsv",
+      "fields": {
+        "javaIntermediateCP": 1,
+        "rustIntermediateCP": 1
+      },
+      "entries": [
+        "plain-success-diagnostics"
       ]
     }
   ],

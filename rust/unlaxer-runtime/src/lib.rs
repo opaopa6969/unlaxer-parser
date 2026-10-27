@@ -276,7 +276,7 @@ pub enum Expr {
         alternative: Box<Expr>,
         labels: Vec<&'static str>,
     },
-    /// Undeclared custom parser: [`Diagnostics::Auto`] conservatively uses `Detailed`.
+    /// Undeclared custom parser: Auto uses Detailed. For intermediate reads see [`ParseContext::failure`].
     Custom(fn(&mut ParseContext<'_>) -> ParseResult),
     /// Custom parser with a caller-supplied contract for automatic diagnostics.
     /// Deferred diagnostics require `reads_diagnostics: false` and `replayable: true`.
@@ -889,6 +889,8 @@ const _: () = {
 
 /// Shared entry point for handwritten and generated parsers. Use context.parse(parser)
 /// when calling a custom implementation so failed calls roll back transactional state.
+/// Inside a grammar callback, success diagnostics can lag Java until the enclosing entry
+/// returns; see [`ParseContext::failure`]. Reading diagnostics itself has no parse effects.
 pub trait Parser {
     fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult;
     /// Classic entry. Existing custom parsers retain transactional failure cleanup;
@@ -2526,6 +2528,23 @@ impl<'a> ParseContext<'a> {
         self.raised
     }
 
+    /// Returns a snapshot of the current syntax diagnostic in code-point offsets.
+    /// Reading it does not advance cursors, reset state, replay parsing or change memo hits.
+    /// Actual syntax failures take precedence over the successful-reach fallback; resource,
+    /// name and raised failures retain their own precedence.
+    ///
+    /// In the Java-compatible grammar path, a custom parser reading this **before the
+    /// enclosing public entry returns** sees only reach already recorded by completed
+    /// transaction frames / nested entries and actual failures. Unlike Java's per-consume
+    /// tracking, unrecorded successful consumption is absent: the intermediate success
+    /// offset is a lower bound (Rust <= Java), not a live cursor or a final diagnostic.
+    /// Once an actual syntax failure has been recorded, its offset agrees with Java even
+    /// during parsing. After the public grammar entry returns, the final offset agrees.
+    /// This intentional observation-time difference (#881) avoids per-node work under #197.
+    /// It does not extend the grammar contract to the native PEG [`Self::parse`] entry,
+    /// lexing sessions, or arbitrary custom code that changes acceptance based on the value.
+    /// [`Diagnostics::DetailedOnFailure`] on a low-level context keeps empty diagnostics
+    /// (offset zero) and this accessor never triggers a detailed retry.
     pub fn failure(&self) -> ParseError {
         if let Some(error) = &self.resource_failure {
             return error.clone();
@@ -2614,6 +2633,8 @@ impl<'a> ParseContext<'a> {
     /// Temporarily installs grammar rules/trivia policy; user state and input are shared.
     /// This accepts a prefix. Use an EOF parser or parse_detailed for full-input acceptance.
     /// Node rule IDs are local to this grammar; map each returned root with its own mapper.
+    /// Custom callbacks observe intermediate success diagnostics until this entry returns;
+    /// see [`Self::failure`] for the Java/Rust observation-time contract.
     pub fn parse_grammar(
         &mut self,
         rules: Vec<Rule>,
