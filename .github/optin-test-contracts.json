@@ -1,4 +1,12 @@
 {
+  "ubnf-authoring": {
+    "description": "maven.yml / vsix: 実 Java と JVM 不要 Rust の UBNF authoring stdio 契約。",
+    "reports": ["unlaxer-dsl/ubnf-vscode/target/surefire-reports"],
+    "properties": {"rustConformance": "true"},
+    "required": {
+      "org.unlaxer.dsl.lsp.ubnf.UbnfAuthoringProtocolConformanceTest": ["authoringDataMatchesTheJavaReference", "nativeAndJavaServersShareAuthoringFixtures"]
+    }
+  },
   "cross-language": {
     "python_unittests": ["scripts.tests.test_java_api_parity"],
     "description": "maven.yml / rust: Java21・Rust1.85 共通適合性、frontend、意味・位置・IDE、token stream 計測の実行。実 Tiny Portability は downstream が担当する。性能判定は追加しない。",

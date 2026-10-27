@@ -344,6 +344,7 @@ pub struct Resolver {
     lock: Option<Value>,
     artifacts: BTreeMap<String, Value>,
     loaded_bytes: usize,
+    sources: BTreeMap<PathBuf, String>,
 }
 fn normalize(path: &Path) -> PathBuf {
     let mut result = PathBuf::new();
@@ -367,6 +368,18 @@ impl Resolver {
             lock: None,
             artifacts: BTreeMap::new(),
             loaded_bytes: 0,
+            sources: BTreeMap::new(),
+        }
+    }
+    /// Read-only editor snapshots for local modules. Verified package sources
+    /// always take precedence; these buffers never replace manifest/lock/artifacts.
+    pub fn with_sources(grammar: &Path, sources: BTreeMap<PathBuf, String>) -> Self {
+        Self {
+            sources: sources
+                .into_iter()
+                .map(|(p, s)| (normalize(&p), s))
+                .collect(),
+            ..Self::new(grammar)
         }
     }
     fn lock(&mut self) -> Result<&Value, String> {
@@ -518,6 +531,9 @@ impl Resolver {
     }
     pub fn read(&mut self, path: &Path) -> Result<String, String> {
         let Some(owner) = self.owner(path)? else {
+            if let Some(source) = self.sources.get(&normalize(path)) {
+                return Ok(source.clone());
+            }
             return std::fs::read_to_string(path).map_err(|e| e.to_string());
         };
         let value = self.loaded(&owner)?;
