@@ -16,6 +16,21 @@ pub struct Step {
     /// Both text fields are None for input/AST steps and cannot both be Some.
     pub projected_text: Option<String>,
 }
+
+enum RequestError {
+    Message(String),
+    ProjectedSpanOutsideSnapshot,
+}
+impl From<String> for RequestError {
+    fn from(message: String) -> Self {
+        Self::Message(message)
+    }
+}
+impl From<&str> for RequestError {
+    fn from(message: &str) -> Self {
+        Self::Message(message.into())
+    }
+}
 #[derive(Clone, Debug)]
 pub struct DebugSource {
     pub text: String,
@@ -176,7 +191,7 @@ impl<B: Backend> Server<B> {
             .cloned()
             .unwrap_or_else(|| json!({}));
         let mut events = vec![];
-        let result: Result<Value, String> = (|| {
+        let result: Result<Value, RequestError> = (|| {
             if request_seq == 0 || message["type"] != "request" || command.is_empty() {
                 return Err("invalid request".into());
             }
@@ -293,7 +308,13 @@ impl<B: Backend> Server<B> {
                         let step = self.current().unwrap();
                         let snapshot = self.snapshot.as_ref().unwrap();
                         let position = snapshot.lsp(step.span.start).map_err(str::to_owned)?;
-                        let end = snapshot.lsp(step.span.end).map_err(str::to_owned)?;
+                        let end = snapshot.lsp(step.span.end).map_err(|error| {
+                            if step.projected_text.is_some() && error == "outside snapshot" {
+                                RequestError::ProjectedSpanOutsideSnapshot
+                            } else {
+                                error.into()
+                            }
+                        })?;
                         vec![
                             json!({"id":0,"name":format!("{} ({}/{})",step.label,self.index+1,self.steps.len()),"line":position.line+self.line_offset+self.line_base,"column":position.character+self.column_base,"endLine":end.line+self.line_offset+self.line_base,"endColumn":end.character+self.column_base,"source":{"path":self.program,"name":std::path::Path::new(&self.program).file_name().unwrap_or_default().to_string_lossy()}}),
                         ]
@@ -344,7 +365,7 @@ impl<B: Backend> Server<B> {
                         ));
                     }
                     for (name, value) in &self.variables {
-                        if name != "runtimeMode" {
+                        if name != "runtimeMode" || self.current().is_none() {
                             variables.push(variable(name, value, "String"));
                         }
                     }
@@ -401,8 +422,14 @@ impl<B: Backend> Server<B> {
                     response["body"] = body;
                 }
             }
-            Err(message) => {
+            Err(RequestError::Message(message)) => {
                 response["message"] = json!(message);
+            }
+            Err(RequestError::ProjectedSpanOutsideSnapshot) => {
+                // LSP4J's generated Java adapter returns a string body, not an ErrorResponse.
+                // Preserve its diagnostic without fabricating JVM-specific stack frames.
+                response["message"] = json!("Internal error.");
+                response["body"] = json!("java.lang.IllegalArgumentException: outside snapshot\n");
             }
         }
         output.push(response);
@@ -472,9 +499,20 @@ impl<B: Backend> Server<B> {
             {
                 return Err("generated text requires a zero-width token anchor".into());
             }
-            snapshot.check(step.span).map_err(str::to_owned)?;
+            // Java retains concatenated terminals whose logical end exceeds the input.
+            // Only stackTrace fails for that step; text and stepping remain available.
+            // Keep rejecting malformed hand-built spans and every other source kind.
+            let projected_overflow = step.projected_text.as_ref().is_some_and(|text| {
+                step.span.end > snapshot.len()
+                    && step.span.end.checked_sub(step.span.start) == Some(text.chars().count())
+            });
+            if !projected_overflow {
+                snapshot.check(step.span).map_err(str::to_owned)?;
+            }
             snapshot.lsp(step.span.start).map_err(str::to_owned)?;
-            snapshot.lsp(step.span.end).map_err(str::to_owned)?;
+            if !projected_overflow {
+                snapshot.lsp(step.span.end).map_err(str::to_owned)?;
+            }
             if step.label.is_empty() {
                 return Err(if self.ast_mode {
                     "empty AST label"

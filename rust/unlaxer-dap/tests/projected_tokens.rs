@@ -153,6 +153,111 @@ fn variables_show_owned_projected_text_not_the_input_slice() {
     std::fs::remove_file(file).unwrap();
 }
 
+#[test]
+fn projected_overflow_fails_only_stack_trace_and_preserves_lifecycle() {
+    static ROWS: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+    let rows = ROWS.get_or_init(|| {
+        serde_json::from_str(include_str!(
+            "../../../docs/fixtures/projected-token-dap/overflow.json"
+        ))
+        .unwrap()
+    });
+    assert_eq!(rows.as_array().unwrap().len(), 4);
+    let file = std::env::temp_dir().join(format!("projected-overflow-{}.txt", std::process::id()));
+    let mut server = Server::new(SharedFixtureBackend(rows));
+    let mut seq = 0;
+    let mut send = |command: &str, args: Value| {
+        seq += 1;
+        server.handle(request(seq, command, args))
+    };
+    send("initialize", json!({}));
+    for row in rows.as_array().unwrap() {
+        let input = row["input"].as_str().unwrap();
+        let tree = fixture::fixture_tree(input, row, Limits::default()).unwrap();
+        let steps = token_steps(&tree).unwrap();
+        for (step, expected) in steps.iter().zip(row["steps"].as_array().unwrap()) {
+            assert_eq!(
+                json!([step.span.start, step.span.end]),
+                json!([expected[2], expected[3]])
+            );
+        }
+        std::fs::write(&file, input).unwrap();
+        for resume in ["next", "continue"] {
+            let launch = send(
+                "launch",
+                json!({"program":file,"fixture":row["name"],"stopOnEntry":true,"runtimeMode":"inspection-token"}),
+            );
+            assert_eq!(launch[0]["success"], true);
+            let configured = send("configurationDone", json!({}));
+            assert_eq!(configured.len(), 2);
+            assert_eq!(configured[1]["event"], "stopped");
+            assert_eq!(configured[1]["body"]["reason"], "entry");
+            for (i, expected) in row["steps"].as_array().unwrap().iter().enumerate() {
+                let overflow = expected[4].is_null();
+                let frames = send("stackTrace", json!({"threadId":1}));
+                assert_eq!(frames.len(), 1, "no event on stackTrace failure");
+                assert_eq!(frames[0]["success"], !overflow);
+                if overflow {
+                    assert_eq!(frames[0]["message"], "Internal error.");
+                    assert_eq!(
+                        frames[0]["body"],
+                        "java.lang.IllegalArgumentException: outside snapshot\n"
+                    );
+                } else {
+                    let frame = &frames[0]["body"]["stackFrames"][0];
+                    for (key, value) in ["line", "column", "endLine", "endColumn"]
+                        .iter()
+                        .zip(&expected.as_array().unwrap()[4..])
+                    {
+                        assert_eq!(&frame[key], value);
+                    }
+                }
+                let scopes = send("scopes", json!({"frameId":0}));
+                assert_eq!(scopes[0]["body"]["scopes"][0]["name"], "Current Token");
+                let vars = send("variables", json!({"variablesReference":1}));
+                assert_eq!(vars[0]["body"]["variables"][0]["name"], expected[0]);
+                assert_eq!(
+                    vars[0]["body"]["variables"][0]["value"],
+                    format!("\"{}\"", expected[1].as_str().unwrap())
+                );
+                let command = if overflow { resume } else { "next" };
+                let moved = send(command, json!({"threadId":1}));
+                assert_eq!(moved[0]["success"], true);
+                if i + 1 == steps.len() || command == "continue" {
+                    assert_eq!(moved.len(), 4);
+                    assert_eq!(moved[1]["body"]["category"], "stdout");
+                    assert_eq!(moved[2]["event"], "terminated");
+                    assert_eq!(moved[3]["event"], "exited");
+                    assert_eq!(moved[3]["body"]["exitCode"], 0);
+                    break;
+                }
+                assert_eq!(moved.len(), 2);
+                assert_eq!(moved[1]["body"]["reason"], "step");
+            }
+            assert_eq!(
+                send("stackTrace", json!({"threadId":1}))[0]["body"]["stackFrames"],
+                json!([])
+            );
+            assert_eq!(
+                send("scopes", json!({"frameId":0}))[0]["body"]["scopes"],
+                json!([])
+            );
+            let ended = send("variables", json!({"variablesReference":1}));
+            assert_eq!(
+                ended[0]["body"]["variables"],
+                json!([
+                    {"name":"runtimeMode","value":"inspection-token","type":"String","variablesReference":0},
+                    {"name":"steppingMode","value":"token","type":"String","variablesReference":0}
+                ])
+            );
+            for command in ["next", "continue"] {
+                assert_eq!(send(command, json!({"threadId":1}))[0]["success"], false);
+            }
+        }
+    }
+    std::fs::remove_file(file).unwrap();
+}
+
 fn projected(context: &mut ParseContext<'_>) -> ParseResult {
     context.declare_complete_token_trace();
     let span = Span { start: 0, end: 2 };
@@ -268,18 +373,32 @@ impl Backend for FailureBackend {
         let case = args["failure"].as_str().unwrap();
         if matches!(
             case,
-            "dual-source" | "crlf-span" | "outside" | "reversed" | "ast"
+            "dual-source"
+                | "crlf-span"
+                | "crlf-end"
+                | "outside"
+                | "outside-start"
+                | "reversed"
+                | "input-overflow"
+                | "generated-overflow"
+                | "ast"
         ) {
             return Ok(vec![Step {
                 label: "ProjectedToken".into(),
                 span: match case {
                     "crlf-span" => Span { start: 2, end: 3 },
+                    "crlf-end" => Span { start: 0, end: 2 },
                     "outside" => Span { start: 0, end: 20 },
+                    "outside-start" => Span { start: 5, end: 6 },
+                    "input-overflow" => Span { start: 3, end: 5 },
+                    "generated-overflow" => Span { start: 5, end: 5 },
                     "reversed" => Span { start: 2, end: 1 },
                     _ => Span { start: 0, end: 1 },
                 },
-                generated_text: (case == "dual-source").then(|| "repair".into()),
-                projected_text: Some("é".into()),
+                generated_text: matches!(case, "dual-source" | "generated-overflow")
+                    .then(|| "repair".into()),
+                projected_text: (!matches!(case, "input-overflow" | "generated-overflow"))
+                    .then(|| "é".into()),
             }]);
         }
         let options = if case == "missing" {
@@ -327,7 +446,11 @@ fn trace_limit_resource_and_incomplete_failures_terminate_without_stopping() {
         ("dual-source", "unambiguous"),
         ("ast", "unambiguous"),
         ("crlf-span", "CRLF"),
+        ("crlf-end", "CRLF"),
         ("outside", "outside snapshot"),
+        ("outside-start", "outside snapshot"),
+        ("input-overflow", "outside snapshot"),
+        ("generated-overflow", "outside snapshot"),
         ("reversed", "outside snapshot"),
     ] {
         assert_eq!(
