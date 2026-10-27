@@ -593,6 +593,8 @@ rule 単位 cache を変更したりしない。これらは安全性・性能�
   `failure_hits` / `success_hits` も上記 getter の値であり、同じ host 依存の契約になる。
   Java の `Parsed`、Rust の `ParseMatch` / `ParseDiagnostic` / Classic `TokenInfo` 自体には
   hit フィールドはない。hit は構文診断の位置や成否ではなく、cache の再利用を調べる統計である。
+- Java の `PackratMemoTable.failureHits()` / `successHits()` と Rust の両 getter の Javadoc / rustdoc にも、
+  host 依存で言語間の比較に使えないことを記す。
 
 公開されているため「利用者には見えない値」とは扱わない。host・生成器・安全判定・診断設定・
 候補除外・cache 予算・trace の条件が変われば hit 数も変わり得る。言語間の互換性判定や性能順位に
@@ -640,7 +642,8 @@ Rust の inline group には対応する cache probe がない。trace 用コー
 | Longest-text / Unique-text（qb）、同 partial（azb、先読み a） | 成功候補の再実行で success 1 / 0 となる行 |
 | Outer-nonstarter（+b、先読み +、3回失敗） | AUTO / DETAILED は初期 false: 5 / 2、true: 4 / 2。DETAILED_ON_FAILURE は 0 / 2 |
 | Outer-failure（ab、先読み a、3回失敗） | 診断3設定とも初期 false: 5 / 2、true: 4 / 2 |
-| Outer-no-prefix（ab、先読みなし）、Outer-success（hxb） | 先読みなしの失敗と成功の対照。生の値を TSV に保持 |
+| Outer-no-prefix（ab、先読みなし、3回失敗） | 先読みなしの失敗の対照。診断3設定とも初期 false: 5 / 2、true: 4 / 2 |
+| Outer-success（hxb） | 成功の対照。hit は両 host とも 0 / 0 で差分表に行はない |
 | frame-start の Root-longest-negative（ab、先読み a、通常、初期 false） | 診断3設定とも success 1 / 0 |
 
 Outer の遅延診断0 hit は、候補の FIRST 除外で probe 自体を省く入力の値である。
