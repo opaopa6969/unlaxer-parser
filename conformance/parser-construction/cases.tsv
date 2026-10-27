@@ -12,6 +12,10 @@
 # nothing in a direct context). ruleStack is the
 # failure stack (outermost first, rule@startCP) and is only recorded under DETAILED/AUTO.
 # original = Parsed.getOriginalTokens(); committed = root tokens; leaves = retained terminal tokens.
+# Only these root and leaf tokens are compared across languages; intermediate nodes are not
+# (Java keeps combinator tokens, Rust Fragments omit them: the meta-function boundary, #851).
+# Each test instead requires the whole original CST, intermediate nodes included, to be equal
+# across its own construction routes (Rust groups the Custom-source NotProbe separately).
 # A Rust rule node has no Java counterpart (a Java rule is the combinator itself), so Rust reads
 # original from the rule's expression node, as classic_memo.rs does.
 # id	root	inputHex	kind	invert	success	consumedCP	matchedCP	failureCP	original	committed	leaves	ruleStack

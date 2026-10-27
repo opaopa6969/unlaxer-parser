@@ -52,6 +52,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 ### Added
 
 - Rust runtime に構築時の名前解決 `RuleNames` / `RuleNameError` を追加し、Java の Class/Supplier factory・lazy children・`ReferenceByNameParser`・`ReferenceParser` の移植経路を Java 6 経路・Rust 5 経路の共通 corpus（`conformance/parser-construction`）で固定した (#845)。[移植の契約](docs/rust-shared-grammar.md#java-parser構築からの移植845)。
+- Rust の `RuleNames::share` は、規則本体の `Expr::Rule(index)` が rules の範囲外なら `RuleNameError::OutOfRange` で拒否する。別の table で作った参照が、parse 時に黙って choice の次の候補へ進むことがなくなる。共通 corpus に RootParserIndicator の範囲、名前参照の hit と root の cache、kind が null の key、入れ子の Chain/Choice の filter、LazyInstance の meta token を追加した (#845)。
 - cut とラベル付き失敗を Java/Rust runtime および UBNF の `COMMIT` / `LABEL` / `CATCH` に追加 (PR #707、#710、issue #700)。確定エラーは recovery 境界へ、ラベル付き失敗は指定した CATCH へ伝わる。[契約](docs/cut-and-labeled-failures.md)。
 - 一階の引数付き規則を両 frontend で生成前に単相化し、`F(=x, y)` の値渡し引数を `CAPTURE_SCOPE` / `CAPTURE` / `SAME_AS` へ展開する (PR #708、#711、issue #701、#704)。[引数付き規則](docs/parameterized-rules.md)、[値渡し](docs/call-by-value-arguments.md)。
 - FIRST 集合と外側の文脈による cut 位置の lint、規則単位で opt-in する `@autoCommit` を追加。文法全体の `@whitespace: javaStyle` にも対応する (PR #724、#731、issue #702、#728)。対象外の警告は lint API から取得する。[条件と制限](docs/auto-commit.md)。

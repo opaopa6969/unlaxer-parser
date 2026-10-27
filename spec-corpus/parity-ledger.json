@@ -1525,7 +1525,7 @@
       "issues": [
         845
       ],
-      "observation": "construction.tsv の java/rust 列は各言語の構築観測。同じ契約の行は同値を共有し、`-` と値の違いは意図した差: Java は parser instance・親pointer・反射名・PseudoRoot・共有sourceの反転状態を持ち、Rust は構築時に名前を Rule index へ解決（RuleNames の重複/未登録/順序不一致は構築エラー）し、反転は context の token_mode に置く。左再帰は両方とも資源上限（Java ParseLimitException 1024、Rust rule nesting 256）。parse 結果（cursor・CST・失敗位置・RuleStack）は cases.tsv で差を許さない。",
+      "observation": "construction.tsv の java/rust 列は各言語の構築観測。同じ契約の行は同値を共有し、`-` と値の違いは意図した差: Java は parser instance・親pointer・反射名・PseudoRoot・共有sourceの反転状態を持ち、Rust は構築時に名前を Rule index へ解決（RuleNames の重複/未登録/順序不一致は構築エラー）し、反転は context の token_mode に置く。左再帰は両方とも資源上限（Java ParseLimitException 1024、Rust rule nesting 256）。RootParserIndicator の範囲は、Java は親走査、Rust は scope ごとの grammar と RuleNames で表し、受理と RuleStack は一致する。名前参照の hit と root は Java では instance に cache され、Rust の共有済み grammar も Rule ID を変えない。parse 結果（cursor・根と葉の CST・失敗位置・RuleStack）は cases.tsv で差を許さない。中間 node は言語間で比べず、各言語で構築経路間の一致を検査する。Java の共有 graph の可変状態について、並行時の同値は主張しない。",
       "evidence": [
         "conformance/parser-construction/cases.tsv",
         "conformance/parser-construction/construction.tsv",

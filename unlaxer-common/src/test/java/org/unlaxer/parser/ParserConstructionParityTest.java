@@ -12,6 +12,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -23,11 +24,14 @@ import java.util.stream.Collectors;
 import org.junit.Test;
 import org.unlaxer.Name;
 import org.unlaxer.Parsed;
+import org.unlaxer.ParserHierarchy;
 import org.unlaxer.ParserNameContext;
 import org.unlaxer.StringSource;
+import org.unlaxer.Tag;
 import org.unlaxer.Token;
 import org.unlaxer.TokenKind;
 import org.unlaxer.ast.ASTNodeKind;
+import org.unlaxer.context.CreateMetaTokenSpecifier;
 import org.unlaxer.context.Memoization;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.context.ParseLimitException;
@@ -37,11 +41,14 @@ import org.unlaxer.listener.OutputLevel;
 import org.unlaxer.parser.combinator.AbstractPropagatableSource;
 import org.unlaxer.parser.combinator.Chain;
 import org.unlaxer.parser.combinator.Choice;
+import org.unlaxer.parser.combinator.Commit;
 import org.unlaxer.parser.combinator.InvertMatchPropagationStopper;
 import org.unlaxer.parser.combinator.LazyChain;
 import org.unlaxer.parser.combinator.LazyChoice;
+import org.unlaxer.parser.combinator.LazyZeroOrMore;
 import org.unlaxer.parser.combinator.MatchOnly;
 import org.unlaxer.parser.combinator.NotPropagatableSource;
+import org.unlaxer.parser.combinator.ZeroOrMore;
 import org.unlaxer.parser.elementary.WordParser;
 import org.unlaxer.parser.referencer.ReferenceByNameParser;
 import org.unlaxer.parser.referencer.ReferenceParser;
@@ -317,6 +324,23 @@ public class ParserConstructionParityTest {
     }
   }
 
+  /**
+   * The whole original CST including intermediate combinator nodes: rule names for GrammarRule
+   * parsers, otherwise the combinator kind. cases.tsv compares root and leaves across languages;
+   * this shape is compared across the construction routes of one language.
+   */
+  private static String shape(Token token) {
+    Parser parser = token.parser;
+    Class<?> type = parser.getClass().isAnonymousClass() ? parser.getClass().getSuperclass() : parser.getClass();
+    String label = parser instanceof GrammarRule ? GrammarRule.nameOf(parser) : type.getSimpleName();
+    if (token.getOriginalChildren().isEmpty()) {
+      return label + "@" + token.source.offsetFromRoot().value() + ":" + token.source.codePointLength().value();
+    }
+    return label + token.getOriginalChildren().stream()
+        .map(ParserConstructionParityTest::shape)
+        .collect(Collectors.joining(",", "(", ")"));
+  }
+
   private static String render(java.util.Optional<RuleStack> stack) {
     return stack.map(value -> value.frames().stream()
         .map(frame -> frame.rule() + "@" + frame.start())
@@ -339,6 +363,7 @@ public class ParserConstructionParityTest {
     List<String[]> rows = rows("cases.tsv", 13);
     assertEquals(23, rows.size());
     List<String> failures = new ArrayList<>();
+    Map<String, String> shapes = new LinkedHashMap<>();
     for (String variantName : VARIANTS) {
       // One graph per route, reused by every row, memo policy and diagnostics mode.
       Function<String, Parser> rules = variant(variantName);
@@ -368,6 +393,11 @@ public class ParserConstructionParityTest {
                   c[9], c[10], c[11], detailed ? c[12] : "~");
               assertEquals(label, expected, actual);
               assertEquals(label, 1, context.getTokenStack().size());
+              String tree = context.getCurrent().getTokens().stream()
+                  .map(ParserConstructionParityTest::shape)
+                  .collect(Collectors.joining(";"));
+              String first = shapes.putIfAbsent(c[0] + "/" + memo + "/" + diagnostics, tree);
+              assertEquals(label + " intermediate CST differs from " + VARIANTS.get(0), first == null ? tree : first, tree);
             } catch (AssertionError failure) {
               failures.add(failure.getMessage());
             }
@@ -410,6 +440,101 @@ public class ParserConstructionParityTest {
 
     public EagerCycleParser() {
       super(new Parsers(EagerCycleParser.class));
+    }
+  }
+
+  /** A RootParserIndicator scope: references below it search only the scope's subtree. */
+  static final class ScopeChoice extends Choice implements RootParserIndicator, GrammarRule {
+    private static final long serialVersionUID = 1L;
+
+    ScopeChoice(Parser... children) {
+      super(Name.of("Scope"), children);
+    }
+
+    @Override
+    public String grammarRuleName() {
+      return "Scope";
+    }
+  }
+
+  /**
+   * Outer ::= Scope; Scope ::= '(' Scope ')' | Item | 'x'; Item ::= 'a' is registered outside the
+   * scope. With the indicator, Scope still resolves itself but not the outer Item.
+   */
+  private static Parser scopeGraph(boolean indicator, Function<String, Parser> reference) {
+    Parser[] alternatives = {
+        new Chain(w("("), reference.apply("Scope"), w(")")), reference.apply("Item"), w("x")};
+    Parser scope = indicator ? new ScopeChoice(alternatives) : new NamedChoice("Scope", alternatives);
+    Parser outer = new NamedChain("Outer", scope);
+    new PseudoRootParser(new Parsers(outer, new NamedChain("Item", w("a"))));
+    return outer;
+  }
+
+  /** The same observation in every memo policy and diagnostics mode, or the differing labels. */
+  private static String everyOption(Function<ParseContext, String> observation, String input) {
+    Set<String> observed = new java.util.TreeSet<>();
+    for (Memoization memo : Memoization.values()) {
+      for (ParseOptions.Diagnostics diagnostics : ParseOptions.Diagnostics.values()) {
+        try (ParseContext context = ParseContext.withOptions(StringSource.createRootSource(input),
+            ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+          observed.add(observation.apply(context));
+        }
+      }
+    }
+    return String.join("|", observed);
+  }
+
+  private static String scopeObservation(Function<String, Parser> reference) {
+    Parser scoped = scopeGraph(true, reference);
+    Parser control = scopeGraph(false, reference);
+    // A failure, then a success on the same graph, then the control without the indicator.
+    return String.join(";", everyOption(context -> prefix(scoped, context), "a"),
+        everyOption(context -> prefix(scoped, context), "(x)"),
+        everyOption(context -> prefix(control, context), "a"));
+  }
+
+  private static String prefix(Parser parser, ParseContext context) {
+    Parsed parsed = parser.parse(context);
+    return parsed.isSucceeded() + "/" + context.getConsumedPosition().value();
+  }
+
+  /** A marked parser: neither marker has a caller, so construction and parsing ignore them. */
+  public static final class MarkedParser extends LazyChain implements StaticParser, Initializable {
+    private static final long serialVersionUID = 1L;
+    static final AtomicInteger initializations = new AtomicInteger();
+
+    @Override
+    public void initialize() {
+      initializations.incrementAndGet();
+    }
+
+    @Override
+    public Parsers getLazyParsers() {
+      return new Parsers(w("m"));
+    }
+  }
+
+  /** Writes parse-local state into the context it parses with. */
+  static final class Recording extends Chain {
+    private static final long serialVersionUID = 1L;
+
+    Recording(Parser child) {
+      super(child);
+    }
+
+    @Override
+    public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
+      parseContext.getGlobalScopeTreeMap().put(Name.of("seen"), Boolean.TRUE);
+      return super.parse(parseContext, tokenKind, invertMatch);
+    }
+  }
+
+  private static String metaShape(Parser parser, CreateMetaTokenSpecifier meta) {
+    try (ParseContext context = new ParseContext(StringSource.createRootSource("aa"), meta)) {
+      assertTrue(parser.parse(context).isSucceeded());
+      return context.getCurrent().getTokens().stream()
+          .map(ParserConstructionParityTest::shape)
+          .collect(Collectors.joining(";"));
     }
   }
 
@@ -653,6 +778,123 @@ public class ParserConstructionParityTest {
       case "child-occurs":
         return w("a").getChildOccurs() + ";" + new MatchOnly(w("a")).getChildOccurs() + ";"
             + new Chain(w("a")).getChildOccurs();
+      case "root-indicator-scope-by-name":
+        return scopeObservation(target -> new ReferenceByNameParser(Name.of(target)));
+      case "root-indicator-scope-predicate":
+        return scopeObservation(target -> ReferenceParser.of(Name.of(target)));
+      case "root-indicator-root": {
+        Parser reference = new ReferenceByNameParser(Name.of("Item"));
+        new PseudoRootParser(new Parsers(new NamedChain("Outer", new ScopeChoice(reference)),
+            new NamedChain("Item", w("a"))));
+        return reference.getRoot().getName().getSimpleName() + ";"
+            + reference.findFirstToParent(parser -> parser.getName().equals(Name.of("Outer"))).isPresent();
+      }
+      case "root-indicator-path": {
+        Parser leaf = w("x");
+        Parser scope = new ScopeChoice(new Chain(Name.of("Inner"), leaf));
+        new PseudoRootParser(new Parsers(new NamedChain("Outer", scope)));
+        return leaf.findParents(parser -> false).size() + ";" + leaf.getPath() + ";"
+            + ParserHierarchy.isRoot.test(scope) + ";"
+            + ParserPrinter.get(leaf, OutputLevel.detail);
+      }
+      case "root-indicator-rule-stack": {
+        Parser outer = scopeGraph(true, target -> new ReferenceByNameParser(Name.of(target)));
+        try (ParseContext context = ParseContext.withOptions(StringSource.createRootSource("y"),
+            ParseOptions.withMemoization(Memoization.OFF).withDiagnostics(ParseOptions.Diagnostics.DETAILED))) {
+          assertFalse(outer.parse(context).isSucceeded());
+          return render(context.getRuleStack());
+        }
+      }
+      case "by-name-hit-cached": {
+        Parser use = new NamedChain("Use", new ReferenceByNameParser(Name.of("Item")));
+        Parser top = new NamedChoice("Top", use, new NamedChain("Item", w("a")));
+        String first = parse(use, "a");
+        top.getChildren().add(1, new NamedChain("Item", w("b")));
+        // A reference created after the change resolves the new first Item.
+        Parser fresh = new NamedChain("Fresh", new ReferenceByNameParser(Name.of("Item")));
+        fresh.setParent(top);
+        return first + ";" + parse(use, "b") + ";" + parse(use, "a") + ";" + parse(fresh, "b");
+      }
+      case "root-cache-after-reparent": {
+        Parser inner = new NamedChain("Inner", new ReferenceByNameParser(Name.of("Late")));
+        String before = parse(inner, "x");
+        new NamedChain("NewRoot", inner, new NamedChain("Late", w("x")));
+        Parser attached = new NamedChain("Inner", new ReferenceByNameParser(Name.of("Late")));
+        new NamedChain("NewRoot", attached, new NamedChain("Late", w("x")));
+        return before + ";" + parse(inner, "x") + ";" + parse(attached, "x");
+      }
+      case "class-and-kind-null-kind":
+        return failure(() -> new ParserFactoryByClass.ClassAndKind(null, KindParser.class)) + ";"
+            + failure(() -> ParserFactoryByClass.get((ASTNodeKind) null, KindParser.class));
+      case "class-and-kind-equality": {
+        ParserFactoryByClass.ClassAndKind kindless = new ParserFactoryByClass.ClassAndKind(KindParser.class);
+        ParserFactoryByClass.ClassAndKind other = new ParserFactoryByClass.ClassAndKind(ASTNodeKind.Other, KindParser.class);
+        return kindless.equals(new ParserFactoryByClass.ClassAndKind(KindParser.class)) + ";"
+            + kindless.equals(other) + ";"
+            + other.equals(new ParserFactoryByClass.ClassAndKind(ASTNodeKind.Other, KindParser.class));
+      }
+      case "new-without-recursive-mixed": {
+        Parser excluded = w("c");
+        Chain chain = new Chain(Name.of("Outer"), new Choice(Name.of("Nested"), w("a"), excluded, w("z")), w("b"),
+            excluded);
+        Parser filtered = (Parser) chain.newWithoutRecursive(parser -> parser == excluded);
+        Parser kept = filtered.getChildren().get(0);
+        return filtered.getClass().getSimpleName() + ":" + filtered.getName().getSimpleName() + "("
+            + kept.getClass().getSimpleName() + ":" + kept.getName().getSimpleName() + ");"
+            + parse(filtered, "ab") + ";" + parse(filtered, "zb") + ";" + parse(filtered, "cb");
+      }
+      case "new-without-recursive-tags": {
+        Parser excluded = w("c");
+        Choice nested = new Choice(Name.of("Nested"), w("a"), excluded);
+        nested.addTag(Tag.of("T"));
+        Chain chain = new Chain(nested, w("b"));
+        HasChildrenParser filtered = chain.newWithoutRecursive(parser -> parser == excluded);
+        return nested.getTags().size() + ";" + filtered.getChildren().get(0).getTags().size();
+      }
+      case "new-without-recursive-single-child": {
+        Parser excluded = w("c");
+        Parser commit = new Commit(excluded, "m");
+        Chain chain = new Chain(commit, w("b"));
+        String emptied = failure(() -> chain.newWithoutRecursive(parser -> parser == excluded));
+        return emptied + ";" + parse((Parser) chain.newWithoutRecursive(parser -> parser == commit), "b");
+      }
+      case "lazy-instance-meta-token": {
+        Parser eager = new Chain(new ZeroOrMore(w("a")));
+        Parser lazy = new Chain(new LazyZeroOrMore() {
+          private static final long serialVersionUID = 1L;
+
+          @Override
+          public Supplier<Parser> getLazyParser() {
+            return () -> w("a");
+          }
+
+          @Override
+          public Optional<Parser> getLazyTerminatorParser() {
+            return Optional.empty();
+          }
+        });
+        return metaShape(eager, CreateMetaTokenSpecifier.createMetaOn) + "|"
+            + metaShape(eager, CreateMetaTokenSpecifier.createMetaOff) + "|"
+            + metaShape(lazy, CreateMetaTokenSpecifier.createMetaOff);
+      }
+      case "marker-no-effect": {
+        MarkedParser.initializations.set(0);
+        MarkedParser marked = Parser.get(MarkedParser.class);
+        return MarkedParser.initializations.get() + ";" + identity(marked, Parser.get(MarkedParser.class)) + ";"
+            + parse(marked, "m") + ";" + MarkedParser.initializations.get();
+      }
+      case "shared-graph-context-state": {
+        Parser recording = new Recording(w("a"));
+        String first;
+        try (ParseContext context = new ParseContext(StringSource.createRootSource("a"))) {
+          assertTrue(recording.parse(context).isSucceeded());
+          first = String.valueOf(context.getGlobalScopeTreeMap().get(Name.of("seen")));
+        }
+        try (ParseContext context = new ParseContext(StringSource.createRootSource("a"))) {
+          String fresh = context.getGlobalScopeTreeMap().containsKey(Name.of("seen")) ? "present" : "absent";
+          return first + ";" + fresh + ";" + prefix(recording, context);
+        }
+      }
       default:
         throw new AssertionError("unimplemented observation " + id);
     }
@@ -661,7 +903,7 @@ public class ParserConstructionParityTest {
   @Test
   public void constructionAndIdentityObservationsMatchTheSharedTable() throws Exception {
     List<String[]> rows = rows("construction.tsv", 4);
-    assertEquals(39, rows.size());
+    assertEquals(56, rows.size());
     Set<String> ids = rows.stream().map(row -> row[0]).collect(Collectors.toSet());
     assertEquals(rows.size(), ids.size());
     List<String> failures = new ArrayList<>();
