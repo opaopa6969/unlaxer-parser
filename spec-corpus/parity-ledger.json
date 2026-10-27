@@ -25,6 +25,9 @@
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
+    "892": {"state": "OPEN", "title": "parity(dap): projected token の論理 CP 範囲が原文末尾を越えるときの Java/Rust DAP の差"},
+    "899": {"state": "OPEN", "title": "parity(dap): CRLF 内部を指す token 位置で Java は launch 後に局所失敗し Rust は launch 時に拒否する（#892 レビュー）"},
+    "900": {"state": "OPEN", "title": "parity(dap): stackTrace 以外の失敗 response の message / body が Java（LSP4J）と異なる（#892 レビュー）"},
     "864": {"state": "OPEN", "title": "parity(lsp): UBNF authoring serverのRust利用経路をJava基準へ揃える"},
     "885": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の全診断・profile 再設定を Java 契約へ揃える（#864 後続）"},
     "886": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の navigation・編集支援・packageSource と native 配布（#864 後続）"},
@@ -477,7 +480,7 @@
       "title": "parity: 外部入口の成功前に custom parser が読む途中の成功診断 CP が Java と異なる（#878 の制限）"
     },
     "889": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity(dap): consumed leaf の TokenSource::Projected を Rust token DAP で表示するか対象外として記録する"
     }
   },
@@ -1264,9 +1267,10 @@
         111,
         463,
         863,
-        889
+        889,
+        892
       ],
-      "observation": "#863: Rust token_steps は generated text を所有し、原文 anchor をゼロ幅 CP span として表示する。Java の既存 detached source 座標は維持し、tokenSourceSpan hook で PortableTokenMetadata の原文 anchor を渡す。共通6入力・各80停止点の実 stdio と5 rollback ケースで検証。未宣言 custom/不完全 trace の拒否は維持する。 #889: Java の連結 source terminal は実 stdio で到達可能。Rust の Projected 拒否を除去し、text を所有、span を論理 CP 範囲として表示する。8入力・各80停止点、input/generated 混在・本文と原文 slice の相違・空/Unicode/CRLF・逆順・先頭の空 part・breakpoint と5 rollbackケースを共通検証。custom terminal の明示 add_traced_token_node は既存 parser ホットパスに処理を足さず trace 上限を使う。",
+      "observation": "#863: Rust token_steps は generated text を所有し、原文 anchor をゼロ幅 CP span として表示する。Java の既存 detached source 座標は維持し、tokenSourceSpan hook で PortableTokenMetadata の原文 anchor を渡す。共通6入力・各80停止点の実 stdio と5 rollback ケースで検証。未宣言 custom/不完全 trace の拒否は維持する。 #889: Java の連結 source terminal は実 stdio で到達可能。Rust の Projected 拒否を除去し、text を所有、span を論理 CP 範囲として表示する。8入力・各80停止点、input/generated 混在・本文と原文 slice の相違・空/Unicode/CRLF・逆順・先頭の空 part・breakpoint と5 rollbackケースを共通検証。custom terminal の明示 add_traced_token_node は既存 parser ホットパスに処理を足さず trace 上限を使う。 #892: 論理終端の原文超過は launch を拒否せず該当 stackTrace のみ success:false / Internal error. / 文字列 body（outside snapshot 診断）で失敗する。Java/JDK 固有の呼出履歴は比較対象外。4共通入力・各48 session/116停止点で next/continue/breakpoint、variables と終了後の状態を実 stdio 比較し、Java の既存表示と parser ホットパスを維持する。",
       "evidence": [
         "docs/token-trace.md",
         "docs/classic-rust-dap.md",
@@ -1274,9 +1278,25 @@
         "docs/fixtures/generated-token-dap/rollback.json",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/GeneratedTokenDapProtocolConformanceTest.java",
         "docs/fixtures/projected-token-dap/cases.json",
+        "docs/fixtures/projected-token-dap/overflow.json",
         "docs/fixtures/projected-token-dap/rollback.json",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ProjectedTokenDapProtocolConformanceTest.java",
         "rust/unlaxer-dap/tests/projected_tokens.rs"
+      ]
+    },
+    {
+      "id": "dap-token-position-failures",
+      "category": "unresolved",
+      "title": "CRLF 内部の token 位置と stackTrace 以外の失敗 response",
+      "hosts": "Java DAP / Rust DAP・両生成host",
+      "issues": [
+        899,
+        900
+      ],
+      "observation": "#892 のレビューで実 stdio により確認した未修正の差。#899: CRLF の内部を指す Input / Projected token の開始・終端は、Java では launch が成功し、該当 step の stackTrace が inside CRLF で失敗する。breakpoint 探索がその step を通ると continue や breakpoint 付きの configurationDone も失敗する。Rust は launch 時に inside CRLF で拒否する。#900: 不正 thread や終了後の next / continue などの失敗 response は、Java が Internal error. と文字列 body（例外名の先頭行）を返す。Rust は独自の message を返し、body はない。#892 の終端超過による stackTrace の失敗だけを Java の形に揃えた。",
+      "evidence": [
+        "docs/token-trace.md",
+        "rust/unlaxer-dap/src/lib.rs"
       ]
     },
     {

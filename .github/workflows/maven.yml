@@ -244,6 +244,7 @@ jobs:
         test -s unlaxer-dsl/target/classic-token-dap-protocol.tsv
         test -s unlaxer-dsl/target/generated-token-dap-protocol.tsv
         test -s unlaxer-dsl/target/projected-token-dap-protocol.tsv
+        test -s unlaxer-dsl/target/projected-token-dap-overflow.tsv
         test -s unlaxer-dsl/target/token-trace.tsv
     - name: Resolver tutorial (Java and Rust)
       run: |
@@ -392,6 +393,7 @@ jobs:
           unlaxer-dsl/target/classic-lsp-diagnostics.tsv
           unlaxer-dsl/target/generated-token-dap-protocol.tsv
           unlaxer-dsl/target/projected-token-dap-protocol.tsv
+          unlaxer-dsl/target/projected-token-dap-overflow.tsv
           unlaxer-dsl/target/rule-stack-lsp.tsv
           unlaxer-dsl/target/case-insensitive-conformance.tsv
           unlaxer-dsl/target/case-insensitive-java.tsv

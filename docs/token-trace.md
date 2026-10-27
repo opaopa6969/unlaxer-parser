@@ -60,7 +60,11 @@ Java の既存生成 DAP は `token.source.sourceAsString().strip()` を variabl
 
 Java の既存経路（PR #887 merge 後 `60debd99`）で、`TokenList.toSource(SourceKind.subSource)` が連結した source を `new Token(kind, source, parser)` の terminal として返す custom collector を、生成 DAP の実 stdio で先に実行した。原文 `abc` の CP `[1,2)` を2回連結すると本文 `bb`、source の論理 CP 範囲 `[1,3)` になり、variables は `"bb"`、stackTrace は原文の UTF-16 column 2–4 を表示する。原文 slice `bc` へ置換されない。Projected は到達可能であり、対象外とはしない。Java の生成 DAP と既存 parser の実装・既定位置は変更していない。
 
-Rust の `TokenSource::Projected { span, text }` はこの連結本文と論理 CP 範囲に対応する。`token_steps` は本文を `Step.projected_text: Some(String)` に所有し、空文字も保持する。stackTrace / breakpoint は `span` を原文 snapshot で UTF-16 に変換し、variables は保持した本文を Java と同じ strip / 引用符 escape で表示する。本文内の改行や非 BMP 文字から原文位置を作り直さない。source は launch した program を指す。範囲外・逆転範囲・CRLF 内部の位置は従来の snapshot 検査で拒否する。論理範囲の終端が原文末尾を越える連結（`abc` の `[2,3)` を2回で `[2,4)`）は、Java が該当 step の stackTrace で失敗し Rust が launch 時に拒否するという差が残る（#892）。
+Rust の `TokenSource::Projected { span, text }` はこの連結本文と論理 CP 範囲に対応する。`token_steps` は本文を `Step.projected_text: Some(String)` に所有し、空文字も保持する。stackTrace / breakpoint は `span` を原文 snapshot で UTF-16 に変換し、variables は保持した本文を Java と同じ strip / 引用符 escape で表示する。本文内の改行や非 BMP 文字から原文位置を作り直さない。source は launch した program を指す。逆転範囲・範囲外の開始・CRLF 内部の位置は従来の snapshot 検査で拒否する。ただし CRLF 内部は Java と一致しない。Java は launch が成功し、該当 step の stackTrace、およびその step を通る breakpoint 探索・continue が `inside CRLF` で失敗する。Input token でも同じ差が残る（[#899](https://github.com/opaopa6969/unlaxer-parser/issues/899)）。論理終端が原文末尾を越える場合は下記 #892 の契約に従う。
+
+#892 は選択肢1（Rust を Java に合わせる）を採用した。Java が参照実装で、既存の launch・表示・停止順を維持するためである。PR #891 merge 後 `a555deb7` の Java 実 stdio で、原文 `abc` の `[2,3)` を2回連結した本文 `cc`・論理範囲 `[2,4)` は launch / entry が成功し、その step の `stackTrace` だけが失敗することを再確認した。Rust の prepare は、開始位置が原文内で、論理幅と所有本文の CP 長が一致する Projected の終端超過だけを保持する。位置は切り詰めない。不正な手組みの幅、input / generated / AST の範囲外、逆転範囲、CRLF 内部位置、trace 上限・不完全 trace の拒否は維持する。
+
+失敗 response は `success:false`、`message:"Internal error."`、**文字列**の body とし、先頭行は `java.lang.IllegalArgumentException: outside snapshot` に揃える。Java の body は続いて Java/JDK の呼出履歴を含む。Rust は互換診断の先頭行と改行を返し、JVM の呼出履歴を捏造しない。共通比較は body の型と先頭行を固定し、Java 固有の `\tat ...` 行のみを除外する。失敗の反復で step は進まず、scope と所有本文の variables は表示できる。next は後続 step へ、continue は後続 breakpoint または正常終了へ進む。最終 step が範囲外でも stdout の Completed → terminated → exited(exitCode=0) で終わる。共通 fixture の終了後は空の stackFrames / scopes、runtimeMode / steppingMode のみの variables、next / continue の失敗となる。終了後に Rust が runtimeMode を除外していた点も Java に合わせた。終端超過以外の失敗 response（不正 thread、終了後の next / continue など）は Rust 独自の message のままで、Java の `Internal error.` と文字列 body には揃えていない（[#900](https://github.com/opaopa6969/unlaxer-parser/issues/900)）。共通 stdio はそれらの `success:false` だけを比べる。Java の製品コードと parser のホットパス、公開済み 3.3.0 は変更していない。
 
 公開経路は opt-in trace を持つ `ParseContext` の `add_traced_token_node(rule, label, kind, source)` → 成功した `Tree` → `unlaxer_dap::token_steps` → custom `Backend::steps` である。[実行可能な consumer](../rust/unlaxer-dap/examples/projected_token_dap.rs)を参照。既存 `add_token_node` は Projected terminal を trace に記録しないため、custom terminal の明示登録だけを新設した。既存 parser のホットパスに呼出・分岐を追加しない。新 API は cursor を動かさず、元 API と同じ source 検査を行い、Input / Projected / Generated を指定 label で1回だけ記録する。trace の件数・本文 UTF-8 bytes 上限と transaction rollback をそのまま使う。custom callback では全認識を記録したうえで `declare_complete_token_trace()` が必要であり、新 API はその宣言を暗黙に行わない。
 
@@ -75,6 +79,8 @@ Rust の `TokenSource::Projected { span, text }` はこの連結本文と論理 
 
 - [`projected-token-dap/cases.json`](fixtures/projected-token-dap/cases.json): 8入力、20 leaf × 0/1基底 × source offset 0/7 = 各版80停止点。空文字・ASCII・非BMP/結合文字・CRLF・本文と原文の改行差・input/generated 混在・逆順・strip/引用符 escape・先頭の空 part（Java `TokenList.toSource` と同じく論理範囲は最初の非空 part から始まる） を共通 stdio で確認する。Java fixture は実 token の raw text / CP 範囲も独立期待値に照合する。[`rollback.json`](fixtures/projected-token-dap/rollback.json) は5ケースの Java terminal / Rust trace の本文・範囲・rollback を固定する。
 
+- [`projected-token-dap/overflow.json`](fixtures/projected-token-dap/overflow.json): #892 の4入力・11 leaf。ASCII の `[2,4)`、非 BMP、先頭の空 part と entry での失敗、CRLF を含む最終 step の失敗を固定する。0/1基底 × source offset 0/7 × next / 失敗後 continue / breakpoint 巡回の各48 session・116停止点を実 stdio で比較し、各48終了状態も検証する。Rust 単体テストでも同じ fixture の CP 範囲・失敗応答・variables・終了を検証する。
+
 ```sh
 mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
  -Dtest=TokenTraceConformanceTest,GeneratedTokenDapProtocolConformanceTest,ProjectedTokenDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,ClassicDapProtocolConformanceTest,RustUbnfFrontendConformanceTest,PlaygroundCommandTest \
@@ -82,4 +88,4 @@ mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
 cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml --workspace
 ```
 
-CI は `target/token-trace.tsv`、`target/classic-token-dap-protocol.tsv`、`target/generated-token-dap-protocol.tsv`、`target/projected-token-dap-protocol.tsv` を必須にする。Generated / Projected の各3テストメソッドも `.github/optin-test-contracts.json` で skip・欠落を拒否する。通常 Maven test だけで Rust 比較済みとは扱わない。性能freeze・root-retry最適化・一般positive assertionの既存差は変更しない。
+CI は `target/token-trace.tsv`、`target/classic-token-dap-protocol.tsv`、`target/generated-token-dap-protocol.tsv`、`target/projected-token-dap-protocol.tsv`、`target/projected-token-dap-overflow.tsv` を必須にする。Generated の3メソッドと Projected の4メソッドも `.github/optin-test-contracts.json` で skip・欠落を拒否する。通常 Maven test だけで Rust 比較済みとは扱わない。性能freeze・root-retry最適化・一般positive assertionの既存差は変更しない。
