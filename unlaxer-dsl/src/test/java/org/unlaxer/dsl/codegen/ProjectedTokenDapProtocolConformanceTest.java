@@ -81,12 +81,12 @@ public class ProjectedTokenDapProtocolConformanceTest {
             exercise(wire, "rust", evidence);
         }
         assertEquals(evidence.stream().filter(s -> s.startsWith("java\t")).map(s -> s.substring(5)).toList(), evidence.stream().filter(s -> s.startsWith("rust\t")).map(s -> s.substring(5)).toList());
-        assertEquals(145, evidence.size());
+        assertEquals(161, evidence.size());
         Files.write(evidenceFile, evidence);
     }
 
     private void exercise(Wire wire, String backend, List<String> evidence) throws Exception {
-        assertEquals(7, rows().size());
+        assertEquals(8, rows().size());
         for (boolean base : List.of(true, false)) for (int offset : List.of(0, 7)) {
             wire.request("initialize", Map.of("adapterID", "projected", "linesStartAt1", base, "columnsStartAt1", base));
             for (var element : rows()) {
@@ -130,7 +130,7 @@ public class ProjectedTokenDapProtocolConformanceTest {
     @Test public void javaProjectedSourcesKeepExistingTextAndCoordinates() throws Exception {
         var evidence = new ArrayList<String>();
         try (var wire = javaWire()) { exercise(wire, "java", evidence); }
-        assertEquals(72, evidence.size());
+        assertEquals(80, evidence.size());
         Files.write(Path.of("target/projected-token-dap-java.tsv"), evidence);
     }
 

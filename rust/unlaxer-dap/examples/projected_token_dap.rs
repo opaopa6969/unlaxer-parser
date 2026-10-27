@@ -22,12 +22,21 @@ pub fn fixture_tree(input: &str, row: &'static Value, limits: Limits) -> Result<
                 .root_node();
         } else if let Some(parts) = token["parts"].as_array() {
             let mut text = String::new();
+            // Like Java TokenList.toSource, the logical range starts at the first
+            // non-empty part; an all-empty projection keeps its first part's position.
+            let mut first = None;
             for part in parts {
                 let start = part[0].as_u64().ok_or("missing start")? as usize;
                 let end = part[1].as_u64().ok_or("missing end")? as usize;
                 text.push_str(context.text(Span { start, end }).ok_or("invalid part")?);
+                if first.is_none() && start != end {
+                    first = Some(start);
+                }
             }
-            let start = parts[0][0].as_u64().ok_or("missing start")? as usize;
+            let start = match first {
+                Some(start) => start,
+                None => parts[0][0].as_u64().ok_or("missing start")? as usize,
+            };
             let span = Span {
                 start,
                 end: start + text.chars().count(),

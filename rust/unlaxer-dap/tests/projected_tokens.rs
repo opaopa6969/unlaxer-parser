@@ -20,7 +20,7 @@ fn shared_fixture_preserves_projected_text_and_logical_cp_ranges() {
         ))
         .unwrap()
     });
-    assert_eq!(rows.as_array().unwrap().len(), 7);
+    assert_eq!(rows.as_array().unwrap().len(), 8);
     for row in rows.as_array().unwrap() {
         let input = row["input"].as_str().unwrap();
         let tree = fixture::fixture_tree(input, row, Limits::default()).unwrap();
@@ -67,6 +67,90 @@ fn shared_fixture_preserves_projected_text_and_logical_cp_ranges() {
             }
         }
     }
+}
+
+struct SharedFixtureBackend(&'static Value);
+impl Backend for SharedFixtureBackend {
+    fn supports_token_trace(&self) -> bool {
+        true
+    }
+    fn steps(&mut self, snapshot: &Snapshot, args: &Value) -> Result<Vec<Step>, String> {
+        let row = self
+            .0
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["name"] == args["fixture"])
+            .unwrap();
+        token_steps(&fixture::fixture_tree(
+            &snapshot.text,
+            row,
+            Limits::default(),
+        )?)
+    }
+}
+
+/// In-process check that `cargo test` alone rejects an input-slice substitution.
+#[test]
+fn variables_show_owned_projected_text_not_the_input_slice() {
+    static ROWS: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+    let rows = ROWS.get_or_init(|| {
+        serde_json::from_str(include_str!(
+            "../../../docs/fixtures/projected-token-dap/cases.json"
+        ))
+        .unwrap()
+    });
+    let file = std::env::temp_dir().join(format!(
+        "projected-token-variables-{}.txt",
+        std::process::id()
+    ));
+    let mut server = Server::new(SharedFixtureBackend(rows));
+    server.handle(request(1, "initialize", json!({})));
+    let mut seq = 2;
+    let mut differing = 0;
+    for row in rows.as_array().unwrap() {
+        let input = row["input"].as_str().unwrap();
+        std::fs::write(&file, input).unwrap();
+        server.handle(request(
+            seq,
+            "launch",
+            json!({"program":file,"fixture":row["name"],"stopOnEntry":true,"runtimeMode":"inspection-token"}),
+        ));
+        server.handle(request(seq + 1, "configurationDone", json!({})));
+        seq += 2;
+        for expected in row["steps"].as_array().unwrap() {
+            let text = expected[1].as_str().unwrap();
+            let label = expected[0].as_str().unwrap();
+            let response =
+                server.handle(request(seq, "variables", json!({"variablesReference":1})));
+            let value = response[0]["body"]["variables"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|v| v["name"] == label)
+                .unwrap()["value"]
+                .clone();
+            assert_eq!(
+                value,
+                json!(format!("\"{}\"", text.trim().replace('"', "\\\""))),
+                "{}",
+                row["name"]
+            );
+            let start = expected[2].as_u64().unwrap() as usize;
+            let end = expected[3].as_u64().unwrap() as usize;
+            let slice: String = input.chars().skip(start).take(end - start).collect();
+            if label == "ProjectedToken" && slice != text {
+                differing += 1;
+            }
+            server.handle(request(seq + 1, "next", json!({"threadId":1})));
+            seq += 2;
+        }
+    }
+    assert!(
+        differing >= 5,
+        "fixtures must keep text that differs from the slice"
+    );
+    std::fs::remove_file(file).unwrap();
 }
 
 fn projected(context: &mut ParseContext<'_>) -> ParseResult {
