@@ -93,5 +93,153 @@
     "name": "name-predicate-mapping-before-undefined",
     "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n,missing]) R ::= 'x' @n B; B ::= Missing; }",
     "code": "E-MAPPING-MISSING-CAPTURE"
+  },
+  {
+    "name": "duplicate-interleave-before-invalid-profile",
+    "source": "grammar G { @mapping(R) @interleave(profile=bogus) @interleave(profile=javaStyle) R ::= 'x'; }",
+    "code": "E-ANNOTATION-DUPLICATE-INTERLEAVE",
+    "rootRule": "R",
+    "detail": "duplicate @interleave on R"
+  },
+  {
+    "name": "duplicate-interleave-valid-profiles",
+    "source": "grammar G { @mapping(R) @interleave(profile=javaStyle) @interleave(profile=javaStyle) R ::= 'x'; }",
+    "code": "E-ANNOTATION-DUPLICATE-INTERLEAVE",
+    "rootRule": "R",
+    "detail": "duplicate @interleave on R"
+  },
+  {
+    "name": "duplicate-scopetree-before-invalid-mode",
+    "source": "grammar G { @mapping(R) @scopeTree(mode=bogus) @scopeTree(mode=lexical) R ::= 'x'; }",
+    "code": "E-ANNOTATION-DUPLICATE-SCOPETREE",
+    "rootRule": "R",
+    "detail": "duplicate @scopeTree on R"
+  },
+  {
+    "name": "assoc-no-mapping-before-undefined",
+    "source": "grammar G { @leftAssoc @precedence(level=1) Expr ::= 'x'; B ::= Missing; }",
+    "code": "E-ASSOC-NO-MAPPING",
+    "rootRule": "Expr"
+  },
+  {
+    "name": "rightassoc-noncanonical-before-undefined",
+    "source": "grammar G { @mapping(R, params=[left,op,right]) @rightAssoc @precedence(level=1) R ::= 'x' @left { '+' @op 'y' @right }; B ::= Missing; }",
+    "code": "E-RIGHTASSOC-NONCANONICAL",
+    "rootRule": "R",
+    "detail": "@rightAssoc requires left { op Self } with scalar base and params=[left, op, right] on R"
+  },
+  {
+    "name": "longest-choice-shape",
+    "source": "grammar G { @mapping(R) @longestChoice R ::= 'x'; }",
+    "code": "E-LONGEST-CHOICE-SHAPE",
+    "rootRule": "R",
+    "detail": "@longestChoice requires multiple alternatives on R"
+  },
+  {
+    "name": "qualified-reference-without-import",
+    "source": "grammar G { @mapping(R) R ::= 'x' ns.Missing; }",
+    "code": "E-RULE-UNDEFINED",
+    "rootRule": "R"
+  },
+  {
+    "name": "duplicate-scopetree-valid-modes",
+    "source": "grammar G { @mapping(R) @scopeTree(mode=lexical) @scopeTree(mode=dynamic) R ::= 'x'; }",
+    "code": "E-ANNOTATION-DUPLICATE-SCOPETREE",
+    "rootRule": "R",
+    "detail": "duplicate @scopeTree on R"
+  },
+  {
+    "name": "assoc-no-mapping-before-later-profile",
+    "source": "grammar G { @leftAssoc @precedence(level=1) R ::= 'x'; @interleave(profile=bogus) B ::= 'y'; }",
+    "code": "E-ASSOC-NO-MAPPING",
+    "rootRule": "R"
+  },
+  {
+    "name": "rightassoc-noncanonical-before-profile",
+    "source": "grammar G { @mapping(R, params=[left,op,right]) @rightAssoc @precedence(level=1) @interleave(profile=bogus) R ::= 'x' @left { '+' @op 'y' @right }; }",
+    "code": "E-RIGHTASSOC-NONCANONICAL",
+    "rootRule": "R"
+  },
+  {
+    "name": "longest-shape-before-precedence",
+    "source": "grammar G { @mapping(R) @longestChoice @precedence(level=1) R ::= 'x'; }",
+    "code": "E-LONGEST-CHOICE-SHAPE",
+    "rootRule": "R"
+  },
+  {
+    "name": "interleave-profile-before-duplicate-scopetree",
+    "source": "grammar G { @mapping(R) @interleave(profile=bogus) @scopeTree(mode=lexical) @scopeTree(mode=dynamic) R ::= 'x'; }",
+    "code": "E-ANNOTATION-INTERLEAVE-PROFILE",
+    "rootRule": "R"
+  },
+  {
+    "name": "mapping-before-duplicate-interleave",
+    "source": "grammar G { @mapping(R, params=[missing]) @interleave(profile=javaStyle) @interleave(profile=javaStyle) R ::= 'x'; }",
+    "code": "E-MAPPING-MISSING-CAPTURE",
+    "rootRule": "R"
+  },
+  {
+    "name": "rightassoc-noncanonical-single",
+    "source": "grammar G { @mapping(R, params=[left,op,right]) @rightAssoc @precedence(level=1) R ::= 'x' @left { '+' @op 'y' @right }; }",
+    "code": "E-RIGHTASSOC-NONCANONICAL",
+    "rootRule": "R",
+    "detail": "@rightAssoc requires left { op Self } with scalar base and params=[left, op, right] on R"
+  },
+  {
+    "name": "qualified-self-reference-after-assoc-shape",
+    "source": "grammar G { @mapping(R, params=[left,op,right]) @rightAssoc @precedence(level=1) R ::= 'x' @left { '+' @op ns.R @right }; }",
+    "code": "E-RULE-UNDEFINED",
+    "rootRule": "R"
+  },
+  {
+    "name": "name-predicate-before-rightassoc-shape",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='op', kind='type') @mapping(R, params=[left,op,right]) @rightAssoc @precedence(level=1) R ::= 'x' @left { '+' @op 'y' @right }; }",
+    "code": "E-NAME-PREDICATE-CONFLICT",
+    "rootRule": "R"
+  },
+  {
+    "name": "assoc-mapping-param-before-longest-shape",
+    "source": "grammar G { @mapping(R) @leftAssoc @precedence(level=1) @longestChoice R ::= 'x'; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R"
+  },
+  {
+    "name": "assoc-mapping-param-before-duplicate-interleave",
+    "source": "grammar G { @mapping(R) @leftAssoc @precedence(level=1) @interleave(profile=javaStyle) @interleave(profile=javaStyle) R ::= 'x'; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R"
+  },
+  {
+    "name": "assoc-mapping-param-before-qualified-reference",
+    "source": "grammar G { @mapping(R) @leftAssoc @precedence(level=1) R ::= 'x' ns.Missing; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R"
+  },
+  {
+    "name": "assoc-mapping-param-before-undefined",
+    "source": "grammar G { @mapping(R) @leftAssoc @precedence(level=1) R ::= 'x' Missing; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R",
+    "detail": "@leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on R"
+  },
+  {
+    "name": "rightassoc-mapping-param-single",
+    "source": "grammar G { @mapping(R, params=[left,op]) @rightAssoc @precedence(level=1) R ::= 'x' @left { '+' @op 'y' }; }",
+    "code": "E-ASSOC-MAPPING-PARAM",
+    "rootRule": "R",
+    "detail": "@rightAssoc requires left { op Self } with scalar base and params=[left, op, right] on R"
+  },
+  {
+    "name": "assoc-no-repeat-before-duplicate-scopetree",
+    "source": "grammar G { @mapping(R, params=[left,op,right]) @leftAssoc @precedence(level=1) @scopeTree(mode=lexical) @scopeTree(mode=lexical) R ::= 'x' @left 'y' @op 'z' @right; }",
+    "code": "E-ASSOC-NO-REPEAT",
+    "rootRule": "R",
+    "detail": "@leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on R"
+  },
+  {
+    "name": "name-predicate-before-assoc-mapping-param",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='op', kind='type') @mapping(R, params=[op]) @leftAssoc @precedence(level=1) R ::= 'x' @op; }",
+    "code": "E-NAME-PREDICATE-CONFLICT",
+    "rootRule": "R"
   }
 ]
