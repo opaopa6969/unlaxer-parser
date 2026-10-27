@@ -3,6 +3,9 @@ const trace = (event, details={}) => require('node:fs').appendFileSync(process.e
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const childProcess = require('node:child_process');
+const originalSpawn = childProcess.spawn;
+const {performance} = require('node:perf_hooks');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check, label, timeout = 30000) {
   const deadline = Date.now() + timeout;
@@ -20,6 +23,15 @@ function dead(pid) {
 }
 const run = async () => {
   const settings = JSON.parse(process.env.TINYCALC_SETTINGS);
+  let ownedLsp;
+  // Capture the actual owned wrapper. A fast Rust child can answer initialize
+  // before its wrapper has recorded the spawn in the PID journal.
+  childProcess.spawn = function(command, args) {
+    const child = originalSpawn.apply(this, arguments);
+    if (command === settings['server.rustLspPath'] ||
+        (command === settings['server.javaPath'] && args?.includes('-jar'))) ownedLsp = child;
+    return child;
+  };
   const config = vscode.workspace.getConfiguration('tinycalcLsp');
   for (const [key, value] of Object.entries(settings)) await config.update(key, value, vscode.ConfigurationTarget.Global);
   const extension = vscode.extensions.getExtension('your-name.tinycalc-lsp');
@@ -110,13 +122,46 @@ const run = async () => {
   const {StreamMessageWriter} = packagedRequire('vscode-jsonrpc/node');
   const {LanguageClient} = packagedRequire('vscode-languageclient/node');
   const originalStop = LanguageClient.prototype.stop;
-  let completedShutdowns = 0;
-  LanguageClient.prototype.stop = function(timeout) {
+  let completedShutdowns = 0, shutdownDelayMs = 0;
+  const shutdowns = [];
+  const observeStop = function(timeout) {
+    assert.ok(ownedLsp?.pid, 'healthy LSP process was captured at spawn');
+    assert.equal(ownedLsp.exitCode, null, 'the observed LSP process has not already exited');
+    const started = performance.now();
+    const shutdown = {wrapperPid: ownedLsp.pid,
+      startedAt: Date.now(), backend: settings['server.backend'], timeout, injectedDelayMs: shutdownDelayMs};
+    ownedLsp.once('exit', (code, signal) => {
+      shutdown.ownedElapsedMs = Math.round(performance.now() - started);
+      shutdown.ownedExitCode = code;
+      shutdown.ownedExitSignal = signal;
+      trace('normal-lsp-owned-process-exited', shutdown);
+    });
+    trace('normal-lsp-shutdown-started', shutdown);
     return originalStop.call(this, timeout).then(() => {
       completedShutdowns++;
-      trace('normal-lsp-shutdown-completed', {backend: settings['server.backend']});
+      shutdowns.push(shutdown);
+      trace('normal-lsp-shutdown-completed', {...shutdown, elapsedMs: Math.round(performance.now() - started)});
+    }, error => {
+      trace('normal-lsp-shutdown-failed', {...shutdown, elapsedMs: Math.round(performance.now() - started), error: String(error)});
+      throw error;
     });
   };
+  const assertNormalExit = async () => {
+    const shutdown = shutdowns.at(-1);
+    assert.ok(shutdown, 'a real protocol shutdown completed');
+    const events = await until(async () => {
+      const rows = (await fs.readFile(process.env.TINYCALC_TIMELINE, 'utf8')).trim().split('\n').filter(Boolean).map(JSON.parse);
+      return rows.some(row => row.pid === shutdown.wrapperPid && row.event === 'wrapper-exit') && rows;
+    }, 'normally stopped LSP process and wrapper exit');
+    const exit = events.find(row => row.pid === shutdown.wrapperPid && row.event === 'child-exit');
+    assert.equal(exit.code, 0, 'normal shutdown exits the real backend with code 0');
+    assert.equal(exit.signal, null, 'normal shutdown does not kill the real backend');
+    assert.ok(!events.some(row => row.pid === shutdown.wrapperPid && row.event === 'sigterm'), 'normal shutdown must not fall back to SIGTERM');
+    assert.equal(shutdown.ownedExitCode, 0, 'normal shutdown joins the owned wrapper with code 0');
+    assert.equal(shutdown.ownedExitSignal, null, 'the owned wrapper is not killed');
+    trace('normal-lsp-process-exited', {...shutdown, elapsedMs: shutdown.ownedElapsedMs, backendPid: exit.child});
+  };
+  LanguageClient.prototype.stop = observeStop;
   const originalWrite = StreamMessageWriter.prototype.write;
   let failedWriter, originalStream, injected = false, prematureShutdowns = 0;
   StreamMessageWriter.prototype.write = function(message) {
@@ -139,6 +184,7 @@ const run = async () => {
     await assert.rejects(bounded(restart(), 'initialized stream failure'), /stream was destroyed/);
     assert.ok(injected, 'real backend completed initialize before the injected transport failure');
     assert.ok(completedShutdowns >= 1, 'the preceding healthy client still completes normal protocol shutdown');
+    await assertNormalExit();
     await delay(1500); // Let Node report any unhandled rejection before asserting the transition.
     assert.equal(prematureShutdowns, 0, 'failed initialization cannot send an LSP shutdown request');
   } finally {
@@ -148,6 +194,28 @@ const run = async () => {
   }
   await healthy();
   observations.initializationFailure = {rejected: true, prematureShutdowns, recovered: true, normalShutdownCompleted: true};
+  // Delay dispatch of a real shutdown request beyond the former 1000 ms budget.
+  // Keep the real backend response/exit and force-cleanup assertions: merely
+  // delaying stop() resolution would not exercise languageclient's shutdown timer.
+  shutdownDelayMs = 1500;
+  const completedBeforeDelay = completedShutdowns;
+  LanguageClient.prototype.stop = observeStop;
+  StreamMessageWriter.prototype.write = function(message) {
+    if (message.method === 'shutdown') {
+      trace('delayed-shutdown-request', {delayMs: shutdownDelayMs});
+      return delay(shutdownDelayMs).then(() => originalWrite.call(this, message));
+    }
+    return originalWrite.call(this, message);
+  };
+  try {
+    await bounded(restart(), 'delayed normal shutdown');
+    assert.ok(completedShutdowns > completedBeforeDelay, 'a shutdown exchange beyond 1000 ms still completes normally');
+    await assertNormalExit();
+  } finally {
+    StreamMessageWriter.prototype.write = originalWrite;
+    LanguageClient.prototype.stop = originalStop;
+  }
+  observations.shutdownLifecycle = {delayedProtocolCompleted: true, exitedNormally: true};
   const startupTimeoutMs = vscode.workspace.getConfiguration('tinycalcLsp').get('server.startupTimeoutMs', 30000);
   const restore = async () => {
     // Restore the normal startup budget before any setting can launch a healthy backend.
@@ -203,5 +271,5 @@ exports.run = async () => {
     await Promise.race([run(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('IDE smoke exceeded 180 seconds')), 180000); })]);
     await delay(1500);
     assert.deepEqual(unhandled, [], 'startup interruption must not leave unhandled rejections');
-  } finally { clearTimeout(timer); process.off('unhandledRejection', record); }
+  } finally { childProcess.spawn = originalSpawn; clearTimeout(timer); process.off('unhandledRejection', record); }
 };
