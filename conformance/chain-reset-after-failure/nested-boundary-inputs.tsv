@@ -74,3 +74,7 @@ Predictive-lookahead-success	Predictive	lookahead	12b	1
 Predictive-choice-failure	Predictive	choice	ab	a
 Predictive-text	Predictive	direct	qb	-
 Predictive-partial	Predictive	direct	azb	a
+Outer-failure	Outer	direct	ab	a
+Outer-no-prefix	Outer	direct	ab	-
+Outer-success	Outer	direct	hxb	-
+Outer-nonstarter	Outer	direct	+b	+

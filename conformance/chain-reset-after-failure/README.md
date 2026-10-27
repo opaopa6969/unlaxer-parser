@@ -213,7 +213,7 @@ entry field・cache・allocation は追加しない。
 **結論:** 候補単独の owner reset 差は既知の内部差として残す。今回調べた生成文法の外部経路では、
 その候補に Java 相当の Chain 境界を加えても観測は変わらなかった。PR #828 では runtime / IR / 公開型を変更しなかった。
 ただし、**Java / Rust の診断位置と memo hit がすべて一致したという意味ではない**。
-調査で見つかった診断差は #826 で解消し、残る memo 会計差は #827 と差分表で追跡する。
+調査で見つかった診断差は #826 で解消し、残る memo 会計差は #827 で host 依存の内部会計という契約にした（末尾参照）。
 
 ### lowering と frame の根拠
 
@@ -310,8 +310,8 @@ Root / Integer の第1候補、`ab`、先行 `LOOKAHEAD('a')`、初期 reset=tru
 
 ### 別に見つかった診断・memo 差
 
-`nested-boundary-differences.tsv` は232行（#838 で456→288行、#826 で288→232行）の**全行キー付きの明示差分**であり、
-Java oracle の該当値も照合してから Rust の4列（最遠診断 CP、failure / success memo hit、後続の最遠診断 CP）だけに適用する。
+`nested-boundary-differences.tsv` は #826 時点で232行（#838 で456→288行、#826 で288→232行、#827 の追加後は268行）の**全行キー付きの明示差分**であり、
+Java oracle の該当値も照合してから Rust の値に適用する。#827 では診断2列の同値を必須にし、host 差を failure / success hit の2列だけに限定した。
 他の列や行を除外しない。
 通常 / mapping、両 host、Chain 対照に同じ値を要求する。PBT の known-differences は変更しない。
 
@@ -572,3 +572,104 @@ UNTIL の失敗記録、その初回試行位置、Classic capture の失敗記�
 `NestedCandidateBoundaryConformanceTest` / `FrameStartMatchedResetConformanceTest` を実行した。
 Java oracle の2テストは成功し、Rust 照合の2テストはそれぞれ `Root-partial` / `Root-ahead` の
 CP2→0で失敗する。最終版の両 host の照合と同じテストで修正除去を検出する。
+
+<a id="memo-hit-accounting"></a>
+
+## failure / success hit の契約 (#827)
+
+**結論:** hit 数は host 依存の内部会計であり、同じ文法・入力・設定でも Java/Rust 間の
+数値の一致を契約しない。成否・consumed / matched cursor・診断・reset・後続解析の一致は
+引き続き検証する。hit 数を揃えるために cache を追加したり、Java の安全 marker や Rust の
+rule 単位 cache を変更したりしない。これらは安全性・性能の作業であり、#197 の凍結対象になる。
+今回は runtime / generator / memo key / 計数処理を変更せず、性能の再計測もしない。
+
+### 公開される値と利用範囲
+
+- Java: `ParseContext.getPackratMemoTable().failureHits() / successHits()`。
+  memo OFF では table が null の場合がある。
+- Rust: `ParseContext::memoized_failure_hits() / memoized_success_hits()`。
+  通常 / Classic とも context の pass 内の実 hit で、別 context の詳細診断 retry を合算しない。
+- `benchmarks/tiny-classic/consumers/` の Java / Rust consumer が返す結果 JSON の
+  `failure_hits` / `success_hits` も上記 getter の値であり、同じ host 依存の契約になる。
+  Java の `Parsed`、Rust の `ParseMatch` / `ParseDiagnostic` / Classic `TokenInfo` 自体には
+  hit フィールドはない。hit は構文診断の位置や成否ではなく、cache の再利用を調べる統計である。
+
+公開されているため「利用者には見えない値」とは扱わない。host・生成器・安全判定・診断設定・
+候補除外・cache 予算・trace の条件が変われば hit 数も変わり得る。言語間の互換性判定や性能順位に
+hit の絶対値を使わない。固定 corpus では回帰検知のため、各 host の現在の生の値を厳密に残す。
+
+### marker と cache 対象の対応
+
+`nested-boundary.ubnf` の生成 Java を compile し、次の直接宣言 marker をテストで照合する。
+Java の `PackratMemoTable` は継承した marker ではなく exact class の直接宣言を確認し、
+parser identity と両 cursor 等を key にする。Rust の `rule → memoized_rule → probe_rule_memo` は
+安全性を確認した `Rule` 全体を key にし、inline の Choice / Sequence / 値投影に独立した entry は作らない。
+
+| 生成 Java のクラス | failure / success marker | Rust の対応する cache 単位 |
+| --- | --- | --- |
+| RootParser / IntegerParser / LongestParser / UniqueParser | なし / なし | 各 Rule 全体（Number を含む既知の式として安全） |
+| IntegerGroup0Parser / __CaptureSite | なし / なし | inline Choice / TextValue / ValueBoundary。独立 cache なし |
+| RootGroup0Parser / LongestGroup0Parser / UniqueGroup0Parser | あり / あり | literal だけの inline Choice。独立 cache なし |
+| OuterParser / MixParser | なし / なし | Outer / Mix の各 Rule 全体 |
+| HelperParser | あり / あり | Helper Rule 全体 |
+| MixGroup0Parser | あり / あり | Helper を参照する inline Choice。独立 cache なし |
+
+Java の `ParserGenerator.collectMemoDependencies` は `token N = NumberParser` のような
+`TokenDecl.Simple` を名前だけで安全とみなさない。N に依存する rule は marker を持たず、
+literal のみ、または安全な Helper だけに依存する group は `ParserRuleEmitter.generateHelperCode`
+で両 marker を得る。Rust の lowering は N を既知の `Expr::Number` にし、
+`expression_is_memo_safe` が rule の依存先まで確認する。この安全判定と粒度の違いを
+計数の誤りとして補正する根拠はない。
+
+一時コピーだけに hit の trace を加えた対照でも、`Outer` の Java の内訳は初期 false で
+初回 Helper 1回、2・3回目に MixGroup0 と Helper 各1回の計5回、初期 true は初回0・以後各2の計4回だった。
+Rust は両設定とも2・3回目に Outer 全体を再生して計2回だった。
+Longest / Unique の Java success hit 1回は勝者を再実行するときの Group0 再生であり、
+Rust の inline group には対応する cache probe がない。trace 用コードは製品・テストへ組み込まない。
+
+### 共通 corpus と owner reset の切り分け
+
+既存75経路・Java1800行を維持し、nested を使わない
+`Helper ::= 'a' 'z' | 'h'; Mix ::= (Helper | 'q') | N; Outer ::= Mix | Helper 'x';`
+の4経路96行を追加した。生成 Java の候補に __CaptureSite がないことも検査する。
+両 Rust host の生成物は byte 一致を確認し、それぞれを compile・実行する。
+
+| 入力経路 | SAFE_FAILURES の実 hit（Java / Rust） |
+| --- | --- |
+| Integer-failure（ab、先読み a、3回失敗） | failure 0 / 2 |
+| Longest-text / Unique-text（qb）、同 partial（azb、先読み a） | 成功候補の再実行で success 1 / 0 となる行 |
+| Outer-nonstarter（+b、先読み +、3回失敗） | AUTO / DETAILED は初期 false: 5 / 2、true: 4 / 2。DETAILED_ON_FAILURE は 0 / 2 |
+| Outer-failure（ab、先読み a、3回失敗） | 診断3設定とも初期 false: 5 / 2、true: 4 / 2 |
+| Outer-no-prefix（ab、先読みなし）、Outer-success（hxb） | 先読みなしの失敗と成功の対照。生の値を TSV に保持 |
+| frame-start の Root-longest-negative（ab、先読み a、通常、初期 false） | 診断3設定とも success 1 / 0 |
+
+Outer の遅延診断0 hit は、候補の FIRST 除外で probe 自体を省く入力の値である。
+ab は Helper の開始文字 a を含むため同じ0にはならず、追加した +b で issue コメントの値を再現する。
+これは診断設定による既存の候補除外で、成否・cursor を変える cache 再生ではない。
+
+nested の18候補だけに Sequence([child]) を付ける既存の Chain 対照も継続する。
+候補単独の reset が true→false、後続先読みが失敗→成功になることを正の対照とし、
+rule 全体からの観測は hit を含む全列が元の Rust と一致する。
+さらに Outer には nested 境界がなくても差が出る。したがって #823 の owner reset 内部差を
+正規化すればこの会計差が消える、という説明は成立しない。初期 reset による同一 host 内の
+key の区別は正しい動作であり、異なる cache 対象間の hit 数を揃える理由にはならない。
+
+最終的な検査範囲は nested 79経路・Java1896行、両 host × 通常/mapping × Chain 対照の
+15168観測と、frame-start 115経路・Java2760行、両 host × 通常/mapping の11040観測である。
+全経路に通常/Classic、初期 reset 2設定、memo OFF/SAFE_FAILURES、診断3設定を含む。
+差分表は nested 268行（既存232行＋Outer失敗36行）、frame-start 81行で、既存データ行は変更しない。
+hit 列は削除せず Java 側の値・全キー・全行・全列を照合し、診断2列の host 差はテストが拒否する。
+`MemoHitAccountingAssertions` は実測の OFF/SAFE_FAILURES の成否・両 cursor・reset・診断と
+後続解析を直接比較し、OFF の両 hit が0であることも検査する。
+この範囲では cache が結果を変える反例はなく、新しい不具合 issue に分離する項目はない。
+任意文法・任意 IR の全面一致や #823 の候補単独の差の解消は主張しない。
+
+### mutation
+
+隔離した比較用 worktree で、同じ生成 parser・実測照合テストを実行した。変更なしの
+nested 対照は成功し、次の4変異はいずれも失敗した。元の作業 worktree の oracle は変えていない。
+
+- Outer の会計差36行を差分表から除去すると、Rust の実 failure hit 2 が Java の期待5と異なり失敗する。
+- frame-start の Root-longest-negative の Rust success hit を0→1に変えると、実測0との不一致で失敗する。
+- Outer-nonstarter の Rust 診断 CP を差分表で +1すると、診断差を許可しない検査で失敗する。
+- Outer-nonstarter の Java failure hit の期待値を5→6に変えると、生成 Java の実測5との不一致で失敗する。

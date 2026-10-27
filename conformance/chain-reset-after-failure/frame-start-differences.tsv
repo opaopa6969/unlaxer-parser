@@ -1,4 +1,5 @@
 # id	classic	initialReset	memo	diagnostics	javaDiagnosticCP	rustDiagnosticCP	javaFailureHits	rustFailureHits	javaSuccessHits	rustSuccessHits	javaFollowerDiagnosticCP	rustFollowerDiagnosticCP
+# #827 契約: failure/success hit は host 依存の内部会計で一致を保証しない。生の値を全行照合し、成否・cursor・診断・reset の比較は維持する。
 PlainTok-ahead	false	true	1	0	1	1	0	2	0	0	1	1
 PlainTok-ahead	false	true	1	1	1	1	0	2	0	0	1	1
 PlainTok-ahead	false	true	1	2	0	0	0	2	0	0	0	0
