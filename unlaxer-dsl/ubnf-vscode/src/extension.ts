@@ -29,7 +29,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   outputChannel.appendLine(`[ubnf-lsp] jar:  ${jarPath}`);
   registerPlayground(context, {javaPath, jarPath, jvmArgs, output: outputChannel});
 
-  const serverOptions: ServerOptions = {
+  const backend = config.get<string>("server.backend", "java");
+  const rustPath = config.get<string>("server.rustPath", "ubnf-language-server");
+  outputChannel.appendLine(`[ubnf-lsp] backend: ${backend}`);
+  const serverOptions: ServerOptions = backend === "rust" ? {
+    command: rustPath, args: [], options: {}
+  } : {
     command: javaPath,
     args: [...jvmArgs, "--enable-preview", "-jar", jarPath],
     options: {}
@@ -66,7 +71,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     (error: unknown) => {
       outputChannel?.appendLine(`[ubnf-lsp] failed to start: ${String(error)}`);
       void vscode.window.showErrorMessage(
-        "UBNF language server failed to start. Java 21+ is required. " +
+        `UBNF language server failed to start (${backend}). ` +
+        (backend === "rust" ? "Check ubnfLsp.server.rustPath. " : "Java 21+ is required. ") +
         "See output channel 'UBNF LSP' for details."
       );
     }

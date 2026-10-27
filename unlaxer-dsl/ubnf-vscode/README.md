@@ -9,6 +9,17 @@ validation, navigation, snippets and authoring help. Keyword vocabulary is read
 from the meta-grammar AST; descriptions and tutorials are maintained separately.
 This is not yet a fully generated replacement for the handwritten UBNF frontend.
 
+## Rust の文法編集サーバー（開発版）
+
+既定の Java server に加え、JVM 不要の Rust server を選択できます。
+repository の `rust/` で `RUSTUP_TOOLCHAIN=1.85.0 cargo build -p unlaxer-ubnf-lsp --release` を実行し、
+VS Code 設定の `ubnfLsp.server.backend` を `rust`、`ubnfLsp.server.rustPath` を
+`rust/target/release/ubnf-language-server` の絶対パスにして Reload Window してください。
+
+第一段は診断の一部・hover・completion に対応します。Java の全診断、rename、definition、outline 等は未対応です。
+[対応表と残課題 #885/#886](../../docs/ubnf-authoring-lsp.md) を確認してください。
+この VSIX は native binary を同梱しません。Playground 生成には従来の Java/Node/Rust 環境が必要です。
+
 ## はじめて使う場合：画面内の catalog/help
 
 拡張をインストールしたら、コマンドパレットから

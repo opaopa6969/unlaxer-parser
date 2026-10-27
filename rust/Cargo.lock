@@ -375,6 +375,16 @@ name = "unlaxer-ubnf"
 version = "0.1.0"
 
 [[package]]
+name = "unlaxer-ubnf-lsp"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "unlaxer-generator",
+ "unlaxer-lsp",
+ "unlaxer-ubnf",
+]
+
+[[package]]
 name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

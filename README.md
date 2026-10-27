@@ -15,6 +15,8 @@
 
 **3.3.0 is published** on [Maven Central](https://repo1.maven.org/maven2/org/unlaxer/unlaxer-parser/3.3.0/unlaxer-parser-3.3.0.pom) and [GitHub Releases](https://github.com/opaopa6969/unlaxer-parser/releases/tag/v3.3.0). See the [verified source, signatures, and consumer results](release/3.3.0-verification.json).
 The development UBNF VSIX includes an in-editor [beginner catalog/help](unlaxer-dsl/ubnf-vscode/README.md).
+開発版では JVM 不要の [Rust UBNF authoring server](docs/ubnf-authoring-lsp.md) を VSIX から選択できます。第一段は診断の一部・hover・completion までで、Java が既定です（#864、残り #885/#886）。
+
 Generate a self-contained [language playground from UBNF](docs/ubnf-playground-ja.md), including UBNF's own meta-grammar.
 Try UBNF grammar syntax, AST and CST in the [online UBNF playground](https://opaopa6969.github.io/unlaxer-parser/ubnf/).
 

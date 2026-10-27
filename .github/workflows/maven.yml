@@ -678,6 +678,24 @@ jobs:
     - name: Install unlaxer to local repo
       run: mvn -B -pl .,unlaxer-common,unlaxer-dsl install -DskipTests -Dgpg.skip=true
 
+    - name: Set up Rust for UBNF authoring
+      run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
+
+    - name: Prepare required tests (ubnf-authoring)
+      run: python3 scripts/verify-optin-tests.py ubnf-authoring --prepare
+
+    - name: Verify native and Java UBNF authoring servers
+      run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        mvn -B -pl unlaxer-dsl/ubnf-vscode test -Dtest=UbnfAuthoringProtocolConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+
+    - name: Verify required tests (ubnf-authoring)
+      id: verify-ubnf-authoring
+      if: success()
+      run: python3 scripts/verify-optin-tests.py ubnf-authoring
+
     - name: Build ubnf-vscode VSIX
       run: mvn -B -pl unlaxer-dsl/ubnf-vscode verify -Dgpg.skip=true
 
@@ -693,6 +711,22 @@ jobs:
         export PATH="$HOME/.cargo/bin:$PATH"
         bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update --target wasm32-unknown-unknown
         xvfb-run -a npm run test:vsix
+
+    - name: Activate the packaged VSIX with the native UBNF server
+      working-directory: unlaxer-dsl/ubnf-vscode
+      env:
+        UBNF_TEST_BACKEND: rust
+        UBNF_TEST_RUST_PATH: ${{ github.workspace }}/rust/target/debug/ubnf-language-server
+      run: xvfb-run -a npm run test:vsix
+
+    - name: Upload UBNF authoring protocol evidence
+      if: ${{ !cancelled() && steps.verify-ubnf-authoring.outcome != 'skipped' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ubnf-authoring-protocol
+        path: |
+          target/optin-evidence/ubnf-authoring/
+          unlaxer-dsl/ubnf-vscode/target/ubnf-authoring-protocol.json
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4

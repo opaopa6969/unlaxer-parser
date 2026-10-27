@@ -1,0 +1,182 @@
+{
+  "annotations": [
+    {
+      "label": "@ubnf",
+      "snippet": "@ubnf: v2",
+      "signature": "@ubnf: v2",
+      "doc": "文法形式 v2 を指定します。製品のバージョンとは別です。"
+    },
+    {
+      "label": "@feature",
+      "snippet": "@feature: ${1:declarativeTokensV1}",
+      "signature": "@feature: name",
+      "doc": "この文法に必要な機能契約を記録します。"
+    },
+    {
+      "label": "@package",
+      "snippet": "@package: ${1:org.example}",
+      "signature": "@package: name",
+      "doc": "生成 Java コードのパッケージです。"
+    },
+    {
+      "label": "@root",
+      "snippet": "@root",
+      "signature": "@root",
+      "doc": "Marks the grammar entry point. Exactly one rule must be annotated."
+    },
+    {
+      "label": "@mapping",
+      "snippet": "@mapping(${1:TypeName}, params=[${2:field}])",
+      "signature": "@mapping(TypeName, params=[field1, field2, ...])",
+      "doc": "Generates a Java record for this rule. `params` must match captures (`@name`) in positional order."
+    },
+    {
+      "label": "@leftAssoc",
+      "snippet": "@leftAssoc",
+      "signature": "@leftAssoc",
+      "doc": "Left-associative folding for `left { op right }` binary rules."
+    },
+    {
+      "label": "@rightAssoc",
+      "snippet": "@rightAssoc",
+      "signature": "@rightAssoc",
+      "doc": "Right-associative folding for binary rules."
+    },
+    {
+      "label": "@precedence",
+      "snippet": "@precedence(level=${1:10})",
+      "signature": "@precedence(level=N)",
+      "doc": "Operator precedence level for this rule."
+    },
+    {
+      "label": "@whitespace",
+      "snippet": "@whitespace: ${1:javaStyle}",
+      "signature": "@whitespace: javaStyle|none|TOKEN|alias.TOKEN",
+      "doc": "ルールの連接境界で組込みまたは non-nullable な宣言的 token を読み飛ばします。"
+    },
+    {
+      "label": "@enum",
+      "snippet": "@enum",
+      "signature": "@enum",
+      "doc": "Generates a Java enum from string-literal alternatives."
+    },
+    {
+      "label": "@commonField",
+      "snippet": "@commonField(${1:name})",
+      "signature": "@commonField(field)",
+      "doc": "Lifts a field shared by all @mapping variants into the sealed interface."
+    },
+    {
+      "label": "@scopeTree",
+      "snippet": "@scopeTree(mode=${1:lexical})",
+      "signature": "@scopeTree(mode=lexical|dynamic)",
+      "doc": "Marks this rule as a scope boundary (enter/leave scope events)."
+    },
+    {
+      "label": "@declares",
+      "snippet": "@declares(symbol=${1:name})",
+      "signature": "@declares(symbol=capture)",
+      "doc": "Registers the captured identifier as a symbol declaration in the current scope."
+    },
+    {
+      "label": "@backref",
+      "snippet": "@backref(name=${1:name})",
+      "signature": "@backref(name=capture)",
+      "doc": "Marks the capture as a reference to a previously declared symbol."
+    },
+    {
+      "label": "@import",
+      "snippet": "@import ${1:alias} from '${2:path/to/grammar.ubnf}'",
+      "signature": "@import alias from 'path'",
+      "doc": "宣言的 token の部品を相対パスから読み込みます。設定より前に置き、alias.TOKEN で参照します。任意のルール import は未対応です。"
+    },
+    {
+      "label": "@recovery",
+      "snippet": "@recovery(${1:sync})",
+      "signature": "@recovery(sync|auto|skip)",
+      "doc": "Recovery metadata. Execution support depends on the backend; do not assume recognition implies recovery support."
+    },
+    {
+      "label": "@skip",
+      "snippet": "@skip",
+      "signature": "@skip",
+      "doc": "Excludes this rule from AST output."
+    },
+    {
+      "label": "@interleave",
+      "snippet": "@interleave(${1:profile})",
+      "signature": "@interleave(profile)",
+      "doc": "Interleave profile (whitespace/comment handling) for this rule."
+    },
+    {
+      "label": "@typeof",
+      "snippet": "@typeof(${1:capture})",
+      "signature": "@typeof(capture)",
+      "doc": "Type query element for typed if/ternary support."
+    },
+    {
+      "label": "@catalog",
+      "snippet": "@catalog(context=${1:name})",
+      "signature": "@catalog(context=...)",
+      "doc": "Associates the rule with an external symbol catalog context."
+    },
+    {
+      "label": "@eval",
+      "snippet": "@eval",
+      "signature": "@eval",
+      "doc": "Marks the rule for evaluator generation."
+    },
+    {
+      "label": "@doc",
+      "snippet": "@doc('${1:description}')",
+      "signature": "@doc('text')",
+      "doc": "Attaches documentation text to the rule."
+    }
+  ],
+  "snippets": [
+    {
+      "label": "grammar",
+      "detail": "grammar block skeleton",
+      "body": "grammar ${1:Name} {\n  @ubnf: v2\n  @package: ${2:org.example}\n\n  token ${3:NUMBER} ::= CHAR_RANGE('0', '9')+;\n\n  @root\n  @mapping(Value, params=[text])\n  @doc('数字を入力してください。')\n  ${4:Start} ::= ${3:NUMBER} @text;\n}$0"
+    },
+    {
+      "label": "token",
+      "detail": "token declaration",
+      "body": "token ${1:NAME} ::= ${2:CHAR_RANGE('0', '9')+};$0"
+    },
+    {
+      "label": "rule",
+      "detail": "plain rule",
+      "body": "${1:RuleName} ::= ${2:body} ;$0"
+    },
+    {
+      "label": "mapped-rule",
+      "detail": "rule with @mapping record",
+      "body": "@mapping(${1:TypeName}, params=[${2:left}, ${3:right}])\n${4:RuleName} ::= ${5:Element} @${2:left} ${6:Element} @${3:right} ;$0"
+    },
+    {
+      "label": "enum-rule",
+      "detail": "@enum rule from literals",
+      "body": "@enum\n${1:Kind} ::= '${2:a}' | '${3:b}' ;$0"
+    },
+    {
+      "label": "binary-rule",
+      "detail": "left-assoc binary expression rule",
+      "body": "@mapping(${1:BinaryExpr}, params=[left, op, right])\n@leftAssoc\n${2:Expression} ::= ${3:Term} @left { ${4:Op} @op ${3:Term} @right } ;$0"
+    }
+  ],
+  "parsers": [
+    "org.unlaxer.parser.elementary.NumberParser",
+    "org.unlaxer.parser.elementary.WordParser",
+    "org.unlaxer.parser.elementary.SingleQuotedParser",
+    "org.unlaxer.parser.elementary.DoubleQuotedParser",
+    "org.unlaxer.parser.elementary.EndOfSourceParser",
+    "org.unlaxer.parser.elementary.WildCardCharacterParser",
+    "org.unlaxer.parser.clang.IdentifierParser",
+    "org.unlaxer.parser.posix.DigitParser",
+    "org.unlaxer.parser.posix.AlphabetParser",
+    "org.unlaxer.parser.posix.SpaceParser",
+    "org.unlaxer.parser.posix.CommaParser",
+    "org.unlaxer.parser.posix.SemiColonParser"
+  ]
+}
