@@ -26,6 +26,8 @@
   ],
   "issues": {
     "892": {"state": "OPEN", "title": "parity(dap): projected token の論理 CP 範囲が原文末尾を越えるときの Java/Rust DAP の差"},
+    "899": {"state": "OPEN", "title": "parity(dap): CRLF 内部を指す token 位置で Java は launch 後に局所失敗し Rust は launch 時に拒否する（#892 レビュー）"},
+    "900": {"state": "OPEN", "title": "parity(dap): stackTrace 以外の失敗 response の message / body が Java（LSP4J）と異なる（#892 レビュー）"},
     "864": {"state": "OPEN", "title": "parity(lsp): UBNF authoring serverのRust利用経路をJava基準へ揃える"},
     "885": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の全診断・profile 再設定を Java 契約へ揃える（#864 後続）"},
     "886": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の navigation・編集支援・packageSource と native 配布（#864 後続）"},
@@ -466,7 +468,7 @@
       "title": "parity: 外部入口の成功前に custom parser が読む途中の成功診断 CP が Java と異なる（#878 の制限）"
     },
     "889": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity(dap): consumed leaf の TokenSource::Projected を Rust token DAP で表示するか対象外として記録する"
     }
   },
@@ -1263,6 +1265,21 @@
         "docs/fixtures/projected-token-dap/rollback.json",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ProjectedTokenDapProtocolConformanceTest.java",
         "rust/unlaxer-dap/tests/projected_tokens.rs"
+      ]
+    },
+    {
+      "id": "dap-token-position-failures",
+      "category": "unresolved",
+      "title": "CRLF 内部の token 位置と stackTrace 以外の失敗 response",
+      "hosts": "Java DAP / Rust DAP・両生成host",
+      "issues": [
+        899,
+        900
+      ],
+      "observation": "#892 のレビューで実 stdio により確認した未修正の差。#899: CRLF の内部を指す Input / Projected token の開始・終端は、Java では launch が成功し、該当 step の stackTrace が inside CRLF で失敗する。breakpoint 探索がその step を通ると continue や breakpoint 付きの configurationDone も失敗する。Rust は launch 時に inside CRLF で拒否する。#900: 不正 thread や終了後の next / continue などの失敗 response は、Java が Internal error. と文字列 body（例外名の先頭行）を返す。Rust は独自の message を返し、body はない。#892 の終端超過による stackTrace の失敗だけを Java の形に揃えた。",
+      "evidence": [
+        "docs/token-trace.md",
+        "rust/unlaxer-dap/src/lib.rs"
       ]
     },
     {
