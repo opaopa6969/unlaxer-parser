@@ -68,7 +68,7 @@ completion は順序・snippet・documentation・textEdit を含む全 JSON、�
 `past-line-end`・`non-ascii-prefix`・`leading-dot`・`nested-qualifier`・`supplementary-letter-hover` で固定した。
 残差: サロゲートペアの内側を指す位置は Rust が `-32602` で拒否し、Java は UTF-16 の途中 offset のまま処理する。
 BMP 内の Unicode 分類は `char::is_alphanumeric` による近似で、結合文字（Mn/Mc）と Nl/No は未照合（#886）。
-同じ version 以下の `didChange` も Java と同じく適用する（#885 の診断67文法で検証）。
+同じ version 以下の `didChange` も Java と同じく適用する（#885 の診断76文法で検証）。
 
 構文エラー時の fallback hover は Java の consumed offset と Rust の最初の error offset を区別する（#885）。
 構文エラーは両方の拒否を確認するが、native frontend の最初のエラー位置と
@@ -82,7 +82,7 @@ virtual package path に開いた偽 buffer が検証済み source を置換で�
 server が manifest/lock/cache を書き換えないことも両版で検証する。
 現時点の native file URI は Linux のローカル絶対パスを検証対象とし、UNC/Windows 等は #886 に残す。
 
-CI は `ubnf-authoring` 必須契約の3メソッドと94件（従来27＋診断67）の実行件数を検査する。
+CI は `ubnf-authoring` 必須契約の3メソッドと103件（従来27＋診断76）の実行件数を検査する。
 packaged VSIX は従来 Java smoke を保持し、別の隔離 profile で Java executable を不存在に設定して
 Rust の completion/hover/診断と変更後の修復、未広告 definition を確認する。最後に拡張の `deactivate` で
 native server の子プロセスが終了し、残らないことを確認する（tinycalc-vscode #874/#880 と同じ後始末の水準）。
@@ -111,17 +111,20 @@ lexical / adapter / token-contract / feature / token-stream / comment / lexical-
 raising の解析は既存実装を再利用し、Java の authoring message/hint の組立てを分離する。
 通常 parser、frontend の受理条件、Java validator、公開済み3.3.0は変更しない。
 
-`spec-corpus/ubnf-authoring-lsp/diagnostics.json` は67文法の手書き全 JSON oracle。
-従来27件と合わせ94件を両実 stdio で実行する。両 server を比較するだけでなく、各結果を独立期待値へ照合する。
+`spec-corpus/ubnf-authoring-lsp/diagnostics.json` は76文法の手書き全 JSON oracle。
+従来27件と合わせ103件を両実 stdio で実行する。両 server を比較するだけでなく、各結果を独立期待値へ照合する。
 `code` / `severity` / `source` / `message` / `range` とキーの有無・診断配列の順序を検査し、診断や位置のフィルタ・正規化はしない。
 Java validator 診断には `data` と `relatedInformation` が**存在しない**ため、Rust も省略し、全 JSON 検査でこれも固定する。
 これは `ULX-PARSE-001` の data を省略してよいという意味ではない（#894）。
 
 range は rule 所属がある場合、Java の文書全体の最初の同名宣言（grammar 名も含む）を指す。
+宣言は Java `UbnfEditorIndex` と同じく各 grammar の名前・token・rule の AST node の範囲内だけで探し、
+rule 本体に書かれた `token R` や `grammar R` を宣言と取り違えない。
 一般診断は `0:0–0:1`。`W-TOKEN-UNRESOLVED` は token の宣言行にある parserClass detail を指す。
+detail は Java `tokenDetail` の正規表現と `strip()` に従い、名前と `=` の間にコメントがあれば空文字列（宣言行の `n:0–n:0`）になる。
 Rust の byte span を UTF-16 に変換し、CRLF と非BMPの後、複数 grammar の同名宣言も固定した。
 生成警告→各 grammar の validate→advisory 左再帰という Java の順序を保持する。
-同じ・小さい version の Full `didChange` も Java に従って適用し、全67文法で診断の置換・修復と
+同じ・小さい version の Full `didChange` も Java に従って適用し、全76文法で診断の置換・修復と
 別文書の open/close、save、close 後の query、session の shutdown/exit を検査する。
 
 ### validate の呼出順と Rust 利用経路
@@ -138,8 +141,8 @@ message は Java の `message + " — " + hint`。hint を捨てたり、CLI の
 | NestedCaptures.problems | `E-NESTED-SHAPE` / 既存 `nested_captures::validate` は fail-fast | 残差。rule ごとの収集、共有 schema、hint/所属が未接続 #893 |
 | validateScalarRanges / validateCaseInsensitiveTokens | `E-TOKEN-RANGE-SURROGATE`, `E-CI-EMPTY`, `E-CI-SCALAR` | 範囲/empty は接続。不対 surrogate を表せない Rust AST 入力の照合は残差 #893 |
 | LexicalCompiler.compile | `E-LEXICAL` / `lexical::compile_syntax` | 接続。Java message の `E-LEXICAL:` prefix を付ける。duplicate/undefined/cycle/version/SAME_AS を比較 |
-| TokenAdapterRegistry.build | `P-ADAPTER-DEFINITION`, `P-ADAPTER-DUPLICATE` / `adapters::AdapterRegistry::from_grammar` | 接続。token参照解決を追加せず Java の宣言検査範囲を維持 |
-| TokenContractRegistry.build | `P-TOKEN-CONTRACT-{VERSION,DEFINITION,DUPLICATE}` / `adapters::token_contract_diagnostics` | 接続 |
+| TokenAdapterRegistry.build | `P-ADAPTER-{DEFINITION,DUPLICATE,UNKNOWN,VERSION}` / `adapters::AdapterRegistry::from_grammar` + `resolve` | 接続。宣言検査に加え Java と同じく各 `ADAPTER(...)` token 参照も検査し、span なしの Java と同じ code→subject（UTF-16順）で整列。空白だけの `context`・NBSP の扱いは #893 |
+| TokenContractRegistry.build | `P-TOKEN-CONTRACT-{VERSION,DEFINITION,DUPLICATE}` / `adapters::token_contract_diagnostics` | 接続。span なしの Java と同じ code 順に整列し、重複した `token` key は最初の値を subject にする（authoring 側で適合、生成器の共有関数は不変）。空白だけの `context`・NBSP の扱いは #893 |
 | UBNFFeatures.validate | `E-FEATURE-{VERSION,UNKNOWN,DUPLICATE}` / `adapters::feature_diagnostics` + authoring adapter | 接続。Java は VERSION/UNKNOWN subject を `feature` にし、非v2を最優先する。CLI の value subject との違いを実装で明示 |
 | TokenStreamGrammar.problems | `E-TOKEN-STREAM-{SETTING,VERSION,TRIVIA,TOKEN,ANNOTATION}` / `token_stream::problems` | 接続 |
 | GlobalComment.problems / warnings | `E-COMMENT-{SETTING,WHITESPACE}` / `global_comment::problems` | 接続。`W-COMMENT-IGNORED` は Java LSP と同じく GenerationWarnings だけから出す |
@@ -166,6 +169,12 @@ message は Java の `message + " — " + hint`。hint を捨てたり、CLI の
 | validateUndefinedRuleRefs | `E-RULE-UNDEFINED` / 同上 | 接続。宣言順の候補、UTF-16 Levenshtein<=2、重複参照抑制。Java legacy query が postfix/separated を辿らない点も保持 |
 | unique-longest cycle branch / detectLeftRecursionIssues | `E-UNIQUE-LONGEST-LEFT-RECURSION`, `W-LEFT-RECURSION[-LIMIT]` / `validation::recursion` + `collect` | 接続。advisoryは最後に追加 |
 
+レビュー（PR #896）で見つけた、再利用した共有解析・frontend 表現に由来する残差は #893 に追記した。
+空白だけの `context`/NBSP の判定、`E-LEXICAL` の最初の報告 token、lexical-context の件数上限と字句エラーの優先順、
+左再帰の深さ・作業量の数え方（Java は1択の本体にも `ChoiceBody` 段を数える）、`{2147483647}` の raising 検査、
+`@whitespace(...)` 内の区切り・コメントの表記、legacy `RegexTokenParser` の Simple token。
+range 付きの `didChange` は Java が先頭の text を全文として適用し、Rust は拒否する（#895）。
+
 `validateRustDeclarations` は生成器向け別APIであり、この Java LSP は呼ばない。
 単なる rule 名重複（従来 `duplicate` fixture）では Java validator は診断しないため、独自の重複エラーを足さない。
 このfixtureは両serverで `[]` を確認し、以前の `validatorGap` ラベルだけを完全一致へ変更した。
@@ -186,3 +195,6 @@ packaged VSIX は Java/Rust 両方で共通の `vsix-diagnostics.cjs` を実行�
 message から hint を外す、同じ/減少 version を拒否する4変異で共通実 stdio が失敗した。
 新規 bundled class 候補テストの `@Test` を外す変異では Maven の残り2メソッドが成功しても、
 `verify-optin-tests.py ubnf-authoring` が必須メソッド欠落を拒否した。変異を復元し3メソッドを再検証した。
+PR #896 のレビューでは、候補提示の閾値を `< 2` にする、`ADAPTER(...)` token 参照の検査を外す、
+宣言検索の AST node 範囲の制限を外す3変異が、それぞれ追加 fixture（`closest-name-*`、`adapter-token-references`、
+`declaration-not-body-grammar-keyword`）で共通実 stdio を失敗させることを確認し、復元した。

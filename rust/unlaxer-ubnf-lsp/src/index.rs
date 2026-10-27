@@ -132,6 +132,8 @@ impl Index {
                 return result;
             }
         };
+        // Before linking replaces the file: Java ranges use this document's declarations.
+        let declarations = declarations(&file, source, &lex);
         for grammar in &file.grammars {
             let mut scope = Scope {
                 start: grammar.span.byte_start,
@@ -216,12 +218,9 @@ impl Index {
         if !result.diagnostics.iter().any(|d| d["code"] == "E-MODULE") {
             for grammar in &file.grammars {
                 for issue in unlaxer_generator::validation::collect(grammar) {
-                    result.diagnostics.push(validation_diagnostic(
-                        source,
-                        &lex,
-                        &result.scopes,
-                        &issue,
-                    ));
+                    result
+                        .diagnostics
+                        .push(validation_diagnostic(source, &declarations, &issue));
                 }
             }
         }
@@ -372,62 +371,128 @@ fn atom_uses(atom: &AtomicElement, out: &mut Vec<(String, usize, usize)>) {
     }
 }
 
-fn validation_diagnostic(
-    source: &str,
-    lex: &[Lexeme],
-    scopes: &[Scope],
-    issue: &unlaxer_generator::validation::Issue,
-) -> Value {
-    // Match Java's document-wide first declaration, even across grammars.
-    let mut range = json!({"start":{"line":0,"character":0},"end":{"line":0,"character":1}});
-    let declaration = |name: &str| {
-        lex.iter()
-            .enumerate()
-            .find(|(i, t)| {
-                t.text == name
-                    && (*i > 0 && matches!(lex[*i - 1].text.as_str(), "token" | "grammar")
-                        || lex.get(*i + 1).is_some_and(|t| t.text == "::="))
-            })
-            .map(|(_, t)| t)
+/// A Java `UbnfEditorIndex` declaration: grammar, then tokens, then rules per grammar,
+/// each the first lexeme its node-bounded pattern matches (masked comments/strings).
+struct Declaration {
+    name: String,
+    start: usize,
+    end: usize,
+    /// `tokenDetail` of the token node text; `None` for grammars and rules.
+    detail: Option<String>,
+}
+
+fn declarations(file: &UbnfFile, source: &str, lex: &[Lexeme]) -> Vec<Declaration> {
+    let mut out = vec![];
+    let mut find = |name: &str, span: Span, kind: &str| {
+        let site = lex.iter().enumerate().find(|(i, t)| {
+            t.start >= span.byte_start
+                && t.end <= span.byte_end
+                && t.text == name
+                && match kind {
+                    "rule" => lex.get(i + 1).is_some_and(|n| n.text == "::="),
+                    keyword => *i > 0 && lex[i - 1].text == keyword,
+                }
+        });
+        if let Some((_, t)) = site {
+            out.push(Declaration {
+                name: name.into(),
+                start: t.start,
+                end: t.end,
+                detail: (kind == "token")
+                    .then(|| token_detail(&source[span.byte_start..span.byte_end])),
+            });
+        }
     };
-    if let Some(name) = &issue.rule {
-        if let Some(site) = declaration(name) {
-            range = text::range(source, site.start, site.end);
+    for grammar in &file.grammars {
+        find(&grammar.name, grammar.span, "grammar");
+        for token in &grammar.tokens {
+            find(&token.name, token.span, "token");
+        }
+        for rule in &grammar.rules {
+            find(&rule.name, rule.span, "rule");
         }
     }
-    if issue.code == "W-TOKEN-UNRESOLVED" {
-        if let Some((name, _)) = issue
-            .message
-            .strip_prefix("token ")
-            .and_then(|m| m.split_once(" references unresolved parser class: "))
-        {
-            if let Some(site) = declaration(name).filter(|site| {
-                lex.iter()
-                    .position(|t| t.start == site.start)
-                    .is_some_and(|i| i > 0 && lex[i - 1].text == "token")
-            }) {
-                let line_start = source[..site.start].rfind('\n').map_or(0, |i| i + 1);
-                let line_end = source[site.start..]
-                    .find('\n')
-                    .map_or(source.len(), |i| site.start + i);
-                if let Some((_, symbol)) = scopes
-                    .iter()
-                    .flat_map(|s| &s.symbols)
-                    .find(|(n, _)| n == name)
-                {
-                    if let Some((_, detail)) = symbol.detail.split_once('=') {
-                        let detail = detail.trim();
-                        if let Some(col) = source[line_start..line_end].find(detail) {
-                            range = text::range(
-                                source,
-                                line_start + col,
-                                line_start + col + detail.len(),
-                            );
-                        }
-                    }
-                }
-            }
+    out
+}
+
+/// Java `(?s)\btoken\s+\w+\s*(?:::=|=)\s*(.*)` (ASCII classes), first match, then `strip()`.
+fn token_detail(declaration: &str) -> String {
+    let bytes = declaration.as_bytes();
+    let word = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
+    let space = |b: u8| matches!(b, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r');
+    let skip = |mut i: usize, test: &dyn Fn(u8) -> bool| {
+        while i < bytes.len() && test(bytes[i]) {
+            i += 1;
         }
+        i
+    };
+    for (at, _) in declaration.match_indices("token") {
+        if at > 0 && word(bytes[at - 1]) {
+            continue;
+        }
+        let name = skip(at + 5, &space);
+        if name == at + 5 {
+            continue;
+        }
+        let after = skip(name, &word);
+        if after == name {
+            continue;
+        }
+        let op = skip(after, &space);
+        let rest = if declaration[op..].starts_with("::=") {
+            op + 3
+        } else if declaration[op..].starts_with('=') {
+            op + 1
+        } else {
+            continue;
+        };
+        return declaration[skip(rest, &space)..]
+            .trim_matches(java_whitespace)
+            .to_owned();
+    }
+    String::new()
+}
+
+/// `Character.isWhitespace`, which `String.strip()` uses.
+fn java_whitespace(c: char) -> bool {
+    matches!(c, '\t'..='\r' | '\u{1c}'..='\u{1f}')
+        || c.is_whitespace() && !matches!(c, '\u{85}' | '\u{a0}' | '\u{2007}' | '\u{202f}')
+}
+
+fn validation_diagnostic(
+    source: &str,
+    declarations: &[Declaration],
+    issue: &unlaxer_generator::validation::Issue,
+) -> Value {
+    // Java's `decls` keeps the document-wide first declaration of each name (putIfAbsent).
+    let declaration = |name: &str| declarations.iter().find(|d| d.name == name);
+    let mut range = json!({"start":{"line":0,"character":0},"end":{"line":0,"character":1}});
+    let unresolved = (issue.code == "W-TOKEN-UNRESOLVED")
+        .then(|| {
+            issue
+                .message
+                .strip_prefix("token ")?
+                .split_once(" references unresolved parser class: ")
+        })
+        .flatten();
+    let detail_range = unresolved.and_then(|(name, _)| {
+        let site = declaration(name)?;
+        let detail = site.detail.as_deref()?;
+        let line_start = source[..site.start].rfind('\n').map_or(0, |i| i + 1);
+        let line_end = source[site.start..]
+            .find('\n')
+            .map_or(source.len(), |i| site.start + i);
+        let col = source[line_start..line_end].find(detail)?;
+        Some(text::range(
+            source,
+            line_start + col,
+            line_start + col + detail.len(),
+        ))
+    });
+    if let Some(found) = detail_range {
+        range = found;
+    } else if let Some(site) = issue.rule.as_deref().and_then(declaration) {
+        range = text::range(source, site.start, site.end);
     }
     json!({"range":range,"severity":if issue.code.starts_with("W-"){2}else{1},"code":issue.code,"source":"ubnf-validator","message":format!("{} — {}",issue.message,issue.hint)})
 }

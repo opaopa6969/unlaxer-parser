@@ -86,11 +86,11 @@ pub fn collect(grammar: &GrammarDecl) -> Vec<Issue> {
     );
     for (issues, hint) in [
         (
-            AdapterRegistry::from_grammar(grammar).1,
+            adapter_diagnostics(grammar),
             "Correct the token adapter declaration or registration.",
         ),
         (
-            crate::adapters::token_contract_diagnostics(grammar),
+            contract_diagnostics(grammar),
             "Correct the format-2 token contract declaration.",
         ),
         (
@@ -462,6 +462,53 @@ fn tokens(grammar: &GrammarDecl, out: &mut Vec<Issue>) {
             first.push((name, token));
         }
     }
+}
+
+// Java's GrammarValidator builds both registries without a source snapshot, so
+// every span is null and Java's stable sort orders adapters by code then subject
+// (UTF-16 order) and contracts by code. Adapter diagnostics also cover each ADAPTER
+// token reference. Adapt the authoring contract here without changing the
+// fail-fast generator/check consumers of the shared functions.
+fn adapter_diagnostics(grammar: &GrammarDecl) -> Vec<crate::adapters::AdapterDiagnostic> {
+    let (registry, mut issues) = AdapterRegistry::from_grammar(grammar);
+    for token in &grammar.tokens {
+        if let TokenKind::Adapter { id, version } = &token.kind {
+            if let Err((code, subject)) = registry.resolve(id, version) {
+                issues.push(crate::adapters::AdapterDiagnostic {
+                    code,
+                    subject,
+                    span: token.span,
+                });
+            }
+        }
+    }
+    issues.sort_by(|a, b| {
+        a.code
+            .cmp(b.code)
+            .then_with(|| a.subject.encode_utf16().cmp(b.subject.encode_utf16()))
+    });
+    issues
+}
+fn contract_diagnostics(grammar: &GrammarDecl) -> Vec<crate::adapters::AdapterDiagnostic> {
+    let mut issues = crate::adapters::token_contract_diagnostics(grammar);
+    for issue in &mut issues {
+        // Java keeps the first value of a repeated block key (putIfAbsent).
+        let first = grammar
+            .settings
+            .iter()
+            .find(|s| s.key == "tokenContract" && s.span == issue.span)
+            .and_then(|s| match &s.value {
+                SettingValue::Block(entries) => entries.iter().find(|e| e.key == "token"),
+                _ => None,
+            });
+        if issue.code == "P-TOKEN-CONTRACT-DEFINITION" {
+            if let Some(entry) = first {
+                issue.subject = entry.value.clone();
+            }
+        }
+    }
+    issues.sort_by(|a, b| a.code.cmp(b.code));
+    issues
 }
 
 // The shared check API uses the written feature value as subject; Java's
