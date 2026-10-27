@@ -73,6 +73,8 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- Rust の token trace 予算が、Classic collector が後で除く leaf（consumed 親の下の match-only token、virtual 親の下の `stop_consume` 終端など）まで数え、最終 trace が予算内でも `Error::Limit` を残していた不具合を修正した (#866)。最終 trace に残る leaf だけを件数・UTF-8 bytes に数え、本当に超えた場合は従来どおり Limit とする。受理・cursor・CST・capture・state、hard ceiling、generated text の複製前の検査、既定 OFF は変えない。Java の実 leaf を基準とする共通 corpus と、Rust の n-1/n/n+1・DAP protocol で検証する。AST value node 直下の custom callback は保守的に数える。[上限と collector の scope](docs/token-trace.md#上限custom-parsermemo)。
+
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
 - Rust の token-stream / lexical-context 文法の非空 literal の Classic 反転を Java の幅0 assertion に揃え、EOF・lexical goal・先読み後の cursor・CST・失敗位置を両 Rust host の共通 corpus で固定した (#768)。同じ区別により、これらの文法では Classic の非反転照合も lexical goal を通し、optional / repeat 内の literal の失敗で matched cursor を戻さず、token trace の label が `LexicalTokenParser` になる。Java の既存挙動は変更しない。
 - 量指定子 `{n}` / `{n,m}` / `{n,}` の整数 overflow を Java / Java-host Rust / native Rust の検証・生成で `E-BOUNDED-OVERFLOW` と元ソース CP 範囲として報告し、公開済み AST の整数型 API を維持した。境界値・非 BMP・未使用/ゼロ回反復を共通 fixture で検証し、仕様 corpus の既知差を削除 (#783)。

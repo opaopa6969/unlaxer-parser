@@ -243,6 +243,10 @@ jobs:
         test -s unlaxer-dsl/target/classic-dap-protocol.tsv
         test -s unlaxer-dsl/target/classic-token-dap-protocol.tsv
         test -s unlaxer-dsl/target/token-trace.tsv
+        # #866: every budget.tsv row ran on Java and was matched by Rust's trace.
+        rows=$(grep -vc '^#' conformance/token-trace/budget.tsv)
+        test "$(grep -c '^java-budget' unlaxer-dsl/target/token-trace.tsv)" -eq "$rows"
+        test "$(grep -c '^rust-budget' unlaxer-dsl/target/token-trace.tsv)" -eq "$rows"
     - name: Resolver tutorial (Java and Rust)
       run: |
         python3 examples/resolver-tutorial/run.py build

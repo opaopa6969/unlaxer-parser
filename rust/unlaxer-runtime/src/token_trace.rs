@@ -1,6 +1,6 @@
 //! Bounded opt-in trace of committed parser terminals. No synthetic CST nodes.
 use crate::{
-    token::{TokenKind, TokenSource},
+    token::{ParseMode, TokenKind, TokenSource},
     Expr, ParseContext, Span, Tree,
 };
 
@@ -10,11 +10,13 @@ pub struct Limits {
     pub leaves: usize,
     pub source_bytes: usize,
 }
+const HARD_LEAVES: usize = 65_536;
+const HARD_SOURCE_BYTES: usize = 4 * 1024 * 1024;
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            leaves: 65_536,
-            source_bytes: 4 * 1024 * 1024,
+            leaves: HARD_LEAVES,
+            source_bytes: HARD_SOURCE_BYTES,
         }
     }
 }
@@ -68,12 +70,83 @@ impl std::fmt::Display for Error {
     }
 }
 impl std::error::Error for Error {}
+// Retained counts are bounded by the hard ceilings, so u32 counters leave room for
+// the collector scope without enlarging every checkpoint or token store (#866).
+const _: () = assert!(HARD_LEAVES <= u32::MAX as usize);
+const _: () = assert!(HARD_SOURCE_BYTES <= u32::MAX as usize);
+#[cfg(target_pointer_width = "64")]
+const _: () = {
+    assert!(std::mem::size_of::<Mark>() == 40);
+    assert!(std::mem::size_of::<Trace>() == 96);
+};
+/// Which leaf kinds the active Classic collectors can still retain (#866).
+///
+/// A collector keeps only direct children of its own kind, and its node has that
+/// kind. Wrappers between collectors pass nodes through unchanged, so a leaf of
+/// another kind is removed when the collectors complete; it is not counted at all.
+/// Rollback and collector completion return to the enclosing scope.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Scope {
+    retains: Retains,
+    /// Below an AST value node and no collector since. That node takes its child's
+    /// source kind without filtering, and a custom result there may mix kinds, so a
+    /// custom callback reached here decides its own leaves.
+    value_node: bool,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Retains {
+    Any,
+    Only(TokenKind),
+    /// Two nested collectors of different kinds: no leaf below can survive both.
+    Nothing,
+}
+impl Scope {
+    pub(crate) const OPEN: Self = Self {
+        retains: Retains::Any,
+        value_node: false,
+    };
+    fn enter(self, expression: &Expr, kind: TokenKind) -> Self {
+        // Each of these collects with the kind below and runs collect_classic_trace.
+        let kind = match expression {
+            Expr::TextValue(_) | Expr::ValueBoundary(_) => {
+                return Self {
+                    value_node: true,
+                    ..self
+                }
+            }
+            Expr::MatchOnly(_) => TokenKind::MatchOnly,
+            Expr::InvertMatch(_)
+            | Expr::Rule(_)
+            | Expr::CaptureBoundary(_, _)
+            | Expr::InputCaptureBoundary(_, _) => kind,
+            _ if crate::classic_collector_label(expression).is_some() => kind,
+            _ => return self,
+        };
+        let retains = match self.retains {
+            Retains::Any => Retains::Only(kind),
+            Retains::Only(only) if only == kind => self.retains,
+            _ => Retains::Nothing,
+        };
+        Self {
+            retains,
+            value_node: false,
+        }
+    }
+    fn hides(self, kind: TokenKind) -> bool {
+        match self.retains {
+            Retains::Any => false,
+            Retains::Only(only) => only != kind,
+            Retains::Nothing => true,
+        }
+    }
+}
 #[derive(Clone, Debug)]
 pub(crate) struct Trace {
     limits: Limits,
     leaves: Vec<Leaf>,
     nodes: Vec<Option<usize>>,
-    bytes: usize,
+    bytes: u32,
+    scope: Scope,
     error: Option<Error>,
 }
 impl Trace {
@@ -87,6 +160,7 @@ impl Trace {
             leaves: vec![],
             nodes: vec![],
             bytes: 0,
+            scope: Scope::OPEN,
             error: None,
         }
     }
@@ -95,8 +169,9 @@ impl Trace {
     }
 }
 pub(crate) struct Mark {
-    pub(crate) leaves: usize,
-    bytes: usize,
+    leaves: u32,
+    bytes: u32,
+    scope: Scope,
     error: Option<Error>,
 }
 impl Mark {
@@ -105,20 +180,41 @@ impl Mark {
             Self {
                 leaves: 0,
                 bytes: 0,
+                scope: Scope::OPEN,
                 error: None,
             },
             |t| Self {
-                leaves: t.leaves.len(),
+                leaves: t.leaves.len() as u32,
                 bytes: t.bytes,
+                scope: t.scope,
                 error: t.error.clone(),
             },
         )
     }
+    /// The checkpoint of an expression entry. Only an enabled Classic trace enters
+    /// the expression's collector scope; the mark keeps the enclosing one.
+    pub(crate) fn enter(
+        trace: Option<&mut Trace>,
+        expression: Option<&Expr>,
+        mode: Option<ParseMode>,
+    ) -> Self {
+        match trace {
+            None => Self::of(None),
+            Some(t) => {
+                let mark = Self::of(Some(t));
+                if let (Some(expression), Some(mode)) = (expression, mode) {
+                    t.scope = t.scope.enter(expression, mode.kind);
+                }
+                mark
+            }
+        }
+    }
     pub(crate) fn restore(self, trace: Option<&mut Trace>) {
         if let Some(t) = trace {
-            t.leaves.truncate(self.leaves);
-            t.nodes.truncate(self.leaves);
+            t.leaves.truncate(self.leaves as usize);
+            t.nodes.truncate(self.leaves as usize);
             t.bytes = self.bytes;
+            t.scope = self.scope;
             t.error = self.error;
         }
     }
@@ -173,12 +269,17 @@ impl ParseContext<'_> {
             return;
         }
         if trace.leaves.len() >= trace.limits.leaves
-            || bytes > trace.limits.source_bytes.saturating_sub(trace.bytes)
+            || bytes
+                > trace
+                    .limits
+                    .source_bytes
+                    .saturating_sub(trace.bytes as usize)
         {
             trace.error = Some(Error::Limit);
             return;
         }
-        trace.bytes += bytes;
+        // Within the 4 MiB hard ceiling checked above.
+        trace.bytes += bytes as u32;
         trace.nodes.push(None);
         trace.leaves.push(Leaf {
             label,
@@ -195,10 +296,13 @@ impl ParseContext<'_> {
         source: &TokenSource,
         node: usize,
     ) {
-        let before = self
-            .token_trace
-            .as_ref()
-            .map_or(0, |trace| trace.leaves.len());
+        let before = match &self.token_trace {
+            None => return,
+            // The active collectors remove this node, so its leaf never takes budget
+            // and generated text is not copied (#866).
+            Some(trace) if trace.scope.hides(kind) => return,
+            Some(trace) => trace.leaves.len(),
+        };
         self.record_trace(label, kind, source);
         if let Some(trace) = self.token_trace.as_mut() {
             if trace.leaves.len() > before {
@@ -215,10 +319,37 @@ impl ParseContext<'_> {
             }
         }
     }
-    pub(crate) fn collect_classic_trace(&mut self, start: usize, roots: &[usize]) {
-        if self.token_trace.is_none() {
+    /// Directly below an AST value node, a custom callback's mixed-kind result can
+    /// reach the outer collectors under a node of its first node's kind, so they do
+    /// not decide the callback's leaves. Returns the scope to reinstate afterwards.
+    pub(crate) fn open_trace_scope(&mut self) -> Option<Scope> {
+        let trace = self.token_trace.as_mut()?;
+        let scope = trace.scope;
+        if scope.value_node {
+            trace.scope = Scope::OPEN;
+        }
+        Some(scope)
+    }
+    pub(crate) fn close_trace_scope(&mut self, scope: Option<Scope>) {
+        if let (Some(trace), Some(scope)) = (self.token_trace.as_mut(), scope) {
+            trace.scope = scope;
+        }
+    }
+    pub(crate) fn collect_classic_trace(
+        &mut self,
+        mark: &Mark,
+        expression: &Expr,
+        roots: &[usize],
+    ) {
+        let Some(trace) = self.token_trace.as_mut() else {
+            return;
+        };
+        trace.scope = mark.scope;
+        // An AST value node only leaves its scope; it is not a collector.
+        if matches!(expression, Expr::TextValue(_) | Expr::ValueBoundary(_)) {
             return;
         }
+        let start = mark.leaves as usize;
         let mut retained = std::collections::BTreeSet::new();
         let mut pending = roots.to_vec();
         while let Some(node) = pending.pop() {
@@ -245,7 +376,8 @@ impl ParseContext<'_> {
                 };
             }
         }
-        trace.bytes -= removed;
+        // Removed leaves were counted in bytes, which stays within the hard ceiling.
+        trace.bytes -= removed as u32;
     }
     pub(crate) fn trace_empty(&mut self, label: &'static str) {
         if self.token_trace.is_some() {
