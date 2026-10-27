@@ -448,7 +448,8 @@ Not 自身も token mode のまま fallback を開始する（Java の MatchOnly
 これは #838 時点の範囲であり、正の先読みからの成功時到達位置は後述の #826 で追加する。
 
 #197 に対する成功側の例外は `finish_expression` のこの fallback 記録だけである。
-成功した `java_transaction` の frame でだけ、診断設定と「負の先読み、または native で fallback が有効」かを判定し、
+成功した `java_transaction` の frame でだけ、診断設定と「負の先読み、または native で fallback が有効」かを判定し
+（#872 / #876 で後者は「native」に変わった。[後述](#plain-success-diagnostics)）、
 記録本体（CatchLabels・frontier・token stream の除外と最大値更新）は `#[cold]` / `#[inline(never)]` の
 `note_success_frame_start` に置く。診断 OFF では transaction 以外の成功に追加の判定はなく、
 transaction の成功でも診断設定の比較1つだけで、保存・確保・最大値計算・呼出しは行わない。
@@ -745,6 +746,12 @@ Java は frame-start 2880行・nested 2664行、両 Rust host × 通常/mapping 
 - DETAILED_ON_FAILURE の処理・呼出し数と UNTIL の走査ループは不変。新しい再帰経路はない。
   入力照合・候補選択・memo key / hit 会計も変えず、性能の再計測は行わない。
 
+記録点は成功した Java transaction frame（Choice / NonOrdered / MatchOnly / UNTIL など）だけである。
+最後の transaction frame の後に、transaction を持たない Chain / literal が消費した位置は入らない。
+例: `'a' 'z'` を `azb` で direct に呼ぶと Java CP2 / Rust CP0、`('a' | 'h') 'z'` は Java CP2 / Rust CP1
+（修正前は CP0）、先行先読み `a` の後の `'a' 'z'` は修正前から Java CP2 / Rust CP1。
+外側に NonOrdered / Choice などがあればその frame が終端を記録するので一致する。
+この残りは診断 OFF との境界の判断が要るため [#878](https://github.com/opaopa6969/unlaxer-parser/issues/878) で追跡し、corpus には含めない。
 任意の手組み IR や成功履歴全般の全面一致、#823 の候補単独 reset 差の解消は主張しない。
 
 

@@ -442,6 +442,10 @@
     "876": {
       "state": "OPEN",
       "title": "parity: 先読みが先行しない通常呼出で失敗のない成功の診断 CP が Java と違う（#875 レビュー、#872 の一般形）"
+    },
+    "878": {
+      "state": "OPEN",
+      "title": "parity: transaction frame の外で消費した Chain / literal の成功到達位置が診断 CP に入らない（#877 レビュー、#876 の残り）"
     }
   },
   "entries": [
@@ -1667,9 +1671,10 @@
         876,
         826,
         827,
-        197
+        197,
+        878
       ],
-      "observation": "JavaのgetParseFailureDiagnosticsは実失敗のfarthestFailureOffsetを優先し、なければstartParse/endParse/consume/matchOnlyが保存したmaxReachedOffsetを返す。Rustの成功記録からclassic_max_reached.is_some()の条件を除き、native UNTILの失敗試行も既存cold helperで集約する。aab/bbはCP1、a😀のEOFはCP2、Helper2+azbはCP2、Outer2+azxはCP3。Java runtimeは不変。frame-startに5経路120行、nestedに32経路768行をJava実測から追加し、既存oracle2760/1896行を維持。Java計2880/2664行、両host・通常/mapping・通常/Classic・初期reset2・memo2・診断3とnested Chain対照を照合する。差分表の診断2列は全行同値、frame-start81行は不変、nested268→316行の増分48行は#827型のmemo会計差のみ。成否・両cursor・reset・後続診断/成否・memo hitは修正前後で不変。既存Detailed transactionガード内の判定1つを除き、新規分岐・field/cache・呼出し箇所・再帰経路は0。先行先読みなしのDetailed成功でも既存cold helperが呼ばれるため頻度は増えるが、診断OFFと走査ループは不変。UNTILのexpected名登録は既存の診断領域を利用する。#197に従い性能再計測なし。生成grammarのJava互換経路へ適用し、独立native PEG式入口/lexingは既存ガードで除外、peg-frontierの別列は維持。任意IRの成功履歴全般の全面一致は主張しない。両issueはPRのmerge待ちでOPEN。 隔離worktreeの修正前runtimeと更新後corpusでJava oracleの2テストは成功、Rust照合の2テストはUNTIL CP1→0とHelper2 CP2→0で失敗。各hostの全出力比較ではframe-start64/5760、nested608/10656の診断差を検出する。",
+      "observation": "JavaのgetParseFailureDiagnosticsは実失敗のfarthestFailureOffsetを優先し、なければstartParse/endParse/consume/matchOnlyが保存したmaxReachedOffsetを返す。Rustの成功記録からclassic_max_reached.is_some()の条件を除き、native UNTILの失敗試行も既存cold helperで集約する。aab/bbはCP1、a😀のEOFはCP2、Helper2+azbはCP2、Outer2+azxはCP3。Java runtimeは不変。frame-startに5経路120行、nestedに32経路768行をJava実測から追加し、既存oracle2760/1896行を維持。Java計2880/2664行、両host・通常/mapping・通常/Classic・初期reset2・memo2・診断3とnested Chain対照を照合する。差分表の診断2列は全行同値、frame-start81行は不変、nested268→316行の増分48行は#827型のmemo会計差のみ。成否・両cursor・reset・後続診断/成否・memo hitは修正前後で不変。既存Detailed transactionガード内の判定1つを除き、新規分岐・field/cache・呼出し箇所・再帰経路は0。先行先読みなしのDetailed成功でも既存cold helperが呼ばれるため頻度は増えるが、診断OFFと走査ループは不変。UNTILのexpected名登録は既存の診断領域を利用する。#197に従い性能再計測なし。生成grammarのJava互換経路へ適用し、独立native PEG式入口/lexingは既存ガードで除外、peg-frontierの別列は維持。任意IRの成功履歴全般の全面一致は主張しない。記録点は成功したtransaction frameで、最後のtransaction frameの後のChain/literalの消費（direct の 'a' 'z' は Java CP2 / Rust CP0）は#878で追跡する。両issueはPRのmerge待ちでOPEN。 隔離worktreeの修正前runtimeと更新後corpusでJava oracleの2テストは成功、Rust照合の2テストはUNTIL CP1→0とHelper2 CP2→0で失敗。各hostの全出力比較ではframe-start64/5760、nested608/10656の診断差を検出する。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/frame-start-inputs.tsv",

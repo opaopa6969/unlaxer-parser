@@ -118,7 +118,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Rust の通常呼出でも、Java に対応する frame の開始時に owner reset=true なら matched を consumed へ戻すよう修正 (#829)。先読み後に同じ context で Choice 等を呼ぶときの受理・拒否を Java に揃え、Chain の begin 前の reset=false と回数0の反復の保持を維持する。生成 Java の共通 corpus、両 Rust host、通常 / Classic と memo・診断設定で検証する。
 - Rust の rule を介さない frame の診断に reset 前の `max(consumed, matched)` を反映し、直接の MatchOnly / Not と LongestChoice / UniqueLongestChoice などを Java に揃える (#838)。負の先読み成功の到達位置は失敗候補と区別して外側の frame（MatchOnly の直下を含む）へ伝え、診断 OFF・memo hit・cursor / reset の契約を維持する。
 - Rust の正の先読みから成功時の診断到達位置を記録し、nested mixed grammar と後続 MatchOnly の診断を Java に揃える (#826)。Classic capture の失敗 frame と、先読みの後の native UNTIL の失敗した終端候補も記録し、成功時の到達位置より実際の失敗候補を優先する。成否・両 cursor・reset・memo hit は維持する。先読みのない通常呼出への拡張は次項の #872 / #876 を参照。
-- Rust の生成 Java 互換経路で、先読みが先行しない通常呼出の成功時診断 CP を Java に揃える (#872、#876)。UNTIL の失敗した終端試行を優先し、実失敗がなければ成功 frame の到達位置を返す。診断 OFF・走査ループ・native PEG 式入口の契約と成否・両 cursor・reset・memo hit は維持する。
+- Rust の生成 Java 互換経路で、先読みが先行しない通常呼出の成功時診断 CP を Java に揃える (#872、#876)。UNTIL の失敗した終端試行を優先し、実失敗がなければ成功 frame の到達位置を返す。診断 OFF・走査ループ・native PEG 式入口の契約と成否・両 cursor・reset・memo hit は維持する。記録点は成功した transaction frame で、その外の Chain / literal の消費は #878 で追跡する。
 
 - Java frontend の annotation 名の prefix 誤認、`@eval` の名前付き引数と `@commonField` の comma 後 trivia の解析を修正 (PR #540)。左再帰の診断順と `@eval` パラメータの表示順も決定的にした (PR #726)。
 - Java の token stream / lexical context 内の literal capture と、左結合の同じ parser class を使う literal の取得箇所を修正 (PR #672、#677)。[token stream](docs/token-stream.md)、[結合演算子](docs/associative-projection.md)。
