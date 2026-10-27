@@ -91,7 +91,7 @@ continue が空の breakpoint 集合でも失敗するのは Java の既存挙�
 
 - [`projected-token-dap/overflow.json`](fixtures/projected-token-dap/overflow.json): #892 の4入力・11 leaf。ASCII の `[2,4)`、非 BMP、先頭の空 part と entry での失敗、CRLF を含む最終 step の失敗を固定する。0/1基底 × source offset 0/7 × next / 失敗後 continue / breakpoint 巡回の各48 session・116停止点を実 stdio で比較し、各48終了状態も検証する。Rust 単体テストでも同じ fixture の CP 範囲・失敗応答・variables・終了を検証する。
 
-- [`projected-token-dap/crlf.json`](fixtures/projected-token-dap/crlf.json): #899 の3入力に Generated anchor と先頭 Projected を追加した5入力。0/1基底 × source offset 0/7 × next / continue / breakpoint 付き continue / breakpoint 付き configurationDone / breakpoint なし直接実行の各100 session。失敗の反復・不変な停止位置・変数・next による復帰・終了を比較する。Rust 単体テストも同じ fixture を使う。
+- [`projected-token-dap/crlf.json`](fixtures/projected-token-dap/crlf.json): #899 の3入力に Generated anchor と先頭 Projected を追加した5入力。0/1基底 × source offset 0/7 × next / continue / breakpoint 付き continue / breakpoint 付き configurationDone / 一致しない負の breakpoint 行での configurationDone / breakpoint なし直接実行の各120 session。失敗の反復・不変な停止位置・変数・next による復帰・終了を比較する。Rust 単体テストも同じ fixture を使う。
 - [`dap-failures/requests.json`](fixtures/dap-failures/requests.json): #900 の各 request の success・message・body 型・先頭行を独立に固定する。`target/dap-failures-*.tsv` に全 route の比較一覧と生 response、`target/token-dap-crlf.tsv` に #899 の比較を出力し、CI artifact を必須化する。
 
 ```sh

@@ -1293,7 +1293,7 @@
         899,
         900
       ],
-      "observation": "#899 は Java 基準 revision 1a8c8921 の既存挙動に合わせ、CRLF 内部の Input / Generated / Projected token を保持。stackTrace と不正な開始を通る breakpoint 探索の continue / configurationDone だけを Internal error. と inside CRLF の直接例外で失敗させ、停止位置を維持する。5共通入力・各100 sessionで0/1基底・offset0/7・next/continue/breakpoint/直接実行を比較。#900 は Classic AST/token（両生成host）/ Generated / Projected の未初期化・未配置・停止中・終了後の request を実 stdio で一覧化し、success・message・body型・先頭行を固定。残す意図した差: Java/JDK の呼出履歴（CompletionException原因節含む）は Rust に生成しない。setBreakpoints(null) / null breakpoint は両方 Internal error. / 文字列 body / java.lang.NullPointerException だが、Java の JVM メソッド・parameter 名を含む helpful NPE 説明を Rust は missing setBreakpoints arguments / null breakpoint とする。他の共通 fixture の失敗先頭行は全文一致。Java 製品コード・公開3.3.0・parser ホットパスは不変。",
+      "observation": "#899 は Java 基準 revision 1a8c8921 の既存挙動に合わせ、CRLF 内部の Input / Generated / Projected token を保持。stackTrace と不正な開始を通る breakpoint 探索の continue / configurationDone だけを Internal error. と inside CRLF の直接例外で失敗させ、停止位置を維持する。5共通入力・各120 sessionで0/1基底・offset0/7・next/continue/breakpoint/負の breakpoint 行/直接実行を比較。負の breakpoint 行は Java と同じく保持され、configurationDone の探索を有効にする。#900 は Classic AST/token（両生成host）/ Generated / Projected の未初期化・未配置・停止中・終了後の request を実 stdio で一覧化し、success・message・body型・先頭行を固定。残す意図した差: Java/JDK の呼出履歴（CompletionException原因節含む）は Rust に生成しない。setBreakpoints(null) / null breakpoint は両方 Internal error. / 文字列 body / java.lang.NullPointerException だが、Java の JVM メソッド・parameter 名を含む helpful NPE 説明を Rust は missing setBreakpoints arguments / null breakpoint とする。他の共通 fixture の失敗先頭行は全文一致。Java 製品コード・公開3.3.0・parser ホットパスは不変。",
       "evidence": [
         "docs/token-trace.md",
         "rust/unlaxer-dap/src/lib.rs",

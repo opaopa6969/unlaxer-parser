@@ -276,7 +276,14 @@ fn crlf_interior_failure_preserves_step_and_can_resume() {
     };
     for row in rows.as_array().unwrap() {
         std::fs::write(&file, row["input"].as_str().unwrap()).unwrap();
-        for stop_on_entry in [true, false] {
+        // Continue searches every later start even without breakpoints. A negative line
+        // never matches, but Java still searches every start for it in configurationDone.
+        for (stop_on_entry, lines) in [
+            (true, json!([{"line":2}])),
+            (true, json!([])),
+            (false, json!([{"line":2}])),
+            (false, json!([{"line":-1}])),
+        ] {
             // Launch is accepted even before initialize, matching the Java adapter.
             assert_eq!(
                 send(
@@ -285,7 +292,7 @@ fn crlf_interior_failure_preserves_step_and_can_resume() {
                 )[0]["success"],
                 true
             );
-            send("setBreakpoints", json!({"breakpoints":[{"line":2}]}));
+            send("setBreakpoints", json!({"breakpoints":lines}));
             let configured = send("configurationDone", json!({}));
             let bad_start = row["startLines"]
                 .as_array()

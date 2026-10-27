@@ -15,7 +15,7 @@ Java 基準 revision は `1a8c8921`（LSP4J 0.23.1）。`requests.json` は実 s
 | setBreakpoints(null) / null breakpoint | false | `Internal error.` | 文字列: 例外型 `java.lang.NullPointerException` が一致。Java の JVM メソッド・parameter 名を含む説明と Rust の `missing setBreakpoints arguments` / `null breakpoint` は意図した差 |
 | IDebugProtocolServer の未実装31 request（stepIn / pause / evaluate / cancel / attach 等、JSON に全件列挙） | false | `Internal error.` | 文字列: `java.lang.UnsupportedOperationException` |
 | 未知 command | false | `Unsupported request method: unknown-fixture-command` | body なし |
-| setBreakpoints の line -1 / 0 / 省略 | true | なし | Java と同じく -1 / 0 / 0 を返す。負の行は停止位置に一致しない |
+| setBreakpoints の line -1 / 0 / 省略 | true | なし | Java と同じく -1 / 0 / 0 を返す。負の行は停止位置に一致しないが、Java と同じく breakpoint 集合を空でなくし、configurationDone の探索を有効にする |
 | initialize 前の threads / 有効 stackTrace / scopes / variables、frameId 省略の scopes | true | なし | 通常の応答 object。initialize 前という理由だけでは拒否しない |
 
 CRLF 内部と Projected 終端超過の位置変換は、それぞれ直接の `java.lang.IllegalArgumentException: inside CRLF` / `outside snapshot`。CompletionException を付けない。共通入力・停止順・終了・失敗後の状態は [`../projected-token-dap/crlf.json`](../projected-token-dap/crlf.json) と [`../projected-token-dap/overflow.json`](../projected-token-dap/overflow.json) で別途照合する。

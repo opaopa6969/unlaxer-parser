@@ -285,7 +285,7 @@ public class ProjectedTokenDapProtocolConformanceTest {
         try (var wire = javaWire("crlf.json")) { exerciseCrlf(wire, javaEvidence); }
         try (var wire = rustWire("crlf.json")) { exerciseCrlf(wire, rustEvidence); }
         assertEquals(javaEvidence, rustEvidence);
-        assertEquals(100, javaEvidence.stream().filter(line -> line.contains("\tend\t")).count());
+        assertEquals(120, javaEvidence.stream().filter(line -> line.contains("\tend\t")).count());
         var evidence = new ArrayList<String>(List.of("backend\tfixture\tbase\toffset\tmode\tstep\tobservation"));
         javaEvidence.forEach(line -> evidence.add("java\t"+line));
         rustEvidence.forEach(line -> evidence.add("rust\t"+line));
@@ -298,16 +298,17 @@ public class ProjectedTokenDapProtocolConformanceTest {
         String diagnostic = "java.lang.IllegalArgumentException: inside CRLF";
         for (boolean base : List.of(true, false)) for (int offset : List.of(0, 7)) {
             wire.request("initialize", Map.of("linesStartAt1", base, "columnsStartAt1", base));
-            for (var element : rows) for (String mode : List.of("next", "continue", "breakpoints", "configuration-breakpoints", "run")) {
+            for (var element : rows) for (String mode : List.of("next", "continue", "breakpoints", "configuration-breakpoints", "configuration-negative-breakpoints", "run")) {
                 var row = element.getAsJsonObject(); var steps = row.getAsJsonArray("steps");
                 var starts = row.getAsJsonArray("startLines");
-                boolean configuration = mode.equals("configuration-breakpoints") || mode.equals("run");
+                boolean configuration = mode.startsWith("configuration-") || mode.equals("run");
                 boolean breakpoints = mode.contains("breakpoints");
                 String prefix = row.get("name").getAsString()+"\t"+base+"\t"+offset+"\t"+mode+"\t";
                 Path program = temporary.newFile().toPath(); Files.writeString(program, "outer\n".repeat(offset)+row.get("input").getAsString());
                 wire.request("launch", Map.of("program", program.toString(), "fixture", row.get("name").getAsString(), "stopOnEntry", !configuration, "runtimeMode", "inspection-token", "lineOffset", offset));
                 wire.event("initialized");
-                wire.request("setBreakpoints", Map.of("source", Map.of("path", program.toString()), "breakpoints", breakpoints ? List.of(Map.of("line", 2+offset-(base ? 0 : 1))) : List.of()));
+                wire.request("setBreakpoints", Map.of("source", Map.of("path", program.toString()), "breakpoints", breakpoints ? List.of(Map.of("line", mode.contains("negative") ? -1 : 2+offset-(base ? 0 : 1))) : List.of()));
+                // Java keeps the unmatched negative line, so configurationDone still searches every start.
                 var configured = wire.response("configurationDone", Map.of());
                 boolean badStart = starts.asList().stream().anyMatch(JsonElement::isJsonNull);
                 if (configuration && breakpoints && badStart) {

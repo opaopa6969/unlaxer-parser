@@ -165,7 +165,8 @@ pub struct Server<B> {
     line_offset: usize,
     steps: Vec<Step>,
     index: usize,
-    breakpoints: BTreeSet<usize>,
+    // Signed like Java's Set<Integer>: an unmatched line still makes the set non-empty.
+    breakpoints: BTreeSet<i64>,
     variables: BTreeMap<String, String>,
     line_base: usize,
     column_base: usize,
@@ -287,7 +288,8 @@ impl<B: Backend> Server<B> {
                             ));
                         }
                         // LSP4J accepts signed lines and defaults a missing primitive to 0.
-                        // Negative lines are reported but cannot match a source position.
+                        // Negative lines never match a position, but still enable the breakpoint
+                        // search in configurationDone, as in Java.
                         let line = match breakpoint.get("line") {
                             None | Some(Value::Null) => 0,
                             Some(line) => line
@@ -295,9 +297,7 @@ impl<B: Backend> Server<B> {
                                 .filter(|line| i32::try_from(*line).is_ok())
                                 .ok_or("invalid breakpoint line")?,
                         };
-                        if let Ok(line) = usize::try_from(line) {
-                            lines.insert(line);
-                        }
+                        lines.insert(line);
                         let mut result = json!({"verified":same_source,"line":line});
                         if !same_source {
                             result["message"] = json!("source does not match launch program");
@@ -493,7 +493,7 @@ impl<B: Backend> Server<B> {
             }
         })();
         let mut output = vec![];
-        // Complete the request before sending resulting events (initialized is never pre-initialize).
+        // Complete the request before sending resulting events.
         let mut response = json!({"seq":self.next_seq(),"type":"response","request_seq":request_seq,"command":command,"success":result.is_ok()});
         match result {
             Ok(body) => {
@@ -549,9 +549,8 @@ impl<B: Backend> Server<B> {
             let position = snapshot
                 .lsp(self.steps[index].span.start)
                 .map_err(RequestError::position)?;
-            if self
-                .breakpoints
-                .contains(&(position.line + self.line_offset + self.line_base))
+            if i64::try_from(position.line + self.line_offset + self.line_base)
+                .is_ok_and(|line| self.breakpoints.contains(&line))
             {
                 return Ok(Some(index));
             }
