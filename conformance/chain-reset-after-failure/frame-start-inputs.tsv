@@ -103,3 +103,11 @@ Root-stop-consume	Root	stop-consume	ab	a
 PlainSeq-stop-consume	PlainSeq	stop-consume	ab	a
 Root-stop-invert	Root	stop-invert	ab	a
 PlainSeq-stop-invert	PlainSeq	stop-invert	ab	a
+Root-lookahead-longest	Root	lookahead-longest	ab	a
+PlainSeq-lookahead-longest	PlainSeq	lookahead-longest	ab	a
+Root-unique-lookahead	Root	unique-lookahead	ab	a
+Negative-lookahead-negative	Negative	lookahead-negative	ab	a
+Root-longest-negative	Root	longest-negative	ab	a
+Negative-longest-negative	Negative	longest-negative	ab	a
+PlainSeq-negative-then	PlainSeq	negative-then	ab	a
+Root-choice-negative-seq	Root	choice-negative-seq	ab	a

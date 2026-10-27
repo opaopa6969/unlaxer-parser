@@ -102,6 +102,13 @@ public class FrameStartMatchedResetConformanceTest {
             case "stop-invert" -> new InvertMatchPropagationStopper(parser);
             case "positive" -> new MatchOnly(new WordParser("b"));
             case "negative" -> new Not(new WordParser("b"));
+            // #838 nested frames: rule and non-rule frames, and failures after a successful Not.
+            case "lookahead-longest" -> new MatchOnly(new LongestChoice(parser, new WordParser("fallback")));
+            case "unique-lookahead" -> new UniqueLongestChoice(new MatchOnly(parser), new WordParser("fallback"));
+            case "lookahead-negative" -> new MatchOnly(new Not(new WordParser("b")));
+            case "longest-negative" -> new LongestChoice(new Not(new WordParser("b")), parser);
+            case "negative-then" -> new Chain(new Not(new WordParser("b")), parser);
+            case "choice-negative-seq" -> new Choice(new Chain(new Not(new WordParser("b")), new WordParser("zz")), parser);
             default -> throw new AssertionError(boundary);
         };
     }

@@ -2730,6 +2730,11 @@ impl<'a> ParseContext<'a> {
         let previous = self.token_mode;
         if previous.is_none() && requires_classic_mode(expression, &self.rules) {
             self.token_mode = Some(token::ParseMode::default());
+            // Like parse_with_token_mode: Java's startParse of the outer frame (e.g.
+            // MatchOnly around a successful Not) records its reach before begin (#838).
+            if self.options.diagnostics == Diagnostics::Detailed {
+                self.note_classic_entry();
+            }
         }
         let start = self.position();
         let result = match self.expression(expression, self.call_depth) {
@@ -3091,6 +3096,37 @@ impl<'a> ParseContext<'a> {
             && self.frontier(self.position) > self.position
         {
             self.fail_without_expected();
+        }
+    }
+
+    /// The successful Classic watermark at an implicit Classic entry (#838).
+    #[cold]
+    #[inline(never)]
+    fn note_classic_entry(&mut self) {
+        let reached = self.position.max(self.matched_position);
+        self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+    }
+
+    /// Java's fallback reach after a successful Not (#838): its startParse
+    /// max(consumed, matched), recorded before begin reset matched, and that of every
+    /// enclosing frame (e.g. a Choice that reset before the Not or a MatchOnly around it).
+    /// This is not a failure: a later real failure behind it still wins. The successful
+    /// Classic watermark and memo diagnostics carry it; nothing is allocated. A Not
+    /// directly under MatchOnly runs in token mode and starts the fallback there; only
+    /// native frames carry it. A token-stream session keeps the consumed frontier.
+    #[cold]
+    #[inline(never)]
+    fn note_success_frame_start(&mut self, expression: &Expr, start: usize) {
+        if matches!(expression, Expr::CatchLabels { .. })
+            || !self.grammar_frontier
+            || self.lexing.is_some()
+        {
+            return;
+        }
+        let reached = start.max(self.position).max(self.matched_position);
+        self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.classic_max_reached = Some(frame.classic_max_reached.unwrap_or(0).max(reached));
         }
     }
 
@@ -3736,20 +3772,13 @@ impl<'a> ParseContext<'a> {
             let failed_reset = self.match_cursor_policy.reset;
             self.restore(checkpoint);
             if self.resource_failure.is_none() {
-                // Group/choice parsers have frames even without a rule invocation (#793).
-                // A bounded repeat (`'x'{2}`) is a Java Repeat frame that fails after its
-                // earlier iterations consumed. Reuse the restored cursors; successful
-                // expressions and the deferred pass need no frame bookkeeping. Classic
-                // records its frames below.
+                // Java startParse precedes begin's matched reset (#793, #838).
+                // CatchLabels has a transaction but no startParse/endParse notification.
+                // Reuse the restored entry cursors only on failure; Classic records its
+                // failed frames below and deferred diagnostics need no bookkeeping.
                 if self.options.diagnostics == Diagnostics::Detailed
-                    && matches!(
-                        expression,
-                        Expr::Sequence(_)
-                            | Expr::Choice(_)
-                            | Expr::PredictiveChoice { .. }
-                            | Expr::Repeat { .. }
-                            | Expr::JavaRepeat { .. }
-                    )
+                    && ((java_transaction && !matches!(expression, Expr::CatchLabels { .. }))
+                        || matches!(expression, Expr::Sequence(_) | Expr::Repeat { .. }))
                 {
                     self.fail_parser_frame();
                 }
@@ -3793,6 +3822,25 @@ impl<'a> ParseContext<'a> {
                 }
             }
         } else {
+            // A successful Not discards its child's failures; Java then falls back to the
+            // startParse reach recorded before begin reset matched (#838). Only Detailed
+            // transactions that start or carry that fallback reach the cold recorder; a
+            // Classic call carries its own watermark.
+            if java_transaction
+                && self.options.diagnostics == Diagnostics::Detailed
+                && (matches!(
+                    expression,
+                    Expr::JavaLookahead {
+                        positive: false,
+                        ..
+                    }
+                ) || (self.token_mode.is_none() && self.classic_max_reached.is_some()))
+            {
+                self.note_success_frame_start(
+                    expression,
+                    checkpoint.position.max(checkpoint.matched_position),
+                );
+            }
             if self.token_mode.is_some()
                 && (classic_collector_label(expression).is_some()
                     || matches!(
