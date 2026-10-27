@@ -27,4 +27,15 @@ grammar NestedBoundary {
     Unique ::= ('a' 'z' | 'q') | N;
     @nestedCaptures @mapping(PredictiveNode) @predictiveChoice
     Predictive ::= ('a' 'z' | 'q') | N;
+    Helper ::= 'a' 'z' | 'h';
+    Mix ::= (Helper | 'q') | N;
+    Outer ::= Mix | Helper 'x';
+    Helper2 ::= 'a' 'z' | 'h';
+    Outer2 ::= Helper2 'x' | Helper2 'y' | Helper2;
+    OptHelper ::= [Helper] 'x' | Helper;
+    @longestChoice
+    LongestHelper ::= Helper 'x' | Helper | 'a';
+    @uniqueLongestChoice
+    UniqueHelper ::= Helper 'x' | Helper;
+    OuterOuter ::= Outer 'y' | Outer | Mix 'x';
 }

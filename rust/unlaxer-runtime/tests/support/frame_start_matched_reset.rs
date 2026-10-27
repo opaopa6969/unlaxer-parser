@@ -86,6 +86,7 @@ fn observe(context: &mut ParseContext<'_>) -> ParseResult {
     if c[4] != "-" {
         let prefix = match c[4].as_str() {
             "a" => "a",
+            "ab" => "ab",
             "a😀" => "a😀",
             "1" => "1",
             "+" => "+",
@@ -144,16 +145,16 @@ fn observe(context: &mut ParseContext<'_>) -> ParseResult {
             rule,
             Expr::Literal("fallback"),
         ]))),
-        "unique-lookahead" => {
-            Expr::UniqueLongestChoice(vec![Expr::MatchOnly(Box::new(rule)), Expr::Literal("fallback")])
-        }
+        "unique-lookahead" => Expr::UniqueLongestChoice(vec![
+            Expr::MatchOnly(Box::new(rule)),
+            Expr::Literal("fallback"),
+        ]),
         "lookahead-negative" => Expr::MatchOnly(Box::new(NOT_B)),
         "longest-negative" => Expr::LongestChoice(vec![NOT_B, rule]),
         "negative-then" => Expr::Sequence(vec![NOT_B, rule]),
-        "choice-negative-seq" => Expr::Choice(vec![
-            Expr::Sequence(vec![NOT_B, Expr::Literal("zz")]),
-            rule,
-        ]),
+        "choice-negative-seq" => {
+            Expr::Choice(vec![Expr::Sequence(vec![NOT_B, Expr::Literal("zz")]), rule])
+        }
         _ => panic!("boundary"),
     };
     let mut before = None;

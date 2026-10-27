@@ -111,3 +111,12 @@ Root-longest-negative	Root	longest-negative	ab	a
 Negative-longest-negative	Negative	longest-negative	ab	a
 PlainSeq-negative-then	PlainSeq	negative-then	ab	a
 Root-choice-negative-seq	Root	choice-negative-seq	ab	a
+PlainSeq-until-unicode	PlainSeq	until-frame	a😀b	a
+PlainSeq-until-eof	PlainSeq	until-frame	a😀x	a
+PlainSeq-until-earlier	PlainSeq	until-frame	abxb	ab
+# #872: UNTIL without a preceding lookahead, including CP/byte and EOF controls.
+PlainSeq-until-noprefix	PlainSeq	until-frame	aab	-
+PlainSeq-until-immediate	PlainSeq	until-frame	bb	-
+PlainSeq-until-noprefix-unicode	PlainSeq	until-frame	a😀b	-
+PlainSeq-until-noprefix-eof	PlainSeq	until-frame	a😀	-
+PlainSeq-until-empty	PlainSeq	until-frame	-	-
