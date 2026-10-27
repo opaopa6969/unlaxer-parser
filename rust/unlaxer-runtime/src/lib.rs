@@ -2738,21 +2738,28 @@ impl<'a> ParseContext<'a> {
         }
         let start = self.position();
         let result = match self.expression(expression, self.call_depth) {
-            Some(fragment) => Ok(ParseMatch {
-                span: fragment
-                    .source
-                    .as_deref()
-                    .filter(|source| source.classic)
-                    .map_or(
-                        Span {
-                            start,
-                            end: self.position(),
-                        },
-                        |source| source.span,
-                    ),
-                nodes: fragment.nodes,
-                captures: fragment.captures,
-            }),
+            Some(fragment) => {
+                // Once per caller entry, never per expression node (#878). The successful
+                // tail can consume beyond the last Java transaction frame.
+                if self.options.diagnostics == Diagnostics::Detailed {
+                    self.note_success_entry(expression);
+                }
+                Ok(ParseMatch {
+                    span: fragment
+                        .source
+                        .as_deref()
+                        .filter(|source| source.classic)
+                        .map_or(
+                            Span {
+                                start,
+                                end: self.position(),
+                            },
+                            |source| source.span,
+                        ),
+                    nodes: fragment.nodes,
+                    captures: fragment.captures,
+                })
+            }
             None => Err(self.failure()),
         };
         self.token_mode = previous;
@@ -3105,6 +3112,26 @@ impl<'a> ParseContext<'a> {
     fn note_classic_entry(&mut self) {
         let reached = self.position.max(self.matched_position);
         self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+    }
+
+    /// Java also tracks consumption outside transaction frames. Record the final reach
+    /// at the public expression/grammar entry, preserving Classic and native PEG contracts.
+    /// Actual failures still take precedence over this fallback in failure().
+    #[cold]
+    #[inline(never)]
+    fn note_success_entry(&mut self, expression: &Expr) {
+        if self.token_mode.is_some()
+            || !self.grammar_frontier
+            || self.lexing.is_some()
+            || matches!(expression, Expr::CatchLabels { .. })
+        {
+            return;
+        }
+        let reached = self.position.max(self.matched_position);
+        self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.classic_max_reached = Some(frame.classic_max_reached.unwrap_or(0).max(reached));
+        }
     }
 
     /// Java's fallback reach after a successful parser frame (#826, #838, #872, #876): startParse
