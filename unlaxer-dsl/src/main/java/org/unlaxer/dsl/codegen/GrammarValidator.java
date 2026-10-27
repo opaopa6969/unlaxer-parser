@@ -288,6 +288,17 @@ public final class GrammarValidator {
             if (left && right) addRuleError(errors, rule.name(),
                 "rule " + rule.name() + " cannot use both @leftAssoc and @rightAssoc",
                 "Keep exactly one associativity annotation per rule.", "E-ASSOC-BOTH");
+            // Preserve #835's missing/duplicate-precedence contracts. With one level,
+            // use validateAssoc's first error, before choice profiles and references.
+            if ((left || right) && !(left && right) && rule.annotations().stream()
+                    .filter(PrecedenceAnnotation.class::isInstance).count() == 1) {
+                var assoc = new ArrayList<ValidationIssue>();
+                var mapping = rule.annotations().stream().filter(MappingAnnotation.class::isInstance)
+                    .map(MappingAnnotation.class::cast).reduce((first, second) -> second).orElse(null);
+                validateAssoc(rule, mapping, left, right, assoc);
+                // Every first assoc error, so a later declaration code cannot contradict it.
+                if (!assoc.isEmpty()) errors.add(assoc.get(0));
+            }
             int longest = (int) rule.annotations().stream().filter(LongestChoiceAnnotation.class::isInstance).count();
             int predictive = (int) rule.annotations().stream().filter(PredictiveChoiceAnnotation.class::isInstance).count();
             int unique = (int) rule.annotations().stream().filter(UniqueLongestChoiceAnnotation.class::isInstance).count();
@@ -309,7 +320,10 @@ public final class GrammarValidator {
             "E-MAPPING-DUPLICATE-PARAM", "E-MAPPING-MISSING-CAPTURE", "E-MAPPING-UNLISTED-CAPTURE",
             "E-ASSOC-BOTH", "E-PRECEDENCE-DUPLICATE", "E-PRECEDENCE-NO-ASSOC",
             "E-ANNOTATION-INTERLEAVE-PROFILE", "E-ANNOTATION-SCOPETREE-MODE",
-            "E-ASSOC-NO-PRECEDENCE", "E-RULE-UNDEFINED");
+            "E-ASSOC-NO-PRECEDENCE", "E-RULE-UNDEFINED",
+            "E-ANNOTATION-DUPLICATE-INTERLEAVE", "E-ANNOTATION-DUPLICATE-SCOPETREE",
+            "E-ASSOC-NO-MAPPING", "E-RIGHTASSOC-NONCANONICAL", "E-LONGEST-CHOICE-SHAPE",
+            "E-ASSOC-MAPPING-PARAM", "E-ASSOC-MISSING-CAPTURE", "E-ASSOC-NO-REPEAT");
         // A choice-profile error occurs before precedence in Java. Let the existing
         // lowering path report it, preserving its established explanation/code.
         return errors.stream().filter(issue -> codes.contains(issue.code())
@@ -1514,10 +1528,6 @@ public final class GrammarValidator {
                 if (dot > 0 && importAliases.contains(refName.substring(0, dot))) {
                     continue;
                 }
-                // Rust keeps its own qualified-reference rejection, like native lowering.
-                if (rustDescription && dot > 0) {
-                    continue;
-                }
                 if (false == definedNames.contains(refName)) {
                     String suggestion = suggestSimilarName(refName, definedNames);
                     String hint;
@@ -1527,7 +1537,7 @@ public final class GrammarValidator {
                         hint = "Define a rule or token named '" + refName + "'.";
                     }
                     addRuleError(errors, rule.name(),
-                        rustDescription ? "unknown reference " + refName : "rule " + rule.name() + " references undefined rule or token '"
+                        rustDescription ? (dot > 0 ? "qualified rule reference" : "unknown reference " + refName) : "rule " + rule.name() + " references undefined rule or token '"
                             + refName + "'",
                         hint,
                         "E-RULE-UNDEFINED");

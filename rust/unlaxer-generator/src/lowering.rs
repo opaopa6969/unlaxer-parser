@@ -63,7 +63,9 @@ fn validate_declarations(
         let mut right = false;
         let mut precedence_count = 0;
         let mut interleave = None;
+        let mut interleave_count = 0;
         let mut scope = None;
+        let mut scope_count = 0;
         for annotation in &rule.annotations {
             match &annotation.kind {
                 AnnotationKind::Whitespace { style } => {
@@ -81,9 +83,11 @@ fn validate_declarations(
                 AnnotationKind::RightAssoc => right = true,
                 AnnotationKind::Precedence { .. } => precedence_count += 1,
                 AnnotationKind::Interleave { profile } => {
+                    interleave_count += 1;
                     interleave.get_or_insert(profile);
                 }
                 AnnotationKind::ScopeTree { mode } => {
+                    scope_count += 1;
                     scope.get_or_insert(mode);
                 }
                 _ => (),
@@ -125,6 +129,39 @@ fn validate_declarations(
                 rule.name
             ));
         }
+        // Keep #835's missing/duplicate-precedence priority; otherwise validateAssoc runs
+        // before choice profiles, precedence and references in Java.
+        if (left || right) && precedence_count == 1 {
+            let mut captures = HashSet::new();
+            collect_capture_names(&rule.body, &mut captures);
+            let required = ["left", "op", "right"];
+            // The first error of Java's validateAssoc, in its order. Returning a later
+            // declaration code here would contradict the Java validator.
+            let code = match mapping {
+                None => Some("E-ASSOC-NO-MAPPING"),
+                Some(params)
+                    if required
+                        .iter()
+                        .any(|name| !params.iter().any(|param| param == name)) =>
+                {
+                    Some("E-ASSOC-MAPPING-PARAM")
+                }
+                _ if required.iter().any(|name| !captures.contains(*name)) => {
+                    Some("E-ASSOC-MISSING-CAPTURE")
+                }
+                _ if !contains_declared_repeat(&rule.body) => Some("E-ASSOC-NO-REPEAT"),
+                _ if right && !canonical_right_assoc(rule) => Some("E-RIGHTASSOC-NONCANONICAL"),
+                _ => None,
+            };
+            if let Some(code) = code {
+                let detail = if right {
+                    "@rightAssoc requires left { op Self } with scalar base and params=[left, op, right]"
+                } else {
+                    "@leftAssoc requires left { op right } with scalar operands and params=[left, op, right]"
+                };
+                return Err(format!("{code}: {detail} on {}", rule.name));
+            }
+        }
         // Preserve existing choice-profile errors, which Java diagnoses before
         // precedence/consistency. Ordinary lowering will return their old messages.
         let count = |test: fn(&AnnotationKind) -> bool| {
@@ -134,6 +171,20 @@ fn validate_declarations(
         let predictive = count(|a| matches!(a, AnnotationKind::PredictiveChoice));
         let unique = count(|a| matches!(a, AnnotationKind::UniqueLongestChoice));
         let alternatives = rule.body.alternatives.len();
+        // Unique-longest errors and duplicate longest annotations precede shape.
+        let unique_error = unique > 0
+            && (unique > 1
+                || !(2..=64).contains(&alternatives)
+                || left
+                || right
+                || longest > 0
+                || predictive > 0);
+        if !unique_error && longest == 1 && alternatives < 2 {
+            return Err(format!(
+                "E-LONGEST-CHOICE-SHAPE: @longestChoice requires multiple alternatives on {}",
+                rule.name
+            ));
+        }
         if (longest > 0 && (longest > 1 || alternatives < 2 || left || right))
             || (predictive > 0
                 && (predictive > 1 || alternatives < 2 || left || right || longest > 0))
@@ -159,12 +210,24 @@ fn validate_declarations(
                 rule.name
             ));
         }
+        if interleave_count > 1 {
+            return Err(format!(
+                "E-ANNOTATION-DUPLICATE-INTERLEAVE: duplicate @interleave on {}",
+                rule.name
+            ));
+        }
         if let Some(profile) = interleave {
             if !matches!(profile.trim(), "javaStyle" | "commentsAndSpaces") {
                 return Err(format!(
                     "E-ANNOTATION-INTERLEAVE-PROFILE: unsupported interleave profile {profile}"
                 ));
             }
+        }
+        if scope_count > 1 {
+            return Err(format!(
+                "E-ANNOTATION-DUPLICATE-SCOPETREE: duplicate @scopeTree on {}",
+                rule.name
+            ));
         }
         if let Some(mode) = scope {
             if !matches!(mode.trim(), "lexical" | "dynamic") {
@@ -218,6 +281,13 @@ fn validate_declarations(
                 } if !defined.contains(name.as_str()) => {
                     return Err(format!("E-RULE-UNDEFINED: unknown reference {name}"));
                 }
+                ElementKind::RuleRef {
+                    namespace: Some(_), ..
+                } => {
+                    // Imports are resolved before lowering; retain the established
+                    // qualified-reference explanation for an unresolved namespace.
+                    return Err("E-RULE-UNDEFINED: unsupported qualified rule reference".into());
+                }
                 ElementKind::OwnedCapture { body, .. }
                 | ElementKind::CaptureScope(body)
                 | ElementKind::Commit { body, .. }
@@ -239,6 +309,47 @@ fn validate_declarations(
         }
     }
     Ok(())
+}
+
+// Match GrammarValidator's syntax checks, without constructing runtime IR.
+fn contains_declared_repeat(body: &ast::RuleBody) -> bool {
+    let mut pending = vec![body];
+    while let Some(body) = pending.pop() {
+        for element in body.alternatives.iter().flat_map(|s| &s.elements) {
+            match &element.element.kind {
+                ElementKind::Repeat(_) => return true,
+                ElementKind::OwnedCapture { body, .. }
+                | ElementKind::CaptureScope(body)
+                | ElementKind::Commit { body, .. }
+                | ElementKind::Label { body, .. }
+                | ElementKind::Catch { choice: body, .. }
+                | ElementKind::Group(body)
+                | ElementKind::Optional(body) => pending.push(body),
+                _ => (),
+            }
+        }
+    }
+    false
+}
+
+fn canonical_right_assoc(rule: &ast::RuleDecl) -> bool {
+    let [top] = rule.body.alternatives.as_slice() else {
+        return false;
+    };
+    let [_, second] = top.elements.as_slice() else {
+        return false;
+    };
+    let ElementKind::Repeat(body) = &second.element.kind else {
+        return false;
+    };
+    let [tail] = body.alternatives.as_slice() else {
+        return false;
+    };
+    let [_, right] = tail.elements.as_slice() else {
+        return false;
+    };
+    // Java checks the terminal rule name here; namespace resolution runs later.
+    matches!(&right.element.kind, ElementKind::RuleRef { name, .. } if name == &rule.name)
 }
 
 fn direct_ref(atom: &ast::AtomicElement, target: &str) -> bool {
@@ -597,11 +708,17 @@ impl Lowering<'_> {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
         let declaration_error = match validate_declarations(self.grammar, &lexical) {
-            // Java validates name-predicate capture shapes before mapping params.
+            // Preserve the existing root-projection explanation when it fails;
+            // otherwise use the assoc explanation, still before undefined refs.
+            Err(error) if error.starts_with("E-ASSOC-NO-MAPPING:") => Some(error),
+            // Java validates name predicates before mapping params and assoc shape.
             // Native needs lowered bodies for that check, so retain the diagnostic
             // until then instead of letting the new preflight mask it.
             Err(error)
-                if error.starts_with("E-MAPPING-")
+                if (error.starts_with("E-MAPPING-")
+                    || error.starts_with("E-ASSOC-MAPPING-PARAM:")
+                    || error.starts_with("E-ASSOC-NO-REPEAT:")
+                    || error.starts_with("E-RIGHTASSOC-NONCANONICAL:"))
                     && self.grammar.rules.iter().any(|rule| {
                         rule.annotations
                             .iter()
@@ -620,6 +737,12 @@ impl Lowering<'_> {
         let deferred = declaration_error.clone();
         self.run_after_declarations(lexical, adapter_registry, declaration_error)
             .map_err(|error| match deferred {
+                Some(deferred)
+                    if deferred.starts_with("E-ASSOC-NO-MAPPING:")
+                        && error == "root must resolve to exactly one AST node" =>
+                {
+                    format!("E-ASSOC-NO-MAPPING: {error}")
+                }
                 Some(deferred) if !error.starts_with("E-NAME-PREDICATE-") => deferred,
                 _ => error,
             })

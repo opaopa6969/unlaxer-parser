@@ -622,5 +622,117 @@
       "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 56, "end": 85}, "subject": "commonField schema"}]},
       "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-COMMONFIELD", "severity": "error", "span": {"start": 59, "end": 88}, "subject": "commonField schema"}]}
     }
+  },
+  {
+    "name": "remaining-duplicate-interleave-before-invalid-profile-rootless",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) @interleave(profile=bogus) @interleave(profile=javaStyle) R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-INTERLEAVE", "severity": "error", "span": {"start": 31, "end": 57}, "subject": "bogus"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-INTERLEAVE", "severity": "error", "span": {"start": 33, "end": 59}, "subject": "bogus"}]}
+    }
+  },
+  {
+    "name": "remaining-duplicate-interleave-before-invalid-profile-rooted",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) @interleave(profile=bogus) @interleave(profile=javaStyle) @root R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-INTERLEAVE", "severity": "error", "span": {"start": 31, "end": 57}, "subject": "bogus"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-INTERLEAVE", "severity": "error", "span": {"start": 33, "end": 59}, "subject": "bogus"}]}
+    }
+  },
+  {
+    "name": "remaining-duplicate-interleave-valid-profiles-rootless",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) @interleave(profile=javaStyle) @interleave(profile=javaStyle) R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 105}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 108}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "remaining-duplicate-interleave-valid-profiles-rooted",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) @interleave(profile=javaStyle) @interleave(profile=javaStyle) @root R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 111}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 114}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "remaining-duplicate-scopetree-before-invalid-mode-rootless",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) @scopeTree(mode=bogus) @scopeTree(mode=lexical) R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SCOPE-MODE", "severity": "error", "span": {"start": 31, "end": 53}, "subject": "bogus"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SCOPE-MODE", "severity": "error", "span": {"start": 33, "end": 55}, "subject": "bogus"}]}
+    }
+  },
+  {
+    "name": "remaining-duplicate-scopetree-before-invalid-mode-rooted",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) @scopeTree(mode=bogus) @scopeTree(mode=lexical) @root R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SCOPE-MODE", "severity": "error", "span": {"start": 31, "end": 53}, "subject": "bogus"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SCOPE-MODE", "severity": "error", "span": {"start": 33, "end": 55}, "subject": "bogus"}]}
+    }
+  },
+  {
+    "name": "remaining-assoc-no-mapping-before-undefined-rootless",
+    "source": "// 😀\ngrammar G {\n  @leftAssoc @precedence(level=1) Expr ::= 'x'; B ::= Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 81}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 84}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "remaining-assoc-no-mapping-before-undefined-rooted",
+    "source": "// 😀\ngrammar G {\n  @leftAssoc @precedence(level=1) @root Expr ::= 'x'; B ::= Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 87}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 90}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "remaining-rightassoc-noncanonical-before-undefined-rootless",
+    "source": "// 😀\ngrammar G {\n  @mapping(R, params=[left,op,right]) @rightAssoc @precedence(level=1) R ::= 'x' @left { '+' @op 'y' @right }; B ::= Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 144}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 147}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "remaining-rightassoc-noncanonical-before-undefined-rooted",
+    "source": "// 😀\ngrammar G {\n  @mapping(R, params=[left,op,right]) @rightAssoc @precedence(level=1) @root R ::= 'x' @left { '+' @op 'y' @right }; B ::= Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 150}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 153}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "remaining-longest-choice-shape-rootless",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) @longestChoice R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 58}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 61}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "remaining-longest-choice-shape-rooted",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) @longestChoice @root R ::= 'x';\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 64}, "subject": "Rust structural constraints"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 67}, "subject": "Rust structural constraints"}]}
+    }
+  },
+  {
+    "name": "remaining-qualified-reference-without-import-rootless",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) R ::= 'x' ns.Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-QUALIFIED-REFERENCE", "severity": "error", "span": {"start": 41, "end": 51}, "subject": "ns.Missing"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-QUALIFIED-REFERENCE", "severity": "error", "span": {"start": 43, "end": 53}, "subject": "ns.Missing"}]}
+    }
+  },
+  {
+    "name": "remaining-qualified-reference-without-import-rooted",
+    "source": "// 😀\ngrammar G {\n  @mapping(R) @root R ::= 'x' ns.Missing;\n}\n",
+    "expected": {
+      "LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-QUALIFIED-REFERENCE", "severity": "error", "span": {"start": 47, "end": 57}, "subject": "ns.Missing"}]},
+      "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-QUALIFIED-REFERENCE", "severity": "error", "span": {"start": 49, "end": 59}, "subject": "ns.Missing"}]}
+    }
   }
 ]
