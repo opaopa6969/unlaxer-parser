@@ -54,4 +54,17 @@ grammar NestedBoundary {
     RepeatedA ::= { 'a' };
     PlainAlias ::= PlainSeq2;
     NestedTail ::= LiteralOnly 'z';
+    OptTail ::= 'a' ['z'];
+    RepTail ::= 'a' {'z'};
+    AheadTail ::= 'a' 'z' B;
+    @longestChoice
+    LongestSeq ::= 'a' 'z' | 'a';
+    @longestChoice
+    LongestShort ::= 'a' | 'h';
+    @predictiveChoice
+    PredictiveSeq ::= 'a' 'z' | 'h';
+    SingleA ::= 'a';
+    SingleZ ::= 'z';
+    RuleTail ::= 'a' SingleZ;
+    UnicodeRep ::= {'😀'};
 }

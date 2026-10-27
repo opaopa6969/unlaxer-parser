@@ -159,3 +159,22 @@ FailedFirst-control	FailedFirst	direct	azzb	-
 RepeatedA-control	RepeatedA	direct	aab	-
 PlainAlias-nested	PlainAlias	direct	azb	-
 NestedTail-nested	NestedTail	direct	azzb	-
+# #878 review (PR #882): single literal, literal then rule, optional/repeat/lookahead tails, longest/predictive choices.
+OptTail-hit	OptTail	direct	azb	-
+OptTail-miss	OptTail	direct	ab	-
+RepTail-two	RepTail	direct	azzb	-
+RepTail-eof	RepTail	direct	azz	-
+RepTail-none	RepTail	direct	ab	-
+AheadTail-direct	AheadTail	direct	azb	-
+AheadTail-lookahead	AheadTail	lookahead	azb	-
+LongestSeq-direct	LongestSeq	direct	azb	-
+LongestShort-direct	LongestShort	direct	azb	-
+PredictiveSeq-direct	PredictiveSeq	direct	azb	-
+SingleA-direct	SingleA	direct	ab	-
+SingleA-prior-wide	SingleA	direct	a😀b	a😀
+SingleA-eof	SingleA	direct	a	-
+RuleTail-direct	RuleTail	direct	azb	-
+RuleTail-choice	RuleTail	choice	azb	-
+RuleTail-nonordered	RuleTail	nonordered	azb	-
+UnicodeRep-direct	UnicodeRep	direct	😀😀b	-
+UnicodeRep-empty	UnicodeRep	direct	b	-

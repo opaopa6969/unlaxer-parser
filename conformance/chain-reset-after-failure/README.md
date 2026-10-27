@@ -790,6 +790,12 @@ nested-boundary に47経路・1128行を Java の実行値から追加した。�
 両 Rust host × 通常/mapping × 既存 Chain 対照で30336観測を照合する。両生成器の byte 一致を
 確認したうえで、それぞれ compile・実行する。差分表は既存316行のままで診断差は0行。
 
+PR #882 のレビューで、Java 実測の18経路・432行をさらに追加した（計176経路・4224行、
+両 Rust host × 通常/mapping × Chain 対照で33792観測、診断差0行）。`'a'` 単独 rule とその EOF、
+literal の後の rule 呼出し（`'a' SingleZ`）は修正を外すと失敗する。末尾の optional / 反復
+（当たり・外れ・EOF）、末尾の先読み、`@longestChoice` / `@predictiveChoice`、Unicode の反復と
+その空一致、先行先読みが消費より広い `'a'` は対照で、修正の前後で値が変わらない。
+
 `NonOrdered(PlainSeq2)`、`Choice(TailSeq, 'fallback')`、最後が Choice の Chain、UNTIL 単独・
 Choice・後続消費、optional、先行失敗候補、反復、alias と入れ子 rule の後続消費を対照に含める。
 Unicode・EOF・空入力・先行先読みも検査する。成否・両 cursor・reset・後続成否/診断・memo hit を
@@ -826,3 +832,6 @@ base `3b8a2bc7` の隔離 worktree に更新後の corpus を置き、修正前 
 各 host の通常/mapping/Chain 対照15168観測を修正前後で比較すると、16経路512行の成功直後の
 診断 CP だけが変化する（128行/graph）。成否・両 cursor・reset・後続の成否/診断・failure/success hit、
 Classic と DETAILED_ON_FAILURE は全行不変。修正済みの診断差は両 host とも0行である。
+レビューで追加した後の corpus（各 host 16896観測）でも修正の呼出しだけを外して照合し、
+両 host とも19経路608行（上記16経路と `SingleA-direct` / `SingleA-eof` / `RuleTail-direct`）の
+成功直後の診断 CP だけが変わることを確認した。
