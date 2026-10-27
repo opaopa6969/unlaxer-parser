@@ -3,6 +3,11 @@ use unlaxer_runtime::{token::TokenKind, *};
 const INPUTS: &str =
     include_str!("../../../../conformance/chain-reset-after-failure/frame-start-inputs.tsv");
 
+const NOT_B: Expr = Expr::JavaLookahead {
+    pattern: "b",
+    positive: false,
+};
+
 pub fn report(rules: Vec<Rule>) {
     for rule in &rules {
         let mut body = &rule.expression;
@@ -134,6 +139,21 @@ fn observe(context: &mut ParseContext<'_>) -> ParseResult {
             pattern: "b",
             positive: false,
         },
+        // #838 nested frames: rule and non-rule frames, and failures after a successful Not.
+        "lookahead-longest" => Expr::MatchOnly(Box::new(Expr::LongestChoice(vec![
+            rule,
+            Expr::Literal("fallback"),
+        ]))),
+        "unique-lookahead" => {
+            Expr::UniqueLongestChoice(vec![Expr::MatchOnly(Box::new(rule)), Expr::Literal("fallback")])
+        }
+        "lookahead-negative" => Expr::MatchOnly(Box::new(NOT_B)),
+        "longest-negative" => Expr::LongestChoice(vec![NOT_B, rule]),
+        "negative-then" => Expr::Sequence(vec![NOT_B, rule]),
+        "choice-negative-seq" => Expr::Choice(vec![
+            Expr::Sequence(vec![NOT_B, Expr::Literal("zz")]),
+            rule,
+        ]),
         _ => panic!("boundary"),
     };
     let mut before = None;
