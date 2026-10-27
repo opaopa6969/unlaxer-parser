@@ -1,0 +1,9 @@
+[
+  {"name":"empty","input":"","tokens":[{"parts":[[0,0]]}],"steps":[["ProjectedToken","",0,0,1,1,1,1]]},
+  {"name":"ascii-mixed","input":"abc","tokens":[{"input":"a"},{"parts":[[1,2],[1,2]]},{"input":"bc"},{"generated":"G","anchor":3}],"steps":[["WordParser","a",0,1,1,1,1,2],["ProjectedToken","bb",1,3,1,2,1,4],["WordParser","bc",1,3,1,2,1,4],["GeneratedToken","G",3,3,1,4,1,4]]},
+  {"name":"unicode","input":"😀éZ","tokens":[{"input":"😀éZ"},{"parts":[[0,1],[2,3],[1,2]]},{"parts":[[3,3]]}],"steps":[["WordParser","😀éZ",0,4,1,1,1,6],["ProjectedToken","😀́e",0,3,1,1,1,5],["ProjectedToken","",3,3,1,5,1,5]]},
+  {"name":"crlf","input":"A\r\n😀B","tokens":[{"input":"A\r\n😀B"},{"parts":[[3,4],[0,1]]},{"parts":[[0,1],[1,3]]}],"steps":[["WordParser","A\r\n😀B",0,5,1,1,2,4],["ProjectedToken","😀A",3,5,2,1,2,4],["ProjectedToken","A\r\n",0,3,1,1,2,1]]},
+  {"name":"different-newlines","input":"a\nbcde","tokens":[{"input":"a\nbcde"},{"parts":[[2,3],[1,2],[2,3]]}],"steps":[["WordParser","a\nbcde",0,6,1,1,2,5],["ProjectedToken","b\nb",2,5,2,1,2,4]]},
+  {"name":"trace-order","input":"😀\r\nxyz","tokens":[{"input":"😀\r\nxyz"},{"parts":[[3,4],[3,4]]},{"parts":[[0,1]]}],"steps":[["WordParser","😀\r\nxyz",0,6,1,1,2,4],["ProjectedToken","xx",3,5,2,1,2,3],["ProjectedToken","😀",0,1,1,1,1,3]]},
+  {"name":"strip-escape","input":" a\"b\tZ","tokens":[{"input":" a\"b\tZ"},{"parts":[[0,1],[2,3],[1,2],[2,3],[4,5]]}],"steps":[["WordParser"," a\"b\tZ",0,6,1,1,1,7],["ProjectedToken"," \"a\"\t",0,5,1,1,1,6]]}
+]

@@ -65,6 +65,7 @@
       "org.unlaxer.dsl.codegen.ClassicDapProtocolConformanceTest": ["generatedJavaAndRustShareStrictTypedAstInspection"],
       "org.unlaxer.dsl.codegen.ClassicTokenDapProtocolConformanceTest": ["generatedTokenDapUsesRealBoundedTerminalTrace"],
       "org.unlaxer.dsl.codegen.GeneratedTokenDapProtocolConformanceTest": ["existingJavaDetachedDisplayDoesNotInferAnOriginalAnchor", "generatedLeavesFollowTheSharedRollbackOracle", "generatedSourcesShareTextAnchorsAndLifecycleOverStdio"],
+      "org.unlaxer.dsl.codegen.ProjectedTokenDapProtocolConformanceTest": ["javaProjectedSourcesKeepExistingTextAndCoordinates", "projectedLeavesFollowTheSharedRollbackOracle", "projectedSourcesShareTextPositionsAndLifecycleOverStdio"],
       "org.unlaxer.dsl.codegen.TokenTraceConformanceTest": ["detachedVirtualSourceUsesTheSharedAnchorAndTextOracle", "independentJavaAndRustCommittedTerminalOracle"],
       "org.unlaxer.parser.combinator.NonOrderedParityTest": ["failedCandidateCannotConsumeInputOrLeakOwnedState", "tokenKindsInversionAndRepeatedIdentityKeepTheirContracts", "safeFailureMemoReplaysTheCandidateTransactions", "recursiveCandidateResourceAbortIsStickyAndClosesTransactions", "successfulChainChangesThePolicyForFollowingCandidates", "sharedGreedyOrderNullableSpansAndDiagnostics"],
       "org.unlaxer.dsl.codegen.NonOrderedStateTest": ["sharedScopeCaptureStateAndRecoveryRollback"],

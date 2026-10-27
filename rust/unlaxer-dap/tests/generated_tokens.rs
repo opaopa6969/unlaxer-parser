@@ -163,6 +163,7 @@ impl Backend for FailureBackend {
                     Span { start: 2, end: 2 }
                 },
                 generated_text: Some("repair".into()),
+                projected_text: None,
             }]);
         }
         let options = if case == "missing" {

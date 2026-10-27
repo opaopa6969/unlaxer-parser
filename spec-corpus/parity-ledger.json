@@ -438,7 +438,7 @@
       "title": "fix: Java Choice の FIRST 候補除外が reset 前の cursor を読み、DETAILED_ON_FAILURE だけ受理が変わる"
     },
     "863": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity(dap): detached generated tokenのtextと位置をJava/Rust双方で表示・検証する"
     },
     "869": {
@@ -460,6 +460,10 @@
     "881": {
       "state": "OPEN",
       "title": "parity: 外部入口の成功前に custom parser が読む途中の成功診断 CP が Java と異なる（#878 の制限）"
+    },
+    "889": {
+      "state": "OPEN",
+      "title": "parity(dap): consumed leaf の TokenSource::Projected を Rust token DAP で表示するか対象外として記録する"
     }
   },
   "entries": [
@@ -1215,20 +1219,25 @@
     {
       "id": "dap-generated-source",
       "category": "contract",
-      "title": "generated text と原文 anchor の明示的な DAP 表示",
+      "title": "generated / projected text と CP 位置の明示的な DAP 表示",
       "hosts": "Java DAP / Rust DAP・両生成host",
       "issues": [
         111,
         463,
-        863
+        863,
+        889
       ],
-      "observation": "#863: Rust token_steps は generated text を所有し、原文 anchor をゼロ幅 CP span として表示する。Java の既存 detached source 座標は維持し、tokenSourceSpan hook で PortableTokenMetadata の原文 anchor を渡す。共通6入力・各80停止点の実 stdio と5 rollback ケースで検証。未宣言 custom/不完全 trace の拒否は維持する。",
+      "observation": "#863: Rust token_steps は generated text を所有し、原文 anchor をゼロ幅 CP span として表示する。Java の既存 detached source 座標は維持し、tokenSourceSpan hook で PortableTokenMetadata の原文 anchor を渡す。共通6入力・各80停止点の実 stdio と5 rollback ケースで検証。未宣言 custom/不完全 trace の拒否は維持する。 #889: Java の連結 source terminal は実 stdio で到達可能。Rust の Projected 拒否を除去し、text を所有、span を論理 CP 範囲として表示する。7入力・各72停止点、input/generated 混在・本文と原文 slice の相違・空/Unicode/CRLF・逆順・breakpoint と5 rollbackケースを共通検証。custom terminal の明示 add_traced_token_node は既存 parser ホットパスに処理を足さず trace 上限を使う。",
       "evidence": [
         "docs/token-trace.md",
         "docs/classic-rust-dap.md",
         "docs/fixtures/generated-token-dap/cases.json",
         "docs/fixtures/generated-token-dap/rollback.json",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/GeneratedTokenDapProtocolConformanceTest.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/GeneratedTokenDapProtocolConformanceTest.java",
+        "docs/fixtures/projected-token-dap/cases.json",
+        "docs/fixtures/projected-token-dap/rollback.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ProjectedTokenDapProtocolConformanceTest.java",
+        "rust/unlaxer-dap/tests/projected_tokens.rs"
       ]
     },
     {
