@@ -3107,13 +3107,14 @@ impl<'a> ParseContext<'a> {
         self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
     }
 
-    /// Java's fallback reach after a successful MatchOnly or Not (#826, #838): its startParse
+    /// Java's fallback reach after a successful parser frame (#826, #838, #872, #876): startParse
     /// max(consumed, matched), recorded before begin reset matched, and that of every
     /// enclosing frame (e.g. a Choice that reset before the Not or a MatchOnly around it).
     /// This is not a failure: a later real failure behind it still wins. The successful
-    /// Classic watermark and memo diagnostics carry it; nothing is allocated. A Not
-    /// directly under MatchOnly runs in token mode and starts the fallback there; only
-    /// native frames carry it. A token-stream session keeps the consumed frontier.
+    /// Classic watermark and memo diagnostics carry this reach in existing fields. A Not
+    /// directly under MatchOnly runs in token mode and starts the fallback there. Native
+    /// transaction frames also start it without a prior lookahead; token streams keep
+    /// the consumed frontier, and explicit native PEG expression entries keep their contract.
     #[cold]
     #[inline(never)]
     fn note_success_frame_start(&mut self, expression: &Expr, checkpoint: &Checkpoint) {
@@ -3861,14 +3862,13 @@ impl<'a> ParseContext<'a> {
                 }
             }
         } else {
-            // Both successful Java lookahead polarities establish a fallback reach.
-            // MatchOnly advances matched; Not discards the child's failures (#826, #838).
-            // Reuse the existing Detailed transaction gate and cold recorder: removing
-            // the polarity test adds no success-path branch or diagnostic-off work.
+            // Java records successful frames even without a preceding lookahead (#872, #876).
+            // Reuse the Detailed transaction gate and cold recorder; requiring an existing
+            // watermark would drop both plain success and UNTIL's rejected probes.
+            // Native PEG expression entries and lexing are excluded inside the recorder.
             if java_transaction
                 && self.options.diagnostics == Diagnostics::Detailed
-                && (matches!(expression, Expr::JavaLookahead { .. })
-                    || (self.token_mode.is_none() && self.classic_max_reached.is_some()))
+                && (matches!(expression, Expr::JavaLookahead { .. }) || self.token_mode.is_none())
             {
                 self.note_success_frame_start(expression, &checkpoint);
             }
