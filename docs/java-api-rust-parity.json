@@ -73,7 +73,7 @@
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/MetaFunctionParser.java#L3", "anchor": "public interface MetaFunctionParser extends Parser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L125", "anchor": "boolean outputCollected = doCreateMetaToken() ||"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/reducer/MetaFunctionTokenReducer.java#L8", "anchor": "public class MetaFunctionTokenReducer extends AbstractTokenReducer"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L3965", "anchor": "fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment>"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L3986", "anchor": "fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment>"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/context/CreateMetaTokenSpecifier.java#L3", "anchor": "public enum CreateMetaTokenSpecifier implements ParseContextEffector"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/reducer/CommittedReducer.java#L6", "anchor": "public interface CommittedReducer"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/Committed.java#L15", "anchor": "public class Committed implements Serializable"}
@@ -93,7 +93,7 @@
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChildOccursWithTerminator.java#L12", "anchor": "public abstract class ChildOccursWithTerminator extends ConstructedOccurs"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67", "anchor": "if(terminator.isPresent())"},
         {"location": "rust/unlaxer-runtime/src/lib.rs#L410", "anchor": "pub fn repeat_java(self, min: usize, max: Option<usize>) -> Self"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L4734", "anchor": "Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => ("}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L4755", "anchor": "Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => ("}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/combinator/ZeroOrMoreTest.java",
@@ -131,7 +131,7 @@
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13", "anchor": "public class MatchedChoiceParser extends NoneChildParser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7", "anchor": "public class ChoiceCommitAction implements AdditionalPreCommitAction"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5367", "anchor": "fn ordered_choice<'b>("}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5388", "anchor": "fn ordered_choice<'b>("}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedChoiceParserTest.java"
@@ -148,7 +148,7 @@
       "route": "NonOrdered ID ごとに選択 occurrence の順序を保存し、同じ順序で再実行する API と rollback の共通 oracle を追加する。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedNonOrderedParser.java#L16", "anchor": "public class MatchedNonOrderedParser extends NoneChildParser"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L3987", "anchor": "fn non_ordered(&mut self, children: &[Expr], depth: usize) -> Option<Fragment>"}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L4008", "anchor": "fn non_ordered(&mut self, children: &[Expr], depth: usize) -> Option<Fragment>"}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedNonOrderedParserTest.java",
@@ -166,7 +166,7 @@
       "route": "`Expr::non_ordered([Expr::literal(\"a\"), Expr::literal(\"b\")])`。専用 UBNF 構文はない。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NonOrdered.java#L22", "anchor": "public class NonOrdered extends ConstructedCombinatorParser"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L3987", "anchor": "fn non_ordered(&mut self, children: &[Expr], depth: usize) -> Option<Fragment>"}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L4008", "anchor": "fn non_ordered(&mut self, children: &[Expr], depth: usize) -> Option<Fragment>"}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/NonOrderedParityTest.java",
@@ -295,8 +295,8 @@
       "route": "`ParseContext::parse/transaction` と返却 nodes/Tree の走査は部品。predicate 失敗時の consumed/matched・CST・state・failure位置を保つ公開 wrapper または adapter 例が必要。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PredicateAnyMatchForParsedParser.java#L13", "anchor": "public class PredicateAnyMatchForParsedParser extends ConstructedSingleChildParser"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L2352", "anchor": "pub fn tree(&self, root: usize) -> Option<Tree>"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L2557", "anchor": "pub fn parse<P: Parser + ?Sized>(&mut self, parser: &P) -> ParseResult"}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L2354", "anchor": "pub fn tree(&self, root: usize) -> Option<Tree>"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L2576", "anchor": "pub fn parse<P: Parser + ?Sized>(&mut self, parser: &P) -> ParseResult"}
       ],
       "tests": [],
       "fixtures": [],
@@ -312,7 +312,7 @@
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EscapeInQuotedParser.java#L9", "anchor": "public class EscapeInQuotedParser extends LazyChain implements StaticParser"},
         {"location": "rust/unlaxer-runtime/src/lib.rs#L120", "anchor": "Quoted(char),", "scope": "pub enum Expr"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L3965", "anchor": "fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment>"}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L3986", "anchor": "fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment>"}
       ],
       "tests": [
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustConformanceTest.java"
@@ -414,7 +414,7 @@
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L24", "anchor": "public class MatchedTokenParser extends AbstractParser{//extends ConstructedSingleChildParserA"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19", "anchor": "public class OldMatchedTokenParser extends ConstructedSingleChildParser"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L4069", "anchor": "Expr::Backreference(name) | Expr::Replay(name) =>"}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L4090", "anchor": "Expr::Backreference(name) | Expr::Replay(name) =>"}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java",
@@ -434,7 +434,7 @@
       "route": "`expr.capture_owned(\"x\").capture_scope()`、`Expr::Replay(\"x\")`。UBNF `CAPTURE/CAPTURE_SCOPE/SAME_AS`。",
       "code": [
         {"location": "rust/unlaxer-runtime/src/lib.rs#L424", "anchor": "pub fn capture_owned(self, name: &'static str) -> Self"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L4069", "anchor": "Expr::Backreference(name) | Expr::Replay(name) =>"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L4090", "anchor": "Expr::Backreference(name) | Expr::Replay(name) =>"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NamedCapture.java#L15", "anchor": "public class NamedCapture extends ConstructedAbstractParser implements MetaFunctionParser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureScope.java#L15", "anchor": "public class CaptureScope extends ConstructedAbstractParser implements MetaFunctionParser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ReplayParser.java#L18", "anchor": "public class ReplayParser extends NoneChildParser implements TerminalSymbol"}
@@ -548,7 +548,7 @@
       "reason": "通常失敗のcommit/label昇格、指定labelのcatch、原位置とstate rollbackを共通 corpus で比較する。資源失敗を通常の選択へ吸収しない。",
       "route": "`expr.commit()/label(\"x\")/catch_labels(other, [\"x\"])`。UBNF `COMMIT/LABEL/CATCH`。",
       "code": [
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L4616", "anchor": "fn expression_raising(&mut self, expression: &Expr, depth: usize) -> Option<Fragment>"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L4637", "anchor": "fn expression_raising(&mut self, expression: &Expr, depth: usize) -> Option<Fragment>"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Commit.java#L22", "anchor": "public class Commit extends ConstructedSingleChildParser implements MetaFunctionParser,"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Label.java#L22", "anchor": "public class Label extends ConstructedSingleChildParser implements MetaFunctionParser,"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CatchLabels.java#L28", "anchor": "public class CatchLabels extends ConstructedAbstractParser implements MetaFunctionParser,"}
@@ -569,7 +569,7 @@
       "route": "`Expr::sequence/choice/longest_choice/unique_longest_choice/predictive_choice/zero_match`。Lazy版は構築済み Rule参照へ移す。min/max反復の terminator は別行。",
       "code": [
         {"location": "rust/unlaxer-runtime/src/lib.rs#L350", "anchor": "pub fn sequence(elements: impl IntoIterator<Item = Self>) -> Self"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5367", "anchor": "fn ordered_choice<'b>("},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5388", "anchor": "fn ordered_choice<'b>("},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11", "anchor": "public interface ChainInterface extends Parser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14", "anchor": "public interface ChoiceInterface extends Parser"}
       ],
@@ -610,7 +610,7 @@
       "reason": "SpaceDelimitor/CStyleDelimitor と whitespace-delimited chain は既存 Rust trivia policyに対応する部分がある。独立comment parserのCST、全lazy overload、正確な空白集合と終端条件を共通 fixture で網羅していない。",
       "route": "`Expr::sequence(...).trivia_scope(true)`、`line_comment_scope()`、UBNF `@whitespace/@comment/@interleave`。コメントだけの CPPComment は line_comment_scope。直接 comment leafは専用 lexical式/adapterで抽出する。",
       "code": [
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L3965", "anchor": "fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment>"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L3986", "anchor": "fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment>"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/WhiteSpaceDelimitedLazyChain.java#L16", "anchor": "public abstract class WhiteSpaceDelimitedLazyChain extends LazyChain"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/clang/BlockComment.java#L10", "anchor": "public class BlockComment extends LazyChain"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/clang/CPPComment.java#L15", "anchor": "public class CPPComment extends LazyChain"}
@@ -720,7 +720,7 @@
       "route": "`expr.recover(mode, [\";\"], \"message\")`、`Tree.recoveries` / `ParseContext::recoveries`、UBNF `@recovery`。",
       "code": [
         {"location": "rust/unlaxer-runtime/src/lib.rs#L483", "anchor": "pub fn recover("},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L4528", "anchor": "fn recover_after_failure("},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L4549", "anchor": "fn recover_after_failure("},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java#L11", "anchor": "public record RecoveryDiagnostic(int start, int end, String message)"}
       ],
       "tests": [
@@ -740,9 +740,9 @@
       "reason": "ParseContext/TransactionElement/Parsed/Token/TokenList/ParserCursor は Rust context/ParseResult/Fragment/Tree/Span として利用できる。既存の両cursor・所有state・portable metadataの共通 corpusはあるが、Java stopped/失敗結果、全static factory、抽出・走査・listener・raw Object metadataまで全API同値とは扱わない。 ParseContext が実装する Transaction/ParseContextBase/ParserContextScopeTree の default method、ParseContextEffector、TransactionMetrics、TypedToken/TokenEffecterWithMatcher も含む。chosen parser/ordered parsers の保存は selected-choice/selected-order 行で別に追跡する。",
       "route": "`ParseContext::parse/parse_classic/transaction`、`position()/matched_position()`、`state/with_scope`、`Tree` と token metadata。任意外部副作用は登録state以外rollback対象にならない。",
       "code": [
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L2352", "anchor": "pub fn tree(&self, root: usize) -> Option<Tree>"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L2447", "anchor": "pub fn set_state<T: Any + Clone>(&mut self, name: impl Into<String>, value: T)"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L2557", "anchor": "pub fn parse<P: Parser + ?Sized>(&mut self, parser: &P) -> ParseResult"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L2354", "anchor": "pub fn tree(&self, root: usize) -> Option<Tree>"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L2449", "anchor": "pub fn set_state<T: Any + Clone>(&mut self, name: impl Into<String>, value: T)"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L2576", "anchor": "pub fn parse<P: Parser + ?Sized>(&mut self, parser: &P) -> ParseResult"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39", "anchor": "public class ParseContext implements"},
         {"location": "rust/unlaxer-runtime/src/token.rs#L1", "anchor": "//! Explicit Classic token parsing and owned portable metadata."},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L31", "anchor": "public interface Transaction extends TransactionListenerContainer , ParseContextBase"}
@@ -766,7 +766,7 @@
       "reason": "withBindings は map/listを固定し、文字列の順序・重複・空を保持する共通契約。Rustは所有権、Javaはcopyで保持する。",
       "route": "`ParseContext::with_bindings(source, map, options)`。",
       "code": [
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L2172", "anchor": "pub fn with_bindings("},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L2174", "anchor": "pub fn with_bindings("},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39", "anchor": "public class ParseContext implements"}
       ],
       "tests": [
