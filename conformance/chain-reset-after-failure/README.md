@@ -538,6 +538,9 @@ Longest / Unique の成功候補の試行中に記録された実失敗も fallb
 - テストの読み替え・除外は加えない。差分表のすべての値を実際の Rust 出力と照合する既存テストを維持する。
   この2 corpus に未解決の診断差は残らない。候補単独の owner reset（#823 の内部差）と #827 の会計差は対象外。
   任意の手組み IR や、成功履歴全般の全面一致を主張するものではない。
+- UNTIL の失敗候補の集約は、先行する先読みなどで成功時の到達位置が既に記録された後（`classic_max_reached` がある場合）だけ働く。
+  先読みのない native UNTIL（`aab` や直ちに終端に一致する `bb`、通常呼出・AUTO/DETAILED）は Java CP1 / Rust CP0 のままで、
+  master でも同じ値である。この corpus の入力には含めず [#872](https://github.com/opaopa6969/unlaxer-parser/issues/872) で追跡する。
 
 ### #197 と mutation
 
