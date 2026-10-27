@@ -241,5 +241,50 @@
     "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='op', kind='type') @mapping(R, params=[op]) @leftAssoc @precedence(level=1) R ::= 'x' @op; }",
     "code": "E-NAME-PREDICATE-CONFLICT",
     "rootRule": "R"
+  },
+  {
+    "name": "name-predicate-before-duplicate-interleave",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n]) @interleave(profile=javaStyle) @interleave(profile=javaStyle) R ::= 'x' @n 'y' @n; }",
+    "code": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "name-predicate-before-duplicate-scopetree",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n]) @scopeTree(mode=lexical) @scopeTree(mode=lexical) R ::= 'x' @n 'y' @n; }",
+    "code": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "name-predicate-before-longest-shape",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n]) @longestChoice R ::= 'x' @n 'y' @n; }",
+    "code": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "name-predicate-before-qualified-ref",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n])  R ::= 'x' @n 'y' @n ns.Missing; }",
+    "code": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "name-predicate-before-interleave-profile",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n]) @interleave(profile=bogus) R ::= 'x' @n 'y' @n; }",
+    "code": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "name-predicate-before-undefined-ref",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n])  R ::= 'x' @n 'y' @n Missing; }",
+    "code": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "name-predicate-before-missing-precedence",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n]) @leftAssoc R ::= 'x' @n; }",
+    "code": "E-NAME-PREDICATE-CONFLICT"
+  },
+  {
+    "name": "name-predicate-capture-before-grammar-version-conflict",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n]) R ::= 'x' @n; @namePredicate(snapshot='names', version='v2', name='n', kind='type') @mapping(Y, params=[n]) S ::= 'y' @n; @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(Z, params=[n]) T ::= 'z' @n 'a' @n; }",
+    "code": "E-NAME-PREDICATE-CAPTURE"
+  },
+  {
+    "name": "name-predicate-kind-before-grammar-version-conflict",
+    "source": "grammar G { @namePredicate(snapshot='names', version='v1', name='n', kind='type') @mapping(X, params=[n]) R ::= 'x' @n; @namePredicate(snapshot='names', version='v2', name='n', kind='type') @mapping(Y, params=[n]) S ::= 'y' @n; @namePredicate(snapshot='names', version='v1', name='n', kind='bogus') @mapping(Z, params=[n]) T ::= 'z' @n; }",
+    "code": "E-NAME-PREDICATE-KIND"
   }
 ]
