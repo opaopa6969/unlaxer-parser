@@ -16,7 +16,7 @@ final class RustDapEmitter {
             for (var mapping : mappings.values()) {
                 out.append("        super::ast::Ast::r#").append(mapping.name()).append(" { span");
                 for (var field : mapping.fields()) if ((field.kind() == Kind.NODE || field.kind() == Kind.NULLABLE_NODE || field.kind() == Kind.VALUE || NestedEmitter.dapNode(field))) out.append(", r#").append(field.name());
-                out.append(", .. } => {\n            out.push(unlaxer_dap::Step { label: ").append(RustBackend.quote(mapping.name())).append(".into(), span: *span, generated_text: None });\n");
+                out.append(", .. } => {\n            out.push(unlaxer_dap::Step { label: ").append(RustBackend.quote(mapping.name())).append(".into(), span: *span, generated_text: None, projected_text: None });\n");
                 for (var field : mapping.fields()) {
                     if(NestedEmitter.dapNode(field)) { out.append("            ").append(NestedEmitter.dapWalk(field.nested(),"r#"+field.name(),0)).append('\n');continue; }
                     if (field.kind() != Kind.NODE && field.kind() != Kind.NULLABLE_NODE && field.kind() != Kind.VALUE) continue;

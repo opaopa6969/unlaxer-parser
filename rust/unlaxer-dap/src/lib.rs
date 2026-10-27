@@ -7,10 +7,14 @@ use unlaxer_runtime::{source::Snapshot, Span};
 #[derive(Clone, Debug)]
 pub struct Step {
     pub label: String,
-    /// Original-source CP range. Generated tokens have a zero-width anchor.
+    /// CP range in the original snapshot (logical extent for projected tokens).
+    /// Generated tokens have a zero-width anchor.
     pub span: Span,
-    /// None uses the input slice; Some (including an empty string) owns generated text.
+    /// Some (including an empty string) owns generated text at a zero-width anchor.
     pub generated_text: Option<String>,
+    /// Projected terminal text, independent of the input slice at its logical CP span.
+    /// Both text fields are None for input/AST steps and cannot both be Some.
+    pub projected_text: Option<String>,
 }
 #[derive(Clone, Debug)]
 pub struct DebugSource {
@@ -88,8 +92,8 @@ pub fn stepping_mode(arguments: &Value) -> &str {
         }
     })
 }
-/// Converts a complete committed trace, retaining detached text independently of
-/// its original-source anchor. No input slice is substituted for generated text.
+/// Converts a complete committed trace, retaining generated/projected text independently of
+/// its anchor or logical CP range. No input slice is substituted for owned text.
 pub fn token_steps(tree: &unlaxer_runtime::Tree) -> Result<Vec<Step>, String> {
     let trace = tree
         .token_trace()
@@ -97,17 +101,20 @@ pub fn token_steps(tree: &unlaxer_runtime::Tree) -> Result<Vec<Step>, String> {
         .map_err(|error| error.to_string())?;
     let mut steps = Vec::new();
     for leaf in trace.iter().filter(|leaf| leaf.kind.is_consumed()) {
-        let generated_text = match &leaf.source {
-            unlaxer_runtime::token::TokenSource::Input(_) => None,
-            unlaxer_runtime::token::TokenSource::Generated { text, .. } => Some(text.clone()),
-            unlaxer_runtime::token::TokenSource::Projected { .. } => {
-                return Err("projected token source is not supported by source DAP".into());
+        let (generated_text, projected_text) = match &leaf.source {
+            unlaxer_runtime::token::TokenSource::Input(_) => (None, None),
+            unlaxer_runtime::token::TokenSource::Generated { text, .. } => {
+                (Some(text.clone()), None)
+            }
+            unlaxer_runtime::token::TokenSource::Projected { text, .. } => {
+                (None, Some(text.to_string()))
             }
         };
         steps.push(Step {
             label: leaf.label.into(),
             span: leaf.span(),
             generated_text,
+            projected_text,
         });
     }
     Ok(steps)
@@ -310,7 +317,11 @@ impl<B: Backend> Server<B> {
                     let mut variables = vec![];
                     if let Some(step) = self.current() {
                         let snapshot = self.snapshot.as_ref().unwrap();
-                        let source_text = match &step.generated_text {
+                        let source_text = match step
+                            .generated_text
+                            .as_ref()
+                            .or(step.projected_text.as_ref())
+                        {
                             Some(text) => text.as_str(),
                             None => snapshot.slice(step.span).map_err(str::to_owned)?,
                         };
@@ -454,6 +465,9 @@ impl<B: Backend> Server<B> {
             .into());
         }
         for step in &steps {
+            if step.projected_text.is_some() && (self.ast_mode || step.generated_text.is_some()) {
+                return Err("projected text requires an unambiguous token source".into());
+            }
             if step.generated_text.is_some() && (self.ast_mode || step.span.start != step.span.end)
             {
                 return Err("generated text requires a zero-width token anchor".into());

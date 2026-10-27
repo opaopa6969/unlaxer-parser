@@ -14,17 +14,20 @@ impl Backend for Hooks {
             "bad-span" => Ok(vec![Step {
                 label: "bad".into(),
                 generated_text: None,
+                projected_text: None,
                 span: Span { start: 0, end: 99 },
             }]),
             "A\r\nB" => Ok(vec![Step {
                 label: "bad".into(),
                 generated_text: None,
+                projected_text: None,
                 span: Span { start: 2, end: 3 },
             }]),
             _ => Ok(vec![
                 Step {
                     label: "Parent".into(),
                     generated_text: None,
+                    projected_text: None,
                     span: Span {
                         start: 0,
                         end: source.len(),
@@ -33,6 +36,7 @@ impl Backend for Hooks {
                 Step {
                     label: "Child".into(),
                     generated_text: None,
+                    projected_text: None,
                     span: Span {
                         start: 1,
                         end: source.len(),
