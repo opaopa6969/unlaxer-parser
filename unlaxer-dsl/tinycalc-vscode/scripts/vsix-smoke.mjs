@@ -116,7 +116,7 @@ process.on('SIGTERM',()=>record('sigterm'));
       try {
         const logs = await editorLogs(path.join(folder, 'user/logs'));
         await writeFile(path.join(output, `ide-${label}-editor.log`), logs);
-        assert.doesNotMatch(logs, /Invalid debug adapter|[Uu]nhandled[Pp]romise[Rr]ejection|[Uu]nhandled promise rejection/, `${label} adapter shutdown must not leave editor errors`);
+        assert.doesNotMatch(logs, /Invalid debug adapter|[Uu]nhandled[Pp]romise[Rr]ejection|[Uu]nhandled promise rejection|Stopping (?:the )?server timed out/, `${label} adapter shutdown must not leave editor errors`);
       } catch (error) { status.error = [status.error, String(error)].filter(Boolean).join('\n'); }
       for (const [source, suffix] of [[pids, 'pids'], [timeline, 'timeline']]) {
         await cp(source, path.join(output, `ide-${label}-${suffix}.jsonl`));
