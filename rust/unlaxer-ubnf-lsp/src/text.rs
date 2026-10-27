@@ -131,10 +131,12 @@ pub fn file_path(uri: &str) -> Result<PathBuf, String> {
     }
     Ok(PathBuf::from(text))
 }
+/// Java `UnixPath.toUri()` (UnixUriUtils): RFC 2396 path characters, i.e. unreserved
+/// `-_.!~*'()` plus `:@&=+$,;/`, stay literal; every other byte is `%XX` (#886).
 pub fn file_uri(path: &std::path::Path) -> String {
     let mut uri = String::from("file://");
     for b in path.to_string_lossy().bytes() {
-        if b.is_ascii_alphanumeric() || b"/-._~".contains(&b) {
+        if b.is_ascii_alphanumeric() || b"/-_.!~*'():@&=+$,;".contains(&b) {
             uri.push(b as char);
         } else {
             uri.push_str(&format!("%{b:02X}"));

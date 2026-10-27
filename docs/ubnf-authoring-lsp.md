@@ -84,7 +84,7 @@ virtual package path に開いた偽 buffer が検証済み source を置換で�
 server が manifest/lock/cache を書き換えないことも両版で検証する。
 現時点の native file URI は Linux のローカル絶対パスを検証対象とし、UNC/Windows 等は #902（親 #886）に残す。
 
-CI は `ubnf-authoring` 必須契約の4メソッドと、基準103件（従来27＋診断76）・navigation38件の実行件数を別々に検査する。
+CI は `ubnf-authoring` 必須契約の4メソッドと、基準103件（従来27＋診断76）・navigation39件の実行件数を別々に検査する。
 packaged VSIX は従来 Java smoke を保持し、別の隔離 profile で Java executable を不存在に設定して
 Rust の completion/hover/診断と変更後の修復、および両 backend の definition/references・rename・documentSymbol・foldingRange・linkedEditingRange・readonly package source を確認する。最後に拡張の `deactivate` で
 native server の子プロセスが終了し、残らないことを確認する（tinycalc-vscode #874/#880 と同じ後始末の水準）。
@@ -204,9 +204,9 @@ PR #896 のレビューでは、候補提示の閾値を `< 2` にする、`ADAP
 ## #886 第一単位: AST navigation と package source
 
 Java/Rust の同じ stdio fixture を、`UbnfAuthoringProtocolConformanceTest#nativeAndJavaServersShareNavigationFixtures` で実行する。
-`navigation.json` の28文書は source と手書きの binding/outline/folding の期待値を持ち、
+`navigation.json` の29文書は source と手書きの binding/outline/folding の期待値を持ち、
 `scripts/ubnf_authoring_navigation.py` の10シナリオが複数文書・import/package・キャッシュ寿命を検査する。
-全38件で各ホストを独立期待値へ照合し、range・順序・キー有無・rename エラー全文を正規化しない。
+全39件で各ホストを独立期待値へ照合し、range・順序・キー有無・rename エラー全文を正規化しない。
 従来103件とは別の必須メソッドにし、CI のテスト契約は削除・skip を失敗にする。
 
 - definition は AST に由来する use と一意な宣言、references は同じ Symbol の文書内 use に結び付く。
@@ -217,7 +217,9 @@ Java/Rust の同じ stdio fixture を、`UbnfAuthoringProtocolConformanceTest#na
   token library の公開 token、外部 token、alias、capture、文字列/comment、重複・予約語・不正な新名、
   不完全入力・module失敗は拒否する。補完用の回復宣言から編集を許可しない。
   parameterized rule の合成名が実宣言に対応しない場合も拒否する。展開が同じ位置を複製する場合の
-  references の重複は Java と同じく保持する。COMMIT / autoCommit 内は Java index が辿らない範囲として同じ結果を返す。
+  references の重複は Java と同じく保持する。COMMIT / LABEL / CATCH / CAPTURE / CAPTURE_SCOPE と
+  `@autoCommit` が挿入する COMMIT の中の参照は、group と同じく両版で use に含める。
+  以前は Java も辿らず、rename が中の参照を残して文法を壊していたため、PR #903 のレビューで両版を直した。
 - native frontend は `a .N` / `a. b.N` を受理するが Java の namespace prefix は連続した文字列を要求する。
   authoring 側で AST の元位置を検査し、この形を回復索引へ落として編集を拒否する。`a. N` は受理する。
   frontend 自体と parser ホットパスは変えない。消去済みの未使用 parameterized 宣言を含む元入力全体や
@@ -229,7 +231,8 @@ Java/Rust の同じ stdio fixture を、`UbnfAuthoringProtocolConformanceTest#na
   これらを黙って改善して Java と異なる結果にしない。
 
 package 定義先は `ubnf-package:/<sha256>/<encoded-file>` と元 source の UTF-16 range を返す。
-外部 URI は検証済み resolver identity から構築する。`ubnf/packageSource` は直前の索引作成で得た
+外部 URI は検証済み resolver identity から構築する。local import の定義先は JDK の `Path.toUri()` と同じく
+`-_.!~*'()` と `:@&=+$,;/` をそのまま残し、ほかを `%XX` にする（PR #903 のレビューで修正）。`ubnf/packageSource` は直前の索引作成で得た
 snapshot の検索だけを行い、URI を resolver に渡さず、ファイル読取り・ネットワーク取得・cache更新をしない。
 開いた直後は Java の refreshImporters と同じく自文書の索引が消えるため、definition/outline 等の
 索引作成後に source が利用可能になる。他文書の通知は既存 importer を再索引化する。

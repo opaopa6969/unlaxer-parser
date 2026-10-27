@@ -49,7 +49,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=240000) public void nativeAndJavaServersShareNavigationFixtures() throws Exception {
-        runProtocol("navigation", 38);
+        runProtocol("navigation", 39);
     }
 
     private void runProtocol(String suite, int count) throws Exception {

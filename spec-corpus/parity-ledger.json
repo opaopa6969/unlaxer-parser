@@ -499,7 +499,7 @@
         901,
         902
       ],
-      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通103件（既存27件＋validator76文法の全JSON）で検証。同一/減少versionもJava通り適用。validatorの意味解析/classpathは #893、syntax/module全診断は #894、profile再設定は #895（親 #885）で未完了。#886 第一単位で AST definition/references・rename・outline/folding・linked editing と検証済み packageSource を追加し、共通stdio38件と両backendのpackaged IDEで元位置/拒否/cache境界を検証。残るFQN quick fix/signature/semantic tokensは #901、completion/hoverのUTF16内部/BMP分類・frontend制約・非file didOpen時のJava provider解決エラー・特殊URI/platform/起動失敗は #902。native配布は方針の文書化のみで公開しない。親 #886 はopenのまま。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。",
+      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通103件（既存27件＋validator76文法の全JSON）で検証。同一/減少versionもJava通り適用。validatorの意味解析/classpathは #893、syntax/module全診断は #894、profile再設定は #895（親 #885）で未完了。#886 第一単位で AST definition/references・rename・outline/folding・linked editing と検証済み packageSource を追加し、共通stdio39件と両backendのpackaged IDEで元位置/拒否/cache境界を検証。残るFQN quick fix/signature/semantic tokensは #901、completion/hoverのUTF16内部/BMP分類・frontend制約・非file didOpen時のJava provider解決エラー・特殊URI/platform/起動失敗は #902。native配布は方針の文書化のみで公開しない。親 #886 はopenのまま。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。",
       "evidence": [
         "docs/ubnf-authoring-lsp.md",
         "spec-corpus/ubnf-authoring-lsp/cases.json",

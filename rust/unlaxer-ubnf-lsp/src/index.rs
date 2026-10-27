@@ -559,9 +559,17 @@ fn atom_uses(atom: &AtomicElement, out: &mut Vec<(String, usize, usize)>) {
             atom.span.byte_start,
             atom.span.byte_end,
         )),
-        ElementKind::Group(b) | ElementKind::Optional(b) | ElementKind::Repeat(b) => {
-            body_uses(b, out)
-        }
+        // Java TransparentElement: COMMIT/LABEL/CATCH/CAPTURE/CAPTURE_SCOPE (and the COMMIT
+        // inserted by @autoCommit) hold references like a group. Skipping them let rename
+        // leave stale references behind (#886).
+        ElementKind::Group(b)
+        | ElementKind::OwnedCapture { body: b, .. }
+        | ElementKind::CaptureScope(b)
+        | ElementKind::Commit { body: b, .. }
+        | ElementKind::Label { body: b, .. }
+        | ElementKind::Catch { choice: b, .. }
+        | ElementKind::Optional(b)
+        | ElementKind::Repeat(b) => body_uses(b, out),
         ElementKind::OneOrMore(a) | ElementKind::BoundedRepeat { element: a, .. } => {
             atom_uses(a, out)
         }

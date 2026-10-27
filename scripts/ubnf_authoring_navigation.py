@@ -51,7 +51,7 @@ def closed(client, params, label):
 
 def run_navigation(clients, directory):
     cases = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/navigation.json').read_text())
-    assert len(cases) == 28, 'authored navigation fixtures must not disappear'
+    assert len(cases) == 29, 'authored navigation fixtures must not disappear'
     evidence = []
     for case in cases:
         uri = (directory / (case['id'] + ' space 😀.ubnf')).as_uri()
@@ -101,6 +101,12 @@ def at(source, needle, length=None, occurrence=0):
     return p(start) + p(start + (len(needle) if length is None else length))
 
 
+def java_file_uri(path):
+    """JDK UnixPath.toUri(): RFC 2396 path characters stay literal (unlike Path.as_uri)."""
+    from urllib.parse import quote
+    return 'file://' + quote(str(path), safe="/-_.!~*'():@&=+$,;")
+
+
 def imported_binding(client, uri, source, module_uri, module, marker, name, refs, label):
     params = {'textDocument': {'uri': uri}, 'position': point(at(source, marker)[:2]), 'newName': 'Renamed'}
     target = location(module_uri, at(module, name + ' ::=', len(name)))
@@ -115,10 +121,11 @@ def imported_binding(client, uri, source, module_uri, module, marker, name, refs
 def import_navigation(clients, directory):
     folder = directory / 'navigation-imports'
     folder.mkdir()
-    module_file = folder / 'number space 😀.ubnf'
+    # RFC 2396 path punctuation that Java's Path.toUri keeps literal (#886 review).
+    module_file = folder / 'number space 😀+(),;=@&$!~*.ubnf'
     module = "grammar N { @ubnf: v2 token EMOJI ::= '😀'; token DIGIT ::= '0'; token NUMBER ::= DIGIT+; }"
     module_file.write_text(module)
-    source = "grammar A {\r\n @import a from 'number space 😀.ubnf'\r\n @import b from 'number space 😀.ubnf'\r\n @ubnf: v2\r\n @root Start ::= a.NUMBER b. NUMBER;\r\n}\r\ngrammar B {\r\n @import c from 'number space 😀.ubnf'\r\n @ubnf: v2\r\n @root Start ::= c.NUMBER;\r\n}"
+    source = "grammar A {\r\n @import a from 'number space 😀+(),;=@&$!~*.ubnf'\r\n @import b from 'number space 😀+(),;=@&$!~*.ubnf'\r\n @ubnf: v2\r\n @root Start ::= a.NUMBER b. NUMBER;\r\n}\r\ngrammar B {\r\n @import c from 'number space 😀+(),;=@&$!~*.ubnf'\r\n @ubnf: v2\r\n @root Start ::= c.NUMBER;\r\n}"
     uri = (folder / 'main.ubnf').as_uri()
     refs = [at(source, v) for v in ['a.NUMBER', 'b. NUMBER', 'c.NUMBER']]
     for host, client in zip(('java', 'rust'), clients):
@@ -126,12 +133,12 @@ def import_navigation(clients, directory):
         diagnostics = open_document(client, uri, source)
         assert diagnostics == [], (label, diagnostics)
         for marker in ('a.NUMBER', 'b. NUMBER', 'c.NUMBER'):
-            imported_binding(client, uri, source, module_file.as_uri(), module, marker, 'NUMBER', refs, label)
+            imported_binding(client, uri, source, java_file_uri(module_file), module, marker, 'NUMBER', refs, label)
         # A second open document's references do not turn this into a workspace index.
         peer = (folder / 'peer.ubnf').as_uri()
         open_document(client, peer, source)
         client.diagnostics(uri)
-        imported_binding(client, uri, source, module_file.as_uri(), module, 'a.NUMBER', 'NUMBER', refs, label)
+        imported_binding(client, uri, source, java_file_uri(module_file), module, 'a.NUMBER', 'NUMBER', refs, label)
         client.send('textDocument/didClose', {'textDocument': {'uri': peer}})
         client.diagnostics(uri)
         # The alias declaration and a capture are not symbol bindings.
@@ -141,21 +148,21 @@ def import_navigation(clients, directory):
         changed = "// moved 😀\r\n" + module
         open_document(client, module_file.as_uri(), changed)
         client.diagnostics(uri)
-        imported_binding(client, uri, source, module_file.as_uri(), changed, 'a.NUMBER', 'NUMBER', refs, label)
+        imported_binding(client, uri, source, java_file_uri(module_file), changed, 'a.NUMBER', 'NUMBER', refs, label)
         change(client, module_file.as_uri(), changed.replace('NUMBER', 'INTEGER'))
         client.diagnostics(uri)
         params['position'] = point(at(source, 'a.NUMBER')[:2])
         result(client, 'definition', params, [], label)
         client.send('textDocument/didClose', {'textDocument': {'uri': module_file.as_uri()}})
         client.diagnostics(uri)
-        imported_binding(client, uri, source, module_file.as_uri(), module, 'a.NUMBER', 'NUMBER', refs, label)
+        imported_binding(client, uri, source, java_file_uri(module_file), module, 'a.NUMBER', 'NUMBER', refs, label)
         # Disk changes are observed by the next navigation request, like ensureIndex.
         module_file.write_text(changed)
-        imported_binding(client, uri, source, module_file.as_uri(), changed, 'a.NUMBER', 'NUMBER', refs, label)
+        imported_binding(client, uri, source, java_file_uri(module_file), changed, 'a.NUMBER', 'NUMBER', refs, label)
         module_file.write_text(module)
         client.send('textDocument/didSave', {'textDocument': {'uri': module_file.as_uri()}})
         client.diagnostics(uri)
-        imported_binding(client, uri, source, module_file.as_uri(), module, 'a.NUMBER', 'NUMBER', refs, label)
+        imported_binding(client, uri, source, java_file_uri(module_file), module, 'a.NUMBER', 'NUMBER', refs, label)
         client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
     assert module_file.read_text() == module
     evidence = [{'case': 'import-aliases-scopes-buffer-change-close-save', 'navigationContract': 'full-json-independent-oracle'}]
