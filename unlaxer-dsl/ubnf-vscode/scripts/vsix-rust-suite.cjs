@@ -47,12 +47,14 @@ exports.run = async function () {
   const hover = await vscode.commands.executeCommand('vscode.executeHoverProvider', file, new vscode.Position(2, 17));
   assert.ok(hover.some(h => h.contents.some(c => c.value.includes('**rule Item**'))));
   const definitions = await vscode.commands.executeCommand('vscode.executeDefinitionProvider', file, new vscode.Position(2, 17));
-  assert.equal(definitions?.length ?? 0, 0, 'Rust first stage must not advertise definition');
+  assert.equal(definitions.length, 1);
+  assert.deepEqual([definitions[0].range.start.line, definitions[0].range.start.character], [3, 1]);
   await editor.edit(edit => edit.replace(new vscode.Range(0, 0, document.lineCount, 0), 'grammar Broken {'));
   await waitFor(() => vscode.languages.getDiagnostics(file), ds => ds.some(d => d.code === 'ULX-PARSE-001'), 'native diagnostics');
   await editor.edit(edit => edit.replace(new vscode.Range(0, 0, document.lineCount, 0), source));
   await waitFor(() => vscode.languages.getDiagnostics(file), ds => ds.length === 0, 'diagnostics after repair');
   await require('./vsix-diagnostics.cjs').verify();
+  await require('./vsix-navigation.cjs').verify();
   // Same cleanup bar as tinycalc-vscode (#874/#880): deactivate stops the owned process.
   await require(path.join(extension.extensionPath, 'out/extension.js')).deactivate();
   await waitFor(() => dead(server), Boolean, 'native server exit after deactivate');

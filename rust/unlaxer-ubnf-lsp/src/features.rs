@@ -37,7 +37,7 @@ fn help(id: &str) -> Option<String> {
     }
     Some(text)
 }
-fn keywords() -> &'static Vec<String> {
+pub(crate) fn keywords() -> &'static Vec<String> {
     static WORDS: OnceLock<Vec<String>> = OnceLock::new();
     WORDS.get_or_init(|| {
         let file = parse(include_str!("../../../unlaxer-dsl/grammar/ubnf.ubnf"))
