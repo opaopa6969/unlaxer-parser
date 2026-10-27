@@ -2291,7 +2291,7 @@ impl<'a> ParseContext<'a> {
         metrics
     }
 
-    /// Hits in this context's pass only; excludes any separate detailed retry.
+    /// Hits in this context's pass only, excluding a separate detailed retry. Host-dependent (#827).
     pub fn memoized_failure_hits(&self) -> usize {
         self.memoized_failure_hits
     }
@@ -2320,8 +2320,8 @@ impl<'a> ParseContext<'a> {
         self.success_memo.budget_misses
     }
 
-    /// Actual successful rule replays in this context's pass. Tracing, unsafe
-    /// rules and snapshots exceeding the memo budgets are misses.
+    /// Actual successful rule replays in this context's pass (host-dependent, not comparable with
+    /// Java, #827). Tracing, unsafe rules and snapshots exceeding the memo budgets are misses.
     pub fn memoized_success_hits(&self) -> usize {
         self.memoized_success_hits
     }

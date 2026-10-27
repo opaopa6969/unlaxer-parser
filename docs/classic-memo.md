@@ -41,3 +41,5 @@ Rust opt-in terminal trace中はsuccess replayを停止して通常実行しま�
 [共通fixtureと正確な観測数](../conformance/classic-memo/README.md)を参照してください。
 
 [stateful failureのepoch契約](stateful-failure-memo.md) は #629 で対応しました。
+
+Classic の公開 context API から取得する failure/success hit も host 依存の内部会計であり、Java/Rust 間の一致を契約しません (#827)。Tiny Classic harness の結果 JSON の `failure_hits` / `success_hits` も同じ扱いです。成否・cursor・診断・reset は引き続き memo OFF/ON と各 host の間で検証します。[公開範囲と共通 corpus](../conformance/chain-reset-after-failure/README.md#memo-hit-accounting)。

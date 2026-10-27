@@ -18,7 +18,8 @@
     "2026-10-27 #833/#834/#835: spec corpusの診断差16件を両Rust hostで修正し契約へ移した（issueは本PRのmerge待ちでOPEN）。#784の実行先・独立期待値を維持し、rootあり/なしと複数不正の順序を追加検証する。 前提の#784（PR #836）・#825（PR #831）はmerge済み/CLOSEDを確認した。",
     "2026-10-27 #843: 残る7入力の診断コード・順序を両Rust hostでJava validatorに揃えた。rootあり/なし、単一エラー説明とcheck JSONを共通fixtureで固定する。precedence欠如・重複の#835契約は維持する。性能作業・parser実行経路は対象外。 レビューでvalidateAssocのparams欠落・repeat欠如もJavaの最初のERRORに揃え、nativeの名前述語の隠れは#858へ分離した。",
     "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。",
-    "2026-10-27 #826: 正の先読みの到達位置、Classic capture の失敗 frame、native UNTIL の失敗した終端候補を記録。既存の Java oracle 値は変更せず nested/frame-start の全診断列を両Rust host・通常/mappingで一致させる。差分表は実測に一致する memo 会計差だけを保持する。個別修正であり台帳全体の監査日・revision は更新しない。"
+    "2026-10-27 #826: 正の先読みの到達位置、Classic capture の失敗 frame、native UNTIL の失敗した終端候補を記録。既存の Java oracle 値は変更せず nested/frame-start の全診断列を両Rust host・通常/mappingで一致させる。差分表は実測に一致する memo 会計差だけを保持する。個別修正であり台帳全体の監査日・revision は更新しない。",
+    "2026-10-27 #827: failure/success hit は公開 context API と Classic harness に現れる host 依存の内部会計であり、Java/Rust 間の数値一致を契約しないと決定。marker・rule/inline group の cache 粒度と Chain 対照を確認し、非nested Outer を追加。runtime/生成器を変えず、実測全行と memo OFF/SAFE_FAILURES の結果不変を検証する。個別の契約判断であり台帳全体の監査日・revision は更新しない。"
   ],
   "issues": {
     "111": {
@@ -576,9 +577,10 @@
         197,
         629,
         184,
-        756
+        756,
+        827
       ],
-      "observation": "memo-reset-policy の java_hits は Java 同一context の warm/next。Rust の同fixtureは別grammar sessionで意味だけ比較し、実hitは別probeが検証する。byte予算は言語のlayoutに依存する。measurement-metadata.json の java は計測JDKで期待値ではないが保守的な走査対象として登録。性能改善は #197 の凍結に従い本PRでは行わない。 capture比較effectやopaque callbackを自動memo/cache対象にする条件にもhost差がある。Javaのlistener通知を省略せず、Rustの未監査effectは保守的に除外する。hit数の一致と構文結果の一致を混同しない。 #756は選択肢3として計算量を文書化。CAPTURE / SAME_ASに到達する相互再帰ruleは両言語ともSAFE_FAILURESの対象外で、指数時間になる場合がある。PBTの手数予算は試験入力の除外でありruntimeの手数上限ではない。captureを考慮した失敗memoとopt-inの手数上限は#197の凍結解除後の候補として残す。",
+      "observation": "memo-reset-policy の java_hits は Java 同一context の warm/next。Rust の同fixtureは別grammar sessionで意味だけ比較し、実hitは別probeが検証する。byte予算は言語のlayoutに依存する。measurement-metadata.json の java は計測JDKで期待値ではないが保守的な走査対象として登録。性能改善は #197 の凍結に従い本PRでは行わない。 capture比較effectやopaque callbackを自動memo/cache対象にする条件にもhost差がある。Javaのlistener通知を省略せず、Rustの未監査effectは保守的に除外する。hit数の一致と構文結果の一致を混同しない。 #756は選択肢3として計算量を文書化。CAPTURE / SAME_ASに到達する相互再帰ruleは両言語ともSAFE_FAILURESの対象外で、指数時間になる場合がある。PBTの手数予算は試験入力の除外でありruntimeの手数上限ではない。captureを考慮した失敗memoとopt-inの手数上限は#197の凍結解除後の候補として残す。 #827で生成rule/groupのfailure/success hitもhost依存の内部会計と契約化した。公開context APIとClassic consumer JSONの値も言語間の一致を保証しない。nested-boundary-memo-accountingにmarker・cache粒度・全行検証の根拠を記録する。",
       "evidence": [
         "docs/memo-reset-policy.md",
         "docs/failure-memo-budget.md",
@@ -586,7 +588,8 @@
         "docs/generated-scope-effects.md",
         "docs/incremental-cache.md",
         "docs/packrat-memoization.md",
-        "docs/property-based-testing.md"
+        "docs/property-based-testing.md",
+        "conformance/chain-reset-after-failure/README.md"
       ]
     },
     {
@@ -951,15 +954,16 @@
     },
     {
       "id": "nested-boundary-memo-accounting",
-      "category": "unresolved",
-      "title": "nested mixed rule の memo hit 会計",
+      "category": "contract",
+      "title": "生成 rule / group の failure・success memo hit は host 依存",
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         827,
         823,
-        829
+        829,
+        197
       ],
-      "observation": "Integer ::= (N | N) | t をab・先行LOOKAHEAD(a)で同一contextから3回呼ぶとSAFE_FAILURESでJava failure hit0/Rust2。Java生成rule/group/__CaptureSiteの安全markerとRustのrule単位cache対象が異なり、候補のChain対照でも差は変わらない。Rootのtext groupはJavaでも安全markerがあり多くの経路で2だが、空入力やMatchOnly経由は0/2。Longest/Uniqueのtext・途中失敗では1回の呼出でJava success hit1/Rust0。両hostと通常/mapping grammarで生のhit数を固定し、成否/cursor/resetを除外しない。意図した契約として採用するかの判断を含め#827で追跡する。 #829のframe-start corpusでもPlainTok等のfailure hit Java0/Rust2、外側Longestのsuccess hit Java1/Rust0を全行キー付きで固定する。",
+      "observation": "failure/success hit は公開 API で取得できる host 依存の内部会計であり、同じ文法・入力・設定でも Java/Rust 間の数値一致を契約しない (#827)。Java ParseContext.getPackratMemoTable().failureHits()/successHits()、Rust ParseContext::memoized_failure_hits()/memoized_success_hits()、Tiny Classic consumer の結果JSONの failure_hits/success_hits に適用する。Java は exact class の安全markerとparser identity、Rust は安全なRule全体をcacheしinline groupはcacheしない。NumberParserのSimple tokenに依存するJava Root/Integer/Longest/Unique/Mix/Outerと__CaptureSiteにはmarkerがなく、literal groupやHelper/MixGroup0には両markerがある。RustはNumberを既知のExprとしてrule全体をcacheする。Integerはfailure0/2、Longest/Uniqueおよびframe-startのRoot-longest-negativeはsuccess1/0。非nested Outerを4経路96行追加し、+b・先読み+では初期false/trueでJava5/4・Rust2、DETAILED_ON_FAILUREはJava0・Rust2を再現。ab・先読みaでは遅延診断も5/4なので入力別に固定する。JavaのHelper/MixGroup0とRustのOuter再生を一時traceでも確認。18候補のChain対照で候補単独のresetだけが変わり、rule全体の観測はhitを含め不変なのでowner resetの正規化差ではない。nested79経路1896行・frame-start115経路2760行をJavaと両Rust host・通常/mapping・通常/Classic・初期reset2・memo2・診断3で再実行し、nestedはChain対照も照合。差分表はnested268行（既存232+Outer失敗36）、frame-start81行で既存データ行と全hit列を保持。診断2列のhost差を拒否し、成否・両cursor・reset・診断・後続解析はmemo OFF/SAFE_FAILURESでも直接一致を要求する。対象corpusにcacheで結果が変わる反例はない。runtime/生成器/marker/key/計数処理は変更せず、#197に従い性能再計測なし。#827はPRのmerge待ちでOPEN。",
       "evidence": [
         "conformance/chain-reset-after-failure/README.md",
         "conformance/chain-reset-after-failure/nested-boundary.ubnf",
@@ -970,7 +974,16 @@
         "conformance/chain-reset-after-failure/nested-boundary-differences.tsv",
         "conformance/chain-reset-after-failure/frame-start-differences.tsv",
         "conformance/chain-reset-after-failure/frame-start.tsv",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/FrameStartMatchedResetConformanceTest.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/FrameStartMatchedResetConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/MemoHitAccountingAssertions.java",
+        "docs/packrat-memoization.md",
+        "docs/pure-success-memo.md",
+        "docs/classic-memo.md",
+        "benchmarks/tiny-classic/README.md",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/codegen/ParserGenerator.java",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/codegen/ParserRuleEmitter.java",
+        "unlaxer-common/src/main/java/org/unlaxer/context/PackratMemoTable.java",
+        "rust/unlaxer-runtime/src/lib.rs"
       ]
     },
     {
