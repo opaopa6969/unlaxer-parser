@@ -12,6 +12,32 @@ public final class UBNFPackageResolver {
     public static final String MANIFEST = "ubnf.json";
     public static final String LOCK = "ubnf.lock.json";
     private static final int MAX_BYTES = 8 * 1024 * 1024;
+    // Local source files share the package graph byte budget; individual artifacts stay at 8 MiB.
+    static final int MAX_LOCAL_BYTES = 64 * 1024 * 1024;
+    private static final String NOT_REGULAR = "E-MODULE: local import is not a regular file";
+    private static final String TOO_LARGE = "E-MODULE: local import exceeds 64 MiB";
+
+    /** Disk reader for local imports. Custom SourceReaders may still supply in-memory documents. */
+    public static String readLocalSource(Path path) throws IOException {
+        return readLocalSource(path, Files::newInputStream);
+    }
+
+    @FunctionalInterface interface LocalInput {
+        java.io.InputStream open(Path path) throws IOException;
+    }
+
+    // The opener seam also lets tests replace/grow the file after stat, without a timing race.
+    static String readLocalSource(Path path, LocalInput input) throws IOException {
+        var attributes = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class);
+        if (!attributes.isRegularFile()) throw new IOException(NOT_REGULAR);
+        if (attributes.size() > MAX_LOCAL_BYTES) throw new IOException(TOO_LARGE);
+        try (var stream = input.open(path)) {
+            byte[] bytes = stream.readNBytes(MAX_LOCAL_BYTES + 1);
+            if (bytes.length > MAX_LOCAL_BYTES) throw new IOException(TOO_LARGE);
+            // Preserve Files.readString's strict UTF-8 decoding (no replacement characters).
+            return StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+        }
+    }
     private static final Gson JSON = new GsonBuilder().disableHtmlEscaping().setStrictness(Strictness.STRICT).create();
     private final Path directory;
     private final Path virtualRoot;
@@ -105,7 +131,7 @@ public final class UBNFPackageResolver {
         Map<String, byte[]> blobs = new TreeMap<>();
         for (var root : roots.entrySet()) resolveOne(root.getKey(), root.getValue().getAsJsonObject(),
             manifest.getParent(), packages, blobs, new LinkedHashSet<>(), false);
-        if (packages.size() > 128 || blobs.values().stream().mapToLong(b -> b.length).sum() > 64L * 1024 * 1024)
+        if (packages.size() > 128 || blobs.values().stream().mapToLong(b -> b.length).sum() > MAX_LOCAL_BYTES)
             throw error("package graph exceeds cache limits");
         JsonObject lock = new JsonObject();
         JsonObject packageValues = new JsonObject();
@@ -168,7 +194,7 @@ public final class UBNFPackageResolver {
         JsonObject previous = packages.putIfAbsent(name, pinned);
         if (previous != null && !previous.equals(pinned)) throw error("conflicting package identity: " + name);
         if (previous == null) {
-            if (blobs.values().stream().mapToLong(blob -> blob.length).sum() + bytes.length > 64L * 1024 * 1024)
+            if (blobs.values().stream().mapToLong(blob -> blob.length).sum() + bytes.length > MAX_LOCAL_BYTES)
                 throw error("package graph exceeds cache limits");
             blobs.put(hash, bytes);
             for (var entry : nested.entrySet()) resolveOne(entry.getKey(), entry.getValue().getAsJsonObject(),
@@ -240,7 +266,7 @@ public final class UBNFPackageResolver {
         if (Files.size(cache) > MAX_BYTES) throw error("artifact exceeds 8 MiB");
         byte[] bytes = Files.readAllBytes(cache);
         loadedBytes += bytes.length;
-        if (loadedBytes > 64L * 1024 * 1024) throw error("package graph exceeds cache limits");
+        if (loadedBytes > MAX_LOCAL_BYTES) throw error("package graph exceeds cache limits");
         if (!sha256(bytes).equals(string(pinned, "sha256"))) throw error("artifact hash mismatch: " + name);
         JsonObject value = artifact(bytes);
         if (!name.equals(string(value, "id")) || !string(value, "version").equals(string(pinned, "version")))

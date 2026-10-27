@@ -63,7 +63,7 @@ public final class PortabilityCheck {
             return check(snapshot, snapshot.ast());
         try {
             var linked = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolveWithSource(
-                snapshot, path, java.nio.file.Files::readString);
+                snapshot, path, org.unlaxer.dsl.bootstrap.UBNFPackageResolver::readLocalSource);
             // Only root identities (including rebuilt nodes) have positions in this snapshot.
             return check(linked, linked.ast());
         } catch (IllegalArgumentException | java.io.IOException error) {

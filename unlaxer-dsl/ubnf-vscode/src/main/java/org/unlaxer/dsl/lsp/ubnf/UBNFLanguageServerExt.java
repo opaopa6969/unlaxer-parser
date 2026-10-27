@@ -194,7 +194,7 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
                     if (java.nio.file.Path.of(java.net.URI.create(state.uri())).toAbsolutePath().normalize().equals(path)) return state.content();
                 } catch (IllegalArgumentException ignored) { /* Non-file editor. */ }
             }
-            return java.nio.file.Files.readString(path);
+            return org.unlaxer.dsl.bootstrap.UBNFPackageResolver.readLocalSource(path);
         });
         var grammars = editor.snapshot == null ? null : editor.snapshot.ast().grammars();
         DocumentIndex index = new DocumentIndex(content, grammars, editor);

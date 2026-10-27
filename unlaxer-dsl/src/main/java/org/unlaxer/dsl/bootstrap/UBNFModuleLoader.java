@@ -37,7 +37,7 @@ public final class UBNFModuleLoader {
     }
 
     public static UBNFFile load(Path path) throws IOException {
-        return resolve(UBNFMapper.parse(Files.readString(path)), path, Files::readString);
+        return resolve(UBNFMapper.parse(Files.readString(path)), path, UBNFPackageResolver::readLocalSource);
     }
 
     public static UBNFFile resolve(UBNFFile file, Path path, SourceReader reader) throws IOException {

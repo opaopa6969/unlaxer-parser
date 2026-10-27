@@ -66,7 +66,7 @@ final class RustGenerateCommand {
         try {
             Path grammarPath = Path.of(options.get("--grammar"));
             var snapshot = UBNFMapper.parseWithSource(Files.readString(grammarPath));
-            var file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(snapshot, grammarPath, Files::readString);
+            var file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(snapshot, grammarPath, org.unlaxer.dsl.bootstrap.UBNFPackageResolver::readLocalSource);
             org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, snapshot);
             // Java class-resolution warnings do not define Rust token support: lowering
             // enforces an explicit Rust allowlist. Common grammar errors remain fatal.
