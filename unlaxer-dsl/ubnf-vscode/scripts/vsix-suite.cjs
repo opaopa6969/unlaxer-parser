@@ -57,5 +57,6 @@ exports.run = async function () {
   assert.ok(definitions?.some(item => (item.uri ?? item.targetUri)?.toString() === moduleFile.toString()), 'real LSP resolves imported token locations');
   const importedCompletion = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider', mainFile, new vscode.Position(4, 15));
   assert.ok(importedCompletion.items.some(item => item.label === 'num.NUMBER' || item.label?.label === 'num.NUMBER'));
+  await require('./vsix-diagnostics.cjs').verify();
   console.log('Packaged VSIX: activation, catalog, LSP imports, generation, WASM build and live playground webview passed');
 };

@@ -28,6 +28,18 @@
     "864": {"state": "OPEN", "title": "parity(lsp): UBNF authoring serverのRust利用経路をJava基準へ揃える"},
     "885": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の全診断・profile 再設定を Java 契約へ揃える（#864 後続）"},
     "886": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の navigation・編集支援・packageSource と native 配布（#864 後続）"},
+    "893": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF validator の意味解析・Java classpath 診断を完全接続する（#885 後続）"
+    },
+    "894": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF syntax・module 全診断と parse-status hover を一致させる（#885 後続）"
+    },
+    "895": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF initialize options・unlaxer/configure・profile 契約を移植する（#885 後続）"
+    },
     "111": {
       "state": "OPEN",
       "title": "Rust full-spec: UBNF・context/combinatorからtinyexpression native toolchainまで"
@@ -478,12 +490,17 @@
       "issues": [
         864,
         885,
+        893,
+        894,
+        895,
         886
       ],
-      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通27件で検証。全 GrammarValidator・syntax expected/stack・profile 再設定は #885、navigation/rename/outline/folding/linked editing/quick fix/signature/semantic tokens/packageSource/native 配布は #886 で未対応のまま追跡。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。",
+      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通103件（既存27件＋validator76文法の全JSON）で検証。同一/減少versionもJava通り適用。validatorの意味解析/classpathは #893、syntax/module全診断は #894、profile再設定は #895（親 #885）で未完了。navigation/rename/outline/folding/linked editing/quick fix/signature/semantic tokens/packageSource/native 配布は #886 で未対応のまま追跡。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。",
       "evidence": [
         "docs/ubnf-authoring-lsp.md",
         "spec-corpus/ubnf-authoring-lsp/cases.json",
+        "spec-corpus/ubnf-authoring-lsp/diagnostics.json",
+        "rust/unlaxer-generator/src/validation/mod.rs",
         "scripts/check-ubnf-authoring-lsp.py",
         "rust/unlaxer-ubnf-lsp/src/lib.rs",
         "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"

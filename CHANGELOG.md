@@ -75,6 +75,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Java/Rust の上限付き snapshot cache、Rust の pure success / Classic token mode の memo 再生、rollback に対応する state version 付き failure memo を追加 (PR #565、#633、#640、#647)。Rust の pure success memo 再生は既定 OFF で、`ParseOptions::with_memoization(Memoization::SafeFailures)` を指定した opt-in。外部 callback を含む文法は既定で snapshot cache の対象外 (issue #613)。編集は全再解析し、unsafe callback や stateful success の暗黙再利用は行わない。[snapshot cache](docs/incremental-cache.md)、[pure success](docs/pure-success-memo.md)、[Classic](docs/classic-memo.md)、[state version](docs/stateful-failure-memo.md)。
 - Java/Rust LSP の full semantic-token provider と、TinyCalc / `unlaxer init` 拡張での Java/Rust stdio backend 選択を追加 (PR #550、#556)。[semantic tokens](docs/classic-rust-lsp.md)、[起動・再設定](docs/rust-vscode-launch.md)。
 - JVM 不要の Rust UBNF authoring server と VSIX の明示選択を追加。Java 基準の capability/request 表、実 stdio 共通 fixture、import/package 境界を固定し、第一段は診断の一部・hover・completion を提供する (#864)。残る診断/profile は #885、navigation・編集支援・packageSource・native 配布は #886。[対応範囲](docs/ubnf-authoring-lsp.md)。
+- Rust UBNF authoring server に root・mapping・参照・左再帰などの validator 診断を接続し、同一/減少 version の Full change を Java と一致させた。76文法の全診断 JSON・VSIX 表示を照合する（#885、意味解析/classpath #893・syntax/module #894・profile #895 は継続）。
 - Java / Rust（native・Java-host）の既知差・未対応・条件付き skip を issue へ結ぶ [台帳](docs/parity-ledger.md) と JSON、host 別 corpus（JSON・JSON Lines・TSV・CSV・YAML、host 列の行）とテスト内の無条件 skip・差分表・除外集合の登録漏れ、文書の不一致を検出する既存 CI の検査を追加 (#771)。
 
 ### Fixed

@@ -163,11 +163,44 @@ def run(java, native, directory):
         evidence.append({'case': case['id'], 'completionItems': len(completions[0]), 'diagnosticContract': 'syntax-accept-reject-only' if case.get('syntaxError') else 'module-code-range' if case.get('moduleError') else 'validator-pending' if case.get('validatorGap') else 'exact'})
     evidence.extend(import_buffers(clients, directory))
     evidence.extend(packages(clients, directory))
+    evidence.extend(validator_diagnostics(clients, directory))
     for client in clients:
         assert client.result('shutdown') is None
         assert client.request('textDocument/hover')['error']['code'] == -32600
         client.send('exit')
         assert client.process.wait(timeout=10) == 0
+    return evidence
+
+
+def validator_diagnostics(clients, directory):
+    """Independent authored full JSON, including absent data/relatedInformation fields."""
+    cases = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/diagnostics.json').read_text())
+    assert len(cases) == 76, 'validator fixtures must not silently disappear'
+    evidence, failures = [], []
+    for case in cases:
+        uri = (directory / (case['id'] + ' 😀.ubnf')).as_uri()
+        for host, client in zip(('java', 'rust'), clients):
+            client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'languageId': 'ubnf', 'version': 8, 'text': case['source']}})
+            actual = client.diagnostics(uri)
+            if actual != case['expected']:
+                failures.append({'case': case['id'], 'host': host, 'expected': case['expected'], 'actual': actual})
+            # Java applies every Full change, even equal/decreasing versions. Check
+            # replacement and diagnostic invalidation with a second open document.
+            peer = uri + '.peer'
+            fixed = "grammar Fixed { @root Start ::= 'x'; }"
+            client.send('textDocument/didOpen', {'textDocument': {'uri': peer, 'languageId': 'ubnf', 'version': 1, 'text': fixed}})
+            assert client.diagnostics(peer) == []
+            for version, text, expected in [(8, fixed, []), (7, case['source'], case['expected']), (6, fixed, [])]:
+                client.send('textDocument/didChange', {'textDocument': {'uri': uri, 'version': version}, 'contentChanges': [{'text': text}]})
+                actual = client.diagnostics(uri)
+                if actual != expected:
+                    failures.append({'case': case['id'], 'host': host, 'version': version, 'expected': expected, 'actual': actual})
+            client.send('textDocument/didSave', {'textDocument': {'uri': uri}})
+            client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
+            assert client.result('textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 0}}) is None
+            client.send('textDocument/didClose', {'textDocument': {'uri': peer}})
+        evidence.append({'case': case['id'], 'diagnosticContract': 'exact-full-json-and-version-changes'})
+    assert not failures, json.dumps(failures, ensure_ascii=False, indent=2)
     return evidence
 
 

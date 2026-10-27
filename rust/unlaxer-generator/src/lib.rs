@@ -24,6 +24,7 @@ mod raising;
 pub mod semantic_rules;
 pub mod simple_annotations;
 mod token_stream;
+pub mod validation;
 pub mod warnings;
 
 /// Parse and validate the complete grammar before producing any artifacts.
