@@ -13,15 +13,18 @@ impl Backend for Hooks {
             "empty" => Ok(vec![]),
             "bad-span" => Ok(vec![Step {
                 label: "bad".into(),
+                generated_text: None,
                 span: Span { start: 0, end: 99 },
             }]),
             "A\r\nB" => Ok(vec![Step {
                 label: "bad".into(),
+                generated_text: None,
                 span: Span { start: 2, end: 3 },
             }]),
             _ => Ok(vec![
                 Step {
                     label: "Parent".into(),
+                    generated_text: None,
                     span: Span {
                         start: 0,
                         end: source.len(),
@@ -29,6 +32,7 @@ impl Backend for Hooks {
                 },
                 Step {
                     label: "Child".into(),
+                    generated_text: None,
                     span: Span {
                         start: 1,
                         end: source.len(),
@@ -225,7 +229,7 @@ fn malformed_frames_and_requests_fail_with_bounded_transport() {
 }
 
 #[test]
-fn token_backend_requires_complete_real_trace_and_rejects_detached_source() {
+fn token_backend_requires_complete_real_trace_and_retains_detached_source() {
     use unlaxer_runtime::{
         token::{TokenKind, TokenSource},
         token_trace::Limits,
@@ -277,10 +281,26 @@ fn token_backend_requires_complete_real_trace_and_rejects_detached_source() {
             },
         )
         .unwrap();
-    assert!(
+    let steps = unlaxer_dap::token_steps(&context.tree(token.index()).unwrap()).unwrap();
+    assert_eq!(steps.len(), 2);
+    assert_eq!(steps[0].generated_text, None);
+    assert_eq!(steps[1].span, Span { start: 1, end: 1 });
+    assert_eq!(steps[1].generated_text.as_deref(), Some("generated"));
+    context
+        .add_token_node(
+            0,
+            TokenKind::VirtualMatchOnly,
+            TokenSource::Generated {
+                anchor: 0,
+                text: "hidden".into(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
         unlaxer_dap::token_steps(&context.tree(token.index()).unwrap())
-            .unwrap_err()
-            .contains("detached generated")
+            .unwrap()
+            .len(),
+        2
     );
 }
 

@@ -21,7 +21,7 @@ pub fn generate(ir: &GrammarIr) -> GeneratedFile {
             out.push_str(", .. } => {\n");
             writeln!(
                 out,
-                "            out.push(unlaxer_dap::Step {{ label: {}.into(), span: *span }});",
+                "            out.push(unlaxer_dap::Step {{ label: {}.into(), span: *span, generated_text: None }});",
                 quote(&mapping.name)
             )
             .unwrap();

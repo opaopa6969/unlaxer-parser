@@ -49,8 +49,11 @@ public class ClassicTokenDapProtocolConformanceTest {
    }
    fn main(){unlaxer_dap::Server::new(Backend).serve_stdio().unwrap();}
    """);
-  run(List.of("cargo","build","--quiet","--offline","--manifest-path",project.resolve("Cargo.toml").toString()));
-  try(var wire=new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/classic-token-dap-fixture").toString()).redirectError(temporary.newFile("rust-stderr.log")).start())){exercise(wire,"rust");}
+  for(String host:List.of("rust","rust-native")){
+   if(host.equals("rust-native"))for(var file:new RustBackend().generateWithProtocols(grammar,false,true))Files.copy(nativeOutput.resolve(file.relativePath()),modules.resolve(file.relativePath()),StandardCopyOption.REPLACE_EXISTING);
+   run(List.of("cargo","build","--quiet","--offline","--manifest-path",project.resolve("Cargo.toml").toString()));
+   try(var wire=new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/classic-token-dap-fixture").toString()).redirectError(temporary.newFile(host+"-stderr.log")).start())){exercise(wire,host);}
+  }
   Files.createDirectories(Path.of("target"));Files.write(Path.of("target/classic-token-dap-protocol.tsv"),evidence);
  }
  private void exercise(Wire wire,String backend)throws Exception {

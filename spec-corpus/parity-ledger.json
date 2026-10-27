@@ -437,6 +437,10 @@
       "state": "OPEN",
       "title": "fix: Java Choice の FIRST 候補除外が reset 前の cursor を読み、DETAILED_ON_FAILURE だけ受理が変わる"
     },
+    "863": {
+      "state": "OPEN",
+      "title": "parity(dap): detached generated tokenのtextと位置をJava/Rust双方で表示・検証する"
+    },
     "869": {
       "state": "OPEN",
       "title": "check: commonField の容器の綴り違いと通常 choice の型比較を Java-host に揃える"
@@ -1210,17 +1214,21 @@
     },
     {
       "id": "dap-generated-source",
-      "category": "unresolved",
-      "title": "detached generated source のRust DAP表示",
+      "category": "contract",
+      "title": "generated text と原文 anchor の明示的な DAP 表示",
       "hosts": "Java DAP / Rust DAP・両生成host",
       "issues": [
         111,
-        463
+        463,
+        863
       ],
-      "observation": "runtime traceはGenerated sourceを保持するが、Rust DAPは原文slice表示なのでconsumed generated sourceを拒否する。Javaの任意Token表示との境界が残る。",
+      "observation": "#863: Rust token_steps は generated text を所有し、原文 anchor をゼロ幅 CP span として表示する。Java の既存 detached source 座標は維持し、tokenSourceSpan hook で PortableTokenMetadata の原文 anchor を渡す。共通6入力・各80停止点の実 stdio と5 rollback ケースで検証。未宣言 custom/不完全 trace の拒否は維持する。",
       "evidence": [
         "docs/token-trace.md",
-        "docs/classic-rust-dap.md"
+        "docs/classic-rust-dap.md",
+        "docs/fixtures/generated-token-dap/cases.json",
+        "docs/fixtures/generated-token-dap/rollback.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/GeneratedTokenDapProtocolConformanceTest.java"
       ]
     },
     {

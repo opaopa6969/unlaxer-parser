@@ -40,21 +40,34 @@ Number の `12.3` は `Optional[0,0]`, `Digit[0,1]`, `Digit[1,2]`, `Point[2,3]`,
 
 生成 `dap::backend()` は `ParserBackend` を返す。`runtimeMode: "token"`（既定）または `steppingMode: "token"` で生成 parser の trace を使い、`"ast"` は既存 strict mapper を使う。`AstBackend` と既存 custom Backend は引き続きAST専用。custom Backend が token に対応する場合は `supports_token_trace()` を明示する。
 
-token mode では consumed / virtual consumed の input-backed leaf を巡回する。`Current Token` scope、`Token` variable、`runtimeMode`、`steppingMode` を返し、AST件数は0。位置変換・breakpoint・next・continue・source offset・client基底は [AST DAP と共通](classic-rust-dap.md)。これは解析後の構造 inspection であり、live evaluator の実行停止ではない。
+token mode では consumed / virtual consumed の input-backed / generated leaf を committed trace の順で巡回する。同じ anchor の leaf も統合・ソートせず、それぞれ停止する。`Current Token` scope、`Token` variable、`runtimeMode`、`steppingMode` を返し、AST件数は0。位置変換・breakpoint・next・continue・source offset・client基底は [AST DAP と共通](classic-rust-dap.md)。これは解析後の構造 inspection であり、live evaluator の実行停止ではない。
 
-`TokenSource::Generated { anchor, text }` は runtime trace で保持できるが、原文 slice を表示する現在の Rust DAP は consumed generated source を明示拒否する。generated text を空の原文 anchor として表示しない。Java の既存 collector/任意 Token 表示 API は変更しない。この host 境界と上記未対応複合 atom は、全仕様の [#111](https://github.com/opaopa6969/unlaxer-parser/issues/111) に残る。
+### generated token の本文と原文 anchor（#863）
+
+`TokenSource::Input(span)` の本文は原文 slice。`TokenSource::Generated { anchor, text }` の本文は独立した `text` であり、空文字も有効。原文の空 slice で代用しない。`anchor` は原文上の CP 位置で、DAP の stack frame は `[anchor, anchor)` を原文 snapshot から UTF-16 へ変換する。generated text の長さ・改行・非 BMP 文字は原文の開始/終了位置を動かさない。source は launch した program、breakpoint は同じ anchor の原文行を使う。CRLF の途中など原文 snapshot で表現できない位置は従来どおり拒否する。
+
+Rust の公開経路は、`ParseOptions::with_token_trace` を有効にした `ParseContext` で `add_token_node(..., TokenKind::VirtualConsumed, TokenSource::Generated { anchor, text })` を呼び、成功した完全な `Tree` を `unlaxer_dap::token_steps(&tree)` へ渡す。`Backend::supports_token_trace()` を `true` にし、`Backend::steps` からこの結果を返す。[実行可能な custom backend](../rust/unlaxer-dap/examples/generated_token_dap.rs)を参照。custom callback 内なら `declare_complete_token_trace()` も必要で、宣言漏れを無視して成功にしない。match-only leaf、choice 敗者、先読み・外側失敗の leaf は停止対象にならない。
+
+`Step.generated_text` は `None` なら input-backed、`Some(String)` なら generated。`token_steps` は trace が所有する本文を複製するので Tree/context 破棄後も表示できる。generated の非ゼロ幅 span と AST mode への generated text は拒否する。`TokenSource::Projected` の DAP 表示は今回の対象ではなく、従来どおり明示拒否する。trace limit（件数・UTF-8 bytes）、未指定・不完全 trace、parse の resource failure は正常な空 trace に置換せず、stderr・terminated・exited で終了する。
+
+Java の既存生成 DAP は `token.source.sourceAsString().strip()` を variables に表示する。一方、素の detached source の offset は0、長さは生成本文の CP 長であり、`PortableTokenMetadata.registerGenerated(token, anchor)` の位置は自動では使われない。共通 `ascii-mixed` fixture で、原文 `ab`、anchor 1、生成本文 `R` の既定表示が本文 `"R"`・原文 CP `[0,1)` になることを、変更前の実 stdio で確認した。
+
+既存の任意 Token 表示と collector を維持し、生成 Java DAP に `protected int[] tokenSourceSpan(Token token)` を追加した。既定は従来の source offset/長さを返す。generated source の所有者は、成功した token に対応する `PortableTokenMetadata.Info` の `[offset(), end()]` をこの hook で返す。stackTrace と breakpoint の両方がこの範囲を使い、variables は既存の本文経路を使う。[共通 fixture の Java consumer](fixtures/generated-token-dap/JavaMain.java.txt)は実 custom collector・detached Token・metadata を使ってこの接続を実行する。原文と generated text を同じ source に捏造しない。表示上の strip と引用符 escape は両版で同じで、保持している raw text は変更しない。
+
+開発版の移行: 手組みの Rust `Step { label, span }` には input/AST 用の `generated_text: None` を追加する。`--dap` 生成物は Java host / native host とも再生成する。Java の hook を使う consumer も DAP を再生成する。公開済み 3.3.0 と parser のホットパスは変更しない。
 
 ## 独立期待値と実行
 
 - [`leaves.tsv`](../conformance/token-trace/leaves.tsv): 40入力。Java実Token / Rust実traceで source・kind・CP span・text・最終両cursor・各leaf両cursorを照合する。再実行、4種、consume/invert、sequence/choice/longest/predictive/lookahead、Number/Identifier/quoted、空要素、失敗rollback、memo hit を含む。
 - [`generated.tsv`](../conformance/token-trace/generated.tsv): generated virtual の anchor/text/kind/cursor を3入力で独立比較。
 - [`classic-token-dap`](fixtures/classic-token-dap/): 8入力、0/1基底、source offset 0/7、実Java/Rust stdio DAP。UTF-16、CRLF、EOF、breakpoint/next/continue、variables、無効request、失敗relaunchを確認。両host生成6ファイルのbyte一致も検証。
+- [`generated-token-dap/cases.json`](fixtures/generated-token-dap/cases.json): 6入力、計20 leaf × 0/1基底 × source offset 0/7 = 各版80停止点。各 step は `[label, raw text, start CP, end CP, line, column, endLine, endColumn]` の独立期待値。空文字・ASCII・非BMP/結合文字・CRLF・同anchorの複数leaf・通常入力との混在・anchorの逆順を含む。実 initialize/launch/configurationDone/stackTrace/scopes/variables/next/continue/disconnect、終了後の状態と breakpoint を照合する。[`rollback.json`](fixtures/generated-token-dap/rollback.json) の5ケースは Java 実 Token と Rust 実 trace で committed / choice 敗者 / 正負先読み / 外側失敗を比較する。
 
 ```sh
 mvn -B -pl unlaxer-common,unlaxer-dsl -am test \
- -Dtest=TokenTraceConformanceTest,ClassicTokenDapProtocolConformanceTest,ClassicDapProtocolConformanceTest,RustUbnfFrontendConformanceTest,PlaygroundCommandTest \
+ -Dtest=TokenTraceConformanceTest,GeneratedTokenDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,ClassicDapProtocolConformanceTest,RustUbnfFrontendConformanceTest,PlaygroundCommandTest \
  -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
 cargo +1.85.0 test --locked --manifest-path rust/Cargo.toml --workspace
 ```
 
-CI は `target/token-trace.tsv` と `target/classic-token-dap-protocol.tsv` を必須にする。通常 Maven test だけで Rust 比較済みとは扱わない。性能freeze・root-retry最適化・一般positive assertionの既存差は変更しない。
+CI は `target/token-trace.tsv`、`target/classic-token-dap-protocol.tsv`、`target/generated-token-dap-protocol.tsv` を必須にする。新しい3テストメソッドも `.github/optin-test-contracts.json` で skip・欠落を拒否する。通常 Maven test だけで Rust 比較済みとは扱わない。性能freeze・root-retry最適化・一般positive assertionの既存差は変更しない。

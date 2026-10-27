@@ -1,0 +1,7 @@
+[
+  {"name":"committed","input":"a","accepted":true,"generated":1},
+  {"name":"choice-loser","input":"a","accepted":true,"generated":0},
+  {"name":"lookahead","input":"a","accepted":true,"generated":0},
+  {"name":"negative-lookahead","input":"a","accepted":true,"generated":0},
+  {"name":"outer-failure","input":"a","accepted":false,"generated":0}
+]
