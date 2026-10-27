@@ -19,7 +19,8 @@
     "2026-10-27 #843: 残る7入力の診断コード・順序を両Rust hostでJava validatorに揃えた。rootあり/なし、単一エラー説明とcheck JSONを共通fixtureで固定する。precedence欠如・重複の#835契約は維持する。性能作業・parser実行経路は対象外。 レビューでvalidateAssocのparams欠落・repeat欠如もJavaの最初のERRORに揃え、nativeの名前述語の隠れは#858へ分離した。",
     "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。",
     "2026-10-27 #826: 正の先読みの到達位置、Classic capture の失敗 frame、native UNTIL の失敗した終端候補を記録。既存の Java oracle 値は変更せず nested/frame-start の全診断列を両Rust host・通常/mappingで一致させる。差分表は実測に一致する memo 会計差だけを保持する。個別修正であり台帳全体の監査日・revision は更新しない。",
-    "2026-10-27 #827: failure/success hit は公開 context API と Classic harness に現れる host 依存の内部会計であり、Java/Rust 間の数値一致を契約しないと決定。marker・rule/inline group の cache 粒度と Chain 対照を確認し、非nested Outer を追加。runtime/生成器を変えず、実測全行と memo OFF/SAFE_FAILURES の結果不変を検証する。個別の契約判断であり台帳全体の監査日・revision は更新しない。"
+    "2026-10-27 #827: failure/success hit は公開 context API と Classic harness に現れる host 依存の内部会計であり、Java/Rust 間の数値一致を契約しないと決定。marker・rule/inline group の cache 粒度と Chain 対照を確認し、非nested Outer を追加。runtime/生成器を変えず、実測全行と memo OFF/SAFE_FAILURES の結果不変を検証する。個別の契約判断であり台帳全体の監査日・revision は更新しない。",
+    "2026-10-27 #872/#876: 先行先読みのない通常呼出の成功診断をJava実測に揃える。両issueは成功記録の既存watermark必須条件が共通原因。生成grammarのJava互換経路と独立native PEG式入口を区別し、後者の別診断列を維持する。個別修正であり台帳全体の監査日・revisionは更新しない。"
   ],
   "issues": {
     "111": {
@@ -433,6 +434,14 @@
     "861": {
       "state": "OPEN",
       "title": "fix: Java Choice の FIRST 候補除外が reset 前の cursor を読み、DETAILED_ON_FAILURE だけ受理が変わる"
+    },
+    "872": {
+      "state": "OPEN",
+      "title": "parity: 先行する先読みのない native UNTIL の成功時診断 CP が Java と違う（#871 レビューで分離）"
+    },
+    "876": {
+      "state": "OPEN",
+      "title": "parity: 先読みが先行しない通常呼出で失敗のない成功の診断 CP が Java と違う（#875 レビュー、#872 の一般形）"
     }
   },
   "entries": [
@@ -527,13 +536,16 @@
       "issues": [
         545,
         655,
-        706
+        706,
+        872,
+        876
       ],
-      "observation": "Java の成功到達位置と Rust の failure()=0、prior matched を含む Classic frontier と native PEG の source frontier を別列で保持する。nativeClassicCP は Java の Classic と比較する。grammar 呼出しでの不一致 #706 は修正済みで、旧差を未修正として数えない。",
+      "observation": "Java の成功到達位置と Rust の failure()=0、prior matched を含む Classic frontier と native PEG の source frontier を別列で保持する。nativeClassicCP は Java の Classic と比較する。grammar 呼出しでの不一致 #706 は修正済みで、旧差を未修正として数えない。 #872/#876の生成grammar内の通常呼出はgrammar_frontier=trueのJava互換経路なので成功到達位置を揃える。native生成器の使用と独立native PEG式入口は区別する。context.parseはgrammar内でもfrontier=falseとなり、cold recorderの既存ガードで対象外。peg-assertion/prior-matchedの別列は変更しない。",
       "evidence": [
         "docs/peg-assertions.md",
         "docs/prior-matched-diagnostics.md",
-        "conformance/prior-matched-diagnostics/cases.tsv"
+        "conformance/prior-matched-diagnostics/cases.tsv",
+        "conformance/chain-reset-after-failure/README.md"
       ]
     },
     {
@@ -1644,6 +1656,36 @@
         "conformance/line-boundary/probe.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java"
       ]
+    },
+    {
+      "id": "plain-success-diagnostics",
+      "category": "contract",
+      "title": "先行先読みのない生成grammarの成功診断（#872 / #876）",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        872,
+        876,
+        826,
+        827,
+        197
+      ],
+      "observation": "JavaのgetParseFailureDiagnosticsは実失敗のfarthestFailureOffsetを優先し、なければstartParse/endParse/consume/matchOnlyが保存したmaxReachedOffsetを返す。Rustの成功記録からclassic_max_reached.is_some()の条件を除き、native UNTILの失敗試行も既存cold helperで集約する。aab/bbはCP1、a😀のEOFはCP2、Helper2+azbはCP2、Outer2+azxはCP3。Java runtimeは不変。frame-startに5経路120行、nestedに32経路768行をJava実測から追加し、既存oracle2760/1896行を維持。Java計2880/2664行、両host・通常/mapping・通常/Classic・初期reset2・memo2・診断3とnested Chain対照を照合する。差分表の診断2列は全行同値、frame-start81行は不変、nested268→316行の増分48行は#827型のmemo会計差のみ。成否・両cursor・reset・後続診断/成否・memo hitは修正前後で不変。既存Detailed transactionガード内の判定1つを除き、新規分岐・field/cache・呼出し箇所・再帰経路は0。先行先読みなしのDetailed成功でも既存cold helperが呼ばれるため頻度は増えるが、診断OFFと走査ループは不変。UNTILのexpected名登録は既存の診断領域を利用する。#197に従い性能再計測なし。生成grammarのJava互換経路へ適用し、独立native PEG式入口/lexingは既存ガードで除外、peg-frontierの別列は維持。任意IRの成功履歴全般の全面一致は主張しない。両issueはPRのmerge待ちでOPEN。 隔離worktreeの修正前runtimeと更新後corpusでJava oracleの2テストは成功、Rust照合の2テストはUNTIL CP1→0とHelper2 CP2→0で失敗。各hostの全出力比較ではframe-start64/5760、nested608/10656の診断差を検出する。",
+      "evidence": [
+        "conformance/chain-reset-after-failure/README.md",
+        "conformance/chain-reset-after-failure/frame-start-inputs.tsv",
+        "conformance/chain-reset-after-failure/frame-start.tsv",
+        "conformance/chain-reset-after-failure/frame-start-differences.tsv",
+        "conformance/chain-reset-after-failure/nested-boundary.ubnf",
+        "conformance/chain-reset-after-failure/nested-boundary-inputs.tsv",
+        "conformance/chain-reset-after-failure/nested-boundary.tsv",
+        "conformance/chain-reset-after-failure/nested-boundary-differences.tsv",
+        "unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/FrameStartMatchedResetConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NestedCandidateBoundaryConformanceTest.java",
+        "rust/unlaxer-runtime/src/lib.rs",
+        "docs/peg-assertions.md",
+        "rust/unlaxer-runtime/tests/prior_matched_diagnostics.rs"
+      ]
     }
   ],
   "corpora": [
@@ -1661,7 +1703,8 @@
       },
       "entries": [
         "nested-boundary-diagnostics",
-        "nested-boundary-memo-accounting"
+        "nested-boundary-memo-accounting",
+        "plain-success-diagnostics"
       ]
     },
     {
@@ -1678,7 +1721,8 @@
       },
       "entries": [
         "nested-boundary-diagnostics",
-        "nested-boundary-memo-accounting"
+        "nested-boundary-memo-accounting",
+        "plain-success-diagnostics"
       ]
     },
     {
