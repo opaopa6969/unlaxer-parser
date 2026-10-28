@@ -1,0 +1,994 @@
+[
+  {
+    "name": "invalid-v0",
+    "source": "grammar G {\n@ubnf: v0\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 82}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 85}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-v3",
+    "source": "grammar G {\n@ubnf: v3\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 82}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 85}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-V2",
+    "source": "grammar G {\n@ubnf: V2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 82}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 85}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-V1",
+    "source": "grammar G {\n@ubnf: V1\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 82}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 85}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-V3",
+    "source": "grammar G {\n@ubnf: V3\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 82}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 85}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-VERSION",
+    "source": "grammar G {\n@ubnf: VERSION\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 87}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 90}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-banana",
+    "source": "grammar G {\n@ubnf: banana\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 86}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 89}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "duplicate-v2",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 92}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-v1-v2",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 92}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-v2-v1",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v1\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 92}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-then-v2",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 92}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "v2-then-invalid",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v3\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 92}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-twice",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: V2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 92}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "block",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-then-v2",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "v2-then-block",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: { version: 'v2' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 22, "end": 46}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 24, "end": 48}, "subject": "ubnf"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "valid-implicit",
+    "source": "grammar G {\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": [],
+    "ubnf": []
+  },
+  {
+    "name": "valid-v1",
+    "source": "grammar G {\n@ubnf: v1\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": [],
+    "ubnf": []
+  },
+  {
+    "name": "valid-v2",
+    "source": "grammar G {\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": [],
+    "ubnf": []
+  },
+  {
+    "name": "invalid-feature",
+    "source": "grammar G {\n@ubnf: v3\n@feature: nope\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 97}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 101}, "subject": "Rust structural constraints"}]}},
+    "first": "E-FEATURE-VERSION: feature",
+    "features": ["E-FEATURE-VERSION: feature"],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-adapter",
+    "source": "grammar G {\n@ubnf: v3\n@tokenAdapter: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 22, "end": 40}, "subject": "tokenAdapter"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 24, "end": 42}, "subject": "tokenAdapter"}]}},
+    "first": "P-ADAPTER-DEFINITION: tokenAdapter",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-lexical",
+    "source": "grammar G {\n@ubnf: v3\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 103}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 107}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: declarative tokens require @ubnf: v2",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-undefined-rule",
+    "source": "grammar G {\n@ubnf: v3\n@root @mapping(Root, params=[value]) Start ::= Missing @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 86}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 89}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-global-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@whitespace: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 38}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 40}, "subject": "bad"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported setting whitespace: bad",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "global @whitespace style must be javaStyle, none, or a non-nullable declarative token: bad [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "invalid-duplicate-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@whitespace: none\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 123}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-none-twice",
+    "source": "grammar G {\n@ubnf: v3\n@whitespace: none\n@whitespace: none\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 118}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 123}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-duplicate-javaStyle",
+    "source": "grammar G {\n@ubnf: v3\n@whitespace: javaStyle\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 133}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "invalid-duplicate-NONE",
+    "source": "grammar G {\n@ubnf: v3\n@whitespace: NONE\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 123}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "invalid-block-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@whitespace: { style: 'none' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 22, "end": 52}, "subject": "whitespace"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 24, "end": 54}, "subject": "whitespace"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported block setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "global @whitespace requires a style name [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "invalid-rule-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@whitespace(bad)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 22, "end": 38}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 24, "end": 40}, "subject": "bad"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-lexical-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@whitespace: javaStyle\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: declarative tokens require @ubnf: v2",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-mapping",
+    "source": "grammar G {\n@ubnf: v3\n@root @mapping(Root, params=[missing]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 84}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 87}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "uppercase-feature",
+    "source": "grammar G {\n@ubnf: V2\n@feature: nope\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 97}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 101}, "subject": "Rust structural constraints"}]}},
+    "first": "E-FEATURE-VERSION: feature",
+    "features": ["E-FEATURE-VERSION: feature"],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "uppercase-adapter",
+    "source": "grammar G {\n@ubnf: V2\n@tokenAdapter: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 22, "end": 40}, "subject": "tokenAdapter"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 24, "end": 42}, "subject": "tokenAdapter"}]}},
+    "first": "P-ADAPTER-DEFINITION: tokenAdapter",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "uppercase-lexical",
+    "source": "grammar G {\n@ubnf: V2\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 103}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 107}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: declarative tokens require @ubnf: v2",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "uppercase-undefined-rule",
+    "source": "grammar G {\n@ubnf: V2\n@root @mapping(Root, params=[value]) Start ::= Missing @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 86}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 89}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "uppercase-global-whitespace",
+    "source": "grammar G {\n@ubnf: V2\n@whitespace: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 38}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 40}, "subject": "bad"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported setting whitespace: bad",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "global @whitespace style must be javaStyle, none, or a non-nullable declarative token: bad [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "uppercase-duplicate-whitespace",
+    "source": "grammar G {\n@ubnf: V2\n@whitespace: none\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 123}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "uppercase-none-twice",
+    "source": "grammar G {\n@ubnf: V2\n@whitespace: none\n@whitespace: none\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 118}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 123}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "uppercase-duplicate-javaStyle",
+    "source": "grammar G {\n@ubnf: V2\n@whitespace: javaStyle\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 133}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "uppercase-duplicate-NONE",
+    "source": "grammar G {\n@ubnf: V2\n@whitespace: NONE\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 123}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "uppercase-block-whitespace",
+    "source": "grammar G {\n@ubnf: V2\n@whitespace: { style: 'none' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 22, "end": 52}, "subject": "whitespace"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 24, "end": 54}, "subject": "whitespace"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported block setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "global @whitespace requires a style name [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "uppercase-rule-whitespace",
+    "source": "grammar G {\n@ubnf: V2\n@whitespace(bad)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 22, "end": 38}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 24, "end": 40}, "subject": "bad"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "uppercase-lexical-whitespace",
+    "source": "grammar G {\n@ubnf: V2\n@whitespace: javaStyle\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: declarative tokens require @ubnf: v2",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "uppercase-mapping",
+    "source": "grammar G {\n@ubnf: V2\n@root @mapping(Root, params=[missing]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 84}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 87}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "duplicate-feature",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@feature: nope\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 107}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 112}, "subject": "Rust structural constraints"}]}},
+    "first": "E-FEATURE-UNKNOWN: feature",
+    "features": ["E-FEATURE-UNKNOWN: feature"],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-adapter",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@tokenAdapter: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 32, "end": 50}, "subject": "tokenAdapter"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 35, "end": 53}, "subject": "tokenAdapter"}]}},
+    "first": "P-ADAPTER-DEFINITION: tokenAdapter",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-lexical",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 113}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 118}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-undefined-rule",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= Missing @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 100}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-global-whitespace",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@whitespace: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 45, "end": 48}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 48, "end": 51}, "subject": "bad"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported setting whitespace: bad",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "global @whitespace style must be javaStyle, none, or a non-nullable declarative token: bad [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "duplicate-duplicate-whitespace",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@whitespace: none\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 133}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 139}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-none-twice",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@whitespace: none\n@whitespace: none\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 134}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-duplicate-javaStyle",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@whitespace: javaStyle\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 138}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 144}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "duplicate-duplicate-NONE",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@whitespace: NONE\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 133}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 139}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "duplicate-block-whitespace",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@whitespace: { style: 'none' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 32, "end": 62}, "subject": "whitespace"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 35, "end": 65}, "subject": "whitespace"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported block setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "global @whitespace requires a style name [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "duplicate-rule-whitespace",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@whitespace(bad)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 32, "end": 48}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 51}, "subject": "bad"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-lexical-whitespace",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 45, "end": 54}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 48, "end": 57}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-mapping",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@root @mapping(Root, params=[missing]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 94}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 98}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-feature",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@feature: nope\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 107}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 112}, "subject": "Rust structural constraints"}]}},
+    "first": "E-FEATURE-UNKNOWN: feature",
+    "features": ["E-FEATURE-UNKNOWN: feature"],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-adapter",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@tokenAdapter: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 32, "end": 50}, "subject": "tokenAdapter"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 35, "end": 53}, "subject": "tokenAdapter"}]}},
+    "first": "P-ADAPTER-DEFINITION: tokenAdapter",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-lexical",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 113}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 118}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-undefined-rule",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= Missing @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 100}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-global-whitespace",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@whitespace: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 45, "end": 48}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 48, "end": 51}, "subject": "bad"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported setting whitespace: bad",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "global @whitespace style must be javaStyle, none, or a non-nullable declarative token: bad [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "mixed-duplicate-whitespace",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@whitespace: none\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 133}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 139}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-none-twice",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@whitespace: none\n@whitespace: none\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 134}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-duplicate-javaStyle",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@whitespace: javaStyle\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 138}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 144}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "mixed-duplicate-NONE",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@whitespace: NONE\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 133}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 139}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "mixed-block-whitespace",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@whitespace: { style: 'none' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 32, "end": 62}, "subject": "whitespace"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 35, "end": 65}, "subject": "whitespace"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported block setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "global @whitespace requires a style name [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "mixed-rule-whitespace",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@whitespace(bad)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 32, "end": 48}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 51}, "subject": "bad"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-lexical-whitespace",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 45, "end": 54}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 48, "end": 57}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "mixed-mapping",
+    "source": "grammar G {\n@ubnf: v1\n@ubnf: v2\n@root @mapping(Root, params=[missing]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 94}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 98}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "block-feature",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@feature: nope\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "E-FEATURE-VERSION: feature",
+    "features": ["E-FEATURE-VERSION: feature"],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-adapter",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@tokenAdapter: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}, {"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 37, "end": 55}, "subject": "tokenAdapter"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}, {"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 39, "end": 57}, "subject": "tokenAdapter"}]}},
+    "first": "P-ADAPTER-DEFINITION: tokenAdapter",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-lexical",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "E-LEXICAL: declarative tokens require @ubnf: v2",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-undefined-rule",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@root @mapping(Root, params=[value]) Start ::= Missing @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-global-whitespace",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@whitespace: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 50, "end": 53}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 52, "end": 55}, "subject": "bad"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported setting whitespace: bad",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "global @whitespace style must be javaStyle, none, or a non-nullable declarative token: bad [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "block-duplicate-whitespace",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@whitespace: none\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-none-twice",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@whitespace: none\n@whitespace: none\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-duplicate-javaStyle",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@whitespace: javaStyle\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "block-duplicate-NONE",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@whitespace: NONE\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "block-block-whitespace",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@whitespace: { style: 'none' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}, {"code": "P-SETTING", "severity": "error", "span": {"start": 37, "end": 67}, "subject": "whitespace"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}, {"code": "P-SETTING", "severity": "error", "span": {"start": 39, "end": 69}, "subject": "whitespace"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported block setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"],
+    "javaFirst": "global @whitespace requires a style name [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "block-rule-whitespace",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@whitespace(bad)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 53}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 39, "end": 55}, "subject": "bad"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-lexical-whitespace",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@whitespace: javaStyle\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 50, "end": 59}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 52, "end": 61}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: declarative tokens require @ubnf: v2",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-mapping",
+    "source": "grammar G {\n@ubnf: { version: 'v2' }\n@root @mapping(Root, params=[missing]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 12, "end": 36}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 13, "end": 37}, "subject": "ubnf"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-and-v2-feature",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@feature: nope\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 107}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 112}, "subject": "Rust structural constraints"}]}},
+    "first": "E-FEATURE-UNKNOWN: feature",
+    "features": ["E-FEATURE-UNKNOWN: feature"],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-and-v2-adapter",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@tokenAdapter: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 32, "end": 50}, "subject": "tokenAdapter"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 35, "end": 53}, "subject": "tokenAdapter"}]}},
+    "first": "P-ADAPTER-DEFINITION: tokenAdapter",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-and-v2-lexical",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 113}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 118}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-and-v2-undefined-rule",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= Missing @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 96}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 100}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-and-v2-global-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@whitespace: bad\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 45, "end": 48}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 48, "end": 51}, "subject": "bad"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported setting whitespace: bad",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "global @whitespace style must be javaStyle, none, or a non-nullable declarative token: bad [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "invalid-and-v2-duplicate-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@whitespace: none\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 133}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 139}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-and-v2-none-twice",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@whitespace: none\n@whitespace: none\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 134}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-and-v2-duplicate-javaStyle",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@whitespace: javaStyle\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 138}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 144}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "invalid-and-v2-duplicate-NONE",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@whitespace: NONE\n@whitespace: javaStyle\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 133}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 139}, "subject": "Rust structural constraints"}]}},
+    "first": "E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "duplicate global @whitespace settings [code: E-WHITESPACE-GLOBAL-DUPLICATE]"
+  },
+  {
+    "name": "invalid-and-v2-block-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@whitespace: { style: 'none' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 32, "end": 62}, "subject": "whitespace"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 35, "end": 65}, "subject": "whitespace"}]}},
+    "first": "E-WHITESPACE-GLOBAL-STYLE: unsupported block setting whitespace",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"],
+    "javaFirst": "global @whitespace requires a style name [code: E-WHITESPACE-GLOBAL-STYLE]"
+  },
+  {
+    "name": "invalid-and-v2-rule-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@whitespace(bad)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 32, "end": 48}, "subject": "bad"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 51}, "subject": "bad"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-and-v2-lexical-whitespace",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= Missing;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 45, "end": 54}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 48, "end": 57}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-and-v2-mapping",
+    "source": "grammar G {\n@ubnf: v3\n@ubnf: v2\n@root @mapping(Root, params=[missing]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 94}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 98}, "subject": "Rust structural constraints"}]}},
+    "first": "duplicate global @ubnf setting",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION-DUPLICATE",
+    "javaFirst": "duplicate global @ubnf setting [code: E-UBNF-VERSION-DUPLICATE]",
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-lexical-duplicate",
+    "source": "grammar G {\n@ubnf: v3\ntoken A ::= 'a';\ntoken A ::= 'b';\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 116}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 121}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-lexical-cycle",
+    "source": "grammar G {\n@ubnf: v3\ntoken A ::= B;\ntoken B ::= A;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 112}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 117}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: declarative tokens require @ubnf: v2",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-lexical-backref",
+    "source": "grammar G {\n@ubnf: v3\ntoken A ::= SAME_AS(x);\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 106}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 110}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: declarative tokens require @ubnf: v2",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-lexical-nullable",
+    "source": "grammar G {\n@ubnf: v3\ntoken A ::= { '' };\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 102}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 106}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: declarative tokens require @ubnf: v2",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "duplicate-lexical-duplicate",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 126}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 132}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-lexical-cycle",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 122}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 128}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-lexical-backref",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\ntoken A ::= SAME_AS(x);\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 116}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 121}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "duplicate-lexical-nullable",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\ntoken A ::= { '' };\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 112}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 0, "end": 117}, "subject": "Rust structural constraints"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": [],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  },
+  {
+    "name": "invalid-nonbmp",
+    "source": "// 😀\ngrammar G {\n@ubnf: v3\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 5, "end": 87}, "subject": "Rust structural constraints"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "failed", "diagnostics": [{"code": "P-STRUCTURE", "severity": "error", "span": {"start": 6, "end": 91}, "subject": "Rust structural constraints"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "block-nonbmp",
+    "source": "// 😀\ngrammar G {\n@ubnf: { version: 'v2' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 17, "end": 41}, "subject": "ubnf"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-SETTING", "severity": "error", "span": {"start": 19, "end": 43}, "subject": "ubnf"}]}},
+    "first": "@ubnf must be format version v1 or v2",
+    "features": [],
+    "firstCode": "E-UBNF-VERSION",
+    "javaFirst": "@ubnf must be format version v1 or v2 [code: E-UBNF-VERSION]",
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "invalid-combined",
+    "source": "grammar G {\n@ubnf: v3\n@whitespace: none\n@feature: nope\n@tokenAdapter: bad\ntoken A ::= 'a';\ntoken A ::= 'b';\n@root @mapping(Root, params=[value]) Start ::= Missing @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}, {"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 55, "end": 73}, "subject": "tokenAdapter"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}, {"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 59, "end": 77}, "subject": "tokenAdapter"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": ["E-FEATURE-VERSION: feature"],
+    "ubnf": ["E-UBNF-VERSION: @ubnf must be format version v1 or v2"]
+  },
+  {
+    "name": "duplicate-combined",
+    "source": "grammar G {\n@ubnf: v2\n@ubnf: v2\n@whitespace: none\n@feature: nope\n@tokenAdapter: bad\ntoken A ::= 'a';\ntoken A ::= 'b';\n@root @mapping(Root, params=[value]) Start ::= Missing @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 45, "end": 49}, "subject": "none"}, {"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 65, "end": 83}, "subject": "tokenAdapter"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 48, "end": 52}, "subject": "none"}, {"code": "P-ADAPTER-DEFINITION", "severity": "error", "span": {"start": 70, "end": 88}, "subject": "tokenAdapter"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": ["E-FEATURE-UNKNOWN: feature"],
+    "ubnf": ["E-UBNF-VERSION-DUPLICATE: duplicate global @ubnf setting"]
+  }
+]

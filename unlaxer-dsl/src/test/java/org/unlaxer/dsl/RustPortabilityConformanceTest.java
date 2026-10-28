@@ -335,6 +335,10 @@ public class RustPortabilityConformanceTest {
             "spec-corpus/feature-diagnostics/whitespace.json"))).getAsJsonArray();
         assertEquals("all whitespace combinations execute", 172, whitespace.size());
         cases.addAll(whitespace);
+        var versions = JsonParser.parseString(Files.readString(repo.resolve(
+            "spec-corpus/feature-diagnostics/ubnf-version.json"))).getAsJsonArray();
+        assertEquals("all ubnf version cases execute", 109, versions.size());
+        cases.addAll(versions);
         List<String> report = new ArrayList<>(List.of("case\tline_endings\tcheck_exit\tgenerate_exit\tresult"));
         for (var entry : cases) {
             var fixture = entry.getAsJsonObject();
@@ -345,6 +349,12 @@ public class RustPortabilityConformanceTest {
                 var features = org.unlaxer.dsl.bootstrap.UBNFFeatures.validate(grammar).stream()
                     .map(d -> d.code() + ": " + d.subject()).toList();
                 assertEquals(label, fixture.get("features"), new Gson().toJsonTree(features));
+                if (fixture.has("ubnf")) {
+                    var versionIssues = org.unlaxer.dsl.codegen.GrammarValidator.validate(grammar).stream()
+                        .filter(d -> d.code().startsWith("E-UBNF-VERSION"))
+                        .map(d -> d.code() + ": " + d.message()).toList();
+                    assertEquals(label, fixture.get("ubnf"), new Gson().toJsonTree(versionIssues));
+                }
                 assertEquals(label, features, org.unlaxer.dsl.codegen.GrammarValidator.validate(grammar).stream()
                     .filter(d -> d.code().startsWith("E-FEATURE-")).map(d -> d.message()).toList());
                 Path directory = temporary.newFolder().toPath(), input = directory.resolve("main.ubnf");
@@ -364,9 +374,12 @@ public class RustPortabilityConformanceTest {
                 } else {
                     String first = fixture.get("first").getAsString();
                     assertEquals(label, first, rust.err().strip());
-                    // Java renders comment subjects separately from their diagnostic code.
+                    // Java renders some diagnostic codes separately from their messages.
                     String javaFirst = fixture.has("javaFirst") ? fixture.get("javaFirst").getAsString() : first + " [code:";
                     assertTrue(label + java.err(), java.err().startsWith("Grammar validation failed:\n - " + javaFirst));
+                    if (fixture.has("firstCode"))
+                        assertTrue(label + java.err(), java.err().lines().skip(1).findFirst().orElseThrow()
+                            .contains("[code: " + fixture.get("firstCode").getAsString() + "]"));
                     assertFalse(label, Files.exists(javaOutput));
                     assertFalse(label, Files.exists(rustOutput));
                 }

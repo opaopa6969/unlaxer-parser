@@ -14,6 +14,12 @@ fn feature_and_lexical_diagnostics_match_independent_oracle() {
     .unwrap();
     assert_eq!(172, whitespace.len(), "all whitespace combinations execute");
     cases.extend(whitespace);
+    let versions: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../spec-corpus/feature-diagnostics/ubnf-version.json"
+    ))
+    .unwrap();
+    assert_eq!(109, versions.len(), "all ubnf version cases execute");
+    cases.extend(versions);
     for case in cases {
         for (ending, separator) in [("LF", "\n"), ("CRLF", "\r\n")] {
             let source = case["source"].as_str().unwrap().replace('\n', separator);
@@ -34,6 +40,14 @@ fn feature_and_lexical_diagnostics_match_independent_oracle() {
                 .map(|d| d.message)
                 .collect();
             assert_eq!(features, authoring, "{}", case["name"]);
+            if let Some(expected) = case.get("ubnf") {
+                let versions: Vec<_> = validation::collect(grammar)
+                    .into_iter()
+                    .filter(|d| d.code.starts_with("E-UBNF-VERSION"))
+                    .map(|d| format!("{}: {}", d.code, d.message))
+                    .collect();
+                assert_eq!(*expected, serde_json::json!(versions), "{}", case["name"]);
+            }
             assert_eq!(
                 case["expected"][ending],
                 serde_json::from_str::<Value>(&portability::check(&source).to_json()).unwrap(),

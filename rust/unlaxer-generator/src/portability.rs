@@ -280,10 +280,9 @@ impl Inventory {
                     "package" | "memoSafeToken" | "tokenStream" | "embedding",
                     SettingValue::String(_),
                 ) => {}
-                ("ubnf", SettingValue::String(value)) if value == "v1" || value == "v2" => {}
-                // Java scanGrammar leaves feature validation to structural lowering.
+                // Java scanGrammar leaves ubnf/feature validation to structural lowering.
                 // Block values still receive P-SETTING through the default arm.
-                ("feature", SettingValue::String(_)) => {}
+                ("ubnf" | "feature", SettingValue::String(_)) => {}
                 // @comment has its own E-COMMENT-* diagnostics, including the block form check.
                 ("tokenAdapter" | "tokenContract" | "embedded" | "comment", _) => {}
                 ("whitespace", SettingValue::String(value)) => {

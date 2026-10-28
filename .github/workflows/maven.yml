@@ -329,7 +329,7 @@ jobs:
         test "$cases" -gt 0
         awk -v rows="$((1 + 2 * cases))" 'END {exit NR != rows}' unlaxer-dsl/target/rust-adapter-contract-diagnostics.tsv
         test -s unlaxer-dsl/target/rust-feature-lexical-diagnostics.tsv
-        awk 'END {exit NR != 435}' unlaxer-dsl/target/rust-feature-lexical-diagnostics.tsv
+        awk 'END {exit NR != 653}' unlaxer-dsl/target/rust-feature-lexical-diagnostics.tsv
         test -s unlaxer-dsl/target/rust-token-adapter-runtime.tsv
         test -s unlaxer-dsl/target/rust-parse-bindings.tsv
     - name: Require declarative token codegen and runtime evidence
