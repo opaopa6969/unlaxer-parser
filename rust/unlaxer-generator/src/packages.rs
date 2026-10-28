@@ -1,11 +1,13 @@
 //! Explicit artifact resolution and read-only pinned module loading. No runtime dependencies.
-use serde_json::{json, Map, Value};
+use serde_json::{json, Map, Value as OutputValue};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
+use value::{Object, Value};
 
 mod json;
+mod value;
 
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 // Share the package graph budget; individual pinned artifacts still have their 8 MiB limit.
@@ -130,7 +132,7 @@ const STANDARD: &[u8] =
 fn error(message: impl std::fmt::Display) -> String {
     format!("E-PACKAGE: {message}")
 }
-fn object<'a>(value: &'a Value, name: &str) -> Result<&'a Map<String, Value>, String> {
+fn object<'a>(value: &'a Value, name: &str) -> Result<&'a Object, String> {
     value
         .as_object()
         .ok_or_else(|| error(format!("expected object: {name}")))
@@ -141,7 +143,7 @@ fn string<'a>(value: &'a Value, name: &str) -> Result<&'a str, String> {
         .ok_or_else(|| error(format!("expected string: {name}")))
 }
 fn versioned(value: &Value) -> Result<(), String> {
-    if value["schemaVersion"] != 1 {
+    if value["schemaVersion"] != Value::Number(1.into()) {
         return Err(error("unsupported schemaVersion"));
     }
     Ok(())
@@ -235,7 +237,7 @@ fn artifact(bytes: &[u8]) -> Result<Value, String> {
     Ok(value)
 }
 fn references(value: &Value) -> Result<Value, String> {
-    let mut result = Map::new();
+    let mut result = Object::default();
     for (name, dependency) in object(value, "dependencies")? {
         result.insert(
             name.clone(),
@@ -280,7 +282,7 @@ fn read_bytes<R: Read>(
     )
 }
 /// This command explicitly updates the dependency snapshot. Parsing never calls it.
-pub fn resolve(manifest: &Path) -> Result<Value, String> {
+pub fn resolve(manifest: &Path) -> Result<OutputValue, String> {
     // Match Java's absolute, lexical manifest base without following symlinks.
     let manifest = if manifest.is_absolute() {
         manifest.to_owned()
@@ -359,7 +361,7 @@ fn resolve_one(
     name: &str,
     dependency: &Value,
     directory: &Path,
-    packages: &mut Map<String, Value>,
+    packages: &mut Map<String, OutputValue>,
     blobs: &mut BTreeMap<String, Vec<u8>>,
     visiting: &mut BTreeSet<String>,
     remote: bool,
@@ -486,7 +488,7 @@ fn audit(lock: &Value) -> Result<(), String> {
 }
 fn audit_node(
     name: &str,
-    packages: &Map<String, Value>,
+    packages: &Object,
     visiting: &mut BTreeSet<String>,
     done: &mut BTreeSet<String>,
 ) -> Result<(), String> {
@@ -647,7 +649,7 @@ impl Resolver {
         Err(error("unknown package source identity"))
     }
     /// Return only identities whose cached artifact has already passed hash validation.
-    pub fn identity(&mut self, path: &Path) -> Result<Option<Value>, String> {
+    pub fn identity(&mut self, path: &Path) -> Result<Option<OutputValue>, String> {
         let Some(name) = self.owner(path)? else {
             return Ok(None);
         };
@@ -726,6 +728,7 @@ impl Resolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     #[test]
     fn artifact_utf8_fixtures_preserve_hash_and_json_order() {

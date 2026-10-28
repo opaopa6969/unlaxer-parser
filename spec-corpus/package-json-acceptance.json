@@ -1793,5 +1793,1633 @@
       }
     ],
     "resolveError": "cannot read local artifact"
+  },
+  {
+    "id": "order-manifest-id-id-first",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-id-version-first",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-high-id-first",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-high-version-first",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-low-id-first",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-low-version-first",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-broken-pair-id-first",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800x\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-broken-pair-version-first",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800x\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-duplicate-first-position-last-value",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"b/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-duplicate-escaped-key",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"b/\\u0078\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-duplicate-surrogate",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800\":{\"version\":\"2.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-id-id-first",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-id-version-first",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-high-id-first",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-high-version-first",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-low-id-first",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-low-version-first",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-broken-pair-id-first",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800x\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-broken-pair-version-first",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800x\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-duplicate-first-position-last-value",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"b/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-duplicate-escaped-key",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"b/\\u0078\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-duplicate-surrogate",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800\":{\"version\":\"2.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-packages-id-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b!\":{\"id\":\"b!\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-id-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b!\":{\"id\":\"b!\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-high-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b\\ud800\":{\"id\":\"b\\ud800\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-high-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b\\ud800\":{\"id\":\"b\\ud800\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-low-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b\\udc00\":{\"id\":\"b\\udc00\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-low-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b\\udc00\":{\"id\":\"b\\udc00\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-broken-pair-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b\\ud800x\\udc00\":{\"id\":\"b\\ud800x\\udc00\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-broken-pair-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b\\ud800x\\udc00\":{\"id\":\"b\\ud800x\\udc00\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-duplicate-first-position-last-value",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b/x\":{\"id\":\"b/x\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a!\":{\"id\":\"a!\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b/x\":{\"id\":\"b/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-duplicate-escaped-key",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b/x\":{\"id\":\"b/x\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a!\":{\"id\":\"a!\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b/\\u0078\":{\"id\":\"b/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-duplicate-surrogate",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b\\ud800\":{\"id\":\"b\\ud800\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b\\ud800\":{\"id\":\"b\\ud800\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-id-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b!\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-id-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b!\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-high-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-high-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b\\ud800\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-low-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b\\udc00\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-low-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b\\udc00\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-broken-pair-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800x\\udc00\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-broken-pair-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b\\ud800x\\udc00\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-duplicate-first-position-last-value",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b/x\":\"1.0.0\",\"a!\":\"1.0.0\",\"b/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-duplicate-escaped-key",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b/x\":\"1.0.0\",\"a!\":\"1.0.0\",\"b/\\u0078\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-duplicate-surrogate",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":\"1.0.0\",\"a/x\":\"bad\",\"b\\ud800\":\"2.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-files-path-first",
+    "subject": "artifact",
+    "loadError": "package file path escapes boundary",
+    "resolveError": "package file path escapes boundary",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"z/../bad.ubnf\":\"text\",\"a.ubnf\":7}"
+      }
+    ]
+  },
+  {
+    "id": "order-roots-id-first",
+    "subject": "lock",
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"b\\ud800\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-files-text-first",
+    "subject": "artifact",
+    "loadError": "package file must contain source text",
+    "resolveError": "package file must contain source text",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"a.ubnf\":7,\"z/../bad.ubnf\":\"text\"}"
+      }
+    ]
+  },
+  {
+    "id": "order-roots-version-first",
+    "subject": "lock",
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b\\ud800\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-files-duplicate-first-position-last-value",
+    "subject": "artifact",
+    "loadError": "package file must contain source text",
+    "resolveError": "package file must contain source text",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"z.ubnf\":\"text\",\"a/../bad.ubnf\":\"text\",\"z.ubnf\":7}"
+      }
+    ]
+  },
+  {
+    "id": "order-roots-duplicate-valid-last",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"std/layout\":\"bad\",\"std/layout\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-roots-duplicate-bad-last",
+    "subject": "lock",
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"std/layout\":\"1.0.0\",\"std/layout\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-manifest-duplicate-final-valid",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"std/layout\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-duplicate-final-valid",
+    "subject": "artifact",
+    "loadError": "artifact dependencies differ from lock",
+    "resolveError": "package name/version mismatch: b/x",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-sorted-lock-za",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "package": "team/z",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        },
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    }
+  },
+  {
+    "id": "order-roots-fetch-za",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": "unsupported artifact source; use HTTPS, local: or builtin:",
+    "package": "team/z",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/z": {
+          "version": "1.0.0",
+          "source": "unsupported:artifact"
+        },
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:missing.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    }
+  },
+  {
+    "id": "order-loaded-children-za",
+    "subject": "manifest",
+    "loadError": "artifact hash mismatch: team/z",
+    "resolveError": null,
+    "corruptCache": [
+      "team/z",
+      "team/a"
+    ],
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/z": {
+            "version": "1.0.0",
+            "source": "local:z.json"
+          },
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:a.json"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "order-nested-fetch-za",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": "unsupported artifact source; use HTTPS, local: or builtin:",
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/z": {
+            "version": "1.0.0",
+            "source": "unsupported:artifact"
+          },
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:missing.json"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "order-audit-package-cycles-za",
+    "subject": "lock",
+    "loadError": "cyclic package dependency: team/z",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"team/z\":{\"id\":\"team/z\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\"}},\"team/a\":{\"id\":\"team/a\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\"}}}"
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        },
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        }
+      }
+    },
+    "package": "team/z",
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-audit-dependency-cycles-za",
+    "subject": "lock",
+    "loadError": "cyclic package dependency: team/z",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"team/parent\":{\"id\":\"team/parent\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\",\"team/a\":\"1.0.0\"}},\"team/z\":{\"id\":\"team/z\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\"}},\"team/a\":{\"id\":\"team/a\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\"}}}"
+      }
+    ],
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/z": {
+            "version": "1.0.0",
+            "source": "local:z.json"
+          },
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:a.json"
+          }
+        }
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-roots-equality-za",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"team/a\":\"1.0.0\",\"team/z\":\"1.0.0\"}"
+      }
+    ],
+    "package": "team/z",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        },
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-sorted-lock-az",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "package": "team/a",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        },
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    }
+  },
+  {
+    "id": "order-roots-fetch-az",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": "missing local artifact",
+    "package": "team/a",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:missing.json"
+        },
+        "team/z": {
+          "version": "1.0.0",
+          "source": "unsupported:artifact"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    }
+  },
+  {
+    "id": "order-loaded-children-az",
+    "subject": "manifest",
+    "loadError": "artifact hash mismatch: team/a",
+    "resolveError": null,
+    "corruptCache": [
+      "team/a",
+      "team/z"
+    ],
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:a.json"
+          },
+          "team/z": {
+            "version": "1.0.0",
+            "source": "local:z.json"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "order-nested-fetch-az",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": "missing local artifact",
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:missing.json"
+          },
+          "team/z": {
+            "version": "1.0.0",
+            "source": "unsupported:artifact"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "order-audit-package-cycles-az",
+    "subject": "lock",
+    "loadError": "cyclic package dependency: team/a",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"team/a\":{\"id\":\"team/a\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\"}},\"team/z\":{\"id\":\"team/z\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\"}}}"
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        },
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        }
+      }
+    },
+    "package": "team/a",
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-audit-dependency-cycles-az",
+    "subject": "lock",
+    "loadError": "cyclic package dependency: team/a",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"team/parent\":{\"id\":\"team/parent\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\",\"team/z\":\"1.0.0\"}},\"team/a\":{\"id\":\"team/a\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\"}},\"team/z\":{\"id\":\"team/z\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\"}}}"
+      }
+    ],
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:a.json"
+          },
+          "team/z": {
+            "version": "1.0.0",
+            "source": "local:z.json"
+          }
+        }
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-roots-equality-az",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"team/z\":\"1.0.0\",\"team/a\":\"1.0.0\"}"
+      }
+    ],
+    "package": "team/a",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        },
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-duplicate-package-last-child-order-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"std/layout\":{\"id\":\"std/layout\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"a/x\":\"bad\",\"b!\":\"1.0.0\"}},\"std/layout\":{\"id\":\"std/layout\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"b!\":\"1.0.0\",\"a/x\":\"bad\"}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-duplicate-package-last-child-order-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"std/layout\":{\"id\":\"std/layout\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"b!\":\"1.0.0\",\"a/x\":\"bad\"}},\"std/layout\":{\"id\":\"std/layout\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"a/x\":\"bad\",\"b!\":\"1.0.0\"}}}"
+      }
+    ],
+    "resolveLock": true
   }
 ]
