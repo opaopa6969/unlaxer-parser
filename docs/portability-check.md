@@ -112,6 +112,8 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 推測しない。UBNF 構文失敗 `P-SYNTAX` は Java frontend の精密な位置 API がないため
 両 host とも `span: null`。部分 AST からの recovery は行わない。
 
+`@lexicalContext` の検査中に宣言的 token の `E-LEXICAL:` が発生しても、inventory は例外で中断せず構造検査へ委ねる（#916）。他の inventory 診断がない場合、両 host とも終了コード3・`failed`・grammar 全体の `P-STRUCTURE` を返す。`E-LEXICAL-CONTEXT-*` の診断位置と、generate が返す最初の `E-LEXICAL:` は従来どおり。terminal 数の上限（`E-LEXICAL-CONTEXT-LIMIT`）と字句エラーが同居する場合も、native は Java と同じく字句エラーを優先し、check は `P-STRUCTURE`、generate は最初の `E-LEXICAL:` を返す。
+
 ## 診断コード（schemaVersion 1）
 
 | code | 対象 / subject |

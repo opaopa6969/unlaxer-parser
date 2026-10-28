@@ -397,10 +397,9 @@ public class RustPortabilityConformanceTest {
                 report.add("module/" + fixture.get("name").getAsString() + "\t" + ending + "\t3\t3\tequal");
             }
         }
-        // Java check aborts on these inputs (#916), so only generate and the validator are compared.
         var contexts = JsonParser.parseString(Files.readString(repo.resolve(
             "spec-corpus/feature-diagnostics/lexical-contexts.json"))).getAsJsonArray();
-        assertEquals("all lexical-context cases execute", 5, contexts.size());
+        assertEquals("all lexical-context cases execute", 6, contexts.size());
         for (var entry : contexts) {
             var fixture = entry.getAsJsonObject();
             for (String ending : List.of("LF", "CRLF")) {
@@ -412,6 +411,8 @@ public class RustPortabilityConformanceTest {
                     .filter(d -> d.code().equals("E-LEXICAL")).map(d -> d.message()).toList());
                 Path directory = temporary.newFolder().toPath(), input = directory.resolve("main.ubnf");
                 Files.writeString(input, source);
+                var expected = fixture.getAsJsonObject("expected").getAsJsonObject(ending);
+                assertEquals(label, expected, compareFile(binary, directory, input, source));
                 Path javaOutput = directory.resolve("java-rust"), rustOutput = directory.resolve("native-rust");
                 Run java = javaRun("generate", "--target", "rust", "--grammar", input.toString(), "--output", javaOutput.toString());
                 Run rust = nativeRun(List.of(binary.toString(), "generate", "--target", "rust", "--grammar", input.toString(),
@@ -422,7 +423,7 @@ public class RustPortabilityConformanceTest {
                 assertEquals(label, first, rust.err().strip());
                 assertFalse(label, Files.exists(javaOutput));
                 assertFalse(label, Files.exists(rustOutput));
-                report.add("lexical-context/" + fixture.get("name").getAsString() + "\t" + ending + "\t-\t3\tequal");
+                report.add("lexical-context/" + fixture.get("name").getAsString() + "\t" + ending + "\t3\t3\tequal");
             }
         }
         Files.write(Path.of("target/rust-feature-lexical-diagnostics.tsv"), report);
