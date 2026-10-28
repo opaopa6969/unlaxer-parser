@@ -10,6 +10,18 @@ import org.junit.Test;
 
 /** Raw JSON, semantic diagnostics and transactional snapshots through both real CLIs. */
 public class PackageJsonAcceptanceConformanceTest {
+    @Test public void gsonStrictKeepsFirstPositionAndLastDuplicateValue() {
+        var gson = new com.google.gson.GsonBuilder().setStrictness(com.google.gson.Strictness.STRICT).create();
+        var value = gson.fromJson("{\"b\":1,\"a\":2,\"\\u0062\":3}", com.google.gson.JsonObject.class);
+        assertEquals(List.of("b", "a"), List.copyOf(value.keySet()));
+        assertEquals(3, value.get("b").getAsInt());
+        var reordered = gson.fromJson("{\"a\":2,\"b\":3}", com.google.gson.JsonObject.class);
+        assertEquals(reordered, value);
+        value = gson.fromJson("{\"b\\ud800\":1,\"a\":2,\"b\\uD800\":3}", com.google.gson.JsonObject.class);
+        assertEquals(List.of("b\ud800", "a"), List.copyOf(value.keySet()));
+        assertEquals(3, value.get("b\ud800").getAsInt());
+    }
+
     @Test(timeout=1200000) public void packageJsonAcceptanceMatchesAcrossClis() throws Exception {
         if (!Boolean.getBoolean("rustConformance"))
             System.out.println("[assumption] package JSON conformance requires -DrustConformance=true");
@@ -23,7 +35,7 @@ public class PackageJsonAcceptanceConformanceTest {
             "--classpath", System.getProperty("java.class.path"),
             "--rust", root.resolve("rust/target/debug/unlaxer").toString(),
             "--output", output.toString()), Path.of("target/package-json-cli.log"), 1000);
-        assertEquals("all raw JSON cases executed", 127,
+        assertEquals("all raw JSON cases executed", 196,
             JsonParser.parseString(Files.readString(output)).getAsJsonArray().size());
     }
 

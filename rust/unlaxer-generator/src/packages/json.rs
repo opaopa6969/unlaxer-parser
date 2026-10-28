@@ -1,5 +1,5 @@
 //! Package-envelope compatibility with Gson, without changing raw artifact bytes.
-use serde_json::Value;
+use super::value::{Object, Value};
 
 pub(super) fn parse(bytes: &[u8], artifact: bool) -> Result<Value, String> {
     // Gson ignores exactly one BOM, only at byte zero. Hashing/UTF-8/size checks
@@ -15,14 +15,14 @@ pub(super) fn parse(bytes: &[u8], artifact: bool) -> Result<Value, String> {
     } else {
         bytes
     };
-    if let Ok(value) = serde_json::from_slice(bytes) {
+    if let Ok(value) = super::value::parse(bytes) {
         return Ok(value);
     }
     // Only unpaired UTF-16 escapes get a compatibility pass. serde_json still
     // validates the entire JSON (including trailing input) before any field use.
     let invalid = || super::error("invalid JSON");
     let rewritten = rewrite(bytes).ok_or_else(invalid)?;
-    let mut value = serde_json::from_slice(&rewritten).map_err(|_| invalid())?;
+    let mut value = super::value::parse(&rewritten).map_err(|_| invalid())?;
     restore(&mut value, &mut Vec::new(), artifact).map_err(|_| invalid())?;
     Ok(value)
 }
@@ -118,8 +118,8 @@ fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<
             *s = decoded;
         }
         Value::Object(fields) => {
-            let mut restored = serde_json::Map::new();
-            for (key, mut child) in std::mem::take(fields) {
+            let mut restored = Vec::with_capacity(fields.len());
+            for (key, mut child) in std::mem::take(fields).into_entries() {
                 let (key, surrogate) = text(&key);
                 if surrogate && artifact && path.first().is_some_and(|p| p == "files") {
                     return Err(());
@@ -127,9 +127,10 @@ fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<
                 path.push(key.clone());
                 restore(&mut child, path, artifact)?;
                 path.pop();
-                restored.insert(key, child);
+                restored.push((key, child));
             }
-            *fields = restored;
+            // Distinct surrogate escapes may decode to the same sentinel key.
+            *fields = Object::from_entries(restored);
         }
         Value::Array(items) => {
             for child in items {
@@ -146,6 +147,132 @@ fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn objects_keep_first_position_last_value_and_order_independent_equality() {
+        let value = parse(
+            br#"{"b":{"a":2,"z":1,"z":3},"a":0,"\u0062":{"z":4,"a":5}}"#,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            value.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["b", "a"]
+        );
+        assert_eq!(
+            value["b"].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["z", "a"]
+        );
+        assert_eq!(value["b"]["z"], serde_json::json!(4));
+        let reordered = parse(br#"{"a":0,"b":{"a":5,"z":4}}"#, false).unwrap();
+        assert_eq!(value, reordered);
+        assert_eq!(
+            serde_json::to_string(&value).unwrap(),
+            r#"{"a":0,"b":{"a":5,"z":4}}"#
+        );
+        let value = parse(br#"{"b\ud800":1,"a":2,"b\uD800":3}"#, false).unwrap();
+        assert_eq!(
+            value.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["b\0", "a"]
+        );
+        assert_eq!(value["b\0"], serde_json::json!(3));
+    }
+
+    #[test]
+    fn wide_objects_and_mixed_arrays_keep_order_lookup_and_sorted_output() {
+        // Reverse-ordered wide object with duplicates, and scalar runs around nested objects.
+        let mut text = String::from("{");
+        for i in (0..3000).rev() {
+            text.push_str(&format!("\"k{i:04}\":{i},"));
+        }
+        text.push_str(r#""k0005":"last","x":[1,2,{"b":1,"a":2},3,[{"d":1,"c":2}],4]}"#);
+        let value = parse(text.as_bytes(), false).unwrap();
+        let object = value.as_object().unwrap();
+        assert_eq!(object.len(), 3001);
+        let keys: Vec<_> = object.keys().cloned().collect();
+        assert_eq!(keys[0], "k2999");
+        assert_eq!(keys[2994], "k0005");
+        assert_eq!(keys[2999], "k0000");
+        assert_eq!(keys[3000], "x");
+        for i in 0..3000 {
+            assert!(object.contains_key(&format!("k{i:04}")));
+        }
+        assert!(object.get("k3000").is_none() && object.get("").is_none());
+        assert_eq!(value["k0005"], "last");
+        assert_eq!(value["k0006"], serde_json::json!(6));
+        let x = |i: usize| match &value["x"] {
+            Value::Array(items) => items[i].clone(),
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            x(2).as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["b", "a"]
+        );
+        let Value::Array(inner) = x(4) else {
+            unreachable!()
+        };
+        assert_eq!(
+            inner[0].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["d", "c"]
+        );
+        assert_eq!(
+            serde_json::to_string(&value).unwrap(),
+            serde_json::to_string(&serde_json::from_str::<serde_json::Value>(&text).unwrap())
+                .unwrap()
+        );
+        // The ordered tree must not grow each JSON value beyond serde_json's own node.
+        assert!(std::mem::size_of::<Value>() <= std::mem::size_of::<serde_json::Value>());
+    }
+
+    #[test]
+    fn document_acceptance_outside_member_order_is_unchanged() {
+        for input in [
+            b"".as_slice(),
+            b" \r\n",
+            b"{\"x\":1} true",
+            b"{\"b\":1,\"b\":}",
+        ] {
+            assert_eq!(
+                parse(input, false).unwrap_err(),
+                super::super::error("invalid JSON")
+            );
+        }
+        for input in [b"null".as_slice(), b"[]", b"1", b"\"x\"", b"true"] {
+            assert!(parse(input, false).unwrap().as_object().is_none());
+        }
+        let nested = |depth| format!("{{\"meta\":{}0{}}}", "[".repeat(depth), "]".repeat(depth));
+        assert!(parse(nested(126).as_bytes(), false).is_ok());
+        assert_eq!(
+            parse(nested(127).as_bytes(), false).unwrap_err(),
+            super::super::error("invalid JSON")
+        );
+    }
+
+    #[test]
+    fn numeric_values_keep_serde_semantics_with_workspace_feature_unification() {
+        // Run both standalone and with the workspace (DAP enables arbitrary_precision).
+        // Numeric map envelopes must not become package objects or change diagnostics.
+        for input in [
+            r#"{"dependencies":1.25,"files":18446744073709551616,"schemaVersion":1e0}"#,
+            r#"{"note":[-0.0,0.5,1e300,18446744073709551616]}"#,
+            r#"{"note":1e999}"#,
+            r#"{"note":{"$serde_json::private::Number":"1.5"}}"#,
+            r#"{"note":{"$serde_json::private::Number":null}}"#,
+        ] {
+            let reference = serde_json::from_str::<serde_json::Value>(input);
+            let ordered = parse(input.as_bytes(), false);
+            match reference {
+                Ok(reference) => assert_eq!(ordered.unwrap(), reference, "{input}"),
+                Err(_) => assert_eq!(ordered.unwrap_err(), super::super::error("invalid JSON")),
+            }
+        }
+        let value = parse(br#"{"dependencies":1.25,"files":1.25}"#, false).unwrap();
+        assert_eq!(
+            super::super::dependencies(&value["dependencies"]).unwrap_err(),
+            super::super::error("expected object: dependencies")
+        );
+        assert!(value["files"].as_object().is_none());
+    }
 
     #[test]
     fn bom_is_single_initial_and_keeps_empty_document_diagnostic() {
