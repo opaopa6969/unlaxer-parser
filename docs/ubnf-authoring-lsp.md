@@ -296,3 +296,10 @@ Rust は stat 後に FIFO・過大ファイルへ差し替えた open も、開�
 通常parserのホットパスには変更を加えない。
 
 64 MiBの正常文字列の読取り成功はreader単体でも検証する。有効な64 MiBコメントは既存Java parserの解析に時間がかかるため、このfixtureだけstdio待ち480秒・CLI待ち240秒、suite全体900秒の有限deadlineを使う。これは製品のtimeout設定や性能作業ではない（#197）。この変更は許容サイズ内の文法の解析時間を制限しない。
+
+## package metadata の読取り（#908）
+
+manifest/lock は両 backend で各8 MiBの bounded reader を通し、lock I/O、manifest 検証、lock JSON検証の順に処理する。
+`package-documents.json` の共通25件で全診断JSONと後続requestを比較し、同じfileを3 CLIにも送る。
+Javaのstat後のFIFO差替えや完全なhandle型判定は未解決（#907/#911）で、#908も完了扱いにしない。
+[上限・診断・競合の制限](ubnf-packages.md#manifest--lock-の-disk-読取り908残り-911)。

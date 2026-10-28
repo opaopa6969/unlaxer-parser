@@ -1,0 +1,147 @@
+[
+  {
+    "id": "manifest-missing",
+    "manifest": "missing",
+    "lock": "valid",
+    "error": "missing manifest; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "manifest-fifo",
+    "manifest": "fifo",
+    "lock": "valid",
+    "error": "manifest is not a regular file"
+  },
+  {
+    "id": "manifest-fifo-link",
+    "manifest": "fifo-link",
+    "lock": "valid",
+    "error": "manifest is not a regular file"
+  },
+  {
+    "id": "manifest-device-link",
+    "manifest": "device-link",
+    "lock": "valid",
+    "error": "manifest is not a regular file"
+  },
+  {
+    "id": "manifest-directory",
+    "manifest": "directory",
+    "lock": "valid",
+    "error": "manifest is not a regular file"
+  },
+  {
+    "id": "manifest-directory-link",
+    "manifest": "directory-link",
+    "lock": "valid",
+    "error": "manifest is not a regular file"
+  },
+  {
+    "id": "manifest-oversized",
+    "manifest": "oversized",
+    "lock": "valid",
+    "error": "manifest exceeds 8 MiB"
+  },
+  {
+    "id": "manifest-oversized-link",
+    "manifest": "oversized-link",
+    "lock": "valid",
+    "error": "manifest exceeds 8 MiB"
+  },
+  {
+    "id": "manifest-exact",
+    "manifest": "exact",
+    "lock": "valid"
+  },
+  {
+    "id": "manifest-regular-link",
+    "manifest": "regular-link",
+    "lock": "valid"
+  },
+  {
+    "id": "lock-missing",
+    "manifest": "valid",
+    "lock": "missing",
+    "error": "missing lock; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "lock-fifo",
+    "manifest": "valid",
+    "lock": "fifo",
+    "error": "lock is not a regular file"
+  },
+  {
+    "id": "lock-fifo-link",
+    "manifest": "valid",
+    "lock": "fifo-link",
+    "error": "lock is not a regular file"
+  },
+  {
+    "id": "lock-device-link",
+    "manifest": "valid",
+    "lock": "device-link",
+    "error": "lock is not a regular file"
+  },
+  {
+    "id": "lock-directory",
+    "manifest": "valid",
+    "lock": "directory",
+    "error": "lock is not a regular file"
+  },
+  {
+    "id": "lock-directory-link",
+    "manifest": "valid",
+    "lock": "directory-link",
+    "error": "lock is not a regular file"
+  },
+  {
+    "id": "lock-oversized",
+    "manifest": "valid",
+    "lock": "oversized",
+    "error": "lock exceeds 8 MiB"
+  },
+  {
+    "id": "lock-oversized-link",
+    "manifest": "valid",
+    "lock": "oversized-link",
+    "error": "lock exceeds 8 MiB"
+  },
+  {
+    "id": "lock-exact",
+    "manifest": "valid",
+    "lock": "exact"
+  },
+  {
+    "id": "lock-regular-link",
+    "manifest": "valid",
+    "lock": "regular-link"
+  },
+  {
+    "id": "both-missing-lock-first",
+    "manifest": "missing",
+    "lock": "missing",
+    "error": "missing lock; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "manifest-fifo-lock-directory",
+    "manifest": "fifo",
+    "lock": "directory",
+    "error": "lock is not a regular file"
+  },
+  {
+    "id": "manifest-invalid-lock-oversized",
+    "manifest": "invalid",
+    "lock": "oversized",
+    "error": "lock exceeds 8 MiB"
+  },
+  {
+    "id": "manifest-schema-before-lock-json",
+    "manifest": "schema",
+    "lock": "invalid",
+    "error": "unsupported schemaVersion"
+  },
+  {
+    "id": "valid",
+    "manifest": "valid",
+    "lock": "valid"
+  }
+]

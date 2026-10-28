@@ -8,7 +8,7 @@ import org.unlaxer.dsl.bootstrap.*;
 /** Read-only source and pinned identity snapshots for CLI and authoring tools. */
 public final class VocabularyOrigins {
     private VocabularyOrigins() {}
-    public static JsonObject inspect(Path grammar) throws IOException { return inspect(grammar, UBNFPackageResolver::readLocalSource); }
+    public static JsonObject inspect(Path grammar) throws IOException { return inspect(grammar, UBNFPackageResolver.diskReader()); }
     public static JsonObject inspect(Path grammar, UBNFModuleLoader.SourceReader reader) throws IOException {
         Path path = grammar.toAbsolutePath().normalize();
         String source = reader.read(path);

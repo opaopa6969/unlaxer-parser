@@ -42,34 +42,87 @@ fn read_local_with<R: Read>(
     path: &Path,
     open: impl FnOnce(&Path) -> std::io::Result<OpenedLocal<R>>,
 ) -> Result<String, String> {
+    let bytes = read_source_with(
+        path,
+        MAX_LOCAL_BYTES,
+        NOT_REGULAR,
+        TOO_LARGE,
+        |e| e.to_string(),
+        open,
+    )?;
+    String::from_utf8(bytes).map_err(|_| "stream did not contain valid UTF-8".into())
+}
+
+fn read_source_with<R: Read>(
+    path: &Path,
+    limit: usize,
+    not_regular: &str,
+    too_large: &str,
+    io_error: impl Fn(std::io::Error) -> String,
+    open: impl FnOnce(&Path) -> std::io::Result<OpenedLocal<R>>,
+) -> Result<Vec<u8>, String> {
     // Reject by path first so the usual devices/FIFOs are never opened at all.
-    let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;
+    let metadata = std::fs::metadata(path).map_err(&io_error)?;
     if !metadata.is_file() {
-        return Err(NOT_REGULAR.into());
+        return Err(not_regular.into());
     }
-    if metadata.len() > MAX_LOCAL_BYTES as u64 {
-        return Err(TOO_LARGE.into());
+    if metadata.len() > limit as u64 {
+        return Err(too_large.into());
     }
-    // Re-check the opened handle (the path may have been replaced), then still
-    // stop reading at limit + 1 for growth after the fstat.
-    let opened = open(path).map_err(|e| e.to_string())?;
+    // Re-check the opened handle, then bound growth after the fstat to limit + 1.
+    let opened = open(path).map_err(|e| {
+        // Sockets can fail during open; normalize a visible non-file replacement.
+        if std::fs::metadata(path).is_ok_and(|m| !m.is_file()) {
+            not_regular.to_owned()
+        } else {
+            io_error(e)
+        }
+    })?;
     if !opened.regular {
-        return Err(NOT_REGULAR.into());
+        return Err(not_regular.into());
     }
-    if opened.len > MAX_LOCAL_BYTES as u64 {
-        return Err(TOO_LARGE.into());
+    if opened.len > limit as u64 {
+        return Err(too_large.into());
     }
     let mut bytes = Vec::new();
     opened
         .reader
-        .take((MAX_LOCAL_BYTES + 1) as u64)
+        .take((limit + 1) as u64)
         .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
-    if bytes.len() > MAX_LOCAL_BYTES {
-        return Err(TOO_LARGE.into());
+        .map_err(io_error)?;
+    if bytes.len() > limit {
+        return Err(too_large.into());
     }
-    String::from_utf8(bytes).map_err(|_| "stream did not contain valid UTF-8".into())
+    Ok(bytes)
 }
+
+fn read_document(path: &Path, subject: &str) -> Result<Vec<u8>, String> {
+    read_document_with(path, subject, open_local)
+}
+
+fn read_document_with<R: Read>(
+    path: &Path,
+    subject: &str,
+    open: impl FnOnce(&Path) -> std::io::Result<OpenedLocal<R>>,
+) -> Result<Vec<u8>, String> {
+    read_source_with(
+        path,
+        MAX_BYTES,
+        &error(format!("{subject} is not a regular file")),
+        &error(format!("{subject} exceeds 8 MiB")),
+        |e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                error(format!(
+                    "missing {subject}; run unlaxer deps resolve --manifest ubnf.json"
+                ))
+            } else {
+                error(format!("cannot read {subject}"))
+            }
+        },
+        open,
+    )
+}
+
 const STANDARD: &[u8] =
     include_bytes!("../../../unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json");
 fn error(message: impl std::fmt::Display) -> String {
@@ -196,7 +249,7 @@ fn read_bytes(path: &Path) -> Result<Vec<u8>, String> {
 /// This command explicitly updates the dependency snapshot. Parsing never calls it.
 pub fn resolve(manifest: &Path) -> Result<Value, String> {
     let directory = manifest.parent().unwrap_or_else(|| Path::new("."));
-    let configuration = parse(&read_bytes(manifest)?)?;
+    let configuration = parse(&read_document(manifest, "manifest")?)?;
     versioned(&configuration)?;
     let roots = &configuration["dependencies"];
     dependencies(roots)?;
@@ -449,15 +502,12 @@ impl Resolver {
     }
     fn lock(&mut self) -> Result<&Value, String> {
         if self.lock.is_none() {
-            let configuration = std::fs::read(self.directory.join("ubnf.json")).map_err(|_| {
-                error("missing manifest; run unlaxer deps resolve --manifest ubnf.json")
-            })?;
+            // Lock I/O first (including missing lock), then manifest validation, then lock JSON.
+            let bytes = read_document(&self.directory.join("ubnf.lock.json"), "lock")?;
+            let configuration = read_document(&self.directory.join("ubnf.json"), "manifest")?;
             let configuration = parse(&configuration)?;
             versioned(&configuration)?;
             dependencies(&configuration["dependencies"])?;
-            let bytes = std::fs::read(self.directory.join("ubnf.lock.json")).map_err(|_| {
-                error("missing lock; run unlaxer deps resolve --manifest ubnf.json")
-            })?;
             let lock = parse(&bytes)?;
             versioned(&lock)?;
             if lock["roots"] != references(&configuration["dependencies"])? {
@@ -757,6 +807,120 @@ mod tests {
             read_local_source(&file).unwrap_err(),
             "stream did not contain valid UTF-8"
         );
+    }
+
+    #[test]
+    fn document_reader_checks_subject_limits_and_growth() {
+        let fixture = LocalFixture::new();
+        let file = fixture.0.join("document");
+        for subject in ["manifest", "lock"] {
+            assert_eq!(
+                read_document(&file, subject).unwrap_err(),
+                error(format!(
+                    "missing {subject}; run unlaxer deps resolve --manifest ubnf.json"
+                ))
+            );
+            let unopened = |_: &Path| -> std::io::Result<OpenedLocal<std::io::Empty>> {
+                panic!("rejected document opened")
+            };
+            assert_eq!(
+                read_document_with(&fixture.0, subject, unopened).unwrap_err(),
+                error(format!("{subject} is not a regular file"))
+            );
+            std::fs::File::create(&file)
+                .unwrap()
+                .set_len((MAX_BYTES + 1) as u64)
+                .unwrap();
+            assert_eq!(
+                read_document_with(&file, subject, unopened).unwrap_err(),
+                error(format!("{subject} exceeds 8 MiB"))
+            );
+            std::fs::File::create(&file)
+                .unwrap()
+                .set_len(MAX_BYTES as u64)
+                .unwrap();
+            assert_eq!(read_document(&file, subject).unwrap().len(), MAX_BYTES);
+            struct Growing(usize);
+            impl Read for Growing {
+                fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+                    assert!(self.0 + bytes.len() <= MAX_BYTES + 1, "read past limit + 1");
+                    bytes.fill(b'a');
+                    self.0 += bytes.len();
+                    Ok(bytes.len())
+                }
+            }
+            let mut growing = Growing(0);
+            assert_eq!(
+                read_document_with(&file, subject, |_| Ok(OpenedLocal {
+                    reader: &mut growing,
+                    regular: true,
+                    len: MAX_BYTES as u64,
+                }))
+                .unwrap_err(),
+                error(format!("{subject} exceeds 8 MiB"))
+            );
+            assert_eq!(growing.0, MAX_BYTES + 1);
+            for regular in [false, true] {
+                // No readable bytes: only handle metadata can detect this replacement.
+                assert_eq!(
+                    read_document_with(&file, subject, |_| Ok(OpenedLocal {
+                        reader: std::io::empty(),
+                        regular,
+                        len: (MAX_BYTES + 1) as u64,
+                    }))
+                    .unwrap_err(),
+                    error(format!(
+                        "{subject} {}",
+                        if regular {
+                            "exceeds 8 MiB"
+                        } else {
+                            "is not a regular file"
+                        }
+                    ))
+                );
+            }
+            std::fs::remove_file(&file).unwrap();
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn document_reader_rechecks_replaced_fifo_and_device_handles() {
+        let fixture = LocalFixture::new();
+        let file = fixture.0.join("document");
+        std::fs::write(&file, "{}").unwrap();
+        let pipe = fixture.0.join("pipe");
+        assert!(std::process::Command::new("mkfifo")
+            .arg(&pipe)
+            .status()
+            .unwrap()
+            .success());
+        for subject in ["manifest", "lock"] {
+            let (send, receive) = std::sync::mpsc::channel();
+            let (source, swapped) = (file.clone(), pipe.clone());
+            std::thread::spawn(move || {
+                let _ = send.send(read_document_with(&source, subject, |_| {
+                    open_local(&swapped)
+                }));
+            });
+            let result = receive.recv_timeout(std::time::Duration::from_secs(5));
+            if result.is_err() {
+                // O_RDWR cannot itself wait for a reader when releasing an open mutation.
+                let _ = std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(&pipe);
+            }
+            assert_eq!(
+                result.expect("open blocked on FIFO").unwrap_err(),
+                error(format!("{subject} is not a regular file"))
+            );
+            assert_eq!(
+                read_document_with(&file, subject, |_| open_local(Path::new("/dev/zero")))
+                    .unwrap_err(),
+                error(format!("{subject} is not a regular file"))
+            );
+        }
     }
 
     #[test]
