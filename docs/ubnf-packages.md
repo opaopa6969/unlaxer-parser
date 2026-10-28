@@ -150,6 +150,10 @@ lock/hash/依存/境界検証は変更しない。metadata の size が上限を
 `E-MODULE: local import exceeds 64 MiB` を返す。上限ちょうどは受理する。
 stat と read の間にファイルが増大・差替えされても、reader は最大 **上限＋1バイト** しか読み取らず、
 余分な1バイトを検出したら同じ過大サイズ診断で拒否する。UTF-8 の不正バイトは従来どおり拒否する。
+Rust は `O_NONBLOCK` で open し、開いた handle の fstat で通常ファイル・サイズを再確認する。stat の後に FIFO へ差し替えられても
+open で止まらず、同じ診断で拒否する。Java は JDK17 の NIO で `O_NONBLOCK` を指定できないため、stat と open の間に FIFO へ
+差し替えられると open がブロックしうる。この残りは [#907](https://github.com/opaopa6969/unlaxer-parser/issues/907) で追跡する。
+package の manifest / lock の読取りは対象外で、[#908](https://github.com/opaopa6969/unlaxer-parser/issues/908) で揃える。
 この byte 上限はファイル内容全体の読取り制限であり、文法の解析時間や全import合計の上限ではない。
 
 Java の既存 `SourceReader` 注入経路と Rust の open-buffer overlay は、呼出側が既に持つ仮想/未保存sourceを

@@ -33,7 +33,7 @@ def run_local_imports(clients, directory, java_command, native_command, root):
             remaining -= count
     for name, target in [('pipe-link', 'pipe'), ('directory-link', 'directory'),
                          ('device-link', '/dev/zero'), ('large-link.ubnf', 'large.ubnf'),
-                         ('tokens-link.ubnf', 'tokens.ubnf')]:
+                         ('tokens-link.ubnf', 'tokens.ubnf'), ('chain-link', 'pipe-link')]:
         (folder / name).symlink_to(target)
     evidence = []
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as endpoint:

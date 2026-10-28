@@ -12,13 +12,37 @@ const NOT_REGULAR: &str = "E-MODULE: local import is not a regular file";
 const TOO_LARGE: &str = "E-MODULE: local import exceeds 64 MiB";
 
 fn read_local_source(path: &Path) -> Result<String, String> {
-    read_local_with(path, |path| std::fs::File::open(path))
+    read_local_with(path, open_local)
+}
+
+/// An opened local source and the type/size seen by fstat on that same handle.
+struct OpenedLocal<R> {
+    reader: R,
+    regular: bool,
+    len: u64,
+}
+
+fn open_local(path: &Path) -> std::io::Result<OpenedLocal<std::fs::File>> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    // A path replaced by a FIFO after the stat must not block in open(2). O_NONBLOCK
+    // does not change reads of regular files; anything else is rejected below.
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, libc::O_NONBLOCK);
+    let file = options.open(path)?;
+    let metadata = file.metadata()?;
+    Ok(OpenedLocal {
+        regular: metadata.is_file(),
+        len: metadata.len(),
+        reader: file,
+    })
 }
 
 fn read_local_with<R: Read>(
     path: &Path,
-    open: impl FnOnce(&Path) -> std::io::Result<R>,
+    open: impl FnOnce(&Path) -> std::io::Result<OpenedLocal<R>>,
 ) -> Result<String, String> {
+    // Reject by path first so the usual devices/FIFOs are never opened at all.
     let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;
     if !metadata.is_file() {
         return Err(NOT_REGULAR.into());
@@ -26,9 +50,18 @@ fn read_local_with<R: Read>(
     if metadata.len() > MAX_LOCAL_BYTES as u64 {
         return Err(TOO_LARGE.into());
     }
+    // Re-check the opened handle (the path may have been replaced), then still
+    // stop reading at limit + 1 for growth after the fstat.
+    let opened = open(path).map_err(|e| e.to_string())?;
+    if !opened.regular {
+        return Err(NOT_REGULAR.into());
+    }
+    if opened.len > MAX_LOCAL_BYTES as u64 {
+        return Err(TOO_LARGE.into());
+    }
     let mut bytes = Vec::new();
-    open(path)
-        .map_err(|e| e.to_string())?
+    opened
+        .reader
         .take((MAX_LOCAL_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
         .map_err(|e| e.to_string())?;
@@ -610,8 +643,9 @@ mod tests {
     #[test]
     fn local_reader_rejects_before_open() {
         let fixture = LocalFixture::new();
-        let unopened =
-            |_: &Path| -> std::io::Result<std::io::Empty> { panic!("rejected file opened") };
+        let unopened = |_: &Path| -> std::io::Result<OpenedLocal<std::io::Empty>> {
+            panic!("rejected file opened")
+        };
         assert_eq!(
             read_local_with(&fixture.0, unopened).unwrap_err(),
             NOT_REGULAR
@@ -633,8 +667,13 @@ mod tests {
             .set_len(MAX_LOCAL_BYTES as u64)
             .unwrap();
         assert_eq!(read_local_source(&file).unwrap().len(), MAX_LOCAL_BYTES);
+        let regular = |reader| OpenedLocal {
+            reader,
+            regular: true,
+            len: MAX_LOCAL_BYTES as u64,
+        };
         let exact = read_local_with(&file, |_| {
-            Ok(std::io::repeat(b'a').take(MAX_LOCAL_BYTES as u64))
+            Ok(regular(std::io::repeat(b'a').take(MAX_LOCAL_BYTES as u64)))
         })
         .unwrap();
         assert_eq!(exact.len(), MAX_LOCAL_BYTES);
@@ -654,10 +693,59 @@ mod tests {
         }
         let mut growing = Growing { count: 0 };
         assert_eq!(
-            read_local_with(&file, |_| Ok(&mut growing)).unwrap_err(),
+            read_local_with(&file, |_| Ok(OpenedLocal {
+                reader: &mut growing,
+                regular: true,
+                len: MAX_LOCAL_BYTES as u64,
+            }))
+            .unwrap_err(),
             TOO_LARGE
         );
         assert_eq!(growing.count, MAX_LOCAL_BYTES + 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_reader_rechecks_the_opened_handle_after_replacement() {
+        let fixture = LocalFixture::new();
+        let file = fixture.0.join("source");
+        std::fs::write(&file, "grammar Module { }\n").unwrap();
+        let pipe = fixture.0.join("pipe");
+        let status = std::process::Command::new("mkfifo")
+            .arg(&pipe)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let large = fixture.0.join("large");
+        std::fs::File::create(&large)
+            .unwrap()
+            .set_len((MAX_LOCAL_BYTES + 1) as u64)
+            .unwrap();
+        // The path stat sees a regular file; open then reaches the replacement.
+        let (send, receive) = std::sync::mpsc::channel();
+        let (source, swapped) = (file.clone(), pipe.clone());
+        std::thread::spawn(move || {
+            send.send(read_local_with(&source, |_| open_local(&swapped)))
+                .unwrap()
+        });
+        let result = receive.recv_timeout(std::time::Duration::from_secs(10));
+        if result.is_err() {
+            // Release a reader blocked in open(2) so the test fails instead of hanging.
+            let _ = std::fs::OpenOptions::new().write(true).open(&pipe);
+        }
+        assert_eq!(
+            result.expect("open blocked on a FIFO").unwrap_err(),
+            NOT_REGULAR
+        );
+        // The handle's fstat rejects the oversized replacement before any read.
+        let unread = |_: &Path| {
+            open_local(&large).map(|opened| OpenedLocal {
+                reader: std::io::repeat(0).take(0),
+                regular: opened.regular,
+                len: opened.len,
+            })
+        };
+        assert_eq!(read_local_with(&file, unread).unwrap_err(), TOO_LARGE);
     }
 
     #[test]

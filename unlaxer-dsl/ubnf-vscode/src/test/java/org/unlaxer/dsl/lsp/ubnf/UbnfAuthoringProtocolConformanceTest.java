@@ -53,7 +53,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=1080000) public void localImportsRejectUnsafeFilesWithoutBlockingServersOrClis() throws Exception {
-        runProtocol("local-imports", 14);
+        runProtocol("local-imports", 17);
     }
 
     private void runProtocol(String suite, int count) throws Exception {
