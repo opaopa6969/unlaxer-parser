@@ -94,3 +94,32 @@ stream の診断は `$.arguments` からの path と、実際の frame の行・
 今回の fixture の parse 失敗は body.message の全文まで一致し、Gson 固有の文言を例外種類だけへ弱めた行はない。既存の Internal error. の JVM stack trace / helpful NPE 説明の差は #900 の契約を維持する。任意の未知拡張 field、重複 JSON key、不完全な map-entry 配列、壊れた framing の総当り互換はこの fixture の範囲外。Java 製品コード・公開3.3.0・parser ホットパスは変更しない。
 
 Rust の `serve` / `serve_stdio` は実 frame の表記と順序を使う。JSON Value を直接渡す `Server::handle` は、その Value を直列化した入力に同じ規則を適用するため、呼出側が既に失った数値表記や空白は復元しない。serde_json の object は key 順に並ぶので、`handle` では常に `arguments` が `command` より先（tree）の規則になり、field の検査順も key 順になる。field 順序は frame から読むため、serde_json の `preserve_order`（indexmap などの追加 crate）は使わない。数値は `arbitrary_precision` で元の表記を保つ。
+
+## launch 直後の表示と複数要素の引数配列（#938）
+
+基準 revision `aa5c78c8` の生成 Java DAP を実 stdio で測定し、[`launch-state.json`](launch-state.json) に独立期待値を固定した。JDK 21.0.9 Oracle と JDK 17.0.12 Oracle の双方で確認した。Java 製品コード、公開済み3.3.0、parser ホットパスは変更しない。
+
+**初回 launch と再 launch は同じ状態ではない。** launch はまだファイルを読まず、既存の step だけを取り消す。ファイルの存在、数値/object/配列/boolean program による違いはなく、program は #905 の文字列化規則を使う。
+
+| configurationDone 前の request | Java と Rust の契約 |
+|---|---|
+| token モードの stackTrace（threadId 1） | `id:0, name:"<program>", source:{path:program文字列}, line:前回のsourceLineOffset+lineBase, column:columnBase` の1 frame。source.name / endLine / endColumn は付けない。初回の offset は0なので、1基底なら line/column は1 |
+| AST モードの stackTrace（threadId 1） | 空。前回の AST/token step は表示しない |
+| scopes（frameId 0／省略） | 空。frameId 1 は既存の invalid request 失敗 |
+| variables（variablesReference 1） | 初回は空。再 launch は前回 **configurationDone の準備で取得した**変数を名前・値・順序ごと保持する。新 launch の runtimeMode / steppingMode で置き換えない |
+| threads | `[{"id":1,"name":"main"}]` |
+| next / continue（threadId 1）、不正 thread / variablesReference | `Internal error.`、文字列 body の先頭行 `java.util.concurrent.CompletionException: java.lang.IllegalArgumentException: invalid or unavailable debug request`。失敗後の表示は変わらない |
+
+準備時の変数順は `runtimeMode`、`steppingMode`、application hook の追加変数。steppingMode の値は `ToKeN` / `AsT` のような元の大小文字も保持する。hook が予約名を上書きしても、その位置は変わらない。Rust の hook は既存の `BTreeMap` の順、Java の hook は戻り値の map の順を使うため、application が対応する順を提供する。Classic AST の共通テスト hook は両 JDK で順序が固定される LinkedHashMap を使い、runtimeLabel / sourceLength も比較する。
+
+共通テストは初回・停止中からの再 launch・終了後の再 launch、存在する／しないファイル、数値・object・配列・boolean、0/1 基底、両 field 順序、token/AST を検査する。Classic AST 専用 backend は AST のみ、Classic token / Generated / Projected は両モードの launch を検査する。計9経路で1,536 pending session。`1e23` / `1e-323` の path は #905 と同じ JDK 差があり、`pathByJdk` に JDK17 の値を持つ。Rust は JDK21 の値に合わせる。他の pending 応答と下記の無応答には JDK 差を観測していない。
+
+### command が先で arguments が2要素以上の場合
+
+LSP4J は、引数 DTO を1個読む request に `arguments:[{},{}]` のような配列を送ると、2個目で `Expected END_ARRAY but was BEGIN_OBJECT ... path $.arguments[1]` を発生させる。Java は **response を返さない**。JDK17/21 の実測では21秒間、エラー response・lifecycle event・切断はなく、stderr に `StreamMessageProducer fireError` の SEVERE、`JsonSyntaxException` と上記診断・stack trace を出した。その後の正しい `threads` には応答し、session は維持された。「永久に無応答」とは断定せず、この観測時間を契約の根拠にする。
+
+Rust はクライアントを待ち続けさせず、**`success:false`、`message:"Message could not be parsed."`、object body の message に上記診断（行・UTF-16列を含む）を返す**。これは意図した差で、`spec-corpus/parity-ledger.json` の `dap-launch-state` に記録する。従来の先頭 DTO の実行・後続要素の黙殺は廃止する。launch / next / configurationDone / initialize / disconnect の副作用を起こさないため、成功扱いしない最小の案を選んだ。引数1個の配列は既存どおり dispatch する。arguments が先の tree 経路、および引数 DTO を取らない threads / 未知 command の規則は #905 のまま。先頭 DTO 自体が不正な場合は先にその parse 失敗を返す。
+
+Classic AST / Classic token（Java host・native Rust host）/ Generated / Projected の共通 stdio で12 request（stackTrace / setBreakpoints / launch / next / initialize / configurationDone / evaluate / source / scopes / variables / continue / disconnect）×配列長2/3×pending/stopped の48行を各経路で確認する。Java は1秒の観測窓で無応答・生存を確認し、後続 threads を barrier にして、遅れて届く response や event も拒否する。Rust は失敗 response の形と診断全文を照合し、両版とも frame / scope / variables の不変、後続 request の応答、単一要素の正常 dispatch を確認する。
+
+`DapLaunchStateConformance` は既存の必須4クラスから呼び出すため、CI の `-Dtest` と `.github/optin-test-contracts.json` は既存登録を利用する。9経路の `target/dap-launch-state-<route>-<backend>.tsv` と `-raw.tsv` を保存し、CI は比較一覧を必須にする。無応答の観測では同じ read Future を保持し、timeout 後に別の reader を積まない。

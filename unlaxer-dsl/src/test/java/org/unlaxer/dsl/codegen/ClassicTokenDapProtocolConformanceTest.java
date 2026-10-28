@@ -59,6 +59,7 @@ public class ClassicTokenDapProtocolConformanceTest {
  private void exercise(Wire wire,String backend)throws Exception {
         wire.failures = new DapFailureConformance("classic-token", backend);
         wire.probeFailures("fresh");
+        DapLaunchStateConformance.check(wire, "classic-token", backend, temporary.getRoot().toPath());
   var rows=JsonParser.parseString(Files.readString(ROOT.resolve("docs/fixtures/classic-token-dap/steps.json"))).getAsJsonArray();assertEquals(8,rows.size());
   for(boolean base:List.of(true,false))for(int offset:List.of(0,7)){
    wire.request("initialize",Map.of("adapterID","token-fixture","linesStartAt1",base,"columnsStartAt1",base));

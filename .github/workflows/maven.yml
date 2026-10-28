@@ -250,10 +250,12 @@ jobs:
           for backend in java rust; do
             test -s "unlaxer-dsl/target/dap-failures-${route}-${backend}.tsv"
             test -s "unlaxer-dsl/target/dap-arguments-${route}-${backend}.tsv"
+            test -s "unlaxer-dsl/target/dap-launch-state-${route}-${backend}.tsv"
           done
         done
         test -s unlaxer-dsl/target/dap-failures-classic-token-rust-native.tsv
         test -s unlaxer-dsl/target/dap-arguments-classic-token-rust-native.tsv
+        test -s unlaxer-dsl/target/dap-launch-state-classic-token-rust-native.tsv
         test -s unlaxer-dsl/target/token-trace.tsv
     - name: Resolver tutorial (Java and Rust)
       run: |
@@ -411,6 +413,7 @@ jobs:
           unlaxer-dsl/target/token-dap-crlf.tsv
           unlaxer-dsl/target/dap-failures-*.tsv
           unlaxer-dsl/target/dap-arguments-*.tsv
+          unlaxer-dsl/target/dap-launch-state-*.tsv
           unlaxer-dsl/target/rule-stack-lsp.tsv
           unlaxer-dsl/target/case-insensitive-conformance.tsv
           unlaxer-dsl/target/case-insensitive-java.tsv
