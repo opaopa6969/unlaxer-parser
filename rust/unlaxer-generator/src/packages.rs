@@ -276,8 +276,17 @@ fn read_bytes<R: Read>(
 }
 /// This command explicitly updates the dependency snapshot. Parsing never calls it.
 pub fn resolve(manifest: &Path) -> Result<Value, String> {
+    // Match Java's absolute, lexical manifest base without following symlinks.
+    let manifest = if manifest.is_absolute() {
+        manifest.to_owned()
+    } else {
+        std::env::current_dir()
+            .map_err(|_| error("cannot read manifest"))?
+            .join(manifest)
+    };
+    let manifest = normalize(&manifest);
     let directory = manifest.parent().unwrap_or_else(|| Path::new("."));
-    let configuration = parse(&read_document(manifest, "manifest")?)?;
+    let configuration = parse(&read_document(&manifest, "manifest")?)?;
     versioned(&configuration)?;
     let roots = &configuration["dependencies"];
     dependencies(roots)?;
@@ -379,7 +388,11 @@ fn resolve_one(
         if remote {
             return Err(error("remote artifact cannot use local dependencies"));
         }
-        let path = directory.join(relative);
+        // Validate before normalization: even a component removed by ".." may contain NUL.
+        if relative.contains('\0') {
+            return Err(error("cannot read local artifact"));
+        }
+        let path = normalize(&directory.join(relative));
         (
             read_bytes(&path, false, open_local)?,
             path.parent().unwrap().to_owned(),

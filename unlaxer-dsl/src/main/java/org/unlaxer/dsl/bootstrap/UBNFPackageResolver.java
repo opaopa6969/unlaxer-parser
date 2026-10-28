@@ -275,7 +275,9 @@ public final class UBNFPackageResolver {
             }
         } else if (source.startsWith("local:")) {
             if (remote) throw error("remote artifact cannot use local dependencies");
-            Path path = sourceDirectory.resolve(source.substring(6)).normalize();
+            Path path;
+            try { path = sourceDirectory.resolve(source.substring(6)).normalize(); }
+            catch (InvalidPathException exception) { throw error("cannot read local artifact"); }
             bytes = readArtifact(path, false, UBNFPackageResolver::openSource);
             childDirectory = path.toAbsolutePath().getParent();
         } else if (source.startsWith("https:")) {
