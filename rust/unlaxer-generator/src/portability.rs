@@ -1,6 +1,6 @@
 //! Read-only capability inventory followed by structural validation when possible.
 //! String API is I/O-free; file API resolves local lexical modules.
-use crate::adapters::{feature_diagnostics, token_contract_diagnostics, AdapterRegistry};
+use crate::adapters::{token_contract_diagnostics, AdapterRegistry};
 use std::fmt::Write;
 use unlaxer_ubnf::*;
 
@@ -256,9 +256,6 @@ impl Inventory {
         for issue in token_contract_diagnostics(grammar) {
             self.add(issue.code, issue.subject, issue.span);
         }
-        for issue in feature_diagnostics(grammar) {
-            self.add(issue.code, issue.subject, issue.span);
-        }
         for issue in crate::lexical_contexts::problems(grammar) {
             self.diagnostics.push(issue);
         }
@@ -281,15 +278,9 @@ impl Inventory {
                     SettingValue::String(_),
                 ) => {}
                 ("ubnf", SettingValue::String(value)) if value == "v1" || value == "v2" => {}
-                ("feature", SettingValue::String(value))
-                    if matches!(
-                        value.as_str(),
-                        "tokenContractsV1"
-                            | "contextAccessorsV1"
-                            | "parseBindingsV1"
-                            | "tokenProgressContractsV1"
-                            | "declarativeTokensV1"
-                    ) => {}
+                // Java scanGrammar leaves feature validation to structural lowering.
+                // Block values still receive P-SETTING through the default arm.
+                ("feature", SettingValue::String(_)) => {}
                 // @comment has its own E-COMMENT-* diagnostics, including the block form check.
                 ("tokenAdapter" | "tokenContract" | "embedded" | "comment", _) => {}
                 ("whitespace", SettingValue::String(value)) => {

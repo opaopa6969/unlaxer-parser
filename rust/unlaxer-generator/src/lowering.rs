@@ -687,7 +687,8 @@ impl Lowering<'_> {
         for rule in &self.grammar.rules {
             validate_typeof(rule)?;
         }
-        let lexical = crate::lexical::compile(self.grammar)?;
+        let lexical = crate::lexical::compile(self.grammar)
+            .map_err(|message| format!("E-LEXICAL: {message}"))?;
         if !self.grammar.imports.is_empty() {
             return Err("unsupported imports".into());
         }

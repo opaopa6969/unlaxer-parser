@@ -326,6 +326,80 @@ public class RustPortabilityConformanceTest {
         Files.write(Path.of("target/rust-adapter-contract-diagnostics.tsv"), report);
     }
 
+    @Test public void featureAndLexicalDiagnosticsMatchIndependentOracleAcrossConsumers() throws Exception {
+        Path binary = binary();
+        var cases = JsonParser.parseString(Files.readString(repo.resolve(
+            "spec-corpus/feature-diagnostics/cases.json"))).getAsJsonArray();
+        assertEquals("all authored cases execute", 31, cases.size());
+        List<String> report = new ArrayList<>(List.of("case\tline_endings\tcheck_exit\tgenerate_exit\tresult"));
+        for (var entry : cases) {
+            var fixture = entry.getAsJsonObject();
+            for (String ending : List.of("LF", "CRLF")) {
+                String label = fixture.get("name").getAsString() + " / " + ending;
+                String source = fixture.get("source").getAsString().replace("\n", ending.equals("LF") ? "\n" : "\r\n");
+                var grammar = org.unlaxer.dsl.bootstrap.UBNFMapper.parse(source).grammars().get(0);
+                var features = org.unlaxer.dsl.bootstrap.UBNFFeatures.validate(grammar).stream()
+                    .map(d -> d.code() + ": " + d.subject()).toList();
+                assertEquals(label, fixture.get("features"), new Gson().toJsonTree(features));
+                assertEquals(label, features, org.unlaxer.dsl.codegen.GrammarValidator.validate(grammar).stream()
+                    .filter(d -> d.code().startsWith("E-FEATURE-")).map(d -> d.message()).toList());
+                Path directory = temporary.newFolder().toPath(), input = directory.resolve("main.ubnf");
+                Files.writeString(input, source);
+                var expected = fixture.getAsJsonObject("expected").getAsJsonObject(ending);
+                assertEquals(label, expected, compareFile(binary, directory, input, source));
+                Path javaOutput = directory.resolve("java-rust"), rustOutput = directory.resolve("native-rust");
+                Run java = javaRun("generate", "--target", "rust", "--grammar", input.toString(), "--output", javaOutput.toString());
+                Run rust = nativeRun(List.of(binary.toString(), "generate", "--target", "rust", "--grammar", input.toString(),
+                    "--output", rustOutput.toString()), true, directory);
+                int code = fixture.get("first").isJsonNull() ? 0 : 3;
+                assertEquals(label + java.err(), code, java.code());
+                assertEquals(label + rust.err(), code, rust.code());
+                if (code == 0) {
+                    for (String file : List.of("ast.rs", "parser.rs", "mapper.rs", "evaluator.rs", "mod.rs"))
+                        assertArrayEquals(label + file, Files.readAllBytes(javaOutput.resolve(file)), Files.readAllBytes(rustOutput.resolve(file)));
+                } else {
+                    String first = fixture.get("first").getAsString();
+                    assertEquals(label, first, rust.err().strip());
+                    assertTrue(label + java.err(), java.err().startsWith("Grammar validation failed:\n - " + first + " [code:"));
+                    assertFalse(label, Files.exists(javaOutput));
+                    assertFalse(label, Files.exists(rustOutput));
+                }
+                report.add(fixture.get("name").getAsString() + "\t" + ending + "\t"
+                    + (expected.get("portable").getAsBoolean() ? 0 : 3) + "\t" + code + "\tequal");
+            }
+        }
+        var modules = JsonParser.parseString(Files.readString(repo.resolve(
+            "spec-corpus/feature-diagnostics/modules.json"))).getAsJsonArray();
+        assertEquals("all imported lexical messages execute", 8, modules.size());
+        for (var entry : modules) {
+            var fixture = entry.getAsJsonObject();
+            for (String ending : List.of("LF", "CRLF")) {
+                String label = "module/" + fixture.get("name").getAsString() + " / " + ending;
+                Path directory = temporary.newFolder().toPath(), input = directory.resolve("main.ubnf");
+                Files.writeString(directory.resolve("child.ubnf"), fixture.get("source").getAsString()
+                    .replace("\n", ending.equals("LF") ? "\n" : "\r\n"));
+                String source = "grammar G { @import m from 'child.ubnf' @ubnf: v2 @root @mapping(Root) Start ::= 'x'; }";
+                Files.writeString(input, source);
+                var expected = JsonParser.parseString("{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,"
+                    + "\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\","
+                    + "\"span\":null,\"subject\":\"UBNF module resolution\"}]}");
+                assertEquals(label, expected, compareFile(binary, directory, input, source));
+                Path javaOutput = directory.resolve("java-rust"), rustOutput = directory.resolve("native-rust");
+                Run java = javaRun("generate", "--target", "rust", "--grammar", input.toString(), "--output", javaOutput.toString());
+                Run rust = nativeRun(List.of(binary.toString(), "generate", "--target", "rust", "--grammar", input.toString(),
+                    "--output", rustOutput.toString()), true, directory);
+                assertEquals(label + java.err(), 3, java.code());
+                assertEquals(label + rust.err(), 3, rust.code());
+                assertEquals(label, fixture.get("first").getAsString(), java.err().strip());
+                assertEquals(label, fixture.get("first").getAsString(), rust.err().strip());
+                assertFalse(label, Files.exists(javaOutput));
+                assertFalse(label, Files.exists(rustOutput));
+                report.add("module/" + fixture.get("name").getAsString() + "\t" + ending + "\t3\t3\tequal");
+            }
+        }
+        Files.write(Path.of("target/rust-feature-lexical-diagnostics.tsv"), report);
+    }
+
     private static List<String> diagnosticMessages(JsonArray diagnostics) {
         var messages = new ArrayList<String>();
         for (var entry : diagnostics) {

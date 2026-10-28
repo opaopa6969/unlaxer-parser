@@ -25,6 +25,7 @@
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
+    "910": {"state": "OPEN", "title": "parity(generator): feature と E-LEXICAL の check/generate 診断を Java-host に揃える"},
     "897": {
       "state": "OPEN",
       "title": "parity(generator): adapter/token-contract 診断の整列・重複 key・空白判定を Java の check/generate に揃える（#885 レビュー由来）"
@@ -735,10 +736,16 @@
       "issues": [
         111,
         716,
-        897
+        897,
+        910
       ],
-      "observation": "javaClass/java/rust は組込みJava token classとRustの対応実装・consumerを区別する。任意JVM class/bytecodeをnativeで直接実行せず、ADAPTER registryと明示bindingを使う。宣言単位の棚卸しと未検証の移植境界は全API対応表 / public-api-audit で追跡。 #897ではadapter/contractの共有診断をJavaに統一。spanなしadapterはcode→UTF-16 subject、contractはcodeのみの安定順、重複token keyは最初の値。isBlank/trimを区別して空白context・NBSPを扱う。46文法×LF/CRLFでregistry/validateOrThrow/check/3生成CLI・全5ファイルを検査し、参照診断が後段の生成器診断より先に出ることを5文法で検査。checkは従来のソース位置順を維持し、Java-target CLI独自の再整列も固定する。",
+      "observation": "javaClass/java/rust は組込みJava token classとRustの対応実装・consumerを区別する。任意JVM class/bytecodeをnativeで直接実行せず、ADAPTER registryと明示bindingを使う。宣言単位の棚卸しと未検証の移植境界は全API対応表 / public-api-audit で追跡。 #897ではadapter/contractの共有診断をJavaに統一。spanなしadapterはcode→UTF-16 subject、contractはcodeのみの安定順、重複token keyは最初の値。isBlank/trimを区別して空白context・NBSPを扱う。46文法×LF/CRLFでregistry/validateOrThrow/check/3生成CLI・全5ファイルを検査し、参照診断が後段の生成器診断より先に出ることを5文法で検査。checkは従来のソース位置順を維持し、Java-target CLI独自の再整列も固定する。 #910でfeatureのVERSION/UNKNOWN subjectをfeatureへ統一し、checkはJava同様にinventoryで意味検査せずP-STRUCTUREへ委ねる。block値のP-SETTINGは保持。生成入口でE-LEXICAL接頭辞を付け、31文法とimport先8文法×LF/CRLFの全check JSON・終了コード・生成先頭エラーを固定する。module読込み入口でもE-LEXICAL接頭辞を付ける。LSP専用補正を削除し、既存103件＋feature24件の共通stdioで全JSONを検証する。",
       "evidence": [
+        "spec-corpus/feature-diagnostics/README.md",
+        "spec-corpus/feature-diagnostics/cases.json",
+        "spec-corpus/feature-diagnostics/authoring.json",
+        "spec-corpus/feature-diagnostics/modules.json",
+        "rust/unlaxer-generator/tests/feature_diagnostics.rs",
         "docs/token-adapters.md",
         "spec-corpus/java-token-bindings/cases.json",
         "spec-corpus/token-adapters/README.md",

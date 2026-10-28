@@ -146,7 +146,7 @@ message は Java の `message + " — " + hint`。hint を捨てたり、CLI の
 | LexicalCompiler.compile | `E-LEXICAL` / `lexical::compile_syntax` | 接続。Java message の `E-LEXICAL:` prefix を付ける。duplicate/undefined/cycle/version/SAME_AS を比較 |
 | TokenAdapterRegistry.build | `P-ADAPTER-{DEFINITION,DUPLICATE,UNKNOWN,VERSION}` / `adapters::AdapterRegistry::from_grammar` | 接続。宣言検査に加え Java と同じく各 `ADAPTER(...)` token 参照も検査し、span なしの Java と同じ code→subject（UTF-16順）で整列。空白だけの `context`・NBSP は #897 で Java の isBlank/trim に適合 |
 | TokenContractRegistry.build | `P-TOKEN-CONTRACT-{VERSION,DEFINITION,DUPLICATE}` / `adapters::token_contract_diagnostics` | 接続。span なしの Java と同じ code 順に整列し、重複した `token` key は最初の値を subject にする（#897 で生成器・check と共有し、authoring 専用補正を削除）。空白だけの `context`・NBSP は #897 で Java の isBlank/trim に適合 |
-| UBNFFeatures.validate | `E-FEATURE-{VERSION,UNKNOWN,DUPLICATE}` / `adapters::feature_diagnostics` + authoring adapter | 接続。Java は VERSION/UNKNOWN subject を `feature` にし、非v2を最優先する。CLI の value subject との違いを実装で明示 |
+| UBNFFeatures.validate | `E-FEATURE-{VERSION,UNKNOWN,DUPLICATE}` / `adapters::feature_diagnostics` | 接続。VERSION/UNKNOWN subject は `feature`、非v2を最優先する。#910 で生成器との共有関数へ統一し、authoring 専用補正を削除。check の inventory は Java と同じく feature を意味検査せず、構造検査で報告する |
 | TokenStreamGrammar.problems | `E-TOKEN-STREAM-{SETTING,VERSION,TRIVIA,TOKEN,ANNOTATION}` / `token_stream::problems` | 接続 |
 | GlobalComment.problems / warnings | `E-COMMENT-{SETTING,WHITESPACE}` / `global_comment::problems` | 接続。`W-COMMENT-IGNORED` は Java LSP と同じく GenerationWarnings だけから出す |
 | LexicalContexts.requireValid | `E-LEXICAL-CONTEXT[-VERSION,-DUPLICATE,-TOKEN,-LITERAL,-LIMIT]` / `lexical_contexts::validate` | 接続。既存 lexical error を合成した message の全入力域は #893 |
@@ -296,3 +296,7 @@ Rust は stat 後に FIFO・過大ファイルへ差し替えた open も、開�
 通常parserのホットパスには変更を加えない。
 
 64 MiBの正常文字列の読取り成功はreader単体でも検証する。有効な64 MiBコメントは既存Java parserの解析に時間がかかるため、このfixtureだけstdio待ち480秒・CLI待ち240秒、suite全体900秒の有限deadlineを使う。これは製品のtimeout設定や性能作業ではない（#197）。この変更は許容サイズ内の文法の解析時間を制限しない。
+
+#910 の [feature 共通 corpus](../spec-corpus/feature-diagnostics/README.md) で12文法×LF/CRLFを追加し、
+既存103件を含む baseline stdio は127件。feature の全JSONと同一/減少versionでの修復を比較する。
+既存 lexical 診断の prefix・range は維持し、CLI生成時の prefix 修正とは別経路で検証する。

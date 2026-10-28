@@ -94,7 +94,7 @@ pub fn collect(grammar: &GrammarDecl) -> Vec<Issue> {
             "Correct the format-2 token contract declaration.",
         ),
         (
-            feature_diagnostics(grammar),
+            crate::adapters::feature_diagnostics(grammar),
             "Use a supported format-2 @feature declaration.",
         ),
     ] {
@@ -462,22 +462,4 @@ fn tokens(grammar: &GrammarDecl, out: &mut Vec<Issue>) {
             first.push((name, token));
         }
     }
-}
-
-// The shared check API uses the written feature value as subject; Java's
-// GrammarValidator uses "feature" for VERSION/UNKNOWN and gives VERSION priority.
-// Adapt the authoring contract here without changing CLI diagnostic consumers.
-fn feature_diagnostics(grammar: &GrammarDecl) -> Vec<crate::adapters::AdapterDiagnostic> {
-    crate::adapters::feature_diagnostics(grammar)
-        .into_iter()
-        .map(|mut issue| {
-            if !format_two(grammar) {
-                issue.code = "E-FEATURE-VERSION";
-            }
-            if issue.code != "E-FEATURE-DUPLICATE" {
-                issue.subject = "feature".into();
-            }
-            issue
-        })
-        .collect()
 }
