@@ -195,10 +195,11 @@ Java-host Rust / native Rust / Java flag CLI に送る。FIFO、device/directory
 欠落、不正な UTF-8、上限ちょうど、有効fileへの symlink、複数異常時の順序を検査し、全診断 JSON と後続 completion/hover を照合する。
 manifest の拒否は両 `deps resolve` CLI でも検査する。既存 package corpus の期待値は変更しない。
 
-lock が指す cache artifact と `local:` 依存 artifact の読取りはこの範囲外で、
-[#913](https://github.com/opaopa6969/unlaxer-parser/issues/913) で揃える（Rust は FIFO・`/dev/zero` で停止する）。
+lock が指す cache artifact と明示 `deps resolve` の `local:` 依存も、下記 #913 の規則で同じ reader を使う。
 先頭 BOM の受理差（Java は受理、Rust は `invalid JSON`）は
 [#914](https://github.com/opaopa6969/unlaxer-parser/issues/914) で扱う。
+不正 UTF-8 artifact の内容診断（Java は `invalid UTF-8 artifact`、Rust は `invalid JSON`）の既存差は
+[#919](https://github.com/opaopa6969/unlaxer-parser/issues/919) で扱う。#913 の I/O 拒否条件とは別で、raw hash 検証後の内容解析に残る差である。
 
 ### Java の競合に残る制限と採用しなかった方式
 
@@ -234,3 +235,50 @@ JDK17 の [StandardOpenOption](https://docs.oracle.com/en/java/javase/17/docs/ap
   fd一覧の差分・pathの再statは、並行open/closeや再差替えで別の競合を作るため代用しない。
 - JDK更新、native bridge、OS別の隔離方式は runtime/配布への影響を伴う別単位として #911 で検証する。
   既存 Java の受理集合・注入経路を削ったり parser のホットパスへ処理を追加したりして解決しない。
+
+
+## cache / local artifact の disk 読取り（#913）
+
+cache の `.ubnf-cache/packages/<sha256>.json` と、明示 `deps resolve` の `local:` 依存 artifact は、
+manifest/lock/local import と同じ reader を共用する。上限は既存定数の **8 MiB（8,388,608バイト）**。
+path の通常ファイル・サイズ確認 → open → 開いた handle の再検査 → 上限＋1バイトの順で読み、
+ちょうどのサイズと通常ファイルへの symlink は受理する。Rust は既存 `read_source_with` の
+`O_NONBLOCK` + fstat、Java は既存 reader の `FileChannel.position()` / `size()` を使う。
+Java の reader 内部は raw bytes を返し、文字列を必要とする既存経路だけで strict UTF-8 に復号する。
+artifact は復号・再エンコードせず、元の bytes で SHA-256 を検証する。
+
+| 条件 | cache artifact | 明示 `local:` artifact |
+| --- | --- | --- |
+| 非通常ファイル | `E-PACKAGE: missing artifact; run unlaxer deps resolve --manifest ubnf.json` | `E-PACKAGE: artifact is not a regular file` |
+| 欠落・dangling symlink | `E-PACKAGE: missing artifact; run unlaxer deps resolve --manifest ubnf.json` | `E-PACKAGE: missing local artifact` |
+| 8 MiB 超過 | `E-PACKAGE: artifact exceeds 8 MiB` | 同左 |
+| その他の I/O 失敗 | `E-PACKAGE: cannot read artifact` | `E-PACKAGE: cannot read local artifact` |
+
+cache の非通常ファイルの文言は **既存 Java の表示と既存 corpus の期待値を維持するため** missing artifact のままにした。
+過大・読取り失敗は #912 と同じ対象別の文言を使い、Rust の従来の一律 missing artifact への変換を外した。
+明示 `local:` の非通常ファイルは原因を示す文言とした。`local:` の欠落・読取り失敗は **Rust の従来の文言**
+（`missing local artifact` / `cannot read local artifact`）を維持し、Java もこれに揃えた。
+`deps resolve` の実行中に「`deps resolve` を実行せよ」と案内しても直らないため、cache の再 resolve 案内は使わない
+（Java の従来は `NoSuchFileException` 等の例外文をそのまま表示していた）。
+reader に渡る前の `local:` パスの組み立て（Java は `normalize()` で `..`・末尾 `/` を字句的に畳み、Rust は OS が解決する）の
+既存差と、NUL を含むパスの Java 例外文は reader の範囲外として
+[#921](https://github.com/opaopa6969/unlaxer-parser/issues/921) で扱う。
+同じ経路・入力に対する message/code/severity/range と検査順は両版で共通。
+stdio は code `E-MODULE`、severity `1`、source `ubnf-module`、message `import <alias>: E-PACKAGE: ...`、
+import 宣言全体の UTF-16 range。CLI は既存 wrapper・終了コードを維持して同じ原因文字列を表示する。
+
+検査順は lock I/O → manifest 検証 → lock JSON/audit → artifact I/O → graph byte budget →
+raw hash → artifact JSON/identity/dependencies → 推移的 artifact の検証。hash 不一致は JSON 不正より先に報告する。
+明示 resolve は manifest → source の読取り → artifact 内容/identity → 推移的依存の順で検証し、
+全依存の成功後にのみ lock/cache を書く。通常の生成・server は manifest に危険な `local:` source があっても
+その source を取得せず、検証済みの固定 cache を読む。既存の SourceReader 注入・未保存 buffer の経路は維持する。
+
+共通 `spec-corpus/ubnf-authoring-lsp/package-artifacts.json` の **39件**を両実 stdio server と
+Java-host Rust / native Rust / Java flag CLI に送り、全診断JSON、診断後の completion と close 後の hover を確認する。
+FIFO、`/dev/zero` symlink、directory、過大、欠落、symlink loop、8 MiB ちょうど、raw hash と検査順を含む。
+`local:` は両 `deps resolve` にも送り、推移的依存の異常と失敗時の lock/cache 不変、成功時の raw bytes/hash/lock 一致を確認する。
+単体テストは opener seam で stat 後の増大・handle 差替えを再現し、mutation を有限 deadline で検出する。
+既存 `PackageResolverConformanceTest` / `package-documents.json` の期待値と parser のホットパスは変更しない。
+
+Java の writer なし FIFO への差替えで open が止まる競合、正確な handle 型検査の制限は
+上記と同じく **Refs #911**。artifact でも同じ reader を使うため同じ制限があり、今回その競合を解決したとは扱わない。

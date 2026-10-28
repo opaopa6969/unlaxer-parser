@@ -236,15 +236,37 @@ fn references(value: &Value) -> Result<Value, String> {
 fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
-fn read_bytes(path: &Path) -> Result<Vec<u8>, String> {
-    if std::fs::metadata(path)
-        .map_err(|_| error("missing local artifact"))?
-        .len()
-        > MAX_BYTES as u64
-    {
-        return Err(error("artifact exceeds 8 MiB"));
-    }
-    std::fs::read(path).map_err(|_| error("cannot read local artifact"))
+fn read_bytes<R: Read>(
+    path: &Path,
+    cached: bool,
+    open: impl FnOnce(&Path) -> std::io::Result<OpenedLocal<R>>,
+) -> Result<Vec<u8>, String> {
+    // Preserve the Java cache diagnostic; explicit local sources keep the existing Rust
+    // local wording, since a missing source cannot be fixed by running deps resolve again.
+    let (missing, not_regular, unreadable) = if cached {
+        let missing = error("missing artifact; run unlaxer deps resolve --manifest ubnf.json");
+        (missing.clone(), missing, error("cannot read artifact"))
+    } else {
+        (
+            error("missing local artifact"),
+            error("artifact is not a regular file"),
+            error("cannot read local artifact"),
+        )
+    };
+    read_source_with(
+        path,
+        MAX_BYTES,
+        &not_regular,
+        &error("artifact exceeds 8 MiB"),
+        |e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                missing.clone()
+            } else {
+                unreadable.clone()
+            }
+        },
+        open,
+    )
 }
 /// This command explicitly updates the dependency snapshot. Parsing never calls it.
 pub fn resolve(manifest: &Path) -> Result<Value, String> {
@@ -352,7 +374,10 @@ fn resolve_one(
             return Err(error("remote artifact cannot use local dependencies"));
         }
         let path = directory.join(relative);
-        (read_bytes(&path)?, path.parent().unwrap().to_owned())
+        (
+            read_bytes(&path, false, open_local)?,
+            path.parent().unwrap().to_owned(),
+        )
     } else if source.starts_with("https:") {
         (crate::package_fetch::fetch(source)?, directory.to_owned())
     } else {
@@ -546,9 +571,7 @@ impl Resolver {
             ".ubnf-cache/packages/{}.json",
             string(&pinned, "sha256")?
         ));
-        let bytes = read_bytes(&path).map_err(|_| {
-            error("missing artifact; run unlaxer deps resolve --manifest ubnf.json")
-        })?;
+        let bytes = read_bytes(&path, true, open_local)?;
         self.loaded_bytes += bytes.len();
         if self.loaded_bytes > MAX_LOCAL_BYTES {
             return Err(error("package graph exceeds cache limits"));
@@ -919,6 +942,144 @@ mod tests {
                 read_document_with(&file, subject, |_| open_local(Path::new("/dev/zero")))
                     .unwrap_err(),
                 error(format!("{subject} is not a regular file"))
+            );
+        }
+    }
+
+    #[test]
+    fn artifact_reader_checks_paths_raw_bytes_and_growth() {
+        let fixture = LocalFixture::new();
+        let file = fixture.0.join("artifact");
+        for cached in [true, false] {
+            let (missing, non_file, unreadable) = if cached {
+                let missing =
+                    error("missing artifact; run unlaxer deps resolve --manifest ubnf.json");
+                (missing.clone(), missing, error("cannot read artifact"))
+            } else {
+                (
+                    error("missing local artifact"),
+                    error("artifact is not a regular file"),
+                    error("cannot read local artifact"),
+                )
+            };
+            let unopened = |_: &Path| -> std::io::Result<OpenedLocal<std::io::Empty>> {
+                panic!("rejected artifact opened")
+            };
+            assert_eq!(read_bytes(&file, cached, unopened).unwrap_err(), missing);
+            assert_eq!(
+                read_bytes(&fixture.0, cached, unopened).unwrap_err(),
+                non_file
+            );
+            std::fs::File::create(&file)
+                .unwrap()
+                .set_len((MAX_BYTES + 1) as u64)
+                .unwrap();
+            assert_eq!(
+                read_bytes(&file, cached, unopened).unwrap_err(),
+                error("artifact exceeds 8 MiB")
+            );
+            // Hash validation must see the original bytes, even invalid UTF-8 or BOM.
+            let raw = [0xef, 0xbb, 0xbf, b'{', 0xff, b'}'];
+            std::fs::write(&file, raw).unwrap();
+            assert_eq!(read_bytes(&file, cached, open_local).unwrap(), raw);
+            std::fs::File::create(&file)
+                .unwrap()
+                .set_len(MAX_BYTES as u64)
+                .unwrap();
+            assert_eq!(
+                read_bytes(&file, cached, open_local).unwrap().len(),
+                MAX_BYTES
+            );
+            struct Growing(usize);
+            impl Read for Growing {
+                fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+                    assert!(self.0 + bytes.len() <= MAX_BYTES + 1, "read past limit + 1");
+                    bytes.fill(b'a');
+                    self.0 += bytes.len();
+                    Ok(bytes.len())
+                }
+            }
+            let mut growing = Growing(0);
+            assert_eq!(
+                read_bytes(&file, cached, |_| Ok(OpenedLocal {
+                    reader: &mut growing,
+                    regular: true,
+                    len: MAX_BYTES as u64,
+                }))
+                .unwrap_err(),
+                error("artifact exceeds 8 MiB")
+            );
+            assert_eq!(growing.0, MAX_BYTES + 1);
+            for regular in [false, true] {
+                assert_eq!(
+                    read_bytes(&file, cached, |_| Ok(OpenedLocal {
+                        reader: std::io::empty(),
+                        regular,
+                        len: (MAX_BYTES + 1) as u64,
+                    }))
+                    .unwrap_err(),
+                    if regular {
+                        error("artifact exceeds 8 MiB")
+                    } else {
+                        non_file.clone()
+                    }
+                );
+            }
+            struct Broken;
+            impl Read for Broken {
+                fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                    Err(std::io::Error::other("private path detail"))
+                }
+            }
+            assert_eq!(
+                read_bytes(&file, cached, |_| Ok(OpenedLocal {
+                    reader: Broken,
+                    regular: true,
+                    len: 0,
+                }))
+                .unwrap_err(),
+                unreadable
+            );
+            std::fs::remove_file(&file).unwrap();
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn artifact_reader_rechecks_replaced_fifo_and_device_handles() {
+        let fixture = LocalFixture::new();
+        let file = fixture.0.join("artifact");
+        std::fs::write(&file, "{}").unwrap();
+        let pipe = fixture.0.join("pipe");
+        assert!(std::process::Command::new("mkfifo")
+            .arg(&pipe)
+            .status()
+            .unwrap()
+            .success());
+        for cached in [true, false] {
+            let expected = error(if cached {
+                "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+            } else {
+                "artifact is not a regular file"
+            });
+            let (send, receive) = std::sync::mpsc::channel();
+            let (source, swapped) = (file.clone(), pipe.clone());
+            let worker = std::thread::spawn(move || {
+                let _ = send.send(read_bytes(&source, cached, |_| open_local(&swapped)));
+            });
+            let result = receive.recv_timeout(std::time::Duration::from_secs(5));
+            if result.is_err() {
+                // O_RDWR releases a removed-O_NONBLOCK mutation without waiting for a writer.
+                let _ = std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(&pipe);
+            }
+            worker.join().unwrap();
+            assert_eq!(result.expect("open blocked on FIFO").unwrap_err(), expected);
+            assert_eq!(
+                read_bytes(&file, cached, |_| open_local(Path::new("/dev/zero"))).unwrap_err(),
+                expected
             );
         }
     }
