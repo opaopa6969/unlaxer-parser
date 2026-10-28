@@ -1,0 +1,236 @@
+[
+  {
+    "id": "cache-valid",
+    "mode": "cache",
+    "kind": "valid"
+  },
+  {
+    "id": "cache-regular-link",
+    "mode": "cache",
+    "kind": "regular-link"
+  },
+  {
+    "id": "cache-exact",
+    "mode": "cache",
+    "kind": "exact"
+  },
+  {
+    "id": "cache-fifo",
+    "mode": "cache",
+    "kind": "fifo",
+    "loadError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "cache-fifo-link",
+    "mode": "cache",
+    "kind": "fifo-link",
+    "loadError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "cache-device-link",
+    "mode": "cache",
+    "kind": "device-link",
+    "loadError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "cache-directory",
+    "mode": "cache",
+    "kind": "directory",
+    "loadError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "cache-directory-link",
+    "mode": "cache",
+    "kind": "directory-link",
+    "loadError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "cache-oversized",
+    "mode": "cache",
+    "kind": "oversized",
+    "loadError": "artifact exceeds 8 MiB"
+  },
+  {
+    "id": "cache-oversized-link",
+    "mode": "cache",
+    "kind": "oversized-link",
+    "loadError": "artifact exceeds 8 MiB"
+  },
+  {
+    "id": "cache-missing",
+    "mode": "cache",
+    "kind": "missing",
+    "loadError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "cache-dangling-link",
+    "mode": "cache",
+    "kind": "dangling-link",
+    "loadError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "cache-loop",
+    "mode": "cache",
+    "kind": "loop",
+    "loadError": "cannot read artifact"
+  },
+  {
+    "id": "cache-invalid-json",
+    "mode": "cache",
+    "kind": "invalid-json",
+    "loadError": "invalid JSON"
+  },
+  {
+    "id": "cache-hash-mismatch",
+    "mode": "cache",
+    "kind": "hash-mismatch",
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "cache-raw-hash-mismatch",
+    "mode": "cache",
+    "kind": "raw-hash-mismatch",
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "local-valid",
+    "mode": "local",
+    "kind": "valid"
+  },
+  {
+    "id": "local-regular-link",
+    "mode": "local",
+    "kind": "regular-link"
+  },
+  {
+    "id": "local-exact",
+    "mode": "local",
+    "kind": "exact"
+  },
+  {
+    "id": "local-fifo",
+    "mode": "local",
+    "kind": "fifo",
+    "resolveError": "artifact is not a regular file"
+  },
+  {
+    "id": "local-fifo-link",
+    "mode": "local",
+    "kind": "fifo-link",
+    "resolveError": "artifact is not a regular file"
+  },
+  {
+    "id": "local-device-link",
+    "mode": "local",
+    "kind": "device-link",
+    "resolveError": "artifact is not a regular file"
+  },
+  {
+    "id": "local-directory",
+    "mode": "local",
+    "kind": "directory",
+    "resolveError": "artifact is not a regular file"
+  },
+  {
+    "id": "local-directory-link",
+    "mode": "local",
+    "kind": "directory-link",
+    "resolveError": "artifact is not a regular file"
+  },
+  {
+    "id": "local-oversized",
+    "mode": "local",
+    "kind": "oversized",
+    "resolveError": "artifact exceeds 8 MiB"
+  },
+  {
+    "id": "local-oversized-link",
+    "mode": "local",
+    "kind": "oversized-link",
+    "resolveError": "artifact exceeds 8 MiB"
+  },
+  {
+    "id": "local-missing",
+    "mode": "local",
+    "kind": "missing",
+    "resolveError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "local-dangling-link",
+    "mode": "local",
+    "kind": "dangling-link",
+    "resolveError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "local-loop",
+    "mode": "local",
+    "kind": "loop",
+    "resolveError": "cannot read artifact"
+  },
+  {
+    "id": "local-invalid-json",
+    "mode": "local",
+    "kind": "invalid-json",
+    "resolveError": "invalid JSON"
+  },
+  {
+    "id": "local-hash-mismatch",
+    "mode": "local",
+    "kind": "hash-mismatch"
+  },
+  {
+    "id": "local-utf8-bytes",
+    "mode": "local",
+    "kind": "utf8"
+  },
+  {
+    "id": "cache-lock-io-first",
+    "mode": "cache",
+    "kind": "fifo",
+    "lock": "oversized",
+    "manifest": "invalid",
+    "loadError": "lock exceeds 8 MiB"
+  },
+  {
+    "id": "cache-manifest-before-artifact",
+    "mode": "cache",
+    "kind": "fifo",
+    "manifest": "invalid",
+    "loadError": "invalid JSON"
+  },
+  {
+    "id": "local-transitive-fifo",
+    "mode": "local",
+    "kind": "fifo",
+    "resolveError": "artifact is not a regular file",
+    "transitive": true
+  },
+  {
+    "id": "local-transitive-device-link",
+    "mode": "local",
+    "kind": "device-link",
+    "resolveError": "artifact is not a regular file",
+    "transitive": true
+  },
+  {
+    "id": "local-transitive-directory",
+    "mode": "local",
+    "kind": "directory",
+    "resolveError": "artifact is not a regular file",
+    "transitive": true
+  },
+  {
+    "id": "local-transitive-oversized",
+    "mode": "local",
+    "kind": "oversized",
+    "resolveError": "artifact exceeds 8 MiB",
+    "transitive": true
+  },
+  {
+    "id": "local-transitive-missing",
+    "mode": "local",
+    "kind": "missing",
+    "resolveError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json",
+    "transitive": true
+  }
+]

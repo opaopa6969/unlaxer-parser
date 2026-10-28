@@ -85,7 +85,7 @@ virtual package path に開いた偽 buffer が検証済み source を置換で�
 server が manifest/lock/cache を書き換えないことも両版で検証する。
 現時点の native file URI は Linux のローカル絶対パスを検証対象とし、UNC/Windows 等は #902（親 #886）に残す。
 
-CI は `ubnf-authoring` 必須契約の5メソッドと、基準103件（従来27＋診断76）・navigation39件・local import 17件の実行件数を別々に検査する。
+CI は `ubnf-authoring` 必須契約の7メソッドと、基準103件（従来27＋診断76）・navigation39件・local import 17件・package metadata 27件・artifact 39件の実行件数を別々に検査する。
 packaged VSIX は従来 Java smoke を保持し、別の隔離 profile で Java executable を不存在に設定して
 Rust の completion/hover/診断と変更後の修復、および両 backend の definition/references・rename・documentSymbol・foldingRange・linkedEditingRange・readonly package source を確認する。最後に拡張の `deactivate` で
 native server の子プロセスが終了し、残らないことを確認する（tinycalc-vscode #874/#880 と同じ後始末の水準）。
@@ -303,3 +303,11 @@ manifest/lock は両 backend で各8 MiBの bounded reader を通し、lock I/O�
 `package-documents.json` の共通27件で全診断JSONと後続requestを比較し、同じfileを3 CLIにも送る。
 競合のない通常時の条件を満たしたので #908 は閉じる。Javaのstat後の差替え競合と完全なhandle型判定は #907/#911 に残す。
 [上限・診断・競合の制限](ubnf-packages.md#manifest--lock-の-disk-読取り908残り-911)。
+
+
+## package artifact の読取り（#913）
+
+cache と明示 resolve の local artifact は既存 reader の8 MiB制限とhandle再検査を共用する。
+`package-artifacts.json` の39件を両stdio・3 CLIに送り、全診断と後続requestを確認する。
+local source は固定cacheから読む通常経路では取得せず、明示 `deps resolve` だけで両版の拒否を確認する。
+[文言を維持した理由・検査順・Java競合の制限](ubnf-packages.md#cache--local-artifact-の-disk-読取り913)。

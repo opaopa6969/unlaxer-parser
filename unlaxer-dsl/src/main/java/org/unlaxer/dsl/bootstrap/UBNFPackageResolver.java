@@ -58,6 +58,13 @@ public final class UBNFPackageResolver {
     }
 
     static String readSource(Path path, int limit, String notRegular, String tooLarge, LocalInput input) throws IOException {
+        byte[] bytes = readSourceBytes(path, limit, notRegular, tooLarge, input);
+        // Preserve Files.readString's strict UTF-8 decoding (no replacement characters).
+        return StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+    }
+
+    // The same bounded reader also supplies raw artifact bytes for SHA-256 verification.
+    private static byte[] readSourceBytes(Path path, int limit, String notRegular, String tooLarge, LocalInput input) throws IOException {
         checkSource(path, limit, notRegular, tooLarge);
         OpenedSource source;
         try { source = input.open(path); }
@@ -71,9 +78,17 @@ public final class UBNFPackageResolver {
             if (opened.size() > limit) throw new IOException(tooLarge);
             byte[] bytes = opened.stream().readNBytes(limit + 1);
             if (bytes.length > limit) throw new IOException(tooLarge);
-            // Preserve Files.readString's strict UTF-8 decoding (no replacement characters).
-            return StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+            return bytes;
         }
+    }
+
+    static byte[] readArtifact(Path path, boolean cached, LocalInput input) throws IOException {
+        String notRegular = cached ? "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+            : "artifact is not a regular file";
+        try {
+            return readSourceBytes(path, MAX_BYTES, "E-PACKAGE: " + notRegular,
+                "E-PACKAGE: artifact exceeds 8 MiB", input);
+        } catch (IOException exception) { throw documentError("artifact", exception); }
     }
 
     /** Disk callbacks keep package metadata separate from local/unsaved source documents. */
@@ -254,8 +269,7 @@ public final class UBNFPackageResolver {
         } else if (source.startsWith("local:")) {
             if (remote) throw error("remote artifact cannot use local dependencies");
             Path path = sourceDirectory.resolve(source.substring(6)).normalize();
-            if (Files.size(path) > MAX_BYTES) throw error("artifact exceeds 8 MiB");
-            bytes = Files.readAllBytes(path);
+            bytes = readArtifact(path, false, UBNFPackageResolver::openSource);
             childDirectory = path.toAbsolutePath().getParent();
         } else if (source.startsWith("https:")) {
             bytes = UBNFPackageFetcher.fetch(source);
@@ -344,9 +358,7 @@ public final class UBNFPackageResolver {
         if (artifacts.containsKey(name)) return artifacts.get(name);
         JsonObject pinned = pinned(name);
         Path cache = directory.resolve(".ubnf-cache/packages/" + string(pinned, "sha256") + ".json");
-        if (!Files.isRegularFile(cache)) throw error("missing artifact; run unlaxer deps resolve --manifest ubnf.json");
-        if (Files.size(cache) > MAX_BYTES) throw error("artifact exceeds 8 MiB");
-        byte[] bytes = Files.readAllBytes(cache);
+        byte[] bytes = readArtifact(cache, true, UBNFPackageResolver::openSource);
         loadedBytes += bytes.length;
         if (loadedBytes > MAX_LOCAL_BYTES) throw error("package graph exceeds cache limits");
         if (!sha256(bytes).equals(string(pinned, "sha256"))) throw error("artifact hash mismatch: " + name);
