@@ -43,7 +43,8 @@ impl From<String> for FileError {
 
 /// Read an already absolute, lexically normalized entry grammar (Java Files.readString).
 pub fn read_grammar(path: &Path) -> Result<String, FileError> {
-    std::fs::read_to_string(path).map_err(|error| FileError::Io(io_message(path, error)))
+    let bytes = std::fs::read(path).map_err(|error| FileError::Io(io_message(path, error)))?;
+    String::from_utf8(bytes).map_err(|error| FileError::Io(utf8_message(error, true)))
 }
 
 /// Match Java NIO's file exception messages, without Rust's numeric errno suffix.
@@ -51,7 +52,7 @@ pub(crate) fn io_message(path: &Path, error: io::Error) -> String {
     match error.kind() {
         io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied => path.display().to_string(),
         io::ErrorKind::IsADirectory => "Is a directory".into(),
-        // Content decoding is a separate contract; keep the existing strict UTF-8 error.
+        // Non-OS reader errors already carry their content diagnostic.
         io::ErrorKind::InvalidData => error.to_string(),
         _ => {
             #[cfg(unix)]
@@ -66,4 +67,33 @@ pub(crate) fn io_message(path: &Path, error: io::Error) -> String {
             format!("{}: {reason}", path.display())
         }
     }
+}
+
+/// Java's Files.readString and CharsetDecoder have different malformed lengths.
+/// Only failure formatting inspects the invalid suffix; valid input is decoded once.
+pub(crate) fn utf8_message(error: std::string::FromUtf8Error, read_string: bool) -> String {
+    let invalid = &error.as_bytes()[error.utf8_error().valid_up_to()..];
+    let length = if read_string {
+        match invalid[0] {
+            0xe0..=0xef if invalid.len() >= 3 => 3,
+            0xe0..=0xef
+                if invalid.len() == 2
+                    && (invalid[1] & 0xc0 != 0x80 || invalid[0] == 0xe0 && invalid[1] < 0xa0) =>
+            {
+                2
+            }
+            0xf0..=0xf7 if invalid.len() >= 4 => 4,
+            _ => 1,
+        }
+    } else if invalid[0] == 0xed && invalid.get(1).is_some_and(|b| (0xa0..=0xbf).contains(b)) {
+        // CharsetDecoder consumes a surrogate encoding as one malformed sequence.
+        if invalid.get(2).is_some_and(|b| b & 0xc0 == 0x80) {
+            3
+        } else {
+            2
+        }
+    } else {
+        error.utf8_error().error_len().unwrap_or(invalid.len())
+    };
+    format!("Input length = {length}")
 }

@@ -371,7 +371,7 @@ fn write_playground(output: &Path, files: &[GeneratedFile], check: bool) -> io::
     let parent = output
         .parent()
         .ok_or_else(|| invalid("output needs a parent"))?;
-    fs::create_dir_all(parent)?;
+    create_output_directories(parent)?;
     let mut staging = None;
     for attempt in 0..100 {
         let candidate = parent.join(format!(".ubnf-playground-{}-{attempt}", std::process::id()));
@@ -381,24 +381,27 @@ fn write_playground(output: &Path, files: &[GeneratedFile], check: bool) -> io::
                 break;
             }
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error),
+            Err(error) => return Err(path_error(&candidate, error)),
         }
     }
     let staging = staging.ok_or_else(|| invalid("cannot allocate playground staging directory"))?;
     let result = (|| {
         for file in files {
             let destination = staging.join(&file.relative_path);
-            fs::create_dir_all(destination.parent().unwrap())?;
+            create_output_directories(destination.parent().unwrap())?;
             let mut handle = OpenOptions::new()
                 .write(true)
                 .create_new(true)
-                .open(destination)?;
-            handle.write_all(file.content.as_bytes())?;
+                .open(&destination)
+                .map_err(|e| path_error(&destination, e))?;
+            handle
+                .write_all(file.content.as_bytes())
+                .map_err(|e| path_error(&destination, e))?;
         }
         if output.exists() {
             return Err(invalid("output was created during generation"));
         }
-        fs::rename(&staging, &output)
+        fs::rename(&staging, &output).map_err(|e| path_error(&output, e))
     })();
     result.map_err(|error| {
         invalid(format!(
@@ -424,15 +427,65 @@ fn reject_symlink_ancestors(path: &Path) -> io::Result<()> {
                 )))
             }
             Ok(_) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(path_error(&normalized, error)),
+            // Java Files.isSymbolicLink returns false when attributes cannot be read.
+            Err(_) => {}
         }
     }
     Ok(())
 }
 
+// Java NIO path exceptions for output operations (EISDIR differs from input reads).
 fn path_error(path: &Path, error: io::Error) -> io::Error {
-    io::Error::new(error.kind(), format!("{}: {error}", path.display()))
+    let message = error.to_string();
+    let reason = error
+        .raw_os_error()
+        .and_then(|errno| message.strip_suffix(&format!(" (os error {errno})")))
+        .unwrap_or(&message);
+    let message = match error.kind() {
+        io::ErrorKind::NotFound
+        | io::ErrorKind::PermissionDenied
+        | io::ErrorKind::AlreadyExists => path.display().to_string(),
+        _ => format!("{}: {reason}", path.display()),
+    };
+    io::Error::new(error.kind(), message)
+}
+
+// Files.createDirectories first tries the supplied path, then walks from an
+// existing absolute parent. Preserve that path spelling in failures (#937).
+fn create_output_directories(path: &Path) -> io::Result<()> {
+    fn create(path: &Path) -> io::Result<()> {
+        match fs::create_dir(path) {
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists && path.is_dir() => Ok(()),
+            result => result,
+        }
+    }
+    match create(path) {
+        Ok(()) => return Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            return Err(path_error(path, error))
+        }
+        Err(_) => {}
+    }
+    let absolute = std::path::absolute(path)?;
+    let mut missing = vec![absolute.as_path()];
+    for parent in absolute.ancestors().skip(1) {
+        match fs::metadata(parent) {
+            Ok(_) => break,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => missing.push(parent),
+            Err(error) => return Err(path_error(parent, error)),
+        }
+    }
+    for directory in missing.into_iter().rev() {
+        create(directory).map_err(|e| path_error(directory, e))?;
+    }
+    Ok(())
+}
+
+fn cannot_write(destination: &Path, error: io::Error) -> io::Error {
+    io::Error::new(
+        error.kind(),
+        format!("cannot write {}: {error}", destination.display()),
+    )
 }
 
 fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::Result<()> {
@@ -441,7 +494,7 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
     for file in files {
         let destination = output.join(&file.relative_path);
         reject_symlink_ancestors(&destination)?;
-        for parent in destination.ancestors().skip(1) {
+        for parent in destination.ancestors().skip(1).take_while(|p| *p != output) {
             if parent.exists() && !parent.is_dir() {
                 return Err(invalid(format!(
                     "refusing non-directory {}",
@@ -453,7 +506,7 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
             Ok(metadata) => {
                 if metadata.file_type().is_symlink() || !metadata.is_file() {
                     return Err(invalid(format!(
-                        "refusing non-regular file {}",
+                        "refusing to overwrite non-generated file {}",
                         destination.display()
                     )));
                 }
@@ -468,31 +521,38 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
                     }
                 } else if !previous.starts_with(HEADER) {
                     return Err(invalid(format!(
-                        "refusing to overwrite handwritten file {}",
+                        "refusing to overwrite non-generated file {}",
                         destination.display()
                     )));
                 }
             }
-            Err(error) if error.kind() == io::ErrorKind::NotFound && !check => {}
+            // Files.exists masks attribute errors; the write reports the failing path.
+            Err(_) if !check => {}
             Err(error) => return Err(path_error(&destination, error)),
         }
     }
     if check {
         return Ok(());
     }
-    fs::create_dir_all(output).map_err(|e| path_error(output, e))?;
     // Per-file replacement avoids truncation on a failed write and does not follow a
     // destination symlink introduced after preflight. This is not a directory transaction.
     for (i, file) in files.iter().enumerate() {
         let destination = output.join(&file.relative_path);
-        fs::create_dir_all(destination.parent().unwrap())
-            .map_err(|e| path_error(&destination, e))?;
+        create_output_directories(destination.parent().unwrap())
+            .map_err(|e| cannot_write(&destination, e))?;
         let temporary = output.join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
         let mut handle = OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&temporary)
-            .map_err(|e| path_error(&destination, path_error(&temporary, e)))?;
+            .map_err(|e| {
+                let failed = if e.kind() == io::ErrorKind::AlreadyExists {
+                    &temporary
+                } else {
+                    &destination
+                };
+                cannot_write(&destination, path_error(failed, e))
+            })?;
         let result = (|| {
             handle.write_all(file.content.as_bytes())?;
             handle.sync_all()?;
@@ -502,7 +562,7 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
         if result.is_err() {
             let _ = fs::remove_file(&temporary);
         }
-        result.map_err(|e| path_error(&destination, e))?;
+        result.map_err(|e| cannot_write(&destination, path_error(&destination, e)))?;
     }
     Ok(())
 }

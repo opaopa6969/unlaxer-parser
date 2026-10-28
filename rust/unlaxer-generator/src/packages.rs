@@ -52,7 +52,7 @@ fn read_local_with<R: Read>(
         |e| crate::input::io_message(path, e),
         open,
     )?;
-    String::from_utf8(bytes).map_err(|_| "stream did not contain valid UTF-8".into())
+    String::from_utf8(bytes).map_err(|error| crate::input::utf8_message(error, false))
 }
 
 fn read_source_with<R: Read>(
@@ -973,10 +973,7 @@ mod tests {
         let fixture = LocalFixture::new();
         let file = fixture.0.join("source");
         std::fs::write(&file, [0xc3, 0x28]).unwrap();
-        assert_eq!(
-            read_local_source(&file).unwrap_err(),
-            "stream did not contain valid UTF-8"
-        );
+        assert_eq!(read_local_source(&file).unwrap_err(), "Input length = 1");
     }
 
     #[test]

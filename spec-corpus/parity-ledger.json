@@ -25,6 +25,7 @@
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
+    "949": {"state": "OPEN", "title": "parity(frontend): REGEX 宣言後の余分なセミコロンで Java の P-SYNTAX と native の E-REGEX-RETIRED が異なる"},
     "923": {"state": "OPEN", "title": "parity(check): 字句エラーと @whitespace の組込み名の同居を Java 参照契約へ揃える"},
     "910": {"state": "OPEN", "title": "parity(generator): feature と E-LEXICAL の check/generate 診断を Java-host に揃える"},
     "916": {"state": "OPEN", "title": "parity(check): @lexicalContext と字句エラーが同居すると Java の check が例外で終わる（#910 レビュー由来）"},
@@ -530,11 +531,11 @@
       "title": "package: deps inspect の grammar パスの基準ディレクトリが Java（字句的）と Rust（OS 解決）で異なる（#921 レビュー由来）"
     },
     "932": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity(generator): import 先が存在しないとき generate の終了コード（Java-host 4 / native 3）とメッセージが違う（#918 レビュー由来）"
     },
     "934": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "parity(cli): 入口 grammar が存在しない・ディレクトリのとき Java と native の終了コード・stderr が違う（#928 レビュー由来）"
     },
     "937": {
@@ -1979,7 +1980,7 @@
         934,
         937
       ],
-      "observation": "Javaを参照に、入口とimportのI/O種別を保持する。欠落・権限拒否は字句正規化済み絶対パス、directoryは入口のFiles.readStringとinspect/local bounded readerの文を区別する。generateのimport I/Oは4、Playgroundの入口I/Oは4、import readinessは3とP-MODULEのDiagnostic表記。checkのJSONは不変。共通26形（非ASCII・空白・非BMPの入口パスを含む）をLF/CRLFで実CLIに送り400観測と成功時の全生成bytes/--checkを比較。chmod(000)が効かない実行ユーザーでは権限2形だけ理由付きでfixtureから除外しJUnit skipと成功観測には数えない。追加のubnf省略/v1/v3/blockの4形はI/O前に停止するPlaygroundを含めずinspect/check/generateを検証する。JVM固有文のELOOPも実測して対応し、対象I/Oの文言差は残さない。同じbounded readerによりnative authoring LSPのlocal import E-MODULE messageもJavaと一致し、authoring baselineのmoduleError fixtureはmessageまで照合する。GitHub Actionsでは権限fixtureの除外を許さない。出力先書込み失敗・不正UTF-8・P-MODULE以外のPlayground readiness・構文エラーのstderr差（終了コードは一致）は#937。#932/#934は修正PRのmerge待ち。",
+      "observation": "Javaを参照に、入口とimportのI/O種別を保持する。欠落・権限拒否は字句正規化済み絶対パス、directoryは入口のFiles.readStringとinspect/local bounded readerの文を区別する。generateのimport I/Oは4、Playgroundの入口I/Oは4、import readinessは3とP-MODULEのDiagnostic表記。checkのJSONは不変。共通26形（非ASCII・空白・非BMPの入口パスを含む）をLF/CRLFで実CLIに送り400観測と成功時の全生成bytes/--checkを比較。chmod(000)が効かない実行ユーザーでは権限2形だけ理由付きでfixtureから除外しJUnit skipと成功観測には数えない。追加のubnf省略/v1/v3/blockの4形はI/O前に停止するPlaygroundを含めずinspect/check/generateを検証する。JVM固有文のELOOPも実測して対応し、対象I/Oの文言差は残さない。同じbounded readerによりnative authoring LSPのlocal import E-MODULE messageもJavaと一致し、authoring baselineのmoduleError fixtureはmessageまで照合する。GitHub Actionsでは権限fixtureの除外を許さない。#932/#934はPR #936でmerge済み。#937で出力先I/O・UTF-8・readinessの表示をJavaへ揃えた詳細と構文エラーの意図した差はcli-stderr-presentationに記録する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/cli-input-errors.json",
@@ -1989,9 +1990,46 @@
         "rust/unlaxer-generator/src/main.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliInputIoConformanceTest.java"
       ]
+    },
+    {
+      "id": "cli-stderr-presentation",
+      "category": "contract",
+      "title": "CLI の出力先 I/O・UTF-8・readiness 表示と構文エラーの位置診断",
+      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "issues": [
+        937
+      ],
+      "observation": "Java製品コードを維持しnativeの書込み失敗をJava NIOの失敗パス・原因文に統一する。errno接尾辞は除去し、Playground stagingの乱数/PID部分だけ比較時に正規化する。UTF-8はFiles.readStringとstrict decoderの異なるmalformed lengthを入口/inspect/importに応じて保持する。check JSON・入力OS I/O表・package artifactのraw hash→strict UTF-8→JSONは不変。readinessは全種別をDiagnostic/Spanのrecord表記にし、順序・null・CP位置・subjectを保つ。共通106形（出力8、UTF-8 48、readiness48、構文2）をLF/CRLFで両実CLIの1232観測・無出力/既存入力不変と比較する。権限probeが効かない環境の3形は理由付きで除外し、CIでは除外0/skip0を必須とする。意図した差: generate/deps inspectの構文エラーはJavaのソース全文表示に対しnativeの既存の行/列/原因を維持する。利用者の位置情報を失わせずparserホットパスを変えない最小・可逆の選択。nativeSyntaxにLF/CRLFの独立期待値を固定する。変更は公開3.3.0へ適用しない。",
+      "evidence": [
+        "spec-corpus/cli-stderr.json",
+        "scripts/cli_stderr.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
+        "rust/unlaxer-generator/src/input.rs",
+        "rust/unlaxer-generator/src/main.rs",
+        "rust/unlaxer-generator/src/packages.rs",
+        "rust/unlaxer-generator/src/playground.rs",
+        "docs/ubnf-packages.md"
+      ]
+    },
+    {
+      "id": "readiness-regex-syntax-priority",
+      "category": "unresolved",
+      "title": "不正な REGEX 宣言と構文エラーの診断優先順位",
+      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "issues": [
+        949
+      ],
+      "observation": "grammar Main { token X = REGEX('x'); @root Start ::= X; } は両CLIで終了3だがJava17/21のcheckはP-SYNTAX/null/UBNF syntax、nativeはE-REGEX-RETIRED/[25,30)/移行message。旧token宣言の余分なセミコロンによる既存の診断選択差で、21dac030の変更前nativeでも再現する。Playgroundは同じrecord形式でもcode/span/subjectが異なる。#937ではcheck JSONとparserホットパスを維持する制約のため変更せず、Java参照の優先順・両CLI/LF/CRLF/import・正常系・mutationを#949の受け入れ条件として分離した。余分なセミコロンのないREGEX移行診断は#937の共通fixtureで両版一致を検証する。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/regex-retirement/invalid.json",
+        "rust/unlaxer-ubnf/src/parser.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/RegexRetirement.java"
+      ]
     }
   ],
   "corpora": [
+    {"path": "spec-corpus/cli-stderr.json", "fields": {"nativeSyntax": 2}, "entries": ["cli-stderr-presentation"]},
     {
       "path": "spec-corpus/package-json-acceptance.json",
       "fields": {

@@ -43,7 +43,7 @@ pub fn generate_package(manifest: &Path, package_id: &str) -> Result<Vec<Generat
     if !readiness.portable {
         return Err(format!(
             "Playground requires a Rust-portable grammar: {}",
-            readiness.to_json()
+            readiness_diagnostics(&readiness)
         ));
     }
     let mut files = generate_resolved(selected.source, &selected.ast, &selected.vocabulary)?;
@@ -81,13 +81,7 @@ pub fn generate_file_with_errors(
     let source = crate::input::read_grammar(path)?;
     let readiness = crate::portability::check_file(path);
     if !readiness.portable {
-        // check's JSON remains unchanged; Java renders its module failure as a record list.
-        let diagnostic =
-            if readiness.diagnostics.len() == 1 && readiness.diagnostics[0].code == "P-MODULE" {
-                "[Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]".into()
-            } else {
-                readiness.to_json()
-            };
+        let diagnostic = readiness_diagnostics(&readiness);
         return Err(format!("Playground requires a Rust-portable grammar: {diagnostic}").into());
     }
     let file = crate::modules::load(path)?;
@@ -225,4 +219,30 @@ fn generate_resolved(
         content: format!("{}\n", crate::vocabulary_origins::to_json(vocabulary)),
     });
     Ok(files)
+}
+
+// Java List<Diagnostic>#toString, including record spans and unescaped subjects.
+// Keep this presentation separate from the public check JSON contract.
+fn readiness_diagnostics(report: &crate::portability::Report) -> String {
+    let diagnostics = report
+        .diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let span = diagnostic.span.map_or_else(
+                || "null".into(),
+                |span| {
+                    format!(
+                        "Span[start={}, end={}]",
+                        span.codepoint_start, span.codepoint_end
+                    )
+                },
+            );
+            format!(
+                "Diagnostic[code={}, span={span}, subject={}]",
+                diagnostic.code, diagnostic.subject
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("[{diagnostics}]")
 }
