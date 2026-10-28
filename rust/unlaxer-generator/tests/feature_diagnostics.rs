@@ -84,3 +84,36 @@ fn imported_lexical_diagnostics_match_the_same_java_messages() {
     }
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn lexical_context_preflight_keeps_the_java_lexical_prefix() {
+    let cases: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../spec-corpus/feature-diagnostics/lexical-contexts.json"
+    ))
+    .unwrap();
+    assert_eq!(5, cases.len(), "all lexical-context cases execute");
+    for case in cases {
+        for separator in ["\n", "\r\n"] {
+            let source = case["source"].as_str().unwrap().replace('\n', separator);
+            assert_eq!(
+                case["first"].as_str().unwrap(),
+                generate(&source).unwrap_err(),
+                "{}",
+                case["name"]
+            );
+            // The authoring validator keeps its single E-LEXICAL row for the same input.
+            let grammar = &unlaxer_ubnf::parse(&source).unwrap().grammars[0];
+            let lexical: Vec<_> = validation::collect(grammar)
+                .into_iter()
+                .filter(|d| d.code == "E-LEXICAL")
+                .map(|d| d.message)
+                .collect();
+            assert_eq!(
+                vec![case["first"].as_str().unwrap().to_string()],
+                lexical,
+                "{}",
+                case["name"]
+            );
+        }
+    }
+}

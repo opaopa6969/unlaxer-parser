@@ -397,6 +397,34 @@ public class RustPortabilityConformanceTest {
                 report.add("module/" + fixture.get("name").getAsString() + "\t" + ending + "\t3\t3\tequal");
             }
         }
+        // Java check aborts on these inputs (#916), so only generate and the validator are compared.
+        var contexts = JsonParser.parseString(Files.readString(repo.resolve(
+            "spec-corpus/feature-diagnostics/lexical-contexts.json"))).getAsJsonArray();
+        assertEquals("all lexical-context cases execute", 5, contexts.size());
+        for (var entry : contexts) {
+            var fixture = entry.getAsJsonObject();
+            for (String ending : List.of("LF", "CRLF")) {
+                String label = "lexical-context/" + fixture.get("name").getAsString() + " / " + ending;
+                String source = fixture.get("source").getAsString().replace("\n", ending.equals("LF") ? "\n" : "\r\n");
+                String first = fixture.get("first").getAsString();
+                var grammar = org.unlaxer.dsl.bootstrap.UBNFMapper.parse(source).grammars().get(0);
+                assertEquals(label, List.of(first), org.unlaxer.dsl.codegen.GrammarValidator.validate(grammar).stream()
+                    .filter(d -> d.code().equals("E-LEXICAL")).map(d -> d.message()).toList());
+                Path directory = temporary.newFolder().toPath(), input = directory.resolve("main.ubnf");
+                Files.writeString(input, source);
+                Path javaOutput = directory.resolve("java-rust"), rustOutput = directory.resolve("native-rust");
+                Run java = javaRun("generate", "--target", "rust", "--grammar", input.toString(), "--output", javaOutput.toString());
+                Run rust = nativeRun(List.of(binary.toString(), "generate", "--target", "rust", "--grammar", input.toString(),
+                    "--output", rustOutput.toString()), true, directory);
+                assertEquals(label + java.err(), 3, java.code());
+                assertEquals(label + rust.err(), 3, rust.code());
+                assertTrue(label + java.err(), java.err().startsWith("Grammar validation failed:\n - " + first + " [code:"));
+                assertEquals(label, first, rust.err().strip());
+                assertFalse(label, Files.exists(javaOutput));
+                assertFalse(label, Files.exists(rustOutput));
+                report.add("lexical-context/" + fixture.get("name").getAsString() + "\t" + ending + "\t-\t3\tequal");
+            }
+        }
         Files.write(Path.of("target/rust-feature-lexical-diagnostics.tsv"), report);
     }
 

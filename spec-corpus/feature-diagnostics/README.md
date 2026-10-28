@@ -6,6 +6,7 @@ Java の実装・既存起動経路を変更せず、native を次の契約へ�
 - `cases.json`: 手書き31文法。LF/CRLF ごとの **check JSON 全体**、generate の先頭エラー、共有 feature 検査の全診断を固定する。終了コードは成功0、不正文法3。期待値は `UBNFFeatures.validate`、`PortabilityCheck.scanGrammar`、`LexicalCompiler` の契約と入力上の CP 位置から作り、Java-host の実 CLI で照合した。テスト中に Java 出力から期待値を書き換えない。
 - VERSION / UNKNOWN / DUPLICATE、block 値、重複した未知値、診断順序、非BMP、adapter/contract/whitespace/comment/未知setting/未定義規則との同居を含む。lexical は duplicate、version、undefined、cycle、unbound SAME_AS、nullable repeat、128段・4096ノード上限の全メッセージを含む。
 - `modules.json`: import 先に8種類の字句エラーを配置し、LF/CRLFで check の全JSON・終了コード・generate の先頭エラーと無出力を両hostで検査する。
+- `lexical-contexts.json`: `@lexicalContext` を持つ文法に5種類の字句エラー（undefined・duplicate・cycle・unbound SAME_AS・nullable repeat）を置いた5文法。native は lowering 前段の `lexical_contexts::validate` で字句エラーを返すので、そこでも Java の `LexicalContexts.terminals` と同じ `E-LEXICAL:` を付ける。LF/CRLF で両 host の generate の先頭エラー・終了コード・無出力と、validator の `E-LEXICAL` 行を比べる。Java の check はこの入力で例外のまま終わるので check は比べない（#916）。
 - `authoring.json`: 先頭12文法を LF/CRLF で展開した24件。Java/Rust の実 stdio に同じ入力を送り、message/hint/severity/range とキーの有無を含む全 JSON を比較する。既存 `ubnf-authoring-lsp/diagnostics.json` の76文法は変更しない。既存103シナリオに追加して baseline は127件となる。
 
 | 利用経路 | 契約 |
@@ -24,4 +25,6 @@ generate と LSP の feature 診断は引き続き返す。
 `UbnfAuthoringProtocolConformanceTest#nativeAndJavaServersShareAuthoringFixtures`。
 CLI の Rust process は空 PATH・存在しない JAVA_HOME でも動かす。
 成功時は Java-host/native の Rust 全5ファイルを byte 比較し、不正入力では生成先を作らないことも検査する。
-CI の必須実行契約と `rust-feature-lexical-diagnostics.tsv` の79行検査で、未実行を成功扱いにしない。
+CI の必須実行契約と `rust-feature-lexical-diagnostics.tsv` の89行検査で、未実行を成功扱いにしない。
+
+範囲外として分けた差: Java check の例外（#916）、lowering 前段検査（`@typeof`・`@lexicalContext` 等）が字句・adapter・contract・feature より先に出る順序差（#917）、`@ubnf` の不正値・重複の check/generate 診断（#918）。
