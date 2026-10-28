@@ -245,6 +245,13 @@ jobs:
         test -s unlaxer-dsl/target/generated-token-dap-protocol.tsv
         test -s unlaxer-dsl/target/projected-token-dap-protocol.tsv
         test -s unlaxer-dsl/target/projected-token-dap-overflow.tsv
+        test -s unlaxer-dsl/target/token-dap-crlf.tsv
+        for route in classic-ast classic-token generated projected; do
+          for backend in java rust; do
+            test -s "unlaxer-dsl/target/dap-failures-${route}-${backend}.tsv"
+          done
+        done
+        test -s unlaxer-dsl/target/dap-failures-classic-token-rust-native.tsv
         test -s unlaxer-dsl/target/token-trace.tsv
     - name: Resolver tutorial (Java and Rust)
       run: |
@@ -394,6 +401,8 @@ jobs:
           unlaxer-dsl/target/generated-token-dap-protocol.tsv
           unlaxer-dsl/target/projected-token-dap-protocol.tsv
           unlaxer-dsl/target/projected-token-dap-overflow.tsv
+          unlaxer-dsl/target/token-dap-crlf.tsv
+          unlaxer-dsl/target/dap-failures-*.tsv
           unlaxer-dsl/target/rule-stack-lsp.tsv
           unlaxer-dsl/target/case-insensitive-conformance.tsv
           unlaxer-dsl/target/case-insensitive-java.tsv

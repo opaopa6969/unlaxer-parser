@@ -25,7 +25,7 @@
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
-    "892": {"state": "OPEN", "title": "parity(dap): projected token の論理 CP 範囲が原文末尾を越えるときの Java/Rust DAP の差"},
+    "892": {"state": "CLOSED", "title": "parity(dap): projected token の論理 CP 範囲が原文末尾を越えるときの Java/Rust DAP の差"},
     "899": {"state": "OPEN", "title": "parity(dap): CRLF 内部を指す token 位置で Java は launch 後に局所失敗し Rust は launch 時に拒否する（#892 レビュー）"},
     "900": {"state": "OPEN", "title": "parity(dap): stackTrace 以外の失敗 response の message / body が Java（LSP4J）と異なる（#892 レビュー）"},
     "864": {"state": "OPEN", "title": "parity(lsp): UBNF authoring serverのRust利用経路をJava基準へ揃える"},
@@ -1292,17 +1292,23 @@
     },
     {
       "id": "dap-token-position-failures",
-      "category": "unresolved",
+      "category": "contract",
       "title": "CRLF 内部の token 位置と stackTrace 以外の失敗 response",
       "hosts": "Java DAP / Rust DAP・両生成host",
       "issues": [
         899,
         900
       ],
-      "observation": "#892 のレビューで実 stdio により確認した未修正の差。#899: CRLF の内部を指す Input / Projected token の開始・終端は、Java では launch が成功し、該当 step の stackTrace が inside CRLF で失敗する。breakpoint 探索がその step を通ると continue や breakpoint 付きの configurationDone も失敗する。Rust は launch 時に inside CRLF で拒否する。#900: 不正 thread や終了後の next / continue などの失敗 response は、Java が Internal error. と文字列 body（例外名の先頭行）を返す。Rust は独自の message を返し、body はない。#892 の終端超過による stackTrace の失敗だけを Java の形に揃えた。",
+      "observation": "#899 は Java 基準 revision 1a8c8921 の既存挙動に合わせ、CRLF 内部の Input / Generated / Projected token を保持。stackTrace と不正な開始を通る breakpoint 探索の continue / configurationDone だけを Internal error. と inside CRLF の直接例外で失敗させ、停止位置を維持する。5共通入力・各120 sessionで0/1基底・offset0/7・next/continue/breakpoint/負の breakpoint 行/直接実行を比較。負の breakpoint 行は Java と同じく保持され、configurationDone の探索を有効にする。#900 は Classic AST/token（両生成host）/ Generated / Projected の未初期化・未配置・停止中・終了後の request を実 stdio で一覧化し、success・message・body型・先頭行を固定。残す意図した差: Java/JDK の呼出履歴（CompletionException原因節含む）は Rust に生成しない。setBreakpoints(null) / null breakpoint は両方 Internal error. / 文字列 body / java.lang.NullPointerException だが、Java の JVM メソッド・parameter 名を含む helpful NPE 説明を Rust は missing setBreakpoints arguments / null breakpoint とする。他の共通 fixture の失敗先頭行は全文一致。Java 製品コード・公開3.3.0・parser ホットパスは不変。",
       "evidence": [
         "docs/token-trace.md",
-        "rust/unlaxer-dap/src/lib.rs"
+        "rust/unlaxer-dap/src/lib.rs",
+        "docs/fixtures/projected-token-dap/crlf.json",
+        "docs/fixtures/dap-failures/README.md",
+        "docs/fixtures/dap-failures/requests.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/DapFailureConformance.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ProjectedTokenDapProtocolConformanceTest.java",
+        "rust/unlaxer-dap/tests/projected_tokens.rs"
       ]
     },
     {
