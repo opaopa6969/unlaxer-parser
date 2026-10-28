@@ -590,6 +590,9 @@ impl<B: Backend> Server<B> {
         let source = self
             .backend
             .resolve_source(&self.program, &original, &self.arguments)?;
+        // Java stores sourceLineOffset as soon as the source resolves, before parsing or
+        // collecting steps; a later failure still moves the next pending frame (#938).
+        self.line_offset = source.line_offset;
         let snapshot =
             Snapshot::new(self.program.clone(), 0, source.text).map_err(str::to_owned)?;
         let steps = self.backend.steps(&snapshot, &self.arguments)?;
@@ -655,7 +658,6 @@ impl<B: Backend> Server<B> {
                 variables.push((name, value));
             }
         }
-        self.line_offset = source.line_offset;
         self.snapshot = Some(snapshot);
         self.steps = steps;
         self.variables = variables;

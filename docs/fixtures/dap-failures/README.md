@@ -103,7 +103,7 @@ Rust の `serve` / `serve_stdio` は実 frame の表記と順序を使う。JSON
 
 | configurationDone 前の request | Java と Rust の契約 |
 |---|---|
-| token モードの stackTrace（threadId 1） | `id:0, name:"<program>", source:{path:program文字列}, line:前回のsourceLineOffset+lineBase, column:columnBase` の1 frame。source.name / endLine / endColumn は付けない。初回の offset は0なので、1基底なら line/column は1 |
+| token モードの stackTrace（threadId 1） | `id:0, name:"<program>", source:{path:program文字列}, line:前回のsourceLineOffset+lineBase, column:columnBase` の1 frame。source.name / endLine / endColumn は付けない。初回の offset は0なので、1基底なら line/column は1。sourceLineOffset は前回の configurationDone で **source を解決した時点**の値で、その後の parse・step 収集（AST を含む）が失敗しても更新済み。ファイル読込や source 解決自体の失敗では前の値のまま |
 | AST モードの stackTrace（threadId 1） | 空。前回の AST/token step は表示しない |
 | scopes（frameId 0／省略） | 空。frameId 1 は既存の invalid request 失敗 |
 | variables（variablesReference 1） | 初回は空。再 launch は前回 **configurationDone の準備で取得した**変数を名前・値・順序ごと保持する。新 launch の runtimeMode / steppingMode で置き換えない |
@@ -112,7 +112,7 @@ Rust の `serve` / `serve_stdio` は実 frame の表記と順序を使う。JSON
 
 準備時の変数順は `runtimeMode`、`steppingMode`、application hook の追加変数。steppingMode の値は `ToKeN` / `AsT` のような元の大小文字も保持する。hook が予約名を上書きしても、その位置は変わらない。Rust の hook は既存の `BTreeMap` の順、Java の hook は戻り値の map の順を使うため、application が対応する順を提供する。Classic AST の共通テスト hook は両 JDK で順序が固定される LinkedHashMap を使い、runtimeLabel / sourceLength も比較する。
 
-共通テストは初回・停止中からの再 launch・終了後の再 launch、存在する／しないファイル、数値・object・配列・boolean、0/1 基底、両 field 順序、token/AST を検査する。Classic AST 専用 backend は AST のみ、Classic token / Generated / Projected は両モードの launch を検査する。計9経路で1,536 pending session。`1e23` / `1e-323` の path は #905 と同じ JDK 差があり、`pathByJdk` に JDK17 の値を持つ。Rust は JDK21 の値に合わせる。他の pending 応答と下記の無応答には JDK 差を観測していない。
+共通テストは初回・停止中からの再 launch・終了後の再 launch、source 解決後に準備が失敗した後の再 launch（Classic は解析できない sourceText、Generated / Projected は AST step の失敗で、offset 3 の frame と前回の変数を確認）、存在する／しないファイル、数値・object・配列・boolean、0/1 基底、両 field 順序、token/AST を検査する。Classic AST 専用 backend は AST のみ、Classic token / Generated / Projected は両モードの launch を検査する。計9経路で1,536 pending session。`1e23` / `1e-323` の path は #905 と同じ JDK 差があり、`pathByJdk` に JDK17 の値を持つ。Rust は JDK21 の値に合わせる。他の pending 応答と下記の無応答には JDK 差を観測していない。
 
 ### command が先で arguments が2要素以上の場合
 

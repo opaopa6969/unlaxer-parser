@@ -41,7 +41,7 @@ impl Backend for Probe {
     }
 }
 
-fn request(server: &mut Server<Probe>, command: &str, args: Value) -> Value {
+fn request<B: Backend>(server: &mut Server<B>, command: &str, args: Value) -> Value {
     let output =
         server.handle(json!({"seq":1,"type":"request","command":command,"arguments":args}));
     assert!(output[0]["success"].as_bool().unwrap(), "{output:?}");
@@ -161,4 +161,76 @@ fn multiple_method_arguments_fail_without_dispatching_the_first_dto() {
             );
         }
     }
+}
+
+/// Resolves with the requested offset, then fails while collecting steps when asked.
+struct FailAfterResolve;
+impl Backend for FailAfterResolve {
+    fn supports_token_trace(&self) -> bool {
+        true
+    }
+    fn steps(&mut self, _: &Snapshot, args: &Value) -> Result<Vec<Step>, String> {
+        if args["fail"] == true {
+            return Err("parse error".into());
+        }
+        Ok(vec![Step {
+            label: "first".into(),
+            span: Span { start: 0, end: 1 },
+            generated_text: None,
+            projected_text: None,
+        }])
+    }
+    fn resolve_source(&mut self, _: &str, _: &str, args: &Value) -> Result<DebugSource, String> {
+        if args["unresolved"] == true {
+            return Err("unknown source".into());
+        }
+        Ok(DebugSource {
+            text: "x".into(),
+            line_offset: args["lineOffset"].as_u64().unwrap() as usize,
+        })
+    }
+}
+
+#[test]
+fn a_preparation_failing_after_resolution_still_moves_the_pending_offset() {
+    let mut server = Server::new(FailAfterResolve);
+    let program = concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml");
+    let stack = json!({"threadId":1});
+    let pending_line = |server: &mut Server<FailAfterResolve>| {
+        request(
+            server,
+            "launch",
+            json!({"program":"missing","steppingMode":"token"}),
+        );
+        request(server, "stackTrace", stack.clone())["stackFrames"][0]["line"].clone()
+    };
+    request(
+        &mut server,
+        "launch",
+        json!({"program":program,"runtimeMode":"prepared","lineOffset":7,"stopOnEntry":true}),
+    );
+    request(&mut server, "configurationDone", json!({}));
+    request(&mut server, "continue", stack.clone());
+    assert_eq!(pending_line(&mut server), json!(8));
+    // Java assigns sourceLineOffset before parsing: a parse/step failure keeps the new offset,
+    // while the variables still come from the last successful preparation.
+    request(
+        &mut server,
+        "launch",
+        json!({"program":program,"runtimeMode":"failed","lineOffset":3,"fail":true}),
+    );
+    request(&mut server, "configurationDone", json!({}));
+    assert_eq!(pending_line(&mut server), json!(4));
+    assert_eq!(
+        request(&mut server, "variables", json!({"variablesReference":1}))["variables"][0]["value"],
+        json!("prepared")
+    );
+    // A failure while resolving the source happens before Java reads the offset.
+    request(
+        &mut server,
+        "launch",
+        json!({"program":program,"lineOffset":5,"unresolved":true}),
+    );
+    request(&mut server, "configurationDone", json!({}));
+    assert_eq!(pending_line(&mut server), json!(4));
 }

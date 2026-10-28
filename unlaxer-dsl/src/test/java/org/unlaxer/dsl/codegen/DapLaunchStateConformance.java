@@ -60,11 +60,13 @@ final class DapLaunchStateConformance {
             arrays("stopped");
             finish();
             matrix("relaunch-from-terminated", retainedVariables(), 7);
+            failAfterResolve();
             // Leave the existing lifecycle suites with no configuration pending.
             prepare(); finish();
             int sessions = (astOnly ? 1 : 2) * 8 * 2 * 2 * 3;
             assertEquals(sessions, evidence.stream().filter(s -> s.startsWith("pending\t")).count());
             assertEquals(48, evidence.stream().filter(s -> s.startsWith("array\t")).count());
+            assertEquals(1, evidence.stream().filter(s -> s.startsWith("resolved-failure\t")).count());
             Files.write(Path.of(out+".tsv"), evidence);
         } finally { Files.write(Path.of(out+"-raw.tsv"), raw); }
     }
@@ -81,6 +83,30 @@ final class DapLaunchStateConformance {
         wire.event("output"); wire.event("terminated"); wire.event("exited");
         assertTrue(wire.request("stackTrace", Map.of("threadId", 1)).getAsJsonArray("stackFrames").isEmpty());
         assertEquals(retainedVariables(), wire.request("variables", Map.of("variablesReference", 1)).get("variables"));
+    }
+
+    /** Java assigns sourceLineOffset once the source resolves, before parsing or AST steps. */
+    private void failAfterResolve() throws Exception {
+        wire.request("initialize", Map.of("linesStartAt1", true, "columnsStartAt1", true));
+        var args = launch.deepCopy(); args.addProperty("lineOffset", 3);
+        // Classic hosts parse the resolved sourceText; the token-only fixtures have no AST steps.
+        if (route.startsWith("classic")) args.addProperty("sourceText", "#"); else args.addProperty("steppingMode", "ast");
+        wire.request("launch", args); wire.event("initialized");
+        wire.request("configurationDone", Map.of());
+        assertEquals("stderr", wire.event("output").get("category").getAsString());
+        wire.event("terminated"); wire.event("exited");
+        var relaunch = launch.deepCopy(); relaunch.addProperty("program", missing.toString()); relaunch.addProperty("lineOffset", 99);
+        wire.request("launch", relaunch); wire.event("initialized");
+        var frames = new JsonArray();
+        if (!astOnly) {
+            var frame = fixture.getAsJsonObject("placeholder").deepCopy();
+            frame.getAsJsonObject("source").addProperty("path", missing.toString());
+            frame.addProperty("line", 4); frames.add(frame);
+        }
+        assertEquals("failed preparation keeps its resolved offset", frames, success("resolved-failure", "stackTrace", Map.of("threadId", 1)).get("stackFrames"));
+        assertEquals("failed preparation keeps the previous probes", retainedVariables(), success("resolved-failure", "variables", Map.of("variablesReference", 1)).get("variables"));
+        barrier();
+        evidence.add("resolved-failure\t"+frames+"\t"+retainedVariables());
     }
 
     private JsonArray retainedVariables() {
