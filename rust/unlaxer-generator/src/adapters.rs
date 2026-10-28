@@ -1,7 +1,7 @@
 //! Data-only adapter declarations and resolution. Neither construction nor lookup loads
 //! a Java class, compiles a Rust provider, or invokes a token parser.
 use std::collections::{BTreeMap, BTreeSet};
-use unlaxer_ubnf::ast::{GlobalSetting, GrammarDecl, SettingValue, Span};
+use unlaxer_ubnf::ast::{GlobalSetting, GrammarDecl, SettingValue, Span, TokenKind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BuiltinAdapter {
@@ -58,8 +58,9 @@ impl AdapterRegistry {
         Self { bindings }
     }
 
-    /// Returns every invalid or duplicate declaration, with the offending setting span.
-    /// Valid declarations are retained so all token references can also be checked.
+    /// Returns declaration and token-reference diagnostics with their source spans.
+    /// Like Java's build(grammar, null), stable order is code then UTF-16 subject;
+    /// positioned consumers (portability) apply their own final source ordering.
     pub fn from_grammar(grammar: &GrammarDecl) -> (Self, Vec<AdapterDiagnostic>) {
         let mut registry = Self::builtins();
         let mut diagnostics = Vec::new();
@@ -87,6 +88,22 @@ impl AdapterRegistry {
                 }),
             }
         }
+        for token in &grammar.tokens {
+            if let TokenKind::Adapter { id, version } = &token.kind {
+                if let Err((code, subject)) = registry.resolve(id, version) {
+                    diagnostics.push(AdapterDiagnostic {
+                        code,
+                        subject,
+                        span: token.span,
+                    });
+                }
+            }
+        }
+        diagnostics.sort_by(|a, b| {
+            a.code
+                .cmp(b.code)
+                .then_with(|| a.subject.encode_utf16().cmp(b.subject.encode_utf16()))
+        });
         (registry, diagnostics)
     }
 
@@ -151,10 +168,7 @@ fn parse_definition(setting: &GlobalSetting) -> Result<CustomAdapter, String> {
         return Err(id.to_owned());
     }
     let accepts = fields.get("accepts").map(|value| (*value).to_owned());
-    if accepts
-        .as_ref()
-        .is_some_and(|value| value.trim().is_empty())
-    {
+    if accepts.as_ref().is_some_and(|value| java_is_blank(value)) {
         return Err(id.to_owned());
     }
     let failure = fields.get("failure").map(|value| (*value).to_owned());
@@ -171,24 +185,8 @@ fn parse_definition(setting: &GlobalSetting) -> Result<CustomAdapter, String> {
     {
         return Err(id.to_owned());
     }
-    let context_accessors = match fields.get("context") {
-        None | Some(&"") => BTreeSet::new(),
-        Some(value) => value.split(',').map(str::trim).map(str::to_owned).collect(),
-    };
-    let context_count = fields
-        .get("context")
-        .filter(|value| !value.is_empty())
-        .map_or(0, |value| value.split(',').count());
-    if context_accessors.len() != context_count
-        || !context_accessors.iter().all(|value| {
-            matches!(
-                value.as_str(),
-                "source" | "remaining" | "position" | "matchedPosition" | "bindings"
-            )
-        })
-    {
-        return Err(id.to_owned());
-    }
+    let context_accessors = context_accessors(fields.get("context").copied().unwrap_or(""))
+        .ok_or_else(|| id.to_owned())?;
     Ok(CustomAdapter {
         id: id.to_owned(),
         version,
@@ -199,6 +197,34 @@ fn parse_definition(setting: &GlobalSetting) -> Result<CustomAdapter, String> {
         consumes,
         context_accessors,
     })
+}
+
+// String.isBlank uses Character.isWhitespace, not Unicode White_Space (Rust trim).
+// In particular NBSP, figure space, narrow NBSP and NEL are not Java whitespace.
+fn java_is_blank(value: &str) -> bool {
+    value.chars().all(|c| {
+        matches!(c, '\t'..='\r' | '\u{1c}'..='\u{20}' | '\u{1680}'
+            | '\u{2000}'..='\u{2006}' | '\u{2008}'..='\u{200a}'
+            | '\u{2028}' | '\u{2029}' | '\u{205f}' | '\u{3000}')
+    })
+}
+
+fn context_accessors(raw: &str) -> Option<BTreeSet<String>> {
+    let mut names = BTreeSet::new();
+    if !java_is_blank(raw) {
+        for name in raw.split(',') {
+            // Java String.trim removes only UTF-16 units <= U+0020.
+            let name = name.trim_matches(|c| c <= '\u{20}');
+            if !matches!(
+                name,
+                "source" | "remaining" | "position" | "matchedPosition" | "bindings"
+            ) || !names.insert(name.to_owned())
+            {
+                return None;
+            }
+        }
+    }
+    Some(names)
 }
 
 /// Validates source-visible format-2 contracts. Contracts supplement a token
@@ -242,37 +268,26 @@ pub fn token_contract_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnosti
             if !matches!(
                 entry.key.as_str(),
                 "token" | "accepts" | "failure" | "consumes" | "context"
-            ) || fields
-                .insert(entry.key.as_str(), entry.value.as_str())
-                .is_some()
-            {
+            ) {
                 valid = false;
+                continue;
+            }
+            // Java putIfAbsent retains the first value even for an invalid block.
+            match fields.entry(entry.key.as_str()) {
+                std::collections::btree_map::Entry::Vacant(slot) => {
+                    slot.insert(entry.value.as_str());
+                }
+                std::collections::btree_map::Entry::Occupied(_) => valid = false,
             }
         }
         let token = fields.get("token").copied().unwrap_or("tokenContract");
         let context = fields.get("context").copied().unwrap_or("");
-        let contexts: BTreeSet<_> = if context.is_empty() {
-            BTreeSet::new()
-        } else {
-            context.split(',').map(str::trim).collect()
-        };
         valid &= fields.len() == 5
             && tokens.contains(token)
-            && !fields["accepts"].trim().is_empty()
+            && !java_is_blank(fields["accepts"])
             && matches!(fields["failure"], "no-consume" | "may-consume")
             && matches!(fields["consumes"], "always" | "maybe" | "never")
-            && contexts.len()
-                == if context.is_empty() {
-                    0
-                } else {
-                    context.split(',').count()
-                }
-            && contexts.iter().all(|value| {
-                matches!(
-                    *value,
-                    "source" | "remaining" | "position" | "matchedPosition" | "bindings"
-                )
-            });
+            && context_accessors(context).is_some();
         if !valid {
             diagnostics.push(AdapterDiagnostic {
                 code: "P-TOKEN-CONTRACT-DEFINITION",
@@ -287,6 +302,8 @@ pub fn token_contract_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnosti
             });
         }
     }
+    // Java build(grammar, null) sorts by code only, preserving equal-code order.
+    diagnostics.sort_by(|a, b| a.code.cmp(b.code));
     diagnostics
 }
 

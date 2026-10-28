@@ -144,8 +144,8 @@ message は Java の `message + " — " + hint`。hint を捨てたり、CLI の
 | NestedCaptures.problems | `E-NESTED-SHAPE` / 既存 `nested_captures::validate` は fail-fast | 残差。rule ごとの収集、共有 schema、hint/所属が未接続 #893 |
 | validateScalarRanges / validateCaseInsensitiveTokens | `E-TOKEN-RANGE-SURROGATE`, `E-CI-EMPTY`, `E-CI-SCALAR` | 範囲/empty は接続。不対 surrogate を表せない Rust AST 入力の照合は残差 #893 |
 | LexicalCompiler.compile | `E-LEXICAL` / `lexical::compile_syntax` | 接続。Java message の `E-LEXICAL:` prefix を付ける。duplicate/undefined/cycle/version/SAME_AS を比較 |
-| TokenAdapterRegistry.build | `P-ADAPTER-{DEFINITION,DUPLICATE,UNKNOWN,VERSION}` / `adapters::AdapterRegistry::from_grammar` + `resolve` | 接続。宣言検査に加え Java と同じく各 `ADAPTER(...)` token 参照も検査し、span なしの Java と同じ code→subject（UTF-16順）で整列。空白だけの `context`・NBSP の扱いは #893 |
-| TokenContractRegistry.build | `P-TOKEN-CONTRACT-{VERSION,DEFINITION,DUPLICATE}` / `adapters::token_contract_diagnostics` | 接続。span なしの Java と同じ code 順に整列し、重複した `token` key は最初の値を subject にする（authoring 側で適合、生成器の共有関数は不変）。空白だけの `context`・NBSP の扱いは #893 |
+| TokenAdapterRegistry.build | `P-ADAPTER-{DEFINITION,DUPLICATE,UNKNOWN,VERSION}` / `adapters::AdapterRegistry::from_grammar` | 接続。宣言検査に加え Java と同じく各 `ADAPTER(...)` token 参照も検査し、span なしの Java と同じ code→subject（UTF-16順）で整列。空白だけの `context`・NBSP は #897 で Java の isBlank/trim に適合 |
+| TokenContractRegistry.build | `P-TOKEN-CONTRACT-{VERSION,DEFINITION,DUPLICATE}` / `adapters::token_contract_diagnostics` | 接続。span なしの Java と同じ code 順に整列し、重複した `token` key は最初の値を subject にする（#897 で生成器・check と共有し、authoring 専用補正を削除）。空白だけの `context`・NBSP は #897 で Java の isBlank/trim に適合 |
 | UBNFFeatures.validate | `E-FEATURE-{VERSION,UNKNOWN,DUPLICATE}` / `adapters::feature_diagnostics` + authoring adapter | 接続。Java は VERSION/UNKNOWN subject を `feature` にし、非v2を最優先する。CLI の value subject との違いを実装で明示 |
 | TokenStreamGrammar.problems | `E-TOKEN-STREAM-{SETTING,VERSION,TRIVIA,TOKEN,ANNOTATION}` / `token_stream::problems` | 接続 |
 | GlobalComment.problems / warnings | `E-COMMENT-{SETTING,WHITESPACE}` / `global_comment::problems` | 接続。`W-COMMENT-IGNORED` は Java LSP と同じく GenerationWarnings だけから出す |
@@ -173,7 +173,7 @@ message は Java の `message + " — " + hint`。hint を捨てたり、CLI の
 | unique-longest cycle branch / detectLeftRecursionIssues | `E-UNIQUE-LONGEST-LEFT-RECURSION`, `W-LEFT-RECURSION[-LIMIT]` / `validation::recursion` + `collect` | 接続。advisoryは最後に追加 |
 
 レビュー（PR #896）で見つけた、再利用した共有解析・frontend 表現に由来する残差は #893 に追記した。
-空白だけの `context`/NBSP の判定、`E-LEXICAL` の最初の報告 token、lexical-context の件数上限と字句エラーの優先順、
+空白だけの `context`/NBSP の判定は #897 で共有関数へ修正を集約した。残る対象は `E-LEXICAL` の最初の報告 token、lexical-context の件数上限と字句エラーの優先順、
 左再帰の深さ・作業量の数え方（Java は1択の本体にも `ChoiceBody` 段を数える）、`{2147483647}` の raising 検査、
 `@whitespace(...)` 内の区切り・コメントの表記、legacy `RegexTokenParser` の Simple token。
 range 付きの `didChange` は Java が先頭の text を全文として適用し、Rust は拒否する（#895）。

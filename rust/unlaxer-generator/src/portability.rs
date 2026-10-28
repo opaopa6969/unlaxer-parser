@@ -249,7 +249,7 @@ impl Inventory {
         });
     }
     fn grammar(&mut self, grammar: &GrammarDecl) {
-        let (adapter_registry, adapter_issues) = AdapterRegistry::from_grammar(grammar);
+        let (_, adapter_issues) = AdapterRegistry::from_grammar(grammar);
         for issue in adapter_issues {
             self.add(issue.code, issue.subject, issue.span);
         }
@@ -302,15 +302,10 @@ impl Inventory {
         }
         for token in &grammar.tokens {
             match &token.kind {
-                TokenKind::Declarative { .. } => {}
+                TokenKind::Declarative { .. } | TokenKind::Adapter { .. } => {}
                 TokenKind::Simple { parser_class } => {
                     if crate::lowering::token_expression(&token.kind).is_err() {
                         self.add("P-EXTERNAL-TOKEN", parser_class, token.span);
-                    }
-                }
-                TokenKind::Adapter { id, version } => {
-                    if let Err((code, subject)) = adapter_registry.resolve(id, version) {
-                        self.add(code, subject, token.span);
                     }
                 }
                 TokenKind::Regex { .. } => self.add("P-TOKEN-KIND", "REGEX", token.span),

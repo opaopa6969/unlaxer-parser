@@ -25,6 +25,10 @@
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
+    "897": {
+      "state": "OPEN",
+      "title": "parity(generator): adapter/token-contract 診断の整列・重複 key・空白判定を Java の check/generate に揃える（#885 レビュー由来）"
+    },
     "892": {"state": "CLOSED", "title": "parity(dap): projected token の論理 CP 範囲が原文末尾を越えるときの Java/Rust DAP の差"},
     "899": {"state": "OPEN", "title": "parity(dap): CRLF 内部を指す token 位置で Java は launch 後に局所失敗し Rust は launch 時に拒否する（#892 レビュー）"},
     "900": {"state": "OPEN", "title": "parity(dap): stackTrace 以外の失敗 response の message / body が Java（LSP4J）と異なる（#892 レビュー）"},
@@ -730,14 +734,19 @@
       "hosts": "Java / Rust（Java-host・native）",
       "issues": [
         111,
-        716
+        716,
+        897
       ],
-      "observation": "javaClass/java/rust は組込みJava token classとRustの対応実装・consumerを区別する。任意JVM class/bytecodeをnativeで直接実行せず、ADAPTER registryと明示bindingを使う。宣言単位の棚卸しと未検証の移植境界は全API対応表 / public-api-audit で追跡。",
+      "observation": "javaClass/java/rust は組込みJava token classとRustの対応実装・consumerを区別する。任意JVM class/bytecodeをnativeで直接実行せず、ADAPTER registryと明示bindingを使う。宣言単位の棚卸しと未検証の移植境界は全API対応表 / public-api-audit で追跡。 #897ではadapter/contractの共有診断をJavaに統一。spanなしadapterはcode→UTF-16 subject、contractはcodeのみの安定順、重複token keyは最初の値。isBlank/trimを区別して空白context・NBSPを扱う。46文法×LF/CRLFでregistry/validateOrThrow/check/3生成CLI・全5ファイルを検査し、参照診断が後段の生成器診断より先に出ることを5文法で検査。checkは従来のソース位置順を維持し、Java-target CLI独自の再整列も固定する。",
       "evidence": [
         "docs/token-adapters.md",
         "spec-corpus/java-token-bindings/cases.json",
         "spec-corpus/token-adapters/README.md",
-        "docs/java-api-rust-parity.md"
+        "docs/java-api-rust-parity.md",
+        "spec-corpus/token-adapters/diagnostics.json",
+        "spec-corpus/token-adapters/generate-order.json",
+        "rust/unlaxer-generator/tests/token_adapters.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/RustPortabilityConformanceTest.java"
       ]
     },
     {
@@ -2362,6 +2371,15 @@
       },
       "entries": [
         "plain-success-diagnostics"
+      ]
+    },
+    {
+      "path": "spec-corpus/token-adapters/diagnostics.json",
+      "fields": {
+        "javaTargetFirst": 1
+      },
+      "entries": [
+        "host-bindings"
       ]
     }
   ],
