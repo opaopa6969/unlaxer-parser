@@ -45,7 +45,7 @@ def run_package_artifacts(clients, directory, java_command, native_command, root
     from importlib import import_module
     position = import_module('check-ubnf-authoring-lsp').position
     cases = json.loads((root / f'spec-corpus/ubnf-authoring-lsp/{suite}.json').read_text())
-    assert len(cases) == {'package-artifacts': 39, 'package-artifact-utf8': 21}[suite], 'artifact fixtures must not silently disappear'
+    assert len(cases) == {'package-artifacts': 39, 'package-artifact-utf8': 29}[suite], 'artifact fixtures must not silently disappear'
     standard = (root / 'unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json').read_bytes()
     evidence = []
     for case in cases:

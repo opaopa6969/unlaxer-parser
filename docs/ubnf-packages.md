@@ -295,9 +295,13 @@ Java 本体は変更せず、両言語に同じ fixture の回帰テストを追
 bytes でも、全体の UTF-8 検査が優先する。UTF-8 として有効な不正 JSON は従来の `invalid JSON` のまま。
 manifest/lock の不正 UTF-8 診断、先頭 BOM の扱い（#914）、`local:` のパス解決（#921）は変更しない。
 
-共通 `spec-corpus/ubnf-authoring-lsp/package-artifact-utf8.json` の **21件**に raw bytes を16進表記で保存する。
+共通 `spec-corpus/ubnf-authoring-lsp/package-artifact-utf8.json` の **29件**に raw bytes を16進表記で保存する。
 不正な開始バイト、途切れた多バイト列、JSON 文字列内の不正バイト、過長符号化、サロゲート、
 Unicode 上限超過を cache（hash 一致 / 不一致）と明示 local に配置する。JSON 不正との優先順も含む。
+レビューで足した8件は、3バイトの過長符号化（`E0 80 80`）、`F5` 以上の開始バイト、
+先頭 BOM の後ろの不正バイト（BOM を除く処理を足しても UTF-8 診断が先に出ること）、
+有効な JSON の直後でファイル末尾が途切れる多バイト列を、cache（hash 一致）と明示 local に置く。
+いずれも Java の strict decoder（`CodingErrorAction.REPORT`）と `std::str::from_utf8` の判定が一致することを実測した。
 両実 stdio server の message/code/severity/UTF-16 range 全体と後続 completion/hover、
 Java-host Rust / native Rust / Java flag CLI の最終診断行、両 `deps resolve` の拒否と lock/cache 不変を照合する。
 通常の生成・server は local source を取得せず正常な固定 cache を利用し、明示 resolve だけが local を拒否する。

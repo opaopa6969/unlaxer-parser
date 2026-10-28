@@ -706,7 +706,7 @@ mod tests {
         ))
         .unwrap();
         let cases = cases.as_array().unwrap();
-        assert_eq!(cases.len(), 21);
+        assert_eq!(cases.len(), 29);
         for case in cases {
             let fixture = LocalFixture::new();
             let manifest = fixture.0.join("ubnf.json");

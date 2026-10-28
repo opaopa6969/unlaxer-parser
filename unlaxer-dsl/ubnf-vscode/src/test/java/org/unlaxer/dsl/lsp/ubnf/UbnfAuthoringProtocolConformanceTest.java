@@ -65,7 +65,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=300000) public void packageArtifactUtf8DiagnosticsAndHashOrderMatchAcrossHosts() throws Exception {
-        runProtocol("package-artifact-utf8", 21);
+        runProtocol("package-artifact-utf8", 29);
     }
 
     private void runProtocol(String suite, int count) throws Exception {

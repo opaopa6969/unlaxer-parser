@@ -13,18 +13,18 @@ public class PackageArtifactUtf8Test {
     @Rule public TemporaryFolder temporary = new TemporaryFolder();
 
     @Test public void cachedArtifactsCheckRawHashBeforeUtf8AndJson() throws Exception {
-        check("cache", 15);
+        check("cache", 19);
     }
 
     @Test public void explicitLocalArtifactsRejectInvalidUtf8WithoutPublishing() throws Exception {
-        check("local", 6);
+        check("local", 10);
     }
 
     private void check(String mode, int expectedCount) throws Exception {
         Path repository = Path.of("..");
         var cases = JsonParser.parseString(Files.readString(repository.resolve(
             "spec-corpus/ubnf-authoring-lsp/package-artifact-utf8.json"))).getAsJsonArray();
-        assertEquals(21, cases.size());
+        assertEquals(29, cases.size());
         byte[] standard = Files.readAllBytes(repository.resolve(
             "unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json"));
         int count = 0;

@@ -154,5 +154,61 @@
     "bytesHex": "5dff",
     "hashMismatch": false,
     "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-overlong-three-byte",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "e08080",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "local-overlong-three-byte",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "e08080",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-above-f4",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "f5808080",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "local-above-f4",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "f5808080",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-bom-then-invalid",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "efbbbfff",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "local-bom-then-invalid",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "efbbbfff",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-json-then-truncated",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "7b7de282",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "local-json-then-truncated",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "7b7de282",
+    "resolveError": "invalid UTF-8 artifact"
   }
 ]
