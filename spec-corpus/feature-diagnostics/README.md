@@ -30,6 +30,6 @@ CLI の Rust process は空 PATH・存在しない JAVA_HOME でも動かす。
 成功時は Java-host/native の Rust 全5ファイルを byte 比較し、不正入力では生成先を作らないことも検査する。
 CI の必須実行契約と `rust-feature-lexical-diagnostics.tsv` の653行検査で、未実行を成功扱いにしない。
 
-範囲外として分けた差: lowering 前段検査（`@typeof`・`@lexicalContext` 等）が字句・adapter・contract・feature より先に出る順序差（#917）。
+範囲外として分けた差: lowering 前段検査（`@typeof`・`@lexicalContext` 等）が字句・adapter・contract・feature より先に出る順序差（#917）。`@ubnf` の不正値・重複でも、native の前段検査（`@typeof`・bounded・precedence overflow・`@commonField`・`@enum`・`@eval`）が先に出る差は #917、名前述語が後に出る差は #858、左再帰を native が後段で検出する差は #930、複数 grammar で Java が全 grammar の validator を先に回す差は #931 で追跡し、`ubnf-version.json` には入れない。
 
 #918ではnativeだけが返していた不正な文字列値の位置付き `P-SETTING` を意図的に減らす。Javaのinventoryと構造検査の分担を採り、Java実装・既存のauthoring詳細診断・正しいv1/v2の結果を維持する。
