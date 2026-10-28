@@ -306,13 +306,23 @@ def main():
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports'], default='baseline')
+    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents'], default='baseline')
     args = parser.parse_args()
     java = Client([args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.lsp.ubnf.UBNFLspLauncherExt'])
     native = Client([args.rust], native=True)
     try:
         with tempfile.TemporaryDirectory(prefix='ubnf-authoring-', dir=os.environ.get('TMPDIR')) as directory:
-            if args.suite == 'local-imports':
+            if args.suite == 'package-documents':
+                from ubnf_package_documents import run_package_documents
+                initialize(java, native)
+                evidence = run_package_documents([java, native], Path(directory),
+                    [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'],
+                    [str(Path(args.rust).with_name('unlaxer'))], ROOT)
+                for client in [java, native]:
+                    assert client.result('shutdown') is None
+                    client.send('exit')
+                    assert client.process.wait(timeout=5) == 0
+            elif args.suite == 'local-imports':
                 from ubnf_local_imports import run_local_imports
                 initialize(java, native)
                 evidence = run_local_imports([java, native], Path(directory),

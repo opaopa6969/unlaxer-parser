@@ -151,12 +151,86 @@ lock/hash/依存/境界検証は変更しない。metadata の size が上限を
 stat と read の間にファイルが増大・差替えされても、reader は最大 **上限＋1バイト** しか読み取らず、
 余分な1バイトを検出したら同じ過大サイズ診断で拒否する。UTF-8 の不正バイトは従来どおり拒否する。
 Rust は `O_NONBLOCK` で open し、開いた handle の fstat で通常ファイル・サイズを再確認する。stat の後に FIFO へ差し替えられても
-open で止まらず、同じ診断で拒否する。Java は JDK17 の NIO で `O_NONBLOCK` を指定できないため、stat と open の間に FIFO へ
-差し替えられると open がブロックしうる。この残りは [#907](https://github.com/opaopa6969/unlaxer-parser/issues/907) で追跡する。
-package の manifest / lock の読取りは対象外で、[#908](https://github.com/opaopa6969/unlaxer-parser/issues/908) で揃える。
+open で止まらず、同じ診断で拒否する。Java は開いた `FileChannel` の `position()` と `size()` を確認し、
+writer のある FIFO と過大な通常ファイルへの差替えを読取り前に拒否する。open が失敗したとき、path に socket 等の
+非通常ファイルが見えれば同じ対象別の非通常ファイル診断にする。完全な型判定と writer のない FIFO の競合は未解決
+（[#907](https://github.com/opaopa6969/unlaxer-parser/issues/907)、[#911](https://github.com/opaopa6969/unlaxer-parser/issues/911)）。
 この byte 上限はファイル内容全体の読取り制限であり、文法の解析時間や全import合計の上限ではない。
 
 Java の既存 `SourceReader` 注入経路と Rust の open-buffer overlay は、呼出側が既に持つ仮想/未保存sourceを
 引き続き利用できる。Java の disk callback には `UBNFPackageResolver::readLocalSource` を使う。
 editor は未保存の local buffer を優先し、package の検証済みsourceを buffer で置換しない。
 CLI と authoring server は同じ disk reader を使い、新しい拒否も既存の `E-MODULE` 表示/位置契約を通す。
+
+## manifest / lock の disk 読取り（#908、残り #911）
+
+両版は `ubnf.json` / `ubnf.lock.json` にも local import と同じ bounded reader を使う。
+上限は **各8 MiB（8,388,608バイト）**。既存 JSON document の受理上限をそのまま使い、
+64 MiB の graph budget まで読んでから拒否する無駄な確保を避ける。symlink の通常ファイル実体は受理する。
+path の型・サイズを open 前に検査し、Rust は `O_NONBLOCK` + 開いた handle の fstat、
+Java は開いた channel の seek 可否・サイズを再検査する。読取りは上限＋1バイトで打ち切る。
+上限ちょうどの UTF-8 JSON は従来どおり受理する。明示 `deps resolve` の manifest も同じ reader を使う。
+
+検査順は **lock の読取り → manifest の読取り・JSON/schema/dependencies検証 → lock のJSON/schema/roots/audit検証**。
+両方欠落している場合も既存 Java の missing lock を維持する。新しい I/O 診断は次のとおり両版で共通とする。
+`{subject}` は `manifest` または `lock`。位置は既存 import 宣言全体の UTF-16 range、severity は 1。
+stdio では code `E-MODULE`、source `ubnf-module`、message `import <alias>: <以下の文言>` を返す。
+CLI も以下の同じ原因文字列を表示する（既存の CLI wrapper と終了コードは変更しない）。
+
+| 条件 | 文言 |
+| --- | --- |
+| 非通常ファイル | `E-PACKAGE: {subject} is not a regular file` |
+| 上限超過 | `E-PACKAGE: {subject} exceeds 8 MiB` |
+| 欠落 | `E-PACKAGE: missing {subject}; run unlaxer deps resolve --manifest ubnf.json` |
+| その他の I/O 失敗 | `E-PACKAGE: cannot read {subject}` |
+| 不正な UTF-8 | `E-PACKAGE: invalid JSON`（I/O 失敗ではなく内容の誤り。Rust の byte JSON parser と同じ） |
+
+Java の `SourceReader` と `FileSystemPort` には `readPackage` の既定メソッドを追加した。
+既存のカスタム callback は引き続き呼ばれ、disk 実装だけが bounded reader を明示する。
+注入された文字列の UTF-8 byte上限も確認するが、信頼された独自 callback 内の I/O は呼出側の責任である。
+editor の未保存 buffer は local source にだけ適用し、manifest/lock の disk 読取りを置換しない。
+
+共通 `spec-corpus/ubnf-authoring-lsp/package-documents.json` の27件を、両実 stdio server と
+Java-host Rust / native Rust / Java flag CLI に送る。FIFO、device/directory/過大file と symlink、
+欠落、不正な UTF-8、上限ちょうど、有効fileへの symlink、複数異常時の順序を検査し、全診断 JSON と後続 completion/hover を照合する。
+manifest の拒否は両 `deps resolve` CLI でも検査する。既存 package corpus の期待値は変更しない。
+
+lock が指す cache artifact と `local:` 依存 artifact の読取りはこの範囲外で、
+[#913](https://github.com/opaopa6969/unlaxer-parser/issues/913) で揃える（Rust は FIFO・`/dev/zero` で停止する）。
+先頭 BOM の受理差（Java は受理、Rust は `invalid JSON`）は
+[#914](https://github.com/opaopa6969/unlaxer-parser/issues/914) で扱う。
+
+### Java の競合に残る制限と採用しなかった方式
+
+[#908](https://github.com/opaopa6969/unlaxer-parser/issues/908) は、競合のない通常時の受入条件（両版の
+通常ファイル確認・上限付き読取り・共通診断・検査順・共通 fixture）をこの変更で満たしたので閉じる。
+Java で stat の後・open の前後に path を差し替える競合（TOCTOU）は local import と同じ
+[#907](https://github.com/opaopa6969/unlaxer-parser/issues/907) の範囲であり、manifest/lock の分も含めて
+[#911](https://github.com/opaopa6969/unlaxer-parser/issues/911) に受け入れ条件を記録した。
+
+Java の開いた handle の再検査（`position()` / `size()`）は、競合時に次を **防ぐ**。
+
+- writer のある FIFO・pipe への差替え: `position()` が失敗するので、読まずに非通常ファイル診断にする。
+- socket への差替え: open が失敗し、path に非通常ファイルが見えれば非通常ファイル診断にする。
+- 過大な通常ファイルへの差替え・stat 後の増大: handle の size、または上限＋1の打切りで過大診断にする。
+
+次は **防げない**（Rust は fstat で同じ非通常ファイル診断にする。Java の結果は実測）。
+
+- writer のない FIFO への差替え: open 自体が writer を待ってブロックする。
+- seek できる文字デバイスへの差替え: `/dev/zero` は上限＋1バイトで打ち切られて過大診断になる（停止や無制限確保はしない）。
+  `/dev/null` は空の内容として読まれ、その後の JSON 検証で拒否される（local import では空の文法として読まれる）。
+- directory への差替え: open は成功し、read の `EISDIR` で `cannot read {subject}`（local import では I/O エラー文）になる。
+
+JDK17 の [StandardOpenOption](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/file/StandardOpenOption.html)
+には nonblocking open がなく、[FileChannel](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/channels/FileChannel.html)
+は file type の metadata API を提供しない。JDK17/21 の実測で、writer なし FIFO の open は別threadを interrupt しても
+戻らず、writer を接続して初めて解放された。`/dev/zero` は `position() == 0` / `size() == 0` なので seek検査だけでは
+通常ファイルと区別できない。stat後にこれらへ差し替える競合を、今回の実装が完全に防ぐとは主張しない。
+
+- open/read を有限時間の worker へ移して timeout 後に放棄するだけでは、停止した thread / handle が蓄積する。
+  pool を制限すると、攻撃後に正常fileまで読めなくなる。安全で決定的な解決としては採用しない。
+- `/proc/self/fd/<fd>` の検査には、保持している正確な fd の取得が必要になる。
+  公開 `FileDescriptor` API は番号を公開せず、private field へのアクセスには追加の module開放等が必要。
+  fd一覧の差分・pathの再statは、並行open/closeや再差替えで別の競合を作るため代用しない。
+- JDK更新、native bridge、OS別の隔離方式は runtime/配布への影響を伴う別単位として #911 で検証する。
+  既存 Java の受理集合・注入経路を削ったり parser のホットパスへ処理を追加したりして解決しない。

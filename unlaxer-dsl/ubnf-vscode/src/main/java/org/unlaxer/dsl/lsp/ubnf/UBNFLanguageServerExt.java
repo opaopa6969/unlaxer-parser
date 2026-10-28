@@ -188,13 +188,18 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
         if (cached != null && cached.content.equals(content) && !content.contains("@import")) {
             return cached;
         }
-        var editor = new UbnfEditorIndex(uri, content, path -> {
-            for (var state : documents.values()) {
-                try {
-                    if (java.nio.file.Path.of(java.net.URI.create(state.uri())).toAbsolutePath().normalize().equals(path)) return state.content();
-                } catch (IllegalArgumentException ignored) { /* Non-file editor. */ }
+        var editor = new UbnfEditorIndex(uri, content, new org.unlaxer.dsl.bootstrap.UBNFModuleLoader.SourceReader() {
+            @Override public String read(java.nio.file.Path path) throws java.io.IOException {
+                for (var state : documents.values()) {
+                    try {
+                        if (java.nio.file.Path.of(java.net.URI.create(state.uri())).toAbsolutePath().normalize().equals(path)) return state.content();
+                    } catch (IllegalArgumentException ignored) { /* Non-file editor. */ }
+                }
+                return org.unlaxer.dsl.bootstrap.UBNFPackageResolver.readLocalSource(path);
             }
-            return org.unlaxer.dsl.bootstrap.UBNFPackageResolver.readLocalSource(path);
+            @Override public String readPackage(java.nio.file.Path path) throws java.io.IOException {
+                return org.unlaxer.dsl.bootstrap.UBNFPackageResolver.readPackageSource(path);
+            }
         });
         var grammars = editor.snapshot == null ? null : editor.snapshot.ast().grammars();
         DocumentIndex index = new DocumentIndex(content, grammars, editor);

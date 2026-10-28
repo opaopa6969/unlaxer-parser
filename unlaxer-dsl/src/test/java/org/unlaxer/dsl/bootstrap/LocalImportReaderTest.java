@@ -29,12 +29,12 @@ public class LocalImportReaderTest {
         try (var random = new RandomAccessFile(file.toFile(), "rw")) { random.setLength(LIMIT); }
         assertEquals(LIMIT, UBNFPackageResolver.readLocalSource(file).length());
         var exact = new CountingInput(LIMIT);
-        assertEquals(LIMIT, UBNFPackageResolver.readLocalSource(file, path -> exact).length());
+        assertEquals(LIMIT, UBNFPackageResolver.readLocalSource(file, path -> new UBNFPackageResolver.OpenedSource(exact, true, LIMIT)).length());
         assertEquals(LIMIT, exact.count);
         assertTrue(exact.closed);
         // The stat still sees LIMIT; the opened stream has grown and never reaches EOF.
         var growing = new CountingInput(Long.MAX_VALUE);
-        var failure = assertThrows(IOException.class, () -> UBNFPackageResolver.readLocalSource(file, path -> growing));
+        var failure = assertThrows(IOException.class, () -> UBNFPackageResolver.readLocalSource(file, path -> new UBNFPackageResolver.OpenedSource(growing, true, LIMIT)));
         assertEquals("E-MODULE: local import exceeds 64 MiB", failure.getMessage());
         assertEquals(LIMIT + 1L, growing.count);
         assertTrue(growing.closed);
@@ -48,6 +48,43 @@ public class LocalImportReaderTest {
         assertEquals(Files.readString(file), UBNFPackageResolver.readLocalSource(link));
         Files.write(file, new byte[] {(byte) 0xc3, 0x28});
         assertThrows(java.nio.charset.CharacterCodingException.class, () -> UBNFPackageResolver.readLocalSource(link));
+    }
+
+    @Test(timeout=15000) public void openedReplacementRejectsWriterFifoSocketAndOversizedFile() throws Exception {
+        Path file = temporary.newFile().toPath();
+        Path pipe = temporary.getRoot().toPath().resolve("pipe");
+        Process make = new ProcessBuilder("mkfifo", pipe.toString()).start();
+        assertTrue(make.waitFor(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertEquals(0, make.exitValue());
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor(task -> {
+            Thread thread = new Thread(task, "replacement-test"); thread.setDaemon(true); return thread;
+        });
+        // O_RDWR keeps a writer connected, but supplies no bytes. A reader must reject
+        // the opened FIFO before read; mutations fail by deadline rather than hanging Maven.
+        try (var writer = java.nio.channels.FileChannel.open(pipe, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+            assertTrue(writer.isOpen());
+            var future = executor.submit(() -> assertThrows(IOException.class,
+                () -> UBNFPackageResolver.readLocalSource(file, path -> UBNFPackageResolver.openSource(pipe))));
+            try {
+                assertEquals("E-MODULE: local import is not a regular file",
+                    future.get(5, java.util.concurrent.TimeUnit.SECONDS).getMessage());
+            } finally { future.cancel(true); }
+        } finally { executor.shutdownNow(); }
+        assertTrue(executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS));
+        try (var socket = java.nio.channels.ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)) {
+            Path endpoint = temporary.getRoot().toPath().resolve("s");
+            socket.bind(java.net.UnixDomainSocketAddress.of(endpoint));
+            assertEquals("E-MODULE: local import is not a regular file", assertThrows(IOException.class,
+                () -> UBNFPackageResolver.readLocalSource(file, path -> {
+                    Files.delete(path); Files.createSymbolicLink(path, endpoint);
+                    return UBNFPackageResolver.openSource(path);
+                })).getMessage());
+        }
+        Files.delete(file); Files.createFile(file);
+        Path large = temporary.newFile().toPath();
+        try (var random = new RandomAccessFile(large.toFile(), "rw")) { random.setLength(LIMIT + 1L); }
+        assertEquals("E-MODULE: local import exceeds 64 MiB", assertThrows(IOException.class,
+            () -> UBNFPackageResolver.readLocalSource(file, path -> UBNFPackageResolver.openSource(large))).getMessage());
     }
 
     private static final class CountingInput extends InputStream {
