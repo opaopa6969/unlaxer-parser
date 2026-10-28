@@ -4,7 +4,7 @@
     "reports": ["unlaxer-dsl/ubnf-vscode/target/surefire-reports"],
     "properties": {"rustConformance": "true"},
     "required": {
-      "org.unlaxer.dsl.lsp.ubnf.UbnfAuthoringProtocolConformanceTest": ["authoringDataMatchesTheJavaReference", "bundledParserCandidatesMatchJavaClasspath", "nativeAndJavaServersShareAuthoringFixtures", "nativeAndJavaServersShareNavigationFixtures", "localImportsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageDocumentsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageArtifactsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageArtifactUtf8DiagnosticsAndHashOrderMatchAcrossHosts"]
+      "org.unlaxer.dsl.lsp.ubnf.UbnfAuthoringProtocolConformanceTest": ["authoringDataMatchesTheJavaReference", "bundledParserCandidatesMatchJavaClasspath", "nativeAndJavaServersShareAuthoringFixtures", "nativeAndJavaServersShareNavigationFixtures", "localImportsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageDocumentsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageArtifactsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageArtifactUtf8DiagnosticsAndHashOrderMatchAcrossHosts", "packageGrammarBasesMatchAcrossServers"]
     }
   },
   "cross-language": {
@@ -54,6 +54,7 @@
       "org.unlaxer.dsl.semantic.CallInferenceConformanceTest": ["javaMatchesIndependentOracles", "rustMatchesSameIndependentOracles"],
       "org.unlaxer.dsl.semantic.SemanticQueriesConformanceTest": ["javaMatchesIndependentEditAndCancellationOracles", "javaRejectsExpiredContextAndReentrantMutation", "rustMatchesSameIndependentOracles", "capacityAndLongEditSequenceStayBounded", "cancellationFromAnotherThreadDiscardsStagedChildren", "rejectedUpdatesAndCapacityLimitsPreserveTheSnapshot"],
       "org.unlaxer.dsl.semantic.SemanticQueryEditsTest": ["incrementalMatchesFreshIndependentSemanticSnapshots", "rustMatchesEveryEditAndFreshRebuild"],
+      "org.unlaxer.dsl.codegen.PackageGrammarBaseConformanceTest": ["inspectUsesLexicalGrammarBase", "generationAndCheckUseLexicalGrammarBase", "packagedPlaygroundUsesLexicalManifestBase", "fileApisAndJavaFlagsUseLexicalGrammarBase", "javaFlagsKeepOsResolvedOutputPaths"],
       "org.unlaxer.dsl.codegen.PackageLocalPathConformanceTest": ["lexicalPathsPublishIdenticalLockAndCacheBytes", "invalidPathsKeepSnapshotsAndDiagnosticsIdentical"],
       "org.unlaxer.dsl.bootstrap.PackageArtifactUtf8Test": ["cachedArtifactsCheckRawHashBeforeUtf8AndJson", "explicitLocalArtifactsRejectInvalidUtf8WithoutPublishing"],
       "org.unlaxer.dsl.bootstrap.PackageArtifactReaderTest": ["artifactsRejectBeforeOpenWithStableDiagnostics", "artifactBytesRemainExactAndGrowthStopsAtLimitPlusOne", "artifactHandleChecksAndIoFailuresCloseTheStream", "artifactReplacementRejectsWriterFifoBeforeReading"],

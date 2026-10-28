@@ -69,6 +69,8 @@ pub fn generate_package(manifest: &Path, package_id: &str) -> Result<Vec<Generat
 }
 
 pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
+    let normalized = crate::modules::normalize(path)?;
+    let path = normalized.as_path();
     let source = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
     let readiness = crate::portability::check_file(path);
     if !readiness.portable {
