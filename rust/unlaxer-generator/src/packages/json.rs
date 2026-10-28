@@ -118,7 +118,7 @@ fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<
             *s = decoded;
         }
         Value::Object(fields) => {
-            let mut restored = Object::default();
+            let mut restored = Vec::with_capacity(fields.len());
             for (key, mut child) in std::mem::take(fields).into_entries() {
                 let (key, surrogate) = text(&key);
                 if surrogate && artifact && path.first().is_some_and(|p| p == "files") {
@@ -127,9 +127,10 @@ fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<
                 path.push(key.clone());
                 restore(&mut child, path, artifact)?;
                 path.pop();
-                restored.insert(key, child);
+                restored.push((key, child));
             }
-            *fields = restored;
+            // Distinct surrogate escapes may decode to the same sentinel key.
+            *fields = Object::from_entries(restored);
         }
         Value::Array(items) => {
             for child in items {
@@ -175,6 +176,52 @@ mod tests {
             ["b\0", "a"]
         );
         assert_eq!(value["b\0"], serde_json::json!(3));
+    }
+
+    #[test]
+    fn wide_objects_and_mixed_arrays_keep_order_lookup_and_sorted_output() {
+        // Reverse-ordered wide object with duplicates, and scalar runs around nested objects.
+        let mut text = String::from("{");
+        for i in (0..3000).rev() {
+            text.push_str(&format!("\"k{i:04}\":{i},"));
+        }
+        text.push_str(r#""k0005":"last","x":[1,2,{"b":1,"a":2},3,[{"d":1,"c":2}],4]}"#);
+        let value = parse(text.as_bytes(), false).unwrap();
+        let object = value.as_object().unwrap();
+        assert_eq!(object.len(), 3001);
+        let keys: Vec<_> = object.keys().cloned().collect();
+        assert_eq!(keys[0], "k2999");
+        assert_eq!(keys[2994], "k0005");
+        assert_eq!(keys[2999], "k0000");
+        assert_eq!(keys[3000], "x");
+        for i in 0..3000 {
+            assert!(object.contains_key(&format!("k{i:04}")));
+        }
+        assert!(object.get("k3000").is_none() && object.get("").is_none());
+        assert_eq!(value["k0005"], "last");
+        assert_eq!(value["k0006"], serde_json::json!(6));
+        let x = |i: usize| match &value["x"] {
+            Value::Array(items) => items[i].clone(),
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            x(2).as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["b", "a"]
+        );
+        let Value::Array(inner) = x(4) else {
+            unreachable!()
+        };
+        assert_eq!(
+            inner[0].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["d", "c"]
+        );
+        assert_eq!(
+            serde_json::to_string(&value).unwrap(),
+            serde_json::to_string(&serde_json::from_str::<serde_json::Value>(&text).unwrap())
+                .unwrap()
+        );
+        // The ordered tree must not grow each JSON value beyond serde_json's own node.
+        assert!(std::mem::size_of::<Value>() <= std::mem::size_of::<serde_json::Value>());
     }
 
     #[test]

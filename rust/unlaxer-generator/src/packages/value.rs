@@ -1,8 +1,8 @@
 //! Input-only JSON tree: Gson member order, without serde_json feature unification.
 use serde::de::{Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
-use serde::ser::{Serialize, Serializer};
+use serde::ser::{Serialize, SerializeMap, Serializer};
 use serde_json::Number;
-use std::collections::BTreeMap;
+use std::collections::{btree_map, BTreeMap};
 use std::ops::Index;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -15,30 +15,63 @@ pub(super) enum Value {
     Object(Object),
 }
 
+/// Members in Gson order. Each key is stored once; `Entry::sorted` of the i-th entry is
+/// the index of the entry whose key is i-th in key order. Keeping that permutation inline
+/// (instead of a second key index) keeps `Value` as small as `serde_json::Value`, so the
+/// 8 MiB package limit bounds memory close to the previous representation.
 #[derive(Clone, Debug, Default)]
 pub(super) struct Object {
-    entries: Vec<(String, Value)>,
-    positions: BTreeMap<String, usize>,
+    entries: Vec<Entry>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct Entry {
+    key: String,
+    value: Value,
+    sorted: usize,
 }
 
 impl Object {
-    pub(super) fn insert(&mut self, key: String, value: Value) {
-        // Gson STRICT keeps the first position but replaces the value of a duplicate.
-        // Indexed lookup avoids quadratic work on wide objects (including metadata).
-        if let Some(&position) = self.positions.get(&key) {
-            self.entries[position].1 = value;
-        } else {
-            self.positions.insert(key.clone(), self.entries.len());
-            self.entries.push((key, value));
+    /// Build from members in written order. Gson STRICT (`LinkedTreeMap.put`) keeps the
+    /// first position of a repeated key and the value of its last occurrence.
+    pub(super) fn from_entries(members: Vec<(String, Value)>) -> Self {
+        let mut kept: Vec<(String, Value)> = Vec::with_capacity(members.len());
+        let mut positions: BTreeMap<String, usize> = BTreeMap::new();
+        for (key, value) in members {
+            match positions.entry(key) {
+                btree_map::Entry::Occupied(position) => kept[*position.get()].1 = value,
+                btree_map::Entry::Vacant(position) => {
+                    kept.push((position.key().clone(), value));
+                    position.insert(kept.len() - 1);
+                }
+            }
         }
+        Self::from_unique(kept, positions.into_values().collect())
+    }
+
+    fn from_unique(members: Vec<(String, Value)>, sorted: Vec<usize>) -> Self {
+        let entries = members
+            .into_iter()
+            .zip(sorted)
+            .map(|((key, value), sorted)| Entry { key, value, sorted })
+            .collect();
+        Self { entries }
+    }
+
+    fn by_key(&self) -> impl Iterator<Item = &Entry> {
+        self.entries.iter().map(|entry| &self.entries[entry.sorted])
     }
 
     pub(super) fn get(&self, key: &str) -> Option<&Value> {
-        self.positions.get(key).map(|&i| &self.entries[i].1)
+        let position = self
+            .entries
+            .binary_search_by(|entry| self.entries[entry.sorted].key.as_str().cmp(key))
+            .ok()?;
+        Some(&self.entries[self.entries[position].sorted].value)
     }
 
     pub(super) fn contains_key(&self, key: &str) -> bool {
-        self.positions.contains_key(key)
+        self.get(key).is_some()
     }
 
     pub(super) fn len(&self) -> usize {
@@ -50,20 +83,25 @@ impl Object {
     }
 
     pub(super) fn keys(&self) -> impl Iterator<Item = &String> {
-        self.entries.iter().map(|(key, _)| key)
+        self.entries.iter().map(|entry| &entry.key)
     }
 
     pub(super) fn into_entries(self) -> Vec<(String, Value)> {
         self.entries
+            .into_iter()
+            .map(|entry| (entry.key, entry.value))
+            .collect()
     }
 }
 
+type Member<'a> = (&'a String, &'a Value);
+
 impl<'a> IntoIterator for &'a Object {
-    type Item = &'a (String, Value);
-    type IntoIter = std::slice::Iter<'a, (String, Value)>;
+    type Item = Member<'a>;
+    type IntoIter = std::iter::Map<std::slice::Iter<'a, Entry>, fn(&'a Entry) -> Member<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.entries.iter()
+        self.entries.iter().map(|entry| (&entry.key, &entry.value))
     }
 }
 
@@ -72,9 +110,9 @@ impl PartialEq for Object {
         // Gson object equality ignores member order (stale lock / pinned references).
         self.len() == other.len()
             && self
-                .entries
-                .iter()
-                .all(|(key, value)| other.get(key) == Some(value))
+                .by_key()
+                .zip(other.by_key())
+                .all(|(a, b)| a.key == b.key && a.value == b.value)
     }
 }
 
@@ -129,23 +167,26 @@ impl Serialize for Value {
             Self::String(value) => value.serialize(serializer),
             Self::Array(value) => value.serialize(serializer),
             // Output stays sorted, as in Java's explicitly constructed lock objects.
-            Self::Object(value) => value
-                .entries
-                .iter()
-                .map(|(k, v)| (k, v))
-                .collect::<BTreeMap<_, _>>()
-                .serialize(serializer),
+            Self::Object(value) => {
+                let mut map = serializer.serialize_map(Some(value.len()))?;
+                for entry in value.by_key() {
+                    map.serialize_entry(&entry.key, &entry.value)?;
+                }
+                map.end()
+            }
         }
     }
 }
 
 // Read only structure/order in the second pass. In workspace builds serde_json's
 // arbitrary_precision feature can be unified by DAP; its numeric map protocol
-// must never be interpreted as a package object. The first pass owns all values.
+// must never be interpreted as a package object. The first pass owns all values,
+// so an object records only each kept member's key rank, and an array whose items
+// are all scalars records nothing.
 enum MemberOrder {
     Scalar,
     Array(Vec<MemberOrder>),
-    Object(Vec<(String, MemberOrder)>),
+    Object(Vec<(usize, MemberOrder)>),
 }
 
 impl<'de> Deserialize<'de> for MemberOrder {
@@ -181,25 +222,43 @@ impl<'de> Deserialize<'de> for MemberOrder {
                 self,
                 mut sequence: A,
             ) -> Result<MemberOrder, A::Error> {
-                let mut items = Vec::new();
-                while let Some(item) = sequence.next_element()? {
-                    items.push(item);
+                // Leading scalars are only counted until a structured item appears.
+                let (mut items, mut count) = (Vec::new(), 0);
+                while let Some(item) = sequence.next_element::<MemberOrder>()? {
+                    if !matches!(item, MemberOrder::Scalar) {
+                        items.resize_with(count, || MemberOrder::Scalar);
+                        items.push(item);
+                    } else if !items.is_empty() {
+                        items.push(item);
+                    }
+                    count += 1;
                 }
-                Ok(MemberOrder::Array(items))
+                Ok(if items.is_empty() {
+                    MemberOrder::Scalar
+                } else {
+                    MemberOrder::Array(items)
+                })
             }
 
             fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<MemberOrder, A::Error> {
-                let mut entries: Vec<(String, MemberOrder)> = Vec::new();
+                // Same duplicate rule as Object::from_entries; the key index is
+                // temporary, so wide or duplicate-heavy metadata stays O(n log n).
+                let mut members: Vec<(usize, MemberOrder)> = Vec::new();
                 let mut positions: BTreeMap<String, usize> = BTreeMap::new();
-                while let Some((key, value)) = map.next_entry::<String, MemberOrder>()? {
-                    if let Some(&position) = positions.get(&key) {
-                        entries[position].1 = value;
-                    } else {
-                        positions.insert(key.clone(), entries.len());
-                        entries.push((key, value));
+                while let Some(key) = map.next_key::<String>()? {
+                    let order = map.next_value::<MemberOrder>()?;
+                    match positions.entry(key) {
+                        btree_map::Entry::Occupied(position) => members[*position.get()].1 = order,
+                        btree_map::Entry::Vacant(position) => {
+                            position.insert(members.len());
+                            members.push((0, order));
+                        }
                     }
                 }
-                Ok(MemberOrder::Object(entries))
+                for (rank, position) in positions.into_values().enumerate() {
+                    members[position].0 = rank;
+                }
+                Ok(MemberOrder::Object(members))
             }
         }
         deserializer.deserialize_any(OrderVisitor)
@@ -218,28 +277,39 @@ fn with_order(value: serde_json::Value, order: MemberOrder) -> Value {
         serde_json::Value::Bool(value) => Value::Bool(value),
         serde_json::Value::Number(value) => Value::Number(value),
         serde_json::Value::String(value) => Value::String(value),
-        serde_json::Value::Array(items) => {
-            let MemberOrder::Array(order) = order else {
-                unreachable!("same JSON array in both passes");
-            };
-            Value::Array(
-                items
-                    .into_iter()
-                    .zip(order)
-                    .map(|(v, o)| with_order(v, o))
-                    .collect(),
-            )
-        }
-        serde_json::Value::Object(mut fields) => {
+        serde_json::Value::Array(items) => Value::Array(match order {
+            MemberOrder::Scalar => items
+                .into_iter()
+                .map(|v| with_order(v, MemberOrder::Scalar))
+                .collect(),
+            MemberOrder::Array(order) => items
+                .into_iter()
+                .zip(order)
+                .map(|(v, o)| with_order(v, o))
+                .collect(),
+            MemberOrder::Object(_) => unreachable!("same JSON array in both passes"),
+        }),
+        serde_json::Value::Object(fields) => {
             let MemberOrder::Object(order) = order else {
                 unreachable!("same JSON object in both passes");
             };
-            let mut object = Object::default();
-            for (key, child_order) in order {
-                let child = fields.remove(&key).expect("same JSON key in both passes");
-                object.insert(key, with_order(child, child_order));
-            }
-            Value::Object(object)
+            // Both passes decode the same unique keys; rank them independently of
+            // whether serde_json's map iterates in key order.
+            let mut fields: Vec<(String, serde_json::Value)> = fields.into_iter().collect();
+            fields.sort_by(|a, b| a.0.cmp(&b.0));
+            assert_eq!(fields.len(), order.len(), "same JSON object in both passes");
+            let mut fields: Vec<_> = fields.into_iter().map(Some).collect();
+            let mut sorted = vec![0; order.len()];
+            let members = order
+                .into_iter()
+                .enumerate()
+                .map(|(position, (rank, child))| {
+                    sorted[rank] = position;
+                    let (key, value) = fields[rank].take().expect("same JSON key in both passes");
+                    (key, with_order(value, child))
+                })
+                .collect();
+            Value::Object(Object::from_unique(members, sorted))
         }
     }
 }

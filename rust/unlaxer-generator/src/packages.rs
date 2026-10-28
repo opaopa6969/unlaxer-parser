@@ -237,14 +237,14 @@ fn artifact(bytes: &[u8]) -> Result<Value, String> {
     Ok(value)
 }
 fn references(value: &Value) -> Result<Value, String> {
-    let mut result = Object::default();
+    let mut result = Vec::new();
     for (name, dependency) in object(value, "dependencies")? {
-        result.insert(
+        result.push((
             name.clone(),
             Value::String(string(dependency, "version")?.into()),
-        );
+        ));
     }
-    Ok(Value::Object(result))
+    Ok(Value::Object(Object::from_entries(result)))
 }
 fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))

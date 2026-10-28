@@ -437,10 +437,14 @@ stale lock / identity conflict にしてはならない。
 
 Rust の `packages/value.rs` は最初に既存 `serde_json::Value` で値と構文を読み、
 既存 serde の `Deserialize` / `Visitor` でもう一度 member の位置だけを記録する。
-その順序で `Vec<(String, Value)>` を構成し、`BTreeMap<String, usize>` で位置を索引する。
+記録するのは各 object で残る member の key の順位だけで、scalar だけの配列は何も記録しない。
+その順序で member を記述順の `Vec` に並べ、各 key は一度だけ持つ。key 順の索引は同じ `Vec` の要素に置き、
+lookup は二分探索、等値比較と出力は key 順の走査で行う。`Value` の大きさは `serde_json::Value` を超えない。
 DAP から既に統合される `arbitrary_precision` の数値表現も最初の解析に任せるため、
 小数・巨大な数値を object と誤認せず、単独 crate / workspace の既存の数値挙動をそれぞれ維持する。
 重複処理と lookup が幅の広い metadata でも二乗にならないようにし、配列は元の順序を保つ。
+8 MiB 近くの入力の peak memory は、数値だけの配列で従来と同程度、幅の広い object で従来の約 2 倍に収まる
+（release build の実測。2 回の解析なので時間は約 1.5〜3 倍）。
 JSON の文法・数値・再帰上限は既存 serde_json に任せる。#940 の BOM・サロゲート復元は
 この木に適用し、raw bytes の reader・hash・UTF-8 の順序は変えない。
 `serde_json/preserve_order` は使用せず、新しい crate / license 依存を追加しない。
@@ -453,7 +457,7 @@ UBNF parser のホットパスには適用しない。#941 の空文書・非 ob
 | manifest / lock / artifact の最上位と各固定 field | JSON 全体を読む。その後は既存の schema → 対象 field の固定順で検査し、最上位 member の並べ替えでは優先順を変えない。未知 metadata は使わない | artifact は元の bytes を保持 |
 | manifest `dependencies` の検証 | 記述順に ID → version → source 型を検査。複数の不正 member の最初の診断に影響 | roots の出力は辞書順 |
 | manifest `dependencies` の `resolveOne` | 記述順に深さ優先で取得・内容検査。最初の取得失敗、identity conflict、cycle / 上限診断に影響 | 全 graph 成功後だけ lock/cache を書く |
-| artifact `files` | 記述順に path → 本文の型を検査。複数の不正 file の最初の診断に影響。その後の entry は key lookup | files を再エンコードしない。cache は raw bytes |
+| artifact `files` | 記述順に path → 本文の型を検査。複数の不正 file の最初の診断に影響。その後の entry は key lookup。path の 1 段目の検査（`invalid package file path`）が Rust にない差は [#947](https://github.com/opaopa6969/unlaxer-parser/issues/947) | files を再エンコードしない。cache は raw bytes |
 | artifact `dependencies` の検証・明示 resolve | 記述順に field 検証、その後同じ順の深さ優先走査 | pinned dependencies の出力は辞書順 |
 | lock `packages` の audit | 記述順に ID、pinned ID/version/SHA、各 dependencies を検査。最初の診断に影響 | 読取りでは lock を変更しない |
 | lock `packages.*.dependencies` の audit | 記述順に ID → version → pinned version を検査。最初の診断に影響 | 同上 |
