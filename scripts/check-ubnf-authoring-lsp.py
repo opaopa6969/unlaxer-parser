@@ -309,18 +309,18 @@ def main():
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents', 'package-artifacts'], default='baseline')
+    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents', 'package-artifacts', 'package-artifact-utf8'], default='baseline')
     args = parser.parse_args()
     java = Client([args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.lsp.ubnf.UBNFLspLauncherExt'])
     native = Client([args.rust], native=True)
     try:
         with tempfile.TemporaryDirectory(prefix='ubnf-authoring-', dir=os.environ.get('TMPDIR')) as directory:
-            if args.suite == 'package-artifacts':
+            if args.suite in ('package-artifacts', 'package-artifact-utf8'):
                 from ubnf_package_artifacts import run_package_artifacts
                 initialize(java, native)
                 evidence = run_package_artifacts([java, native], Path(directory),
                     [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'],
-                    [str(Path(args.rust).with_name('unlaxer'))], ROOT)
+                    [str(Path(args.rust).with_name('unlaxer'))], ROOT, args.suite)
                 for client in [java, native]:
                     assert client.result('shutdown') is None
                     client.send('exit')
