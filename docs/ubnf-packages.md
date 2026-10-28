@@ -365,6 +365,12 @@ artifact の raw bytes は一切変換せず、BOM も含む SHA-256 を lock �
 | BOM + 不正 UTF-8 | manifest/lock は `invalid JSON`、artifact は `invalid UTF-8 artifact` |
 | cache の raw hash 不一致 | BOM・UTF-8・JSON の検証より先に `artifact hash mismatch: <id>` |
 
+BOM のない空文書・空白だけの文書と非 object の top-level（Java は前者が `expected object: document`、後者が `invalid JSON` で、Rust は逆）、
+serde_json の再帰上限を超える深い入れ子は、BOM とは別の既存差として
+[#941](https://github.com/opaopa6969/unlaxer-parser/issues/941) で扱う。
+複数の不正な依存の検査順（Java は記述順、Rust は key の辞書順）は [#942](https://github.com/opaopa6969/unlaxer-parser/issues/942)、
+HTTPS の credentials ファイルの BOM・単独サロゲート・不正 JSON の差は [#943](https://github.com/opaopa6969/unlaxer-parser/issues/943) で扱う。
+
 単独サロゲート escape は有効な ASCII bytes なので、不正 UTF-8 とは別に扱う。
 Gson が受理する `\ud800` / `\udc00` と壊れた組について、次のようにフィールド検証まで進める。
 表中の診断はすべて既存の `E-PACKAGE: ` 接頭辞を持つ。
@@ -395,7 +401,8 @@ ASCII 検証または不正パス検証を通らない NUL sentinel にし、既
 実際の UTF-16 文字列を使う以下の field は、置換で受理するとファイル同一性・文法本文・source 位置を変える。
 Java の受理集合を狭めず、Rust は従来の `invalid JSON` を維持する意図した暫定差とし、
 [#939](https://github.com/opaopa6969/unlaxer-parser/issues/939) の受け入れ条件で追跡する。
-この残差があるため #926 は **Refs** とし、完了扱いにしない。
+これらは `local:` source を扱う #926 の範囲外で、#926 の受け入れ条件（`local:` source の拒否段階・診断と、
+無関係な field の既存診断の維持）は上の表で満たす。
 
 | 単独サロゲートを含む field | Java の実測 | Rust の暫定結果 |
 | --- | --- | --- |

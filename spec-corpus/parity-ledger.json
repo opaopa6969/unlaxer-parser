@@ -554,7 +554,7 @@
         926,
         939
       ],
-      "observation": "#914は先頭BOMを1つだけ受理。#926のlocal source・ASCII形式のID/version/lock・未使用metadataはJavaの受理と診断に揃える。artifact.entry、filesのkey/本文、dependencies.*.sourceのHTTPSはUTF-16をlosslessに表せないため、Javaを狭めずRustの既存invalid JSONを維持する意図した暫定差。共通127件のうち13件は両hostを実行してhost別oracleを照合し、skipしない。これらのfieldとsource位置/取得境界の完全対応は#939の受け入れ条件で追跡し、#926はRefsとする。raw hash→strict UTF-8→JSON、readerとpath規則は維持する。",
+      "observation": "#914は先頭BOMを1つだけ受理。#926のlocal source・ASCII形式のID/version/lock・未使用metadataはJavaの受理と診断に揃える。artifact.entry、filesのkey/本文、dependencies.*.sourceのHTTPSはUTF-16をlosslessに表せないため、Javaを狭めずRustの既存invalid JSONを維持する意図した暫定差。共通127件のうち13件は両hostを実行してhost別oracleを照合し、skipしない。これらのfieldとsource位置/取得境界の完全対応は#939の受け入れ条件で追跡する。#926のlocal sourceの受け入れ条件は満たす（issueはmerge待ちでOPEN）。raw hash→strict UTF-8→JSON、readerとpath規則は維持する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",

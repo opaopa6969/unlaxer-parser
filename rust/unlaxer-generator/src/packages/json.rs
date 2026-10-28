@@ -187,6 +187,23 @@ mod tests {
     }
 
     #[test]
+    fn surrogates_outside_strings_stay_invalid_and_keys_are_restored() {
+        for bytes in [
+            br#"{"a":1}\ud800"#.as_slice(),
+            br#"{"a":\ud800}"#,
+            br#"{\ud800:1}"#,
+        ] {
+            assert_eq!(
+                parse(bytes, false).unwrap_err(),
+                super::super::error("invalid JSON")
+            );
+        }
+        let value = parse(br#"{"k\ud800":"\ud800A","p":"\ud800\\udc00"}"#, false).unwrap();
+        assert_eq!(value["k\0"], "\0A");
+        assert_eq!(value["p"], "\0\\udc00");
+    }
+
+    #[test]
     fn full_json_validation_and_last_member_precede_field_use() {
         for bytes in [
             br#"{"source":"local:\ud800",}"#.as_slice(),
