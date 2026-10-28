@@ -33,17 +33,17 @@ public class PackageLocalPathConformanceTest {
     }
 
     @Test(timeout=300000) public void lexicalPathsPublishIdenticalLockAndCacheBytes() throws Exception {
-        check(false, 17);
+        check(false, 19);
     }
 
     @Test(timeout=300000) public void invalidPathsKeepSnapshotsAndDiagnosticsIdentical() throws Exception {
-        check(true, 8);
+        check(true, 11);
     }
 
     private void check(boolean rejected, int count) throws Exception {
         var fixtures = JsonParser.parseString(Files.readString(REPOSITORY.resolve(
             "spec-corpus/package-local-paths.json"))).getAsJsonArray();
-        assertEquals("fixtures must not silently disappear", 25, fixtures.size());
+        assertEquals("fixtures must not silently disappear", 30, fixtures.size());
         byte[] standard = Files.readAllBytes(REPOSITORY.resolve(
             "unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json"));
         var evidence = new JsonArray();

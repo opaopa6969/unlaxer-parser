@@ -332,9 +332,10 @@ Java の `InvalidPathException` の本文や入力パスをそのまま公開せ
 リンク先の親へ切り替えない。残った symlink をたどって通常ファイルを読む経路は従来どおり維持する。
 Java の既存経路を狭めず、OS が `..` を解釈する前に対象を決めることで、同じ入力の取得先を両版で揃える。
 
-共通 `spec-corpus/package-local-paths.json` の25件を `PackageLocalPathConformanceTest` が
+共通 `spec-corpus/package-local-paths.json` の30件を `PackageLocalPathConformanceTest` が
 Java / native Rust の実 `deps resolve` CLI に送る。表の4形、symlink の前後、推移的依存、
-相対・絶対 manifest とその正規化を含む。lock/cache の有無の両方で計100回実行し、
+相対・絶対 manifest とその正規化、末尾 `/.`、ファイルシステムの root を越える `..`、
+`/` 単独、symlink ディレクトリの `/.`、区切りではない `\` を含む。lock/cache の有無の両方で計120回実行し、
 成功時は固定した期待値と lock/cache の bytes、失敗時は同じ診断と lock/cache 不変を照合する。
 symlink の物理的解決先には異なる bytes の有効 artifact を置き、誤った取得先での成功も検出する。
 CI の `cross-language` 契約で両テストメソッドの実行を必須にする。

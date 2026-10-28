@@ -85,6 +85,14 @@
     "expectedArtifact": "space \ud83d\ude00/artifact.json"
   },
   {
+    "id": "trailing-dot",
+    "source": "local:artifact.json/."
+  },
+  {
+    "id": "beyond-filesystem-root",
+    "source": "local:../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../${ROOT}/artifact.json"
+  },
+  {
     "id": "file-parent-is-directory",
     "source": "local:artifact.json/..",
     "error": "artifact is not a regular file"
@@ -125,5 +133,20 @@
     "id": "not-directory",
     "source": "local:artifact.json/child.json",
     "error": "cannot read local artifact"
+  },
+  {
+    "id": "filesystem-root",
+    "source": "local:/",
+    "error": "artifact is not a regular file"
+  },
+  {
+    "id": "symlink-directory-trailing-dot",
+    "source": "local:a/link/.",
+    "error": "artifact is not a regular file"
+  },
+  {
+    "id": "backslash-is-not-separator",
+    "source": "local:nodir\\..\\artifact.json",
+    "error": "missing local artifact"
   }
 ]
