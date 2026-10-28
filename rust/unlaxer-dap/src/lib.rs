@@ -162,6 +162,7 @@ pub struct Server<B> {
     program: String,
     arguments: Value,
     runtime_mode: String,
+    stepping_mode: String,
     ast_mode: bool,
     stop_on_entry: bool,
     snapshot: Option<Snapshot>,
@@ -170,7 +171,8 @@ pub struct Server<B> {
     index: usize,
     // Signed like Java's Set<Integer>: an unmatched line still makes the set non-empty.
     breakpoints: BTreeSet<i64>,
-    variables: BTreeMap<String, String>,
+    // Java keeps these insertion-ordered probes until the next successful preparation.
+    variables: Vec<(String, String)>,
     line_base: usize,
     column_base: usize,
 }
@@ -185,6 +187,7 @@ impl<B: Backend> Server<B> {
             program: String::new(),
             arguments: Value::Null,
             runtime_mode: "token".into(),
+            stepping_mode: "token".into(),
             ast_mode: false,
             stop_on_entry: false,
             snapshot: None,
@@ -192,7 +195,7 @@ impl<B: Backend> Server<B> {
             steps: vec![],
             index: 0,
             breakpoints: BTreeSet::new(),
-            variables: BTreeMap::new(),
+            variables: vec![],
             line_base: 1,
             column_base: 1,
         }
@@ -258,6 +261,7 @@ impl<B: Backend> Server<B> {
                         self.breakpoints.clear();
                     }
                     self.ast_mode = mode.eq_ignore_ascii_case("ast");
+                    self.stepping_mode = mode.into();
                     self.program = program.into();
                     self.runtime_mode = runtime.into();
                     self.stop_on_entry = arguments["stopOnEntry"] == true;
@@ -266,7 +270,7 @@ impl<B: Backend> Server<B> {
                     self.terminated = false;
                     self.snapshot = None;
                     self.steps.clear();
-                    self.variables.clear();
+                    // launch resets steps, but Java retains the last prepared probes/offset.
                     self.index = 0;
                     events.push(("initialized", Value::Null));
                     Ok(Value::Null)
@@ -365,6 +369,11 @@ impl<B: Backend> Server<B> {
                             .map_err(RequestError::position)?;
                         vec![
                             json!({"id":0,"name":format!("{} ({}/{})",step.label,self.index+1,self.steps.len()),"line":position.line+self.line_offset+self.line_base,"column":position.character+self.column_base,"endLine":end.line+self.line_offset+self.line_base,"endColumn":end.character+self.column_base,"source":{"path":self.program,"name":std::path::Path::new(&self.program).file_name().unwrap_or_default().to_string_lossy()}}),
+                        ]
+                    } else if !self.ast_mode && !self.terminated && !self.program.is_empty() {
+                        vec![
+                            json!({"id":0,"name":"<program>","source":{"path":self.program},
+                            "line":self.line_offset+self.line_base,"column":self.column_base}),
                         ]
                     } else {
                         vec![]
@@ -581,6 +590,9 @@ impl<B: Backend> Server<B> {
         let source = self
             .backend
             .resolve_source(&self.program, &original, &self.arguments)?;
+        // Java stores sourceLineOffset as soon as the source resolves, before parsing or
+        // collecting steps; a later failure still moves the next pending frame (#938).
+        self.line_offset = source.line_offset;
         let snapshot =
             Snapshot::new(self.program.clone(), 0, source.text).map_err(str::to_owned)?;
         let steps = self.backend.steps(&snapshot, &self.arguments)?;
@@ -631,16 +643,21 @@ impl<B: Backend> Server<B> {
                 .into());
             }
         }
-        let mut variables = self
+        let probes = self
             .backend
             .runtime_variables(&snapshot, &self.runtime_mode, &self.arguments)
             .unwrap_or_else(|error| BTreeMap::from([("debugRuntimeError".into(), error)]));
-        variables.insert("runtimeMode".into(), self.runtime_mode.clone());
-        variables.insert(
-            "steppingMode".into(),
-            if self.ast_mode { "ast" } else { "token" }.into(),
-        );
-        self.line_offset = source.line_offset;
+        let mut variables = vec![
+            ("runtimeMode".into(), self.runtime_mode.clone()),
+            ("steppingMode".into(), self.stepping_mode.clone()),
+        ];
+        for (name, value) in probes {
+            if let Some((_, previous)) = variables.iter_mut().find(|(key, _)| key == &name) {
+                *previous = value;
+            } else {
+                variables.push((name, value));
+            }
+        }
         self.snapshot = Some(snapshot);
         self.steps = steps;
         self.variables = variables;

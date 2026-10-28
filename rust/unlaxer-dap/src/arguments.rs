@@ -45,6 +45,7 @@ pub(super) fn read(command: &str, mut value: Value, raw: &str) -> Result<Convert
     let wire = Wire::new(raw);
     let stream = wire.command_first();
     let mut path = "$.arguments";
+    let mut extra_argument = None;
     if stream && known(command) && value.is_array() {
         path = "$.arguments[0]";
         if value.as_array().unwrap().is_empty() {
@@ -55,6 +56,7 @@ pub(super) fn read(command: &str, mut value: Value, raw: &str) -> Result<Convert
             };
             return Err(mismatch("BEGIN_OBJECT", "END_ARRAY", path, &reader));
         }
+        extra_argument = value.as_array().unwrap().get(1).map(token);
         value = value.as_array_mut().unwrap().remove(0);
     }
     let reader = Reader {
@@ -69,6 +71,12 @@ pub(super) fn read(command: &str, mut value: Value, raw: &str) -> Result<Convert
         // Unknown commands and no-argument methods (threads) are dispatched
         // without an argument DTO by LSP4J.
         object(&mut value, schema, path, &reader)?;
+    }
+    if let Some(actual) = extra_argument {
+        // LSP4J logs this diagnostic and drops the request without a response (#938).
+        // Reply with a parse failure: never dispatch the first DTO and silently discard
+        // the remaining arguments (notably launch/next/configurationDone side effects).
+        return Err(mismatch("END_ARRAY", actual, "$.arguments[1]", &reader));
     }
     Ok(Converted { value, launch })
 }

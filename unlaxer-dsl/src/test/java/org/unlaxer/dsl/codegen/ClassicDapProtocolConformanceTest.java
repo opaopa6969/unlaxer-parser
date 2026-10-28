@@ -37,7 +37,8 @@ public class ClassicDapProtocolConformanceTest {
                             return debugSource(arguments.getOrDefault("sourceText",original).toString(),((Number)arguments.getOrDefault("lineOffset",0)).intValue());
                         }
                         @Override protected java.util.Map<String,String> runtimeVariables(String source,String mode,java.util.Map<String,Object> arguments) {
-                            return java.util.Map.of("sourceLength",String.valueOf(source.codePointCount(0,source.length())),"runtimeLabel",mode);
+                            var values = new java.util.LinkedHashMap<String,String>();
+                            values.put("runtimeLabel", mode); values.put("sourceLength", String.valueOf(source.codePointCount(0,source.length()))); return values;
                         }
                     };
                     var launcher=org.eclipse.lsp4j.debug.launch.DSPLauncher.createServerLauncher(server,System.in,System.out);
@@ -83,6 +84,7 @@ public class ClassicDapProtocolConformanceTest {
     private void exercise(Wire wire,String backend)throws Exception {
         wire.failures = new DapFailureConformance("classic-ast", backend);
         wire.probeFailures("fresh");
+        DapLaunchStateConformance.check(wire, "classic-ast", backend, temporary.getRoot().toPath());
         exerciseConfigurationLifecycle(wire, backend);
         exerciseBreakpointSources(wire, backend);
         var rows=JsonParser.parseString(Files.readString(ROOT.resolve("docs/fixtures/classic-dap/ast.json"))).getAsJsonArray();assertEquals(9,rows.size());
@@ -231,12 +233,26 @@ public class ClassicDapProtocolConformanceTest {
         final Process process;final InputStream input;final OutputStream output;final ExecutorService reader=Executors.newSingleThreadExecutor();final List<JsonObject> pending=new ArrayList<>();int next,lastSeq;
         DapFailureConformance failures;
         String lastPayload;
+        Future<JsonObject> incoming;
         void probeFailures(String stage) throws Exception { if (failures != null) failures.check(this, stage); }
         Wire(Process process){this.process=process;input=new BufferedInputStream(process.getInputStream());output=process.getOutputStream();}
-        JsonObject read()throws Exception{return reader.submit(()->{int length=-1;var line=new StringBuilder();while(true){int b=input.read();if(b<0)throw new EOFException();line.append((char)b);if(b=='\n'){String h=line.toString();line.setLength(0);if(h.equals("\r\n"))break;if(h.startsWith("Content-Length:"))length=Integer.parseInt(h.substring(15).trim());}}if(length<0||length>4*1024*1024)throw new IOException("frame limit");byte[] body=input.readNBytes(length);if(body.length!=length)throw new EOFException();var message=JsonParser.parseString(new String(body,StandardCharsets.UTF_8)).getAsJsonObject();assertTrue(message.toString(),message.get("seq").getAsInt()>lastSeq);lastSeq=message.get("seq").getAsInt();return message;}).get(20,TimeUnit.SECONDS);}
+        JsonObject read() throws Exception {
+            var message = readWithin(20000);
+            if (message == null) throw new TimeoutException("DAP response timeout");
+            return message;
+        }
+        JsonObject readWithin(long millis) throws Exception {
+            if (incoming == null) incoming = reader.submit(()->{int length=-1;var line=new StringBuilder();while(true){int b=input.read();if(b<0)throw new EOFException();line.append((char)b);if(b=='\n'){String h=line.toString();line.setLength(0);if(h.equals("\r\n"))break;if(h.startsWith("Content-Length:"))length=Integer.parseInt(h.substring(15).trim());}}if(length<0||length>4*1024*1024)throw new IOException("frame limit");byte[] body=input.readNBytes(length);if(body.length!=length)throw new EOFException();var message=JsonParser.parseString(new String(body,StandardCharsets.UTF_8)).getAsJsonObject();assertTrue(message.toString(),message.get("seq").getAsInt()>lastSeq);lastSeq=message.get("seq").getAsInt();return message;});
+            try { var message = incoming.get(millis, TimeUnit.MILLISECONDS); incoming = null; return message; }
+            catch (TimeoutException timeout) { return null; }
+        }
         JsonObject response(String command,Object arguments)throws Exception { return response(command, arguments, true); }
         JsonObject response(String command,Object arguments,boolean includeArguments)throws Exception { return responseOrdered(command, arguments, includeArguments, true); }
-        JsonObject responseOrdered(String command,Object arguments,boolean includeArguments,boolean argumentsFirst)throws Exception {int seq=++next;var message=new JsonObject();message.addProperty("seq",seq);message.addProperty("type","request");if(!argumentsFirst)message.addProperty("command",command);if(includeArguments)message.add("arguments",JSON.toJsonTree(arguments));if(argumentsFirst)message.addProperty("command",command);byte[] body=JSON.toJson(message).getBytes(StandardCharsets.UTF_8);lastPayload=new String(body,StandardCharsets.UTF_8);output.write(("Content-Length: "+body.length+"\r\n\r\n").getBytes(StandardCharsets.US_ASCII));output.write(body);output.flush();while(true){var result=read();if(result.get("type").getAsString().equals("response")&&result.get("request_seq").getAsInt()==seq){assertEquals(command,result.get("command").getAsString());return result;}pending.add(result);}}
+        int sendOrdered(String command, Object arguments, boolean includeArguments, boolean argumentsFirst) throws Exception {int seq=++next;var message=new JsonObject();message.addProperty("seq",seq);message.addProperty("type","request");if(!argumentsFirst)message.addProperty("command",command);if(includeArguments)message.add("arguments",JSON.toJsonTree(arguments));if(argumentsFirst)message.addProperty("command",command);byte[] body=JSON.toJson(message).getBytes(StandardCharsets.UTF_8);lastPayload=new String(body,StandardCharsets.UTF_8);output.write(("Content-Length: "+body.length+"\r\n\r\n").getBytes(StandardCharsets.US_ASCII));output.write(body);output.flush();return seq;}
+        JsonObject responseOrdered(String command,Object arguments,boolean includeArguments,boolean argumentsFirst)throws Exception {
+            int seq = sendOrdered(command, arguments, includeArguments, argumentsFirst);
+            while(true){var result=read();if(result.get("type").getAsString().equals("response")&&result.get("request_seq").getAsInt()==seq){assertEquals(command,result.get("command").getAsString());return result;}pending.add(result);}
+        }
         JsonObject responseLiteral(String payload)throws Exception {
             var request=JsonParser.parseString(payload).getAsJsonObject();
             int seq=request.get("seq").getAsInt(); String command=request.get("command").getAsString();

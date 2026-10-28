@@ -1,0 +1,180 @@
+{
+  "referenceRevision": "aa5c78c85529092c415803737e97b3cc8a698020",
+  "observationMillis": 21000,
+  "noResponseTestMillis": 1000,
+  "programs": [
+    {
+      "id": "missing",
+      "value": "$MISSING",
+      "path": "$MISSING"
+    },
+    {
+      "id": "existing",
+      "value": "$EXISTING",
+      "path": "$EXISTING"
+    },
+    {
+      "id": "number",
+      "value": 5,
+      "path": "5.0"
+    },
+    {
+      "id": "object",
+      "value": {
+        "b": true,
+        "a": 1
+      },
+      "path": "{b=true, a=1.0}"
+    },
+    {
+      "id": "array",
+      "value": [
+        1,
+        true,
+        "x"
+      ],
+      "path": "[1.0, true, x]"
+    },
+    {
+      "id": "boolean",
+      "value": true,
+      "path": "true"
+    },
+    {
+      "id": "jdk-large",
+      "value": 1e+23,
+      "path": "1.0E23",
+      "pathByJdk": {
+        "17": "9.999999999999999E22"
+      }
+    },
+    {
+      "id": "jdk-subnormal",
+      "value": 1e-323,
+      "path": "9.9E-324",
+      "pathByJdk": {
+        "17": "1.0E-323"
+      }
+    }
+  ],
+  "freshVariables": [],
+  "retainedVariables": [
+    {
+      "name": "runtimeMode",
+      "value": "prepared-runtime",
+      "type": "String",
+      "variablesReference": 0
+    },
+    {
+      "name": "steppingMode",
+      "value": "ToKeN",
+      "type": "String",
+      "variablesReference": 0
+    }
+  ],
+  "placeholder": {
+    "id": 0,
+    "name": "<program>",
+    "source": {
+      "path": "$PROGRAM"
+    },
+    "line": 1,
+    "column": 1
+  },
+  "scopes": {
+    "scopes": []
+  },
+  "threads": {
+    "threads": [
+      {
+        "id": 1,
+        "name": "main"
+      }
+    ]
+  },
+  "invalidRequest": "java.util.concurrent.CompletionException: java.lang.IllegalArgumentException: invalid or unavailable debug request",
+  "arrayRequests": [
+    {
+      "command": "stackTrace",
+      "arguments": {
+        "threadId": 1
+      }
+    },
+    {
+      "command": "setBreakpoints",
+      "arguments": {
+        "breakpoints": [
+          {
+            "line": 99
+          }
+        ]
+      }
+    },
+    {
+      "command": "launch",
+      "arguments": {
+        "program": "$EXISTING",
+        "runtimeMode": "changed-runtime"
+      }
+    },
+    {
+      "command": "next",
+      "arguments": {
+        "threadId": 1
+      }
+    },
+    {
+      "command": "initialize",
+      "arguments": {
+        "linesStartAt1": false,
+        "columnsStartAt1": false
+      }
+    },
+    {
+      "command": "configurationDone",
+      "arguments": {}
+    },
+    {
+      "command": "evaluate",
+      "arguments": {
+        "expression": "x"
+      }
+    },
+    {
+      "command": "source",
+      "arguments": {
+        "sourceReference": 1
+      }
+    },
+    {
+      "command": "scopes",
+      "arguments": {
+        "frameId": 0
+      }
+    },
+    {
+      "command": "variables",
+      "arguments": {
+        "variablesReference": 1
+      }
+    },
+    {
+      "command": "continue",
+      "arguments": {
+        "threadId": 1
+      }
+    },
+    {
+      "command": "disconnect",
+      "arguments": {}
+    }
+  ],
+  "arrayLengths": [
+    2,
+    3
+  ],
+  "arrayFailure": {
+    "message": "Message could not be parsed.",
+    "diagnostic": "java.lang.IllegalStateException: Expected END_ARRAY but was BEGIN_OBJECT at line 1 column {column} path $.arguments[1]\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#unexpected-json-structure"
+  }
+}
