@@ -4,17 +4,21 @@ use super::value::{Object, Value};
 pub(super) fn parse(bytes: &[u8], artifact: bool) -> Result<Value, String> {
     // Gson ignores exactly one BOM, only at byte zero. Hashing/UTF-8/size checks
     // belong to the caller and must continue to see the original bytes.
-    let bytes = if let Some(rest) = bytes.strip_prefix(b"\xef\xbb\xbf") {
-        if rest
-            .iter()
-            .all(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
-        {
-            return Err(super::error("expected object: document"));
-        }
-        rest
-    } else {
-        bytes
-    };
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
+    if bytes
+        .iter()
+        .all(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
+    {
+        return Err(super::error("expected object: document"));
+    }
+    // Gson's JsonObject adapter rejects even a JSON null (unlike an empty document).
+    if bytes
+        .iter()
+        .find(|b| !matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
+        != Some(&b'{')
+    {
+        return Err(super::error("invalid JSON"));
+    }
     if let Ok(value) = super::value::parse(bytes) {
         return Ok(value);
     }
@@ -225,27 +229,65 @@ mod tests {
     }
 
     #[test]
-    fn document_acceptance_outside_member_order_is_unchanged() {
-        for input in [
-            b"".as_slice(),
-            b" \r\n",
-            b"{\"x\":1} true",
-            b"{\"b\":1,\"b\":}",
-        ] {
-            assert_eq!(
-                parse(input, false).unwrap_err(),
-                super::super::error("invalid JSON")
-            );
+    fn document_kind_and_gson_depth_limit() {
+        for bom in ["", "\u{feff}"] {
+            for input in ["", " \r\n\t"] {
+                assert_eq!(
+                    parse(format!("{bom}{input}").as_bytes(), false).unwrap_err(),
+                    super::super::error("expected object: document")
+                );
+            }
+            for input in [
+                "null",
+                "[]",
+                "1",
+                "\"x\"",
+                "true",
+                "false",
+                "\u{000b}",
+                "\u{000c}",
+                "{\"x\":1} true",
+                "{\"b\":1,\"b\":}",
+            ] {
+                assert_eq!(
+                    parse(format!("{bom}{input}").as_bytes(), false).unwrap_err(),
+                    super::super::error("invalid JSON")
+                );
+            }
         }
-        for input in [b"null".as_slice(), b"[]", b"1", b"\"x\"", b"true"] {
-            assert!(parse(input, false).unwrap().as_object().is_none());
-        }
-        let nested = |depth| format!("{{\"meta\":{}0{}}}", "[".repeat(depth), "]".repeat(depth));
-        assert!(parse(nested(126).as_bytes(), false).is_ok());
-        assert_eq!(
-            parse(nested(127).as_bytes(), false).unwrap_err(),
-            super::super::error("invalid JSON")
-        );
+        // Explicitly exercise the default Rust test-thread stack even if RUST_MIN_STACK is set.
+        std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(|| {
+                for (open, close) in [("[", "]"), ("{\"x\":", "}"), ("[{\"x\":", "}]")] {
+                    for depth in [126, 127, 128, 253, 254, 255, 256] {
+                        for leaf in ["0", "\"\\ud800\"", "{\"b\":1,\"a\":2,\"b\":3}"] {
+                            let text = format!(
+                                "{{\"meta\":{}{leaf}{}}}",
+                                open.repeat(depth),
+                                close.repeat(depth)
+                            );
+                            let total =
+                                1 + depth * close.len() + usize::from(leaf.starts_with('{'));
+                            let result = parse(text.as_bytes(), false);
+                            assert_eq!(result.is_ok(), total <= 255, "depth={total}: {result:?}");
+                        }
+                    }
+                }
+                let bytes = format!(
+                    "{{\"meta\":{}0{}}}",
+                    "[".repeat(4_194_299),
+                    "]".repeat(4_194_299)
+                );
+                assert_eq!(bytes.len(), super::super::MAX_BYTES);
+                assert_eq!(
+                    parse(bytes.as_bytes(), false).unwrap_err(),
+                    super::super::error("invalid JSON")
+                );
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 
     #[test]

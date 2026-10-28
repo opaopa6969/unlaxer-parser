@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-COUNT = 196
+COUNT = 362
 
 
 def fixtures():
@@ -81,7 +81,18 @@ def setup(folder, case):
     for index, edit in enumerate(case.get('rawEdits', [])):
         marker = encode(f'__raw_package_member_{index}__')
         assert raw.count(marker) == 1
-        raw = raw.replace(marker, edit['json'].encode('ascii'))
+        if 'nesting' in edit:
+            nesting = edit['nesting']
+            opening, closing = (b'[', b']') if nesting['shape'] == 'array' else (b'{"x":', b'}')
+            leaf = nesting.get('leaf', '0').encode('ascii')
+            budget = nesting.get('fillBytes', 0) - len(raw) + len(marker) - len(leaf)
+            depth = nesting.get('depth', budget // (len(opening) + len(closing)))
+            replacement = opening * depth + leaf + closing * depth
+            if 'fillBytes' in nesting:
+                replacement += b' ' * (budget - depth * (len(opening) + len(closing)))
+        else:
+            replacement = edit['json'].encode('ascii')
+        raw = raw.replace(marker, replacement + edit.get('after', '').encode('ascii'))
     if case.get('interiorBom'):
         raw = raw.replace(b',', b',\xef\xbb\xbf', 1)
     if case.get('uppercase'):
@@ -198,7 +209,12 @@ def check_cli(directory, commands, evidence):
                 reset(folder, initial)
                 actual = run(command, ['deps', 'resolve', '--manifest', str(folder / 'ubnf.json')], host == 'rust')
                 after = snapshot(folder)
-                record['runs'].append(dict(host=host, operation='resolve', existingSnapshot=existing, snapshot=after, **actual))
+                # Keep multi-MiB generated fixtures out of the evidence JSON; assertions
+                # below still compare every raw byte, including failed snapshots.
+                recorded = {name: {'bytes': len(data) // 2, 'sha256': digest(bytes.fromhex(data))}
+                            if data != 'directory' else data for name, data in after.items()} if any(
+                                'fillBytes' in edit.get('nesting', {}) for edit in case.get('rawEdits', [])) else after
+                record['runs'].append(dict(host=host, operation='resolve', existingSnapshot=existing, snapshot=recorded, **actual))
                 error = expected(case, host, 'resolve')
                 assert actual['exit'] == (3 if error else 0), (case['id'], host, actual)
                 assert actual['lastError'] == ('E-PACKAGE: ' + error if error else ''), (case['id'], host, actual)

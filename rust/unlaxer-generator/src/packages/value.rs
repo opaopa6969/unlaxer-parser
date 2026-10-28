@@ -5,6 +5,8 @@ use serde_json::Number;
 use std::collections::{btree_map, BTreeMap};
 use std::ops::Index;
 
+mod depth;
+
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum Value {
     Null,
@@ -266,7 +268,13 @@ impl<'de> Deserialize<'de> for MemberOrder {
 }
 
 pub(super) fn parse(bytes: &[u8]) -> Result<Value, serde_json::Error> {
-    let value = serde_json::from_slice(bytes)?;
+    let value = match serde_json::from_slice(bytes) {
+        Ok(value) => value,
+        Err(error) if error.to_string().starts_with("recursion limit exceeded") => {
+            return depth::parse(bytes);
+        }
+        Err(error) => return Err(error),
+    };
     let order = serde_json::from_slice(bytes)?;
     Ok(with_order(value, order))
 }
