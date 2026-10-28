@@ -735,13 +735,14 @@
         716,
         897
       ],
-      "observation": "javaClass/java/rust は組込みJava token classとRustの対応実装・consumerを区別する。任意JVM class/bytecodeをnativeで直接実行せず、ADAPTER registryと明示bindingを使う。宣言単位の棚卸しと未検証の移植境界は全API対応表 / public-api-audit で追跡。 #897ではadapter/contractの共有診断をJavaに統一。spanなしadapterはcode→UTF-16 subject、contractはcodeのみの安定順、重複token keyは最初の値。isBlank/trimを区別して空白context・NBSPを扱う。36文法×LF/CRLFでregistry/validateOrThrow/check/3生成CLI・全5ファイルを検査。checkは従来のソース位置順を維持し、Java-target CLI独自の再整列も固定する。",
+      "observation": "javaClass/java/rust は組込みJava token classとRustの対応実装・consumerを区別する。任意JVM class/bytecodeをnativeで直接実行せず、ADAPTER registryと明示bindingを使う。宣言単位の棚卸しと未検証の移植境界は全API対応表 / public-api-audit で追跡。 #897ではadapter/contractの共有診断をJavaに統一。spanなしadapterはcode→UTF-16 subject、contractはcodeのみの安定順、重複token keyは最初の値。isBlank/trimを区別して空白context・NBSPを扱う。46文法×LF/CRLFでregistry/validateOrThrow/check/3生成CLI・全5ファイルを検査し、参照診断が後段の生成器診断より先に出ることを5文法で検査。checkは従来のソース位置順を維持し、Java-target CLI独自の再整列も固定する。",
       "evidence": [
         "docs/token-adapters.md",
         "spec-corpus/java-token-bindings/cases.json",
         "spec-corpus/token-adapters/README.md",
         "docs/java-api-rust-parity.md",
         "spec-corpus/token-adapters/diagnostics.json",
+        "spec-corpus/token-adapters/generate-order.json",
         "rust/unlaxer-generator/tests/token_adapters.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/RustPortabilityConformanceTest.java"
       ]

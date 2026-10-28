@@ -12,8 +12,11 @@ Java / Rust の登録・解決・位置付き診断・生成・実行を共通�
   registry の span なし順序と、check のソース位置順序を別々に検証する。
   `javaTargetFirst` は Java-target CLI の既存再整列で先頭が異なる場合だけ明記する。
   UTF-16 順、同一 code の安定順、宣言と参照の競合、重複 key、空白/NBSP の
-  双方向の受理差を含む36文法。Rust の lowering/validation/portability と、
+  双方向の受理差、全角空白・U+001F・制御文字の trim を含む46文法。Rust の lowering/validation/portability と、
   Java の registry/validateOrThrow および3経路の生成 CLI を LF/CRLF で実行する。
+- `generate-order.json` (#897): `ADAPTER(...)` 参照の診断が後段の生成器診断
+  （contract・feature・comment・whitespace・mapping・未定義参照）より先に出る5文法と、
+  Java-host / native の generate が最初に報告するエラー。
 - `runtime.json`: custom ID `example.word` の独立した Java / Rust 実装をコンパイルし、
   prefix success / consumed / matched、全入力受理、capture、AST の code-point span を比較する。
   実装は `😀` → `x` の順に読むため、途中失敗と、その後の choice の rollback も検査できる。

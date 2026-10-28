@@ -21,7 +21,7 @@ fn shared_diagnostic_oracle_covers_lowering_portability_and_authoring() {
         "../../../spec-corpus/token-adapters/diagnostics.json"
     ))
     .unwrap();
-    assert_eq!(36, cases.len());
+    assert_eq!(46, cases.len());
     for case in cases {
         for ending in ["\n", "\r\n"] {
             let source = case["source"].as_str().unwrap().replace('\n', ending);
@@ -80,6 +80,28 @@ fn shared_diagnostic_oracle_covers_lowering_portability_and_authoring() {
             } else {
                 assert_eq!(5, generate(&source).unwrap().len(), "{}", case["name"]);
             }
+        }
+    }
+}
+
+#[test]
+fn adapter_references_precede_later_generator_diagnostics() {
+    // Java-host validateOrThrow reports TokenAdapterRegistry (including references)
+    // before contracts, features, comments, whitespace, mappings and references.
+    let cases: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+        "../../../spec-corpus/token-adapters/generate-order.json"
+    ))
+    .unwrap();
+    assert_eq!(5, cases.len());
+    for case in cases {
+        for ending in ["\n", "\r\n"] {
+            let source = case["source"].as_str().unwrap().replace('\n', ending);
+            assert_eq!(
+                case["first"].as_str().unwrap(),
+                generate(&source).unwrap_err(),
+                "{}",
+                case["name"]
+            );
         }
     }
 }

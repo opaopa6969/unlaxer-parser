@@ -240,7 +240,7 @@ public class RustPortabilityConformanceTest {
         Path binary = binary();
         var cases = JsonParser.parseString(Files.readString(repo.resolve(
             "spec-corpus/token-adapters/diagnostics.json"))).getAsJsonArray();
-        assertEquals("all authored cases execute", 36, cases.size());
+        assertEquals("all authored cases execute", 46, cases.size());
         List<String> report = new ArrayList<>(List.of("case\tline_endings\tcheck_exit\tgenerate_exit\tresult"));
         for (var entry : cases) {
             var fixture = entry.getAsJsonObject();
@@ -295,6 +295,32 @@ public class RustPortabilityConformanceTest {
                     assertFalse(label, Files.exists(javaTarget));
                 }
                 report.add(fixture.get("name").getAsString() + "\t" + ending + "\t" + code + "\t" + code + "\tequal");
+            }
+        }
+        // ADAPTER references are registry diagnostics, so they precede later generator checks.
+        var ordered = JsonParser.parseString(Files.readString(repo.resolve(
+            "spec-corpus/token-adapters/generate-order.json"))).getAsJsonArray();
+        assertEquals("all generate-order cases execute", 5, ordered.size());
+        for (var entry : ordered) {
+            var fixture = entry.getAsJsonObject();
+            for (String ending : List.of("\n", "\r\n")) {
+                String label = fixture.get("name").getAsString() + " / " + ending.length();
+                String source = fixture.get("source").getAsString().replace("\n", ending);
+                String first = fixture.get("first").getAsString();
+                var grammar = org.unlaxer.dsl.bootstrap.UBNFMapper.parse(source).grammars().get(0);
+                var failure = assertThrows(IllegalArgumentException.class,
+                    () -> org.unlaxer.dsl.codegen.GrammarValidator.validateOrThrow(grammar));
+                assertTrue(label + failure.getMessage(), failure.getMessage().startsWith("Grammar validation failed for G:\n - " + first + " [code:"));
+                Path directory = temporary.newFolder().toPath(), input = directory.resolve("main.ubnf");
+                Files.writeString(input, source);
+                Run java = javaRun("generate", "--target", "rust", "--grammar", input.toString(),
+                    "--output", directory.resolve("java-rust").toString());
+                Run rust = nativeRun(List.of(binary.toString(), "generate", "--target", "rust", "--grammar", input.toString(),
+                    "--output", directory.resolve("native-rust").toString()), true, directory);
+                assertEquals(label + java.err(), 3, java.code());
+                assertTrue(label + java.err(), java.err().startsWith("Grammar validation failed:\n - " + first + " [code:"));
+                assertEquals(label + rust.err(), 3, rust.code());
+                assertEquals(label, first, rust.err().strip());
             }
         }
         Files.write(Path.of("target/rust-adapter-contract-diagnostics.tsv"), report);

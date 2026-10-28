@@ -407,5 +407,101 @@
         "line": 2
       }
     ]
+  },
+  {
+    "name": "adapter-ideographic-space-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: '　' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "adapter-ideographic-space-accepts",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' accepts: '　' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "test.word",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-ideographic-space-wrapped-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: '　source　' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "test.word",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-unit-separator-accepts",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' accepts: '\u001f' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "test.word",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-control-trim-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: '\u0001source\u0002' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "contract-ideographic-space-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '　' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "contract-ideographic-space-accepts",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: '　' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "contract-ideographic-space-wrapped-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '　source' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "contract-unit-separator-accepts",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: '\u001f' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "contract-control-trim-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '\u0001source' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
   }
 ]
