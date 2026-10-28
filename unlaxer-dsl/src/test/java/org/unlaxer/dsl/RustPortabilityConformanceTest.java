@@ -399,7 +399,7 @@ public class RustPortabilityConformanceTest {
         }
         var contexts = JsonParser.parseString(Files.readString(repo.resolve(
             "spec-corpus/feature-diagnostics/lexical-contexts.json"))).getAsJsonArray();
-        assertEquals("all lexical-context cases execute", 5, contexts.size());
+        assertEquals("all lexical-context cases execute", 6, contexts.size());
         for (var entry : contexts) {
             var fixture = entry.getAsJsonObject();
             for (String ending : List.of("LF", "CRLF")) {

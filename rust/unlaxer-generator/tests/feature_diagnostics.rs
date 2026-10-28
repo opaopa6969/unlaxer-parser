@@ -91,7 +91,7 @@ fn lexical_context_preflight_keeps_the_java_lexical_prefix() {
         "../../../spec-corpus/feature-diagnostics/lexical-contexts.json"
     ))
     .unwrap();
-    assert_eq!(5, cases.len(), "all lexical-context cases execute");
+    assert_eq!(6, cases.len(), "all lexical-context cases execute");
     for case in cases {
         for (ending, separator) in [("LF", "\n"), ("CRLF", "\r\n")] {
             let source = case["source"].as_str().unwrap().replace('\n', separator);
