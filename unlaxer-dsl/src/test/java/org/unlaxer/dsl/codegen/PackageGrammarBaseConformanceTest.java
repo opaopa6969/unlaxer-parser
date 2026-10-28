@@ -66,6 +66,25 @@ public class PackageGrammarBaseConformanceTest {
         }
     }
 
+    @Test(timeout=300000) public void javaFlagsKeepOsResolvedOutputPaths() throws Exception {
+        // Only the entry grammar is lexical; existing outputs keep exists/write's OS resolution.
+        Path folder = temporary.newFolder().toPath(), work = folder.resolve("work");
+        Files.createDirectories(work.resolve("a"));
+        Files.createDirectories(folder.resolve("physical/deep"));
+        Files.createSymbolicLink(work.resolve("a/link"), Path.of("../../physical/deep"));
+        Files.writeString(work.resolve("g.ubnf"), "grammar Main { @root @mapping(Value) Start ::= 'a'; }\n");
+        Path output = work.resolve("a/link/../out"), generated = folder.resolve("physical/out/generated/MainParsers.java");
+        for (String expected : List.of("Generated: ", "Skipped (unchanged): ")) {
+            Path log = folder.resolve("flags-output.log");
+            run(List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-cp", classpath(),
+                "org.unlaxer.dsl.CodegenMain", "--grammar", work.resolve("g.ubnf").toString(), "--output", output.toString(),
+                "--generators", "Parser", "--overwrite", "if-different"), log, 30);
+            assertTrue(Files.readString(log), Files.readString(log).contains(expected));
+            assertTrue(Files.isRegularFile(generated));
+            assertFalse(Files.exists(work.resolve("a/out")));
+        }
+    }
+
     private static String classpath() {
         return Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
             .map(path -> Path.of(path).toAbsolutePath().toString()).collect(Collectors.joining(File.pathSeparator));

@@ -374,10 +374,13 @@ Java の `toAbsolutePath().normalize()` を共通契約とする。grammar / man
 | `generate --target rust` / `check --target rust` | module loader の基準だけでなく、両 CLI の先行する本文読取り・警告判定も同じ grammar を使う。Java の `checkFile`、Rust の `check_file` も含む。 |
 | `UBNFModuleLoader.load` / Rust `modules::load`・`load_for_check` | Rust は既に絶対・字句正規化済み。Java の本文読取りを揃え、Rust の既存 `modules::normalize` は #927 で使った `packages::normalize` に委譲して重複実装をなくす。 |
 | `playground --grammar` / 両 file API | 本文 snapshot・portability 判定・生成・vocabulary が同じ正規化済み grammar を使う。 |
-| Java flag CLI / `CodegenRunner` | 標準 disk port の本文読取りを正規化する。カスタム `FileSystemPort` / `SourceReader` の注入と元の引数契約は維持する。 |
+| Java flag CLI / `CodegenRunner` | 標準 disk port の入口 grammar の読取り（`readGrammar`）だけを正規化する。`--overwrite if-different` が比較する既存出力の読取りは、`exists` / 書込みと同じ OS のパス解決のままにする。カスタム `FileSystemPort` / `SourceReader` の注入と元の引数契約は維持する。 |
 | authoring LSP（通常解析・回復解析） | Java は既に URI のパスを正規化。Rust の `Resolver::with_sources` が呼ぶ `Resolver::new` で、絶対パスを字句正規化してから親を取る。未保存 buffer と検証済み package source の優先順は維持する。 |
 
 変更前の Java を `origin/master` のソースから別のクラス出力先へコンパイルし、同じ14形で70回の実 CLI 測定を行った。inspect と package Playground の28回は既に成功し、generate/check/flag の42回中21回は、先行する本文読取りが symlink の物理側や不存在成分を参照して失敗した。これが Java 側の本文読取りも揃えた理由である。
+このため Java の generate / check / grammar Playground / flag CLI で grammar が読めないときの
+I/O エラーに出るパスは、`deps inspect` と同じく正規化後の絶対パスになる（例: `nope.ubnf` は
+`<作業ディレクトリ>/nope.ubnf`）。exit code と、Rust の I/O エラー表示（パスを含まない）は変わらない。
 
 Rust の `Resolver::new` の全呼出元を確認した。module / vocabulary / packaged profile の
 入口は絶対化してから渡し、LSP は絶対 file URI を渡す。テスト内の呼出元も絶対パスを使う。

@@ -37,6 +37,8 @@ final class CodegenRunner {
 
     interface FileSystemPort {
         String readString(Path path) throws IOException;
+        /** Entry grammar text; the disk port reads the lexical path the module loader uses (#928). */
+        default String readGrammar(Path path) throws IOException { return readString(path); }
         default String readModule(Path path) throws IOException { return readString(path); }
         default String readPackage(Path path) throws IOException { return readModule(path); }
         boolean exists(Path path);
@@ -65,7 +67,7 @@ final class CodegenRunner {
         String argsHash,
         FileSystemPort fs
     ) throws IOException {
-        String source = fs.readString(Path.of(config.grammarFile()));
+        String source = fs.readGrammar(Path.of(config.grammarFile()));
         var snapshot = UBNFMapper.parseWithSource(source);
         UBNFFile file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(
             snapshot, Path.of(config.grammarFile()), new org.unlaxer.dsl.bootstrap.UBNFModuleLoader.SourceReader() {
@@ -672,8 +674,14 @@ final class CodegenRunner {
         }
 
         @Override
-        public String readString(Path path) throws IOException {
+        public String readGrammar(Path path) throws IOException {
             return Files.readString(path.toAbsolutePath().normalize());
+        }
+
+        @Override
+        public String readString(Path path) throws IOException {
+            // Existing outputs share exists/writeString's OS path resolution.
+            return Files.readString(path);
         }
 
         @Override
