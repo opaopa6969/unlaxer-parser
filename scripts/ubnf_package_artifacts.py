@@ -133,7 +133,10 @@ def run_package_artifacts(clients, directory, java_command, native_command, root
                 env.update(PATH='', JAVA_HOME='/nonexistent-java')
             result = subprocess.run(command + options, capture_output=True, text=True, timeout=30, env=env)
             if error:
-                assert result.returncode != 0 and error in result.stderr, (case['id'], host, result)
+                # Exact last line: a substring would accept e.g. a `local artifact ...` wording drift.
+                last = (result.stderr.strip().splitlines() or [''])[-1]
+                wrapped = 'Generation failed: ' + error if host == 'java-flags' else error
+                assert result.returncode != 0 and last == wrapped, (case['id'], host, result)
                 assert not output.exists(), (case['id'], host, 'partial output')
             else:
                 assert result.returncode == 0, (case['id'], host, result)
@@ -154,7 +157,8 @@ def run_package_artifacts(clients, directory, java_command, native_command, root
                     capture_output=True, text=True, timeout=30,
                     env={**os.environ, **({'PATH': '', 'JAVA_HOME': '/nonexistent-java'} if host == 'rust' else {})})
                 if 'resolveError' in case:
-                    assert result.returncode != 0 and 'E-PACKAGE: ' + case['resolveError'] in result.stderr, (case['id'], host, result)
+                    last = (result.stderr.strip().splitlines() or [''])[-1]
+                    assert result.returncode != 0 and last == 'E-PACKAGE: ' + case['resolveError'], (case['id'], host, result)
                     assert lock_path.read_bytes() == before_lock, (case['id'], host, 'failed resolve wrote lock')
                     assert {p.name: p.read_bytes() for p in cache.iterdir()} == before_cache, (case['id'], host, 'failed resolve wrote cache')
                 else:

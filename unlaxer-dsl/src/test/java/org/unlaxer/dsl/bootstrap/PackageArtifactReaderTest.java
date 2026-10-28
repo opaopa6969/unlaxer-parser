@@ -18,7 +18,7 @@ public class PackageArtifactReaderTest {
         Path file = temporary.getRoot().toPath().resolve("artifact");
         UBNFPackageResolver.LocalInput unopened = path -> { fail("rejected artifact opened"); return null; };
         for (boolean cached : new boolean[] {true, false}) {
-            assertEquals(MISSING, assertThrows(IllegalArgumentException.class,
+            assertEquals(cached ? MISSING : "E-PACKAGE: missing local artifact", assertThrows(IllegalArgumentException.class,
                 () -> UBNFPackageResolver.readArtifact(file, cached, unopened)).getMessage());
             Files.createDirectory(file);
             assertEquals(cached ? MISSING : "E-PACKAGE: artifact is not a regular file",
@@ -80,7 +80,8 @@ public class PackageArtifactReaderTest {
                 @Override public int read() throws IOException { throw new IOException("private path detail"); }
                 @Override public void close() { closed = true; }
             };
-            assertEquals("E-PACKAGE: cannot read artifact", assertThrows(IllegalArgumentException.class,
+            assertEquals(cached ? "E-PACKAGE: cannot read artifact" : "E-PACKAGE: cannot read local artifact",
+                assertThrows(IllegalArgumentException.class,
                 () -> UBNFPackageResolver.readArtifact(file, cached,
                     path -> new UBNFPackageResolver.OpenedSource(broken, true, 0))).getMessage());
             assertTrue(broken.closed);

@@ -153,19 +153,19 @@
     "id": "local-missing",
     "mode": "local",
     "kind": "missing",
-    "resolveError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+    "resolveError": "missing local artifact"
   },
   {
     "id": "local-dangling-link",
     "mode": "local",
     "kind": "dangling-link",
-    "resolveError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+    "resolveError": "missing local artifact"
   },
   {
     "id": "local-loop",
     "mode": "local",
     "kind": "loop",
-    "resolveError": "cannot read artifact"
+    "resolveError": "cannot read local artifact"
   },
   {
     "id": "local-invalid-json",
@@ -230,7 +230,7 @@
     "id": "local-transitive-missing",
     "mode": "local",
     "kind": "missing",
-    "resolveError": "missing artifact; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": "missing local artifact",
     "transitive": true
   }
 ]

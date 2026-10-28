@@ -88,7 +88,14 @@ public final class UBNFPackageResolver {
         try {
             return readSourceBytes(path, MAX_BYTES, "E-PACKAGE: " + notRegular,
                 "E-PACKAGE: artifact exceeds 8 MiB", input);
-        } catch (IOException exception) { throw documentError("artifact", exception); }
+        } catch (IOException exception) {
+            if (cached) throw documentError("artifact", exception);
+            // Explicit local sources keep Rust's existing wording: re-running deps resolve cannot fix them.
+            if (exception instanceof NoSuchFileException) throw error("missing local artifact");
+            if (exception.getMessage() != null && exception.getMessage().startsWith("E-PACKAGE: "))
+                throw new IllegalArgumentException(exception.getMessage(), exception);
+            throw error("cannot read local artifact");
+        }
     }
 
     /** Disk callbacks keep package metadata separate from local/unsaved source documents. */

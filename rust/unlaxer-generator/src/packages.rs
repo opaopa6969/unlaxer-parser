@@ -241,22 +241,28 @@ fn read_bytes<R: Read>(
     cached: bool,
     open: impl FnOnce(&Path) -> std::io::Result<OpenedLocal<R>>,
 ) -> Result<Vec<u8>, String> {
-    // Preserve the Java cache diagnostic; explicit local sources name their type error.
-    let missing = error("missing artifact; run unlaxer deps resolve --manifest ubnf.json");
+    // Preserve the Java cache diagnostic; explicit local sources keep the existing Rust
+    // local wording, since a missing source cannot be fixed by running deps resolve again.
+    let (missing, not_regular, unreadable) = if cached {
+        let missing = error("missing artifact; run unlaxer deps resolve --manifest ubnf.json");
+        (missing.clone(), missing, error("cannot read artifact"))
+    } else {
+        (
+            error("missing local artifact"),
+            error("artifact is not a regular file"),
+            error("cannot read local artifact"),
+        )
+    };
     read_source_with(
         path,
         MAX_BYTES,
-        &if cached {
-            missing.clone()
-        } else {
-            error("artifact is not a regular file")
-        },
+        &not_regular,
         &error("artifact exceeds 8 MiB"),
         |e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 missing.clone()
             } else {
-                error("cannot read artifact")
+                unreadable.clone()
             }
         },
         open,
@@ -945,11 +951,16 @@ mod tests {
         let fixture = LocalFixture::new();
         let file = fixture.0.join("artifact");
         for cached in [true, false] {
-            let missing = error("missing artifact; run unlaxer deps resolve --manifest ubnf.json");
-            let non_file = if cached {
-                missing.clone()
+            let (missing, non_file, unreadable) = if cached {
+                let missing =
+                    error("missing artifact; run unlaxer deps resolve --manifest ubnf.json");
+                (missing.clone(), missing, error("cannot read artifact"))
             } else {
-                error("artifact is not a regular file")
+                (
+                    error("missing local artifact"),
+                    error("artifact is not a regular file"),
+                    error("cannot read local artifact"),
+                )
             };
             let unopened = |_: &Path| -> std::io::Result<OpenedLocal<std::io::Empty>> {
                 panic!("rejected artifact opened")
@@ -1027,7 +1038,7 @@ mod tests {
                     len: 0,
                 }))
                 .unwrap_err(),
-                error("cannot read artifact")
+                unreadable
             );
             std::fs::remove_file(&file).unwrap();
         }

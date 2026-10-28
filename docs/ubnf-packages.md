@@ -250,13 +250,19 @@ artifact は復号・再エンコードせず、元の bytes で SHA-256 を検�
 | 条件 | cache artifact | 明示 `local:` artifact |
 | --- | --- | --- |
 | 非通常ファイル | `E-PACKAGE: missing artifact; run unlaxer deps resolve --manifest ubnf.json` | `E-PACKAGE: artifact is not a regular file` |
-| 欠落・dangling symlink | `E-PACKAGE: missing artifact; run unlaxer deps resolve --manifest ubnf.json` | 同左 |
+| 欠落・dangling symlink | `E-PACKAGE: missing artifact; run unlaxer deps resolve --manifest ubnf.json` | `E-PACKAGE: missing local artifact` |
 | 8 MiB 超過 | `E-PACKAGE: artifact exceeds 8 MiB` | 同左 |
-| その他の I/O 失敗 | `E-PACKAGE: cannot read artifact` | 同左 |
+| その他の I/O 失敗 | `E-PACKAGE: cannot read artifact` | `E-PACKAGE: cannot read local artifact` |
 
 cache の非通常ファイルの文言は **既存 Java の表示と既存 corpus の期待値を維持するため** missing artifact のままにした。
 過大・読取り失敗は #912 と同じ対象別の文言を使い、Rust の従来の一律 missing artifact への変換を外した。
-明示 `local:` の非通常ファイルは原因を示す文言とし、欠落時は同じ再 resolve の案内に揃えた。
+明示 `local:` の非通常ファイルは原因を示す文言とした。`local:` の欠落・読取り失敗は **Rust の従来の文言**
+（`missing local artifact` / `cannot read local artifact`）を維持し、Java もこれに揃えた。
+`deps resolve` の実行中に「`deps resolve` を実行せよ」と案内しても直らないため、cache の再 resolve 案内は使わない
+（Java の従来は `NoSuchFileException` 等の例外文をそのまま表示していた）。
+reader に渡る前の `local:` パスの組み立て（Java は `normalize()` で `..`・末尾 `/` を字句的に畳み、Rust は OS が解決する）の
+既存差と、NUL を含むパスの Java 例外文は reader の範囲外として
+[#921](https://github.com/opaopa6969/unlaxer-parser/issues/921) で扱う。
 同じ経路・入力に対する message/code/severity/range と検査順は両版で共通。
 stdio は code `E-MODULE`、severity `1`、source `ubnf-module`、message `import <alias>: E-PACKAGE: ...`、
 import 宣言全体の UTF-16 range。CLI は既存 wrapper・終了コードを維持して同じ原因文字列を表示する。
