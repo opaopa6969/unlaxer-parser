@@ -14,17 +14,22 @@ final class DapWireConformance {
     }
     private static void run(Wire wire, String route, String backend, Path directory) throws Exception {
         var fixture = JsonParser.parseString(Files.readString(Path.of("../docs/fixtures/dap-failures/wire.json"))).getAsJsonObject().getAsJsonObject("routes").getAsJsonObject(route);
-        assertEquals(Map.of("classic-ast", 81, "classic-token", 137, "generated", 111, "projected", 111).get(route).intValue(), fixture.getAsJsonArray("requests").size());
+        assertEquals(Map.of("classic-ast", 90, "classic-token", 146, "generated", 120, "projected", 120).get(route).intValue(), fixture.getAsJsonArray("requests").size());
         var ids = new HashSet<String>();
         var paths = new LinkedHashMap<String,String>();
         paths.put("$PROGRAM", directory.resolve("wire-program.txt").toString());
         paths.put("$MISSING", directory.resolve("wire-missing.txt").toString());
         paths.put("$DIRECTORY", directory.resolve("wire-directory").toString());
         paths.put("$INVALID_UTF8", directory.resolve("wire-invalid-utf8.txt").toString());
+        paths.put("$LOOP", directory.resolve("wire-loop").toString());
         Files.writeString(Path.of(paths.get("$PROGRAM")), fixture.get("input").getAsString());
         assertFalse(Files.exists(Path.of(paths.get("$MISSING"))));
         Files.createDirectories(Path.of(paths.get("$DIRECTORY")));
         Files.write(Path.of(paths.get("$INVALID_UTF8")), new byte[]{(byte)0xff});
+        // ELOOP; with "$PROGRAM//child/" (ENOTDIR) and a 300-byte name (ENAMETOOLONG) these use
+        // Java's UnixException text, and "$PROGRAM/" shows Path.of dropping a trailing slash.
+        Files.deleteIfExists(Path.of(paths.get("$LOOP")));
+        Files.createSymbolicLink(Path.of(paths.get("$LOOP")), Path.of("wire-loop"));
         var evidence = new ArrayList<String>(); var raw = new ArrayList<String>();
         Path out = Path.of("target/dap-wire-"+route+"-"+backend);
         Files.deleteIfExists(Path.of(out+".tsv"));

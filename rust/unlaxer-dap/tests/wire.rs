@@ -133,3 +133,84 @@ fn malformed_utf8_lengths_use_the_shared_jdk_observations() {
     assert_eq!(count, 20);
     std::fs::remove_file(path).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn unix_path_failures_use_java_unix_exception_text_and_path_normalization() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../../docs/fixtures/dap-failures/wire.json"
+    ))
+    .unwrap();
+    let rows = fixture["routes"]["generated"]["requests"]
+        .as_array()
+        .unwrap();
+    let directory = std::env::temp_dir().join(format!("wire-945-unix-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(directory.join("wire-directory")).unwrap();
+    let markers = [
+        ("$PROGRAM", directory.join("wire-program.txt")),
+        ("$DIRECTORY", directory.join("wire-directory")),
+        ("$LOOP", directory.join("wire-loop")),
+    ];
+    std::fs::write(&markers[0].1, "x").unwrap();
+    std::os::unix::fs::symlink("wire-loop", &markers[2].1).unwrap();
+    let substitute = |text: &str, forward: bool| {
+        markers
+            .iter()
+            .fold(text.to_owned(), |text, (marker, path)| {
+                let path = path.to_str().unwrap();
+                if forward {
+                    text.replace(marker, path)
+                } else {
+                    text.replace(path, marker)
+                }
+            })
+    };
+    let mut server = Server::new(ParserBackend {
+        mapper: |_| Ok(vec![]),
+        tokens: |_| Ok(vec![]),
+    });
+    let mut seq = 0;
+    for case in ["not-directory", "symlink-loop", "long-name"] {
+        let launch = rows
+            .iter()
+            .find(|row| row["id"] == format!("token/{case}/launch"))
+            .unwrap();
+        let program = substitute(launch["arguments"]["program"].as_str().unwrap(), true);
+        seq += 1;
+        server.handle(
+            json!({"seq":seq,"type":"request","command":"launch","arguments":{"program":program}}),
+        );
+        seq += 1;
+        let messages = server.handle(
+            json!({"seq":seq,"type":"request","command":"configurationDone","arguments":{}}),
+        );
+        let mut normalized = vec![];
+        for mut message in messages {
+            let object = message.as_object_mut().unwrap();
+            object.remove("seq");
+            object.remove("request_seq");
+            if let Some(text) = message["body"]["output"].as_str() {
+                message["body"]["output"] = json!(substitute(text, false));
+            }
+            normalized.push(message);
+        }
+        let expected = rows
+            .iter()
+            .find(|row| row["id"] == format!("token/{case}/configure"))
+            .unwrap();
+        assert_eq!(json!(normalized), expected["messages"], "{case}");
+    }
+    // Java's Path.of drops the trailing '/', so the file itself is read (#945).
+    let program = format!("{}/", markers[0].1.to_str().unwrap());
+    server.handle(
+        json!({"seq":seq+1,"type":"request","command":"launch","arguments":{"program":program}}),
+    );
+    let messages = server
+        .handle(json!({"seq":seq+2,"type":"request","command":"configurationDone","arguments":{}}));
+    assert_eq!(
+        messages[0]["body"]["output"],
+        "Token stepping unavailable: no parser steps\n"
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}

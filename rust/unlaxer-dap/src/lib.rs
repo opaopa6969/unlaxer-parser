@@ -647,17 +647,16 @@ impl<B: Backend> Server<B> {
                 self.program
             ));
         }
-        let io_error = |error: io::Error| match error.kind() {
-            io::ErrorKind::NotFound => format!("NoSuchFileException: {}", self.program),
-            io::ErrorKind::PermissionDenied => format!("AccessDeniedException: {}", self.program),
-            io::ErrorKind::IsADirectory => "IOException: Is a directory".into(),
-            _ => format!("IOException: {error}"),
-        };
-        let metadata = std::fs::metadata(&self.program).map_err(io_error)?;
+        // Path.of on Unix collapses repeated '/' and drops a trailing '/', so Java opens
+        // (and names in its exception) "dir/file" for "dir//file/" (#945).
+        let path = java_path(&self.program);
+        let mut file = std::fs::File::open(&path).map_err(|error| open_error(&path, &error))?;
+        let metadata = file.metadata().map_err(|error| read_error(&error))?;
         if metadata.len() > 4 * 1024 * 1024 {
             return Err("source limit exceeded".into());
         }
-        let bytes = std::fs::read(&self.program).map_err(io_error)?;
+        let mut bytes = vec![];
+        io::Read::read_to_end(&mut file, &mut bytes).map_err(|error| read_error(&error))?;
         String::from_utf8(bytes).map_err(|error| {
             // Files.readString uses String's non-replacing UTF-8 path, whose
             // malformed length differs from std::str::Utf8Error::error_len().
@@ -789,6 +788,63 @@ fn stopped(reason: &str) -> (&'static str, Value) {
         json!({"reason":reason,"threadId":1,"allThreadsStopped":true}),
     )
 }
+/// The path string of Java's Path.of(program) on Unix (UnixPath.normalizeAndCheck).
+fn java_path(program: &str) -> String {
+    if !cfg!(unix) {
+        return program.into();
+    }
+    let mut path = String::with_capacity(program.len());
+    for c in program.chars() {
+        if !(c == '/' && path.ends_with('/')) {
+            path.push(c);
+        }
+    }
+    if path.len() > 1 && path.ends_with('/') {
+        path.pop();
+    }
+    path
+}
+/// strerror(3), which both JDK UnixException and Rust's io::Error Display use.
+fn os_reason(error: &io::Error) -> String {
+    let text = error.to_string();
+    match error.raw_os_error() {
+        Some(code) => text
+            .strip_suffix(&format!(" (os error {code})"))
+            .unwrap_or(&text)
+            .to_owned(),
+        None => text,
+    }
+}
+/// Files.readString open failures: UnixException.translateToIOException(file).
+fn open_error(path: &str, error: &io::Error) -> String {
+    // ENOENT / EACCES are 2 / 13 on every Unix; EPERM is not AccessDenied in Java.
+    match (cfg!(unix), error.raw_os_error()) {
+        (true, Some(2)) => format!("NoSuchFileException: {path}"),
+        (true, Some(13)) => format!("AccessDeniedException: {path}"),
+        (true, Some(code)) => format!(
+            "FileSystemException: {path}: {}{}",
+            os_reason(error),
+            if code == ELOOP {
+                " or unable to access attributes of symbolic link"
+            } else {
+                ""
+            }
+        ),
+        _ => match error.kind() {
+            io::ErrorKind::NotFound => format!("NoSuchFileException: {path}"),
+            io::ErrorKind::PermissionDenied => format!("AccessDeniedException: {path}"),
+            _ => read_error(error),
+        },
+    }
+}
+/// Failures after open (for example EISDIR from read) carry only the OS message in Java.
+fn read_error(error: &io::Error) -> String {
+    format!("IOException: {}", os_reason(error))
+}
+#[cfg(any(target_os = "linux", target_os = "android"))]
+const ELOOP: i32 = 40;
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+const ELOOP: i32 = 62;
 fn normalized_debug_path(path: &str) -> Option<std::path::PathBuf> {
     use std::path::{Component, Path, PathBuf};
     if path.trim().is_empty() || path.contains('\0') {
