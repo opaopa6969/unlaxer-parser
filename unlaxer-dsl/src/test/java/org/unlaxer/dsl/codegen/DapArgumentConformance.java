@@ -46,7 +46,7 @@ final class DapArgumentConformance {
         for (boolean argumentsFirst : List.of(true, false)) for (var element : fixture.getAsJsonArray("numbers")) {
             var row = element.getAsJsonObject().deepCopy();
             if (!argumentsFirst) {
-                row.remove("int32"); row.remove("error");
+                row.remove("int32"); row.remove("error"); row.remove("errorByJdk");
                 if (row.has("streamInt32")) row.add("int32", row.get("streamInt32"));
                 else row.add("error", row.get("streamError"));
             }
@@ -68,19 +68,31 @@ final class DapArgumentConformance {
                 var expected = new JsonObject(); expected.addProperty("success", success);
                 expected.add("message", success ? JsonNull.INSTANCE : new JsonPrimitive(row.has("error") ? "Message could not be parsed." : "Internal error."));
                 expected.addProperty("bodyType", row.has("error") || success && !command.equals("next") ? "object" : success ? "absent" : "string");
+                JsonObject canonical = null;
                 if (row.has("error")) {
+                    // `error` is the JDK 21 text that Rust reproduces. Java's BigDecimal
+                    // rejects some exponents with another text on JDK 17 (errorByJdk); the
+                    // evidence keeps the JDK 21 text so the Rust comparison stays exact.
                     String error = row.get("error").getAsString();
-                    if (argumentsFirst) error = error.replace("$.breakpoints[0].line", command.equals("setBreakpoints") ? "$.breakpoints[0].line" : "$."+field);
+                    var variants = row.has("errorByJdk") ? row.getAsJsonObject("errorByJdk") : new JsonObject();
+                    String jdk = Integer.toString(Runtime.version().feature());
+                    String measured = backend.equals("java") && variants.has(jdk) ? variants.get(jdk).getAsString() : error;
+                    java.util.function.UnaryOperator<String> locate;
+                    if (argumentsFirst) locate = text -> text.replace("$.breakpoints[0].line", command.equals("setBreakpoints") ? "$.breakpoints[0].line" : "$."+field);
                     else {
                         String encoded = new Gson().toJson(row.get("value"));
                         int end = wire.lastPayload.lastIndexOf(encoded) + encoded.length();
                         int position = row.get("value").isJsonArray() || row.get("value").isJsonObject() ? end - encoded.length() + 1 : end;
-                        error = error.replace("{column}", Integer.toString(position+1)).replace("{path}", command.equals("setBreakpoints") ? "$.arguments.breakpoints[0].line" : "$.arguments."+field);
+                        locate = text -> text.replace("{column}", Integer.toString(position+1)).replace("{path}", command.equals("setBreakpoints") ? "$.arguments.breakpoints[0].line" : "$.arguments."+field);
                     }
-                    expected.addProperty("bodyMessage", error);
+                    expected.addProperty("bodyMessage", locate.apply(measured));
+                    if (!measured.equals(error)) {
+                        canonical = expected.deepCopy(); canonical.addProperty("bodyMessage", locate.apply(error));
+                    }
                 }
                 else if (!success) expected.addProperty("firstLine", "java.util.concurrent.CompletionException: java.lang.IllegalArgumentException: invalid or unavailable debug request");
                 observe((argumentsFirst ? "tree/" : "stream/")+row.get("id").getAsString()+"/"+command, response, expected);
+                if (canonical != null) evidence.set(evidence.size()-1, (argumentsFirst ? "tree/" : "stream/")+row.get("id").getAsString()+"/"+command+"\t"+canonical);
                 if (success && command.equals("setBreakpoints")) {
                     assertEquals(row.get("int32"), response.getAsJsonObject("body").getAsJsonArray("breakpoints").get(0).getAsJsonObject().get("line"));
                 } else if (success && command.equals("next")) {
@@ -126,7 +138,11 @@ final class DapArgumentConformance {
             if (response.get("success").getAsBoolean()) {
                 wire.event("initialized");
                 assertTrue("measured program path is required", row.has("programPath"));
-                var breakpoint = wire.request("setBreakpoints", Map.of("source", Map.of("path", row.get("programPath").getAsString()), "breakpoints", List.of(Map.of("line", 1))));
+                // Java's Double.toString differs on JDK 17 (programPathByJdk); Rust keeps the JDK 21 text.
+                var variants = row.has("programPathByJdk") ? row.getAsJsonObject("programPathByJdk") : new JsonObject();
+                String jdk = Integer.toString(Runtime.version().feature());
+                String programPath = (backend.equals("java") && variants.has(jdk) ? variants.get(jdk) : row.get("programPath")).getAsString();
+                var breakpoint = wire.request("setBreakpoints", Map.of("source", Map.of("path", programPath), "breakpoints", List.of(Map.of("line", 1))));
                 assertTrue("program stringification: "+row, breakpoint.getAsJsonArray("breakpoints").get(0).getAsJsonObject().get("verified").getAsBoolean());
             } else assertEquals("failed launch preserves the current session", before, state());
             barrier();

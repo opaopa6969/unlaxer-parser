@@ -50,6 +50,17 @@ Java 基準 revision は `bd7e6695`、LSP4J 0.23.1 / Gson 2.13.2 / JDK 21.0.9。
 
 この表の「int」は DTO への変換結果。例えば threadId / variablesReference の 0 は変換には成功するが、その後 adapter が `Internal error.` で拒否する。frameId 0 や breakpoint line 0 は受理する。範囲外の**数値**と**文字列**を同じ規則にしない。極端な指数の例外も fixture に全文を記録している。
 
+**JDK17 と JDK21 で Java の結果が違う行がある。** Java の参照挙動は JDK の `BigDecimal` と `Double.toString` に依存する。fixture の `error` / `programPath` は JDK21 の値で、Rust はこれを返す。JDK17（Temurin 17.0.20 で実測）の値は行の `errorByJdk` / `programPathByJdk` に `"17"` として持ち、Java backend の比較は実行中 JDK の値を使う。Java/Rust の比較一覧には JDK21 の値を記録する。
+
+| 行 | JDK21（既定、Rust） | JDK17（`…ByJdk`） |
+|---|---|---|
+| int `1e2147483648`（tree） | `Number has unsupported scale: 1e2147483648` | `Exponent overflow.` |
+| int `1e-2147483648`, `1.0e-2147483647`（tree） | `Exponent overflow.` | `Scale out of range.` |
+| launch program `1e23` | `1.0E23` | `9.999999999999999E22` |
+| launch program `1e-323` | `9.9E-324` | `1.0E-323` |
+
+他の行と stream 経路の診断は JDK17 でも同じになる（全行を JDK17 で照合済み）。
+
 `launch` / `attach` の引数は型付き DTO と異なり `Map<String,Object>`。launch は `program` / `formulaSource` / `runtimeMode` / `steppingMode` の参照時に Java の `String.valueOf` を使う。元の map は application hook に保持する。
 
 | program の JSON 値 | 実際の文字列（両順序） |
@@ -60,8 +71,8 @@ Java 基準 revision は `bd7e6695`、LSP4J 0.23.1 / Gson 2.13.2 / JDK 21.0.9。
 | `{"a":1,"b":true}` | `{a=1.0, b=true}`（入力順を保持） |
 | `[1,true,"x"]` | `[1.0, true, x]` |
 | `-0.0`, `1e400`, `-1e400` | `-0.0` / `Infinity` / `-Infinity` |
-| `5e-324`, `1e-323` | `4.9E-324` / `9.9E-324` |
-| `1e-4`, `1e7`, `1e23` | `1.0E-4` / `1.0E7` / `1.0E23` |
+| `5e-324`, `1e-323` | `4.9E-324` / `9.9E-324`（JDK21。JDK17 の差は下記） |
+| `1e-4`, `1e7`, `1e23` | `1.0E-4` / `1.0E7` / `1.0E23`（同上） |
 | `null`, `""` | fallback の formulaSource もなければ adapter が launch を拒否 |
 
 一方、型付きの `source.path` などの String field は数値の元の表記を保持する（`5` → `"5"`、`1E+0` → `"1E+0"`）。boolean は文字列化し、object / array は parse 失敗。Boolean field は文字列 `"true"`（大小文字を区別しない）だけ true、他の文字列は false。自由形式の launch `stopOnEntry` は Boolean.TRUE だけが true であり、この DTO 用の変換を適用しない。
