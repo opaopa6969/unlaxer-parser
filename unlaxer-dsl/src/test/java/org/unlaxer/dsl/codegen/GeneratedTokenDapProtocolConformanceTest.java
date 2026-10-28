@@ -79,6 +79,7 @@ public class GeneratedTokenDapProtocolConformanceTest {
         wire.failures = new DapFailureConformance("generated", backend);
         wire.probeFailures("fresh");
         DapLaunchStateConformance.check(wire, "generated", backend, temporary.getRoot().toPath());
+        DapWireConformance.check(wire, "generated", backend, temporary.getRoot().toPath());
         assertEquals(6, rows().size());
         for (boolean base : List.of(true, false)) for (int offset : List.of(0, 7)) {
             wire.request("initialize", Map.of("adapterID", "generated", "linesStartAt1", base, "columnsStartAt1", base));

@@ -38,6 +38,7 @@
     "899": {"state": "CLOSED", "title": "parity(dap): CRLF 内部を指す token 位置で Java は launch 後に局所失敗し Rust は launch 時に拒否する（#892 レビュー）"},
     "900": {"state": "CLOSED", "title": "parity(dap): stackTrace 以外の失敗 response の message / body が Java（LSP4J）と異なる（#892 レビュー）"},
     "938": {"state": "OPEN", "title": "parity(dap): launch 直後の未設定 session の表示と、command 先行 frame の複数要素引数配列で Java/Rust DAP が異なる（#935 レビュー）"},
+    "945": {"state": "OPEN", "title": "parity(dap): stackTrace の totalFrames、event と response の順序、準備失敗の output 本文が Java/Rust DAP で異なる（#944 レビュー）"},
     "905": {"state": "CLOSED", "title": "parity: Rust DAP が Java（Gson）の受理する型の緩い引数を拒否し、parse 失敗の形も異なる"},
     "864": {"state": "OPEN", "title": "parity(lsp): UBNF authoring serverのRust利用経路をJava基準へ揃える"},
     "885": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の全診断・profile 再設定を Java 契約へ揃える（#864 後続）"},
@@ -1612,6 +1613,28 @@
       ]
     },
     {
+      "id": "dap-wire-contract",
+      "category": "contract",
+      "title": "DAP stackTrace 全 body・到着順・準備失敗 output",
+      "hosts": "Java DAP / Rust DAP・両生成host",
+      "issues": [
+        945,
+        938,
+        905
+      ],
+      "observation": "Java基準 fef78402 / LSP4J0.23.1 の実stdioを独立期待値に、Classic AST/token・Generated・Projected の9経路1098requestをJDK17/21で検証。RustはtotalFramesを除去し、pending/停止中/終了後/準備失敗後のstackTrace全bodyを一致させる。DAPではtotalFramesは任意だが、省略だけで全frame取得済みを意味せず、少数返却まで追加取得する規定。launch/configurationDone/continueはJavaと同じevent先行、seqはwire順に単調増加しrequest_seqを保持。意図した差: NextRequestはDAPがresponse→stoppedを明示するため、Rustのnextは終了時もresponse先行を維持（Javaはevent先行）。VS Code公開clientの到着順queue/request_seq対応とstoppedSinceLastStep処理を確認。準備失敗はstderr、file/source解決はCannot prepare debug source、root失敗はParse error at offset 0、成功prefixの未消費入力はUTF-16長N、AST収集はAST stepping unavailableに統一。JVMのhook例外クラス名はRust String APIに無いため詳細だけ意図した差（source throw/null、AST throw/span）。Generated/ProjectedのAST fixtureはJava UnsupportedOperationException:token fixtureとRust source検証の詳細が異なる。両版の全文をwire.json messages/rustMessagesで固定し、順序のソートやprefixだけの照合はしない。不正UTF-8は11列を実測し、Stringの非置換decodeが返す長さ1/2/3/4も合わせる（Rust標準error_lenとは異なる）。UnixのIO失敗はJava UnixExceptionと同じ本文（ENOENT→NoSuchFileException、EACCES→AccessDeniedException、ENOTDIR/ELOOP/ENAMETOOLONG等→FileSystemException: path: strerror、ELOOPは or unable to access attributes of symbolic link 付き、open後のEISDIR等→IOException: strerror）に揃え、Path.ofと同じく連続/末尾の/を正規化して開く（末尾/のprogramもJavaと同じく読める）。Unix以外のOS固有IO errorの詳細は意図した差として、Cannot prepare debug sourceとstderrを保ちRustの詳細を使う。今回の本文にJDK差なし。Java製品DAP・公開3.3.0・parserホットパス・crate依存は不変。既存Rustの4MiB source上限とbounded/incomplete trace・不正手製Stepの防護は共通Java wire入力のない範囲として維持（source上限はCannot prepare debug source、step拒否はモード別stepping unavailable）。",
+      "evidence": [
+        "docs/fixtures/dap-failures/README.md",
+        "docs/fixtures/dap-failures/wire.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/DapWireConformance.java",
+        "rust/unlaxer-dap/src/lib.rs",
+        "rust/unlaxer-dap/tests/wire.rs",
+        "rust/unlaxer-dap/tests/protocol.rs",
+        "rust/unlaxer-codegen/src/dap.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/codegen/rust/RustDapEmitter.java"
+      ]
+    },
+    {
       "id": "advanced-dap",
       "category": "unsupported",
       "title": "live evaluator debugger と advanced DAP",
@@ -2551,7 +2574,8 @@
       "entries": [
         "host-bindings"
       ]
-    }
+    },
+    {"path": "docs/fixtures/dap-failures/wire.json", "fields": {"rustMessages": 47}, "entries": ["dap-wire-contract"]}
   ],
   "test_markers": [
     {

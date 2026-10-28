@@ -15,11 +15,21 @@ public final class JavaMain {
     public static void main(String[] args) throws Exception {
         var fixtures = JsonParser.parseString(Files.readString(Path.of(args[0]))).getAsJsonArray();
         var server = new GeneratedInspectionDebugAdapter() {
+            String wireFailure = "";
+            @Override protected Object parseDebugAst(String source) {
+                if (wireFailure.equals("ast-empty")) return null;
+                if (wireFailure.equals("ast-span")) return new Object();
+                if (wireFailure.equals("ast-throw")) throw new IllegalStateException("fixture mapper failure");
+                return super.parseDebugAst(source);
+            }
             @Override protected DebugSource resolveDebugSource(String program, String original, Map<String,Object> arguments) {
+                wireFailure = String.valueOf(arguments.getOrDefault("wireFailure", ""));
+                if (wireFailure.equals("source-throw")) throw new IllegalArgumentException("fixture source failure");
+                if (wireFailure.equals("source-null")) return null;
                 row = null;
                 for (var item : fixtures) if (item.getAsJsonObject().get("name").getAsString().equals(arguments.get("fixture"))) row = item.getAsJsonObject();
                 if (row == null) throw new IllegalArgumentException("unknown fixture");
-                return debugSource(row.get("input").getAsString(), ((Number)arguments.getOrDefault("lineOffset", 0)).intValue());
+                return debugSource(String.valueOf(arguments.getOrDefault("sourceText", row.get("input").getAsString())), ((Number)arguments.getOrDefault("lineOffset", 0)).intValue());
             }
             // ANCHOR_HOOK
         };

@@ -62,6 +62,7 @@ pub trait Backend {
     }
     /// Return strict mapped AST nodes, or a complete committed token trace when
     /// supports_token_trace() is true and token mode is requested. No partial results.
+    /// Use parse_error() for syntax failures; other errors describe unavailable stepping.
     fn steps(&mut self, snapshot: &Snapshot, arguments: &Value) -> Result<Vec<Step>, String>;
     fn resolve_source(
         &mut self,
@@ -153,6 +154,25 @@ pub fn token_steps(tree: &unlaxer_runtime::Tree) -> Result<Vec<Step>, String> {
     }
     Ok(steps)
 }
+/// Format the generated Java DAP's parse failure for Backend::steps.
+/// A rejected root reports zero; a successful prefix reports its UTF-16 length.
+/// Pass the structured diagnostic (not its farthest failure, which loses trailing_input).
+pub fn parse_error(source: &str, diagnostic: &unlaxer_runtime::ParseDiagnostic) -> String {
+    if diagnostic.kind == "resource_limit" {
+        return format!("{:?}", diagnostic.farthest);
+    }
+    let offset = if diagnostic.kind == "trailing_input" {
+        source
+            .chars()
+            .take(diagnostic.offset)
+            .map(char::len_utf16)
+            .sum()
+    } else {
+        0
+    };
+    format!("Parse error at offset {offset}")
+}
+
 pub struct Server<B> {
     backend: B,
     seq: i64,
@@ -349,7 +369,7 @@ impl<B: Backend> Server<B> {
                             }
                         }
                         Err(error) => {
-                            events.push(("output",json!({"category":"stderr","output":format!("{} stepping unavailable: {error}\n",if self.ast_mode {"AST"}else{"Token"})})));
+                            events.push(("output", json!({"category":"stderr","output":error})));
                             self.finish_events(&mut events);
                         }
                     }
@@ -378,7 +398,7 @@ impl<B: Backend> Server<B> {
                     } else {
                         vec![]
                     };
-                    Ok(json!({"stackFrames":frames,"totalFrames":frames.len()}))
+                    Ok(json!({"stackFrames":frames}))
                 }
                 "scopes" => {
                     if !arguments.is_object()
@@ -513,7 +533,14 @@ impl<B: Backend> Server<B> {
             }
         })();
         let mut output = vec![];
-        // Complete the request before sending resulting events.
+        // LSP4J emits notifications inside the adapter method, before its future
+        // completes. DAP NextRequest explicitly requires response-before-stopped,
+        // so keep that exception (including the terminating next) on Rust.
+        // Allocate seq only in wire order; request_seq always identifies the request.
+        let response_first = command == "next";
+        if !response_first {
+            self.append_events(&mut output, &mut events);
+        }
         let mut response = json!({"seq":self.next_seq(),"type":"response","request_seq":request_seq,"command":command,"success":result.is_ok()});
         match result {
             Ok(body) => {
@@ -536,14 +563,17 @@ impl<B: Backend> Server<B> {
             }
         }
         output.push(response);
-        for (event, body) in events {
+        self.append_events(&mut output, &mut events);
+        output
+    }
+    fn append_events(&mut self, output: &mut Vec<Value>, events: &mut Vec<(&str, Value)>) {
+        for (event, body) in events.drain(..) {
             let mut value = json!({"seq":self.next_seq(),"type":"event","event":event});
             if !body.is_null() {
                 value["body"] = body;
             }
             output.push(value);
         }
-        output
     }
     fn next_seq(&mut self) -> i64 {
         self.seq += 1;
@@ -582,14 +612,71 @@ impl<B: Backend> Server<B> {
         Ok(None)
     }
     fn prepare(&mut self) -> Result<(), String> {
-        let metadata = std::fs::metadata(&self.program).map_err(|e| e.to_string())?;
+        let original = self
+            .read_source()
+            .map_err(|detail| self.source_error(&detail))?;
+        let source = self
+            .backend
+            .resolve_source(&self.program, &original, &self.arguments)
+            .map_err(|detail| self.source_error(&detail))?;
+        self.prepare_steps(source).map_err(|detail| {
+            // The String-returning Backend API is retained. Generated backends use
+            // parse_error() for this exact diagnostic, rather than leaking parser Debug text.
+            if detail
+                .strip_prefix("Parse error at offset ")
+                .is_some_and(|offset| {
+                    !offset.is_empty() && offset.bytes().all(|b| b.is_ascii_digit())
+                })
+            {
+                format!("{detail}\n")
+            } else {
+                format!(
+                    "{} stepping unavailable: {detail}\n",
+                    if self.ast_mode { "AST" } else { "Token" }
+                )
+            }
+        })
+    }
+    fn source_error(&self, detail: &str) -> String {
+        format!("Cannot prepare debug source: {} ({detail})\n", self.program)
+    }
+    fn read_source(&self) -> Result<String, String> {
+        if self.program.contains('\0') {
+            return Err(format!(
+                "InvalidPathException: Nul character not allowed: {}",
+                self.program
+            ));
+        }
+        // Path.of on Unix collapses repeated '/' and drops a trailing '/', so Java opens
+        // (and names in its exception) "dir/file" for "dir//file/" (#945).
+        let path = java_path(&self.program);
+        let mut file = std::fs::File::open(&path).map_err(|error| open_error(&path, &error))?;
+        let metadata = file.metadata().map_err(|error| read_error(&error))?;
         if metadata.len() > 4 * 1024 * 1024 {
             return Err("source limit exceeded".into());
         }
-        let original = std::fs::read_to_string(&self.program).map_err(|e| e.to_string())?;
-        let source = self
-            .backend
-            .resolve_source(&self.program, &original, &self.arguments)?;
+        let mut bytes = vec![];
+        io::Read::read_to_end(&mut file, &mut bytes).map_err(|error| read_error(&error))?;
+        String::from_utf8(bytes).map_err(|error| {
+            // Files.readString uses String's non-replacing UTF-8 path, whose
+            // malformed length differs from std::str::Utf8Error::error_len().
+            let invalid = &error.as_bytes()[error.utf8_error().valid_up_to()..];
+            let length = match invalid[0] {
+                0xe0..=0xef if invalid.len() >= 3 => 3,
+                0xe0..=0xef
+                    if invalid.len() == 2
+                        && (invalid[1] & 0xc0 != 0x80
+                            || invalid[0] == 0xe0 && invalid[1] < 0xa0) =>
+                {
+                    2
+                }
+                0xf0..=0xf7 if invalid.len() >= 4 => 4,
+                _ => 1,
+            };
+            format!("MalformedInputException: Input length = {length}")
+        })
+    }
+    fn prepare_steps(&mut self, source: DebugSource) -> Result<(), String> {
         // Java stores sourceLineOffset as soon as the source resolves, before parsing or
         // collecting steps; a later failure still moves the next pending frame (#938).
         self.line_offset = source.line_offset;
@@ -701,6 +788,63 @@ fn stopped(reason: &str) -> (&'static str, Value) {
         json!({"reason":reason,"threadId":1,"allThreadsStopped":true}),
     )
 }
+/// The path string of Java's Path.of(program) on Unix (UnixPath.normalizeAndCheck).
+fn java_path(program: &str) -> String {
+    if !cfg!(unix) {
+        return program.into();
+    }
+    let mut path = String::with_capacity(program.len());
+    for c in program.chars() {
+        if !(c == '/' && path.ends_with('/')) {
+            path.push(c);
+        }
+    }
+    if path.len() > 1 && path.ends_with('/') {
+        path.pop();
+    }
+    path
+}
+/// strerror(3), which both JDK UnixException and Rust's io::Error Display use.
+fn os_reason(error: &io::Error) -> String {
+    let text = error.to_string();
+    match error.raw_os_error() {
+        Some(code) => text
+            .strip_suffix(&format!(" (os error {code})"))
+            .unwrap_or(&text)
+            .to_owned(),
+        None => text,
+    }
+}
+/// Files.readString open failures: UnixException.translateToIOException(file).
+fn open_error(path: &str, error: &io::Error) -> String {
+    // ENOENT / EACCES are 2 / 13 on every Unix; EPERM is not AccessDenied in Java.
+    match (cfg!(unix), error.raw_os_error()) {
+        (true, Some(2)) => format!("NoSuchFileException: {path}"),
+        (true, Some(13)) => format!("AccessDeniedException: {path}"),
+        (true, Some(code)) => format!(
+            "FileSystemException: {path}: {}{}",
+            os_reason(error),
+            if code == ELOOP {
+                " or unable to access attributes of symbolic link"
+            } else {
+                ""
+            }
+        ),
+        _ => match error.kind() {
+            io::ErrorKind::NotFound => format!("NoSuchFileException: {path}"),
+            io::ErrorKind::PermissionDenied => format!("AccessDeniedException: {path}"),
+            _ => read_error(error),
+        },
+    }
+}
+/// Failures after open (for example EISDIR from read) carry only the OS message in Java.
+fn read_error(error: &io::Error) -> String {
+    format!("IOException: {}", os_reason(error))
+}
+#[cfg(any(target_os = "linux", target_os = "android"))]
+const ELOOP: i32 = 40;
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+const ELOOP: i32 = 62;
 fn normalized_debug_path(path: &str) -> Option<std::path::PathBuf> {
     use std::path::{Component, Path, PathBuf};
     if path.trim().is_empty() || path.contains('\0') {

@@ -211,7 +211,7 @@ fn trace_limit_resource_and_incomplete_failures_terminate_without_stopping() {
                 seq,
                 "launch",
                 json!({"program":file,"failure":failure,"stopOnEntry":true})
-            ))[0]["success"],
+            ))[1]["success"],
             true
         );
         seq += 1;

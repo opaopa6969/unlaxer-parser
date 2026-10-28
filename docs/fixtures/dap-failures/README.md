@@ -123,3 +123,65 @@ Rust はクライアントを待ち続けさせず、**`success:false`、`messag
 Classic AST / Classic token（Java host・native Rust host）/ Generated / Projected の共通 stdio で12 request（stackTrace / setBreakpoints / launch / next / initialize / configurationDone / evaluate / source / scopes / variables / continue / disconnect）×配列長2/3×pending/stopped の48行を各経路で確認する。Java は1秒の観測窓で無応答・生存を確認し、後続 threads を barrier にして、遅れて届く response や event も拒否する。Rust は失敗 response の形と診断全文を照合し、両版とも frame / scope / variables の不変、後続 request の応答、単一要素の正常 dispatch を確認する。
 
 `DapLaunchStateConformance` は既存の必須4クラスから呼び出すため、CI の `-Dtest` と `.github/optin-test-contracts.json` は既存登録を利用する。9経路の `target/dap-launch-state-<route>-<backend>.tsv` と `-raw.tsv` を保存し、CI は比較一覧を必須にする。無応答の観測では同じ read Future を保持し、timeout 後に別の reader を積まない。
+
+## stackTrace 全 body・wire 順序・準備失敗本文（#945）
+
+基準は `fef784027cea8aaae72a483a89e69ec0ac85c7e8` の生成 Java DAP（LSP4J 0.23.1）。[`wire.json`](wire.json) は Classic AST / Classic token / Generated / Projected の実 stdio の独立期待値である。Java の生成 DAP は変更しない。JDK21.0.9 / JDK17.0.12 Oracle で照合し、今回の本文・順序には JDK 差を観測していない。既存 #905 の `errorByJdk` / `programPathByJdk` は維持する。
+
+### stackTrace
+
+Rust も Java と同じ `{ "stackFrames": [...] }` だけを返す。pending、停止中、各 next 後、終了後、準備失敗後の **body 全体**を照合する。フレームの path だけは両 process 共通の一時ファイルを `$PROGRAM` 等へ置換する。
+
+`totalFrames` は [DAP StackTraceResponse](https://github.com/microsoft/debug-adapter-protocol/blob/c10f18c3332ca04cece1081aa00232a9d882438d/debugAdapterProtocol.json) では任意。ただし「省略すれば常に全 frame を返した意味」ではない。省略時は要求した数より少ない frame が返るまで追加取得する規定である。この adapter は Java と同じく supportsDelayedStackTraceLoading を広告せず、保持中の0/1 frame を返す。[VS Code `Thread.fetchCallStack`](https://github.com/microsoft/vscode/blob/74b7203c0c6eba1f895ab8591a498390400d945c/src/vs/workbench/contrib/debug/common/debugModel.ts#L660) も返却数と要求数で終端を判定し、数値の totalFrames がある場合だけ追加の終端判定に使う。省略でプロトコル上の必須 field は失われない。
+
+### event と response の到着順
+
+`R` はその request の response。以下はバッファでイベントを探した順序ではなく、stdio の受信順である。
+
+| request / 結果 | Java | Rust |
+|---|---|---|
+| initialize | R のみ | 同じ |
+| launch | initialized → R | 同じ |
+| configurationDone / entry・breakpoint | stopped → R | 同じ |
+| configurationDone / 自動終了・準備失敗 | output → terminated → exited → R | 同じ |
+| continue / breakpoint | stopped → R | 同じ |
+| continue / 終了 | output → terminated → exited → R | 同じ |
+| next / step | stopped → R | **R → stopped** |
+| next / 最終 step | output → terminated → exited → R | **R → output → terminated → exited** |
+
+[NextRequest](https://github.com/microsoft/debug-adapter-protocol/blob/c10f18c3332ca04cece1081aa00232a9d882438d/debugAdapterProtocol.json) は response の後に stopped を送ると明記する。Rust はこの順序を維持し、最終 next も同じ response 優先に保つ。仕様が明記するのは stopped の順で、最終 step の output / terminated / exited の順は規定していない。結果によって同じ request の順序を変えないための選択であり、下記のとおり VS Code はどちらの順でも動作する。Java を変更しないという制約の下での意図した差で、fixture の `rustMessages` に両方の配列を明示する。initialize response より前に initialized を送ってよいという変更ではない。共通 wire fixture は initialize の応答を確認した後に launch する。既存 #900/#938 の initialize 前や再 initialize の耐性検査は、仕様が要求する通常の client lifecycle とは別の既存契約である。
+
+[VS Code `AbstractDebugAdapter.processQueue`](https://github.com/microsoft/vscode/blob/74b7203c0c6eba1f895ab8591a498390400d945c/src/vs/workbench/contrib/debug/common/abstractDebugAdapter.ts#L108) は wire の到着順を保ち、response を request_seq で未完了 request に対応させる。event と response を跨ぐ際は task 境界を置く。[`RawDebugSession.next` / `continue`](https://github.com/microsoft/vscode/blob/74b7203c0c6eba1f895ab8591a498390400d945c/src/vs/workbench/contrib/debug/browser/rawDebugSession.ts#L330) は、response を待つ間に stopped を受信したかを `stoppedSinceLastStep` に記録し、受信済みなら疑似 continued を送らない。このコードから、Java の stopped 先行も扱われると判断した。next はそれでも明示的な DAP 順序を優先する。launch 応答を待たず initialized から設定を開始する [`DebugSession.registerListeners`](https://github.com/microsoft/vscode/blob/74b7203c0c6eba1f895ab8591a498390400d945c/src/vs/workbench/contrib/debug/browser/debugSession.ts#L1065) も確認した。GUI の起動試験ではなく公開 client 実装の確認である。
+
+終了側も確認した。[VS Code の terminated listener](https://github.com/microsoft/vscode/blob/74b7203c0c6eba1f895ab8591a498390400d945c/src/vs/workbench/contrib/debug/browser/debugSession.ts#L1123) は disconnect を送り、[`RawDebugSession.shutdown`](https://github.com/microsoft/vscode/blob/74b7203c0c6eba1f895ab8591a498390400d945c/src/vs/workbench/contrib/debug/browser/rawDebugSession.ts#L592) はその応答を待ってから adapter を停止する。Rust は元 request の全 message を書いてから次の disconnect を読むため、terminated の直後に元 response が来る順序だけでその応答が失われる構造ではない、と公開コードから判断した。
+
+Rust は返却する配列の順に seq を割り当てる。response を作ってから前へ event を挿入する方式にはせず、**全 message の seq 単調増加と request_seq の対応**を維持する。`Server::handle` の利用者も「必ず配列の0番目が response」という仮定を外し、type/request_seq を使う必要がある。
+
+### 準備失敗の output
+
+すべて category は `stderr`、末尾に改行1個を持ち、terminated / exited（exitCode 0）を伴う。configurationDone 自体は Java と同じ成功 response（body なし）。
+
+| 原因 | output の本文（末尾改行を省略して表示） |
+|---|---|
+| 存在しない program | `Cannot prepare debug source: <program> (NoSuchFileException: <program>)` |
+| ディレクトリ | `Cannot prepare debug source: <program> (IOException: Is a directory)` |
+| 不正 UTF-8（fixture の 0xff） | `Cannot prepare debug source: <program> (MalformedInputException: Input length = 1)` |
+| NUL を含む path | `Cannot prepare debug source: <program> (InvalidPathException: Nul character not allowed: <program>)` |
+| path の途中が file（ENOTDIR）・名前が長すぎる（ENAMETOOLONG）など | `Cannot prepare debug source: <program> (FileSystemException: <path>: <strerror>)` |
+| symlink の循環（ELOOP） | `Cannot prepare debug source: <program> (FileSystemException: <path>: Too many levels of symbolic links or unable to access attributes of symbolic link)` |
+| 読めない file（EACCES） | `Cannot prepare debug source: <program> (AccessDeniedException: <path>)` |
+| root parse の失敗（途中まで進んだ失敗を含む） | `Parse error at offset 0` |
+| root が成功して末尾に未消費入力 | `Parse error at offset N`（N は消費した UTF-16 長。非 BMP の対照も含む） |
+| AST node が空 | `AST stepping unavailable: no mapped AST nodes` |
+| source hook の throw / null | 先頭は両版 `Cannot prepare debug source:`。Java は括弧内に例外クラス名を含む |
+| AST mapper の throw / span 不足 | 先頭は両版 `AST stepping unavailable:`。Java は詳細に例外クラス名を含む |
+
+不正 UTF-8 は `ff` に加え、切断された列、surrogate、overlong、範囲外 code point、不正 continuation の10列を両モードで照合する。JDK の `Files.readString` は非置換 String decode の長さ（1/2/3/4）を報告し、Rust 標準 UTF-8 validator の error_len とは異なるため、最初の不正列の長さだけを DAP 読込境界で合わせる。JDK17/21 の全列で同文だった。Unix の IO 失敗は JDK の `UnixException.translateToIOException` と同じ本文にする。open の ENOENT / EACCES は `NoSuchFileException` / `AccessDeniedException`、その他の errno は `FileSystemException: <path>: <strerror>`（ELOOP だけ JDK と同じ追記付き）、open 後の read 失敗（ディレクトリの EISDIR など）は `IOException: <strerror>` である。strerror は JDK も Rust も libc から得るため、`(os error N)` だけを除く。`<path>` は `Path.of(program)` と同じく連続する `/` と末尾の `/` を除いた文字列で、Rust もその path を開く。このため Java と同じく `<program>/` は file として読め、`<program>//child/` の失敗は `<program>/child` を報告する。ENOTDIR・ELOOP・ENAMETOOLONG・末尾 `/` は共通 fixture で、EACCES は root 以外の実行に依存するため review の実 stdio 測定（JDK21）で一致を確認した。Unix 以外の OS 固有 IO error の詳細は意図した差として、種類・category を保って Rust の詳細を括弧内に返す。
+
+Rust の既存 `Backend::steps` は String の失敗 API を維持する。生成 DAP の両 host は既存の `parse_tree_detailed*` を呼び、DAP 境界の `parse_error(source, diagnostic)` で上記の parse 診断に変換する。farthest の位置をそのまま使わず、`trailing_input` の成功 prefix だけを UTF-16 長へ変換する。custom backend もこの helper の文を返せる。他の String はモードに応じた stepping 失敗として扱う。
+
+意図した詳細差（#945）は `rustMessages` に全文で保持し、prefix 一致だけに検査を弱めない。Java の `IllegalArgumentException` / `IllegalStateException` といった hook の例外クラス名は Rust の String API に存在しないため、Rust は hook が返した詳細を使う。Generated / Projected の AST fixture は Java では `UnsupportedOperationException:token fixture`、Rust ではそれぞれ generated anchor / projected source の検証失敗になる。両方とも AST stepping を拒否し、同じ category と終了を返す。
+
+Java の `No program specified` 分岐は正常な launch から到達しない（launch の入力検証で先に拒否される）。これを架空の wire 期待値にしない。Rust の既存4 MiB source 上限、bounded trace / 不完全 trace、手作業で不正な Step を渡した拒否には Java の共通 wire 入力がないため、その防護は維持する。source 上限は `Cannot prepare debug source:`、step 検証はモード別 stepping 失敗であり、Rust の既存拒否テストと ledger に適用範囲を記録する。
+
+`DapWireConformance` は既存の必須4クラスから9経路・1,098 request で呼ぶ。1 request ごとに期待数の message を到着順で読み、次の threads barrier が直接応答することまで確認する。initialize はその応答の後で barrier を送る。seq は raw reader、request_seq と command は共通 helper で検査し、余分な event / response、body field、本文の差を検出する。`target/dap-wire-<route>-<backend>.tsv` と `-raw.tsv` が証跡で、CI で必須にする。従来 #905 の1,640観測 / 経路と #938 の1,536 pending session も同じテスト内で引き続き実行する。

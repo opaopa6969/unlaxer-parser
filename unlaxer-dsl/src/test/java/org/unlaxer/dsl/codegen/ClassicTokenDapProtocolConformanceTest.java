@@ -26,7 +26,18 @@ public class ClassicTokenDapProtocolConformanceTest {
    public class Main {
     public static void main(String[] args)throws Exception {
      var server=new TokenInspectionDebugAdapter(){
-      @Override protected DebugSource resolveDebugSource(String program,String original,java.util.Map<String,Object> args){return debugSource(args.getOrDefault("sourceText",original).toString(),((Number)args.getOrDefault("lineOffset",0)).intValue());}
+      String wireFailure = "";
+      @Override protected Object parseDebugAst(String source) {
+       if (wireFailure.equals("ast-empty")) return null;
+       if (wireFailure.equals("ast-span")) return new Object();
+       if (wireFailure.equals("ast-throw")) throw new IllegalStateException("fixture mapper failure");
+       return super.parseDebugAst(source);
+      }
+      @Override protected DebugSource resolveDebugSource(String program,String original,java.util.Map<String,Object> args){
+       wireFailure = String.valueOf(args.getOrDefault("wireFailure", ""));
+       if (wireFailure.equals("source-throw")) throw new IllegalArgumentException("fixture source failure");
+       if (wireFailure.equals("source-null")) return null;
+       return debugSource(args.getOrDefault("sourceText",original).toString(),((Number)args.getOrDefault("lineOffset",0)).intValue());}
      };
      var launcher=org.eclipse.lsp4j.debug.launch.DSPLauncher.createServerLauncher(server,System.in,System.out);server.connect(launcher.getRemoteProxy());launcher.startListening().get();
     }
@@ -44,8 +55,21 @@ public class ClassicTokenDapProtocolConformanceTest {
    struct Backend;
    impl unlaxer_dap::Backend for Backend {
     fn supports_token_trace(&self)->bool {true}
-    fn steps(&mut self,s:&unlaxer_runtime::source::Snapshot,args:&serde_json::Value)->Result<Vec<unlaxer_dap::Step>,String>{unlaxer_dap::Backend::steps(&mut generated::dap::backend(),s,args)}
-    fn resolve_source(&mut self,_:&str,original:&str,args:&serde_json::Value)->Result<unlaxer_dap::DebugSource,String>{Ok(unlaxer_dap::DebugSource{text:args["sourceText"].as_str().unwrap_or(original).into(),line_offset:args["lineOffset"].as_u64().unwrap_or(0) as usize})}
+    fn steps(&mut self,s:&unlaxer_runtime::source::Snapshot,args:&serde_json::Value)->Result<Vec<unlaxer_dap::Step>,String>{
+     match args["wireFailure"].as_str().unwrap_or("") {
+      "ast-empty" => return Ok(vec![]),
+      "ast-span" => return Err("AST source span unavailable".into()),
+      "ast-throw" => return Err("fixture mapper failure".into()),
+      _ => {}
+     }
+     unlaxer_dap::Backend::steps(&mut generated::dap::backend(),s,args)}
+    fn resolve_source(&mut self,_:&str,original:&str,args:&serde_json::Value)->Result<unlaxer_dap::DebugSource,String>{
+     match args["wireFailure"].as_str().unwrap_or("") {
+      "source-throw" => return Err("fixture source failure".into()),
+      "source-null" => return Err("resolveDebugSource returned no content".into()),
+      _ => {}
+     }
+     Ok(unlaxer_dap::DebugSource{text:args["sourceText"].as_str().unwrap_or(original).into(),line_offset:args["lineOffset"].as_u64().unwrap_or(0) as usize})}
    }
    fn main(){unlaxer_dap::Server::new(Backend).serve_stdio().unwrap();}
    """);
@@ -60,6 +84,7 @@ public class ClassicTokenDapProtocolConformanceTest {
         wire.failures = new DapFailureConformance("classic-token", backend);
         wire.probeFailures("fresh");
         DapLaunchStateConformance.check(wire, "classic-token", backend, temporary.getRoot().toPath());
+        DapWireConformance.check(wire, "classic-token", backend, temporary.getRoot().toPath());
   var rows=JsonParser.parseString(Files.readString(ROOT.resolve("docs/fixtures/classic-token-dap/steps.json"))).getAsJsonArray();assertEquals(8,rows.size());
   for(boolean base:List.of(true,false))for(int offset:List.of(0,7)){
    wire.request("initialize",Map.of("adapterID","token-fixture","linesStartAt1",base,"columnsStartAt1",base));
