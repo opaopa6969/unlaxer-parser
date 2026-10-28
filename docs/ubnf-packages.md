@@ -259,9 +259,7 @@ cache の非通常ファイルの文言は **既存 Java の表示と既存 corp
 （`missing local artifact` / `cannot read local artifact`）を維持し、Java もこれに揃えた。
 `deps resolve` の実行中に「`deps resolve` を実行せよ」と案内しても直らないため、cache の再 resolve 案内は使わない
 （Java の従来は `NoSuchFileException` 等の例外文をそのまま表示していた）。
-reader に渡る前の `local:` パスの組み立て（Java は `normalize()` で `..`・末尾 `/` を字句的に畳み、Rust は OS が解決する）の
-既存差と、NUL を含むパスの Java 例外文は reader の範囲外として
-[#921](https://github.com/opaopa6969/unlaxer-parser/issues/921) で扱う。
+reader に渡る前の `local:` パスの組み立てと不正パスの診断は、下記 #921 の規則を両版で使う。
 同じ経路・入力に対する message/code/severity/range と検査順は両版で共通。
 stdio は code `E-MODULE`、severity `1`、source `ubnf-module`、message `import <alias>: E-PACKAGE: ...`、
 import 宣言全体の UTF-16 range。CLI は既存 wrapper・終了コードを維持して同じ原因文字列を表示する。
@@ -306,3 +304,54 @@ Unicode 上限超過を cache（hash 一致 / 不一致）と明示 local に配
 Java-host Rust / native Rust / Java flag CLI の最終診断行、両 `deps resolve` の拒否と lock/cache 不変を照合する。
 通常の生成・server は local source を取得せず正常な固定 cache を利用し、明示 resolve だけが local を拒否する。
 既存の package corpus と #913 の reader の条件は維持し、parser のホットパスや公開済み 3.3.0 には手を加えない。
+
+
+## 明示 `local:` のパス解決（#921）
+
+Java の既存規則を契約として維持し、Rust の `deps resolve` も同じ字句的正規化を行う。
+manifest は呼出時の作業ディレクトリから絶対パスにして正規化し、その親を基準ディレクトリにする。
+`local:` の値は **`directory.resolve(relative).normalize()`** と同じ規則で、`.`、`..`、
+重複する区切りと末尾 `/` をファイルシステムへ問い合わせる前に畳む。絶対パスも引き続き使える。
+symlink の実体パスへの変換（`toRealPath` / `canonicalize`）は行わない。
+
+| source の例 | 結果（`artifact.json` は通常ファイル） |
+| --- | --- |
+| `local:nodir/../artifact.json`（nodir は不存在） | `artifact.json` を読む |
+| `local:artifact.json/..` | 親ディレクトリを読み、`E-PACKAGE: artifact is not a regular file` |
+| `local:artifact.json/` | `artifact.json` を読む |
+| NUL を含む値 | `E-PACKAGE: cannot read local artifact` |
+| `local:a/link/../x.json`（link は symlink） | 字句的に `a/x.json` を選ぶ |
+
+JSON として受理した source の不正なパスは、正規化より先に拒否する。NUL が `..` で取り除かれる成分に含まれる場合も同じ文言にする。
+Java の `InvalidPathException` の本文や入力パスをそのまま公開せず、既存の local I/O 失敗の文言を使う。
+新しい診断を増やさず、既存 Java の受理集合とディレクトリに対する診断を維持するための選択である。
+`local:` が空なら基準ディレクトリを指し、同じ非通常ファイル診断になる。
+
+推移的依存の基準は、正規化した **artifact の絶対パスの親**（Java の
+`path.toAbsolutePath().getParent()`）。artifact 自体が symlink でもリンクを置いた側を基準とし、
+リンク先の親へ切り替えない。残った symlink をたどって通常ファイルを読む経路は従来どおり維持する。
+Java の既存経路を狭めず、OS が `..` を解釈する前に対象を決めることで、同じ入力の取得先を両版で揃える。
+
+共通 `spec-corpus/package-local-paths.json` の30件を `PackageLocalPathConformanceTest` が
+Java / native Rust の実 `deps resolve` CLI に送る。表の4形、symlink の前後、推移的依存、
+相対・絶対 manifest とその正規化、末尾 `/.`、ファイルシステムの root を越える `..`、
+`/` 単独、symlink ディレクトリの `/.`、区切りではない `\` を含む。lock/cache の有無の両方で計120回実行し、
+成功時は固定した期待値と lock/cache の bytes、失敗時は同じ診断と lock/cache 不変を照合する。
+symlink の物理的解決先には異なる bytes の有効 artifact を置き、誤った取得先での成功も検出する。
+CI の `cross-language` 契約で両テストメソッドの実行を必須にする。
+
+この正規化は明示 resolve に限る。#913 の bounded reader、#919 の UTF-8 判定、固定 cache の
+読取り、既存 package corpus の期待値、parser のホットパスは変更しない。
+
+### JSON の単独サロゲートに残る差（#926）
+
+JSON escape の単独サロゲート（例: `local:art\ud800ifact.json` / `\udc00`）は、
+Java では復号後のパス検証で上記 `cannot read local artifact` になる一方、Rust は先行する
+JSON 解析で `E-PACKAGE: invalid JSON` を返す。UTF-8 bytes の不正とは別であり、
+両版が JSON として受理する NUL のパスとは拒否段階が異なる。
+この入力まで同じ診断にするには内容解析との境界を扱う必要があるため、
+[#926](https://github.com/opaopa6969/unlaxer-parser/issues/926) に受け入れ条件を分けた。
+無関係な JSON エラーを local I/O エラーへ一括変換することはせず、#924 の経路を維持する。
+この残りは JSON 受理段階（Rust の JSON 解析が単独サロゲートを拒否する）の問題で、パス解決とは別の意味単位である。
+#926 が独自の受け入れ条件で追跡するため、パス解決を扱う #921 は今回の変更で閉じる。
+正常なサロゲート対による非BMP文字のパスは、上記共通 fixture に含めて受理・bytes 一致を検証する。
