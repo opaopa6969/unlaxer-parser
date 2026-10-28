@@ -38,6 +38,7 @@ final class CodegenRunner {
     interface FileSystemPort {
         String readString(Path path) throws IOException;
         default String readModule(Path path) throws IOException { return readString(path); }
+        default String readPackage(Path path) throws IOException { return readModule(path); }
         boolean exists(Path path);
         boolean deleteIfExists(Path path) throws IOException;
         void createDirectories(Path path) throws IOException;
@@ -67,7 +68,10 @@ final class CodegenRunner {
         String source = fs.readString(Path.of(config.grammarFile()));
         var snapshot = UBNFMapper.parseWithSource(source);
         UBNFFile file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(
-            snapshot, Path.of(config.grammarFile()), fs::readModule);
+            snapshot, Path.of(config.grammarFile()), new org.unlaxer.dsl.bootstrap.UBNFModuleLoader.SourceReader() {
+                @Override public String read(Path path) throws IOException { return fs.readModule(path); }
+                @Override public String readPackage(Path path) throws IOException { return fs.readPackage(path); }
+            });
 
         Map<String, CodeGenerator> generatorMap = generatorMap(config.javaRelease());
 
@@ -658,6 +662,10 @@ final class CodegenRunner {
     }
 
     private static final class JdkFileSystemPort implements FileSystemPort {
+        @Override public String readPackage(Path path) throws IOException {
+            return org.unlaxer.dsl.bootstrap.UBNFPackageResolver.readPackageSource(path);
+        }
+
         @Override
         public String readModule(Path path) throws IOException {
             return org.unlaxer.dsl.bootstrap.UBNFPackageResolver.readLocalSource(path);

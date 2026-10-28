@@ -11,7 +11,7 @@ public record PackagedLanguageProfile(LanguageProfile profile, String source, UB
     public static PackagedLanguageProfile load(Path manifest, String packageId) throws IOException {
         manifest = manifest.toAbsolutePath().normalize();
         if (!manifest.getFileName().toString().equals("ubnf.json")) throw new IllegalArgumentException("expected ubnf.json manifest");
-        var resolver = new UBNFPackageResolver(manifest, UBNFPackageResolver::readLocalSource);
+        var resolver = new UBNFPackageResolver(manifest, UBNFPackageResolver.diskReader());
         Path entry = resolver.importPath(manifest, "pkg:" + packageId);
         var identity = resolver.identity(entry);
         var profile = LanguageProfile.parse(resolver.read(resolver.importPath(entry, "profile.tsv")));

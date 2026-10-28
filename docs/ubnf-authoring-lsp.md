@@ -300,3 +300,10 @@ Rust は stat 後に FIFO・過大ファイルへ差し替えた open も、開�
 #910 の [feature 共通 corpus](../spec-corpus/feature-diagnostics/README.md) で12文法×LF/CRLFを追加し、
 既存103件を含む baseline stdio は127件。feature の全JSONと同一/減少versionでの修復を比較する。
 既存 lexical 診断の prefix・range は維持し、CLI生成時の prefix 修正とは別経路で検証する。
+
+## package metadata の読取り（#908）
+
+manifest/lock は両 backend で各8 MiBの bounded reader を通し、lock I/O、manifest 検証、lock JSON検証の順に処理する。
+`package-documents.json` の共通27件で全診断JSONと後続requestを比較し、同じfileを3 CLIにも送る。
+競合のない通常時の条件を満たしたので #908 は閉じる。Javaのstat後の差替え競合と完全なhandle型判定は #907/#911 に残す。
+[上限・診断・競合の制限](ubnf-packages.md#manifest--lock-の-disk-読取り908残り-911)。

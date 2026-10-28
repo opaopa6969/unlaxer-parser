@@ -89,10 +89,15 @@ final class UbnfEditorIndex {
             Path file = Path.of(URI.create(uri)).toAbsolutePath().normalize();
             var sources = new LinkedHashMap<Path, String>();
             sources.put(file, source);
-            UBNFModuleLoader.SourceReader stable = path -> {
-                path = path.toAbsolutePath().normalize();
-                if (!sources.containsKey(path)) sources.put(path, reader.read(path));
-                return sources.get(path);
+            UBNFModuleLoader.SourceReader stable = new UBNFModuleLoader.SourceReader() {
+                @Override public String read(Path path) throws java.io.IOException {
+                    path = path.toAbsolutePath().normalize();
+                    if (!sources.containsKey(path)) sources.put(path, reader.read(path));
+                    return sources.get(path);
+                }
+                @Override public String readPackage(Path path) throws java.io.IOException {
+                    return reader.readPackage(path);
+                }
             };
             var packages = new UBNFPackageResolver(file, stable);
             for (Scope scope : scopes) {
