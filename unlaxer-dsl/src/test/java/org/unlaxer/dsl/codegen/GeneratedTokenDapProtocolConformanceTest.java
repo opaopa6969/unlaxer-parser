@@ -116,6 +116,8 @@ public class GeneratedTokenDapProtocolConformanceTest {
             assertEquals("\"tail\"", variables(wire).get("GeneratedToken").get("value").getAsString());
             wire.request("continue", Map.of("threadId", 1)); wire.event("output"); wire.event("terminated"); wire.event("exited");
         }
+        wire.failures.complete(); wire.failures = null;
+        DapArgumentConformance.check(wire, "generated", backend, temporary.getRoot().toPath());
         wire.request("disconnect", Map.of());
     }
 

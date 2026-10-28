@@ -82,6 +82,8 @@ public class ClassicTokenDapProtocolConformanceTest {
     args.put("stopOnEntry",false);wire.request("launch",args);wire.event("initialized");int eofLine=steps.get(steps.size()-1).getAsJsonObject().get("line").getAsInt()+offset-(base?0:1);wire.request("setBreakpoints",Map.of("source",Map.of("path",file.toString()),"breakpoints",List.of(Map.of("line",eofLine))));wire.request("configurationDone",Map.of());assertEquals("breakpoint",wire.event("stopped").get("reason").getAsString());assertTrue(wire.request("stackTrace",Map.of("threadId",1)).getAsJsonArray("stackFrames").get(0).getAsJsonObject().get("name").getAsString().startsWith("EndOfSourceParser"));wire.request("continue",Map.of("threadId",1));wire.event("output");wire.event("terminated");wire.event("exited");
    }
   }
+  wire.failures.complete(); wire.failures = null;
+  DapArgumentConformance.check(wire, "classic-token", backend, temporary.getRoot().toPath());
   wire.request("disconnect",Map.of());
  }
  private void run(List<String> command)throws Exception{Path log=temporary.newFile().toPath();var b=new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true).redirectOutput(log.toFile());b.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());b.environment().put("CARGO_INCREMENTAL","0");var p=b.start();try{assertTrue("timeout "+command,p.waitFor(180,TimeUnit.SECONDS));assertEquals(command+"\n"+Files.readString(log),0,p.exitValue());}finally{if(p.isAlive())p.destroyForcibly();}}

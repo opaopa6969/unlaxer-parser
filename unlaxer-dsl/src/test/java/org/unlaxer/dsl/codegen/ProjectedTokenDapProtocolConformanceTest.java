@@ -118,6 +118,8 @@ public class ProjectedTokenDapProtocolConformanceTest {
             assertEquals("\"xx\"", variables(wire).get("ProjectedToken").get("value").getAsString());
             wire.request("continue", Map.of("threadId", 1)); wire.event("output"); wire.event("terminated"); wire.event("exited");
         }
+        wire.failures.complete(); wire.failures = null;
+        DapArgumentConformance.check(wire, "projected", backend, temporary.getRoot().toPath());
         wire.request("disconnect", Map.of());
     }
 

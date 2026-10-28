@@ -35,8 +35,9 @@
       "title": "parity(generator): adapter/token-contract 診断の整列・重複 key・空白判定を Java の check/generate に揃える（#885 レビュー由来）"
     },
     "892": {"state": "CLOSED", "title": "parity(dap): projected token の論理 CP 範囲が原文末尾を越えるときの Java/Rust DAP の差"},
-    "899": {"state": "OPEN", "title": "parity(dap): CRLF 内部を指す token 位置で Java は launch 後に局所失敗し Rust は launch 時に拒否する（#892 レビュー）"},
-    "900": {"state": "OPEN", "title": "parity(dap): stackTrace 以外の失敗 response の message / body が Java（LSP4J）と異なる（#892 レビュー）"},
+    "899": {"state": "CLOSED", "title": "parity(dap): CRLF 内部を指す token 位置で Java は launch 後に局所失敗し Rust は launch 時に拒否する（#892 レビュー）"},
+    "900": {"state": "CLOSED", "title": "parity(dap): stackTrace 以外の失敗 response の message / body が Java（LSP4J）と異なる（#892 レビュー）"},
+    "905": {"state": "OPEN", "title": "parity: Rust DAP が Java（Gson）の受理する型の緩い引数を拒否し、parse 失敗の形も異なる"},
     "864": {"state": "OPEN", "title": "parity(lsp): UBNF authoring serverのRust利用経路をJava基準へ揃える"},
     "885": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の全診断・profile 再設定を Java 契約へ揃える（#864 後続）"},
     "886": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の navigation・編集支援・packageSource と native 配布（#864 後続）"},
@@ -1396,15 +1397,21 @@
       "hosts": "Java DAP / Rust DAP・両生成host",
       "issues": [
         899,
-        900
+        900,
+        905
       ],
-      "observation": "#899 は Java 基準 revision 1a8c8921 の既存挙動に合わせ、CRLF 内部の Input / Generated / Projected token を保持。stackTrace と不正な開始を通る breakpoint 探索の continue / configurationDone だけを Internal error. と inside CRLF の直接例外で失敗させ、停止位置を維持する。5共通入力・各120 sessionで0/1基底・offset0/7・next/continue/breakpoint/負の breakpoint 行/直接実行を比較。負の breakpoint 行は Java と同じく保持され、configurationDone の探索を有効にする。#900 は Classic AST/token（両生成host）/ Generated / Projected の未初期化・未配置・停止中・終了後の request を実 stdio で一覧化し、success・message・body型・先頭行を固定。残す意図した差: Java/JDK の呼出履歴（CompletionException原因節含む）は Rust に生成しない。setBreakpoints(null) / null breakpoint は両方 Internal error. / 文字列 body / java.lang.NullPointerException だが、Java の JVM メソッド・parameter 名を含む helpful NPE 説明を Rust は missing setBreakpoints arguments / null breakpoint とする。他の共通 fixture の失敗先頭行は全文一致。Java 製品コード・公開3.3.0・parser ホットパスは不変。",
+      "observation": "#899 は Java 基準 revision 1a8c8921 の既存挙動に合わせ、CRLF 内部の Input / Generated / Projected token を保持。stackTrace と不正な開始を通る breakpoint 探索の continue / configurationDone だけを Internal error. と inside CRLF の直接例外で失敗させ、停止位置を維持する。5共通入力・各120 sessionで0/1基底・offset0/7・next/continue/breakpoint/負の breakpoint 行/直接実行を比較。負の breakpoint 行は Java と同じく保持され、configurationDone の探索を有効にする。#900 は Classic AST/token（両生成host）/ Generated / Projected の未初期化・未配置・停止中・終了後の request を実 stdio で一覧化し、success・message・body型・先頭行を固定。残す意図した差: Java/JDK の呼出履歴（CompletionException原因節含む）は Rust に生成しない。setBreakpoints(null) / null breakpoint は両方 Internal error. / 文字列 body / java.lang.NullPointerException だが、Java の JVM メソッド・parameter 名を含む helpful NPE 説明を Rust は missing setBreakpoints arguments / null breakpoint とする。他の共通 fixture の失敗先頭行は全文一致。Java 製品コード・公開3.3.0・parser ホットパスは不変。 #905 は基準 bd7e6695 / LSP4J0.23.1 / Gson2.13.2 の実 stdio を独立期待値に、型付き引数と自由形式 launch map の変換・失敗形を合わせた。command/arguments の順序による JsonReader/JsonTreeReader の差も保持し、Classic AST/token（両host）/Generated/Projected の各1640観測で照合する。未実装 default method を含む全引数 DTO の field も同じ規則で変換する。parse 失敗の object body.message は実 frame の行・UTF-16列・指数表記を含め全文一致。ただし Java の参照挙動は JDK に依存し、tree 経路の int 境界 1e2147483648 / 1e-2147483648 / 1.0e-2147483647 の例外文（BigDecimal。JDK17 は Exponent overflow. / Scale out of range.）と launch program 1e23 / 1e-323 の文字列化（Double.toString。JDK17 は 9.999999999999999E22 / 1.0E-323）が JDK17 と JDK21 で違う。fixture の errorByJdk / programPathByJdk に JDK17（Temurin 17.0.20）の実測を持ち、Java は実行中 JDK の値と照合する。Rust は JDK21 の値（error / programPath）を返す。新たな意図した診断差はなく、既存の JVM stack trace/helpful NPE 差だけを維持する。",
       "evidence": [
         "docs/token-trace.md",
         "rust/unlaxer-dap/src/lib.rs",
         "docs/fixtures/projected-token-dap/crlf.json",
         "docs/fixtures/dap-failures/README.md",
         "docs/fixtures/dap-failures/requests.json",
+        "docs/fixtures/dap-failures/arguments.json",
+        "rust/unlaxer-dap/src/arguments.rs",
+        "rust/unlaxer-dap/src/arguments/wire.rs",
+        "rust/unlaxer-dap/tests/arguments.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/DapArgumentConformance.java",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/DapFailureConformance.java",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ProjectedTokenDapProtocolConformanceTest.java",
         "rust/unlaxer-dap/tests/projected_tokens.rs"

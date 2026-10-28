@@ -4,6 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, BufRead, Write};
 use unlaxer_runtime::{source::Snapshot, Span};
 
+mod arguments;
+
 #[derive(Clone, Debug)]
 pub struct Step {
     pub label: String,
@@ -20,6 +22,7 @@ pub struct Step {
 enum RequestError {
     Message(String),
     Internal(String),
+    Parse(String),
 }
 impl RequestError {
     fn unavailable() -> Self {
@@ -196,6 +199,11 @@ impl<B: Backend> Server<B> {
     }
     /// Process one DAP request, with strictly increasing adapter seq on every output message.
     pub fn handle(&mut self, message: Value) -> Vec<Value> {
+        let raw = message.to_string();
+        self.handle_frame(message, &raw)
+    }
+
+    fn handle_frame(&mut self, message: Value, raw: &str) -> Vec<Value> {
         let request_seq = message["seq"]
             .as_i64()
             .filter(|seq| *seq > 0 && *seq <= i32::MAX as i64)
@@ -207,9 +215,12 @@ impl<B: Backend> Server<B> {
             if request_seq == 0 || message["type"] != "request" || command.is_empty() {
                 return Err("invalid request".into());
             }
-            if !arguments.is_object() && !arguments.is_null() {
-                return Err("invalid arguments".into());
-            }
+            // LSP4J converts the entire argument DTO before invoking the adapter.
+            // In particular, a rejected conversion must not mutate session state.
+            let arguments::Converted {
+                value: arguments,
+                launch: strings,
+            } = arguments::read(&command, arguments, raw)?;
             if self.disconnected {
                 return Err("disconnected".into());
             }
@@ -224,7 +235,7 @@ impl<B: Backend> Server<B> {
                 "launch" => {
                     let program = ["program", "formulaSource"]
                         .into_iter()
-                        .filter_map(|key| arguments[key].as_str())
+                        .filter_map(|key| strings[key].as_str())
                         .find(|s| !s.trim().is_empty())
                         .ok_or_else(|| {
                             RequestError::failed_future(
@@ -232,8 +243,8 @@ impl<B: Backend> Server<B> {
                                 "invalid program or stepping mode",
                             )
                         })?;
-                    let runtime = arguments["runtimeMode"].as_str().unwrap_or("token");
-                    let mode = stepping_mode(&arguments);
+                    let runtime = strings["runtimeMode"].as_str().unwrap_or("token");
+                    let mode = stepping_mode(&strings);
                     if !mode.eq_ignore_ascii_case("ast") && !mode.eq_ignore_ascii_case("token") {
                         return Err(RequestError::failed_future(
                             "IllegalArgumentException",
@@ -510,6 +521,10 @@ impl<B: Backend> Server<B> {
                 response["message"] = json!("Internal error.");
                 response["body"] = json!(format!("{diagnostic}\n"));
             }
+            Err(RequestError::Parse(diagnostic)) => {
+                response["message"] = json!("Message could not be parsed.");
+                response["body"] = json!({"message":diagnostic});
+            }
         }
         output.push(response);
         for (event, body) in events {
@@ -651,7 +666,8 @@ impl<B: Backend> Server<B> {
             };
             let message: Value = serde_json::from_slice(&bytes)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-            for message in self.handle(message) {
+            let raw = std::str::from_utf8(&bytes).map_err(io::Error::other)?;
+            for message in self.handle_frame(message, raw) {
                 let body = serde_json::to_vec(&message).map_err(io::Error::other)?;
                 unlaxer_protocol::write_frame(output, &body)?;
             }
