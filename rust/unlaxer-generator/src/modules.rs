@@ -137,7 +137,8 @@ impl Loader<'_> {
                 return Err(error("invalid module features"));
             }
             self.link(grammar, &path)?;
-            let exports: Exports = crate::lexical::compile_syntax(grammar)?
+            let exports: Exports = crate::lexical::compile_syntax(grammar)
+                .map_err(|message| format!("E-LEXICAL: {message}"))?
                 .into_iter()
                 .collect();
             self.cache.insert(path.clone(), exports.clone());

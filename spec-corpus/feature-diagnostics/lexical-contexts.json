@@ -1,0 +1,27 @@
+[
+  {
+    "name": "lexical-context-undefined",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= Missing;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "first": "E-LEXICAL: undefined declarative token Missing"
+  },
+  {
+    "name": "lexical-context-duplicate",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "first": "E-LEXICAL: duplicate token A"
+  },
+  {
+    "name": "lexical-context-cycle",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "first": "E-LEXICAL: cyclic lexical reference A"
+  },
+  {
+    "name": "lexical-context-backref",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= SAME_AS(x);\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "first": "E-LEXICAL: unbound SAME_AS(x)"
+  },
+  {
+    "name": "lexical-context-nullable",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= { '' };\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "first": "E-LEXICAL: nullable unbounded lexical repeat"
+  }
+]

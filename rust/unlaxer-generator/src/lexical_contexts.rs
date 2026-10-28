@@ -111,7 +111,9 @@ pub fn terminals(
     if tokens.len() + literals.len() > 256 {
         return Err("E-LEXICAL-CONTEXT-LIMIT: 256 terminals".into());
     }
-    let programs = crate::lexical::compile(grammar)?;
+    // Java LexicalContexts.terminals propagates LexicalCompiler's prefixed message.
+    let programs =
+        crate::lexical::compile(grammar).map_err(|message| format!("E-LEXICAL: {message}"))?;
     let mut result = vec![];
     let mut seen = HashSet::new();
     for literal in literals {

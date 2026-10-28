@@ -318,6 +318,14 @@ pub fn feature_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
         .iter()
         .filter(|setting| setting.key == "feature")
         .filter_map(|setting| {
+            // UBNFFeatures.validate checks the format before inspecting the value.
+            if !format2 {
+                return Some(AdapterDiagnostic {
+                    code: "E-FEATURE-VERSION",
+                    subject: "feature".into(),
+                    span: setting.span,
+                });
+            }
             let SettingValue::String(value) = &setting.value else {
                 return Some(AdapterDiagnostic {
                     code: "E-FEATURE-UNKNOWN",
@@ -325,9 +333,7 @@ pub fn feature_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
                     span: setting.span,
                 });
             };
-            let code = if !format2 {
-                Some("E-FEATURE-VERSION")
-            } else if !matches!(
+            let code = if !matches!(
                 value.as_str(),
                 "tokenContractsV1"
                     | "contextAccessorsV1"
@@ -343,7 +349,11 @@ pub fn feature_diagnostics(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
             };
             code.map(|code| AdapterDiagnostic {
                 code,
-                subject: value.clone(),
+                subject: if code == "E-FEATURE-DUPLICATE" {
+                    value.clone()
+                } else {
+                    "feature".into()
+                },
                 span: setting.span,
             })
         })

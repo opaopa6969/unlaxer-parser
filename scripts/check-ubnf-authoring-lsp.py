@@ -186,6 +186,9 @@ def validator_diagnostics(clients, directory):
     """Independent authored full JSON, including absent data/relatedInformation fields."""
     cases = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/diagnostics.json').read_text())
     assert len(cases) == 76, 'validator fixtures must not silently disappear'
+    features = json.loads((ROOT / 'spec-corpus/feature-diagnostics/authoring.json').read_text())
+    assert len(features) == 24, 'feature fixtures must not silently disappear'
+    cases += features
     evidence, failures = [], []
     for case in cases:
         uri = (directory / (case['id'] + ' 😀.ubnf')).as_uri()
