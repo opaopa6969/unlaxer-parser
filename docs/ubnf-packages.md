@@ -399,7 +399,8 @@ Gson が受理する `\ud800` / `\udc00` と壊れた組について、次のよ
 
 Rust は通常の `serde_json` 解析が失敗した場合だけ、JSON 文字列中の単独サロゲート escape を検出する。
 正常な組、escape された backslash/quote は変えず、JSON の構造・一般の不正 escape・末尾余剰入力は
-下記の package 専用 reader が全体を検査する。重複 member は最後の値を使用する。
+引き続き `serde_json` が全体を検査する（serde_json の再帰上限を超える深い入力だけ、下記の package 専用 reader が
+同じ規則で検査する）。重複 member は最後の値を使用する。
 内部 marker は既存 NUL と区別して符号化し、既存 NUL を復元する。単独サロゲートを含む metadata は
 ASCII 検証または不正パス検証を通らない NUL sentinel にし、既存の検証順で診断する。
 そのため schema/version エラーが source の取得より先に出て、正常な lock/cache の固定 load も維持される。
