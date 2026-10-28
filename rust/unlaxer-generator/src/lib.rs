@@ -8,6 +8,7 @@ mod evaluation;
 pub mod global_comment;
 mod grammar_files;
 pub mod impact;
+pub mod input;
 mod lexical;
 mod lexical_contexts;
 pub mod lowering;
@@ -191,6 +192,16 @@ pub fn generate_file_with_protocols(
     lsp: bool,
     dap: bool,
 ) -> Result<Vec<unlaxer_codegen::GeneratedFile>, String> {
-    let file = modules::load(path)?;
-    generate_ast_with_protocols(&file, lsp, dap)
+    generate_file_with_errors(path, lsp, dap).map_err(|error| error.to_string())
+}
+
+/// File generation preserving I/O versus grammar failures for native CLI consumers.
+/// The existing String-returning entry points remain available.
+pub fn generate_file_with_errors(
+    path: &std::path::Path,
+    lsp: bool,
+    dap: bool,
+) -> Result<Vec<unlaxer_codegen::GeneratedFile>, input::FileError> {
+    let file = modules::load_with_errors(path)?;
+    generate_ast_with_protocols(&file, lsp, dap).map_err(Into::into)
 }

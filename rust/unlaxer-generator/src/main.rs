@@ -151,7 +151,8 @@ fn run_check(args: Vec<OsString>) -> Result<(u8, String), (u8, String)> {
     }
     let grammar = grammar.ok_or((2, CHECK_HELP.into()))?;
     let grammar = unlaxer_generator::modules::normalize(&grammar).map_err(|e| (4, e))?;
-    let source = fs::read_to_string(&grammar).map_err(io_error)?;
+    let source = unlaxer_generator::input::read_grammar(&grammar)
+        .map_err(|error| (4, format!("I/O error: {error}")))?;
     let report = if unlaxer_ubnf::parse(&source).is_err() {
         unlaxer_generator::portability::check(&source)
     } else {
@@ -251,13 +252,9 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     }
     let grammar = unlaxer_generator::modules::normalize(&grammar).map_err(|e| (4, e))?;
     // Keep I/O exit status separate from grammar/link errors for the entry file.
-    let source = fs::read_to_string(&grammar).map_err(io_error)?;
-    let files = (if lsp || dap {
-        unlaxer_generator::generate_file_with_protocols(&grammar, lsp, dap)
-    } else {
-        unlaxer_generator::generate_file(&grammar)
-    })
-    .map_err(|message| (3, message))?;
+    let source = unlaxer_generator::input::read_grammar(&grammar).map_err(file_error)?;
+    let files =
+        unlaxer_generator::generate_file_with_errors(&grammar, lsp, dap).map_err(file_error)?;
     // Errors come first; under --strict a warning fails before anything is written.
     let warnings = unlaxer_generator::warnings::report(
         &unlaxer_generator::warnings::collect(&source),
@@ -273,6 +270,10 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
         files.len(),
         output.display()
     ))
+}
+
+fn file_error(error: unlaxer_generator::input::FileError) -> (u8, String) {
+    (error.exit_code(), error.to_string())
 }
 
 fn io_error(error: io::Error) -> (u8, String) {
@@ -333,12 +334,13 @@ fn run_playground(args: Vec<OsString>) -> Result<String, (u8, String)> {
             &manifest.unwrap(),
             package.to_str().ok_or((2, PLAYGROUND_HELP.into()))?,
         )
+        .map_err(|message| (3, message))?
     } else if let Some(profile) = profile {
-        unlaxer_generator::playground::generate_profile(&profile)
+        unlaxer_generator::playground::generate_profile(&profile).map_err(|message| (3, message))?
     } else {
-        unlaxer_generator::playground::generate_file(&grammar.unwrap())
-    }
-    .map_err(|message| (3, message))?;
+        unlaxer_generator::playground::generate_file_with_errors(&grammar.unwrap())
+            .map_err(file_error)?
+    };
     write_playground(&output, &files, check).map_err(io_error)?;
     Ok(format!("{} {} playground files in {}\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.",
         if check { "Verified" } else { "Generated" }, files.len(), output.display()))

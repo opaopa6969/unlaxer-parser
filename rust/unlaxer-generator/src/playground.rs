@@ -69,18 +69,29 @@ pub fn generate_package(manifest: &Path, package_id: &str) -> Result<Vec<Generat
 }
 
 pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
+    generate_file_with_errors(path).map_err(|error| error.to_string())
+}
+
+/// Grammar Playground entry point preserving the entry-file I/O exit category.
+pub fn generate_file_with_errors(
+    path: &Path,
+) -> Result<Vec<GeneratedFile>, crate::input::FileError> {
     let normalized = crate::modules::normalize(path)?;
     let path = normalized.as_path();
-    let source = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
+    let source = crate::input::read_grammar(path)?;
     let readiness = crate::portability::check_file(path);
     if !readiness.portable {
-        return Err(format!(
-            "Playground requires a Rust-portable grammar: {}",
-            readiness.to_json()
-        ));
+        // check's JSON remains unchanged; Java renders its module failure as a record list.
+        let diagnostic =
+            if readiness.diagnostics.len() == 1 && readiness.diagnostics[0].code == "P-MODULE" {
+                "[Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]".into()
+            } else {
+                readiness.to_json()
+            };
+        return Err(format!("Playground requires a Rust-portable grammar: {diagnostic}").into());
     }
     let file = crate::modules::load(path)?;
-    generate_resolved(source, &file, &crate::vocabulary_origins::inspect(path)?)
+    generate_resolved(source, &file, &crate::vocabulary_origins::inspect(path)?).map_err(Into::into)
 }
 
 fn generate_resolved(
