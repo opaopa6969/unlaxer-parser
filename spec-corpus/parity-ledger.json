@@ -538,12 +538,32 @@
       "state": "OPEN",
       "title": "parity(cli): 出力先の書込み失敗・不正 UTF-8・Playground readiness・構文エラーの stderr が Java と native で違う（#936 レビュー由来）"
     },
+    "939": {"state": "OPEN", "title": "package JSON: 単独サロゲートを含む artifact の file/entry/source 本文と HTTPS source の残差（#926 後続）"},
     "914": {
       "state": "OPEN",
       "title": "package JSON の先頭 BOM: Java は受理、Rust は invalid JSON で拒否する"
     }
   },
   "entries": [
+    {
+      "id": "package-json-surrogate-text",
+      "category": "contract",
+      "title": "package JSON の単独サロゲート文字列の暫定境界",
+      "hosts": "Java Gson / Rust serde_json（両 stdio・Java-host Rust/native Rust/Java flag CLI）",
+      "issues": [
+        926,
+        939
+      ],
+      "observation": "#914は先頭BOMを1つだけ受理。#926のlocal source・ASCII形式のID/version/lock・未使用metadataはJavaの受理と診断に揃える。artifact.entry、filesのkey/本文、dependencies.*.sourceのHTTPSはUTF-16をlosslessに表せないため、Javaを狭めずRustの既存invalid JSONを維持する意図した暫定差。共通127件のうち13件は両hostを実行してhost別oracleを照合し、skipしない。これらのfieldとsource位置/取得境界の完全対応は#939の受け入れ条件で追跡し、#926はRefsとする。raw hash→strict UTF-8→JSON、readerとpath規則は維持する。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-json-acceptance.json",
+        "scripts/ubnf_package_json.py",
+        "rust/unlaxer-generator/src/packages/json.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/PackageJsonAcceptanceConformanceTest.java",
+        "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
+      ]
+    },
     {
       "id": "ubnf-authoring-lsp",
       "category": "unsupported",
@@ -568,7 +588,7 @@
         926,
         928
       ],
-      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通103件（既存27件＋validator76文法の全JSON）で検証。同一/減少versionもJava通り適用。validatorの意味解析/classpathは #893、syntax/module全診断は #894、profile再設定は #895（親 #885）で未完了。#886 第一単位で AST definition/references・rename・outline/folding・linked editing と検証済み packageSource を追加し、共通stdio39件と両backendのpackaged IDEで元位置/拒否/cache境界を検証。残るFQN quick fix/signature/semantic tokensは #901、completion/hoverのUTF16内部/BMP分類・frontend制約・非file didOpen時のJava provider解決エラー・特殊URI/platform/起動失敗は #902。native配布は方針の文書化のみで公開しない。親 #886 はopenのまま。 #890でlocal importの通常ファイル・64 MiB・bounded readを両版に適用し、共通17件で実stdio後続応答と3 CLI経路、新しい拒否の全診断JSONを検証する。#908でmanifest/lockを8 MiBのbounded readerと共通診断・検査順へ接続し、共通27件で両stdioと3 CLIを照合する（#908はPR #912でCLOSED）。RustはO_NONBLOCKとhandle fstatを共用。Javaはhandleのseek/size検査までで、stat後の差替え競合（writerなしFIFOのopenと完全な型検査）は#907/#911に残る。#913でcache/local artifactも同じ8 MiB readerへ接続し、既存cache診断/raw hashを維持する。共通39件で両stdio/3 CLI/両deps resolveと推移的依存を照合する（#913はPR #920でCLOSED）。artifactにも同じJava差替え競合の制限（Refs #911）が残る。BOMの受理差は#914。#919で不正UTF-8 artifactをJavaの既存文言に統一し、raw hash→strict UTF-8→JSONの順を共通29件の両stdio/3 CLI/両deps resolveで検証する（#919はPR #924でCLOSED）。#921で明示localのパスと推移的依存の基準をJavaの絶対・字句正規化へ揃え、不正パスを既存のcannot read local artifactで拒否する。共通30件を両deps resolveへ送り、lock/cacheの有無を含む120回で成功時のbytesと失敗時不変を照合する（単独サロゲートescapeの先行JSON拒否の差はJSON受理段階の別単位として#926が追跡し、#921はパス解決の単位として閉じる）。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。 #928でgrammar/manifestの基準をJavaの絶対・字句正規化へ揃え、CLIの先行する本文読取りとRust editor resolverも同じ場所を使う。共通14形で両実CLI・stdio・file APIを比較し、reader/raw hash/local規則は維持する（#928はPR #933でCLOSED）。",
+      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通103件（既存27件＋validator76文法の全JSON）で検証。同一/減少versionもJava通り適用。validatorの意味解析/classpathは #893、syntax/module全診断は #894、profile再設定は #895（親 #885）で未完了。#886 第一単位で AST definition/references・rename・outline/folding・linked editing と検証済み packageSource を追加し、共通stdio39件と両backendのpackaged IDEで元位置/拒否/cache境界を検証。残るFQN quick fix/signature/semantic tokensは #901、completion/hoverのUTF16内部/BMP分類・frontend制約・非file didOpen時のJava provider解決エラー・特殊URI/platform/起動失敗は #902。native配布は方針の文書化のみで公開しない。親 #886 はopenのまま。 #890でlocal importの通常ファイル・64 MiB・bounded readを両版に適用し、共通17件で実stdio後続応答と3 CLI経路、新しい拒否の全診断JSONを検証する。#908でmanifest/lockを8 MiBのbounded readerと共通診断・検査順へ接続し、共通27件で両stdioと3 CLIを照合する（#908はPR #912でCLOSED）。RustはO_NONBLOCKとhandle fstatを共用。Javaはhandleのseek/size検査までで、stat後の差替え競合（writerなしFIFOのopenと完全な型検査）は#907/#911に残る。#913でcache/local artifactも同じ8 MiB readerへ接続し、既存cache診断/raw hashを維持する。共通39件で両stdio/3 CLI/両deps resolveと推移的依存を照合する（#913はPR #920でCLOSED）。artifactにも同じJava差替え競合の制限（Refs #911）が残る。BOMは#914でJava同様に先頭1つだけ受理し、共通JSON fixtureでraw hash維持を検証する（merge待ち）。#919で不正UTF-8 artifactをJavaの既存文言に統一し、raw hash→strict UTF-8→JSONの順を共通29件の両stdio/3 CLI/両deps resolveで検証する（#919はPR #924でCLOSED）。#921で明示localのパスと推移的依存の基準をJavaの絶対・字句正規化へ揃え、不正パスを既存のcannot read local artifactで拒否する。共通30件を両deps resolveへ送り、lock/cacheの有無を含む120回で成功時のbytesと失敗時不変を照合する（単独サロゲートescapeの先行JSON拒否の差はJSON受理段階の別単位として#926が追跡し、#921はパス解決の単位として閉じる）。#926ではlocal source・ID/version/lock等をJavaの既存診断へ揃える。artifact file/entry/本文・HTTPS sourceは#939に分離し、#926はRefsのまま残す。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。 #928でgrammar/manifestの基準をJavaの絶対・字句正規化へ揃え、CLIの先行する本文読取りとRust editor resolverも同じ場所を使う。共通14形で両実CLI・stdio・file APIを比較し、reader/raw hash/local規則は維持する（#928はPR #933でCLOSED）。",
       "evidence": [
         "docs/ubnf-authoring-lsp.md",
         "spec-corpus/ubnf-authoring-lsp/cases.json",
@@ -1920,6 +1940,16 @@
     }
   ],
   "corpora": [
+    {
+      "path": "spec-corpus/package-json-acceptance.json",
+      "fields": {
+        "rustLoadError": 13,
+        "rustResolveError": 13
+      },
+      "entries": [
+        "package-json-surrogate-text"
+      ]
+    },
     {"path": "spec-corpus/feature-diagnostics/ubnf-version.json", "fields": {"javaFirst": 72}, "entries": ["host-bindings"]},
     {"path": "spec-corpus/feature-diagnostics/whitespace.json", "fields": {"javaFirst": 2}, "entries": ["host-bindings"]},
     {

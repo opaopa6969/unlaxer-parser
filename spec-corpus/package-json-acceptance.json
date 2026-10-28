@@ -1,0 +1,1797 @@
+[
+  {
+    "id": "manifest-bom-one",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf"
+  },
+  {
+    "id": "manifest-bom-two",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbfefbbbf"
+  },
+  {
+    "id": "manifest-bom-space",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf200d0a09"
+  },
+  {
+    "id": "manifest-bom-only",
+    "subject": "manifest",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf"
+  },
+  {
+    "id": "manifest-bom-only-space",
+    "subject": "manifest",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf200d0a09"
+  },
+  {
+    "id": "manifest-bom-invalid-json",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf7b"
+  },
+  {
+    "id": "manifest-bom-after-space",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "20efbbbf"
+  },
+  {
+    "id": "manifest-bom-internal-string",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "edits": [
+      {
+        "path": [
+          "note"
+        ],
+        "value": "\ufeff"
+      }
+    ]
+  },
+  {
+    "id": "manifest-bom-invalid-utf8",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbfff"
+  },
+  {
+    "id": "lock-bom-one",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf"
+  },
+  {
+    "id": "lock-bom-two",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbfefbbbf"
+  },
+  {
+    "id": "lock-bom-space",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf200d0a09"
+  },
+  {
+    "id": "lock-bom-only",
+    "subject": "lock",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf"
+  },
+  {
+    "id": "lock-bom-only-space",
+    "subject": "lock",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf200d0a09"
+  },
+  {
+    "id": "lock-bom-invalid-json",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf7b"
+  },
+  {
+    "id": "lock-bom-after-space",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "20efbbbf"
+  },
+  {
+    "id": "lock-bom-internal-string",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "edits": [
+      {
+        "path": [
+          "note"
+        ],
+        "value": "\ufeff"
+      }
+    ]
+  },
+  {
+    "id": "lock-bom-invalid-utf8",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbfff"
+  },
+  {
+    "id": "artifact-bom-one",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf"
+  },
+  {
+    "id": "artifact-bom-two",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbfefbbbf"
+  },
+  {
+    "id": "artifact-bom-space",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf200d0a09"
+  },
+  {
+    "id": "artifact-bom-only",
+    "subject": "artifact",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf"
+  },
+  {
+    "id": "artifact-bom-only-space",
+    "subject": "artifact",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf200d0a09"
+  },
+  {
+    "id": "artifact-bom-invalid-json",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf7b"
+  },
+  {
+    "id": "artifact-bom-after-space",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "20efbbbf"
+  },
+  {
+    "id": "artifact-bom-internal-string",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "edits": [
+      {
+        "path": [
+          "note"
+        ],
+        "value": "\ufeff"
+      }
+    ]
+  },
+  {
+    "id": "artifact-bom-invalid-utf8",
+    "subject": "artifact",
+    "loadError": "invalid UTF-8 artifact",
+    "resolveError": "invalid UTF-8 artifact",
+    "bytesHex": "efbbbfff"
+  },
+  {
+    "id": "direct-source-high",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-high-removed",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:\ud800/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-low",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\udc00ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-low-removed",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:\udc00/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-high-high",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800\ud801ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-high-high-removed",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:\ud800\ud801/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-low-high",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\udc00\ud800ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-low-high-removed",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:\udc00\ud800/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-broken",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800x\udc00ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-broken-removed",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:\ud800x\udc00/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-pair",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud83d\ude00ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "transitive": false
+  },
+  {
+    "id": "direct-source-pair-removed",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:\ud83d\ude00/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "transitive": false
+  },
+  {
+    "id": "direct-source-nul",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\u0000ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "direct-source-nul-removed",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:\u0000/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": false
+  },
+  {
+    "id": "transitive-source-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../art\ud800ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-high-removed",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../\ud800/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../art\udc00ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-low-removed",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../\udc00/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-high-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../art\ud800\ud801ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-high-high-removed",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../\ud800\ud801/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-low-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../art\udc00\ud800ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-low-high-removed",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../\udc00\ud800/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../art\ud800x\udc00ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-broken-removed",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../\ud800x\udc00/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-pair",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../art\ud83d\ude00ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-pair-removed",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../\ud83d\ude00/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-nul",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../art\u0000ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "transitive-source-nul-removed",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:../\u0000/../artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "transitive": true
+  },
+  {
+    "id": "manifest-version-high",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "version"
+        ],
+        "value": "1.0.0-\ud800"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required"
+  },
+  {
+    "id": "manifest-version-low",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "version"
+        ],
+        "value": "1.0.0-\udc00"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required"
+  },
+  {
+    "id": "manifest-dependency-name-high",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rename": true
+  },
+  {
+    "id": "manifest-dependency-name-low",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rename": true
+  },
+  {
+    "id": "manifest-unsupported-source-high",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "other:\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "unsupported artifact source; use HTTPS, local: or builtin:"
+  },
+  {
+    "id": "manifest-unsupported-source-low",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "other:\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "unsupported artifact source; use HTTPS, local: or builtin:"
+  },
+  {
+    "id": "manifest-schema-high",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion"
+  },
+  {
+    "id": "manifest-schema-low",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion"
+  },
+  {
+    "id": "lock-id-high",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "id"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "locked package ID mismatch",
+    "resolveError": "locked package ID mismatch"
+  },
+  {
+    "id": "lock-id-low",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "id"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "locked package ID mismatch",
+    "resolveError": "locked package ID mismatch"
+  },
+  {
+    "id": "lock-version-high",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "version"
+        ],
+        "value": "1.0.0-\ud800"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required"
+  },
+  {
+    "id": "lock-version-low",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "version"
+        ],
+        "value": "1.0.0-\udc00"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required"
+  },
+  {
+    "id": "lock-hash-high",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "sha256"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "invalid locked SHA-256",
+    "resolveError": "invalid locked SHA-256"
+  },
+  {
+    "id": "lock-hash-low",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "sha256"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "invalid locked SHA-256",
+    "resolveError": "invalid locked SHA-256"
+  },
+  {
+    "id": "lock-package-name-high",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rename": true
+  },
+  {
+    "id": "lock-package-name-low",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rename": true
+  },
+  {
+    "id": "lock-root-version-high",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "roots",
+          "std/layout"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": "stale lock; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "lock-root-version-low",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "roots",
+          "std/layout"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": "stale lock; run unlaxer deps resolve --manifest ubnf.json"
+  },
+  {
+    "id": "lock-root-name-high",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "roots",
+          "std/layout"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "rename": true
+  },
+  {
+    "id": "lock-root-name-low",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "roots",
+          "std/layout"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "rename": true
+  },
+  {
+    "id": "lock-dependency-version-high",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies",
+          "child/pkg"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required"
+  },
+  {
+    "id": "lock-dependency-version-low",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies",
+          "child/pkg"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required"
+  },
+  {
+    "id": "artifact-id-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "id"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID"
+  },
+  {
+    "id": "artifact-id-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "id"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID"
+  },
+  {
+    "id": "artifact-version-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "version"
+        ],
+        "value": "1.0.0-\ud800"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required"
+  },
+  {
+    "id": "artifact-version-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "version"
+        ],
+        "value": "1.0.0-\udc00"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required"
+  },
+  {
+    "id": "artifact-dependency-version-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "version"
+        ],
+        "value": "1.0.0-\ud800"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "transitive": true
+  },
+  {
+    "id": "artifact-dependency-version-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "version"
+        ],
+        "value": "1.0.0-\udc00"
+      }
+    ],
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "transitive": true
+  },
+  {
+    "id": "artifact-dependency-name-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rename": true,
+    "transitive": true
+  },
+  {
+    "id": "artifact-dependency-name-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rename": true,
+    "transitive": true
+  },
+  {
+    "id": "manifest-ignored-high",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "manifest-ignored-low",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "manifest-ignored-mixed",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\u0000sD800\\ud800\"\ud800\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "manifest-ignored-pair",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "lock-ignored-high",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "lock-ignored-low",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "lock-ignored-mixed",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\u0000sD800\\ud800\"\ud800\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "lock-ignored-pair",
+    "subject": "lock",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "artifact-ignored-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "artifact-ignored-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "artifact-ignored-mixed",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\u0000sD800\\ud800\"\ud800\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "artifact-ignored-pair",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "unknown"
+        ],
+        "value": "\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null
+  },
+  {
+    "id": "manifest-malformed-after-source",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800ifact.json"
+      }
+    ],
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "suffix": "!"
+  },
+  {
+    "id": "manifest-schema-before-source",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800ifact.json"
+      }
+    ],
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "schema": 2
+  },
+  {
+    "id": "artifact-schema-before-source",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800ifact.json"
+      }
+    ],
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "schema": 2,
+    "transitive": true
+  },
+  {
+    "id": "artifact-bom-raw-hash-first",
+    "subject": "artifact",
+    "prefixHex": "efbbbf",
+    "hashMismatch": true,
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "artifact-bom-invalid-hash-first",
+    "subject": "artifact",
+    "bytesHex": "efbbbfff",
+    "hashMismatch": true,
+    "loadError": "artifact hash mismatch: std/layout",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "artifact-entry-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\ud800"
+      }
+    ],
+    "loadError": "missing UBNF package entry",
+    "resolveError": "missing UBNF package entry",
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "artifact-unused-filename-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "extra\ud800.ubnf"
+        ],
+        "value": "grammar Extra { token T ::= 'x'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "artifact-source-comment-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token SPACES ::= ' '; } // \ud800\n"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "artifact-entry-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\udc00"
+      }
+    ],
+    "loadError": "missing UBNF package entry",
+    "resolveError": "missing UBNF package entry",
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "artifact-unused-filename-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "extra\udc00.ubnf"
+        ],
+        "value": "grammar Extra { token T ::= 'x'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "artifact-source-comment-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token SPACES ::= ' '; } // \udc00\n"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "artifact-entry-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\ud800x\udc00"
+      }
+    ],
+    "loadError": "missing UBNF package entry",
+    "resolveError": "missing UBNF package entry",
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "artifact-unused-filename-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "extra\ud800x\udc00.ubnf"
+        ],
+        "value": "grammar Extra { token T ::= 'x'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "artifact-source-comment-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token SPACES ::= ' '; } // \ud800x\udc00\n"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "source-literal-backslash",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\\ud800ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "missing local artifact"
+  },
+  {
+    "id": "source-uppercase-escape",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "uppercase": true
+  },
+  {
+    "id": "source-escaped-field-name",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800ifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read local artifact",
+    "escapedKeys": true
+  },
+  {
+    "id": "source-overwritten-surrogate",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:artifact.json"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "duplicateSource": true
+  },
+  {
+    "id": "direct-https-high",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800.invalid/x"
+      }
+    ],
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "direct-https-low",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\udc00.invalid/x"
+      }
+    ],
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "transitive-https-high",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800.invalid/x"
+      }
+    ],
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "transitive-https-low",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\udc00.invalid/x"
+      }
+    ],
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "rustLoadError": "invalid JSON",
+    "rustResolveError": "invalid JSON",
+    "gap": true
+  },
+  {
+    "id": "artifact-valid-pair-entry",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\ud83d\ude00.ubnf"
+      },
+      {
+        "path": [
+          "files",
+          "\ud83d\ude00.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token SPACES ::= ' '; }"
+      }
+    ]
+  },
+  {
+    "id": "artifact-valid-pair-filename",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "extra\ud83d\ude00.ubnf"
+        ],
+        "value": "grammar Extra { token T ::= 'x'; }"
+      }
+    ]
+  },
+  {
+    "id": "artifact-valid-pair-comment",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token SPACES ::= ' '; } // \ud83d\ude00\n"
+      }
+    ]
+  },
+  {
+    "id": "manifest-interior-bom",
+    "subject": "manifest",
+    "interiorBom": true,
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON"
+  },
+  {
+    "id": "lock-interior-bom",
+    "subject": "lock",
+    "interiorBom": true,
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON"
+  },
+  {
+    "id": "artifact-interior-bom",
+    "subject": "artifact",
+    "interiorBom": true,
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON"
+  },
+  {
+    "id": "direct-bom-surrogate",
+    "subject": "manifest",
+    "transitive": false,
+    "prefixHex": "efbbbf",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800ifact.json"
+      }
+    ],
+    "resolveError": "cannot read local artifact"
+  },
+  {
+    "id": "transitive-bom-surrogate",
+    "subject": "artifact",
+    "transitive": true,
+    "prefixHex": "efbbbf",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "local:art\ud800ifact.json"
+      }
+    ],
+    "resolveError": "cannot read local artifact"
+  }
+]
