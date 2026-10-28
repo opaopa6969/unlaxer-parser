@@ -53,6 +53,8 @@ java -cp "unlaxer-dsl/target/classes:$(tr -d '\n' < unlaxer-dsl/target/rust-clas
   schemaVersion 1 と既存フィールドを維持し、source 識別子は追加しない。root と位置不明の
   出典区分は内部で管理する。import 先のファイル名・位置の出力は引き続き未対応。
 
+`@whitespace` の値・規則注釈（引数なしは `javaStyle`）は、Java と同じく字句コンパイルに成功してから解決する（#923）。字句エラーがあると組込み `javaStyle` / `none` も `P-WHITESPACE` となり、値／注釈の元 span・subject を保持して `structure: blocked`・終了3を返す。`@comment` の宣言 whitespace 判定も字句エラー時には解決失敗とし、追加の `E-COMMENT-WHITESPACE` は出さない。generate は従来の先頭 `E-LEXICAL:` を維持する。独立期待値は [whitespace.json](../spec-corpus/feature-diagnostics/whitespace.json)。
+
 | 終了コード | stdout | stderr |
 |---|---|---|
 | `0` | 検査成功の JSON 1 個（help の場合はヘルプ） | 空 |

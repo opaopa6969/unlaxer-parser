@@ -350,10 +350,9 @@ impl Inventory {
                 }
             }
             AnnotationKind::Whitespace { style } => {
-                if let Some(style) = style {
-                    if !named_whitespace(grammar, style) {
-                        self.add("P-WHITESPACE", style, span);
-                    }
+                let style = style.as_deref().unwrap_or("javaStyle");
+                if !named_whitespace(grammar, style) {
+                    self.add("P-WHITESPACE", style, span);
                 }
             }
             AnnotationKind::Interleave { profile } => {
@@ -425,11 +424,15 @@ fn identifier(value: &str) -> bool {
 }
 
 fn named_whitespace(grammar: &GrammarDecl, value: &str) -> bool {
-    whitespace(value)
-        || crate::lexical::compile_syntax(grammar)
-            .ok()
-            .and_then(|definitions| definitions.get(value.trim()).cloned())
-            .is_some_and(|expression| !expression.nullable())
+    // Java resolves even built-in styles only after LexicalCompiler.compile succeeds.
+    crate::lexical::compile_syntax(grammar)
+        .ok()
+        .is_some_and(|definitions| {
+            whitespace(value)
+                || definitions
+                    .get(value.trim())
+                    .is_some_and(|expression| !expression.nullable())
+        })
 }
 fn whitespace(value: &str) -> bool {
     value.trim().eq_ignore_ascii_case("javaStyle") || value.trim().eq_ignore_ascii_case("none")

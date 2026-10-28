@@ -331,6 +331,10 @@ public class RustPortabilityConformanceTest {
         var cases = JsonParser.parseString(Files.readString(repo.resolve(
             "spec-corpus/feature-diagnostics/cases.json"))).getAsJsonArray();
         assertEquals("all authored cases execute", 31, cases.size());
+        var whitespace = JsonParser.parseString(Files.readString(repo.resolve(
+            "spec-corpus/feature-diagnostics/whitespace.json"))).getAsJsonArray();
+        assertEquals("all whitespace combinations execute", 168, whitespace.size());
+        cases.addAll(whitespace);
         List<String> report = new ArrayList<>(List.of("case\tline_endings\tcheck_exit\tgenerate_exit\tresult"));
         for (var entry : cases) {
             var fixture = entry.getAsJsonObject();
@@ -360,7 +364,9 @@ public class RustPortabilityConformanceTest {
                 } else {
                     String first = fixture.get("first").getAsString();
                     assertEquals(label, first, rust.err().strip());
-                    assertTrue(label + java.err(), java.err().startsWith("Grammar validation failed:\n - " + first + " [code:"));
+                    // Java renders comment subjects separately from their diagnostic code.
+                    String javaFirst = fixture.has("javaFirst") ? fixture.get("javaFirst").getAsString() : first + " [code:";
+                    assertTrue(label + java.err(), java.err().startsWith("Grammar validation failed:\n - " + javaFirst));
                     assertFalse(label, Files.exists(javaOutput));
                     assertFalse(label, Files.exists(rustOutput));
                 }

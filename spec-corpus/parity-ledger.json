@@ -25,6 +25,7 @@
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
+    "923": {"state": "OPEN", "title": "parity(check): 字句エラーと @whitespace の組込み名の同居を Java 参照契約へ揃える"},
     "910": {"state": "OPEN", "title": "parity(generator): feature と E-LEXICAL の check/generate 診断を Java-host に揃える"},
     "916": {"state": "OPEN", "title": "parity(check): @lexicalContext と字句エラーが同居すると Java の check が例外で終わる（#910 レビュー由来）"},
     "917": {"state": "OPEN", "title": "parity(generator): native generate の前段検査（typeof・lexicalContext 等）が字句・adapter・contract・feature より先に出て、Java-host と最初のエラーが違う（#910 レビュー由来）"},
@@ -779,15 +780,17 @@
         910,
         916,
         917,
-        918
+        918,
+        923
       ],
-      "observation": "javaClass/java/rust は組込みJava token classとRustの対応実装・consumerを区別する。任意JVM class/bytecodeをnativeで直接実行せず、ADAPTER registryと明示bindingを使う。宣言単位の棚卸しと未検証の移植境界は全API対応表 / public-api-audit で追跡。 #897ではadapter/contractの共有診断をJavaに統一。spanなしadapterはcode→UTF-16 subject、contractはcodeのみの安定順、重複token keyは最初の値。isBlank/trimを区別して空白context・NBSPを扱う。46文法×LF/CRLFでregistry/validateOrThrow/check/3生成CLI・全5ファイルを検査し、参照診断が後段の生成器診断より先に出ることを5文法で検査。checkは従来のソース位置順を維持し、Java-target CLI独自の再整列も固定する。 #910でfeatureのVERSION/UNKNOWN subjectをfeatureへ統一し、checkはJava同様にinventoryで意味検査せずP-STRUCTUREへ委ねる。block値のP-SETTINGは保持。生成入口でE-LEXICAL接頭辞を付け、31文法とimport先8文法×LF/CRLFの全check JSON・終了コード・生成先頭エラーを固定する。module読込み入口でもE-LEXICAL接頭辞を付ける。LSP専用補正を削除し、既存103件＋feature24件の共通stdioで全JSONを検証する。@lexicalContext の前段検査でも字句エラーにE-LEXICAL接頭辞を付け、5文法×LF/CRLFの生成先頭エラーとvalidatorを比べる。#916でJava checkのinventoryはE-LEXICAL:を構造検査へ委ね、例外終了せず終了3・failed・grammar全体のP-STRUCTUREを返す。nativeはterminal上限より字句エラーを先に報告するJavaの順に揃え、LIMIT同居の1文法を加えた6文法で比べる。両hostの全check JSONを独立期待値で比較し、E-LEXICAL-CONTEXT-*の既存診断とgenerateの最初のエラーを維持する。前段検査の順序差は #917、@ubnf の値・重複の差は #918 で追跡する。",
+      "observation": "javaClass/java/rust は組込みJava token classとRustの対応実装・consumerを区別する。任意JVM class/bytecodeをnativeで直接実行せず、ADAPTER registryと明示bindingを使う。宣言単位の棚卸しと未検証の移植境界は全API対応表 / public-api-audit で追跡。 #897ではadapter/contractの共有診断をJavaに統一。spanなしadapterはcode→UTF-16 subject、contractはcodeのみの安定順、重複token keyは最初の値。isBlank/trimを区別して空白context・NBSPを扱う。46文法×LF/CRLFでregistry/validateOrThrow/check/3生成CLI・全5ファイルを検査し、参照診断が後段の生成器診断より先に出ることを5文法で検査。checkは従来のソース位置順を維持し、Java-target CLI独自の再整列も固定する。 #910でfeatureのVERSION/UNKNOWN subjectをfeatureへ統一し、checkはJava同様にinventoryで意味検査せずP-STRUCTUREへ委ねる。block値のP-SETTINGは保持。生成入口でE-LEXICAL接頭辞を付け、31文法とimport先8文法×LF/CRLFの全check JSON・終了コード・生成先頭エラーを固定する。module読込み入口でもE-LEXICAL接頭辞を付ける。LSP専用補正を削除し、既存103件＋feature24件の共通stdioで全JSONを検証する。@lexicalContext の前段検査でも字句エラーにE-LEXICAL接頭辞を付け、5文法×LF/CRLFの生成先頭エラーとvalidatorを比べる。#916でJava checkのinventoryはE-LEXICAL:を構造検査へ委ね、例外終了せず終了3・failed・grammar全体のP-STRUCTUREを返す。nativeはterminal上限より字句エラーを先に報告するJavaの順に揃え、LIMIT同居の1文法を加えた6文法で比べる。両hostの全check JSONを独立期待値で比較し、E-LEXICAL-CONTEXT-*の既存診断とgenerateの最初のエラーを維持する。前段検査の順序差は #917、@ubnf の値・重複の差は #918 で追跡する。 #923はJava参照契約を採り、nativeのwhitespace判定を字句コンパイル成功後の解決へ統一。組込み名・引数なし規則注釈も字句エラー時は値/注釈span・subject付きP-WHITESPACE、blocked、終了3。GlobalCommentも同じ解決順とし字句エラー時はE-COMMENT-WHITESPACEを追加しない。5字句エラー＋正常系、設定/規則注釈、javaStyle/none/宣言token、comment/lexicalContext有無の168文法×LF/CRLFで全check JSONとgenerate先頭エラー・成功時生成物を比較する。正常な名前付きwhitespace＋commentのgenerateは、Javaがsubjectとcodeを別表示する既存形式をjavaFirstで明示し、同じ診断を検証する。Java実装・parserホットパス・公開3.3.0は不変。",
       "evidence": [
         "spec-corpus/feature-diagnostics/README.md",
         "spec-corpus/feature-diagnostics/cases.json",
         "spec-corpus/feature-diagnostics/authoring.json",
         "spec-corpus/feature-diagnostics/modules.json",
         "spec-corpus/feature-diagnostics/lexical-contexts.json",
+        "spec-corpus/feature-diagnostics/whitespace.json",
         "rust/unlaxer-generator/tests/feature_diagnostics.rs",
         "docs/token-adapters.md",
         "spec-corpus/java-token-bindings/cases.json",
@@ -1861,6 +1864,7 @@
     }
   ],
   "corpora": [
+    {"path": "spec-corpus/feature-diagnostics/whitespace.json", "fields": {"javaFirst": 2}, "entries": ["host-bindings"]},
     {
       "path": "spec-corpus/ubnf-authoring-lsp/cases.json",
       "fields": {"nativeHoverContains": 1},

@@ -1,0 +1,1180 @@
+[
+  {
+    "name": "whitespace-undefined-setting-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 80, "end": 102}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 85, "end": 107}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 111, "end": 133}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 117, "end": 139}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 105, "end": 127}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 111, "end": 133}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 136, "end": 158}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 143, "end": 165}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 80, "end": 97}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 85, "end": 102}, "subject": "none"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 111, "end": 128}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 117, "end": 134}, "subject": "none"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 105, "end": 122}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 111, "end": 128}, "subject": "none"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 136, "end": 153}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 143, "end": 160}, "subject": "none"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 80, "end": 95}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 85, "end": 100}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 111, "end": 126}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 117, "end": 132}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 105, "end": 120}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 111, "end": 126}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 136, "end": 151}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 143, "end": 158}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-default-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 80, "end": 91}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 85, "end": 96}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-default-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 111, "end": 122}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 117, "end": 128}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-default-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 105, "end": 116}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 111, "end": 122}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-annotation-default-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 136, "end": 147}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 143, "end": 154}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-setting-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 93, "end": 115}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 99, "end": 121}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 124, "end": 146}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 131, "end": 153}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 118, "end": 140}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 125, "end": 147}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 149, "end": 171}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 157, "end": 179}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 93, "end": 110}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 99, "end": 116}, "subject": "none"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 124, "end": 141}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 131, "end": 148}, "subject": "none"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 118, "end": 135}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 125, "end": 142}, "subject": "none"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 149, "end": 166}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 157, "end": 174}, "subject": "none"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 93, "end": 108}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 99, "end": 114}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 124, "end": 139}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 131, "end": 146}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 118, "end": 133}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 125, "end": 140}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 149, "end": 164}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 157, "end": 172}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-default-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 93, "end": 104}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 99, "end": 110}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-default-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 124, "end": 135}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 131, "end": 142}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-default-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 118, "end": 129}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 125, "end": 136}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-duplicate-annotation-default-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken A ::= 'b';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 149, "end": 160}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 157, "end": 168}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: duplicate token A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-setting-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 89, "end": 111}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 95, "end": 117}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 120, "end": 142}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 127, "end": 149}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 136}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 121, "end": 143}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 145, "end": 167}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 153, "end": 175}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 89, "end": 106}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 95, "end": 112}, "subject": "none"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 120, "end": 137}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 127, "end": 144}, "subject": "none"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 131}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 121, "end": 138}, "subject": "none"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 145, "end": 162}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 153, "end": 170}, "subject": "none"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 89, "end": 104}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 95, "end": 110}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 120, "end": 135}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 127, "end": 142}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 129}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 121, "end": 136}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 145, "end": 160}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 153, "end": 168}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-default-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 89, "end": 100}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 95, "end": 106}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-default-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 120, "end": 131}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 127, "end": 138}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-default-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 125}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 121, "end": 132}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-cycle-annotation-default-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= B;\ntoken B ::= A;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 145, "end": 156}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 153, "end": 164}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: cyclic lexical reference A",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-setting-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 83, "end": 105}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 88, "end": 110}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 136}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 120, "end": 142}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 108, "end": 130}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 136}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 139, "end": 161}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 146, "end": 168}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 83, "end": 100}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 88, "end": 105}, "subject": "none"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 131}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 120, "end": 137}, "subject": "none"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 108, "end": 125}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 131}, "subject": "none"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 139, "end": 156}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 146, "end": 163}, "subject": "none"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 83, "end": 98}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 88, "end": 103}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 129}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 120, "end": 135}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 108, "end": 123}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 129}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 139, "end": 154}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 146, "end": 161}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-default-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 83, "end": 94}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 88, "end": 99}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-default-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 125}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 120, "end": 131}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-default-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 108, "end": 119}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 114, "end": 125}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-backref-annotation-default-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= SAME_AS(x);\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 139, "end": 150}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 146, "end": 157}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: unbound SAME_AS(x)",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 39}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 41}, "subject": "none"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-setting-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 79, "end": 101}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 84, "end": 106}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 110, "end": 132}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 116, "end": 138}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 104, "end": 126}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 110, "end": 132}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 135, "end": 157}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 142, "end": 164}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 79, "end": 96}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 84, "end": 101}, "subject": "none"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 110, "end": 127}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 116, "end": 133}, "subject": "none"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 104, "end": 121}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 110, "end": 127}, "subject": "none"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 135, "end": 152}, "subject": "none"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 142, "end": 159}, "subject": "none"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 79, "end": 94}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 84, "end": 99}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 110, "end": 125}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 116, "end": 131}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 104, "end": 119}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 110, "end": 125}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 135, "end": 150}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 142, "end": 157}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-default-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 79, "end": 90}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 84, "end": 95}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-default-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 110, "end": 121}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 116, "end": 127}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-default-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 104, "end": 115}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 110, "end": 121}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-nullable-annotation-default-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= { '' };\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 135, "end": 146}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 142, "end": 153}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: nullable unbounded lexical repeat",
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: none\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-setting-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "E-COMMENT-WHITESPACE", "severity": "error", "span": {"start": 38, "end": 62}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "E-COMMENT-WHITESPACE", "severity": "error", "span": {"start": 41, "end": 65}, "subject": "WS"}]}},
+    "first": "E-COMMENT-WHITESPACE: WS",
+    "features": [],
+    "javaFirst": "WS [code: E-COMMENT-WHITESPACE]"
+  },
+  {
+    "name": "whitespace-valid-setting-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "E-COMMENT-WHITESPACE", "severity": "error", "span": {"start": 38, "end": 62}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "E-COMMENT-WHITESPACE", "severity": "error", "span": {"start": 41, "end": 65}, "subject": "WS"}]}},
+    "first": "E-COMMENT-WHITESPACE: WS",
+    "features": [],
+    "javaFirst": "WS [code: E-COMMENT-WHITESPACE]"
+  },
+  {
+    "name": "whitespace-valid-annotation-javaStyle-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-javaStyle-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-javaStyle-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-javaStyle-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(javaStyle)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-none-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-none-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-none-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-none-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(none)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-WS-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-WS-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-WS-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-WS-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-default-no-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-default-no-comment-context",
+    "source": "grammar G {\n@ubnf: v2\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-default-comment-no-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  },
+  {
+    "name": "whitespace-valid-annotation-default-comment-context",
+    "source": "grammar G {\n@ubnf: v2\n@comment: { line: '//' }\ntoken A ::= 'a';\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@lexicalContext(tokens=['OK'])\n@whitespace\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
+    "first": null,
+    "features": []
+  }
+]

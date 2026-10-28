@@ -3,11 +3,17 @@ use unlaxer_generator::{adapters::feature_diagnostics, generate, portability, va
 
 #[test]
 fn feature_and_lexical_diagnostics_match_independent_oracle() {
-    let cases: Vec<Value> = serde_json::from_str(include_str!(
+    let mut cases: Vec<Value> = serde_json::from_str(include_str!(
         "../../../spec-corpus/feature-diagnostics/cases.json"
     ))
     .unwrap();
     assert_eq!(31, cases.len(), "all authored cases execute");
+    let whitespace: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../spec-corpus/feature-diagnostics/whitespace.json"
+    ))
+    .unwrap();
+    assert_eq!(168, whitespace.len(), "all whitespace combinations execute");
+    cases.extend(whitespace);
     for case in cases {
         for (ending, separator) in [("LF", "\n"), ("CRLF", "\r\n")] {
             let source = case["source"].as_str().unwrap().replace('\n', separator);
