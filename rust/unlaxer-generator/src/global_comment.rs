@@ -22,16 +22,12 @@ pub fn problems(grammar: &GrammarDecl) -> Vec<AdapterDiagnostic> {
             let builtin = ["javaStyle", "none"]
                 .iter()
                 .any(|name| style.trim().eq_ignore_ascii_case(name));
-            // Like Java's GlobalComment, resolve only after lexical compilation succeeds.
-            // Lexical errors and undefined/nullable styles belong to the whitespace checks.
-            let named = crate::lexical::compile_syntax(grammar)
-                .ok()
-                .is_some_and(|definitions| {
-                    !builtin
-                        && definitions
-                            .get(style.trim())
-                            .is_some_and(|expression| !expression.nullable())
-                });
+            // An undefined or nullable style is reported by the whitespace checks.
+            let named = !builtin
+                && crate::lexical::compile_syntax(grammar)
+                    .ok()
+                    .and_then(|definitions| definitions.get(style.trim()).cloned())
+                    .is_some_and(|expression| !expression.nullable());
             if named {
                 issues.push(AdapterDiagnostic {
                     code: "E-COMMENT-WHITESPACE",

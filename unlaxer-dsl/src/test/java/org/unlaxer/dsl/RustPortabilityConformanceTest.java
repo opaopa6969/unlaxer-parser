@@ -333,7 +333,7 @@ public class RustPortabilityConformanceTest {
         assertEquals("all authored cases execute", 31, cases.size());
         var whitespace = JsonParser.parseString(Files.readString(repo.resolve(
             "spec-corpus/feature-diagnostics/whitespace.json"))).getAsJsonArray();
-        assertEquals("all whitespace combinations execute", 168, whitespace.size());
+        assertEquals("all whitespace combinations execute", 172, whitespace.size());
         cases.addAll(whitespace);
         List<String> report = new ArrayList<>(List.of("case\tline_endings\tcheck_exit\tgenerate_exit\tresult"));
         for (var entry : cases) {

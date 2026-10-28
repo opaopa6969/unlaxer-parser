@@ -1176,5 +1176,33 @@
     "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": true, "structure": "passed", "diagnostics": []}},
     "first": null,
     "features": []
+  },
+  {
+    "name": "whitespace-self-undefined-setting-WS",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: WS\ntoken WS ::= Missing;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 37}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 39}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-self-undefined-annotation-WS",
+    "source": "grammar G {\n@ubnf: v2\ntoken WS ::= Missing;\ntoken OK ::= 'y';\n@whitespace(WS)\nX ::= OK;\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 62, "end": 77}, "subject": "WS"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 66, "end": 81}, "subject": "WS"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-multiple",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= Missing;\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(none)\nX ::= OK;\n@whitespace(WS)\nY ::= OK;\n@whitespace\nZ ::= OK;\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 44}, "subject": "javaStyle"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 103, "end": 120}, "subject": "none"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 131, "end": 146}, "subject": "WS"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 157, "end": 168}, "subject": "javaStyle"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 46}, "subject": "javaStyle"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 109, "end": 126}, "subject": "none"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 139, "end": 154}, "subject": "WS"}, {"code": "P-WHITESPACE", "severity": "error", "span": {"start": 167, "end": 178}, "subject": "javaStyle"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
+  },
+  {
+    "name": "whitespace-undefined-setting-unknown",
+    "source": "grammar G {\n@ubnf: v2\n@whitespace: foo\ntoken A ::= Missing;\ntoken OK ::= 'y';\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}",
+    "expected": {"LF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 35, "end": 38}, "subject": "foo"}]}, "CRLF": {"schemaVersion": 1, "target": "rust", "portable": false, "structure": "blocked", "diagnostics": [{"code": "P-WHITESPACE", "severity": "error", "span": {"start": 37, "end": 40}, "subject": "foo"}]}},
+    "first": "E-LEXICAL: undefined declarative token Missing",
+    "features": []
   }
 ]
