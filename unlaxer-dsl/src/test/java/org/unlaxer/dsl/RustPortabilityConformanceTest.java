@@ -236,6 +236,112 @@ public class RustPortabilityConformanceTest {
         Files.write(Path.of("target/rust-portability-structure-priority.tsv"), report);
     }
 
+    @Test public void adapterAndContractDiagnosticsMatchIndependentOracleAcrossConsumers() throws Exception {
+        Path binary = binary();
+        var cases = JsonParser.parseString(Files.readString(repo.resolve(
+            "spec-corpus/token-adapters/diagnostics.json"))).getAsJsonArray();
+        assertEquals("all authored cases execute", 36, cases.size());
+        List<String> report = new ArrayList<>(List.of("case\tline_endings\tcheck_exit\tgenerate_exit\tresult"));
+        for (var entry : cases) {
+            var fixture = entry.getAsJsonObject();
+            for (String ending : List.of("LF", "CRLF")) {
+                String label = fixture.get("name").getAsString() + " / " + ending;
+                String source = fixture.get("source").getAsString().replace("\n", ending.equals("LF") ? "\n" : "\r\n");
+                var grammar = org.unlaxer.dsl.bootstrap.UBNFMapper.parse(source).grammars().get(0);
+                List<String> adapterErrors = diagnosticMessages(fixture.getAsJsonArray("adapters"));
+                List<String> contractErrors = diagnosticMessages(fixture.getAsJsonArray("contracts"));
+                assertEquals(label, adapterErrors, org.unlaxer.dsl.bootstrap.TokenAdapterRegistry.build(grammar, null)
+                    .diagnostics().stream().map(d -> d.code() + ": " + d.subject()).toList());
+                assertEquals(label, contractErrors, org.unlaxer.dsl.bootstrap.TokenContractRegistry.build(grammar, null)
+                    .diagnostics().stream().map(d -> d.code() + ": " + d.subject()).toList());
+                var errors = new ArrayList<>(adapterErrors);
+                errors.addAll(contractErrors);
+                assertEquals(label, errors, org.unlaxer.dsl.codegen.GrammarValidator.validate(grammar)
+                    .stream().map(d -> d.message()).toList());
+                if (errors.isEmpty()) {
+                    org.unlaxer.dsl.codegen.GrammarValidator.validateOrThrow(grammar);
+                } else {
+                    var failure = assertThrows(IllegalArgumentException.class,
+                        () -> org.unlaxer.dsl.codegen.GrammarValidator.validateOrThrow(grammar));
+                    assertTrue(label + failure.getMessage(), failure.getMessage().contains("\n - " + errors.get(0) + " [code:"));
+                }
+                Path directory = temporary.newFolder().toPath();
+                Path input = directory.resolve("main.ubnf");
+                Files.writeString(input, source);
+                assertEquals(label, diagnosticCheckOracle(fixture, source), compareFile(binary, directory, input, source));
+                Path javaOutput = directory.resolve("java-rust"), rustOutput = directory.resolve("native-rust");
+                Run java = javaRun("generate", "--target", "rust", "--grammar", input.toString(), "--output", javaOutput.toString());
+                Run rust = nativeRun(List.of(binary.toString(), "generate", "--target", "rust", "--grammar", input.toString(),
+                    "--output", rustOutput.toString()), true, directory);
+                int code = errors.isEmpty() ? 0 : 3;
+                assertEquals(label + java.err(), code, java.code());
+                assertEquals(label + rust.err(), code, rust.code());
+                // Keep the Java-target CLI as well as Java-host Rust generation intact.
+                Path javaTarget = directory.resolve("java");
+                Run javaGeneration = javaRun("--grammar", input.toString(), "--output", javaTarget.toString(),
+                    "--generators", "Parser,AST,Mapper,Evaluator");
+                assertEquals(label + javaGeneration.err(), code, javaGeneration.code());
+                if (errors.isEmpty()) {
+                    for (String file : List.of("ast.rs", "parser.rs", "mapper.rs", "evaluator.rs", "mod.rs"))
+                        assertArrayEquals(label + file, Files.readAllBytes(javaOutput.resolve(file)), Files.readAllBytes(rustOutput.resolve(file)));
+                    try (var files = Files.walk(javaTarget)) { assertTrue(label, files.anyMatch(p -> p.toString().endsWith("AST.java"))); }
+                } else {
+                    assertEquals(label, errors.get(0), rust.err().strip());
+                    assertTrue(label + java.err(), java.err().startsWith("Grammar validation failed:\n - " + errors.get(0) + " [code:"));
+                    String javaFirst = fixture.has("javaTargetFirst") ? fixture.get("javaTargetFirst").getAsString() : errors.get(0);
+                    assertTrue(label + javaGeneration.err(), javaGeneration.err().startsWith("Grammar validation failed:\n - grammar G: " + javaFirst + " [code:"));
+                    assertFalse(label, Files.exists(javaOutput));
+                    assertFalse(label, Files.exists(rustOutput));
+                    assertFalse(label, Files.exists(javaTarget));
+                }
+                report.add(fixture.get("name").getAsString() + "\t" + ending + "\t" + code + "\t" + code + "\tequal");
+            }
+        }
+        Files.write(Path.of("target/rust-adapter-contract-diagnostics.tsv"), report);
+    }
+
+    private static List<String> diagnosticMessages(JsonArray diagnostics) {
+        var messages = new ArrayList<String>();
+        for (var entry : diagnostics) {
+            var d = entry.getAsJsonObject();
+            messages.add(d.get("code").getAsString() + ": " + d.get("subject").getAsString());
+        }
+        return messages;
+    }
+
+    private static JsonObject diagnosticCheckOracle(JsonObject fixture, String source) {
+        // Fixture line numbers select complete declarations independently of AST spans.
+        var diagnostics = new ArrayList<JsonObject>();
+        for (String kind : List.of("adapters", "contracts")) {
+            for (var entry : fixture.getAsJsonArray(kind)) {
+                var d = entry.getAsJsonObject();
+                int line = d.get("line").getAsInt(), offset = 0;
+                for (int i = 0; i < line; i++) offset = source.indexOf('\n', offset) + 1;
+                int end = source.indexOf('\n', offset);
+                if (source.charAt(end - 1) == '\r') end--;
+                var span = new JsonObject();
+                span.addProperty("start", source.codePointCount(0, offset));
+                span.addProperty("end", source.codePointCount(0, end));
+                var diagnostic = new JsonObject();
+                diagnostic.add("code", d.get("code"));
+                diagnostic.addProperty("severity", "error");
+                diagnostic.add("span", span);
+                diagnostic.add("subject", d.get("subject"));
+                diagnostics.add(diagnostic);
+            }
+        }
+        diagnostics.sort(java.util.Comparator.comparingInt(d -> d.getAsJsonObject("span").get("start").getAsInt()));
+        var result = new JsonObject();
+        result.addProperty("schemaVersion", 1);
+        result.addProperty("target", "rust");
+        result.addProperty("portable", diagnostics.isEmpty());
+        result.addProperty("structure", diagnostics.isEmpty() ? "passed" : "blocked");
+        var values = new JsonArray();
+        diagnostics.forEach(values::add);
+        result.add("diagnostics", values);
+        return result;
+    }
+
     private void compareGeneration(Path binary, Path directory, Path input, JsonObject expected) throws Exception {
         Path javaRust = directory.resolve("java-rust"), nativeRust = directory.resolve("native-rust");
         Run java = javaRun("generate", "--target", "rust", "--grammar", input.toString(),

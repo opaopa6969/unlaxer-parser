@@ -1,0 +1,411 @@
+[
+  {
+    "name": "adapter-subject-order",
+    "source": "grammar G {\n@tokenAdapter: zzz\n@tokenAdapter: { id: 'b.x' }\n@tokenAdapter: { id: 'a.x' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "a.x",
+        "line": 3
+      },
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "b.x",
+        "line": 2
+      },
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "tokenAdapter",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-code-order",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' }\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' }\n@tokenAdapter: { id: 'z.x' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "z.x",
+        "line": 3
+      },
+      {
+        "code": "P-ADAPTER-DUPLICATE",
+        "subject": "test.word",
+        "line": 2
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-utf16-order",
+    "source": "grammar G {\n@tokenAdapter: { id: '' }\n@tokenAdapter: { id: '😀' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "😀",
+        "line": 2
+      },
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-token-reference-order",
+    "source": "grammar G {\ntoken Z = ADAPTER('zzz.word', version=1)\ntoken V = ADAPTER('tinyexpression.string', version=2)\ntoken A = ADAPTER('aaa.word', version=1)\ntoken Bad = ADAPTER('bad', version=0)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "bad",
+        "line": 4
+      },
+      {
+        "code": "P-ADAPTER-UNKNOWN",
+        "subject": "aaa.word",
+        "line": 3
+      },
+      {
+        "code": "P-ADAPTER-UNKNOWN",
+        "subject": "zzz.word",
+        "line": 1
+      },
+      {
+        "code": "P-ADAPTER-VERSION",
+        "subject": "tinyexpression.string",
+        "line": 2
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-reference-before-registration-error",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' }\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' }\ntoken Bad = ADAPTER('bad', version=0)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "bad",
+        "line": 3
+      },
+      {
+        "code": "P-ADAPTER-DUPLICATE",
+        "subject": "test.word",
+        "line": 2
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-equal-key-stable",
+    "source": "grammar G {\n@tokenAdapter: { id: 'a.x' }\ntoken Bad = ADAPTER('a.x', version=0)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "a.x",
+        "line": 1
+      },
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "a.x",
+        "line": 2
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-duplicate-id-first",
+    "source": "grammar G {\n@tokenAdapter: { id: 'first.x' id: 'last.x' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "first.x",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "contract-code-stable-order",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '' }\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '' }\n@tokenContract: { token: 'Z' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '' }\n@tokenContract: { token: 'A' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "Z",
+        "line": 4
+      },
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "A",
+        "line": 5
+      },
+      {
+        "code": "P-TOKEN-CONTRACT-DUPLICATE",
+        "subject": "T",
+        "line": 3
+      }
+    ],
+    "javaTargetFirst": "P-TOKEN-CONTRACT-DEFINITION: A"
+  },
+  {
+    "name": "contract-duplicate-token-first",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' token: 'Last' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "contract-version",
+    "source": "grammar G {\n@tokenContract: { token: 'Z' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '' }\n@tokenContract: { token: 'A' accepts: 'x' failure: 'no-consume' consumes: 'always' context: '' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-VERSION",
+        "subject": "tokenContract",
+        "line": 1
+      },
+      {
+        "code": "P-TOKEN-CONTRACT-VERSION",
+        "subject": "tokenContract",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "adapter-space-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: ' ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "adapter-em-space-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: ' ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "adapter-nbsp-accepts",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' accepts: ' ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "adapter-figure-space-accepts",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' accepts: ' ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "adapter-narrow-nbsp-accepts",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' accepts: ' ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "adapter-nel-accepts",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' accepts: '' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "adapter-space-accepts",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' accepts: ' ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "test.word",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-em-space-accepts",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' accepts: ' ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "test.word",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-ascii-trim-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: ' source , position ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "adapter-nbsp-wrapped-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: ' source ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "test.word",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-em-space-wrapped-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: ' source ' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "test.word",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-duplicate-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: 'source, source' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "test.word",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "adapter-trailing-empty-context",
+    "source": "grammar G {\n@tokenAdapter: { id: 'test.word' version: '1' java: 'example.Word' rust: 'crate::word' context: 'source,' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [
+      {
+        "code": "P-ADAPTER-DEFINITION",
+        "subject": "test.word",
+        "line": 1
+      }
+    ],
+    "contracts": []
+  },
+  {
+    "name": "contract-space-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: ' ' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "contract-em-space-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: ' ' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "contract-nbsp-accepts",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: ' ' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "contract-figure-space-accepts",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: ' ' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "contract-narrow-nbsp-accepts",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: ' ' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "contract-nel-accepts",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: '' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "contract-space-accepts",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: ' ' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "contract-em-space-accepts",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: ' ' failure: 'no-consume' consumes: 'always' context: '' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "contract-ascii-trim-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: ' source , position ' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": []
+  },
+  {
+    "name": "contract-nbsp-wrapped-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: ' source ' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "contract-em-space-wrapped-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: ' source ' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "contract-duplicate-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: 'source, source' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  },
+  {
+    "name": "contract-trailing-empty-context",
+    "source": "grammar G {\n@ubnf: v2\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: 'source,' }\ntoken T = ANY\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "adapters": [],
+    "contracts": [
+      {
+        "code": "P-TOKEN-CONTRACT-DEFINITION",
+        "subject": "T",
+        "line": 2
+      }
+    ]
+  }
+]
