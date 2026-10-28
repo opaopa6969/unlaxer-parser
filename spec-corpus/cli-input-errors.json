@@ -18,6 +18,15 @@
     "error": "${WORK}/absent/missing.ubnf"
   },
   {
+    "id": "entry-non-ascii-space",
+    "scope": "entry",
+    "grammar": "日本 語/../日本 語/欠落 ファイル😀.ubnf",
+    "error": "${WORK}/日本 語/欠落 ファイル😀.ubnf",
+    "directories": [
+      "日本 語"
+    ]
+  },
+  {
     "id": "entry-symlink-dotdot",
     "scope": "entry",
     "grammar": "a/link/../missing.ubnf",

@@ -24,7 +24,7 @@ public class CliInputIoConformanceTest {
             "-p", "unlaxer-generator"), EVIDENCE.resolve("cli-input-build.log"), 180);
     }
 
-    @Test(timeout=300000) public void entryIoMatchesJavaWithoutOutput() throws Exception { check("entry", 144); }
+    @Test(timeout=300000) public void entryIoMatchesJavaWithoutOutput() throws Exception { check("entry", 160); }
     @Test(timeout=300000) public void importedIoRetainsItsExitCategoryAndCheckJson() throws Exception { check("import", 208); }
     @Test(timeout=300000) public void readableInputsKeepOutputAndGeneratedBytes() throws Exception { check("success", 32); }
 
@@ -40,6 +40,9 @@ public class CliInputIoConformanceTest {
         var excluded = evidence.getAsJsonArray("excluded");
         assertTrue("only chmod(000) may be inapplicable", excluded.size() <= (suite.equals("success") ? 0 : 1));
         for (var entry : excluded) System.out.println("[fixture exclusion] " + entry);
+        // The self-hosted runner is non-root; CI must not pass by silently dropping the permission cases.
+        if (System.getenv("GITHUB_ACTIONS") != null)
+            assertEquals("CI must exercise chmod(000): " + excluded, 0, excluded.size());
         assertEquals(observations - excluded.size() * 16, evidence.getAsJsonArray("observations").size());
     }
 

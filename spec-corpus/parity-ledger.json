@@ -526,8 +526,18 @@
       "state": "CLOSED",
       "title": "package: deps inspect の grammar パスの基準ディレクトリが Java（字句的）と Rust（OS 解決）で異なる（#921 レビュー由来）"
     },
-    "932": {"state": "OPEN", "title": "import 先が存在しないとき generate の終了コードと stderr が Java / native で違う"},
-    "934": {"state": "OPEN", "title": "入口 grammar が存在しない・ディレクトリのとき Java / native の終了コード・stderr が違う"},
+    "932": {
+      "state": "OPEN",
+      "title": "parity(generator): import 先が存在しないとき generate の終了コード（Java-host 4 / native 3）とメッセージが違う（#918 レビュー由来）"
+    },
+    "934": {
+      "state": "OPEN",
+      "title": "parity(cli): 入口 grammar が存在しない・ディレクトリのとき Java と native の終了コード・stderr が違う（#928 レビュー由来）"
+    },
+    "937": {
+      "state": "OPEN",
+      "title": "parity(cli): 出力先の書込み失敗・不正 UTF-8・Playground readiness・構文エラーの stderr が Java と native で違う（#936 レビュー由来）"
+    },
     "914": {
       "state": "OPEN",
       "title": "package JSON の先頭 BOM: Java は受理、Rust は invalid JSON で拒否する"
@@ -1894,9 +1904,10 @@
       "hosts": "Java CodegenMain / native Rust unlaxer",
       "issues": [
         932,
-        934
+        934,
+        937
       ],
-      "observation": "Javaを参照に、入口とimportのI/O種別を保持する。欠落・権限拒否は字句正規化済み絶対パス、directoryは入口のFiles.readStringとinspect/local bounded readerの文を区別する。generateのimport I/Oは4、Playgroundの入口I/Oは4、import readinessは3とP-MODULEのDiagnostic表記。checkのJSONは不変。共通25形をLF/CRLFで実CLIに送り384観測と成功時の全生成bytes/--checkを比較。chmod(000)が効かない実行ユーザーでは権限2形だけ理由付きでfixtureから除外しJUnit skipと成功観測には数えない。追加のubnf省略/v1/v3/blockの4形はI/O前に停止するPlaygroundを含めずinspect/check/generateを検証する。JVM固有文のELOOPも実測して対応し、対象I/Oの文言差は残さない。#932/#934は修正PRのmerge待ち。",
+      "observation": "Javaを参照に、入口とimportのI/O種別を保持する。欠落・権限拒否は字句正規化済み絶対パス、directoryは入口のFiles.readStringとinspect/local bounded readerの文を区別する。generateのimport I/Oは4、Playgroundの入口I/Oは4、import readinessは3とP-MODULEのDiagnostic表記。checkのJSONは不変。共通26形（非ASCII・空白・非BMPの入口パスを含む）をLF/CRLFで実CLIに送り400観測と成功時の全生成bytes/--checkを比較。chmod(000)が効かない実行ユーザーでは権限2形だけ理由付きでfixtureから除外しJUnit skipと成功観測には数えない。追加のubnf省略/v1/v3/blockの4形はI/O前に停止するPlaygroundを含めずinspect/check/generateを検証する。JVM固有文のELOOPも実測して対応し、対象I/Oの文言差は残さない。同じbounded readerによりnative authoring LSPのlocal import E-MODULE messageもJavaと一致し、authoring baselineのmoduleError fixtureはmessageまで照合する。GitHub Actionsでは権限fixtureの除外を許さない。出力先書込み失敗・不正UTF-8・P-MODULE以外のPlayground readiness・構文エラーのstderr差（終了コードは一致）は#937。#932/#934は修正PRのmerge待ち。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/cli-input-errors.json",

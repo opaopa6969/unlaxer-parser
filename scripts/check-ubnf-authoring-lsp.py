@@ -158,8 +158,8 @@ def run(java, native, directory):
         if 'diagnostics' in case:
             assert diagnostics[0] == diagnostics[1], (case['id'], 'diagnostic mismatch', diagnostics)
         if case.get('moduleError'):
-            # Native resolver error text is intentionally tracked separately; code/severity/range agree.
-            select = lambda ds: [{k: d[k] for k in ('code', 'severity', 'source', 'range')} for d in ds if d['code'] == 'E-MODULE']
+            # #932: local import I/O and cycle messages also match Java (absolute path, no errno).
+            select = lambda ds: [{k: d[k] for k in ('code', 'severity', 'source', 'range', 'message')} for d in ds if d['code'] == 'E-MODULE']
             assert select(diagnostics[0]) == select(diagnostics[1]), (case['id'], diagnostics)
         for client in clients:
             fixed = "grammar Fixed { @root @mapping(Value) Root ::= 'a'; }"
@@ -170,7 +170,7 @@ def run(java, native, directory):
             client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
             assert client.result('textDocument/hover', params) is None
             assert client.result('textDocument/completion', params) == []
-        evidence.append({'case': case['id'], 'completionItems': len(completions[0]), 'diagnosticContract': 'syntax-accept-reject-only' if case.get('syntaxError') else 'module-code-range' if case.get('moduleError') else 'validator-pending' if case.get('validatorGap') else 'exact'})
+        evidence.append({'case': case['id'], 'completionItems': len(completions[0]), 'diagnosticContract': 'syntax-accept-reject-only' if case.get('syntaxError') else 'module-exact' if case.get('moduleError') else 'validator-pending' if case.get('validatorGap') else 'exact'})
     evidence.extend(import_buffers(clients, directory))
     evidence.extend(packages(clients, directory))
     evidence.extend(validator_diagnostics(clients, directory))

@@ -437,17 +437,26 @@ Java の inspect は source snapshot を付けずに解決するため、この�
 Rust の既存 `Result<_, String>` API は残し、CLI 用の `FileError` で I/O と文法エラーの
 区別を module 解決の間も保持する。エラー文字列のパターンや失敗後の再読取りで終了コードを推測しない。
 parser のホットパスに変更はない。
+local import の bounded reader の失敗（非通常ファイル・64 MiB 超過・不正 UTF-8）も、Java と同じく
+generate では I/O として終了4になる（変更前の native は3）。不正 UTF-8 の原因文の差
+（Java `Input length = 1` / Rust `stream did not contain valid UTF-8`）は今回の対象外で、#937 に残す。
+
+同じ bounded reader の文言は native authoring LSP の `E-MODULE` 診断にも届く。local import の欠落・権限拒否は
+`import ALIAS: P` となり、Java LSP と message まで一致する（変更前の native は `No such file or directory (os error 2)`）。
+`scripts/check-ubnf-authoring-lsp.py` の `moduleError` fixture は code・range に加えて message も照合する。
 
 共通 fixture は `spec-corpus/cli-input-errors.json`、実行は `scripts/cli_input_errors.py` と
-`CliInputIoConformanceTest`（`-DrustConformance=true`）。25形を LF/CRLF で実行し、
-入口の相対/絶対/不存在親/symlink＋`..`、ディレクトリ、権限、import の欠落/入れ子/ディレクトリ/権限、
+`CliInputIoConformanceTest`（`-DrustConformance=true`）。26形を LF/CRLF で実行し、
+入口の相対/絶対/不存在親/symlink＋`..`/非 ASCII・空白・非 BMP を含むパス、ディレクトリ、権限、import の欠落/入れ子/ディレクトリ/権限、
 複数 grammar と正常な生成物を検証する。通常の I/O fixture は4コマンドの exit・stdout・stderr 最終行を
 独立期待値に照合し、成功時は両 host の生成 bytes と `--check` も比較する。
 追加の `@ubnf` 省略/v1/v3/block の4形は、Playground が I/O より先に capability 判定で停止するため、
 inspect・check・generate を対象とし、既存 `P-IMPORT` / `P-SETTING` JSON の全体を固定する。
-この4形の Playground の一般的な描画形式は今回変更しない。
+この4形の Playground の一般的な描画形式は今回変更しない（`P-MODULE` 以外の readiness 描画差と
+出力先の書込み失敗の文言差は #937）。
 
 権限 fixture は同じ実行ユーザーで `chmod(000)` の読取りが `PermissionDenied` になることを先に確認する。
 root / `CAP_DAC_OVERRIDE` 等で読める環境では入口/import の各1形を組合せから除外し、
 証跡 JSON の `excluded` に理由を残す。JUnit を skip したり権限拒否が成功したと数えたりしない。
-通常の非 root CI は全384観測（両 host、LF/CRLF）と生成後 `--check` 16回を実行し、必須3メソッドの skip は0とする。
+通常の非 root CI は全400観測（両 host、LF/CRLF）と生成後 `--check` 16回を実行し、必須3メソッドの skip は0とする。
+GitHub Actions 上（`GITHUB_ACTIONS` あり）では除外が1件でもあればテストを失敗させ、権限 fixture が黙って抜けないようにする。

@@ -68,11 +68,13 @@ def setup(work, case, separator):
 
 def run(command, options, work, native):
     env = dict(os.environ)
+    # Non-ASCII paths must not depend on the runner locale (Java's sun.jnu/stderr encodings).
+    env.update(LC_ALL='C.UTF-8')
     if native:
         env.update(PATH='', JAVA_HOME='/nonexistent-java')
     result = subprocess.run(command + options, cwd=work, env=env, capture_output=True, timeout=30)
-    stderr = result.stderr.decode()
-    return {'exit': result.returncode, 'stdout': result.stdout.decode(), 'stderr': stderr,
+    stderr = result.stderr.decode('utf-8')
+    return {'exit': result.returncode, 'stdout': result.stdout.decode('utf-8'), 'stderr': stderr,
             'lastError': (stderr.splitlines() or [''])[-1]}
 
 
@@ -169,10 +171,10 @@ def main():
     parser.add_argument('--suite', choices=['entry', 'import', 'success'], required=True)
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
-    cases = json.loads((ROOT / 'spec-corpus/cli-input-errors.json').read_text())
-    assert len(cases) == 25, 'I/O fixtures must not silently disappear'
+    cases = json.loads((ROOT / 'spec-corpus/cli-input-errors.json').read_text(encoding='utf-8'))
+    assert len(cases) == 26, 'I/O fixtures must not silently disappear'
     cases = [case for case in cases if case['scope'] == args.suite]
-    assert len(cases) == {'entry': 9, 'import': 14, 'success': 2}[args.suite]
+    assert len(cases) == {'entry': 10, 'import': 14, 'success': 2}[args.suite]
     evidence = {'excluded': [], 'observations': []}
     try:
         with tempfile.TemporaryDirectory(prefix='cli-input-', dir=os.environ.get('TMPDIR')) as directory:
@@ -181,7 +183,7 @@ def main():
                 ('rust', [args.rust])], evidence)
         assert len(evidence['observations']) == sum(len(c.get('operations', OPERATIONS)) * 4 for c in cases) - len(evidence['excluded']) * 16
     finally:
-        Path(args.output).write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n')
+        Path(args.output).write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 
 if __name__ == '__main__':
