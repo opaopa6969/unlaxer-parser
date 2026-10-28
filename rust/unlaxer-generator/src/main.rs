@@ -150,6 +150,7 @@ fn run_check(args: Vec<OsString>) -> Result<(u8, String), (u8, String)> {
         return Err((2, CHECK_HELP.into()));
     }
     let grammar = grammar.ok_or((2, CHECK_HELP.into()))?;
+    let grammar = unlaxer_generator::modules::normalize(&grammar).map_err(|e| (4, e))?;
     let source = fs::read_to_string(&grammar).map_err(io_error)?;
     let report = if unlaxer_ubnf::parse(&source).is_err() {
         unlaxer_generator::portability::check(&source)
@@ -248,6 +249,7 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     if grammar.as_os_str().is_empty() || output.as_os_str().is_empty() {
         return Err((2, "grammar and output paths must not be empty".into()));
     }
+    let grammar = unlaxer_generator::modules::normalize(&grammar).map_err(|e| (4, e))?;
     // Keep I/O exit status separate from grammar/link errors for the entry file.
     let source = fs::read_to_string(&grammar).map_err(io_error)?;
     let files = (if lsp || dap {

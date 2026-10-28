@@ -41,6 +41,7 @@ public final class UBNFModuleLoader {
     }
 
     public static UBNFFile load(Path path) throws IOException {
+        path = path.toAbsolutePath().normalize();
         return resolve(UBNFMapper.parse(Files.readString(path)), path, UBNFPackageResolver.diskReader());
     }
 

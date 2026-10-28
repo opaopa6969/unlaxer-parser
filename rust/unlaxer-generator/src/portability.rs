@@ -135,7 +135,9 @@ fn parameterized_code(message: &str) -> Option<&'static str> {
 }
 
 pub fn check_file(path: &std::path::Path) -> Report {
-    if let Ok(source) = std::fs::read_to_string(path) {
+    if let Ok(source) = crate::modules::normalize(path)
+        .and_then(|path| std::fs::read_to_string(path).map_err(|e| e.to_string()))
+    {
         match parse(&source) {
             Ok(file)
                 if file.grammars.iter().any(|g| {

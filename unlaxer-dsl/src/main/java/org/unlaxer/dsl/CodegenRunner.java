@@ -673,7 +673,7 @@ final class CodegenRunner {
 
         @Override
         public String readString(Path path) throws IOException {
-            return Files.readString(path);
+            return Files.readString(path.toAbsolutePath().normalize());
         }
 
         @Override

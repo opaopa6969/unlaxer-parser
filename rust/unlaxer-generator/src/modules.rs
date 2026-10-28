@@ -1,6 +1,6 @@
 //! File-based lexical modules. Import aliases are namespaces, not host package names.
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use unlaxer_ubnf::lexical::{LexicalExpression, Op};
 use unlaxer_ubnf::*;
 
@@ -76,7 +76,9 @@ fn resolve_root(
     Ok(file)
 }
 
-fn normalize(path: &Path) -> Result<PathBuf, String> {
+/// Absolute lexical file identity, shared by CLI readers and module/package loading.
+/// Does not resolve symlinks or require removed components to exist.
+pub fn normalize(path: &Path) -> Result<PathBuf, String> {
     let absolute = if path.is_absolute() {
         path.to_owned()
     } else {
@@ -84,17 +86,7 @@ fn normalize(path: &Path) -> Result<PathBuf, String> {
             .map_err(|e| e.to_string())?
             .join(path)
     };
-    let mut result = PathBuf::new();
-    for component in absolute.components() {
-        match component {
-            Component::ParentDir => {
-                result.pop();
-            }
-            Component::CurDir => {}
-            value => result.push(value),
-        }
-    }
-    Ok(result)
+    Ok(crate::packages::normalize(&absolute))
 }
 fn error(message: impl std::fmt::Display) -> String {
     format!("E-MODULE: {message}")

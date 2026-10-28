@@ -508,7 +508,7 @@ pub struct Resolver {
     loaded_bytes: usize,
     sources: BTreeMap<PathBuf, String>,
 }
-fn normalize(path: &Path) -> PathBuf {
+pub(crate) fn normalize(path: &Path) -> PathBuf {
     let mut result = PathBuf::new();
     for component in path.components() {
         match component {
@@ -523,6 +523,8 @@ fn normalize(path: &Path) -> PathBuf {
 }
 impl Resolver {
     pub fn new(grammar: &Path) -> Self {
+        // Callers supply absolute paths; fold before taking the parent, including LSP URIs.
+        let grammar = normalize(grammar);
         let directory = grammar.parent().unwrap().to_owned();
         Self {
             virtual_root: directory.join(".ubnf-cache/sources"),
@@ -764,6 +766,64 @@ mod tests {
             artifact(&vec![0xff; MAX_BYTES + 1]).unwrap_err(),
             error("artifact exceeds 8 MiB")
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn file_apis_and_editor_resolver_share_lexical_grammar_base() {
+        let fixture = LocalFixture::new();
+        let work = fixture.0.join("work");
+        std::fs::create_dir_all(work.join("a")).unwrap();
+        std::fs::create_dir_all(fixture.0.join("physical/deep")).unwrap();
+        std::os::unix::fs::symlink("../../physical/deep", work.join("a/link")).unwrap();
+        let source = "grammar Main { @import layout from 'pkg:std/layout' @ubnf: v2 @whitespace: layout.SPACES @root @mapping(Value) Start ::= 'a'; }\n";
+        std::fs::write(work.join("g.ubnf"), source).unwrap();
+        std::fs::write(fixture.0.join("g.ubnf"), "grammar Physical { token HOST = com.example.NonportableParser; @root Start ::= HOST; }").unwrap();
+        std::fs::write(work.join("ubnf.json"), r#"{"schemaVersion":1,"dependencies":{"std/layout":{"version":"1.0.0","source":"builtin:std/layout@1.0.0"}}}"#).unwrap();
+        resolve(&work.join("ubnf.json")).unwrap();
+        std::fs::create_dir(work.join("alias")).unwrap();
+        std::os::unix::fs::symlink("../g.ubnf", work.join("alias/g.ubnf")).unwrap();
+        std::os::unix::fs::symlink("../ubnf.json", work.join("alias/ubnf.json")).unwrap();
+        resolve(&work.join("alias/ubnf.json")).unwrap();
+        let cases: Value = serde_json::from_str(include_str!(
+            "../../../spec-corpus/package-grammar-paths.json"
+        ))
+        .unwrap();
+        assert_eq!(cases.as_array().unwrap().len(), 14);
+        for case in cases.as_array().unwrap() {
+            if case["id"] == "symlink-file" {
+                std::fs::remove_file(work.join("ubnf.lock.json")).unwrap();
+            }
+            let path = work.join(
+                case["grammar"]
+                    .as_str()
+                    .unwrap()
+                    .replace("${WORK}", work.to_str().unwrap()),
+            );
+            assert_eq!(
+                crate::modules::load(&path).unwrap().grammars[0].name,
+                "Main",
+                "{case}"
+            );
+            assert!(crate::portability::check_file(&path).portable, "{case}");
+            let files = crate::playground::generate_file(&path).unwrap();
+            assert_eq!(
+                files
+                    .iter()
+                    .find(|f| f.relative_path == "public/grammar.ubnf")
+                    .unwrap()
+                    .content,
+                source,
+                "{case}"
+            );
+            let mut resolver = Resolver::with_sources(&path, BTreeMap::new());
+            let entry = resolver.import_path(&path, "pkg:std/layout").unwrap();
+            assert_eq!(
+                resolver.identity(&entry).unwrap().unwrap()["sha256"],
+                "2701f6884ea6c712d28c76ec3d340c3b27fca4575846239bd0854933205f4b67",
+                "{case}"
+            );
+        }
     }
 
     struct LocalFixture(std::path::PathBuf);

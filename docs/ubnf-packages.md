@@ -355,3 +355,45 @@ JSON 解析で `E-PACKAGE: invalid JSON` を返す。UTF-8 bytes の不正とは
 この残りは JSON 受理段階（Rust の JSON 解析が単独サロゲートを拒否する）の問題で、パス解決とは別の意味単位である。
 #926 が独自の受け入れ条件で追跡するため、パス解決を扱う #921 は今回の変更で閉じる。
 正常なサロゲート対による非BMP文字のパスは、上記共通 fixture に含めて受理・bytes 一致を検証する。
+
+## grammar / manifest の基準ディレクトリ（#928）
+
+Java の `toAbsolutePath().normalize()` を共通契約とする。grammar / manifest のパスを
+まず作業ディレクトリから絶対化し、`.`・`..`・重複区切り・末尾 `/` を字句的に畳んでから、
+その親を `ubnf.json` / `ubnf.lock.json` / `.ubnf-cache` の基準にする。
+`canonicalize` / `toRealPath` は使わない。例えば `work/a/link/../../g.ubnf` は
+`link` の実体によらず `work/g.ubnf` を読み、`work` の lock/cache を使う。
+`missing/../g.ubnf` は missing の存在を要求せず、`g.ubnf/` と `g.ubnf/.` も同じ文法になる。
+残った symlink は通常の I/O でたどるが、grammar ファイル自体への symlink でも
+基準はリンクを指定した側の親であり、実体側の親へ移さない。
+
+| 経路 | 確認と変更 |
+| --- | --- |
+| `deps inspect --grammar` | Java の既存正規化を維持。Rust の本文読取りと再生成する resolver を同じ正規化済みパスに揃える。 |
+| `playground --package --manifest` / `PackagedLanguageProfile.load` / `packaged_profiles::load` | Java の既存規則に Rust の manifest 入口を揃える。ファイル名の検査も正規化後に行う。 |
+| `generate --target rust` / `check --target rust` | module loader の基準だけでなく、両 CLI の先行する本文読取り・警告判定も同じ grammar を使う。Java の `checkFile`、Rust の `check_file` も含む。 |
+| `UBNFModuleLoader.load` / Rust `modules::load`・`load_for_check` | Rust は既に絶対・字句正規化済み。Java の本文読取りを揃え、Rust の既存 `modules::normalize` は #927 で使った `packages::normalize` に委譲して重複実装をなくす。 |
+| `playground --grammar` / 両 file API | 本文 snapshot・portability 判定・生成・vocabulary が同じ正規化済み grammar を使う。 |
+| Java flag CLI / `CodegenRunner` | 標準 disk port の本文読取りを正規化する。カスタム `FileSystemPort` / `SourceReader` の注入と元の引数契約は維持する。 |
+| authoring LSP（通常解析・回復解析） | Java は既に URI のパスを正規化。Rust の `Resolver::with_sources` が呼ぶ `Resolver::new` で、絶対パスを字句正規化してから親を取る。未保存 buffer と検証済み package source の優先順は維持する。 |
+
+変更前の Java を `origin/master` のソースから別のクラス出力先へコンパイルし、同じ14形で70回の実 CLI 測定を行った。inspect と package Playground の28回は既に成功し、generate/check/flag の42回中21回は、先行する本文読取りが symlink の物理側や不存在成分を参照して失敗した。これが Java 側の本文読取りも揃えた理由である。
+
+Rust の `Resolver::new` の全呼出元を確認した。module / vocabulary / packaged profile の
+入口は絶対化してから渡し、LSP は絶対 file URI を渡す。テスト内の呼出元も絶対パスを使う。
+`deps resolve` の manifest / `local:` / 推移的依存は #927 の規則と実装を維持する。
+`--profile` の TSV 自体、出力ディレクトリ、credentials、package 内の仮想パス・境界検査は
+この grammar / manifest 契約とは別の入口なので変更しない。相対 `.ubnf` import の探索や
+cache reader・raw hash・strict UTF-8・JSON の順序にも変更はない。
+
+共通 `spec-corpus/package-grammar-paths.json` の14形を実 Java / native Rust CLI と
+両 authoring stdio に渡す。symlink の `..`、不存在成分の `..`、末尾 `/`・`/.`、途中の `.`、
+通常ファイルを打ち消す `..`、相対/絶対パス、grammar / manifest 自体への symlink を含む。
+字句的な場所に正常な lock/cache、物理的な別の場所には異なる文法を置く。ファイル symlink の
+ケースは実体側の lock を除去し、実体パス化による誤りも検出する。
+inspect・package Playground・generate/check は成功と lock 欠落の exit/stdout/stderr 最終行を
+完全一致で比較し、成功時の生成物も比較する。grammar Playground は成功時の同じ比較と
+本文 snapshot の固定期待値を検証する。既存の readiness エラーの描画形式
+（Java の Diagnostic リスト / Rust の JSON）は基準ディレクトリとは別なので維持する。
+Java flag CLI と両言語の file API も同じ14形を検証する。LSP は全診断・hover・close 後の
+応答と読取り専用性を比較する。parser 実行時のホットパスには処理を追加しない。

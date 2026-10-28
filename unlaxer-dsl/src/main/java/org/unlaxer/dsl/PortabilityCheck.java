@@ -44,6 +44,7 @@ public final class PortabilityCheck {
 
     /** File API opts into local module loading; the String API remains I/O-free. */
     public static Result checkFile(java.nio.file.Path path) throws java.io.IOException {
+        path = path.toAbsolutePath().normalize();
         UBNFSourceSnapshot snapshot;
         try {
             snapshot = UBNFMapper.parseWithSource(java.nio.file.Files.readString(path));

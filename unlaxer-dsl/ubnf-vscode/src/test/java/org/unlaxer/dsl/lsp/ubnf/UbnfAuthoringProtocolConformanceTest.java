@@ -68,6 +68,10 @@ public class UbnfAuthoringProtocolConformanceTest {
         runProtocol("package-artifact-utf8", 29);
     }
 
+    @Test(timeout=300000) public void packageGrammarBasesMatchAcrossServers() throws Exception {
+        runProtocol("package-grammar-paths", 14);
+    }
+
     private void runProtocol(String suite, int count) throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] rustConformance=true is required for native authoring stdio");
         Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
