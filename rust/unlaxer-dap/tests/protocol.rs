@@ -136,6 +136,41 @@ fn real_frames_preserve_sequence_state_and_application_hooks() {
     for (index, message) in emitted.iter().enumerate() {
         assert_eq!(message["seq"], index + 1);
     }
+    // Actual framed output order, including DAP's explicit next-response exception.
+    let order: Vec<_> = emitted
+        .iter()
+        .map(|m| {
+            m[if m["type"] == "response" {
+                "command"
+            } else {
+                "event"
+            }]
+            .as_str()
+            .unwrap()
+        })
+        .collect();
+    assert_eq!(
+        order,
+        [
+            "initialize",
+            "initialized",
+            "launch",
+            "stopped",
+            "configurationDone",
+            "stackTrace",
+            "variables",
+            "next",
+            "stopped",
+            "stackTrace",
+            "output",
+            "terminated",
+            "exited",
+            "continue",
+            "stackTrace",
+            "unknown",
+            "disconnect"
+        ]
+    );
     let response = |id| {
         emitted
             .iter()
@@ -146,10 +181,8 @@ fn real_frames_preserve_sequence_state_and_application_hooks() {
     assert_eq!(response(4)["body"]["stackFrames"][0]["column"], 0);
     assert_eq!(response(7)["body"]["stackFrames"][0]["column"], 2);
     assert_eq!(response(7)["body"]["stackFrames"][0]["endColumn"], 3);
-    assert!(response(9)["body"]["stackFrames"]
-        .as_array()
-        .unwrap()
-        .is_empty());
+    assert_eq!(response(9)["body"], json!({"stackFrames":[]}));
+    assert_eq!(response(4)["body"].as_object().unwrap().len(), 1);
     assert_eq!(response(10)["success"], false);
     assert!(response(5)["body"]["variables"]
         .as_array()
@@ -183,7 +216,7 @@ fn strict_failures_never_substitute_token_or_stale_steps() {
                 4,
                 "launch",
                 json!({"program":path,"steppingMode":"ast","stopOnEntry":true})
-            ))[0]["success"],
+            ))[1]["success"],
             true
         );
         let result = server.handle(request(5, "configurationDone", json!({})));

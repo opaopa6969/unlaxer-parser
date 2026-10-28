@@ -18,7 +18,7 @@ pub fn fixture_tree(input: &str, row: &'static Value, limits: Limits) -> Result<
             let word = TokenExpr::Word { rule: 0, text };
             root = context
                 .parse_token(&word, TokenKind::Consumed, false)
-                .map_err(|e| e.to_string())?
+                .map_err(|_| "Parse error at offset 0".to_owned())?
                 .root_node();
         } else {
             root = Some(
@@ -62,12 +62,26 @@ impl Backend for FixtureBackend {
         true
     }
     fn steps(&mut self, snapshot: &Snapshot, args: &Value) -> Result<Vec<Step>, String> {
+        match args["wireFailure"].as_str().unwrap_or("") {
+            "ast-empty" => return Ok(vec![]),
+            "ast-span" => return Err("AST source span unavailable".into()),
+            "ast-throw" => return Err("fixture mapper failure".into()),
+            _ => {}
+        }
         let tree = fixture_tree(&snapshot.text, self.row(args)?, Limits::default())?;
         unlaxer_dap::token_steps(&tree)
     }
     fn resolve_source(&mut self, _: &str, _: &str, args: &Value) -> Result<DebugSource, String> {
+        match args["wireFailure"].as_str().unwrap_or("") {
+            "source-throw" => return Err("fixture source failure".into()),
+            "source-null" => return Err("resolveDebugSource returned no content".into()),
+            _ => {}
+        }
         Ok(DebugSource {
-            text: self.row(args)?["input"].as_str().unwrap().into(),
+            text: args["sourceText"]
+                .as_str()
+                .unwrap_or(self.row(args)?["input"].as_str().unwrap())
+                .into(),
             line_offset: args["lineOffset"].as_u64().unwrap_or(0) as usize,
         })
     }

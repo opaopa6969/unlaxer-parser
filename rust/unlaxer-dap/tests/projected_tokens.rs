@@ -187,11 +187,11 @@ fn projected_overflow_fails_only_stack_trace_and_preserves_lifecycle() {
                 "launch",
                 json!({"program":file,"fixture":row["name"],"stopOnEntry":true,"runtimeMode":"inspection-token"}),
             );
-            assert_eq!(launch[0]["success"], true);
+            assert_eq!(launch[1]["success"], true);
             let configured = send("configurationDone", json!({}));
             assert_eq!(configured.len(), 2);
-            assert_eq!(configured[1]["event"], "stopped");
-            assert_eq!(configured[1]["body"]["reason"], "entry");
+            assert_eq!(configured[0]["event"], "stopped");
+            assert_eq!(configured[0]["body"]["reason"], "entry");
             for (i, expected) in row["steps"].as_array().unwrap().iter().enumerate() {
                 let overflow = expected[4].is_null();
                 let frames = send("stackTrace", json!({"threadId":1}));
@@ -222,13 +222,19 @@ fn projected_overflow_fails_only_stack_trace_and_preserves_lifecycle() {
                 );
                 let command = if overflow { resume } else { "next" };
                 let moved = send(command, json!({"threadId":1}));
-                assert_eq!(moved[0]["success"], true);
+                let response_index = if command == "next" {
+                    0
+                } else {
+                    moved.len() - 1
+                };
+                let event_index = usize::from(command == "next");
+                assert_eq!(moved[response_index]["success"], true);
                 if i + 1 == steps.len() || command == "continue" {
                     assert_eq!(moved.len(), 4);
-                    assert_eq!(moved[1]["body"]["category"], "stdout");
-                    assert_eq!(moved[2]["event"], "terminated");
-                    assert_eq!(moved[3]["event"], "exited");
-                    assert_eq!(moved[3]["body"]["exitCode"], 0);
+                    assert_eq!(moved[event_index]["body"]["category"], "stdout");
+                    assert_eq!(moved[event_index + 1]["event"], "terminated");
+                    assert_eq!(moved[event_index + 2]["event"], "exited");
+                    assert_eq!(moved[event_index + 2]["body"]["exitCode"], 0);
                     break;
                 }
                 assert_eq!(moved.len(), 2);
@@ -289,7 +295,7 @@ fn crlf_interior_failure_preserves_step_and_can_resume() {
                 send(
                     "launch",
                     json!({"program":file,"fixture":row["name"],"stopOnEntry":stop_on_entry})
-                )[0]["success"],
+                )[1]["success"],
                 true
             );
             send("setBreakpoints", json!({"breakpoints":lines}));
@@ -300,12 +306,12 @@ fn crlf_interior_failure_preserves_step_and_can_resume() {
                 .iter()
                 .any(Value::is_null);
             if !stop_on_entry && !bad_start {
-                assert_eq!(configured[0]["success"], true);
-                assert_eq!(configured[2]["event"], "terminated");
+                assert_eq!(configured.last().unwrap()["success"], true);
+                assert_eq!(configured[1]["event"], "terminated");
                 continue;
             }
             if stop_on_entry {
-                assert_eq!(configured[1]["event"], "stopped");
+                assert_eq!(configured[0]["event"], "stopped");
             } else {
                 assert_crlf_error(&configured);
             }
@@ -562,7 +568,7 @@ fn trace_limit_resource_and_incomplete_failures_terminate_without_stopping() {
                 seq,
                 "launch",
                 json!({"program":file,"failure":failure,"stopOnEntry":true,"steppingMode":if failure == "ast" {"ast"} else {"token"}})
-            ))[0]["success"],
+            ))[1]["success"],
             true
         );
         seq += 1;

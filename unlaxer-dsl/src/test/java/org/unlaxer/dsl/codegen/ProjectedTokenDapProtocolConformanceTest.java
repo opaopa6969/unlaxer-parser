@@ -81,6 +81,7 @@ public class ProjectedTokenDapProtocolConformanceTest {
         wire.failures = new DapFailureConformance("projected", backend);
         wire.probeFailures("fresh");
         DapLaunchStateConformance.check(wire, "projected", backend, temporary.getRoot().toPath());
+        DapWireConformance.check(wire, "projected", backend, temporary.getRoot().toPath());
         assertEquals(8, rows().size());
         for (boolean base : List.of(true, false)) for (int offset : List.of(0, 7)) {
             wire.request("initialize", Map.of("adapterID", "projected", "linesStartAt1", base, "columnsStartAt1", base));

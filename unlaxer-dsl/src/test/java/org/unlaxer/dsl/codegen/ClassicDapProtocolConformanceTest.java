@@ -29,11 +29,18 @@ public class ClassicDapProtocolConformanceTest {
             public final class Main {
                 public static void main(String[] args) throws Exception {
                     var server = new InspectionDebugAdapter() {
+                        String wireFailure = "";
                         @Override protected Object parseDebugAst(String source) {
+                            if (wireFailure.equals("ast-empty")) return null;
+                            if (wireFailure.equals("ast-span")) return new Object();
+                            if (wireFailure.equals("ast-throw")) throw new IllegalStateException("fixture mapper failure");
                             if (source.equals("p<m><b>[]x!")) throw new IllegalStateException("application mapper rejected input");
                             return super.parseDebugAst(source);
                         }
                         @Override protected DebugSource resolveDebugSource(String program,String original,java.util.Map<String,Object> arguments) {
+                            wireFailure = String.valueOf(arguments.getOrDefault("wireFailure", ""));
+                            if (wireFailure.equals("source-throw")) throw new IllegalArgumentException("fixture source failure");
+                            if (wireFailure.equals("source-null")) return null;
                             return debugSource(arguments.getOrDefault("sourceText",original).toString(),((Number)arguments.getOrDefault("lineOffset",0)).intValue());
                         }
                         @Override protected java.util.Map<String,String> runtimeVariables(String source,String mode,java.util.Map<String,Object> arguments) {
@@ -72,8 +79,21 @@ public class ClassicDapProtocolConformanceTest {
             use unlaxer_runtime::source::Snapshot;
             struct Backend;
             impl unlaxer_dap::Backend for Backend {
-                fn steps(&mut self,snapshot:&Snapshot,_:&Value)->Result<Vec<unlaxer_dap::Step>,String> {if snapshot.text=="p<m><b>[]x!" {Err("application mapper rejected input".into())} else {generated::dap::steps(&snapshot.text)}}
-                fn resolve_source(&mut self,_:&str,original:&str,args:&Value)->Result<unlaxer_dap::DebugSource,String> {Ok(unlaxer_dap::DebugSource{text:args["sourceText"].as_str().unwrap_or(original).into(),line_offset:args["lineOffset"].as_u64().unwrap_or(0) as usize})}
+                fn steps(&mut self,snapshot:&Snapshot,args:&Value)->Result<Vec<unlaxer_dap::Step>,String> {
+                    match args["wireFailure"].as_str().unwrap_or("") {
+                        "ast-empty" => return Ok(vec![]),
+                        "ast-span" => return Err("AST source span unavailable".into()),
+                        "ast-throw" => return Err("fixture mapper failure".into()),
+                        _ => {}
+                    }
+                    if snapshot.text=="p<m><b>[]x!" {Err("application mapper rejected input".into())} else {generated::dap::steps(&snapshot.text)}}
+                fn resolve_source(&mut self,_:&str,original:&str,args:&Value)->Result<unlaxer_dap::DebugSource,String> {
+                    match args["wireFailure"].as_str().unwrap_or("") {
+                        "source-throw" => return Err("fixture source failure".into()),
+                        "source-null" => return Err("resolveDebugSource returned no content".into()),
+                        _ => {}
+                    }
+                    Ok(unlaxer_dap::DebugSource{text:args["sourceText"].as_str().unwrap_or(original).into(),line_offset:args["lineOffset"].as_u64().unwrap_or(0) as usize})}
                 fn runtime_variables(&mut self,snapshot:&Snapshot,mode:&str,_:&Value)->Result<BTreeMap<String,String>,String> {Ok(BTreeMap::from([("sourceLength".into(),snapshot.len().to_string()),("runtimeLabel".into(),mode.into())]))}
             }
             fn main(){unlaxer_dap::Server::new(Backend).serve_stdio().unwrap();}
@@ -85,6 +105,7 @@ public class ClassicDapProtocolConformanceTest {
         wire.failures = new DapFailureConformance("classic-ast", backend);
         wire.probeFailures("fresh");
         DapLaunchStateConformance.check(wire, "classic-ast", backend, temporary.getRoot().toPath());
+        DapWireConformance.check(wire, "classic-ast", backend, temporary.getRoot().toPath());
         exerciseConfigurationLifecycle(wire, backend);
         exerciseBreakpointSources(wire, backend);
         var rows=JsonParser.parseString(Files.readString(ROOT.resolve("docs/fixtures/classic-dap/ast.json"))).getAsJsonArray();assertEquals(9,rows.size());

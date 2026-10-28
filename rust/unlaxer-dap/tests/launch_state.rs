@@ -44,8 +44,9 @@ impl Backend for Probe {
 fn request<B: Backend>(server: &mut Server<B>, command: &str, args: Value) -> Value {
     let output =
         server.handle(json!({"seq":1,"type":"request","command":command,"arguments":args}));
-    assert!(output[0]["success"].as_bool().unwrap(), "{output:?}");
-    output[0]["body"].clone()
+    let response = output.iter().find(|m| m["type"] == "response").unwrap();
+    assert!(response["success"].as_bool().unwrap(), "{output:?}");
+    response["body"].clone()
 }
 
 #[test]

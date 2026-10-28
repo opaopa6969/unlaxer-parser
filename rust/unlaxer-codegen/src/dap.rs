@@ -3,7 +3,7 @@ use crate::{mappings, quote, Cardinality, GeneratedFile, GrammarIr, Kind, HEADER
 use std::fmt::Write;
 
 pub fn generate(ir: &GrammarIr) -> GeneratedFile {
-    let mut out = format!("{HEADER}\n/// Strict typed AST nodes in mapping-field declaration order.\npub fn steps(source: &str) -> Result<Vec<unlaxer_dap::Step>, String> {{\n    let tree = super::parser::parse_tree(source).map_err(|error| format!(\"{{error:?}}\"))?;\n    let ast = super::mapper::map(&tree)?;\n");
+    let mut out = format!("{HEADER}\n/// Strict typed AST nodes in mapping-field declaration order.\npub fn steps(source: &str) -> Result<Vec<unlaxer_dap::Step>, String> {{\n    let tree = super::parser::parse_tree_detailed(source).map_err(|error| unlaxer_dap::parse_error(source, &error))?;\n    let ast = super::mapper::map(&tree)?;\n");
     let mappings = mappings(ir);
     if mappings.is_empty() {
         out.push_str("    match ast {}\n}\n");
@@ -72,7 +72,7 @@ pub fn generate(ir: &GrammarIr) -> GeneratedFile {
         }
         out.push_str("    }\n}\n");
     }
-    out.push_str("\n/// Real committed terminal trace; a bounded metadata failure is never a CST fallback.\npub fn token_steps(source: &str) -> Result<Vec<unlaxer_dap::Step>, String> {\n    let options = unlaxer_runtime::ParseOptions::default().with_token_trace(unlaxer_runtime::token_trace::Limits::default());\n    let tree = super::parser::parse_tree_with_options(source, options).map_err(|error| format!(\"{error:?}\"))?;\n    unlaxer_dap::token_steps(&tree)\n}\n\npub fn backend() -> unlaxer_dap::ParserBackend {\n    unlaxer_dap::ParserBackend { mapper: steps, tokens: token_steps }\n}\n\npub fn serve_stdio() -> std::io::Result<()> {\n    unlaxer_dap::Server::new(backend()).serve_stdio()\n}\n");
+    out.push_str("\n/// Real committed terminal trace; a bounded metadata failure is never a CST fallback.\npub fn token_steps(source: &str) -> Result<Vec<unlaxer_dap::Step>, String> {\n    let options = unlaxer_runtime::ParseOptions::default().with_token_trace(unlaxer_runtime::token_trace::Limits::default());\n    let tree = super::parser::parse_tree_detailed_with_options(source, options).map_err(|error| unlaxer_dap::parse_error(source, &error))?;\n    unlaxer_dap::token_steps(&tree)\n}\n\npub fn backend() -> unlaxer_dap::ParserBackend {\n    unlaxer_dap::ParserBackend { mapper: steps, tokens: token_steps }\n}\n\npub fn serve_stdio() -> std::io::Result<()> {\n    unlaxer_dap::Server::new(backend()).serve_stdio()\n}\n");
     GeneratedFile {
         relative_path: "dap.rs".into(),
         content: out,

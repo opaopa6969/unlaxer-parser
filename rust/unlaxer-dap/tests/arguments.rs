@@ -149,10 +149,10 @@ fn launch_string_lookups_do_not_rewrite_application_hook_arguments() {
     std::fs::write(&file, "x").unwrap();
     let mut server = Server::new(Hooks);
     let response = server.handle(json!({"seq":1,"type":"request","command":"launch","arguments":{"program":file,"runtimeMode":5,"formulaSource":{"z":[1,true]},"steppingMode":"ast","stopOnEntry":true}}));
-    assert_eq!(response[0]["success"], true);
+    assert_eq!(response[1]["success"], true);
     let configured = server
         .handle(json!({"seq":2,"type":"request","command":"configurationDone","arguments":{}}));
-    assert_eq!(configured[0]["success"], true);
-    assert_eq!(configured[1]["event"], "stopped");
+    assert_eq!(configured[1]["success"], true);
+    assert_eq!(configured[0]["event"], "stopped");
     std::fs::remove_file(file).unwrap();
 }
