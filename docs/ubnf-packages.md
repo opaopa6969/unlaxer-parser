@@ -380,7 +380,8 @@ Java の `toAbsolutePath().normalize()` を共通契約とする。grammar / man
 変更前の Java を `origin/master` のソースから別のクラス出力先へコンパイルし、同じ14形で70回の実 CLI 測定を行った。inspect と package Playground の28回は既に成功し、generate/check/flag の42回中21回は、先行する本文読取りが symlink の物理側や不存在成分を参照して失敗した。これが Java 側の本文読取りも揃えた理由である。
 このため Java の generate / check / grammar Playground / flag CLI で grammar が読めないときの
 I/O エラーに出るパスは、`deps inspect` と同じく正規化後の絶対パスになる（例: `nope.ubnf` は
-`<作業ディレクトリ>/nope.ubnf`）。exit code と、Rust の I/O エラー表示（パスを含まない）は変わらない。
+`<作業ディレクトリ>/nope.ubnf`）。#928 時点では exit code と Rust の I/O 表示は維持した。
+後述の #932 / #934 で native CLI の終了コード・表示も Java に揃える。
 
 Rust の `Resolver::new` の全呼出元を確認した。module / vocabulary / packaged profile の
 入口は絶対化してから渡し、LSP は絶対 file URI を渡す。テスト内の呼出元も絶対パスを使う。
@@ -397,6 +398,56 @@ cache reader・raw hash・strict UTF-8・JSON の順序にも変更はない。
 inspect・package Playground・generate/check は成功と lock 欠落の exit/stdout/stderr 最終行を
 完全一致で比較し、成功時の生成物も比較する。grammar Playground は成功時の同じ比較と
 本文 snapshot の固定期待値を検証する。既存の readiness エラーの描画形式
-（Java の Diagnostic リスト / Rust の JSON）は基準ディレクトリとは別なので維持する。
+（Java の Diagnostic リスト / Rust の JSON）は基準ディレクトリとは別である。
+#932 ではこのうち `P-MODULE` の描画を Java に揃える。
 Java flag CLI と両言語の file API も同じ14形を検証する。LSP は全診断・hover・close 後の
 応答と読取り専用性を比較する。parser 実行時のホットパスには処理を追加しない。
+
+
+## grammar 入力の I/O エラー（#932 / #934）
+
+参照は Java 21 の実 `CodegenMain`。native `unlaxer` は grammar の入口と local import の
+I/O 失敗を文法検証エラーと区別し、次の終了コード・stderr 最終行を返す。stdout は空。
+出力先は作らず、既存の入力・lock/cache にも書き込まない。
+パス `P` は #928 の絶対・字句正規化後の失敗ファイルで、入れ子の import でも入口ではなく
+実際に読めなかった import 先を表示する。Java の既存コマンド・file API は変更しない。
+
+| 失敗箇所 | deps inspect | check --target rust | generate --target rust | playground --grammar |
+| --- | --- | --- | --- | --- |
+| 入口の I/O | 3、原因文 | 4、`I/O error: `＋原因文 | 4、原因文 | 4、原因文 |
+| local import の I/O | 3、原因文 | 3、既存の `P-MODULE` JSON（stderr は空） | 4、原因文 | 3、`Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]` |
+
+`check` と Playground の import 行は `@ubnf: v2` により module 解決へ進む場合。
+それ以外の inventory / JSON・診断順は従来どおり。複数 grammar の generate は従来の
+`grammar NAME [start,end): ` を原因文の前に付ける（範囲は元ソースの CP）。
+Java の inspect は source snapshot を付けずに解決するため、この接頭辞を付けない。
+
+| I/O 失敗種別 | 原因文への対応 |
+| --- | --- |
+| `NotFound` | `P`（Java の `NoSuchFileException#getMessage()`） |
+| `PermissionDenied` | `P`（Java の `AccessDeniedException#getMessage()`） |
+| `IsADirectory`：入口 check / generate / grammar Playground | `Is a directory` |
+| 非通常ファイル：入口 inspect / local import | bounded reader の `E-MODULE: local import is not a regular file`。ディレクトリもここで拒否する。 |
+| `NotADirectory` | `P: Not a directory` |
+| symlink ループ（Unix `ELOOP`） | `P: Too many levels of symbolic links or unable to access attributes of symbolic link`（Java NIO の文） |
+| その他の OS I/O | `P: <OS の理由>`。Rust の ` (os error N)` は付けない。Linux の長すぎる成分は `P: File name too long`。 |
+| UTF-8 decode（`InvalidData`） | 内容診断の既存契約を維持。上記 OS errno の変換対象ではない。package artifact は #924 の strict UTF-8 / raw hash 順を維持する。 |
+
+通常ファイル・64 MiB・handle 再検査・bounded read と package の `E-PACKAGE` 診断は維持する。
+Rust の既存 `Result<_, String>` API は残し、CLI 用の `FileError` で I/O と文法エラーの
+区別を module 解決の間も保持する。エラー文字列のパターンや失敗後の再読取りで終了コードを推測しない。
+parser のホットパスに変更はない。
+
+共通 fixture は `spec-corpus/cli-input-errors.json`、実行は `scripts/cli_input_errors.py` と
+`CliInputIoConformanceTest`（`-DrustConformance=true`）。25形を LF/CRLF で実行し、
+入口の相対/絶対/不存在親/symlink＋`..`、ディレクトリ、権限、import の欠落/入れ子/ディレクトリ/権限、
+複数 grammar と正常な生成物を検証する。通常の I/O fixture は4コマンドの exit・stdout・stderr 最終行を
+独立期待値に照合し、成功時は両 host の生成 bytes と `--check` も比較する。
+追加の `@ubnf` 省略/v1/v3/block の4形は、Playground が I/O より先に capability 判定で停止するため、
+inspect・check・generate を対象とし、既存 `P-IMPORT` / `P-SETTING` JSON の全体を固定する。
+この4形の Playground の一般的な描画形式は今回変更しない。
+
+権限 fixture は同じ実行ユーザーで `chmod(000)` の読取りが `PermissionDenied` になることを先に確認する。
+root / `CAP_DAC_OVERRIDE` 等で読める環境では入口/import の各1形を組合せから除外し、
+証跡 JSON の `excluded` に理由を残す。JUnit を skip したり権限拒否が成功したと数えたりしない。
+通常の非 root CI は全384観測（両 host、LF/CRLF）と生成後 `--check` 16回を実行し、必須3メソッドの skip は0とする。

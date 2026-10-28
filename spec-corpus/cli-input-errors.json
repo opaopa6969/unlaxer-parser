@@ -1,0 +1,379 @@
+[
+  {
+    "id": "entry-relative",
+    "scope": "entry",
+    "grammar": "missing.ubnf",
+    "error": "${WORK}/missing.ubnf"
+  },
+  {
+    "id": "entry-absolute",
+    "scope": "entry",
+    "grammar": "${WORK}/missing.ubnf",
+    "error": "${WORK}/missing.ubnf"
+  },
+  {
+    "id": "entry-missing-parent",
+    "scope": "entry",
+    "grammar": "absent/missing.ubnf",
+    "error": "${WORK}/absent/missing.ubnf"
+  },
+  {
+    "id": "entry-symlink-dotdot",
+    "scope": "entry",
+    "grammar": "a/link/../missing.ubnf",
+    "error": "${WORK}/a/missing.ubnf",
+    "directories": [
+      "a",
+      "physical/deep"
+    ],
+    "symlinks": {
+      "a/link": "../physical/deep"
+    },
+    "files": {
+      "physical/missing.ubnf": "grammar Main {\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    }
+  },
+  {
+    "id": "entry-directory",
+    "scope": "entry",
+    "grammar": "directory",
+    "error": "Is a directory",
+    "directories": [
+      "directory"
+    ],
+    "inspectError": "E-MODULE: local import is not a regular file"
+  },
+  {
+    "id": "entry-permission",
+    "scope": "entry",
+    "grammar": "denied.ubnf",
+    "error": "${WORK}/denied.ubnf",
+    "files": {
+      "denied.ubnf": "grammar Main {\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    },
+    "denied": "denied.ubnf"
+  },
+  {
+    "id": "entry-not-directory",
+    "scope": "entry",
+    "grammar": "plain/missing.ubnf",
+    "error": "${WORK}/plain/missing.ubnf: Not a directory",
+    "files": {
+      "plain": "x"
+    }
+  },
+  {
+    "id": "entry-symlink-loop",
+    "scope": "entry",
+    "grammar": "loop",
+    "error": "${WORK}/loop: Too many levels of symbolic links or unable to access attributes of symbolic link",
+    "symlinks": {
+      "loop": "loop"
+    }
+  },
+  {
+    "id": "entry-long-component",
+    "scope": "entry",
+    "grammar": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "error": "${WORK}/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx: File name too long"
+  },
+  {
+    "id": "import-missing",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'missing.ubnf'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    }
+  },
+  {
+    "id": "import-directory",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "E-MODULE: local import is not a regular file",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'directory'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    },
+    "directories": [
+      "directory"
+    ]
+  },
+  {
+    "id": "import-permission",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/denied.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'denied.ubnf'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+      "denied.ubnf": "grammar Lib { @ubnf: v2 token T ::= 'x'; }\n"
+    },
+    "denied": "denied.ubnf"
+  },
+  {
+    "id": "import-nested-missing",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/lib/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'lib/first.ubnf'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+      "lib/first.ubnf": "grammar Lib {\n@import sub from 'missing.ubnf'\n@ubnf: v2\ntoken T ::= 'x';\n}\n"
+    }
+  },
+  {
+    "id": "import-missing-omitted",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'missing.ubnf'\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    },
+    "operations": [
+      "inspect",
+      "check",
+      "generate"
+    ],
+    "checkDiagnostics": {
+      "LF": [
+        {
+          "code": "P-IMPORT",
+          "severity": "error",
+          "span": {
+            "start": 15,
+            "end": 46
+          },
+          "subject": "missing.ubnf"
+        }
+      ],
+      "CRLF": [
+        {
+          "code": "P-IMPORT",
+          "severity": "error",
+          "span": {
+            "start": 16,
+            "end": 47
+          },
+          "subject": "missing.ubnf"
+        }
+      ]
+    }
+  },
+  {
+    "id": "import-missing-v1",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'missing.ubnf'\n@ubnf: v1\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    },
+    "operations": [
+      "inspect",
+      "check",
+      "generate"
+    ],
+    "checkDiagnostics": {
+      "LF": [
+        {
+          "code": "P-IMPORT",
+          "severity": "error",
+          "span": {
+            "start": 15,
+            "end": 46
+          },
+          "subject": "missing.ubnf"
+        }
+      ],
+      "CRLF": [
+        {
+          "code": "P-IMPORT",
+          "severity": "error",
+          "span": {
+            "start": 16,
+            "end": 47
+          },
+          "subject": "missing.ubnf"
+        }
+      ]
+    }
+  },
+  {
+    "id": "import-missing-invalid",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'missing.ubnf'\n@ubnf: v3\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    },
+    "operations": [
+      "inspect",
+      "check",
+      "generate"
+    ],
+    "checkDiagnostics": {
+      "LF": [
+        {
+          "code": "P-IMPORT",
+          "severity": "error",
+          "span": {
+            "start": 15,
+            "end": 46
+          },
+          "subject": "missing.ubnf"
+        }
+      ],
+      "CRLF": [
+        {
+          "code": "P-IMPORT",
+          "severity": "error",
+          "span": {
+            "start": 16,
+            "end": 47
+          },
+          "subject": "missing.ubnf"
+        }
+      ]
+    }
+  },
+  {
+    "id": "import-missing-duplicate",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'missing.ubnf'\n@ubnf: v2\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    }
+  },
+  {
+    "id": "import-missing-block",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'missing.ubnf'\n@ubnf: { format: 'v2' }\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    },
+    "operations": [
+      "inspect",
+      "check",
+      "generate"
+    ],
+    "checkDiagnostics": {
+      "LF": [
+        {
+          "code": "P-IMPORT",
+          "severity": "error",
+          "span": {
+            "start": 15,
+            "end": 46
+          },
+          "subject": "missing.ubnf"
+        },
+        {
+          "code": "P-SETTING",
+          "severity": "error",
+          "span": {
+            "start": 47,
+            "end": 70
+          },
+          "subject": "ubnf"
+        }
+      ],
+      "CRLF": [
+        {
+          "code": "P-IMPORT",
+          "severity": "error",
+          "span": {
+            "start": 16,
+            "end": 47
+          },
+          "subject": "missing.ubnf"
+        },
+        {
+          "code": "P-SETTING",
+          "severity": "error",
+          "span": {
+            "start": 49,
+            "end": 72
+          },
+          "subject": "ubnf"
+        }
+      ]
+    }
+  },
+  {
+    "id": "import-missing-referenced",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'missing.ubnf'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= lib.T @value;\n}\n"
+    }
+  },
+  {
+    "id": "import-symlink-dotdot",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/a/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'a/link/../missing.ubnf'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+      "physical/missing.ubnf": "grammar Lib { @ubnf: v2 token T ::= 'x'; }\n"
+    },
+    "directories": [
+      "a",
+      "physical/deep"
+    ],
+    "symlinks": {
+      "a/link": "../physical/deep"
+    }
+  },
+  {
+    "id": "import-not-directory",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/plain/missing.ubnf: Not a directory",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'plain/missing.ubnf'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+      "plain": "x"
+    }
+  },
+  {
+    "id": "import-symlink-loop",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/loop: Too many levels of symbolic links or unable to access attributes of symbolic link",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'loop'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    },
+    "symlinks": {
+      "loop": "loop"
+    }
+  },
+  {
+    "id": "import-multiple-grammars",
+    "scope": "import",
+    "grammar": "main.ubnf",
+    "error": "${WORK}/missing.ubnf",
+    "files": {
+      "main.ubnf": "grammar First { @root @mapping(First) Start ::= 'f'; }\ngrammar Main {\n@import lib from 'missing.ubnf'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    },
+    "context": {
+      "LF": "grammar Main [55,172): ",
+      "CRLF": "grammar Main [56,177): "
+    }
+  },
+  {
+    "id": "valid-entry",
+    "scope": "success",
+    "grammar": "main.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n"
+    }
+  },
+  {
+    "id": "valid-import",
+    "scope": "success",
+    "grammar": "main.ubnf",
+    "files": {
+      "main.ubnf": "grammar Main {\n@import lib from 'lib.ubnf'\n@ubnf: v2\n@root @mapping(Root, params=[value]) Start ::= lib.T @value;\n}\n",
+      "lib.ubnf": "grammar Lib {\n@ubnf: v2\ntoken T ::= 'x';\n}\n"
+    }
+  }
+]

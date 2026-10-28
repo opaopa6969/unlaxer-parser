@@ -11,7 +11,7 @@ const MAX_LOCAL_BYTES: usize = 64 * 1024 * 1024;
 const NOT_REGULAR: &str = "E-MODULE: local import is not a regular file";
 const TOO_LARGE: &str = "E-MODULE: local import exceeds 64 MiB";
 
-fn read_local_source(path: &Path) -> Result<String, String> {
+pub(crate) fn read_local_source(path: &Path) -> Result<String, String> {
     read_local_with(path, open_local)
 }
 
@@ -47,7 +47,7 @@ fn read_local_with<R: Read>(
         MAX_LOCAL_BYTES,
         NOT_REGULAR,
         TOO_LARGE,
-        |e| e.to_string(),
+        |e| crate::input::io_message(path, e),
         open,
     )?;
     String::from_utf8(bytes).map_err(|_| "stream did not contain valid UTF-8".into())
@@ -689,11 +689,19 @@ impl Resolver {
         Ok(target)
     }
     pub fn read(&mut self, path: &Path) -> Result<String, String> {
+        self.read_with_errors(path)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn read_with_errors(
+        &mut self,
+        path: &Path,
+    ) -> Result<String, crate::input::FileError> {
         let Some(owner) = self.owner(path)? else {
             if let Some(source) = self.sources.get(&normalize(path)) {
                 return Ok(source.clone());
             }
-            return read_local_source(path);
+            return read_local_source(path).map_err(crate::input::FileError::Io);
         };
         let value = self.loaded(&owner)?;
         let pinned = self.pinned(&owner)?;
@@ -706,7 +714,7 @@ impl Resolver {
         value["files"][&relative]
             .as_str()
             .map(str::to_owned)
-            .ok_or_else(|| error(format!("missing package file: {relative}")))
+            .ok_or_else(|| error(format!("missing package file: {relative}")).into())
     }
 }
 
