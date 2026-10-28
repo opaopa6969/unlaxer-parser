@@ -11,7 +11,7 @@ def run_package_documents(clients, directory, java_command, native_command, root
     from importlib import import_module
     position = import_module('check-ubnf-authoring-lsp').position
     cases = json.loads((root / 'spec-corpus/ubnf-authoring-lsp/package-documents.json').read_text())
-    assert len(cases) == 25, 'package document fixtures must not silently disappear'
+    assert len(cases) == 27, 'package document fixtures must not silently disappear'
     artifact = (root / 'unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json').read_bytes()
     digest = hashlib.sha256(artifact).hexdigest()
     documents = {
@@ -58,7 +58,7 @@ def run_package_documents(clients, directory, java_command, native_command, root
                 target.write_bytes(content)
                 path.symlink_to(target.name)
             else:
-                path.write_bytes(b'{' if kind == 'invalid' else b'{"schemaVersion":2}' if kind == 'schema' else content)
+                path.write_bytes(b'{' if kind == 'invalid' else b'{"a":"\xff"}' if kind == 'invalid-utf8' else b'{"schemaVersion":2}' if kind == 'schema' else content)
         declaration = "@import layout from 'pkg:std/layout'"
         source = f"grammar Main {{ // 😀\r\n {declaration}\r\n @ubnf: v2\r\n @root @mapping(Value) Start ::= 'a';\r\n}}"
         path = folder / 'main space 😀.ubnf'
@@ -105,7 +105,7 @@ def run_package_documents(clients, directory, java_command, native_command, root
         # Explicit deps resolve reads manifests too. Check its rejection before any writes.
         if case['manifest'] not in ('valid', 'regular-link', 'exact'):
             manifest_error = ('unsupported schemaVersion' if case['manifest'] == 'schema' else
-                              'invalid JSON' if case['manifest'] == 'invalid' else
+                              'invalid JSON' if case['manifest'] in ('invalid', 'invalid-utf8') else
                               'missing manifest; run unlaxer deps resolve --manifest ubnf.json' if case['manifest'] == 'missing' else
                               'manifest exceeds 8 MiB' if case['manifest'].startswith('oversized') else
                               'manifest is not a regular file')

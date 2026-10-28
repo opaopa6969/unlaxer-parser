@@ -183,23 +183,43 @@ CLI も以下の同じ原因文字列を表示する（既存の CLI wrapper と
 | 上限超過 | `E-PACKAGE: {subject} exceeds 8 MiB` |
 | 欠落 | `E-PACKAGE: missing {subject}; run unlaxer deps resolve --manifest ubnf.json` |
 | その他の I/O 失敗 | `E-PACKAGE: cannot read {subject}` |
+| 不正な UTF-8 | `E-PACKAGE: invalid JSON`（I/O 失敗ではなく内容の誤り。Rust の byte JSON parser と同じ） |
 
 Java の `SourceReader` と `FileSystemPort` には `readPackage` の既定メソッドを追加した。
 既存のカスタム callback は引き続き呼ばれ、disk 実装だけが bounded reader を明示する。
 注入された文字列の UTF-8 byte上限も確認するが、信頼された独自 callback 内の I/O は呼出側の責任である。
 editor の未保存 buffer は local source にだけ適用し、manifest/lock の disk 読取りを置換しない。
 
-共通 `spec-corpus/ubnf-authoring-lsp/package-documents.json` の25件を、両実 stdio server と
+共通 `spec-corpus/ubnf-authoring-lsp/package-documents.json` の27件を、両実 stdio server と
 Java-host Rust / native Rust / Java flag CLI に送る。FIFO、device/directory/過大file と symlink、
-欠落、上限ちょうど、有効fileへの symlink、複数異常時の順序を検査し、全診断 JSON と後続 completion/hover を照合する。
+欠落、不正な UTF-8、上限ちょうど、有効fileへの symlink、複数異常時の順序を検査し、全診断 JSON と後続 completion/hover を照合する。
 manifest の拒否は両 `deps resolve` CLI でも検査する。既存 package corpus の期待値は変更しない。
+
+lock が指す cache artifact と `local:` 依存 artifact の読取りはこの範囲外で、
+[#913](https://github.com/opaopa6969/unlaxer-parser/issues/913) で揃える（Rust は FIFO・`/dev/zero` で停止する）。
+先頭 BOM の受理差（Java は受理、Rust は `invalid JSON`）は
+[#914](https://github.com/opaopa6969/unlaxer-parser/issues/914) で扱う。
 
 ### Java の競合に残る制限と採用しなかった方式
 
-[#908](https://github.com/opaopa6969/unlaxer-parser/issues/908) の「開いた handle が通常ファイルであること」の
-完全な保証は Java では未達である。この PR の範囲は上記の通常時の安全化と handle の seek/size 検査まで。
-[#907](https://github.com/opaopa6969/unlaxer-parser/issues/907) と新しい
-[#911](https://github.com/opaopa6969/unlaxer-parser/issues/911) に残りの受け入れ条件を記録し、#908 も Refs のまま残す。
+[#908](https://github.com/opaopa6969/unlaxer-parser/issues/908) は、競合のない通常時の受入条件（両版の
+通常ファイル確認・上限付き読取り・共通診断・検査順・共通 fixture）をこの変更で満たしたので閉じる。
+Java で stat の後・open の前後に path を差し替える競合（TOCTOU）は local import と同じ
+[#907](https://github.com/opaopa6969/unlaxer-parser/issues/907) の範囲であり、manifest/lock の分も含めて
+[#911](https://github.com/opaopa6969/unlaxer-parser/issues/911) に受け入れ条件を記録した。
+
+Java の開いた handle の再検査（`position()` / `size()`）は、競合時に次を **防ぐ**。
+
+- writer のある FIFO・pipe への差替え: `position()` が失敗するので、読まずに非通常ファイル診断にする。
+- socket への差替え: open が失敗し、path に非通常ファイルが見えれば非通常ファイル診断にする。
+- 過大な通常ファイルへの差替え・stat 後の増大: handle の size、または上限＋1の打切りで過大診断にする。
+
+次は **防げない**（Rust は fstat で同じ非通常ファイル診断にする。Java の結果は実測）。
+
+- writer のない FIFO への差替え: open 自体が writer を待ってブロックする。
+- seek できる文字デバイスへの差替え: `/dev/zero` は上限＋1バイトで打ち切られて過大診断になる（停止や無制限確保はしない）。
+  `/dev/null` は空の内容として読まれ、その後の JSON 検証で拒否される（local import では空の文法として読まれる）。
+- directory への差替え: open は成功し、read の `EISDIR` で `cannot read {subject}`（local import では I/O エラー文）になる。
 
 JDK17 の [StandardOpenOption](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/file/StandardOpenOption.html)
 には nonblocking open がなく、[FileChannel](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/channels/FileChannel.html)

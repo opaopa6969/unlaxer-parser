@@ -102,6 +102,8 @@ public final class UBNFPackageResolver {
     private static IllegalArgumentException documentError(String subject, IOException exception) {
         if (exception instanceof NoSuchFileException)
             return error("missing " + subject + "; run unlaxer deps resolve --manifest ubnf.json");
+        // Invalid UTF-8 is invalid JSON content, as in Rust's byte parser, not an I/O failure.
+        if (exception instanceof java.nio.charset.CharacterCodingException) return error("invalid JSON");
         if (exception.getMessage() != null && exception.getMessage().startsWith("E-PACKAGE: "))
             return new IllegalArgumentException(exception.getMessage(), exception);
         return error("cannot read " + subject);

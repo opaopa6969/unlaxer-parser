@@ -24,6 +24,11 @@ public class PackageDocumentReaderTest {
             try (var random = new RandomAccessFile(file.toFile(), "rw")) { random.setLength(LIMIT + 1L); }
             assertEquals("E-PACKAGE: " + subject + " exceeds 8 MiB",
                 assertThrows(IllegalArgumentException.class, () -> UBNFPackageResolver.readPackageSource(file)).getMessage());
+            // Strict UTF-8 decoding failure is content, reported like Rust's byte JSON parser.
+            Files.write(file, new byte[] {'{', '"', 'a', '"', ':', '"', (byte) 0xff, '"', '}'});
+            assertEquals("E-PACKAGE: invalid JSON",
+                assertThrows(IllegalArgumentException.class, () -> UBNFPackageResolver.readPackageSource(file)).getMessage());
+            Files.delete(file);
         }
         Path file = temporary.newFile().toPath();
         try (var random = new RandomAccessFile(file.toFile(), "rw")) { random.setLength(LIMIT + 1L); }

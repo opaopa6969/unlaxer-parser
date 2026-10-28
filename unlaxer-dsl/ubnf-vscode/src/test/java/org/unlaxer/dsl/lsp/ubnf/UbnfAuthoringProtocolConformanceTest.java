@@ -57,7 +57,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=300000) public void packageDocumentsRejectUnsafeFilesWithoutBlockingServersOrClis() throws Exception {
-        runProtocol("package-documents", 25);
+        runProtocol("package-documents", 27);
     }
 
     private void runProtocol(String suite, int count) throws Exception {

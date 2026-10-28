@@ -134,6 +134,18 @@
     "error": "lock exceeds 8 MiB"
   },
   {
+    "id": "manifest-invalid-utf8",
+    "manifest": "invalid-utf8",
+    "lock": "valid",
+    "error": "invalid JSON"
+  },
+  {
+    "id": "lock-invalid-utf8",
+    "manifest": "valid",
+    "lock": "invalid-utf8",
+    "error": "invalid JSON"
+  },
+  {
     "id": "manifest-schema-before-lock-json",
     "manifest": "schema",
     "lock": "invalid",
