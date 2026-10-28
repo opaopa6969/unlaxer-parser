@@ -64,6 +64,10 @@ public class UbnfAuthoringProtocolConformanceTest {
         runProtocol("package-artifacts", 39);
     }
 
+    @Test(timeout=300000) public void packageArtifactUtf8DiagnosticsAndHashOrderMatchAcrossHosts() throws Exception {
+        runProtocol("package-artifact-utf8", 29);
+    }
+
     private void runProtocol(String suite, int count) throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] rustConformance=true is required for native authoring stdio");
         Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
@@ -75,7 +79,7 @@ public class UbnfAuthoringProtocolConformanceTest {
             "--java", Path.of(System.getProperty("java.home"), "bin/java").toString(),
             "--classpath", System.getProperty("java.class.path"),
             "--rust", root().resolve("rust/target/debug/ubnf-language-server").toString(), "--suite", suite, "--output", output.toString()).redirectErrorStream(true).redirectOutput(Path.of("target/ubnf-authoring-" + suite + "-wire.log").toFile()).start();
-        try { assertTrue("protocol timeout", process.waitFor(suite.equals("local-imports") ? 900 : suite.equals("package-artifacts") ? 600 : suite.equals("package-documents") ? 240 : 100, TimeUnit.SECONDS)); assertEquals(0, process.exitValue()); }
+        try { assertTrue("protocol timeout", process.waitFor(suite.equals("local-imports") ? 900 : suite.equals("package-artifacts") ? 600 : (suite.equals("package-documents") || suite.equals("package-artifact-utf8")) ? 240 : 100, TimeUnit.SECONDS)); assertEquals(0, process.exitValue()); }
         finally { process.descendants().forEach(child -> child.destroyForcibly()); process.destroyForcibly(); System.out.print(Files.readString(Path.of("target/ubnf-authoring-" + suite + "-wire.log"))); }
         assertEquals("all authored cases and import/package scenarios executed", count, JsonParser.parseString(Files.readString(output)).getAsJsonArray().size());
     }
