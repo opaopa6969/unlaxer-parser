@@ -143,6 +143,18 @@ final class DapArgumentConformance {
             if (row.has("body")) assertEquals(row.get("body"), response.get("body"));
             barrier();
         }
+        // One value per field of every LSP4J argument DTO, including the default
+        // methods the generated adapter does not implement. These responses do not
+        // depend on the session, and a rejected conversion must not change it.
+        assertEquals(557, fixture.getAsJsonArray("requests").size());
+        prepare();
+        var stopped = state();
+        for (var element : fixture.getAsJsonArray("requests")) {
+            var row = element.getAsJsonObject();
+            observe(row.get("id").getAsString(), wire.responseLiteral(row.get("raw").getAsString()), row.getAsJsonObject("expected"));
+        }
+        assertEquals("rejected requests keep the stopped state", stopped, state());
+        barrier();
         Files.write(Path.of("target/dap-arguments-"+route+"-"+backend+".tsv"), evidence);
         if (backend.startsWith("rust")) assertEquals(Files.readAllLines(Path.of("target/dap-arguments-"+route+"-java.tsv")), evidence);
         // Leave the next independent suite in an empty, terminated session.

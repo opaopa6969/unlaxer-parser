@@ -13,7 +13,7 @@ Java 基準 revision は `1a8c8921`（LSP4J 0.23.1）。`requests.json` は実 s
 | program 未指定 / 不正 steppingMode の launch | false | `Internal error.` | 文字列: `java.util.concurrent.CompletionException: java.lang.IllegalArgumentException: invalid program or stepping mode` |
 | 有効な新 launch がない configurationDone | false | `Internal error.` | 文字列: `java.util.concurrent.CompletionException: java.lang.IllegalStateException: configurationDone requires a new launch` |
 | setBreakpoints(null) / null breakpoint | false | `Internal error.` | 文字列: 例外型 `java.lang.NullPointerException` が一致。Java の JVM メソッド・parameter 名を含む説明と Rust の `missing setBreakpoints arguments` / `null breakpoint` は意図した差 |
-| IDebugProtocolServer の未実装31 request（stepIn / pause / evaluate / cancel / attach 等、JSON に全件列挙） | false | `Internal error.` | 文字列: `java.lang.UnsupportedOperationException` |
+| IDebugProtocolServer の未実装31 request（stepIn / pause / evaluate / cancel / attach 等、JSON に全件列挙） | false | `Internal error.` | 文字列: `java.lang.UnsupportedOperationException`。引数 DTO の変換に失敗する場合は先に下記 #905 の parse 失敗になる |
 | 未知 command | false | `Unsupported request method: unknown-fixture-command` | body なし |
 | setBreakpoints の line -1 / 0 / 省略 | true | なし | Java と同じく -1 / 0 / 0 を返す。負の行は停止位置に一致しないが、Java と同じく breakpoint 集合を空でなくし、configurationDone の探索を有効にする |
 | initialize 前の threads / 有効 stackTrace / scopes / variables、frameId 省略の scopes | true | なし | 通常の応答 object。initialize 前という理由だけでは拒否しない |
@@ -74,10 +74,12 @@ parse 失敗は `success:false`、`message:"Message could not be parsed."`、**o
 
 stream の診断は `$.arguments` からの path と、実際の frame の行・UTF-16 列を含む。IllegalStateException の Gson Troubleshooting URL も一致させる。改行、非 BMP、指数の大文字・符号を含む生 frame でも照合する。Java のメソッド引数配列も順序で異なり、例えば stackTrace `arguments:[]` は tree では BEGIN_ARRAY、stream では空の引数列の END_ARRAY で拒否し、stream の `[{}]` は単一 DTO として読まれる。launch の tree 経路は map の pair-array 表現も受理する。
 
-54 数値境界 × 6 request（stackTrace / scopes / variables / next / continue / setBreakpoints）× 2順序、型・構造111件 × 2順序、launch 198件、literal 15件の **計1,083観測 / route・backend** を照合する。Classic AST / Classic token（Java host・native Rust host）/ Generated / Projected の計9経路、9,747観測。成功時の ID 解釈、line の値、program/source の対応、next の1 step 前進、continue の終了まで確認する。失敗後は停止位置・scope・variables を保持し、余分な lifecycle event がないことも確認する。
+54 数値境界 × 6 request（stackTrace / scopes / variables / next / continue / setBreakpoints）× 2順序、型・構造111件 × 2順序、launch 198件、literal 15件、DTO 全 field の request 557件の **計1,640観測 / route・backend** を照合する。Classic AST / Classic token（Java host・native Rust host）/ Generated / Projected の計9経路、14,760観測。成功時の ID 解釈、line の値、program/source の対応、next の1 step 前進、continue の終了まで確認する。失敗後は停止位置・scope・variables を保持し、余分な lifecycle event がないことも確認する。
+
+`requests` は LSP4J 0.23.1 の `IDebugProtocolServer` の全 method の引数 DTO（`org.eclipse.lsp4j.debug` の javap で確認した field 型）について、field ごとに型の合わない値と受理される値を両順序で送った Java の実測である。生成 adapter が実装しない stepIn / evaluate / source / setExceptionBreakpoints などの default method も、LSP4J は DTO へ変換してから `UnsupportedOperationException` を投げるため、変換に失敗すれば `Message could not be parsed.` になる。入れ子の Source / ValueFormat / SourceBreakpoint / ExceptionOptions なども同じ規則で検査し、Source の `adapterData` や launch の `__restart` など `Object` 型の field は任意の値を受理する。restart の `arguments`（`Either<LaunchRequestArguments, AttachRequestArguments>`）は LSP4J が別の JsonElement として読み直すため、frame の順序によらず tree の規則で `$` からの path になる（例: `Expected BOOLEAN but was NUMBER at path $.noDebug`）。session の状態に依存しない parse 失敗と `UnsupportedOperationException` の行だけを収め、停止中の session で連続して送り、前後の状態が変わらないことも確かめる。
 
 `DapArgumentConformance` は既存の必須4テストクラスから呼び出す。CI のクラス・メソッド契約は既存の `.github/optin-test-contracts.json` にあり、新しいテストクラスは追加していない。`target/dap-arguments-<route>-<backend>.tsv` と `-raw.tsv` を出力し、CI は全経路の比較一覧を必須にする。
 
-今回の fixture の parse 失敗は body.message の全文まで一致し、Gson 固有の文言を例外種類だけへ弱めた行はない。既存の Internal error. の JVM stack trace / helpful NPE 説明の差は #900 の契約を維持する。任意の未知拡張 field、全未実装 DAP request の DTO、重複 JSON key、不完全な map-entry 配列、壊れた framing の総当り互換はこの fixture の範囲外。Java 製品コード・公開3.3.0・parser ホットパスは変更しない。
+今回の fixture の parse 失敗は body.message の全文まで一致し、Gson 固有の文言を例外種類だけへ弱めた行はない。既存の Internal error. の JVM stack trace / helpful NPE 説明の差は #900 の契約を維持する。任意の未知拡張 field、重複 JSON key、不完全な map-entry 配列、壊れた framing の総当り互換はこの fixture の範囲外。Java 製品コード・公開3.3.0・parser ホットパスは変更しない。
 
-Rust の `serve` / `serve_stdio` は実 frame の表記と順序を使う。JSON Value を直接渡す `Server::handle` は、その Value を直列化した入力に同じ規則を適用するため、呼出側が既に失った数値表記や空白は復元しない。
+Rust の `serve` / `serve_stdio` は実 frame の表記と順序を使う。JSON Value を直接渡す `Server::handle` は、その Value を直列化した入力に同じ規則を適用するため、呼出側が既に失った数値表記や空白は復元しない。serde_json の object は key 順に並ぶので、`handle` では常に `arguments` が `command` より先（tree）の規則になり、field の検査順も key 順になる。field 順序は frame から読むため、serde_json の `preserve_order`（indexmap などの追加 crate）は使わない。数値は `arbitrary_precision` で元の表記を保つ。

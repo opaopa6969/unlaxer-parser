@@ -8,7 +8,8 @@ publish=false
 [dependencies]
 unlaxer-runtime={path="../unlaxer-runtime"}
 unlaxer-protocol={path="../unlaxer-protocol"}
-# LSP4J converts the original number spelling and visits fields in wire order.
-serde_json={version="1",features=["arbitrary_precision","preserve_order"]}
+# LSP4J reads numbers such as 1e400 from the frame. Field order comes from the
+# frame itself (src/arguments/wire.rs), so preserve_order is not needed.
+serde_json={version="1",features=["arbitrary_precision"]}
 [lints]
 workspace=true

@@ -91,6 +91,33 @@ fn reader_locations_keep_the_measured_whitespace_unicode_and_number_spelling() {
 }
 
 #[test]
+fn every_lsp4j_argument_dto_field_follows_the_java_oracle() {
+    let fixture = fixture();
+    let cases = fixture["requests"].as_array().unwrap();
+    assert_eq!(cases.len(), 557);
+    for row in cases {
+        let response = exchange(row["raw"].as_str().unwrap());
+        let expected = &row["expected"];
+        assert_eq!(response["success"], expected["success"], "{}", row["id"]);
+        assert_eq!(response["message"], expected["message"], "{}", row["id"]);
+        if expected["bodyType"] == "object" {
+            assert_eq!(
+                response["body"],
+                json!({"message":expected["bodyMessage"]}),
+                "{}",
+                row["id"]
+            );
+        } else {
+            assert_eq!(expected["bodyType"], "string");
+            let first = response["body"]
+                .as_str()
+                .and_then(|body| body.lines().next());
+            assert_eq!(first, expected["firstLine"].as_str(), "{}", row["id"]);
+        }
+    }
+}
+
+#[test]
 fn launch_string_lookups_do_not_rewrite_application_hook_arguments() {
     use std::collections::BTreeMap;
     use unlaxer_dap::{Backend, Step};

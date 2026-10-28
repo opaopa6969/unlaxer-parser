@@ -217,7 +217,10 @@ impl<B: Backend> Server<B> {
             }
             // LSP4J converts the entire argument DTO before invoking the adapter.
             // In particular, a rejected conversion must not mutate session state.
-            let arguments = arguments::read(&command, arguments, raw)?;
+            let arguments::Converted {
+                value: arguments,
+                launch: strings,
+            } = arguments::read(&command, arguments, raw)?;
             if self.disconnected {
                 return Err("disconnected".into());
             }
@@ -230,7 +233,6 @@ impl<B: Backend> Server<B> {
             // validates its own arguments and lifecycle state.
             match command.as_str() {
                 "launch" => {
-                    let strings = arguments::launch_strings(&arguments);
                     let program = ["program", "formulaSource"]
                         .into_iter()
                         .filter_map(|key| strings[key].as_str())
