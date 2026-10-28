@@ -3,11 +3,17 @@ use unlaxer_generator::{adapters::feature_diagnostics, generate, portability, va
 
 #[test]
 fn feature_and_lexical_diagnostics_match_independent_oracle() {
-    let cases: Vec<Value> = serde_json::from_str(include_str!(
+    let mut cases: Vec<Value> = serde_json::from_str(include_str!(
         "../../../spec-corpus/feature-diagnostics/cases.json"
     ))
     .unwrap();
     assert_eq!(31, cases.len(), "all authored cases execute");
+    let whitespace: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../spec-corpus/feature-diagnostics/whitespace.json"
+    ))
+    .unwrap();
+    assert_eq!(172, whitespace.len(), "all whitespace combinations execute");
+    cases.extend(whitespace);
     for case in cases {
         for (ending, separator) in [("LF", "\n"), ("CRLF", "\r\n")] {
             let source = case["source"].as_str().unwrap().replace('\n', separator);
@@ -121,5 +127,27 @@ fn lexical_context_preflight_keeps_the_java_lexical_prefix() {
                 case["name"]
             );
         }
+    }
+}
+
+#[test]
+fn whitespace_lexical_resolution_is_per_grammar() {
+    // #923: check compiles the lexical tokens at most once per grammar; the result must not
+    // leak into another grammar of the same file, in either order.
+    let broken = "grammar G {\n@ubnf: v2\n@whitespace: javaStyle\ntoken A ::= Missing;\ntoken OK ::= 'y';\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}";
+    let valid = "grammar H {\n@ubnf: v2\n@whitespace: none\ntoken WS ::= ' '+;\ntoken OK ::= 'y';\n@whitespace(WS)\nOther ::= OK;\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}";
+    for (source, offset) in [
+        (format!("{broken}\n{valid}"), 0),
+        (format!("{valid}\n{broken}"), valid.len() + 1),
+    ] {
+        let start = offset + broken.find("javaStyle").unwrap();
+        let expected = serde_json::json!({"schemaVersion":1,"target":"rust","portable":false,
+            "structure":"blocked","diagnostics":[{"code":"P-WHITESPACE","severity":"error",
+            "span":{"start":start,"end":start + 9},"subject":"javaStyle"}]});
+        assert_eq!(
+            expected,
+            serde_json::from_str::<Value>(&portability::check(&source).to_json()).unwrap(),
+            "{source}"
+        );
     }
 }
