@@ -196,8 +196,7 @@ Java-host Rust / native Rust / Java flag CLI に送る。FIFO、device/directory
 manifest の拒否は両 `deps resolve` CLI でも検査する。既存 package corpus の期待値は変更しない。
 
 lock が指す cache artifact と明示 `deps resolve` の `local:` 依存も、下記 #913 の規則で同じ reader を使う。
-先頭 BOM の受理差（Java は受理、Rust は `invalid JSON`）は
-[#914](https://github.com/opaopa6969/unlaxer-parser/issues/914) で扱う。
+先頭 BOM は下記 #914 / #926 の規則で、Java の既存動作と同じく1つだけ無視する。
 不正 UTF-8 artifact の内容診断は、下記 #919 の規則で Java の既存文言に統一する。
 
 ### Java の競合に残る制限と採用しなかった方式
@@ -343,18 +342,84 @@ CI の `cross-language` 契約で両テストメソッドの実行を必須に�
 この正規化は明示 resolve に限る。#913 の bounded reader、#919 の UTF-8 判定、固定 cache の
 読取り、既存 package corpus の期待値、parser のホットパスは変更しない。
 
-### JSON の単独サロゲートに残る差（#926）
+### package JSON の受理境界（#914 / #926、残り #939）
 
-JSON escape の単独サロゲート（例: `local:art\ud800ifact.json` / `\udc00`）は、
-Java では復号後のパス検証で上記 `cannot read local artifact` になる一方、Rust は先行する
-JSON 解析で `E-PACKAGE: invalid JSON` を返す。UTF-8 bytes の不正とは別であり、
-両版が JSON として受理する NUL のパスとは拒否段階が異なる。
-この入力まで同じ診断にするには内容解析との境界を扱う必要があるため、
-[#926](https://github.com/opaopa6969/unlaxer-parser/issues/926) に受け入れ条件を分けた。
-無関係な JSON エラーを local I/O エラーへ一括変換することはせず、#924 の経路を維持する。
-この残りは JSON 受理段階（Rust の JSON 解析が単独サロゲートを拒否する）の問題で、パス解決とは別の意味単位である。
-#926 が独自の受け入れ条件で追跡するため、パス解決を扱う #921 は今回の変更で閉じる。
-正常なサロゲート対による非BMP文字のパスは、上記共通 fixture に含めて受理・bytes 一致を検証する。
+Java（Gson 2.13.2）を参照とし、Java 本体・既存の注入経路は変更しない。
+manifest / lock / artifact の**先頭にある UTF-8 BOM を1つだけ** JSON 解析直前に読み飛ばす。
+[RFC 8259 §8.1](https://www.rfc-editor.org/rfc/rfc8259#section-8.1) は解析側の BOM 無視を許容するため、
+既存 Java の受理集合を維持するこの規則を選ぶ。生成する lock に BOM は付けない。
+artifact の raw bytes は一切変換せず、BOM も含む SHA-256 を lock と cache 名に使用する。
+#920 の reader、8 MiB 上限、#924 の **raw hash → strict UTF-8 → JSON**、#927/#933 のパス規則は維持する。
+
+変更前の Java の実 CLI による測定と共通 fixture の結果（3種類の document で共通）:
+
+| 入力 | Java / Rust の結果 |
+| --- | --- |
+| BOM 1つ + 有効 JSON | 受理 |
+| BOM 1つ + JSON 空白 + 有効 JSON | 受理 |
+| BOM 2つ + 有効 JSON | `E-PACKAGE: invalid JSON` |
+| BOM だけ / BOM + JSON 空白だけ | `E-PACKAGE: expected object: document` |
+| BOM + 不正 JSON | `E-PACKAGE: invalid JSON` |
+| 空白の後の BOM / JSON token 間の U+FEFF | `E-PACKAGE: invalid JSON` |
+| JSON 文字列内の U+FEFF | 文字列の一部として保持 |
+| BOM + 不正 UTF-8 | manifest/lock は `invalid JSON`、artifact は `invalid UTF-8 artifact` |
+| cache の raw hash 不一致 | BOM・UTF-8・JSON の検証より先に `artifact hash mismatch: <id>` |
+
+BOM のない空文書・空白だけの文書と非 object の top-level（Java は前者が `expected object: document`、後者が `invalid JSON` で、Rust は逆）、
+serde_json の再帰上限を超える深い入れ子は、BOM とは別の既存差として
+[#941](https://github.com/opaopa6969/unlaxer-parser/issues/941) で扱う。
+複数の不正な依存の検査順（Java は記述順、Rust は key の辞書順）は [#942](https://github.com/opaopa6969/unlaxer-parser/issues/942)、
+HTTPS の credentials ファイルの BOM・単独サロゲート・不正 JSON の差は [#943](https://github.com/opaopa6969/unlaxer-parser/issues/943) で扱う。
+
+単独サロゲート escape は有効な ASCII bytes なので、不正 UTF-8 とは別に扱う。
+Gson が受理する `\ud800` / `\udc00` と壊れた組について、次のようにフィールド検証まで進める。
+表中の診断はすべて既存の `E-PACKAGE: ` 接頭辞を持つ。
+
+| field / 使用段階 | Java の実測と Rust の対応結果 |
+| --- | --- |
+| manifest `dependencies.*.source` の `local:` / 固定 cache load | 受理。明示 resolve 以外では source を取得しない |
+| 同上 / 明示 resolve | `cannot read local artifact`。正規化で消える `..` 成分でも同じ |
+| artifact の推移的 `dependencies.*.source` の `local:` | 固定 cache は受理。明示 resolve は上と同じ診断 |
+| manifest / artifact の dependency 名、artifact ID、lock package 名 | `invalid package ID` |
+| manifest / artifact / lock の version、lock 推移的 dependency version | `exact package version required` |
+| lock の pinned ID | `locked package ID mismatch` |
+| lock の SHA-256 | `invalid locked SHA-256` |
+| lock の root 名 / version | `stale lock; run unlaxer deps resolve --manifest ubnf.json` |
+| schemaVersion の文字列 | `unsupported schemaVersion` |
+| 未対応 scheme の source | 固定 cache は受理。明示 resolve は `unsupported artifact source; use HTTPS, local: or builtin:` |
+| 未使用の metadata 文字列 | 受理。raw artifact bytes をそのまま cache へ保存 |
+| 正常なサロゲート対の `local:`、artifact file/entry、本文 | Unicode scalar として従来どおり受理 |
+
+Rust は通常の `serde_json` 解析が失敗した場合だけ、JSON 文字列中の単独サロゲート escape を検出する。
+正常な組、escape された backslash/quote は変えず、JSON の構造・一般の不正 escape・末尾余剰入力は
+引き続き `serde_json` が全体を検査する。重複 member は最後の値を使用する。
+内部 marker は既存 NUL と区別して符号化し、既存 NUL を復元する。単独サロゲートを含む metadata は
+ASCII 検証または不正パス検証を通らない NUL sentinel にし、既存の検証順で診断する。
+そのため schema/version エラーが source の取得より先に出て、正常な lock/cache の固定 load も維持される。
+新しい JSON parser / 外部 crate は追加せず、UBNF parser のホットパスには処理を追加しない。
+
+実際の UTF-16 文字列を使う以下の field は、置換で受理するとファイル同一性・文法本文・source 位置を変える。
+Java の受理集合を狭めず、Rust は従来の `invalid JSON` を維持する意図した暫定差とし、
+[#939](https://github.com/opaopa6969/unlaxer-parser/issues/939) の受け入れ条件で追跡する。
+これらは `local:` source を扱う #926 の範囲外で、#926 の受け入れ条件（`local:` source の拒否段階・診断と、
+無関係な field の既存診断の維持）は上の表で満たす。
+
+| 単独サロゲートを含む field | Java の実測 | Rust の暫定結果 |
+| --- | --- | --- |
+| artifact.entry（対応 file なし） | `missing UBNF package entry` | `invalid JSON` |
+| artifact.files の未使用ファイル名 | resolve / generate / inspect 成功 | `invalid JSON` |
+| artifact.files の本文（末尾コメント） | resolve / generate / inspect 成功 | `invalid JSON` |
+| manifest / artifact の HTTPS source host | cache load 成功、resolve は `HTTPS artifact URL must omit credentials, query and fragment` | load / resolve とも `invalid JSON` |
+
+共通 `spec-corpus/package-json-acceptance.json` の127件（共通結果114件、上記暫定差13件）を
+両実 stdio と Java-host Rust / native Rust / Java flag CLI、manifest / artifact は両 `deps resolve` に送る。
+上位・下位・壊れた組・正常な組・消える成分、NUL、escape された field 名、重複 source、
+一般の不正 JSON と schema の優先順を含む。stdio の message/code/severity/UTF-16 range 全体と後続 request、
+CLI の最終診断行と既存の終了コード（generate / resolve は3、Java flag CLI は4）、
+成功時の lock/cache raw bytes 一致、失敗時の snapshot 不変（既存 snapshot の有無両方）を照合する。
+暫定差の13件も実行し、host 別 oracle を台帳に記録する。テストを skip して一致扱いにはしない。
+既存 package corpus の期待値は変更しない。
+
 
 ## grammar / manifest の基準ディレクトリ（#928）
 

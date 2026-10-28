@@ -5,6 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
+mod json;
+
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 // Share the package graph budget; individual pinned artifacts still have their 8 MiB limit.
 const MAX_LOCAL_BYTES: usize = 64 * 1024 * 1024;
@@ -185,10 +187,13 @@ fn file(value: &str) -> Result<(), String> {
     Ok(())
 }
 fn parse(bytes: &[u8]) -> Result<Value, String> {
+    parse_document(bytes, false)
+}
+fn parse_document(bytes: &[u8], artifact: bool) -> Result<Value, String> {
     if bytes.len() > MAX_BYTES {
         return Err(error("artifact exceeds 8 MiB"));
     }
-    let value: Value = serde_json::from_slice(bytes).map_err(|_| error("invalid JSON"))?;
+    let value = json::parse(bytes, artifact)?;
     object(&value, "document")?;
     Ok(value)
 }
@@ -207,7 +212,7 @@ fn artifact(bytes: &[u8]) -> Result<Value, String> {
     // Match Java's strict decoder before JSON parsing. Cached callers verify the
     // raw hash first; do not decode in the reader or change manifest/lock parsing.
     std::str::from_utf8(bytes).map_err(|_| error("invalid UTF-8 artifact"))?;
-    let value = parse(bytes)?;
+    let value = parse_document(bytes, true)?;
     versioned(&value)?;
     id(string(&value, "id")?)?;
     version(string(&value, "version")?)?;
