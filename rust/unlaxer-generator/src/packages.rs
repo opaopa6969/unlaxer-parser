@@ -201,6 +201,12 @@ fn dependencies(value: &Value) -> Result<(), String> {
     Ok(())
 }
 fn artifact(bytes: &[u8]) -> Result<Value, String> {
+    if bytes.len() > MAX_BYTES {
+        return Err(error("artifact exceeds 8 MiB"));
+    }
+    // Match Java's strict decoder before JSON parsing. Cached callers verify the
+    // raw hash first; do not decode in the reader or change manifest/lock parsing.
+    std::str::from_utf8(bytes).map_err(|_| error("invalid UTF-8 artifact"))?;
     let value = parse(bytes)?;
     versioned(&value)?;
     id(string(&value, "id")?)?;
@@ -692,6 +698,61 @@ impl Resolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn artifact_utf8_fixtures_preserve_hash_and_json_order() {
+        let cases: Value = serde_json::from_str(include_str!(
+            "../../../spec-corpus/ubnf-authoring-lsp/package-artifact-utf8.json"
+        ))
+        .unwrap();
+        let cases = cases.as_array().unwrap();
+        assert_eq!(cases.len(), 21);
+        for case in cases {
+            let fixture = LocalFixture::new();
+            let manifest = fixture.0.join("ubnf.json");
+            std::fs::write(&manifest, r#"{"schemaVersion":1,"dependencies":{"std/layout":{"version":"1.0.0","source":"local:artifact.json"}}}"#).unwrap();
+            std::fs::write(fixture.0.join("artifact.json"), STANDARD).unwrap();
+            let mut lock = resolve(&manifest).unwrap();
+            let hex = case["bytesHex"].as_str().unwrap();
+            let bytes: Vec<u8> = (0..hex.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+                .collect();
+            let (actual, expected) = if case["mode"] == "cache" {
+                let digest = hash(if case["hashMismatch"] == true {
+                    STANDARD
+                } else {
+                    &bytes
+                });
+                lock["packages"]["std/layout"]["sha256"] = digest.clone().into();
+                std::fs::write(fixture.0.join("ubnf.lock.json"), lock.to_string()).unwrap();
+                std::fs::write(
+                    fixture
+                        .0
+                        .join(format!(".ubnf-cache/packages/{digest}.json")),
+                    &bytes,
+                )
+                .unwrap();
+                let root = fixture.0.join("root.ubnf");
+                (
+                    Resolver::new(&root)
+                        .import_path(&root, "pkg:std/layout")
+                        .unwrap_err(),
+                    &case["loadError"],
+                )
+            } else {
+                std::fs::write(fixture.0.join("artifact.json"), &bytes).unwrap();
+                (resolve(&manifest).unwrap_err(), &case["resolveError"])
+            };
+            assert_eq!(actual, error(expected.as_str().unwrap()), "{}", case["id"]);
+        }
+        // The pre-existing byte limit still wins even for malformed encoding.
+        assert_eq!(
+            artifact(&vec![0xff; MAX_BYTES + 1]).unwrap_err(),
+            error("artifact exceeds 8 MiB")
+        );
+    }
+
     struct LocalFixture(std::path::PathBuf);
     impl LocalFixture {
         fn new() -> Self {

@@ -506,7 +506,7 @@
       "title": "Java disk reader: manifest/lock を含む差替え競合の nonblocking open と正確な handle 型検査（#907/#908 残り）"
     },
     "913": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "package artifact（cache / local: 依存）の読取りが通常ファイル・上限の検査を通らない（Rust は FIFO・/dev/zero で停止）"
     },
     "919": {
@@ -540,7 +540,7 @@
         914,
         919
       ],
-      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通103件（既存27件＋validator76文法の全JSON）で検証。同一/減少versionもJava通り適用。validatorの意味解析/classpathは #893、syntax/module全診断は #894、profile再設定は #895（親 #885）で未完了。#886 第一単位で AST definition/references・rename・outline/folding・linked editing と検証済み packageSource を追加し、共通stdio39件と両backendのpackaged IDEで元位置/拒否/cache境界を検証。残るFQN quick fix/signature/semantic tokensは #901、completion/hoverのUTF16内部/BMP分類・frontend制約・非file didOpen時のJava provider解決エラー・特殊URI/platform/起動失敗は #902。native配布は方針の文書化のみで公開しない。親 #886 はopenのまま。 #890でlocal importの通常ファイル・64 MiB・bounded readを両版に適用し、共通17件で実stdio後続応答と3 CLI経路、新しい拒否の全診断JSONを検証する。#908でmanifest/lockを8 MiBのbounded readerと共通診断・検査順へ接続し、共通27件で両stdioと3 CLIを照合する（#908はPR #912でCLOSED）。RustはO_NONBLOCKとhandle fstatを共用。Javaはhandleのseek/size検査までで、stat後の差替え競合（writerなしFIFOのopenと完全な型検査）は#907/#911に残る。#913でcache/local artifactも同じ8 MiB readerへ接続し、既存cache診断/raw hashを維持する。共通39件で両stdio/3 CLI/両deps resolveと推移的依存を照合する（#913はPRのmerge待ちでOPEN）。artifactにも同じJava差替え競合の制限（Refs #911）が残る。BOMの受理差は#914、不正UTF-8 artifactの内容診断差は#919。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。",
+      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通103件（既存27件＋validator76文法の全JSON）で検証。同一/減少versionもJava通り適用。validatorの意味解析/classpathは #893、syntax/module全診断は #894、profile再設定は #895（親 #885）で未完了。#886 第一単位で AST definition/references・rename・outline/folding・linked editing と検証済み packageSource を追加し、共通stdio39件と両backendのpackaged IDEで元位置/拒否/cache境界を検証。残るFQN quick fix/signature/semantic tokensは #901、completion/hoverのUTF16内部/BMP分類・frontend制約・非file didOpen時のJava provider解決エラー・特殊URI/platform/起動失敗は #902。native配布は方針の文書化のみで公開しない。親 #886 はopenのまま。 #890でlocal importの通常ファイル・64 MiB・bounded readを両版に適用し、共通17件で実stdio後続応答と3 CLI経路、新しい拒否の全診断JSONを検証する。#908でmanifest/lockを8 MiBのbounded readerと共通診断・検査順へ接続し、共通27件で両stdioと3 CLIを照合する（#908はPR #912でCLOSED）。RustはO_NONBLOCKとhandle fstatを共用。Javaはhandleのseek/size検査までで、stat後の差替え競合（writerなしFIFOのopenと完全な型検査）は#907/#911に残る。#913でcache/local artifactも同じ8 MiB readerへ接続し、既存cache診断/raw hashを維持する。共通39件で両stdio/3 CLI/両deps resolveと推移的依存を照合する（#913はPR #920でCLOSED）。artifactにも同じJava差替え競合の制限（Refs #911）が残る。BOMの受理差は#914。#919で不正UTF-8 artifactをJavaの既存文言に統一し、raw hash→strict UTF-8→JSONの順を共通21件の両stdio/3 CLI/両deps resolveで検証する（#919はPRのmerge待ちでOPEN）。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。",
       "evidence": [
         "docs/ubnf-authoring-lsp.md",
         "spec-corpus/ubnf-authoring-lsp/cases.json",
@@ -556,6 +556,8 @@
         "scripts/check-ubnf-authoring-lsp.py",
         "rust/unlaxer-ubnf-lsp/src/lib.rs",
         "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java",
+        "spec-corpus/ubnf-authoring-lsp/package-artifact-utf8.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/bootstrap/PackageArtifactUtf8Test.java",
         "spec-corpus/ubnf-authoring-lsp/package-artifacts.json",
         "scripts/ubnf_package_artifacts.py",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/bootstrap/PackageArtifactReaderTest.java"

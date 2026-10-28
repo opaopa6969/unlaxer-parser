@@ -198,8 +198,7 @@ manifest の拒否は両 `deps resolve` CLI でも検査する。既存 package 
 lock が指す cache artifact と明示 `deps resolve` の `local:` 依存も、下記 #913 の規則で同じ reader を使う。
 先頭 BOM の受理差（Java は受理、Rust は `invalid JSON`）は
 [#914](https://github.com/opaopa6969/unlaxer-parser/issues/914) で扱う。
-不正 UTF-8 artifact の内容診断（Java は `invalid UTF-8 artifact`、Rust は `invalid JSON`）の既存差は
-[#919](https://github.com/opaopa6969/unlaxer-parser/issues/919) で扱う。#913 の I/O 拒否条件とは別で、raw hash 検証後の内容解析に残る差である。
+不正 UTF-8 artifact の内容診断は、下記 #919 の規則で Java の既存文言に統一する。
 
 ### Java の競合に残る制限と採用しなかった方式
 
@@ -268,7 +267,8 @@ stdio は code `E-MODULE`、severity `1`、source `ubnf-module`、message `impor
 import 宣言全体の UTF-16 range。CLI は既存 wrapper・終了コードを維持して同じ原因文字列を表示する。
 
 検査順は lock I/O → manifest 検証 → lock JSON/audit → artifact I/O → graph byte budget →
-raw hash → artifact JSON/identity/dependencies → 推移的 artifact の検証。hash 不一致は JSON 不正より先に報告する。
+raw hash → strict UTF-8 → artifact JSON/identity/dependencies → 推移的 artifact の検証。
+hash 不一致は UTF-8 / JSON 不正より先に報告する。
 明示 resolve は manifest → source の読取り → artifact 内容/identity → 推移的依存の順で検証し、
 全依存の成功後にのみ lock/cache を書く。通常の生成・server は manifest に危険な `local:` source があっても
 その source を取得せず、検証済みの固定 cache を読む。既存の SourceReader 注入・未保存 buffer の経路は維持する。
@@ -282,3 +282,23 @@ FIFO、`/dev/zero` symlink、directory、過大、欠落、symlink loop、8 MiB 
 
 Java の writer なし FIFO への差替えで open が止まる競合、正確な handle 型検査の制限は
 上記と同じく **Refs #911**。artifact でも同じ reader を使うため同じ制限があり、今回その競合を解決したとは扱わない。
+
+
+## artifact の不正 UTF-8 診断（#919）
+
+cache と明示 `local:` artifact は、両版とも **`E-PACKAGE: invalid UTF-8 artifact`** で拒否する。
+Java の既存 strict decoder と利用者に見える文言を参照とし、Rust は `serde_json` に渡す前に
+`std::str::from_utf8` で全 bytes を検査する。Java の既存経路を維持する最小の変更として、
+Java 本体は変更せず、両言語に同じ fixture の回帰テストを追加した。置換文字での復号はしない。
+8 MiB 上限 →（cache は graph budget と raw hash）→ strict UTF-8 → JSON の順とし、
+不正 bytes の hash が lock と一致する場合だけ UTF-8 診断へ進む。先に JSON の構文エラーが現れる
+bytes でも、全体の UTF-8 検査が優先する。UTF-8 として有効な不正 JSON は従来の `invalid JSON` のまま。
+manifest/lock の不正 UTF-8 診断、先頭 BOM の扱い（#914）、`local:` のパス解決（#921）は変更しない。
+
+共通 `spec-corpus/ubnf-authoring-lsp/package-artifact-utf8.json` の **21件**に raw bytes を16進表記で保存する。
+不正な開始バイト、途切れた多バイト列、JSON 文字列内の不正バイト、過長符号化、サロゲート、
+Unicode 上限超過を cache（hash 一致 / 不一致）と明示 local に配置する。JSON 不正との優先順も含む。
+両実 stdio server の message/code/severity/UTF-16 range 全体と後続 completion/hover、
+Java-host Rust / native Rust / Java flag CLI の最終診断行、両 `deps resolve` の拒否と lock/cache 不変を照合する。
+通常の生成・server は local source を取得せず正常な固定 cache を利用し、明示 resolve だけが local を拒否する。
+既存の package corpus と #913 の reader の条件は維持し、parser のホットパスや公開済み 3.3.0 には手を加えない。

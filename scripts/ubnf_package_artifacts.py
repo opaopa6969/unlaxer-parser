@@ -41,11 +41,11 @@ def materialize(path, kind, content):
         path.write_bytes(content)
 
 
-def run_package_artifacts(clients, directory, java_command, native_command, root):
+def run_package_artifacts(clients, directory, java_command, native_command, root, suite="package-artifacts"):
     from importlib import import_module
     position = import_module('check-ubnf-authoring-lsp').position
-    cases = json.loads((root / 'spec-corpus/ubnf-authoring-lsp/package-artifacts.json').read_text())
-    assert len(cases) == 39, 'artifact fixtures must not silently disappear'
+    cases = json.loads((root / f'spec-corpus/ubnf-authoring-lsp/{suite}.json').read_text())
+    assert len(cases) == {'package-artifacts': 39, 'package-artifact-utf8': 21}[suite], 'artifact fixtures must not silently disappear'
     standard = (root / 'unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json').read_bytes()
     evidence = []
     for case in cases:
@@ -61,7 +61,10 @@ def run_package_artifacts(clients, directory, java_command, native_command, root
             value = json.loads(standard)
             value['padding'] = '😀é'
             artifact = json.dumps(value, ensure_ascii=False).encode()
-        digest = hashlib.sha256(standard if 'hash-mismatch' in kind else artifact).hexdigest()
+        if 'bytesHex' in case:
+            artifact = bytes.fromhex(case['bytesHex'])
+        mismatch = case.get('hashMismatch', False) or 'hash-mismatch' in kind
+        digest = hashlib.sha256(standard if mismatch else artifact).hexdigest()
         cache = folder / '.ubnf-cache/packages'
         cache.mkdir(parents=True)
         cached = cache / (digest + '.json')
