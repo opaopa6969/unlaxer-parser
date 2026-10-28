@@ -22,6 +22,7 @@ class Client:
         self.messages = queue.Queue()
         self.serial = 0
         self.pending = []
+        self.timeout = 20
         threading.Thread(target=self.read, daemon=True).start()
 
     def read(self):
@@ -57,7 +58,7 @@ class Client:
             if predicate(item):
                 return self.pending.pop(i)
         while True:
-            item = self.messages.get(timeout=20)
+            item = self.messages.get(timeout=self.timeout)
             if isinstance(item, Exception):
                 raise item
             if predicate(item):
@@ -266,7 +267,7 @@ def packages(clients, directory):
         source = "grammar Main {\n @import layout from 'pkg:team/layout'\n @ubnf: v2\n @whitespace: layout.GAP\n @root @mapping(Value) Start ::= 'a';\n}"
         uri = (folder / 'main.ubnf').as_uri()
         params = {'textDocument': {'uri': uri}, 'position': position(source, source.index('layout.GAP') + 9)}
-        all_completions, all_hovers = [], []
+        all_completions, all_hovers, all_diagnostics = [], [], []
         for client in clients:
             # An open buffer at a virtual package path must not replace verified bytes.
             spoof = (folder / '.ubnf-cache/sources' / digest / 'layout space.ubnf').as_uri()
@@ -274,6 +275,7 @@ def packages(clients, directory):
             assert client.diagnostics(spoof) == []
             client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'languageId': 'ubnf', 'version': 1, 'text': source}})
             diagnostics = client.diagnostics(uri)
+            all_diagnostics.append([{k: d[k] for k in ('code', 'severity', 'source', 'range')} for d in diagnostics])
             completion = client.result('textDocument/completion', params)
             labels = [c['label'] for c in completion]
             assert 'layout.SPOOF' not in labels
@@ -290,6 +292,7 @@ def packages(clients, directory):
             client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
             client.send('textDocument/didClose', {'textDocument': {'uri': spoof}})
         assert all_completions[0] == all_completions[1], (mode, all_completions)
+        assert all_diagnostics[0] == all_diagnostics[1], (mode, all_diagnostics)
         if all_hovers:
             assert all_hovers[0] == all_hovers[1], all_hovers
         assert before == {str(p.relative_to(folder)): p.read_bytes() for p in folder.rglob('*') if p.is_file()}, 'server wrote package files'
@@ -303,13 +306,23 @@ def main():
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--suite', choices=['baseline', 'navigation'], default='baseline')
+    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports'], default='baseline')
     args = parser.parse_args()
     java = Client([args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.lsp.ubnf.UBNFLspLauncherExt'])
     native = Client([args.rust], native=True)
     try:
         with tempfile.TemporaryDirectory(prefix='ubnf-authoring-', dir=os.environ.get('TMPDIR')) as directory:
-            if args.suite == 'navigation':
+            if args.suite == 'local-imports':
+                from ubnf_local_imports import run_local_imports
+                initialize(java, native)
+                evidence = run_local_imports([java, native], Path(directory),
+                    [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'],
+                    [str(Path(args.rust).with_name('unlaxer'))], ROOT)
+                for client in [java, native]:
+                    assert client.result('shutdown') is None
+                    client.send('exit')
+                    assert client.process.wait(timeout=5) == 0
+            elif args.suite == 'navigation':
                 from ubnf_authoring_navigation import run_navigation
                 initialize(java, native)
                 evidence = run_navigation([java, native], Path(directory))

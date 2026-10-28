@@ -1,0 +1,19 @@
+[
+  {"id":"stdin", "path":"/dev/stdin", "error":"is not a regular file"},
+  {"id":"zero", "path":"/dev/zero", "error":"is not a regular file"},
+  {"id":"null", "path":"/dev/null", "error":"is not a regular file"},
+  {"id":"fifo", "path":"pipe", "error":"is not a regular file"},
+  {"id":"socket", "path":"socket", "error":"is not a regular file"},
+  {"id":"directory", "path":"directory", "error":"is not a regular file"},
+  {"id":"symlink-fifo", "path":"pipe-link", "error":"is not a regular file"},
+  {"id":"symlink-directory", "path":"directory-link", "error":"is not a regular file"},
+  {"id":"symlink-device", "path":"device-link", "error":"is not a regular file"},
+  {"id":"proc-stdin", "path":"/proc/self/fd/0", "error":"is not a regular file"},
+  {"id":"symlink-chain-fifo", "path":"chain-link", "error":"is not a regular file"},
+  {"id":"relative-fifo", "path":"directory/../pipe-link", "error":"is not a regular file"},
+  {"id":"oversized", "path":"large.ubnf", "error":"exceeds 64 MiB"},
+  {"id":"symlink-oversized", "path":"large-link.ubnf", "error":"exceeds 64 MiB"},
+  {"id":"regular", "path":"tokens.ubnf"},
+  {"id":"symlink-regular", "path":"tokens-link.ubnf"},
+  {"id":"exact-limit", "path":"exact.ubnf"}
+]

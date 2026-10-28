@@ -47,8 +47,9 @@ VSIX は `ubnfLsp.server.backend=rust` と `ubnfLsp.server.rustPath`（実行フ
 Playground の生成は従来どおり Java/Node/Rust toolchain を使う。
 
 import は既存 `modules::resolve` / `packages::Resolver` を通す。package の lock/hash/依存/境界を検証し、
-自動取得・resolve・書込み・コード実行はしない。local import が `/dev/stdin`・FIFO 等の通常ファイル以外を読んで止まる問題は
-Java/Rust 共通の既存挙動で、[#890](https://github.com/opaopa6969/unlaxer-parser/issues/890) で直す。開いたローカル `.ubnf` buffer は disk より優先し、
+自動取得・resolve・書込み・コード実行はしない。local import の disk reader は Java/Rust とも
+symlink の解決先が通常ファイルの場合だけ読み、1ファイル64 MiBまでに制限する（[#890](https://github.com/opaopa6969/unlaxer-parser/issues/890)、
+[読取り契約](ubnf-packages.md#local-import-の読取り境界890)）。開いたローカル `.ubnf` buffer は disk より優先し、
 package の検証済み source を editor buffer で上書きしない。URI は percent encoding を復号して local file を読む。
 位置は frontend の UTF-8 byte / CP span を編集時に UTF-16 へ変換し、parser 本体は変更しない。
 
@@ -84,7 +85,7 @@ virtual package path に開いた偽 buffer が検証済み source を置換で�
 server が manifest/lock/cache を書き換えないことも両版で検証する。
 現時点の native file URI は Linux のローカル絶対パスを検証対象とし、UNC/Windows 等は #902（親 #886）に残す。
 
-CI は `ubnf-authoring` 必須契約の4メソッドと、基準103件（従来27＋診断76）・navigation39件の実行件数を別々に検査する。
+CI は `ubnf-authoring` 必須契約の5メソッドと、基準103件（従来27＋診断76）・navigation39件・local import 17件の実行件数を別々に検査する。
 packaged VSIX は従来 Java smoke を保持し、別の隔離 profile で Java executable を不存在に設定して
 Rust の completion/hover/診断と変更後の修復、および両 backend の definition/references・rename・documentSymbol・foldingRange・linkedEditingRange・readonly package source を確認する。最後に拡張の `deactivate` で
 native server の子プロセスが終了し、残らないことを確認する（tinycalc-vscode #874/#880 と同じ後始末の水準）。
@@ -276,3 +277,22 @@ package snapshotの欠落、namespace回復の除去、CRLF foldingの変更、r
 任意file URIの読み取り追加という8変異を、共通実stdioがすべて検出することを確認した。
 navigation必須メソッドの `@Test` を除く変異も、残り3件のMaven成功後にopt-in契約が失敗する。
 復元後、4必須メソッドと両suiteを再実行する。これらは既存parserの性能作業ではない。
+
+## #890: local import の有限読取り
+
+`spec-corpus/ubnf-authoring-lsp/local-imports.json` の共通17件を両実 stdio server、
+Java-host Rust/native Rust の生成 CLI、および従来の Java flag CLI に送る。
+`/dev/stdin`・`/proc/self/fd/0`・`/dev/zero`・`/dev/null`、テスト内で `mkfifo` する FIFO、Unix socket、directory、
+symlink の通常/非通常/過大な実体、FIFO への symlink の連鎖と `..` を含む相対パス、64 MiB + 1 の sparse file、64 MiB ちょうどの有効な module を含む。
+新しい拒否診断は message を含む全JSON（CRLF・非BMPを含む root の UTF-16 range）で一致を要求する。
+各 didOpen の publishDiagnostics 後、同じ server の completion（64 MiB境界は未open文書のhover）と close 後の hover が返ることも必須とする。
+成功時は両 Rust 生成 CLI の出力5ファイルを比較し、失敗時は部分出力がないことを確認する。
+既存103＋39件と package/local module corpus は既存の期待値で引き続き検証する。
+
+`LocalImportReaderTest` と Rust の `packages::tests::local_reader_*` は、open 前の拒否、
+上限ちょうど、stat 後に増えるストリームの上限＋1バイトでの打切り、strict UTF-8 を直接検証する。
+Rust は stat 後に FIFO・過大ファイルへ差し替えた open も、開いた handle の再検査で止まらず拒否することを検証する（Java の残りは #907）。
+テストの opener 差替えにより競合をタイミングに依存せず再現し、読み過ぎる変異を必ず失敗させる。
+通常parserのホットパスには変更を加えない。
+
+64 MiBの正常文字列の読取り成功はreader単体でも検証する。有効な64 MiBコメントは既存Java parserの解析に時間がかかるため、このfixtureだけstdio待ち480秒・CLI待ち240秒、suite全体900秒の有限deadlineを使う。これは製品のtimeout設定や性能作業ではない（#197）。この変更は許容サイズ内の文法の解析時間を制限しない。

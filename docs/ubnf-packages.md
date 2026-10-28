@@ -136,3 +136,27 @@ Java/native Rust が生成する language Playground は同じ `vocabulary.json`
 の取得は authoring UI では行わず、プロジェクトの明示 resolver で用意する。
 
 名前付きglobal triviaはtokenStreamの4modeでも対応する（#432）。共通fixtureはstd/layoutをlock/cacheからオフラインロードして検証する。TinyExpression移行の完了確認は親 #368 で追跡する。
+
+## local import の読取り境界（#890）
+
+Java `UBNFPackageResolver.readLocalSource` と Rust `packages::Resolver::read` の disk 経路は、
+相対・絶対パスとも symlink をたどった metadata が通常ファイルであることを open 前に確認する。
+デバイス（`/dev/stdin`・`/dev/zero` 等）、FIFO、socket、directory は読まず、
+`E-MODULE: local import is not a regular file` を返す。
+
+上限は **1ファイル64 MiB（67,108,864バイト）**。既存の package graph 全体の byte budget と同じ値にし、
+有限の読取りを保証しつつ、通常の文法ファイルに十分な余裕を持たせる。package artifact 単体の8 MiB制限や
+lock/hash/依存/境界検証は変更しない。metadata の size が上限を超える場合は open せず、
+`E-MODULE: local import exceeds 64 MiB` を返す。上限ちょうどは受理する。
+stat と read の間にファイルが増大・差替えされても、reader は最大 **上限＋1バイト** しか読み取らず、
+余分な1バイトを検出したら同じ過大サイズ診断で拒否する。UTF-8 の不正バイトは従来どおり拒否する。
+Rust は `O_NONBLOCK` で open し、開いた handle の fstat で通常ファイル・サイズを再確認する。stat の後に FIFO へ差し替えられても
+open で止まらず、同じ診断で拒否する。Java は JDK17 の NIO で `O_NONBLOCK` を指定できないため、stat と open の間に FIFO へ
+差し替えられると open がブロックしうる。この残りは [#907](https://github.com/opaopa6969/unlaxer-parser/issues/907) で追跡する。
+package の manifest / lock の読取りは対象外で、[#908](https://github.com/opaopa6969/unlaxer-parser/issues/908) で揃える。
+この byte 上限はファイル内容全体の読取り制限であり、文法の解析時間や全import合計の上限ではない。
+
+Java の既存 `SourceReader` 注入経路と Rust の open-buffer overlay は、呼出側が既に持つ仮想/未保存sourceを
+引き続き利用できる。Java の disk callback には `UBNFPackageResolver::readLocalSource` を使う。
+editor は未保存の local buffer を優先し、package の検証済みsourceを buffer で置換しない。
+CLI と authoring server は同じ disk reader を使い、新しい拒否も既存の `E-MODULE` 表示/位置契約を通す。

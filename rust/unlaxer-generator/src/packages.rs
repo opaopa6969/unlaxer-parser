@@ -2,9 +2,74 @@
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 const MAX_BYTES: usize = 8 * 1024 * 1024;
+// Share the package graph budget; individual pinned artifacts still have their 8 MiB limit.
+const MAX_LOCAL_BYTES: usize = 64 * 1024 * 1024;
+const NOT_REGULAR: &str = "E-MODULE: local import is not a regular file";
+const TOO_LARGE: &str = "E-MODULE: local import exceeds 64 MiB";
+
+fn read_local_source(path: &Path) -> Result<String, String> {
+    read_local_with(path, open_local)
+}
+
+/// An opened local source and the type/size seen by fstat on that same handle.
+struct OpenedLocal<R> {
+    reader: R,
+    regular: bool,
+    len: u64,
+}
+
+fn open_local(path: &Path) -> std::io::Result<OpenedLocal<std::fs::File>> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    // A path replaced by a FIFO after the stat must not block in open(2). O_NONBLOCK
+    // does not change reads of regular files; anything else is rejected below.
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, libc::O_NONBLOCK);
+    let file = options.open(path)?;
+    let metadata = file.metadata()?;
+    Ok(OpenedLocal {
+        regular: metadata.is_file(),
+        len: metadata.len(),
+        reader: file,
+    })
+}
+
+fn read_local_with<R: Read>(
+    path: &Path,
+    open: impl FnOnce(&Path) -> std::io::Result<OpenedLocal<R>>,
+) -> Result<String, String> {
+    // Reject by path first so the usual devices/FIFOs are never opened at all.
+    let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;
+    if !metadata.is_file() {
+        return Err(NOT_REGULAR.into());
+    }
+    if metadata.len() > MAX_LOCAL_BYTES as u64 {
+        return Err(TOO_LARGE.into());
+    }
+    // Re-check the opened handle (the path may have been replaced), then still
+    // stop reading at limit + 1 for growth after the fstat.
+    let opened = open(path).map_err(|e| e.to_string())?;
+    if !opened.regular {
+        return Err(NOT_REGULAR.into());
+    }
+    if opened.len > MAX_LOCAL_BYTES as u64 {
+        return Err(TOO_LARGE.into());
+    }
+    let mut bytes = Vec::new();
+    opened
+        .reader
+        .take((MAX_LOCAL_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_LOCAL_BYTES {
+        return Err(TOO_LARGE.into());
+    }
+    String::from_utf8(bytes).map_err(|_| "stream did not contain valid UTF-8".into())
+}
 const STANDARD: &[u8] =
     include_bytes!("../../../unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json");
 fn error(message: impl std::fmt::Display) -> String {
@@ -148,7 +213,7 @@ pub fn resolve(manifest: &Path) -> Result<Value, String> {
             false,
         )?;
     }
-    if packages.len() > 128 || blobs.values().map(Vec::len).sum::<usize>() > 64 * 1024 * 1024 {
+    if packages.len() > 128 || blobs.values().map(Vec::len).sum::<usize>() > MAX_LOCAL_BYTES {
         return Err(error("package graph exceeds cache limits"));
     }
     let lock = json!({"schemaVersion":1,"roots":references(roots)?,"packages":packages});
@@ -254,7 +319,7 @@ fn resolve_one(
             return Err(error(format!("conflicting package identity: {name}")));
         }
     } else {
-        if blobs.values().map(Vec::len).sum::<usize>() + bytes.len() > 64 * 1024 * 1024 {
+        if blobs.values().map(Vec::len).sum::<usize>() + bytes.len() > MAX_LOCAL_BYTES {
             return Err(error("package graph exceeds cache limits"));
         }
         packages.insert(name.into(), pinned);
@@ -435,7 +500,7 @@ impl Resolver {
             error("missing artifact; run unlaxer deps resolve --manifest ubnf.json")
         })?;
         self.loaded_bytes += bytes.len();
-        if self.loaded_bytes > 64 * 1024 * 1024 {
+        if self.loaded_bytes > MAX_LOCAL_BYTES {
             return Err(error("package graph exceeds cache limits"));
         }
         if hash(&bytes) != string(&pinned, "sha256")? {
@@ -534,7 +599,7 @@ impl Resolver {
             if let Some(source) = self.sources.get(&normalize(path)) {
                 return Ok(source.clone());
             }
-            return std::fs::read_to_string(path).map_err(|e| e.to_string());
+            return read_local_source(path);
         };
         let value = self.loaded(&owner)?;
         let pinned = self.pinned(&owner)?;
@@ -554,6 +619,146 @@ impl Resolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    struct LocalFixture(std::path::PathBuf);
+    impl LocalFixture {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "ubnf-local-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            std::fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for LocalFixture {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+
+    #[test]
+    fn local_reader_rejects_before_open() {
+        let fixture = LocalFixture::new();
+        let unopened = |_: &Path| -> std::io::Result<OpenedLocal<std::io::Empty>> {
+            panic!("rejected file opened")
+        };
+        assert_eq!(
+            read_local_with(&fixture.0, unopened).unwrap_err(),
+            NOT_REGULAR
+        );
+        let file = fixture.0.join("large");
+        std::fs::File::create(&file)
+            .unwrap()
+            .set_len((MAX_LOCAL_BYTES + 1) as u64)
+            .unwrap();
+        assert_eq!(read_local_with(&file, unopened).unwrap_err(), TOO_LARGE);
+    }
+
+    #[test]
+    fn local_reader_exact_limit_and_growth_after_stat() {
+        let fixture = LocalFixture::new();
+        let file = fixture.0.join("source");
+        std::fs::File::create(&file)
+            .unwrap()
+            .set_len(MAX_LOCAL_BYTES as u64)
+            .unwrap();
+        assert_eq!(read_local_source(&file).unwrap().len(), MAX_LOCAL_BYTES);
+        let regular = |reader| OpenedLocal {
+            reader,
+            regular: true,
+            len: MAX_LOCAL_BYTES as u64,
+        };
+        let exact = read_local_with(&file, |_| {
+            Ok(regular(std::io::repeat(b'a').take(MAX_LOCAL_BYTES as u64)))
+        })
+        .unwrap();
+        assert_eq!(exact.len(), MAX_LOCAL_BYTES);
+        struct Growing {
+            count: usize,
+        }
+        impl Read for Growing {
+            fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+                assert!(
+                    self.count + bytes.len() <= MAX_LOCAL_BYTES + 1,
+                    "read past limit + 1"
+                );
+                bytes.fill(b'a');
+                self.count += bytes.len();
+                Ok(bytes.len())
+            }
+        }
+        let mut growing = Growing { count: 0 };
+        assert_eq!(
+            read_local_with(&file, |_| Ok(OpenedLocal {
+                reader: &mut growing,
+                regular: true,
+                len: MAX_LOCAL_BYTES as u64,
+            }))
+            .unwrap_err(),
+            TOO_LARGE
+        );
+        assert_eq!(growing.count, MAX_LOCAL_BYTES + 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_reader_rechecks_the_opened_handle_after_replacement() {
+        let fixture = LocalFixture::new();
+        let file = fixture.0.join("source");
+        std::fs::write(&file, "grammar Module { }\n").unwrap();
+        let pipe = fixture.0.join("pipe");
+        let status = std::process::Command::new("mkfifo")
+            .arg(&pipe)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let large = fixture.0.join("large");
+        std::fs::File::create(&large)
+            .unwrap()
+            .set_len((MAX_LOCAL_BYTES + 1) as u64)
+            .unwrap();
+        // The path stat sees a regular file; open then reaches the replacement.
+        let (send, receive) = std::sync::mpsc::channel();
+        let (source, swapped) = (file.clone(), pipe.clone());
+        std::thread::spawn(move || {
+            send.send(read_local_with(&source, |_| open_local(&swapped)))
+                .unwrap()
+        });
+        let result = receive.recv_timeout(std::time::Duration::from_secs(10));
+        if result.is_err() {
+            // Release a reader blocked in open(2) so the test fails instead of hanging.
+            let _ = std::fs::OpenOptions::new().write(true).open(&pipe);
+        }
+        assert_eq!(
+            result.expect("open blocked on a FIFO").unwrap_err(),
+            NOT_REGULAR
+        );
+        // The handle's fstat rejects the oversized replacement before any read.
+        let unread = |_: &Path| {
+            open_local(&large).map(|opened| OpenedLocal {
+                reader: std::io::repeat(0).take(0),
+                regular: opened.regular,
+                len: opened.len,
+            })
+        };
+        assert_eq!(read_local_with(&file, unread).unwrap_err(), TOO_LARGE);
+    }
+
+    #[test]
+    fn local_reader_keeps_strict_utf8() {
+        let fixture = LocalFixture::new();
+        let file = fixture.0.join("source");
+        std::fs::write(&file, [0xc3, 0x28]).unwrap();
+        assert_eq!(
+            read_local_source(&file).unwrap_err(),
+            "stream did not contain valid UTF-8"
+        );
+    }
+
     #[test]
     fn document_size_limit_uses_utf8_bytes() {
         let cases =
