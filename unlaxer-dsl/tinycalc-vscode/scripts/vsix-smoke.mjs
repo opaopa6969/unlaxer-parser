@@ -75,7 +75,7 @@ process.on('SIGTERM',()=>{record('sigterm');stopRequested=true;child.kill('SIGTE
       const unresponsive = path.join(folder, 'unresponsive server with spaces');
       await writeFile(unresponsive, `#!/usr/bin/env node
 const fs=require('node:fs');
-const record=event=>fs.appendFileSync(${JSON.stringify(pids)},JSON.stringify({pid:process.pid,protocol:'lsp',fixture:'unresponsive',event})+'\\n');
+const record=event=>fs.appendFileSync(${JSON.stringify(pids)},JSON.stringify({at:Date.now(),pid:process.pid,protocol:'lsp',fixture:'unresponsive',event})+'\\n');
 record('spawn');
 let input='',initialized=false;
 process.stdin.on('data',chunk=>{input+=chunk.toString();if(!initialized && /"method"\\s*:\\s*"initialize"/.test(input)){initialized=true;record('initialize');}});
