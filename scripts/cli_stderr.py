@@ -4,6 +4,8 @@ import json
 import os
 from pathlib import Path
 import re
+import resource
+import signal
 import tempfile
 
 from cli_input_errors import run, setup, snapshot
@@ -14,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def normalize(value, work):
     # Only the unpredictable staging basename is normalized; retain its parent path.
     value = value.replace(str(work), '${WORK}')
-    return re.sub(r'(?<=/)\.ubnf-playground-[0-9]+(?:-[0-9]+)?(?=[:\s]|$)',
+    return re.sub(r'(?<=/)\.ubnf-playground-[0-9]+(?:-[0-9]+)?(?=[:\s/]|$)',
                   '.ubnf-playground-${TEMP}', value)
 
 
@@ -49,13 +51,41 @@ def options(case, operation):
     return {
         'inspect': ['deps', 'inspect'],
         'check': ['check', '--target', 'rust', '--format', 'json'],
-        'generate': ['generate', '--target', 'rust', '--output', output],
-        'playground': ['playground', '--output', output],
+        'generate': ['generate', '--target', 'rust', '--output', output] + case.get('flags', []),
+        'playground': ['playground', '--output', output] + case.get('flags', []),
     }[operation] + ['--grammar', 'main.ubnf']
 
 
+def limited(case):
+    if 'fileSizeLimit' not in case:
+        return {}
+    limit = case['fileSizeLimit']
+
+    def apply():
+        # A failed write must be reported as EFBIG (the ENOSPC class), not a SIGXFSZ kill.
+        signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+        resource.setrlimit(resource.RLIMIT_FSIZE, (limit, limit))
+    return dict(preexec_fn=apply, restore_signals=False)
+
+
+def created(case, operation, host):
+    expected = case.get('created', {}).get(operation, [])
+    return expected[host] if isinstance(expected, dict) else expected
+
+
+def remove_created(work, case, before):
+    readonly = [work / name for name in case.get('readOnly', [])]
+    for path in readonly:
+        path.chmod(0o755)
+    for name in sorted(set(snapshot(work)) - set(before), reverse=True):
+        path = work / name
+        path.rmdir() if path.is_dir() and not path.is_symlink() else path.unlink()
+    for path in readonly:
+        path.chmod(0o555)
+
+
 def observe(command, case, operation, work, native):
-    actual = run(command, options(case, operation), work, native)
+    actual = run(command, options(case, operation), work, native, **limited(case))
     return {key: normalize(actual[key], work) if isinstance(actual[key], str) else actual[key]
             for key in ('exit', 'stdout', 'lastError')}, actual
 
@@ -64,8 +94,8 @@ def exercise(cases, directory, commands, evidence):
     permissions = write_permissions_apply(directory)
     for case in cases:
         if case.get('readOnly') and not permissions:
-            evidence['excluded'].append({'case': case['id'], 'reason':
-                'Execution user can write chmod(555); permission denial is not exercised.'})
+            evidence['excluded'].append({'case': case['id'], 'observations': len(case['operations']) * 4,
+                'reason': 'Execution user can write chmod(555); permission denial is not exercised.'})
             continue
         for ending, separator in [('LF', '\n'), ('CRLF', '\r\n')]:
             work = directory / (case['id'] + '-' + ending)
@@ -84,8 +114,13 @@ def exercise(cases, directory, commands, evidence):
                             expected = {**expected, 'lastError': case['nativeSyntax'][ending]}
                         assert observed == expected, (entry, expected)
                         # Includes absence of output, partial files, and playground staging.
-                        # Existing caller-owned output/file cases must remain byte-for-byte intact.
-                        assert snapshot(work) == before, (entry, 'filesystem changed')
+                        # Existing caller-owned output/file cases must remain byte-for-byte intact;
+                        # only the fixture's listed paths (Java's per-file writes) may appear.
+                        after = snapshot(work)
+                        assert {name: after.get(name) for name in before} == before, (entry, 'changed')
+                        new = sorted(normalize('/' + name, work)[1:] for name in set(after) - set(before))
+                        assert new == created(case, operation, host), (entry, new)
+                        remove_created(work, case, before)
             finally:
                 for name in case.get('readOnly', []):
                     (work / name).chmod(0o755)

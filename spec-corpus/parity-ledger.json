@@ -26,6 +26,8 @@
   ],
   "issues": {
     "949": {"state": "OPEN", "title": "parity(frontend): REGEX 宣言後の余分なセミコロンで Java の P-SYNTAX と native の E-REGEX-RETIRED が異なる"},
+    "952": {"state": "OPEN", "title": "parity(cli): native generate/Playground の出力先パスの扱い（symlink 祖先・`..`・読取り専用の既存生成物・成功時 stdout の綴り）が Java と違う（#937 レビュー由来）"},
+    "953": {"state": "OPEN", "title": "parity(cli): playground --profile の profile ファイル入力 I/O で native の終了コードと stderr が Java と違う（#937 レビュー由来）"},
     "923": {"state": "OPEN", "title": "parity(check): 字句エラーと @whitespace の組込み名の同居を Java 参照契約へ揃える"},
     "910": {"state": "OPEN", "title": "parity(generator): feature と E-LEXICAL の check/generate 診断を Java-host に揃える"},
     "916": {"state": "OPEN", "title": "parity(check): @lexicalContext と字句エラーが同居すると Java の check が例外で終わる（#910 レビュー由来）"},
@@ -1999,7 +2001,7 @@
       "issues": [
         937
       ],
-      "observation": "Java製品コードを維持しnativeの書込み失敗をJava NIOの失敗パス・原因文に統一する。errno接尾辞は除去し、Playground stagingの乱数/PID部分だけ比較時に正規化する。UTF-8はFiles.readStringとstrict decoderの異なるmalformed lengthを入口/inspect/importに応じて保持する。check JSON・入力OS I/O表・package artifactのraw hash→strict UTF-8→JSONは不変。readinessは全種別をDiagnostic/Spanのrecord表記にし、順序・null・CP位置・subjectを保つ。共通106形（出力8、UTF-8 48、readiness48、構文2）をLF/CRLFで両実CLIの1232観測・無出力/既存入力不変と比較する。権限probeが効かない環境の3形は理由付きで除外し、CIでは除外0/skip0を必須とする。意図した差: generate/deps inspectの構文エラーはJavaのソース全文表示に対しnativeの既存の行/列/原因を維持する。利用者の位置情報を失わせずparserホットパスを変えない最小・可逆の選択。nativeSyntaxにLF/CRLFの独立期待値を固定する。変更は公開3.3.0へ適用しない。",
+      "observation": "Java製品コードを維持しnativeの書込み失敗をJava NIOの失敗パス・原因文に統一する。errno接尾辞は除去し、Playground stagingの乱数/PID部分だけ比較時に正規化する。UTF-8はFiles.readStringとstrict decoderの異なるmalformed lengthを入口/inspect/importに応じて保持する。check JSON・入力OS I/O表・package artifactのraw hash→strict UTF-8→JSONは不変。readinessは全種別をDiagnostic/Spanのrecord表記にし、順序・null・CP位置・subjectを保つ。共通113形（出力15: --check・書込み失敗・子directoryの書込み順を含む、UTF-8 48、readiness48、構文2）をLF/CRLFで両実CLIの1280観測・無出力/既存入力不変と比較する。権限probeが効かない環境の4形は理由付きで除外し、CIでは除外0/skip0を必須とする。意図した差: generate/deps inspectの構文エラーはJavaのソース先頭80文字表示に対しnativeの既存の行/列/原因を維持する。書込み失敗時にJavaは途中まで書いた生成物を残すがnativeは同じdirectoryの一時ファイルを消し既存生成物を切り詰めない（作成物をhostごとに固定）。利用者の位置情報を失わせずparserホットパスを変えない最小・可逆の選択。nativeSyntaxにLF/CRLFの独立期待値を固定する。変更は公開3.3.0へ適用しない。",
       "evidence": [
         "spec-corpus/cli-stderr.json",
         "scripts/cli_stderr.py",
@@ -2026,10 +2028,39 @@
         "rust/unlaxer-ubnf/src/parser.rs",
         "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/RegexRetirement.java"
       ]
+    },
+    {
+      "id": "cli-output-path-policy",
+      "category": "unresolved",
+      "title": "generate / Playground の出力先パスの symlink・`..`・読取り専用生成物・成功時 stdout",
+      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "issues": [
+        952
+      ],
+      "observation": "#937の失敗文の統一とは別の既存差で、変更前master 21dac030のnativeでも同じ。generateの出力先祖先がsymlinkの場合Javaは書き込みnativeは拒否、出力先自体のsymlinkはJava `output directory must not be a symbolic link: P`に対しnative `refusing symbolic link P`。不存在成分の`out/../out2`はJavaが失敗しnativeは成功、mode 444の既存生成物はJavaが書込み失敗しnativeはrenameで置換。成功時stdoutはJavaがPath正規化（generate）/絶対正規化（Playground）、nativeは引数の綴り。揃えるか意図した差かを#952で決める。",
+      "evidence": [
+        "rust/unlaxer-generator/src/main.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/RustGenerateCommand.java",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/PlaygroundCommand.java"
+      ]
+    },
+    {
+      "id": "playground-profile-input-io",
+      "category": "unresolved",
+      "title": "playground --profile の profile ファイル入力 I/O",
+      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "issues": [
+        953
+      ],
+      "observation": "profileファイルの欠落・directory・不正UTF-8でJavaはFiles.readStringのIOExceptionを終了4（`missing.tsv` / `Is a directory` / `Input length = 1`）、nativeは文字列エラーとして終了3（`No such file or directory (os error 2)` など）。#932/#934/#937の--grammar入口とlocal importの表の外で、変更前のnativeでも同じ。",
+      "evidence": [
+        "rust/unlaxer-generator/src/playground.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/codegen/rust/PlaygroundGenerator.java"
+      ]
     }
   ],
   "corpora": [
-    {"path": "spec-corpus/cli-stderr.json", "fields": {"nativeSyntax": 2}, "entries": ["cli-stderr-presentation"]},
+    {"path": "spec-corpus/cli-stderr.json", "fields": {"java": 1, "nativeSyntax": 2, "rust": 1}, "entries": ["cli-stderr-presentation"]},
     {
       "path": "spec-corpus/package-json-acceptance.json",
       "fields": {

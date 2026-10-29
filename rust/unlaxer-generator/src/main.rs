@@ -353,7 +353,7 @@ fn write_playground(output: &Path, files: &[GeneratedFile], check: bool) -> io::
         for file in files {
             let destination = output.join(&file.relative_path);
             reject_symlink_ancestors(&destination)?;
-            if fs::read_to_string(&destination)? != file.content {
+            if !destination.is_file() || read_output(&destination)? != file.content {
                 return Err(invalid(format!(
                     "generated file differs: {}",
                     destination.display()
@@ -396,7 +396,7 @@ fn write_playground(output: &Path, files: &[GeneratedFile], check: bool) -> io::
                 .map_err(|e| path_error(&destination, e))?;
             handle
                 .write_all(file.content.as_bytes())
-                .map_err(|e| path_error(&destination, e))?;
+                .map_err(write_error)?;
         }
         if output.exists() {
             return Err(invalid("output was created during generation"));
@@ -436,18 +436,32 @@ fn reject_symlink_ancestors(path: &Path) -> io::Result<()> {
 
 // Java NIO path exceptions for output operations (EISDIR differs from input reads).
 fn path_error(path: &Path, error: io::Error) -> io::Error {
-    let message = error.to_string();
-    let reason = error
-        .raw_os_error()
-        .and_then(|errno| message.strip_suffix(&format!(" (os error {errno})")))
-        .unwrap_or(&message);
     let message = match error.kind() {
         io::ErrorKind::NotFound
         | io::ErrorKind::PermissionDenied
         | io::ErrorKind::AlreadyExists => path.display().to_string(),
-        _ => format!("{}: {reason}", path.display()),
+        _ => format!("{}: {}", path.display(), os_reason(&error)),
     };
     io::Error::new(error.kind(), message)
+}
+
+fn os_reason(error: &io::Error) -> String {
+    let message = error.to_string();
+    error
+        .raw_os_error()
+        .and_then(|errno| message.strip_suffix(&format!(" (os error {errno})")))
+        .map_or_else(|| message.clone(), str::to_owned)
+}
+
+// A failed write on an open channel (ENOSPC, EFBIG, EIO) is a pathless IOException in Java.
+fn write_error(error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), os_reason(&error))
+}
+
+// Files.readString of an existing output: Java NIO path messages and malformed lengths.
+fn read_output(path: &Path) -> io::Result<String> {
+    unlaxer_generator::input::read_string(path)
+        .map_err(|message| io::Error::new(io::ErrorKind::InvalidData, message))
 }
 
 // Files.createDirectories first tries the supplied path, then walks from an
@@ -502,33 +516,24 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
                 )));
             }
         }
-        match fs::symlink_metadata(&destination) {
-            Ok(metadata) => {
-                if metadata.file_type().is_symlink() || !metadata.is_file() {
-                    return Err(invalid(format!(
-                        "refusing to overwrite non-generated file {}",
-                        destination.display()
-                    )));
-                }
-                let previous =
-                    fs::read_to_string(&destination).map_err(|e| path_error(&destination, e))?;
-                if check {
-                    if previous != file.content {
-                        return Err(invalid(format!(
-                            "generated file differs: {}",
-                            destination.display()
-                        )));
-                    }
-                } else if !previous.starts_with(HEADER) {
-                    return Err(invalid(format!(
-                        "refusing to overwrite non-generated file {}",
-                        destination.display()
-                    )));
-                }
+        // Java Files.exists / isRegularFile mask attribute errors (the write reports them);
+        // --check reports any missing or non-regular file as differing.
+        let metadata = fs::metadata(&destination).ok();
+        let regular = metadata.as_ref().is_some_and(fs::Metadata::is_file);
+        if check {
+            if !regular || read_output(&destination)? != file.content {
+                return Err(invalid(format!(
+                    "generated file differs: {}",
+                    destination.display()
+                )));
             }
-            // Files.exists masks attribute errors; the write reports the failing path.
-            Err(_) if !check => {}
-            Err(error) => return Err(path_error(&destination, error)),
+        } else if metadata.is_some()
+            && (!regular || !read_output(&destination)?.starts_with(HEADER))
+        {
+            return Err(invalid(format!(
+                "refusing to overwrite non-generated file {}",
+                destination.display()
+            )));
         }
     }
     if check {
@@ -540,7 +545,11 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
         let destination = output.join(&file.relative_path);
         create_output_directories(destination.parent().unwrap())
             .map_err(|e| cannot_write(&destination, e))?;
-        let temporary = output.join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
+        // A sibling temporary keeps Java's per-file directory permissions and write order.
+        let temporary = destination
+            .parent()
+            .unwrap()
+            .join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
         let mut handle = OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -554,15 +563,17 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
                 cannot_write(&destination, path_error(failed, e))
             })?;
         let result = (|| {
-            handle.write_all(file.content.as_bytes())?;
-            handle.sync_all()?;
+            handle
+                .write_all(file.content.as_bytes())
+                .map_err(write_error)?;
+            handle.sync_all().map_err(write_error)?;
             drop(handle);
-            fs::rename(&temporary, output.join(&file.relative_path))
+            fs::rename(&temporary, &destination).map_err(|e| path_error(&destination, e))
         })();
         if result.is_err() {
             let _ = fs::remove_file(&temporary);
         }
-        result.map_err(|e| cannot_write(&destination, path_error(&destination, e)))?;
+        result.map_err(|e| cannot_write(&destination, e))?;
     }
     Ok(())
 }
@@ -587,7 +598,10 @@ mod artifact_tests {
         let files = unlaxer_generator::generate(source).unwrap();
         assert_eq!(files.last().unwrap().relative_path, "mod.rs");
         // Exclusive temp creation fails at the second artifact, after one child write.
-        let blocked = output.join(format!(".unlaxer-{}-1.tmp", std::process::id()));
+        let blocked = output
+            .join(files[1].relative_path.as_str())
+            .with_file_name(format!(".unlaxer-{}-1.tmp", std::process::id()));
+        fs::create_dir_all(blocked.parent().unwrap()).unwrap();
         fs::write(&blocked, "occupied").unwrap();
         for existing in [false, true] {
             if existing {

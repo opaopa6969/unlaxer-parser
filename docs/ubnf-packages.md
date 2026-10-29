@@ -552,9 +552,18 @@ Rust の数値 errno 接尾辞は付けない。失敗時の終了コード4と�
 | EISDIR 相当: generate の `out/mod.rs` が directory | `refusing to overwrite non-generated file out/mod.rs`。実 CLI は書込み前の preflight で拒否するため、EISDIR 自体は発生しない。書込み中の EISDIR は `cannot write D: P: Is a directory`。 |
 | その他: ENAMETOOLONG（256文字の成分 X）、generate `X/out` | `cannot write X/out/mod.rs: W/X: File name too long` |
 | 同じ ENAMETOOLONG、Playground `X/out` | `W/X: File name too long` |
+| 書込み失敗（EFBIG。ENOSPC / EIO と同じ経路）、generate | `cannot write out/mod.rs: File too large`。開いた channel への write の失敗は Java ではパスを付けない |
+| 同じ書込み失敗、Playground | `Generation failed; partial staging retained at W/.ubnf-playground-<乱数>: File too large` |
+| EACCES: 既存 `out` が555で `out/grammar_a` などの子 directory は書込み可、複数 grammar の generate | `cannot write out/mod.rs: out/mod.rs`。Java の書込み順どおり子 directory の生成物を書いた後、root の `mod.rs` で失敗する |
+| `--check`: 生成物が無い・directory・出力先が通常ファイル | generate は `generated file differs: out/mod.rs`、Playground は `generated file differs: W/out/src/generated/mod.rs`（`Files.isRegularFile` が偽） |
+| `--check` / 上書き前検査: 既存生成物が不正 UTF-8（例 `E2 82 20`） | `Input length = 3`（`Files.readString` の長さ。下記 UTF-8 表） |
 
 Java の `Files.createDirectories` に合わせ、最初に指定パスを mkdir し、EEXIST 以外の失敗は
 絶対パスの既存親から作成を試みる。symlink 拒否と native の排他的な一時ファイル作成・置換は維持する。
+一時ファイルは各生成物と同じ directory に作る。Java が生成物ごとにその directory へ直接書く順序と
+権限の判定を保つためである。意図した差として、書込み失敗時に Java は途中まで書いた
+（`RLIMIT_FSIZE` 0 では空の）生成物を残すが、native は一時ファイルを消して既存の生成物を切り詰めない。
+fixture はこの違いを host ごとの作成物一覧として固定する。
 Playground の乱数/PID部分だけを `.ubnf-playground-${TEMP}` に正規化し、親パスを比較から除かない。
 対象 fixture では staging が作られる前に失敗し、一時ディレクトリも残らない。
 生成途中の失敗で task-owned staging を保持する既存の両版の契約は変更しない。
@@ -595,7 +604,9 @@ JSON の escape や severity を混ぜない。grammar / profile / package は�
 check は従来の JSON 全体を独立期待値と照合する。
 
 意図した差として、generate / deps inspect の構文エラーは Java の
-`UBNF パース失敗: <ソース全文>` と native の行・列・原因付き診断を維持する。
+`UBNF パース失敗: <ソースの先頭80文字（UTF-16 単位）>`（未消費の入力がある場合は
+`UBNF パース失敗: <行:列> に未消費の入力があります: <続く80文字>`）と、native の行・列・原因付き診断を維持する。
+Java の文は複数行のソースを含むため、stderr 最終行がソースの途中の行になることがある。
 利用者が誤りの位置を特定できる既存の情報を削らず、parser ホットパスを変更しない最小の選択である。
 単一行と複数行・非BMP・LF/CRLF の両 host の最終行を固定し、終了3・空 stdout・無出力を検証する。
 この差は parity ledger の `cli-stderr-presentation` / #937 に記録する。

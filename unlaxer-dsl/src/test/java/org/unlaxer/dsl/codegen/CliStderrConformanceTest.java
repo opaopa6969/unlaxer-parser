@@ -39,17 +39,19 @@ public class CliStderrConformanceTest {
             "--output", output.toString()), EVIDENCE.resolve("cli-stderr-" + suite + ".log"), 840);
         var evidence = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
         var excluded = evidence.getAsJsonArray("excluded");
-        assertTrue("only chmod(555) may be inapplicable", excluded.size() <= (suite.equals("output") ? 3 : 0));
+        assertTrue("only chmod(555) may be inapplicable", excluded.size() <= (suite.equals("output") ? 4 : 0));
         for (var entry : excluded) System.out.println("[fixture exclusion] " + entry);
         if (System.getenv("GITHUB_ACTIONS") != null)
             assertEquals("CI must exercise chmod(555): " + excluded, 0, excluded.size());
         int observations = switch (suite) {
-            case "output" -> 64;
+            case "output" -> 112;
             case "utf8" -> 768;
             case "readiness" -> 384;
             default -> 16;
         };
-        assertEquals(observations - excluded.size() * 8, evidence.getAsJsonArray("observations").size());
+        int skipped = 0;
+        for (var entry : excluded) skipped += entry.getAsJsonObject().get("observations").getAsInt();
+        assertEquals(observations - skipped, evidence.getAsJsonArray("observations").size());
     }
 
     private static void run(List<String> command, Path log, int seconds) throws Exception {

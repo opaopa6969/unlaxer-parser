@@ -1,6 +1,6 @@
 {
   "counts": {
-    "output": 8,
+    "output": 15,
     "utf8": 48,
     "readiness": 48,
     "syntax": 2
@@ -339,6 +339,328 @@
             "exit": 4,
             "stdout": "",
             "lastError": "${WORK}/日本 語😀/.ubnf-playground-${TEMP}"
+          }
+        }
+      }
+    },
+    {
+      "id": "output-root-readonly-subdirs",
+      "scope": "output",
+      "operations": [
+        "generate"
+      ],
+      "output": "out",
+      "files": {
+        "main.ubnf": "grammar A { @root @mapping(Value,params=[text]) Root ::= 'a' @text; }\ngrammar B { @root @mapping(Value,params=[text]) Root ::= 'b' @text; }\n"
+      },
+      "directories": [
+        "out/grammar_a",
+        "out/grammar_b"
+      ],
+      "readOnly": [
+        "out"
+      ],
+      "created": {
+        "generate": [
+          "out/grammar_a/ast.rs",
+          "out/grammar_a/evaluator.rs",
+          "out/grammar_a/mapper.rs",
+          "out/grammar_a/mod.rs",
+          "out/grammar_a/parser.rs",
+          "out/grammar_b/ast.rs",
+          "out/grammar_b/evaluator.rs",
+          "out/grammar_b/mapper.rs",
+          "out/grammar_b/mod.rs",
+          "out/grammar_b/parser.rs"
+        ]
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/mod.rs: out/mod.rs"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/mod.rs: out/mod.rs"
+          }
+        }
+      }
+    },
+    {
+      "id": "write-file-too-large",
+      "scope": "output",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "readOnly": [],
+      "fileSizeLimit": 0,
+      "created": {
+        "generate": {
+          "java": [
+            "out",
+            "out/mod.rs"
+          ],
+          "rust": [
+            "out"
+          ]
+        },
+        "playground": [
+          ".ubnf-playground-${TEMP}",
+          ".ubnf-playground-${TEMP}/src",
+          ".ubnf-playground-${TEMP}/src/generated",
+          ".ubnf-playground-${TEMP}/src/generated/mod.rs"
+        ]
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/mod.rs: File too large"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Generation failed; partial staging retained at ${WORK}/.ubnf-playground-${TEMP}: File too large"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/mod.rs: File too large"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Generation failed; partial staging retained at ${WORK}/.ubnf-playground-${TEMP}: File too large"
+          }
+        }
+      }
+    },
+    {
+      "id": "check-missing",
+      "scope": "output",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out",
+      "flags": [
+        "--check"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "readOnly": [],
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: out/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: ${WORK}/out/src/generated/mod.rs"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: out/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: ${WORK}/out/src/generated/mod.rs"
+          }
+        }
+      }
+    },
+    {
+      "id": "check-malformed",
+      "scope": "output",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out",
+      "flags": [
+        "--check"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "out/src/generated"
+      ],
+      "readOnly": [],
+      "bytes": {
+        "out/mod.rs": "e28220",
+        "out/src/generated/mod.rs": "e28220"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      }
+    },
+    {
+      "id": "check-directory",
+      "scope": "output",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out",
+      "flags": [
+        "--check"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "out/mod.rs",
+        "out/src/generated/mod.rs"
+      ],
+      "readOnly": [],
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: out/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: ${WORK}/out/src/generated/mod.rs"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: out/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: ${WORK}/out/src/generated/mod.rs"
+          }
+        }
+      }
+    },
+    {
+      "id": "check-output-file",
+      "scope": "output",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out",
+      "flags": [
+        "--check"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "out": "occupied"
+      },
+      "directories": [],
+      "readOnly": [],
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: out/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: ${WORK}/out/src/generated/mod.rs"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: out/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: ${WORK}/out/src/generated/mod.rs"
+          }
+        }
+      }
+    },
+    {
+      "id": "preflight-malformed",
+      "scope": "output",
+      "operations": [
+        "generate"
+      ],
+      "output": "out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "out"
+      ],
+      "readOnly": [],
+      "bytes": {
+        "out/mod.rs": "2f2f2047656e65726174656420627920756e6c6178657220527573744261636b656e642ee28220"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
           }
         }
       }

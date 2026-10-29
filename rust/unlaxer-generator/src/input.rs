@@ -43,8 +43,13 @@ impl From<String> for FileError {
 
 /// Read an already absolute, lexically normalized entry grammar (Java Files.readString).
 pub fn read_grammar(path: &Path) -> Result<String, FileError> {
-    let bytes = std::fs::read(path).map_err(|error| FileError::Io(io_message(path, error)))?;
-    String::from_utf8(bytes).map_err(|error| FileError::Io(utf8_message(error, true)))
+    read_string(path).map_err(FileError::Io)
+}
+
+/// Java `Files.readString` messages for a path spelled by the caller (also generated outputs).
+pub fn read_string(path: &Path) -> Result<String, String> {
+    let bytes = std::fs::read(path).map_err(|error| io_message(path, error))?;
+    String::from_utf8(bytes).map_err(|error| utf8_message(error, true))
 }
 
 /// Match Java NIO's file exception messages, without Rust's numeric errno suffix.
