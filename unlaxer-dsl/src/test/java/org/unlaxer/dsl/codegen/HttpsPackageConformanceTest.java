@@ -117,6 +117,33 @@ public class HttpsPackageConformanceTest {
         System.out.println("credentials location fixtures: " + report.get("seconds").getAsDouble() + " s");
     }
 
+    @Test(timeout=300000) public void transportDiagnosticsMatchJavaAcrossClis() throws Exception {
+        if (!Boolean.getBoolean("rustConformance"))
+            System.out.println("[assumption] HTTPS transport conformance requires -DrustConformance=true");
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        assertEquals(0, run(List.of("cargo", "build", "--locked", "--manifest-path",
+            repository.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), null, 180).code());
+        Path output = Path.of("target/rust-package-transport.json").toAbsolutePath();
+        Run result = run(List.of("python3", repository.resolve("scripts/ubnf_package_transport.py").toString(),
+            "--java", Path.of(System.getProperty("java.home"), "bin/java").toString(),
+            "--classpath", System.getProperty("java.class.path"),
+            "--rust", repository.resolve("rust/target/debug/unlaxer").toString(),
+            "--output", output.toString()), null, 240);
+        assertEquals(result.output(), 0, result.code());
+        var report = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
+        assertEquals("all transport fixtures executed", 42, report.getAsJsonArray("cases").size());
+        int generated = 0;
+        for (var entry : report.getAsJsonArray("cases")) {
+            // Both resolvers with and without a snapshot; three generation CLIs on two shapes.
+            boolean generation = entry.getAsJsonObject().get("generate").getAsBoolean();
+            if (generation) generated++;
+            assertEquals("both snapshots and every CLI path", generation ? 10 : 4,
+                entry.getAsJsonObject().getAsJsonArray("runs").size());
+        }
+        assertEquals("generation boundary shapes", 2, generated);
+        System.out.println("HTTPS transport fixtures: " + report.get("seconds").getAsDouble() + " s");
+    }
+
     @Test public void secureExplicitFetchAndPinnedOfflineGenerationMatch() throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] HTTPS package conformance requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));

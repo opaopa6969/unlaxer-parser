@@ -139,7 +139,7 @@ native はリポジトリの既定 JDK21 を参照し、残る JDK17 差と互�
 Java の独立 home probe と実 CLI の診断・exit・ローカル TLS server の Authorization 受信から選択ファイルを固定し、
 失敗時の snapshot 不変、生成時の無通信・固定 cache のみの利用を確認する。
 `-Duser.home` の2形は native の明示ファイル指定へ対応付けた検査であり、同じ環境だけで一致したとは扱わない。
-JDK17 の fallback 差3形と #956 の TLS 診断差は host 別期待値で実行し、skip しない。
+JDK17 の fallback 差3形は host 別期待値で実行し、skip しない。TLS の最終診断は #956 で共通化した。
 CI の cross-language job は JDK21 で実行する。JDK17 の期待値は現在の jdk17-parity job に含まれず、手元の JDK17 実行で確認している（CI 化は [#967](https://github.com/opaopa6969/unlaxer-parser/issues/967)）。
 非 UTF-8 ロケールで Java が非 ASCII のパスを扱えない差は [#966](https://github.com/opaopa6969/unlaxer-parser/issues/966) で追跡する。
 Linux のテスト専用 `LD_PRELOAD` shim は子プロセスだけへ仮の passwd home を返し、実 passwd lookup へ fallback しない。
@@ -191,11 +191,47 @@ client 既定の `Host` / `User-Agent` と、Rust ureq だけが付ける `Accep
 独立に測定すると、header 名・値の単独サロゲートは `IllegalArgumentException` になる。
 製品ではその前の token 検査で固定診断を返すため、JDK の値を含み得る例外文は出さない。
 
-資格情報を受理しても CA がなければ通常の TLS trust 検証が続く。未信頼のローカル TLS server に対する
-既存の最終診断は Java が `HTTPS artifact retrieval failed (TLS, timeout or size limit)`、Rust が
-`HTTPS artifact retrieval failed (TLS, timeout, status or redirect)`。これは JSON の受理差とは別の
-transport 診断差として [#956](https://github.com/opaopa6969/unlaxer-parser/issues/956) に分離し、
-この変更では両版の TLS / HTTP 処理を維持する。
+資格情報を受理した後の HTTPS 失敗分類は Java `UBNFPackageFetcher.fetch` を参照する（#956）。
+Java は `sendAsync` の上限付き本文が完了してから status を調べる。Rust も ureq の
+`http_status_as_error(false)` で応答を受け、本文読取り → status の順に判定する。
+redirect は従来どおり0回で、Location の先には接続しない。下表の診断には `E-PACKAGE: ` が付く。
+
+| 条件 | 最終診断 | `deps resolve` exit |
+| --- | --- | --- |
+| TLS trust 失敗・hostname 不一致・接続拒否 | `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
+| 接続 timeout（5秒）・本文 read timeout（全体20秒） | `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
+| 要求していない `101`、本文を宣言した `204`（`Content-Length` が `0` 以外、または `Transfer-Encoding` あり） | Java の exchange 失敗と同じ `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
+| 本文が8 MiB超（Content-Length・chunked・close-delimited） | `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
+| Content-Length より短い本文で切断・chunk の途中切断・応答 header 前の切断 | `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
+| 本文が完了した200以外（201/204/206、300/301/302/303/304/307/308、401/403/404/500。204 は本文なし） | `HTTPS artifact requires status 200; redirects are forbidden` | 3 |
+| 302/404/500 で本文が上限超過・途中切断 | status より先に `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
+| 200・空 body（Content-Length: 0） | 取得後の JSON 検査で `expected object: document` | 3 |
+| 200・有効 artifact・8 MiBちょうど（末尾JSON空白を含む） | 成功。chunked・close-delimited でも同じ | 0 |
+| Content-Length が送信本文より小さい（宣言長までが有効 artifact） | 宣言長までを取得して成功。後続 bytes は artifact に含めない | 0 |
+
+Content-Length の値だけで上限超過と判定せず、HTTP framing に従って読んだ実 bytes を制限する。
+ureq の `limit` は指定量を読み切るとエラーになるため、上限＋1バイトを probe し、8 MiBまでは受理する。
+接続5秒・全体20秒の製品設定は変更しない。本文が未完了なら status の種類によらず全体期限が適用される。
+`101` と本文を宣言した `204` は、java.net.http が status 判定より前に exchange を失敗させる
+（`Exchange` の "Unexpected 101 response"、`MultiExchange.bodyIsPresent`）。Rust も応答 header の時点で同じ規則を適用する。
+期限の fixture は製品の値をそのまま測る。接続 timeout は accept しない listen socket（backlog を先に埋める）への接続で
+5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満を要求し、期限を外すと落ちる。
+待つだけの2形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
+
+共通 `spec-corpus/package-https-transport.json` の42形を `HttpsPackageConformanceTest` から実行する。
+JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を snapshot 有無の両方で照合する。
+待たない形の Java `deps resolve` は、テスト専用の `CodegenBatchHost` が1つの JVM で `CodegenMain.run` を順に呼ぶ
+（JVM 起動を1回にするため。呼出しごとに credentials override を読み直す）。両 JDK で、1呼出し1 JVM の実 CLI と
+診断・exit・snapshot が全76呼出しで一致することを確認した。
+生成は fetch しないため、3生成 CLI（Java-host Rust / native Rust / Java flag CLI）は `generate: true` の代表2形
+（成功・302）で snapshot 有無の両方を照合する。
+失敗時の lock/cache 不変、成功時の raw bytes、認証の exact origin、TLS境界、redirect 先の接続0、
+生成時の接続0と固定cache使用を検査する。空bodyの診断は transport ではなく後続 JSON 検査である。
+42形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
+形の崩れた応答（Content-Length と chunked の併記、header の大きさ・行数、重複・負の Content-Length 等）の
+framing 解釈の差は [#972](https://github.com/opaopa6969/unlaxer-parser/issues/972) で追跡する。
+証跡 `target/rust-package-transport.json` には既知の診断・exit・件数・hash・所要時間だけを記録し、
+資格情報・header値・server body・任意の例外文を残さない。
 
 共通 `spec-corpus/package-credentials.json` の65件を、両 `deps resolve` に既存 lock/cache の有無両方で与える。
 Java を独立の期待値として、最終診断・終了コード・成功時の lock/cache raw bytes・失敗時の snapshot 不変・
@@ -205,7 +241,7 @@ Java-host Rust / native Rust / Java flag CLI の生成は、`generate: true` の
 生成を全形で繰り返さないため、CLI 起動は650回から290回（Java は390回から160回）になる（#954）。
 読取り権限なしの形は、root など chmod(000) を読める実行ユーザーでは除外を記録し、CI（非 root）では除外を許さない。
 stdio の authoring も同じ読取り専用経路を使い、明示 resolve を持たないため、credentials 用の stdio ケースは追加しない。
-検証記録には header 値を残さず一致/欠落だけを記録する。#956 の2形も skip せず既存の host 別診断を照合する。
+検証記録には header 値を残さず一致/欠落だけを記録する。TLS失敗の2形も #956 の共通診断で照合する。
 
 `HttpsPackageConformanceTest` はローカル TLS server を使い、認証、lock/hash と生成物、
 未信頼 TLS/hostname、別 origin、redirect、容量、本文 timeout、remote→local 拒否、
