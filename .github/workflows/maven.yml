@@ -26,7 +26,9 @@ jobs:
     runs-on: [unlaxer-parser-ci, Linux, X64]
     env:
       RUSTUP_TOOLCHAIN: '1.85.0'
-    timeout-minutes: 60
+    # master already reached the 60-minute limit (run 40748957067) and #941 adds ~2 minutes
+    # of package JSON CLI cases. Splitting the job is tracked in #954; keep the same tests.
+    timeout-minutes: 75
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4

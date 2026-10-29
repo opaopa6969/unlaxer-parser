@@ -342,7 +342,7 @@ CI の `cross-language` 契約で両テストメソッドの実行を必須に�
 この正規化は明示 resolve に限る。#913 の bounded reader、#919 の UTF-8 判定、固定 cache の
 読取り、既存 package corpus の期待値、parser のホットパスは変更しない。
 
-### package JSON の受理境界（#914 / #926、残り #939）
+### package JSON の受理境界（#914 / #926 / #941、残り #939）
 
 Java（Gson 2.13.2）を参照とし、Java 本体・既存の注入経路は変更しない。
 manifest / lock / artifact の**先頭にある UTF-8 BOM を1つだけ** JSON 解析直前に読み飛ばす。
@@ -358,16 +358,23 @@ artifact の raw bytes は一切変換せず、BOM も含む SHA-256 を lock �
 | BOM 1つ + 有効 JSON | 受理 |
 | BOM 1つ + JSON 空白 + 有効 JSON | 受理 |
 | BOM 2つ + 有効 JSON | `E-PACKAGE: invalid JSON` |
-| BOM だけ / BOM + JSON 空白だけ | `E-PACKAGE: expected object: document` |
+| 空文書 / JSON 空白だけ（BOM の有無を問わない） | `E-PACKAGE: expected object: document` |
+| 非 object の最上位（`null` / 配列 / 数値 / 文字列 / `true` / `false`、BOM の有無を問わない） | `E-PACKAGE: invalid JSON` |
+| 文書全体の object / array の深さが255以下 | 受理後に既存の field 検査。無視される metadata も同じ |
+| 深さ256以上（上書きされる重複 member の値も含む） | `E-PACKAGE: invalid JSON` |
 | BOM + 不正 JSON | `E-PACKAGE: invalid JSON` |
 | 空白の後の BOM / JSON token 間の U+FEFF | `E-PACKAGE: invalid JSON` |
 | JSON 文字列内の U+FEFF | 文字列の一部として保持 |
 | BOM + 不正 UTF-8 | manifest/lock は `invalid JSON`、artifact は `invalid UTF-8 artifact` |
 | cache の raw hash 不一致 | BOM・UTF-8・JSON の検証より先に `artifact hash mismatch: <id>` |
 
-BOM のない空文書・空白だけの文書と非 object の top-level（Java は前者が `expected object: document`、後者が `invalid JSON` で、Rust は逆）、
-serde_json の再帰上限を超える深い入れ子は、BOM とは別の既存差として
-[#941](https://github.com/opaopa6969/unlaxer-parser/issues/941) で扱う。
+JSON 空白は space / tab / CR / LF の4種類だけで、form feed / vertical tab は `invalid JSON`。
+Gson の `fromJson(String, JsonObject.class)` は空文書で Java の `null` を返す一方、JSON の `null` は
+`JsonSyntaxException` になるため、両者の診断を分ける（#941）。
+深さは最上位 object を1と数える。例えば `{"meta":` に配列254段を続けた文書は受理し、255段は拒否する。
+Gson 2.13.2 STRICT の既定 nesting limit を実 JDK17 / JDK21 で測定し、旧 Rust 境界127/128と
+Gson 境界255/256の前後、8 MiB までの入れ子を確認した。後者も `JsonSyntaxException` で拒否され、
+`StackOverflowError` は観測しなかった。Java の設定・実装は変えず、Rust も255を超えて受理しない。
 object の検査順は下記 #942 のとおり Java の記述順に揃える。
 HTTPS の credentials ファイルの BOM・単独サロゲート・不正 JSON の差は [#943](https://github.com/opaopa6969/unlaxer-parser/issues/943) で扱う。
 
@@ -392,11 +399,12 @@ Gson が受理する `\ud800` / `\udc00` と壊れた組について、次のよ
 
 Rust は通常の `serde_json` 解析が失敗した場合だけ、JSON 文字列中の単独サロゲート escape を検出する。
 正常な組、escape された backslash/quote は変えず、JSON の構造・一般の不正 escape・末尾余剰入力は
-引き続き `serde_json` が全体を検査する。重複 member は最後の値を使用する。
+引き続き `serde_json` が全体を検査する（serde_json の再帰上限を超える深い入力だけ、下記の package 専用 reader が
+同じ規則で検査する）。重複 member は最後の値を使用する。
 内部 marker は既存 NUL と区別して符号化し、既存 NUL を復元する。単独サロゲートを含む metadata は
 ASCII 検証または不正パス検証を通らない NUL sentinel にし、既存の検証順で診断する。
 そのため schema/version エラーが source の取得より先に出て、正常な lock/cache の固定 load も維持される。
-新しい JSON parser / 外部 crate は追加せず、UBNF parser のホットパスには処理を追加しない。
+外部 JSON parser / crate は追加せず、UBNF parser のホットパスには処理を追加しない。
 
 実際の UTF-16 文字列を使う以下の field は、置換で受理するとファイル同一性・文法本文・source 位置を変える。
 Java の受理集合を狭めず、Rust は従来の `invalid JSON` を維持する意図した暫定差とし、
@@ -411,8 +419,10 @@ Java の受理集合を狭めず、Rust は従来の `invalid JSON` を維持す
 | artifact.files の本文（末尾コメント） | resolve / generate / inspect 成功 | `invalid JSON` |
 | manifest / artifact の HTTPS source host | cache load 成功、resolve は `HTTPS artifact URL must omit credentials, query and fragment` | load / resolve とも `invalid JSON` |
 
-共通 `spec-corpus/package-json-acceptance.json` の196件（#914/#926 の127件と #942 の69件、上記暫定差13件）を
-両実 stdio と Java-host Rust / native Rust / Java flag CLI、manifest / artifact は両 `deps resolve` に送る。
+共通 `spec-corpus/package-json-acceptance.json` の362件（#914/#926 の127件、#942 の69件、#941 の166件、上記暫定差13件）を
+両実 stdio と Java-host Rust / native Rust / Java flag CLI、manifest / artifact と #941 の lock は両 `deps resolve` に送る。
+#941 は空文書・非 object・BOM・配列/object の深さ境界、深い単独サロゲート・不正 escape・末尾余剰入力・
+上書きされる深い値・files の非文字列を含む。8 MiB の入れ子はテスト内で生成し、巨大な fixture を保存しない。
 上位・下位・壊れた組・正常な組・消える成分、NUL、escape された field 名、重複 source、
 一般の不正 JSON と schema の優先順を含む。stdio の message/code/severity/UTF-16 range 全体と後続 request、
 CLI の最終診断行と既存の終了コード（generate / resolve は3、Java flag CLI は4）、
@@ -445,12 +455,47 @@ DAP から既に統合される `arbitrary_precision` の数値表現も最初�
 重複処理と lookup が幅の広い metadata でも二乗にならないようにし、配列は元の順序を保つ。
 8 MiB 近くの入力の peak memory は、数値だけの配列で従来と同程度、幅の広い object で従来の約 2 倍に収まる
 （release build の実測。2 回の解析なので時間は約 1.5〜3 倍）。
-JSON の文法・数値・再帰上限は既存 serde_json に任せる。#940 の BOM・サロゲート復元は
+通常の解析はそのまま維持し、serde_json の再帰上限に達した場合だけ `packages/value/depth.rs` に切り替える（#941）。
+この reader は object / array / 区切りの構文を最大255 frame の明示スタックで扱い、
+各 key・文字列・数値・真偽値・null の復号は既存 serde_json に任せる。重複 key は一時 BTreeMap で逐次置換し、
+#942 と同じ `Object` に格納する。深さに比例する関数再帰や上限無効化は追加しない。
+既存の surrogate 復元・木の解放も255段以下に制限され、debug の2 MiB thread stackで検証する。
+数値範囲と workspace の予約 numeric map の既存挙動（#947）は維持する。#940 の BOM・サロゲート復元は
 この木に適用し、raw bytes の reader・hash・UTF-8 の順序は変えない。
-`serde_json/preserve_order` は使用せず、新しい crate / license 依存を追加しない。
+`serde_json/unbounded_depth` / `preserve_order` は使用せず、新しい crate / license 依存を追加しない。
 この表現は package 入力だけに限定し、DAP / LSP の一般 JSON、credentials (#943)、
-UBNF parser のホットパスには適用しない。#941 の空文書・非 object・深い入れ子と
-#939 の file/entry/HTTPS の単独サロゲートに残る挙動も変更しない。
+UBNF parser のホットパスには適用しない。#939 の file/entry/HTTPS の単独サロゲートに残る挙動も変更しない。
+
+#941 の再測定（Linux x86_64、Rust 1.85.0、`deps resolve`、各3回の中央値、時間 s / peak RSS MiB）。
+基点は #946 merge 後の `a40c7513`。比較には同じ入力と固定した standalone binary を使う。
+共有マシンなので時間には実行負荷による変動があるが、通常入力のメモリ水準を維持する。
+性能作業の凍結（#197）に従い、性能改善や CI の速度判定は追加していない。
+
+| 入力 | 基点 release | #941 release |
+| --- | --- | --- |
+| 数値400万個の配列 | 0.25 / 133.4 | 0.25 / 133.8 |
+| `{"a":{"b":0}}` 50万個の配列 | 1.98 / 849.4 | 1.68 / 849.4 |
+| 60万 key の object | 0.63 / 208.3 | 0.66 / 207.9 |
+| 55万 key の逆順 object（値は配列） | 0.76 / 265.4 | 0.84 / 265.1 |
+| 10 key を計110万回書く重複 object | 0.17 / 10.1 | 0.18 / 9.9 |
+| 配列120段 | <0.01 / 3.9 | <0.01 / 3.9 |
+
+深い入力でも reader の8 MiB上限を維持する。最大深さ255の数値配列を横に伸ばす場合と、
+入力全体を入れ子にして256段で拒否する場合の測定は次のとおり。
+
+| 入力サイズ | 深さ255で受理 release | 同 debug | 深さ超過で拒否 release | 同 debug |
+| --- | --- | --- | --- | --- |
+| 約1 MiB | 0.05 / 20.8 | 0.19 / 25.4 | <0.01 / 5.7 | 0.01 / 10.1 |
+| 約2 MiB | 0.09 / 37.7 | 0.39 / 42.1 | <0.01 / 7.8 | 0.02 / 12.2 |
+| 約4 MiB | 0.18 / 71.8 | 0.88 / 76.2 | 0.01 / 11.6 | 0.04 / 16.3 |
+| 8 MiB | 0.45 / 139.5 | 1.76 / 143.0 | 0.05 / 19.7 | 0.09 / 24.0 |
+
+深さ255の object で重複 key を増やす入力も1/2/4/8 MiBで測定した。
+release は0.02/0.04/0.08/0.14 s、debug は0.18/0.30/0.86/1.43 sで、
+8 MiB時の peak RSS は11.7/16.0 MiBだった。入力サイズに対する二乗の増加は観測しなかった。
+深さ255/256・単独サロゲートとの組合せ・8 MiBの入れ子は、明示的に2 MiB stackを指定した
+Rust threadでも debug / release の両方で検証し、stack overflow は起きなかった。
+巨大入力は生成して測り、repository に実体は置かない。
 
 | object / 経路 | 入力の検査・走査順と観測可能な結果 | 出力の扱い |
 | --- | --- | --- |

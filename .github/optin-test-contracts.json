@@ -56,7 +56,7 @@
       "org.unlaxer.dsl.semantic.SemanticQueryEditsTest": ["incrementalMatchesFreshIndependentSemanticSnapshots", "rustMatchesEveryEditAndFreshRebuild"],
       "org.unlaxer.dsl.codegen.CliInputIoConformanceTest": ["entryIoMatchesJavaWithoutOutput", "importedIoRetainsItsExitCategoryAndCheckJson", "readableInputsKeepOutputAndGeneratedBytes"],
       "org.unlaxer.dsl.codegen.PackageGrammarBaseConformanceTest": ["inspectUsesLexicalGrammarBase", "generationAndCheckUseLexicalGrammarBase", "packagedPlaygroundUsesLexicalManifestBase", "fileApisAndJavaFlagsUseLexicalGrammarBase", "javaFlagsKeepOsResolvedOutputPaths"],
-      "org.unlaxer.dsl.codegen.PackageJsonAcceptanceConformanceTest": ["packageJsonAcceptanceMatchesAcrossClis", "gsonStrictKeepsFirstPositionAndLastDuplicateValue"],
+      "org.unlaxer.dsl.codegen.PackageJsonAcceptanceConformanceTest": ["packageJsonAcceptanceMatchesAcrossClis", "gsonStrictKeepsFirstPositionAndLastDuplicateValue", "gsonStrictDocumentKindAndDepthAreTheReference"],
       "org.unlaxer.dsl.codegen.PackageLocalPathConformanceTest": ["lexicalPathsPublishIdenticalLockAndCacheBytes", "invalidPathsKeepSnapshotsAndDiagnosticsIdentical"],
       "org.unlaxer.dsl.bootstrap.PackageArtifactUtf8Test": ["cachedArtifactsCheckRawHashBeforeUtf8AndJson", "explicitLocalArtifactsRejectInvalidUtf8WithoutPublishing"],
       "org.unlaxer.dsl.bootstrap.PackageArtifactReaderTest": ["artifactsRejectBeforeOpenWithStableDiagnostics", "artifactBytesRemainExactAndGrowthStopsAtLimitPlusOne", "artifactHandleChecksAndIoFailuresCloseTheStream", "artifactReplacementRejectsWriterFifoBeforeReading"],
