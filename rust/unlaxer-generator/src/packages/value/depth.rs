@@ -1,6 +1,6 @@
-//! Deep package documents only. Keep the ordinary two-pass reader's memory profile.
-//! Container structure uses an explicit, bounded stack; serde still decodes scalars.
-use super::{with_order, MemberOrder, Object, Value};
+//! Package JSON structure and numeric tokens, independent of serde_json features.
+//! Container depth is bounded; serde still decodes strings, booleans and null.
+use super::{Number, Object, Value};
 use serde::de::{DeserializeOwned, Error};
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -31,7 +31,6 @@ enum Container {
 }
 
 struct Frame {
-    start: usize,
     state: State,
     container: Container,
 }
@@ -55,34 +54,16 @@ impl Frame {
         self.state = State::Separator;
     }
 
-    fn finish(self, bytes: &[u8], end: usize) -> Result<Value> {
-        Ok(match self.container {
+    fn finish(self) -> Value {
+        match self.container {
             Container::Array(items) => Value::Array(items),
             Container::Object {
                 members, positions, ..
-            } => {
-                // Preserve #947's existing workspace arbitrary_precision protocol;
-                // do not silently turn its reserved first key into an ordinary object.
-                if members
-                    .first()
-                    .is_some_and(|(key, _)| key == "$serde_json::private::Number")
-                    && serde_json::from_str::<serde_json::Value>(
-                        r#"{"$serde_json::private::Number":"0"}"#,
-                    )?
-                    .is_number()
-                {
-                    with_order(
-                        serde_json::from_slice(&bytes[self.start..end])?,
-                        MemberOrder::Scalar,
-                    )
-                } else {
-                    Value::Object(Object::from_unique(
-                        members,
-                        positions.into_values().collect(),
-                    ))
-                }
-            }
-        })
+            } => Value::Object(Object::from_unique(
+                members,
+                positions.into_values().collect(),
+            )),
+        }
     }
 }
 
@@ -109,6 +90,49 @@ impl Input<'_> {
         let value = stream.next().ok_or_else(invalid)??;
         self.offset += stream.byte_offset();
         Ok(value)
+    }
+    fn number(&mut self) -> Result<Value> {
+        let start = self.offset;
+        let take = |input: &mut Self, byte| {
+            if input.bytes.get(input.offset) == Some(&byte) {
+                input.offset += 1;
+                true
+            } else {
+                false
+            }
+        };
+        take(self, b'-');
+        if !take(self, b'0') {
+            self.digits()?;
+        }
+        if take(self, b'.') {
+            self.digits()?;
+        }
+        if take(self, b'e') || take(self, b'E') {
+            if !take(self, b'+') {
+                take(self, b'-');
+            }
+            self.digits()?;
+        }
+        // Gson STRICT's 1024-char reader buffer accepts at most 1023 chars in
+        // a numeric token. Preserve that boundary as well as the original spelling.
+        if self.offset - start >= 1024 {
+            return Err(invalid());
+        }
+        let text = std::str::from_utf8(&self.bytes[start..self.offset]).map_err(|_| invalid())?;
+        Ok(Value::Number(Number::new(text)))
+    }
+
+    fn digits(&mut self) -> Result<()> {
+        let start = self.offset;
+        while self.bytes.get(self.offset).is_some_and(u8::is_ascii_digit) {
+            self.offset += 1;
+        }
+        if self.offset == start {
+            Err(invalid())
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -137,7 +161,7 @@ pub(super) fn parse(bytes: &[u8]) -> Result<Value> {
             match frame.state {
                 State::First | State::Separator if token == close => {
                     input.offset += 1;
-                    completed = Some(stack.pop().unwrap().finish(bytes, input.offset)?);
+                    completed = Some(stack.pop().unwrap().finish());
                     continue;
                 }
                 State::Separator => {
@@ -171,7 +195,6 @@ pub(super) fn parse(bytes: &[u8]) -> Result<Value> {
                     return Err(invalid());
                 }
                 stack.push(Frame {
-                    start: input.offset,
                     state: State::First,
                     container: if token == b'[' {
                         Container::Array(Vec::new())
@@ -185,9 +208,13 @@ pub(super) fn parse(bytes: &[u8]) -> Result<Value> {
                 });
                 input.offset += 1;
             }
-            b'"' | b'n' | b't' | b'f' | b'-' | b'0'..=b'9' => {
-                completed = Some(with_order(input.scalar()?, MemberOrder::Scalar));
+            b'"' => completed = Some(Value::String(input.scalar()?)),
+            b'n' => {
+                input.scalar::<()>()?;
+                completed = Some(Value::Null);
             }
+            b't' | b'f' => completed = Some(Value::Bool(input.scalar()?)),
+            b'-' | b'0'..=b'9' => completed = Some(input.number()?),
             _ => return Err(invalid()),
         }
     }
@@ -198,17 +225,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn iterative_structure_keeps_serde_validation_values_and_member_order() {
+    fn iterative_structure_rejects_malformed_json() {
+        let value =
+            parse(br#"{"t":true,"f":false,"n":null,"s":"[{}]:,\\\"","x":[],"x":{},"x":[null]}"#)
+                .unwrap();
+        assert_eq!(value["t"], Value::Bool(true));
+        assert_eq!(value["f"], Value::Bool(false));
+        assert_eq!(value["n"], Value::Null);
+        assert_eq!(value["s"].as_str(), Some("[{}]:,\\\""));
+        assert_eq!(value["x"], Value::Array(vec![Value::Null]));
         let inputs = [
-            r#"{"z":0,"a":[1,2,{"b":3,"a":4},5],"\u007a":{"d":1,"c":2}}"#,
-            r#"{"x":true,"y":false,"z":null,"s":"[{}]:,\\\"é😀"}"#,
-            r#"{"n":-0.0,"x":1.25,"large":18446744073709551616,"exp":1e300}"#,
-            r#"{"n":1e999}"#,
-            r#"{"$serde_json::private::Number":"1.5"}"#,
-            r#"{"$serde_json::private::Number":null}"#,
-            r#"{"$serde_json::private::Number":"1.5","a":1}"#,
-            r#"{"a":1,"$serde_json::private::Number":"1.5"}"#,
-            r#"{"x":[],"x":{},"x":[null],"y":{}}"#,
             r#"{"x":0,"x":01}"#,
             r#"{"x":1,}"#,
             r#"{"x":[1,]}"#,
@@ -231,19 +257,7 @@ mod tests {
             "{\"x\":\u{000c}1}",
         ];
         for input in inputs {
-            let reference = super::super::parse(input.as_bytes());
-            let iterative = parse(input.as_bytes());
-            match reference {
-                Ok(reference) => {
-                    let iterative = iterative.unwrap_or_else(|e| panic!("{input}: {e}"));
-                    assert_eq!(
-                        format!("{iterative:?}"),
-                        format!("{reference:?}"),
-                        "{input}"
-                    );
-                }
-                Err(_) => assert!(iterative.is_err(), "{input}"),
-            }
+            assert!(parse(input.as_bytes()).is_err(), "{input}");
         }
     }
 }

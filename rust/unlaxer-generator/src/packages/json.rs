@@ -22,7 +22,7 @@ pub(super) fn parse(bytes: &[u8], artifact: bool) -> Result<Value, String> {
     if let Ok(value) = super::value::parse(bytes) {
         return Ok(value);
     }
-    // Only unpaired UTF-16 escapes get a compatibility pass. serde_json still
+    // Only unpaired UTF-16 escapes get a compatibility pass. The package reader
     // validates the entire JSON (including trailing input) before any field use.
     let invalid = || super::error("invalid JSON");
     let rewritten = rewrite(bytes).ok_or_else(invalid)?;
@@ -170,10 +170,6 @@ mod tests {
         assert_eq!(value["b"]["z"], serde_json::json!(4));
         let reordered = parse(br#"{"a":0,"b":{"a":5,"z":4}}"#, false).unwrap();
         assert_eq!(value, reordered);
-        assert_eq!(
-            serde_json::to_string(&value).unwrap(),
-            r#"{"a":0,"b":{"a":5,"z":4}}"#
-        );
         let value = parse(br#"{"b\ud800":1,"a":2,"b\uD800":3}"#, false).unwrap();
         assert_eq!(
             value.as_object().unwrap().keys().collect::<Vec<_>>(),
@@ -219,10 +215,16 @@ mod tests {
             inner[0].as_object().unwrap().keys().collect::<Vec<_>>(),
             ["d", "c"]
         );
+        let dependencies = parse(
+            br#"{"b":{"version":"1.0.0"},"a":{"version":"2.0.0"}}"#,
+            false,
+        )
+        .unwrap();
         assert_eq!(
-            serde_json::to_string(&value).unwrap(),
-            serde_json::to_string(&serde_json::from_str::<serde_json::Value>(&text).unwrap())
+            super::super::output_references(&dependencies)
                 .unwrap()
+                .to_string(),
+            r#"{"a":"2.0.0","b":"1.0.0"}"#
         );
         // The ordered tree must not grow each JSON value beyond serde_json's own node.
         assert!(std::mem::size_of::<Value>() <= std::mem::size_of::<serde_json::Value>());
@@ -291,29 +293,67 @@ mod tests {
     }
 
     #[test]
-    fn numeric_values_keep_serde_semantics_with_workspace_feature_unification() {
-        // Run both standalone and with the workspace (DAP enables arbitrary_precision).
-        // Numeric map envelopes must not become package objects or change diagnostics.
-        for input in [
-            r#"{"dependencies":1.25,"files":18446744073709551616,"schemaVersion":1e0}"#,
-            r#"{"note":[-0.0,0.5,1e300,18446744073709551616]}"#,
-            r#"{"note":1e999}"#,
-            r#"{"note":{"$serde_json::private::Number":"1.5"}}"#,
-            r#"{"note":{"$serde_json::private::Number":null}}"#,
+    fn numeric_tokens_and_reserved_keys_are_feature_independent() {
+        // Identical oracle for standalone and workspace (DAP arbitrary_precision).
+        for token in [
+            "1",
+            "1.0",
+            "1e0",
+            "1E+0",
+            "-0",
+            "1e999",
+            "-1e999",
+            "1e-999",
+            "123456789012345678901234567890",
+            "1234567890123456789012",
+            "12345678901234567890123",
         ] {
-            let reference = serde_json::from_str::<serde_json::Value>(input);
-            let ordered = parse(input.as_bytes(), false);
-            match reference {
-                Ok(reference) => assert_eq!(ordered.unwrap(), reference, "{input}"),
-                Err(_) => assert_eq!(ordered.unwrap_err(), super::super::error("invalid JSON")),
+            let value = parse(format!("{{\"schemaVersion\":{token}}}").as_bytes(), false).unwrap();
+            let Value::Number(number) = &value["schemaVersion"] else {
+                panic!("numeric token")
+            };
+            assert_eq!(number.as_str(), token);
+            assert_eq!(super::super::versioned(&value).is_ok(), token == "1");
+        }
+        for depth in [0, 126, 253] {
+            for leaf in [
+                r#"{"$serde_json::private::Number":"1.5"}"#,
+                r#"{"$serde_json::private::Number":null,"x":1}"#,
+            ] {
+                let raw = format!(
+                    "{{\"meta\":{}{leaf}{}}}",
+                    "[".repeat(depth),
+                    "]".repeat(depth)
+                );
+                let value = parse(raw.as_bytes(), false).unwrap();
+                let mut value = &value["meta"];
+                for _ in 0..depth {
+                    let Value::Array(items) = value else {
+                        panic!("array")
+                    };
+                    value = &items[0];
+                }
+                assert!(value
+                    .as_object()
+                    .unwrap()
+                    .contains_key("$serde_json::private::Number"));
             }
         }
-        let value = parse(br#"{"dependencies":1.25,"files":1.25}"#, false).unwrap();
-        assert_eq!(
-            super::super::dependencies(&value["dependencies"]).unwrap_err(),
-            super::super::error("expected object: dependencies")
-        );
-        assert!(value["files"].as_object().is_none());
+        for length in [1023, 1024] {
+            let text = format!("{{\"meta\":{}}}", "9".repeat(length));
+            assert_eq!(parse(text.as_bytes(), false).is_ok(), length == 1023);
+        }
+        // Even an unused/overwritten token is fully validated before schema checks.
+        for token in [
+            "01", "-01", "+1", ".1", "1.", "1e", "1e+", "--1", "NaN", "Infinity", "1e999x",
+        ] {
+            let text = format!("{{\"schemaVersion\":2,\"meta\":{token},\"meta\":0}}");
+            assert_eq!(
+                parse(text.as_bytes(), false).unwrap_err(),
+                super::super::error("invalid JSON"),
+                "{token}"
+            );
+        }
     }
 
     #[test]

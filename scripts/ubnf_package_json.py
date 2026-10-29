@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-COUNT = 362
+COUNT = 400
 
 
 def fixtures():

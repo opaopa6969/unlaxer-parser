@@ -5813,5 +5813,580 @@
         }
       }
     ]
+  },
+  {
+    "id": "schema-manifest-dependency-string",
+    "subject": "manifest",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":\"1.0.0\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-manifest-dependency-array",
+    "subject": "manifest",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":[]}"
+      }
+    ]
+  },
+  {
+    "id": "schema-manifest-dependency-duplicate-last-string",
+    "subject": "manifest",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":{},\"a!\":0,\"std/layout\":\"1.0.0\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-artifact-dependency-string",
+    "subject": "artifact",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":\"1.0.0\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-artifact-dependency-array",
+    "subject": "artifact",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":[]}"
+      }
+    ]
+  },
+  {
+    "id": "schema-artifact-dependency-duplicate-last-string",
+    "subject": "artifact",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":{},\"a!\":0,\"std/layout\":\"1.0.0\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-dependency-id-before-object",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"bad!\":[]}"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-empty",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          ""
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-absolute",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "/a.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-backslash",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a\\b.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-colon",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a:b.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-control",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a\u0001.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-nul",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a\u0000.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-iso-control",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a\u0085.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-entry-empty",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": ""
+      }
+    ]
+  },
+  {
+    "id": "schema-files-boundary-first",
+    "subject": "artifact",
+    "loadError": "package file path escapes boundary",
+    "resolveError": "package file path escapes boundary",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"b/../x\":0,\"a:b\":0}"
+      }
+    ]
+  },
+  {
+    "id": "schema-files-invalid-first",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"b:c\":0,\"a/../x\":0}"
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-roots-missing",
+    "subject": "lock",
+    "loadError": "expected object: roots",
+    "resolveError": null,
+    "resolveLock": true,
+    "bytesHex": "7b22736368656d6156657273696f6e223a312c227061636b61676573223a7b7d7d"
+  },
+  {
+    "id": "schema-lock-roots-array",
+    "subject": "lock",
+    "loadError": "expected object: roots",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-root-missing",
+    "subject": "lock",
+    "loadError": "expected object: locked root",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "value": {}
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-package-null",
+    "subject": "lock",
+    "loadError": "expected object: locked package",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-dependency-missing",
+    "subject": "lock",
+    "loadError": "expected object: locked dependency",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "value": {
+          "z/pkg": "1.0.0"
+        }
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-dependency-null",
+    "subject": "lock",
+    "loadError": "expected object: locked dependency",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "value": {
+          "z/pkg": "1.0.0"
+        }
+      },
+      {
+        "path": [
+          "packages",
+          "z/pkg"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-dependency-version-number",
+    "subject": "lock",
+    "loadError": "expected string: version",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "value": {
+          "z/pkg": "1.0.0"
+        }
+      },
+      {
+        "path": [
+          "packages",
+          "z/pkg"
+        ],
+        "value": {
+          "version": 1
+        }
+      }
+    ]
+  },
+  {
+    "id": "schema-manifest-unused-numbers",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "[1e999,-1e999,123456789012345678901234567890,1e-999,{\"$serde_json::private::Number\":\"1.5\"},{\"$serde_json::private::Number\":null}]"
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-unused-numbers",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "resolveLock": true,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "[1e999,-1e999,123456789012345678901234567890,1e-999,{\"$serde_json::private::Number\":\"1.5\"},{\"$serde_json::private::Number\":null}]"
+      }
+    ]
+  },
+  {
+    "id": "schema-artifact-unused-numbers",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "[1e999,-1e999,123456789012345678901234567890,1e-999,{\"$serde_json::private::Number\":\"1.5\"},{\"$serde_json::private::Number\":null}]"
+      }
+    ]
+  },
+  {
+    "id": "schema-reserved-key-is-object",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"$serde_json::private::Number\":\"1.5\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-version-decimal",
+    "subject": "manifest",
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "rawEdits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "json": "1.0"
+      }
+    ]
+  },
+  {
+    "id": "schema-version-exponent",
+    "subject": "lock",
+    "loadError": "unsupported schemaVersion",
+    "resolveError": null,
+    "resolveLock": true,
+    "rawEdits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "json": "1e0"
+      }
+    ]
+  },
+  {
+    "id": "schema-version-huge-exponent",
+    "subject": "artifact",
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "rawEdits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "json": "1e999"
+      }
+    ]
+  },
+  {
+    "id": "schema-version-negative-huge",
+    "subject": "manifest",
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "rawEdits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "json": "-1e999"
+      }
+    ]
+  },
+  {
+    "id": "schema-number-length-1023",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999"
+      }
+    ]
+  },
+  {
+    "id": "schema-number-length-1024",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999"
+      }
+    ]
+  },
+  {
+    "id": "schema-number-deep-surrogate",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[1e999,{\"x\":\"\\ud800\"}]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+      }
+    ]
+  },
+  {
+    "id": "schema-used-version-number",
+    "subject": "manifest",
+    "loadError": "expected string: version",
+    "resolveError": "expected string: version",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "version"
+        ],
+        "json": "1e999"
+      }
+    ]
+  },
+  {
+    "id": "schema-used-file-number",
+    "subject": "artifact",
+    "loadError": "package file must contain source text",
+    "resolveError": "package file must contain source text",
+    "rawEdits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "json": "1e999"
+      }
+    ]
+  },
+  {
+    "id": "schema-used-root-number",
+    "subject": "lock",
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots",
+          "std/layout"
+        ],
+        "json": "1e999"
+      }
+    ],
+    "resolveLock": true
   }
 ]

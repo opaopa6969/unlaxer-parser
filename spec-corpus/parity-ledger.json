@@ -552,12 +552,12 @@
       "id": "package-json-surrogate-text",
       "category": "contract",
       "title": "package JSON の単独サロゲート文字列の暫定境界",
-      "hosts": "Java Gson / Rust serde_json（両 stdio・Java-host Rust/native Rust/Java flag CLI）",
+      "hosts": "Java Gson / Rust package JSON reader（両 stdio・Java-host Rust/native Rust/Java flag CLI）",
       "issues": [
         926,
         939
       ],
-      "observation": "#914は先頭BOMを1つだけ受理。#926のlocal source・ASCII形式のID/version/lock・未使用metadataはJavaの受理と診断に揃える。artifact.entry、filesのkey/本文、dependencies.*.sourceのHTTPSはUTF-16をlosslessに表せないため、Javaを狭めずRustの既存invalid JSONを維持する意図した暫定差。共通362件（#942の順序69件と#941の文書166件を含む）のうち13件は両hostを実行してhost別oracleを照合し、skipしない。これらのfieldとsource位置/取得境界の完全対応は#939の受け入れ条件で追跡する。#914/#926はPR #940でCLOSED。#942で入力objectの記述順と重複keyの位置/値をJavaに揃え、lock/cacheの辞書順出力は維持する。raw hash→strict UTF-8→JSON、readerとpath規則は維持する。#941で空文書・非object最上位の診断とGsonの深さ255/256境界を揃える。通常の二段階解析を維持し、深い入力はpackage専用の明示スタックで読む。",
+      "observation": "#914は先頭BOMを1つだけ受理。#926のlocal source・ASCII形式のID/version/lock・未使用metadataはJavaの受理と診断に揃える。artifact.entry、filesのkey/本文、dependencies.*.sourceのHTTPSはUTF-16をlosslessに表せないため、Javaを狭めずRustの既存invalid JSONを維持する意図した暫定差。共通400件（#942の順序69件・#941の文書166件・#947のschema38件を含む）のうち13件は両hostを実行してhost別oracleを照合し、skipしない。これらのfieldとsource位置/取得境界の完全対応は#939の受け入れ条件で追跡する。#914/#926はPR #940でCLOSED。#942で入力objectの記述順と重複keyの位置/値をJavaに揃え、lock/cacheの辞書順出力は維持する。raw hash→strict UTF-8→JSON、readerとpath規則は維持する。#941で空文書・非object最上位の診断とGsonの深さ255/256境界を揃える。#947でdependency・files/entry・lockのschema診断をJavaに揃える。数値を表記のまま保持し、未使用の範囲外数値も受理する。package専用の明示スタックを浅い入力にも共用し、feature統合に依存せず深さ・順序・メモリ水準を維持する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",

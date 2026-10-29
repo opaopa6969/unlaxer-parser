@@ -284,7 +284,7 @@ Java の writer なし FIFO への差替えで open が止まる競合、正確�
 ## artifact の不正 UTF-8 診断（#919）
 
 cache と明示 `local:` artifact は、両版とも **`E-PACKAGE: invalid UTF-8 artifact`** で拒否する。
-Java の既存 strict decoder と利用者に見える文言を参照とし、Rust は `serde_json` に渡す前に
+Java の既存 strict decoder と利用者に見える文言を参照とし、Rust は package JSON reader に渡す前に
 `std::str::from_utf8` で全 bytes を検査する。Java の既存経路を維持する最小の変更として、
 Java 本体は変更せず、両言語に同じ fixture の回帰テストを追加した。置換文字での復号はしない。
 8 MiB 上限 →（cache は graph budget と raw hash）→ strict UTF-8 → JSON の順とし、
@@ -397,10 +397,9 @@ Gson が受理する `\ud800` / `\udc00` と壊れた組について、次のよ
 | 未使用の metadata 文字列 | 受理。raw artifact bytes をそのまま cache へ保存 |
 | 正常なサロゲート対の `local:`、artifact file/entry、本文 | Unicode scalar として従来どおり受理 |
 
-Rust は通常の `serde_json` 解析が失敗した場合だけ、JSON 文字列中の単独サロゲート escape を検出する。
-正常な組、escape された backslash/quote は変えず、JSON の構造・一般の不正 escape・末尾余剰入力は
-引き続き `serde_json` が全体を検査する（serde_json の再帰上限を超える深い入力だけ、下記の package 専用 reader が
-同じ規則で検査する）。重複 member は最後の値を使用する。
+Rust は package JSON 解析が失敗した場合だけ、JSON 文字列中の単独サロゲート escape を検出する。
+正常な組、escape された backslash/quote は変えない。下記の package 専用 reader が JSON 全体の構造・数値・
+末尾余剰入力を、既存 `serde_json` が各文字列と一般の escape を検査する。重複 member は最後の値を使用する。
 内部 marker は既存 NUL と区別して符号化し、既存 NUL を復元する。単独サロゲートを含む metadata は
 ASCII 検証または不正パス検証を通らない NUL sentinel にし、既存の検証順で診断する。
 そのため schema/version エラーが source の取得より先に出て、正常な lock/cache の固定 load も維持される。
@@ -419,8 +418,8 @@ Java の受理集合を狭めず、Rust は従来の `invalid JSON` を維持す
 | artifact.files の本文（末尾コメント） | resolve / generate / inspect 成功 | `invalid JSON` |
 | manifest / artifact の HTTPS source host | cache load 成功、resolve は `HTTPS artifact URL must omit credentials, query and fragment` | load / resolve とも `invalid JSON` |
 
-共通 `spec-corpus/package-json-acceptance.json` の362件（#914/#926 の127件、#942 の69件、#941 の166件、上記暫定差13件）を
-両実 stdio と Java-host Rust / native Rust / Java flag CLI、manifest / artifact と #941 の lock は両 `deps resolve` に送る。
+共通 `spec-corpus/package-json-acceptance.json` の400件（#914/#926 の127件、#942 の69件、#941 の166件、#947 の38件。うち上記暫定差13件）を
+両実 stdio と Java-host Rust / native Rust / Java flag CLI、manifest / artifact と resolve 対象の lock は両 `deps resolve` に送る。
 #941 は空文書・非 object・BOM・配列/object の深さ境界、深い単独サロゲート・不正 escape・末尾余剰入力・
 上書きされる深い値・files の非文字列を含む。8 MiB の入れ子はテスト内で生成し、巨大な fixture を保存しない。
 上位・下位・壊れた組・正常な組・消える成分、NUL、escape された field 名、重複 source、
@@ -445,26 +444,24 @@ Gson 2.13.2 STRICT を JDK17 / JDK21 で実測すると、重複 key は拒否�
 object の等値比較は順序に依存しないため、正常な lock の roots や dependencies の並べ替えで
 stale lock / identity conflict にしてはならない。
 
-Rust の `packages/value.rs` は最初に既存 `serde_json::Value` で値と構文を読み、
-既存 serde の `Deserialize` / `Visitor` でもう一度 member の位置だけを記録する。
-記録するのは各 object で残る member の key の順位だけで、scalar だけの配列は何も記録しない。
-その順序で member を記述順の `Vec` に並べ、各 key は一度だけ持つ。key 順の索引は同じ `Vec` の要素に置き、
-lookup は二分探索、等値比較と出力は key 順の走査で行う。`Value` の大きさは `serde_json::Value` を超えない。
-DAP から既に統合される `arbitrary_precision` の数値表現も最初の解析に任せるため、
-小数・巨大な数値を object と誤認せず、単独 crate / workspace の既存の数値挙動をそれぞれ維持する。
-重複処理と lookup が幅の広い metadata でも二乗にならないようにし、配列は元の順序を保つ。
-8 MiB 近くの入力の peak memory は、数値だけの配列で従来と同程度、幅の広い object で従来の約 2 倍に収まる
-（release build の実測。2 回の解析なので時間は約 1.5〜3 倍）。
-通常の解析はそのまま維持し、serde_json の再帰上限に達した場合だけ `packages/value/depth.rs` に切り替える（#941）。
-この reader は object / array / 区切りの構文を最大255 frame の明示スタックで扱い、
-各 key・文字列・数値・真偽値・null の復号は既存 serde_json に任せる。重複 key は一時 BTreeMap で逐次置換し、
-#942 と同じ `Object` に格納する。深さに比例する関数再帰や上限無効化は追加しない。
-既存の surrogate 復元・木の解放も255段以下に制限され、debug の2 MiB thread stackで検証する。
-数値範囲と workspace の予約 numeric map の既存挙動（#947）は維持する。#940 の BOM・サロゲート復元は
-この木に適用し、raw bytes の reader・hash・UTF-8 の順序は変えない。
-`serde_json/unbounded_depth` / `preserve_order` は使用せず、新しい crate / license 依存を追加しない。
-この表現は package 入力だけに限定し、DAP / LSP の一般 JSON、credentials (#943)、
-UBNF parser のホットパスには適用しない。#939 の file/entry/HTTPS の単独サロゲートに残る挙動も変更しない。
+Rust の `packages/value.rs` は入力だけの木を持つ。member は記述順の `Vec`、key 順の索引は
+同じ `Vec` の要素に置き、各 key は一度だけ保持する。lookup は二分探索、object の等値比較は key 順で行う。
+#947 で数値トークンをそのまま保持するため、#941 の `packages/value/depth.rs` の明示スタックを
+浅い入力にも共用する。object / array / 区切り / 数値の構文を検査し、key・文字列・真偽値・null の復号は
+既存 serde_json に任せる。`serde_json::Value` や numeric map protocol を入力に使わないため、
+DAP の `arbitrary_precision` が workspace で統合されても、package の受理と診断は単独 build と同じになる。
+重複 key は一時 BTreeMap で逐次置換し、最初の位置と最後の値を保持する。深さは最上位を含め最大255 frame。
+既存の surrogate 復元・木の解放も255段以下に制限し、debug / release の2 MiB thread stackで検証する。
+
+数値は変換せず表記を保持する。22 bytes 以下は inline、それより長い表記だけを heap に置くため、
+小さい数値の配列で個別の割当てを増やさず、`Value` は32 bytes（従来の serde_json::Value 以下）を維持する。
+lock の出力には検証済みの文字列参照だけを既存の辞書順 JSON object へ移す。
+未使用 metadata とその数値を再エンコードせず、cache は元の artifact bytes のままとする。
+
+新しい crate / feature / license 依存は追加しない。#940 の BOM・サロゲート復元はこの木に適用し、
+raw bytes の reader・hash・UTF-8 の順序は変えない。この表現は package 入力だけに限定し、
+DAP / LSP の一般 JSON、credentials (#943)、UBNF parser のホットパスには適用しない。
+#939 の file/entry/HTTPS の単独サロゲートに残る挙動も変更しない。
 
 #941 の再測定（Linux x86_64、Rust 1.85.0、`deps resolve`、各3回の中央値、時間 s / peak RSS MiB）。
 基点は #946 merge 後の `a40c7513`。比較には同じ入力と固定した standalone binary を使う。
@@ -500,13 +497,13 @@ Rust threadでも debug / release の両方で検証し、stack overflow は起�
 | object / 経路 | 入力の検査・走査順と観測可能な結果 | 出力の扱い |
 | --- | --- | --- |
 | manifest / lock / artifact の最上位と各固定 field | JSON 全体を読む。その後は既存の schema → 対象 field の固定順で検査し、最上位 member の並べ替えでは優先順を変えない。未知 metadata は使わない | artifact は元の bytes を保持 |
-| manifest `dependencies` の検証 | 記述順に ID → version → source 型を検査。複数の不正 member の最初の診断に影響 | roots の出力は辞書順 |
+| manifest `dependencies` の検証 | 記述順に ID → dependency の object 型 → version → source 型を検査。複数の不正 member の最初の診断に影響 | roots の出力は辞書順 |
 | manifest `dependencies` の `resolveOne` | 記述順に深さ優先で取得・内容検査。最初の取得失敗、identity conflict、cycle / 上限診断に影響 | 全 graph 成功後だけ lock/cache を書く |
-| artifact `files` | 記述順に path → 本文の型を検査。複数の不正 file の最初の診断に影響。その後の entry は key lookup。path の 1 段目の検査（`invalid package file path`）が Rust にない差は [#947](https://github.com/opaopa6969/unlaxer-parser/issues/947) | files を再エンコードしない。cache は raw bytes |
+| artifact `files` | 記述順に path → 本文の型を検査。複数の不正 file の最初の診断に影響。その後の entry は key lookup。path は空・制御文字・backslash・先頭 `/`・`:`、次に各成分の空・`.`・`..` の順で検査 (#947) | files を再エンコードしない。cache は raw bytes |
 | artifact `dependencies` の検証・明示 resolve | 記述順に field 検証、その後同じ順の深さ優先走査 | pinned dependencies の出力は辞書順 |
-| lock `packages` の audit | 記述順に ID、pinned ID/version/SHA、各 dependencies を検査。最初の診断に影響 | 読取りでは lock を変更しない |
-| lock `packages.*.dependencies` の audit | 記述順に ID → version → pinned version を検査。最初の診断に影響 | 同上 |
-| lock `roots` | manifest から作った参照と順序を無視して比較。不正な追加/値の変更は audit より先に stale lock。その後は記述順で pinned version を確認 | 同上 |
+| lock `packages` の audit | 記述順に ID、locked package の object 型、pinned ID/version/SHA、各 dependencies を検査。最初の診断に影響 | 読取りでは lock を変更しない |
+| lock `packages.*.dependencies` の audit | 記述順に ID → version → locked dependency の object 型 → pinned version の文字列型・一致を検査。最初の診断に影響 | 同上 |
+| lock `roots` | object 型を確認し、manifest から作った参照と順序を無視して比較。不正な追加/値の変更は audit より先に stale lock。その後は記述順で pinned version を確認 | 同上 |
 | lock `packages` / `packages.*.dependencies` の cycle audit | 各 object の記述順で DFS。複数 cycle があると報告する ID に影響 | 同上 |
 | artifact の dependencies から作る `actual`（固定 cache load） | 記述順を保持して pinned 参照と順序を無視して比較し、同順に子を load。複数 cache の hash 不正などで最初の診断に影響 | 検証済み親は全依存の成功後だけ memo に載せる |
 | lock `packages` の `owner` | 記述順で SHA を照合し、最初に一致した所有者を選ぶ。正常な artifact は ID / raw hash 検証も通る必要がある | identity JSON の field 順は既存どおり |
@@ -520,6 +517,45 @@ package / dependency の cycle、直接・推移的 fetch、固定 cache load �
 lock 用の新 fixture も resolve へ渡し、入力 lock の不正を読み直さず正常な lock に再生成することを確認する。
 成功ケースは記述順を逆にした multi-package graph の lock/cache を Java と固定 byte 期待値に比較し、
 失敗ケースは既存 snapshot の有無両方で不変を検証する。既存127件の期待値は維持する。
+
+
+### package JSON の schema と数値（#947）
+
+Java（Gson 2.13.2 STRICT、UBNFPackageResolver）を参照し、Java の経路・受理集合・診断文は変更しない。
+文書全体の JSON 検査後、既存の固定 field 順と上表の記述順で次を検査する。
+
+| 入力 | 診断または受理 |
+| --- | --- |
+| manifest / artifact の `dependencies` の値が非 object（文字列・配列・重複 key の最後の値を含む） | ID の検査後に `expected object: dependency` |
+| artifact の files key / entry が空、ISO制御文字（U+0000–001F / U+007F–009F）、backslash、先頭 `/`、`:` を含む | `invalid package file path`。本文型や成分の検査より先 |
+| path 成分が空・`.`・`..` | `package file path escapes boundary` |
+| lock の roots が欠落・非 object | stale lock 比較より先に `expected object: roots` |
+| lock の packages に root がない | `expected object: locked root` |
+| lock の packages の値が非 object | `expected object: locked package` |
+| locked dependency の参照先が欠落・非 object | `expected object: locked dependency` |
+| 参照先の version が非文字列 | 一致比較より先に `expected string: version` |
+| 未使用 metadata の `1e999` / `-1e999` / 巨大整数 / `1e-999` | 数値に変換せず受理 |
+| `schemaVersion` | JSON 表記が `1` の数値だけを受理。`1.0` / `1e0` / `1E+0` / `1e999` / 文字列 / object は `unsupported schemaVersion` |
+| 数値を version / source / file 本文などの文字列用 field に置く | その field の既存の型診断。数値の範囲による `invalid JSON` にしない |
+| 数値トークンの長さ | Gson の reader buffer に合わせ1023文字まで受理、1024文字以上は `invalid JSON`。未使用でも同じ |
+| `{"$serde_json::private::Number":"1.5"}` など | 通常の object。key の位置・値によらず数値と解釈しない。単独 / workspace build 共通 |
+
+追加38件は各 schema 行・優先順・使用/未使用の数値・1023/1024境界・深さ255と単独サロゲートの
+組合せを含む。数値の代表は各文書で同じ metadata 配列にまとめ、同型のケース数を増やさない。
+既存362件を保持し、両実 stdio・3 CLI・両 deps resolve を実行する。新 lock ケースの resolve は
+入力 lock を検査せず再生成する既存仕様も確認する。Java の独立 oracle は JDK17 / JDK21 で同一。
+
+#947 のメモリ退行確認（基点 `1f9cdace`、同一入力・固定 standalone release binary、Rust 1.85.0、
+Linux x86_64、3回の中央値。時間 s / peak RSS MiB）。性能改善や CI 時間の判定は追加しない (#197)。
+
+| 入力 | 基点 | #947 |
+| --- | --- | --- |
+| 数値400万個の配列 | 0.26 / 133.8 | 0.17 / 133.0 |
+| `{"a":{"b":0}}` 50万個の配列 | 1.55 / 850.0 | 0.23 / 131.9 |
+| 60万 key の object | 0.82 / 208.8 | 0.46 / 155.0 |
+| 55万 key の逆順 object（値は `[0]`） | 0.51 / 265.9 | 0.35 / 218.0 |
+| 10 key を計110万回書く重複 object | 0.10 / 11.3 | 0.13 / 10.5 |
+| 配列120段 | <0.01 / 4.2 | <0.01 / 3.4 |
 
 
 ## grammar / manifest の基準ディレクトリ（#928）
