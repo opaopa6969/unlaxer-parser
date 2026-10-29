@@ -36,13 +36,15 @@ pub(super) fn get() -> PathBuf {
             let entry = unsafe { entry.assume_init() };
             if !entry.pw_dir.is_null() {
                 let home = unsafe { CStr::from_ptr(entry.pw_dir) }.to_bytes();
-                if !home.is_empty() {
+                // JDK 21 (unlike 17) also replaces a home shorter than two bytes,
+                // such as "/" for systemd DynamicUser, with the fallback below.
+                if home.len() >= 2 {
                     return PathBuf::from(std::ffi::OsStr::from_bytes(home));
                 }
             }
         }
-        // JDK 21 falls back to nonempty HOME, then "?". JDK 17 differs
-        // on missing/empty passwd entries; keep that measured limit explicit.
+        // JDK 21 falls back to nonempty HOME, then "?". JDK 17 differs on
+        // missing/short passwd entries; keep that measured limit explicit (#964).
         return std::env::var_os("HOME")
             .filter(|home| !home.is_empty())
             .map_or_else(|| PathBuf::from("?"), PathBuf::from);

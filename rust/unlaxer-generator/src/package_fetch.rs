@@ -125,14 +125,7 @@ fn credentials(origin: &str) -> Result<BTreeMap<&'static str, Option<String>>, S
     let override_path = std::env::var_os("UBNF_CREDENTIALS_FILE");
     let path = override_path
         .as_ref()
-        .map(|value| {
-            // Path.of("") denotes the working directory in Java, not a missing file.
-            if cfg!(unix) && value.is_empty() {
-                PathBuf::from(".")
-            } else {
-                PathBuf::from(value)
-            }
-        })
+        .map(|value| java_override_path(value.as_os_str()))
         .or_else(|| default_home().map(|home| home.join(".config/unlaxer/credentials.json")))
         .ok_or_else(|| error("cannot locate artifact credentials file"))?;
     if !path.exists() {
@@ -151,6 +144,27 @@ fn credentials(origin: &str) -> Result<BTreeMap<&'static str, Option<String>>, S
     }
     let bytes = std::fs::read(path).map_err(|_| error("cannot read artifact credentials"))?;
     crate::packages::credential_fields(&bytes, origin)
+}
+
+// Java's UnixPath for Path.of(override): "" denotes the working directory, not a
+// missing file, and trailing slashes are dropped (so "file.json/" names the file).
+// Other bytes are kept; the kernel treats repeated inner slashes alike.
+fn java_override_path(value: &std::ffi::OsStr) -> PathBuf {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let bytes = value.as_bytes();
+        if bytes.is_empty() {
+            PathBuf::from(".")
+        } else {
+            let end = bytes.iter().rposition(|&b| b != b'/').map_or(1, |i| i + 1);
+            PathBuf::from(std::ffi::OsStr::from_bytes(&bytes[..end]))
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        PathBuf::from(value)
+    }
 }
 
 // Java's normal Unix user.home comes from the real uid's passwd entry.

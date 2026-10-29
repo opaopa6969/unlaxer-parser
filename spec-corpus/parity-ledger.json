@@ -665,7 +665,7 @@
       "issues": [
         958
       ],
-      "observation": "通常のpasswd homeはHOME未設定・空・差替えより優先する。空overrideはcwd、空白・相対・tildeはそのまま、symlinkを追跡し、欠落/親非directoryとdirectoryの診断をJavaに揃える。getpwuid_rのunsafeは専用関数のみ、外部crate追加なし。23形230呼出しをsnapshot有無で検証する。JVM -Duser.homeはnativeの明示UBNF_CREDENTIALS_FILEへ対応付ける。非Unixは既存のHOME/overrideを維持する。子プロセスのpasswdとHOMEだけを隔離し実credentialsは開かずstatで不変検査。JDK別fallbackはpackage-credentials-home-fallbackに分離。",
+      "observation": "通常のpasswd homeはHOME未設定・空・差替えより優先する。空overrideはcwd、末尾の/は除去、空白・相対・tildeはそのまま、symlinkを追跡し、欠落/親非directoryとdirectoryの診断をJavaに揃える。getpwuid_rのunsafeは専用関数のみ、外部crate追加なし。26形260呼出しをsnapshot有無で検証する（CIはJDK21、JDK17は手元）。JVM -Duser.homeはnativeの明示UBNF_CREDENTIALS_FILEへ対応付ける。非Unixは既存のHOME/overrideを維持する。子プロセスのpasswdとHOMEだけを隔離し実credentialsは開かずstatで不変検査。JDK別fallbackはpackage-credentials-home-fallbackに分離。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials-location.json",
@@ -684,7 +684,7 @@
       "issues": [
         964
       ],
-      "observation": "通常のpasswd entryは一致するが、JDK21は不在/lookup失敗/空homeなら非空HOME→?へfallbackする。JDK17は不在/失敗で?、空homeは空を維持する。nativeは既定JDK21を参照し、passwd-missingとpasswd-emptyをJDK17別期待値でskipせず実行する。共通の明示overrideで回避可能。互換対象/選択方法の確定を#964で追跡する。",
+      "observation": "通常のpasswd entryは一致するが、JDK21は不在/lookup失敗/2バイト未満のhome（空・/など）なら非空HOME→?へfallbackする。JDK17は不在/失敗で?、見つかったhomeは短くても維持する。nativeは既定JDK21を参照し、passwd-missing・passwd-empty・passwd-shortをJDK17別期待値でskipせず実行する。共通の明示overrideで回避可能。互換対象/選択方法の確定を#964で追跡する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials-location.json",
@@ -2904,7 +2904,7 @@
     {
       "path": "spec-corpus/package-credentials-location.json",
       "fields": {
-        "javaSelected17": 2
+        "javaSelected17": 3
       },
       "entries": [
         "package-credentials-location",

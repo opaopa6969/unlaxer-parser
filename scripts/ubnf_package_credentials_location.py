@@ -11,10 +11,10 @@ from ubnf_credentials_home import compile_passwd_shim, isolated_env, protect_rea
 from ubnf_package_credentials import ROOT, TLS_ERROR, local_tls, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
-COUNT = 23
+COUNT = 26
 # Only dummy values; never include these in errors, receipts or logs.
 TOKENS = {label: 'location-fixture-only-' + label for label in
-          ['passwd', 'environment', 'property', 'explicit', 'spaces', 'tilde', 'cwd', 'fallback']}
+          ['passwd', 'environment', 'property', 'explicit', 'spaces', 'tilde', 'cwd', 'fallback', 'short']}
 
 
 def fixtures():
@@ -63,7 +63,8 @@ def check(directory, args, records):
             paths = {label: path / '.config/unlaxer/credentials.json' for label, path in homes.items()}
             paths.update(explicit=folder / 'explicit.json', spaces=folder / '   ',
                          tilde=folder / '~/credentials.json', cwd=folder / '.config/unlaxer/credentials.json',
-                         fallback=folder / '?/.config/unlaxer/credentials.json')
+                         fallback=folder / '?/.config/unlaxer/credentials.json',
+                         short=folder / 's/.config/unlaxer/credentials.json')
             for label, path in paths.items():
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(encode({origin: {'caCertificate': str(ca), 'bearerToken': TOKENS[label]}}))
@@ -77,7 +78,9 @@ def check(directory, args, records):
             if case.get('missingSpaces'):
                 paths['spaces'].unlink()
             home = {'same': homes['passwd'], 'other': homes['environment'], 'unset': None, 'empty': ''}[case['home']]
-            passwd = {'normal': str(homes['passwd']), 'empty': '', 'missing': '!missing', 'error': '!error'}[case.get('passwd', 'normal')]
+            # 'short' is a relative one-byte home, like '/' (systemd DynamicUser) but local.
+            passwd = {'normal': str(homes['passwd']), 'empty': '', 'short': 's', 'missing': '!missing',
+                      'error': '!error'}[case.get('passwd', 'normal')]
             env = isolated_env(library, home, passwd)
             if case.get('retry'):
                 env['UBNF_TEST_PASSWD_RETRY'] = '1'
@@ -91,10 +94,11 @@ def check(directory, args, records):
                                           env=env, cwd=folder, capture_output=True, timeout=15)
             assert probe_result.returncode == 0, 'Java home oracle failed'
             jdk, actual_home = probe_result.stdout.decode().split('\n', 1)
+            # JDK17 keeps any found pw_dir; JDK21 replaces one shorter than two bytes.
+            found = passwd not in ['!missing', '!error']
             expected_home = property_path if property_value is not None else (
-                str(homes['passwd']) if passwd not in ['', '!missing', '!error'] else
-                '' if jdk == '17' and passwd == '' else
-                str(home) if jdk != '17' and home not in [None, ''] else '?')
+                passwd if found and (jdk == '17' or len(passwd) >= 2) else
+                '?' if jdk == '17' or home in [None, ''] else str(home))
             assert actual_home == expected_home, (case['id'], 'unexpected Java home oracle')
             manifest = project / 'ubnf.json'
             manifest.write_bytes(encode({'schemaVersion': 1, 'dependencies': {
