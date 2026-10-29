@@ -19,9 +19,9 @@ from ubnf_package_credentials import ROOT, local_tls_context, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
 LIMIT = 8 * 1024 * 1024
-COUNT = 174
-URI_COUNT = 132
-UNICODE_COUNT = 79
+COUNT = 175
+URI_COUNT = 133
+UNICODE_COUNT = 80
 TOKEN = 'transport-fixture-only-token'
 BODY = b'transport-fixture-private-response'
 HEADER = 'transport-fixture-private-header'

@@ -762,6 +762,15 @@
     "hostHeader": "localhost:{port}"
   },
   {
+    "id": "uri-unicode-percent-hex-compose",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/%4a\u0301",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%4%C3%A1",
+    "hostHeader": "localhost:{port}"
+  },
+  {
     "id": "uri-unicode-percent-encoded-space",
     "kind": "uri",
     "url": "https://localhost:{port}/{id}/\u00e9%20%00%C2%A0",

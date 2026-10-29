@@ -775,7 +775,7 @@
       "issues": [
         960
       ],
-      "observation": "Unicode scalarも既存UTF-16 URI parserで全体構文→scheme/getHost/userinfo/query/fragment/portを検査する。IDNはregistry authorityとしてomit、不正percentと空白はinvalid。送信専用にNFC後の非ASCII UTF-8 bytesを大文字percent encodeし、既存escape/Hostの綴りとraw manifest/cacheを保持する。lockにはsource fieldがない。ASCII接続規則・非scalar送信禁止・exact origin/CA→token/TLS/redirect/期限/上限は不変。Unicode79形を直接/推移的依存・snapshot有無で両resolveに送り、拒否時接続0、target/Hostとraw bytesを検証する。nativeはJDK21/Unicode15を参照し、JDK17/Unicode13に未定義だった50結合文字による版差はBMP/非BMPの2形をjavaJdk17TargetSuffixで固定してskipせず検証する。NFCでbacktickになるU+1FEFのbackend拒否2形は#979に分離し、host別期待値で実行する。#960はPRのレビュー待ち。",
+      "observation": "Unicode scalarもASCIIと同じUTF-16 URI parserで全体構文→scheme/getHost/userinfo/query/fragment/portの順に検査し、IDNはomit、不正percentと非ASCII空白はinvalid。送信用だけNFC後の非ASCII UTF-8 bytesを大文字percent encodeし、既存escape・Host・raw manifest/cacheは保持する（lockにsource fieldはない）。Unicode80形を直接/推移的依存・snapshot有無で両resolveに送り、target/Host/raw bytes・拒否時接続0を照合する。nativeはJDK21/Unicode15を参照し、JDK17の50結合文字の版差2形はjavaJdk17TargetSuffixで固定してJDK17 jobでも実行する。U+1FEFのbackend拒否2形は#979。#960はPRのレビュー待ち。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",

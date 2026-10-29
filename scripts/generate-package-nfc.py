@@ -69,8 +69,10 @@ def generate(java_home):
             '// Extracted data SHA-256: ' + checksum + '\n\n')
     text += '#[rustfmt::skip]\npub(super) const CLASSES: &[(u32, u32, u8)] = &[\n'
     text += ''.join(f'    (0x{a:x}, 0x{b:x}, {k}),\n' for a, b, k in classes) + '];\n\n'
-    text += '#[rustfmt::skip]\npub(super) const DECOMPOSED: &[(u32, &str)] = &[\n'
-    text += ''.join(f'    (0x{cp:x}, "' + ''.join('\\u{' + f'{c:x}' + '}' for c in d) + '"),\n'
+    # Fixed arrays (0-padded; U+0000 never occurs) avoid one pointer and relocation per row.
+    width = max(len(d) for _, d in decomposed)
+    text += f'#[rustfmt::skip]\npub(super) const DECOMPOSED: &[(u32, [u32; {width}])] = &[\n'
+    text += ''.join(f'    (0x{cp:x}, [' + ', '.join(f'0x{c:x}' for c in d + [0] * (width - len(d))) + ']),\n'
                     for cp, d in decomposed) + '];\n\n'
     text += '#[rustfmt::skip]\npub(super) const PAIRS: &[(u32, u32, u32)] = &[\n'
     text += ''.join(f'    (0x{a:x}, 0x{b:x}, 0x{c:x}),\n' for a, b, c in sorted(pairs)) + '];\n'

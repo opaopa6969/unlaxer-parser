@@ -38,10 +38,8 @@ pub(super) fn normalize(source: &str) -> String {
                 units.push((0x11a7 + s % 28, 0));
             }
         } else if let Ok(i) = data::DECOMPOSED.binary_search_by_key(&c, |&(cp, _)| cp) {
-            units.extend(data::DECOMPOSED[i].1.chars().map(|c| {
-                let c = u32::from(c);
-                (c, class(c))
-            }));
+            let decomposed = data::DECOMPOSED[i].1.iter().take_while(|&&c| c != 0);
+            units.extend(decomposed.map(|&c| (c, class(c))));
         } else {
             units.push((c, class(c)));
         }

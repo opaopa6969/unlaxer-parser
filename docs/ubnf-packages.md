@@ -137,7 +137,7 @@ Unicode userinfo / query / fragment は URI が構文受理しても omit、不�
 全角 `／？＃＠：％` は ASCII の区切りへ変換しない。
 非 scalar URL は従来どおり origin の検査だけに parser を使い、HTTP request を作らず送信しない（#939）。
 
-共通 `spec-corpus/package-https-transport.json` の ASCII53形・Unicode79形を、
+共通 `spec-corpus/package-https-transport.json` の ASCII53形・Unicode80形を、
 既存 `HttpsPackageConformanceTest#transportDiagnosticsMatchJavaAcrossClis` で実行する。
 各形は直接依存とローカル親 artifact 経由の推移的依存を両 `deps resolve` に与え、
 snapshot 有無の両方で診断・exit・成功時 lock/cache raw bytes・失敗時 snapshot 不変を照合する。
@@ -164,20 +164,21 @@ IPv4 の10進接続先・末尾 dot 等の接続前失敗は #962 の規則を�
 | `é%2f😀%41%25%ff` | `%C3%A9%2f%F0%9F%98%80%41%25%ff` |
 | `e%CC%81` | `e%CC%81`（escape 越しの合成はしない） |
 | `%65` + U+0301 | `%65%CC%81`（ASCII escape の末尾 `5` は合成されない） |
+| `%4a` + U+0301 | `%4%C3%A1`（末尾の hex 文字 `a` は合成され、送信する escape が崩れる。Java と同じ） |
 | U+212B / `A` + U+030A | `%C3%85` |
 | Hangul U+1100 U+1161 U+11A8 | `%EA%B0%81` |
 | U+1D15E（非 BMP・合成除外） | `%F0%9D%85%97%F0%9D%85%A5` |
 
 native の取得専用 NFC は JDK21 / Unicode15.0 の canonical decomposition・結合クラス・合成対と
 algorithmic Hangul を使う。`scripts/generate-package-nfc.py --java-home <JDK21> --check` で
-JDK から offline 再生成・hash 照合でき、新しい依存 crate や外部プロセスは製品に追加しない。
+JDK から offline 再生成・hash 照合でき（CI の core shard が実行）、新しい依存 crate や外部プロセスは製品に追加しない。
 結合文字列は安定ソートで並べ、長い結合 run に二乗の処理を持ち込まない。
 この表と処理は native の明示取得だけで、WASM / parser / package 本文には適用しない。
 
 **JDK 自身の版差**: JDK17（Unicode13）と21（Unicode15）は canonical decomposition / 合成対が同じだが、
 JDK21 では50文字に新しい結合クラスが付く。たとえば `a` U+1AC1 U+0323 は21/nativeでは
 `%E1%BA%A1%E1%AB%81`、17では `a%E1%AB%81%CC%A3` となる。
-U+1E4EC を含む非 BMP の対照も共通 fixture の `javaJdk17TargetSuffix` に固定して両方を実行する。
+U+1E4EC を含む非 BMP の対照も共通 fixture の `javaJdk17TargetSuffix` に固定し、CI の JDK17 job も同じ transport メソッドを実行する。
 native は主 CI の JDK21 を参照する。入力だけでは実行する JDK の版を選べないための契約であり、
 JDK17 の URI 受理・診断を変更したり、この2形を skip したりしない。
 
@@ -319,7 +320,7 @@ ureq の `limit` は指定量を読み切るとエラーになるため、上限
 5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満を要求し、期限を外すと落ちる。
 待つだけの2形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
 
-共通 `spec-corpus/package-https-transport.json` の transport42形と URL132形を `HttpsPackageConformanceTest` から実行する。
+共通 `spec-corpus/package-https-transport.json` の transport42形と URL133形を `HttpsPackageConformanceTest` から実行する。
 JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を snapshot 有無の両方で照合する。
 待たない形の Java `deps resolve` は、テスト専用の `CodegenBatchHost` が1つの JVM で `CodegenMain.run` を順に呼ぶ
 （JVM 起動を1回にするため。呼出しごとに credentials override を読み直す）。両 JDK で、1呼出し1 JVM の実 CLI と
@@ -680,7 +681,7 @@ Java の `ubnf/packageSource` も、内部 UTF-16 String と stdio encoder が `
 計18件は #959 の host 別期待値で実行し、完了扱いにしない。
 
 正常な対の HTTPS host / userinfo の診断と path の request target は #960 で上記の共通契約へ揃えた。
-package JSON corpus の4診断差と2 request target差の host 別期待値を除き、共通期待値で実行する。
+package JSON corpus にあった4診断差と2 request target差の host 別期待値は削除し、共通期待値で実行する。
 
 共通 `spec-corpus/package-json-acceptance.json` は481件（既存400＋#939 の81）。両実 stdio では全件を実行し、
 本文の代表では definition の UTF-16 range・packageSource・後続 request も照合する。

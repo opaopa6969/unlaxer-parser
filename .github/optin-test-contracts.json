@@ -370,11 +370,11 @@
     }
   },
   "jdk17-parity": {
-    "description": "maven.yml / build-jdk17: 明示した Unicode/frontend・HTTPS credentials（JDK17 別期待値を含む）の opt-in。通常 package の opt-in skip と公開履歴は対象外。",
+    "description": "maven.yml / build-jdk17: 明示した Unicode/frontend・HTTPS credentials/transport（JDK17 別期待値を含む）の opt-in。通常 package の opt-in skip と公開履歴は対象外。",
     "reports": ["unlaxer-common-jdk17/target/surefire-reports", "unlaxer-dsl-jdk17/target/surefire-reports"],
     "properties": {"rustConformance": "true"},
     "required": {
-      "org.unlaxer.dsl.codegen.HttpsPackageConformanceTest": ["credentialsLocationsMatchJavaHomeAndPaths", "credentialsJsonMatchesAcrossClis"],
+      "org.unlaxer.dsl.codegen.HttpsPackageConformanceTest": ["credentialsLocationsMatchJavaHomeAndPaths", "credentialsJsonMatchesAcrossClis", "transportDiagnosticsMatchJavaAcrossClis"],
       "org.unlaxer.dsl.codegen.CliStderrConformanceTest": ["outputFailuresNameTheFailedPath", "outputPathsMatchJavaAndRetainNativeLinkPolicy", "malformedUtf8MatchesEachJavaReader", "readinessRendersEveryDiagnosticAsJavaRecords", "syntaxKeepsDocumentedNativeLocations", "profileInputIoAndReadableOutputsMatchJava"],
       "org.unlaxer.parser.elementary.UnicodeIgnoreCaseWordParserTest": ["everyScalarMatchesOfficialUnicode17SimpleMappings", "sharedOriginalTextSpansRollbackLookaheadAndFirstSets", "legacyFirstSetsCannotExcludeInverseCaseEquivalents", "invertedAndMatchOnlyKeepWordParserCursorContract", "derivedWordsKeepPinnedSemanticsAndMalformedUtf16DoesNotMatch", "longWordsScanOnce"],
       "org.unlaxer.dsl.codegen.CaseInsensitiveConformanceTest": ["generatedJavaMatchesIndependentOracle", "emptyCiIsRejectedEvenWhenUnused", "documentedLegacyJdkDeltaIsExplicit", "bothRustFrontendsCompileAndMatchIndependentOracle"],
