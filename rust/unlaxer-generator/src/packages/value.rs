@@ -1,4 +1,5 @@
 //! Input-only JSON tree: Gson member order, without serde_json feature unification.
+use super::text::Text;
 use std::collections::{btree_map, BTreeMap};
 use std::ops::Index;
 
@@ -9,7 +10,7 @@ pub(super) enum Value {
     Null,
     Bool(bool),
     Number(Number),
-    String(String),
+    String(Text),
     Array(Vec<Value>),
     Object(Object),
 }
@@ -25,7 +26,7 @@ pub(super) struct Object {
 
 #[derive(Clone, Debug)]
 pub(super) struct Entry {
-    key: String,
+    key: Text,
     value: Value,
     sorted: usize,
 }
@@ -33,9 +34,9 @@ pub(super) struct Entry {
 impl Object {
     /// Build from members in written order. Gson STRICT (`LinkedTreeMap.put`) keeps the
     /// first position of a repeated key and the value of its last occurrence.
-    pub(super) fn from_entries(members: Vec<(String, Value)>) -> Self {
-        let mut kept: Vec<(String, Value)> = Vec::with_capacity(members.len());
-        let mut positions: BTreeMap<String, usize> = BTreeMap::new();
+    pub(super) fn from_entries(members: Vec<(Text, Value)>) -> Self {
+        let mut kept: Vec<(Text, Value)> = Vec::with_capacity(members.len());
+        let mut positions: BTreeMap<Text, usize> = BTreeMap::new();
         for (key, value) in members {
             match positions.entry(key) {
                 btree_map::Entry::Occupied(position) => kept[*position.get()].1 = value,
@@ -48,7 +49,7 @@ impl Object {
         Self::from_unique(kept, positions.into_values().collect())
     }
 
-    fn from_unique(members: Vec<(String, Value)>, sorted: Vec<usize>) -> Self {
+    fn from_unique(members: Vec<(Text, Value)>, sorted: Vec<usize>) -> Self {
         let entries = members
             .into_iter()
             .zip(sorted)
@@ -64,11 +65,18 @@ impl Object {
     pub(super) fn get(&self, key: &str) -> Option<&Value> {
         let position = self
             .entries
-            .binary_search_by(|entry| self.entries[entry.sorted].key.as_str().cmp(key))
+            .binary_search_by(|entry| self.entries[entry.sorted].key.cmp_str(key))
             .ok()?;
         Some(&self.entries[self.entries[position].sorted].value)
     }
 
+    pub(super) fn contains_text(&self, key: &Text) -> bool {
+        self.entries
+            .binary_search_by(|entry| self.entries[entry.sorted].key.cmp(key))
+            .is_ok()
+    }
+
+    #[cfg(test)]
     pub(super) fn contains_key(&self, key: &str) -> bool {
         self.get(key).is_some()
     }
@@ -81,11 +89,11 @@ impl Object {
         self.entries.is_empty()
     }
 
-    pub(super) fn keys(&self) -> impl Iterator<Item = &String> {
+    pub(super) fn keys(&self) -> impl Iterator<Item = &Text> {
         self.entries.iter().map(|entry| &entry.key)
     }
 
-    pub(super) fn into_entries(self) -> Vec<(String, Value)> {
+    pub(super) fn into_entries(self) -> Vec<(Text, Value)> {
         self.entries
             .into_iter()
             .map(|entry| (entry.key, entry.value))
@@ -93,7 +101,7 @@ impl Object {
     }
 }
 
-type Member<'a> = (&'a String, &'a Value);
+type Member<'a> = (&'a Text, &'a Value);
 
 impl<'a> IntoIterator for &'a Object {
     type Item = Member<'a>;
@@ -133,6 +141,14 @@ impl Value {
     }
 
     pub(super) fn as_str(&self) -> Option<&str> {
+        if let Self::String(value) = self {
+            value.as_str()
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn as_text(&self) -> Option<&Text> {
         if let Self::String(value) = self {
             Some(value)
         } else {

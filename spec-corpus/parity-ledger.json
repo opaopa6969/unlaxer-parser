@@ -25,43 +25,6 @@
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
-    "949": {"state": "OPEN", "title": "parity(frontend): REGEX 宣言後の余分なセミコロンで Java の P-SYNTAX と native の E-REGEX-RETIRED が異なる"},
-    "952": {"state": "OPEN", "title": "parity(cli): native generate/Playground の出力先パスの扱い（symlink 祖先・`..`・読取り専用の既存生成物・成功時 stdout の綴り）が Java と違う（#937 レビュー由来）"},
-    "953": {"state": "OPEN", "title": "parity(cli): playground --profile の profile ファイル入力 I/O で native の終了コードと stderr が Java と違う（#937 レビュー由来）"},
-    "943": {"state": "OPEN", "title": "HTTPS package の credentials JSON の受理と診断"},
-    "956": {"state": "OPEN", "title": "credentials 受理後の TLS・HTTP 失敗診断を Java に揃える"},
-    "923": {"state": "OPEN", "title": "parity(check): 字句エラーと @whitespace の組込み名の同居を Java 参照契約へ揃える"},
-    "910": {"state": "OPEN", "title": "parity(generator): feature と E-LEXICAL の check/generate 診断を Java-host に揃える"},
-    "916": {"state": "OPEN", "title": "parity(check): @lexicalContext と字句エラーが同居すると Java の check が例外で終わる（#910 レビュー由来）"},
-    "917": {"state": "OPEN", "title": "parity(generator): native generate の前段検査（typeof・lexicalContext 等）が字句・adapter・contract・feature より先に出て、Java-host と最初のエラーが違う（#910 レビュー由来）"},
-    "918": {"state": "OPEN", "title": "parity(generator): 不正・重複した @ubnf の check/generate 診断が Java-host と異なる（#910 レビュー由来）"},
-    "897": {
-      "state": "OPEN",
-      "title": "parity(generator): adapter/token-contract 診断の整列・重複 key・空白判定を Java の check/generate に揃える（#885 レビュー由来）"
-    },
-    "892": {"state": "CLOSED", "title": "parity(dap): projected token の論理 CP 範囲が原文末尾を越えるときの Java/Rust DAP の差"},
-    "899": {"state": "CLOSED", "title": "parity(dap): CRLF 内部を指す token 位置で Java は launch 後に局所失敗し Rust は launch 時に拒否する（#892 レビュー）"},
-    "900": {"state": "CLOSED", "title": "parity(dap): stackTrace 以外の失敗 response の message / body が Java（LSP4J）と異なる（#892 レビュー）"},
-    "938": {"state": "OPEN", "title": "parity(dap): launch 直後の未設定 session の表示と、command 先行 frame の複数要素引数配列で Java/Rust DAP が異なる（#935 レビュー）"},
-    "945": {"state": "OPEN", "title": "parity(dap): stackTrace の totalFrames、event と response の順序、準備失敗の output 本文が Java/Rust DAP で異なる（#944 レビュー）"},
-    "905": {"state": "CLOSED", "title": "parity: Rust DAP が Java（Gson）の受理する型の緩い引数を拒否し、parse 失敗の形も異なる"},
-    "864": {"state": "OPEN", "title": "parity(lsp): UBNF authoring serverのRust利用経路をJava基準へ揃える"},
-    "885": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の全診断・profile 再設定を Java 契約へ揃える（#864 後続）"},
-    "886": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の navigation・編集支援・packageSource と native 配布（#864 後続）"},
-    "901": {"state": "OPEN", "title": "parity(lsp): UBNF authoring の FQN quick fix・signatureHelp・semanticTokens（#886 後続）"},
-    "902": {"state": "OPEN", "title": "parity(lsp): authoring の Unicode/frontend/URI 残差と native platform・起動失敗契約（#886 後続）"},
-    "893": {
-      "state": "OPEN",
-      "title": "parity(lsp): UBNF validator の意味解析・Java classpath 診断を完全接続する（#885 後続）"
-    },
-    "894": {
-      "state": "OPEN",
-      "title": "parity(lsp): UBNF syntax・module 全診断と parse-status hover を一致させる（#885 後続）"
-    },
-    "895": {
-      "state": "OPEN",
-      "title": "parity(lsp): UBNF initialize options・unlaxer/configure・profile 契約を移植する（#885 後続）"
-    },
     "111": {
       "state": "OPEN",
       "title": "Rust full-spec: UBNF・context/combinatorからtinyexpression native toolchainまで"
@@ -478,6 +441,10 @@
       "state": "CLOSED",
       "title": "parity(dap): detached generated tokenのtextと位置をJava/Rust双方で表示・検証する"
     },
+    "864": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF authoring serverのRust利用経路をJava基準へ揃える"
+    },
     "869": {
       "state": "OPEN",
       "title": "check: commonField の容器の綴り違いと通常 choice の型比較を Java-host に揃える"
@@ -498,9 +465,57 @@
       "state": "OPEN",
       "title": "parity: 外部入口の成功前に custom parser が読む途中の成功診断 CP が Java と異なる（#878 の制限）"
     },
+    "885": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF authoring の全診断・profile 再設定を Java 契約へ揃える（#864 後続）"
+    },
+    "886": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF authoring の navigation・編集支援・packageSource と native 配布（#864 後続）"
+    },
     "889": {
       "state": "CLOSED",
       "title": "parity(dap): consumed leaf の TokenSource::Projected を Rust token DAP で表示するか対象外として記録する"
+    },
+    "892": {
+      "state": "CLOSED",
+      "title": "parity(dap): projected token の論理 CP 範囲が原文末尾を越えるときの Java/Rust DAP の差"
+    },
+    "893": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF validator の意味解析・Java classpath 診断を完全接続する（#885 後続）"
+    },
+    "894": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF syntax・module 全診断と parse-status hover を一致させる（#885 後続）"
+    },
+    "895": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF initialize options・unlaxer/configure・profile 契約を移植する（#885 後続）"
+    },
+    "897": {
+      "state": "OPEN",
+      "title": "parity(generator): adapter/token-contract 診断の整列・重複 key・空白判定を Java の check/generate に揃える（#885 レビュー由来）"
+    },
+    "899": {
+      "state": "CLOSED",
+      "title": "parity(dap): CRLF 内部を指す token 位置で Java は launch 後に局所失敗し Rust は launch 時に拒否する（#892 レビュー）"
+    },
+    "900": {
+      "state": "CLOSED",
+      "title": "parity(dap): stackTrace 以外の失敗 response の message / body が Java（LSP4J）と異なる（#892 レビュー）"
+    },
+    "901": {
+      "state": "OPEN",
+      "title": "parity(lsp): UBNF authoring の FQN quick fix・signatureHelp・semanticTokens（#886 後続）"
+    },
+    "902": {
+      "state": "OPEN",
+      "title": "parity(lsp): authoring の Unicode/frontend/URI 残差と native platform・起動失敗契約（#886 後続）"
+    },
+    "905": {
+      "state": "CLOSED",
+      "title": "parity: Rust DAP が Java（Gson）の受理する型の緩い引数を拒否し、parse 失敗の形も異なる"
     },
     "907": {
       "state": "OPEN",
@@ -510,6 +525,10 @@
       "state": "CLOSED",
       "title": "package manifest/lock の読取りが通常ファイル・上限の検査を通らない（Rust は FIFO で停止、Java は local import と表示）"
     },
+    "910": {
+      "state": "OPEN",
+      "title": "parity(generator): feature と E-LEXICAL の check/generate 診断を Java-host に揃える"
+    },
     "911": {
       "state": "OPEN",
       "title": "Java disk reader: manifest/lock を含む差替え競合の nonblocking open と正確な handle 型検査（#907/#908 残り）"
@@ -518,6 +537,22 @@
       "state": "CLOSED",
       "title": "package artifact（cache / local: 依存）の読取りが通常ファイル・上限の検査を通らない（Rust は FIFO・/dev/zero で停止）"
     },
+    "914": {
+      "state": "CLOSED",
+      "title": "package JSON の先頭 BOM: Java は受理、Rust は invalid JSON で拒否する"
+    },
+    "916": {
+      "state": "OPEN",
+      "title": "parity(check): @lexicalContext と字句エラーが同居すると Java の check が例外で終わる（#910 レビュー由来）"
+    },
+    "917": {
+      "state": "OPEN",
+      "title": "parity(generator): native generate の前段検査（typeof・lexicalContext 等）が字句・adapter・contract・feature より先に出て、Java-host と最初のエラーが違う（#910 レビュー由来）"
+    },
+    "918": {
+      "state": "OPEN",
+      "title": "parity(generator): 不正・重複した @ubnf の check/generate 診断が Java-host と異なる（#910 レビュー由来）"
+    },
     "919": {
       "state": "CLOSED",
       "title": "package artifact の不正 UTF-8 診断が Java と Rust で異なる"
@@ -525,6 +560,10 @@
     "921": {
       "state": "CLOSED",
       "title": "package local: 依存のパス解決が Java（字句的 normalize）と Rust（OS 解決）で異なる"
+    },
+    "923": {
+      "state": "OPEN",
+      "title": "parity(check): 字句エラーと @whitespace の組込み名の同居を Java 参照契約へ揃える"
     },
     "926": {
       "state": "CLOSED",
@@ -546,10 +585,49 @@
       "state": "OPEN",
       "title": "parity(cli): 出力先の書込み失敗・不正 UTF-8・Playground readiness・構文エラーの stderr が Java と native で違う（#936 レビュー由来）"
     },
-    "939": {"state": "OPEN", "title": "package JSON: 単独サロゲートを含む artifact の file/entry/source 本文と HTTPS source の残差（#926 後続）"},
-    "914": {
-      "state": "CLOSED",
-      "title": "package JSON の先頭 BOM: Java は受理、Rust は invalid JSON で拒否する"
+    "938": {
+      "state": "OPEN",
+      "title": "parity(dap): launch 直後の未設定 session の表示と、command 先行 frame の複数要素引数配列で Java/Rust DAP が異なる（#935 レビュー）"
+    },
+    "939": {
+      "state": "OPEN",
+      "title": "package JSON: 単独サロゲートを含む artifact の file/entry/source 本文と HTTPS source の残差（#926 後続）"
+    },
+    "943": {
+      "state": "OPEN",
+      "title": "HTTPS package の credentials JSON の受理と診断"
+    },
+    "945": {
+      "state": "OPEN",
+      "title": "parity(dap): stackTrace の totalFrames、event と response の順序、準備失敗の output 本文が Java/Rust DAP で異なる（#944 レビュー）"
+    },
+    "949": {
+      "state": "OPEN",
+      "title": "parity(frontend): REGEX 宣言後の余分なセミコロンで Java の P-SYNTAX と native の E-REGEX-RETIRED が異なる"
+    },
+    "952": {
+      "state": "OPEN",
+      "title": "parity(cli): native generate/Playground の出力先パスの扱い（symlink 祖先・`..`・読取り専用の既存生成物・成功時 stdout の綴り）が Java と違う（#937 レビュー由来）"
+    },
+    "953": {
+      "state": "OPEN",
+      "title": "parity(cli): playground --profile の profile ファイル入力 I/O で native の終了コードと stderr が Java と違う（#937 レビュー由来）"
+    },
+    "956": {
+      "state": "OPEN",
+      "title": "credentials 受理後の TLS・HTTP 失敗診断を Java に揃える"
+    },
+    "959": {
+      "state": "OPEN",
+      "title": "package UTF-16 本文を UBNF・AST・LSP・生成出力まで lossless に扱う"
+    },
+    "960": {
+      "state": "OPEN",
+      "title": "正常 Unicode HTTPS URL の診断と request target encoding"
+    },
+    "962": {
+      "state": "OPEN",
+      "title": "ASCII HTTPS URL の構文受理を Java URI.create に揃える"
     }
   },
   "entries": [
@@ -591,21 +669,71 @@
     {
       "id": "package-json-surrogate-text",
       "category": "contract",
-      "title": "package JSON の単独サロゲート文字列の暫定境界",
+      "title": "package JSON の lossless UTF-16 と field 境界",
       "hosts": "Java Gson / Rust package JSON reader（両 stdio・Java-host Rust/native Rust/Java flag CLI）",
       "issues": [
         926,
-        939
+        939,
+        959,
+        960
       ],
-      "observation": "#914は先頭BOMを1つだけ受理。#926のlocal source・ASCII形式のID/version/lock・未使用metadataはJavaの受理と診断に揃える。artifact.entry、filesのkey/本文、dependencies.*.sourceのHTTPSはUTF-16をlosslessに表せないため、Javaを狭めずRustの既存invalid JSONを維持する意図した暫定差。共通400件（#942の順序69件・#941の文書166件・#947のschema38件を含む）のうち13件は両hostを実行してhost別oracleを照合し、skipしない。これらのfieldとsource位置/取得境界の完全対応は#939の受け入れ条件で追跡する。#914/#926はPR #940でCLOSED。#942で入力objectの記述順と重複keyの位置/値をJavaに揃え、lock/cacheの辞書順出力は維持する。raw hash→strict UTF-8→JSON、readerとpath規則は維持する。#941で空文書・非object最上位の診断とGsonの深さ255/256境界を揃える。#947でdependency・files/entry・lockのschema診断をJavaに揃える。数値を表記のまま保持し、未使用の範囲外数値も受理する。package専用の明示スタックを浅い入力にも共用し、feature統合に依存せず深さ・順序・メモリ水準を維持する。",
+      "observation": "#939 は package 入力に通常 UTF-8 / 非 scalar UTF-16 units の Text を導入し、entry・files key/未使用本文・HTTPS source を復元する。Java の経路・受理集合・診断と raw bytes は不変。schema/ID/path の順序、entry照合、Linux Path拒否、URI→credentials→HTTP encoding の境界をJavaへ揃える。正常URLのtransportは変えず、非scalarURLはJDK17/21のURI.createをUTF-16 unitsへ移植した判定でoriginだけを求め、置換URLを作らず送信しない。既存13 gapの10件と全13件のresolveは一致。実読取り3 commentのloadと追加15件は#959、正常対URLの4診断差とrequest targetは#960へ分離し、完了扱いにしない。共通481件で両stdio/両resolve、既存400＋代表追加13形で3 CLI生成を比較。raw hash→UTF-8→JSON、8MiB reader、深さ255、記述順、数値表記、32byte Value、parserホットパスを維持する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",
         "scripts/ubnf_package_json.py",
         "rust/unlaxer-generator/src/packages/json.rs",
         "rust/unlaxer-generator/src/packages/value.rs",
+        "rust/unlaxer-generator/src/packages/text.rs",
+        "rust/unlaxer-generator/src/packages/java_uri.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/PackageJsonAcceptanceConformanceTest.java",
         "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
+      ]
+    },
+    {
+      "id": "package-source-utf16",
+      "category": "unresolved",
+      "title": "package 本文の UTF-16 と UBNF/AST/stdio/生成出力",
+      "hosts": "Java / Rust native",
+      "issues": [
+        959
+      ],
+      "observation": "Java は単独サロゲートを含む comment・未使用 literal を解析し、使用 literal は生成UTF-8書込みで失敗する。Rust は Text にlossless保持するが実読取りを明示診断で拒否する。共通18件をskipせずhost別oracleで比較し、definitionのUTF-16 range、packageSourceのwire、生成時の部分出力を含める。resolve/未使用本文は一致する。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-json-acceptance.json",
+        "scripts/ubnf_package_json.py"
+      ]
+    },
+    {
+      "id": "package-unicode-url",
+      "category": "unresolved",
+      "title": "正常 Unicode HTTPS URL の診断と request target",
+      "hosts": "Java / Rust native",
+      "issues": [
+        960
+      ],
+      "observation": "正常対のhost/userinfoはJavaのomit診断とRustのinvalid URLが異なる。正常pathはJavaがpercent encode、Rustが生UTF-8のrequest targetを送る。#939は通常URL経路を変えず、共通4診断差と直接/推移的pathのwireをlocal TLSで記録する。不正percentの受理も#960で追跡する。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-json-acceptance.json",
+        "scripts/ubnf_package_json.py"
+      ]
+    },
+    {
+      "id": "package-ascii-url",
+      "category": "unresolved",
+      "title": "ASCII HTTPS URL の構文受理と診断",
+      "hosts": "Java URI.create / Rust ureq::http::Uri（両 deps resolve）",
+      "issues": [
+        962
+      ],
+      "observation": "単独サロゲートを含まないASCIIのHTTPS sourceで、pathの[ ]をJavaはinvalid HTTPS artifact URLで拒否しRustは送信して成功する。port 65536以上・;・非数字・+、hostname labelの先頭/末尾-や空label、percent escapeを含むauthorityはJavaがomit診断、Rustは接続失敗またはinvalid URL。#939の非scalar URLはjava_uri.rsでJavaと一致させたが、scalar URLの既存経路は変えず#962で追跡する。#956のtransport文言、#958のcredentials場所、#960の正常Unicode URLとは別。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "rust/unlaxer-generator/src/package_fetch.rs",
+        "rust/unlaxer-generator/src/packages/java_uri.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFPackageFetcher.java"
       ]
     },
     {
@@ -2098,23 +2226,59 @@
     }
   ],
   "corpora": [
-    {"path": "spec-corpus/cli-stderr.json", "fields": {"java": 1, "nativeSyntax": 2, "rust": 1}, "entries": ["cli-stderr-presentation"]},
+    {
+      "path": "spec-corpus/cli-stderr.json",
+      "fields": {
+        "java": 1,
+        "nativeSyntax": 2,
+        "rust": 1
+      },
+      "entries": [
+        "cli-stderr-presentation"
+      ]
+    },
     {
       "path": "spec-corpus/package-json-acceptance.json",
       "fields": {
-        "rustLoadError": 13,
-        "rustResolveError": 13
+        "java": 2,
+        "rust": 2,
+        "rustLoadError": 18,
+        "rustLoadExit": 3,
+        "rustLoadPrefix": 12,
+        "rustResolveError": 4
       },
       "entries": [
-        "package-json-surrogate-text"
+        "package-json-surrogate-text",
+        "package-source-utf16",
+        "package-unicode-url"
       ]
     },
-    {"path": "spec-corpus/feature-diagnostics/ubnf-version.json", "fields": {"javaFirst": 72}, "entries": ["host-bindings"]},
-    {"path": "spec-corpus/feature-diagnostics/whitespace.json", "fields": {"javaFirst": 2}, "entries": ["host-bindings"]},
+    {
+      "path": "spec-corpus/feature-diagnostics/ubnf-version.json",
+      "fields": {
+        "javaFirst": 72
+      },
+      "entries": [
+        "host-bindings"
+      ]
+    },
+    {
+      "path": "spec-corpus/feature-diagnostics/whitespace.json",
+      "fields": {
+        "javaFirst": 2
+      },
+      "entries": [
+        "host-bindings"
+      ]
+    },
     {
       "path": "spec-corpus/ubnf-authoring-lsp/cases.json",
-      "fields": {"nativeHoverContains": 1},
-      "entries": ["ubnf-authoring-lsp"]
+      "fields": {
+        "nativeHoverContains": 1
+      },
+      "entries": [
+        "ubnf-authoring-lsp"
+      ]
     },
     {
       "path": "conformance/chain-reset-after-failure/nested-boundary-differences.tsv",
@@ -2682,7 +2846,15 @@
         "host-bindings"
       ]
     },
-    {"path": "docs/fixtures/dap-failures/wire.json", "fields": {"rustMessages": 47}, "entries": ["dap-wire-contract"]}
+    {
+      "path": "docs/fixtures/dap-failures/wire.json",
+      "fields": {
+        "rustMessages": 47
+      },
+      "entries": [
+        "dap-wire-contract"
+      ]
+    }
   ],
   "test_markers": [
     {
