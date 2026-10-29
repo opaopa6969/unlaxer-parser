@@ -27,6 +27,7 @@
   "issues": {
     "959": {"state": "OPEN", "title": "package UTF-16 本文を UBNF・AST・LSP・生成出力まで lossless に扱う"},
     "960": {"state": "OPEN", "title": "正常 Unicode HTTPS URL の診断と request target encoding"},
+    "962": {"state": "OPEN", "title": "ASCII HTTPS URL の構文受理を Java URI.create に揃える"},
     "943": {"state": "OPEN", "title": "HTTPS package の credentials JSON の受理と診断"},
     "956": {"state": "OPEN", "title": "credentials 受理後の TLS・HTTP 失敗診断を Java に揃える"},
     "923": {"state": "OPEN", "title": "parity(check): 字句エラーと @whitespace の組込み名の同居を Java 参照契約へ揃える"},
@@ -598,7 +599,7 @@
         959,
         960
       ],
-      "observation": "#939 は package 入力に通常 UTF-8 / 非 scalar UTF-16 units の Text を導入し、entry・files key/未使用本文・HTTPS source を復元する。Java の経路・受理集合・診断と raw bytes は不変。schema/ID/path の順序、entry照合、Linux Path拒否、URI→credentials→HTTP encoding の境界をJavaへ揃える。正常URLのtransportは変えず、非scalarURLのprobeは送信しない。既存13 gapの10件と全13件のresolveは一致。実読取り3 commentのloadと追加15件は#959、正常対URLの4診断差とrequest targetは#960へ分離し、完了扱いにしない。共通472件で両stdio/両resolve、既存400＋代表追加13形で3 CLI生成を比較。raw hash→UTF-8→JSON、8MiB reader、深さ255、記述順、数値表記、32byte Value、parserホットパスを維持する。",
+      "observation": "#939 は package 入力に通常 UTF-8 / 非 scalar UTF-16 units の Text を導入し、entry・files key/未使用本文・HTTPS source を復元する。Java の経路・受理集合・診断と raw bytes は不変。schema/ID/path の順序、entry照合、Linux Path拒否、URI→credentials→HTTP encoding の境界をJavaへ揃える。正常URLのtransportは変えず、非scalarURLはJDK17/21のURI.createをUTF-16 unitsへ移植した判定でoriginだけを求め、置換URLを作らず送信しない。既存13 gapの10件と全13件のresolveは一致。実読取り3 commentのloadと追加15件は#959、正常対URLの4診断差とrequest targetは#960へ分離し、完了扱いにしない。共通481件で両stdio/両resolve、既存400＋代表追加13形で3 CLI生成を比較。raw hash→UTF-8→JSON、8MiB reader、深さ255、記述順、数値表記、32byte Value、parserホットパスを維持する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",
@@ -606,6 +607,7 @@
         "rust/unlaxer-generator/src/packages/json.rs",
         "rust/unlaxer-generator/src/packages/value.rs",
         "rust/unlaxer-generator/src/packages/text.rs",
+        "rust/unlaxer-generator/src/packages/java_uri.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/PackageJsonAcceptanceConformanceTest.java",
         "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
       ]
@@ -638,6 +640,22 @@
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",
         "scripts/ubnf_package_json.py"
+      ]
+    },
+    {
+      "id": "package-ascii-url",
+      "category": "unresolved",
+      "title": "ASCII HTTPS URL の構文受理と診断",
+      "hosts": "Java URI.create / Rust ureq::http::Uri（両 deps resolve）",
+      "issues": [
+        962
+      ],
+      "observation": "単独サロゲートを含まないASCIIのHTTPS sourceで、pathの[ ]をJavaはinvalid HTTPS artifact URLで拒否しRustは送信して成功する。port 65536以上・;・非数字・+、hostname labelの先頭/末尾-や空label、percent escapeを含むauthorityはJavaがomit診断、Rustは接続失敗またはinvalid URL。#939の非scalar URLはjava_uri.rsでJavaと一致させたが、scalar URLの既存経路は変えず#962で追跡する。#956のtransport文言、#958のcredentials場所、#960の正常Unicode URLとは別。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "rust/unlaxer-generator/src/package_fetch.rs",
+        "rust/unlaxer-generator/src/packages/java_uri.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFPackageFetcher.java"
       ]
     },
     {

@@ -91,78 +91,21 @@ impl Text {
         }
     }
 
-    /// An ASCII-only URI for syntax/origin/credential validation, never for I/O.
-    /// The caller must reject before transport: percent-encoding cannot make an
-    /// unpaired Java code unit into a valid request path.
-    pub(super) fn https_probe(&self) -> Result<String, String> {
+    /// The credentials origin of a non-scalar HTTPS source, decided by Java's
+    /// `URI.create` rules over the UTF-16 units. Nothing here is ever sent: Java's
+    /// HTTP request encoder cannot encode an unpaired unit, so the caller rejects
+    /// after the credentials/CA/token checks. Scalar URLs keep `fetch(&str)`.
+    pub(super) fn https_origin(&self) -> Result<String, String> {
         let Self::Units(units) = self else {
             unreachable!("surrogate URL only")
         };
-        let invalid = || super::error("invalid HTTPS artifact URL");
-        for (i, unit) in units.iter().copied().enumerate() {
-            if unit <= 0x20
-                || (0x7f..=0x9f).contains(&unit)
-                || matches!(
-                    unit,
-                    0x22 | 0x3c | 0x3e | 0x5c | 0x5e | 0x60 | 0x7b | 0x7c | 0x7d
-                )
-            {
-                return Err(invalid());
-            }
-            if unit == 0x25
-                && !units.get(i + 1..i + 3).is_some_and(|hex| {
-                    hex.iter()
-                        .all(|u| *u < 128 && (*u as u8).is_ascii_hexdigit())
-                })
-            {
-                return Err(invalid());
-            }
+        match super::java_uri::classify(units) {
+            super::java_uri::Https::Origin(origin) => Ok(origin),
+            super::java_uri::Https::Invalid => Err(super::error("invalid HTTPS artifact URL")),
+            super::java_uri::Https::Omit => Err(super::error(
+                "HTTPS artifact URL must omit credentials, query and fragment",
+            )),
         }
-        let omit = || super::error("HTTPS artifact URL must omit credentials, query and fragment");
-        let prefix: Vec<_> = "https://".encode_utf16().collect();
-        if !units.starts_with(&prefix) {
-            return Err(omit());
-        }
-        let authority = units[prefix.len()..]
-            .split(|u| matches!(*u, 0x2f | 0x3f | 0x23))
-            .next()
-            .unwrap();
-        // URI.create permits registry authorities, whose getHost() is null. HTTP's
-        // Uri parser would reject these earlier with a different diagnostic.
-        if authority.is_empty() || authority.iter().any(|u| *u > 127) {
-            if authority.contains(&0x5b) || authority.contains(&0x5d) {
-                return Err(invalid());
-            }
-            return Err(omit());
-        }
-        if units.iter().filter(|u| **u == 0x23).count() > 1 {
-            return Err(invalid());
-        }
-        let mut probe = String::new();
-        for unit in char::decode_utf16(units.iter().copied()) {
-            match unit {
-                Ok(c) if c.is_ascii() => probe.push(c),
-                Ok(c) => {
-                    if c.is_whitespace() {
-                        return Err(invalid());
-                    }
-                    for byte in c.encode_utf8(&mut [0; 4]).bytes() {
-                        probe.push_str(&format!("%{byte:02X}"));
-                    }
-                }
-                Err(e) => {
-                    let unit = e.unpaired_surrogate();
-                    for byte in [
-                        0xe0 | (unit >> 12) as u8,
-                        0x80 | ((unit >> 6) & 0x3f) as u8,
-                        0x80 | (unit & 0x3f) as u8,
-                    ] {
-                        probe.push_str(&format!("%{byte:02X}"));
-                    }
-                }
-            }
-        }
-        Ok(probe)
     }
 
     pub(super) fn path_text(&self) -> Result<&str, String> {

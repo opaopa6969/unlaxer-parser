@@ -80,7 +80,7 @@ public class PackageJsonAcceptanceConformanceTest {
             "--classpath", System.getProperty("java.class.path"),
             "--rust", root.resolve("rust/target/debug/unlaxer").toString(),
             "--output", output.toString()), Path.of("target/package-json-cli.log"), 1000);
-        assertEquals("all raw JSON cases executed", 472,
+        assertEquals("all raw JSON cases executed", 481,
             JsonParser.parseString(Files.readString(output)).getAsJsonArray().size());
     }
 

@@ -7,15 +7,6 @@ fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
 }
 pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
-    fetch_checked(source, false)
-}
-
-// The probe is only for URI/origin/credentials checks. Never send a rewritten URL.
-pub(crate) fn reject_surrogate_path(probe: &str) -> Result<Vec<u8>, String> {
-    fetch_checked(probe, true)
-}
-
-fn fetch_checked(source: &str, surrogate_path: bool) -> Result<Vec<u8>, String> {
     let uri: ureq::http::Uri = source
         .parse()
         .map_err(|_| error("invalid HTTPS artifact URL"))?;
@@ -42,7 +33,40 @@ fn fetch_checked(source: &str, surrogate_path: bool) -> Result<Vec<u8>, String> 
             .filter(|p| *p != 443)
             .map_or(String::new(), |p| format!(":{p}"))
     );
-    let credentials = credentials(&origin)?;
+    let (agent, token) = client(&origin)?;
+    let mut request = agent.get(source);
+    if let Some(token) = token {
+        request = request.header("Authorization", format!("Bearer {token}"));
+    }
+    let mut response = request
+        .call()
+        .map_err(|_| error("HTTPS artifact retrieval failed (TLS, timeout, status or redirect)"))?;
+    if response.status() != ureq::http::StatusCode::OK {
+        return Err(error(
+            "HTTPS artifact requires status 200; redirects are forbidden",
+        ));
+    }
+    response
+        .body_mut()
+        .with_config()
+        .limit(8 * 1024 * 1024)
+        .read_to_vec()
+        .map_err(|_| error("HTTPS artifact retrieval failed (timeout or size limit)"))
+}
+
+/// A source with an unpaired UTF-16 unit: Java's `URI.create` accepts it, then its
+/// HTTP request encoder fails after the credentials, CA and token checks. Run the
+/// same checks for the Java-derived origin and never send any substituted URL.
+pub(crate) fn reject_unencodable(origin: &str) -> Result<Vec<u8>, String> {
+    client(origin)?;
+    Err(error(
+        "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    ))
+}
+
+/// Exact-origin credentials: CA before token, as UBNFPackageFetcher does.
+fn client(origin: &str) -> Result<(ureq::Agent, Option<String>), String> {
+    let credentials = credentials(origin)?;
     let mut configuration = ureq::Agent::config_builder()
         .max_redirects(0)
         .proxy(None)
@@ -78,39 +102,21 @@ fn fetch_checked(source: &str, surrogate_path: bool) -> Result<Vec<u8>, String> 
         );
     }
     let agent = ureq::Agent::new_with_config(configuration.build());
-    let mut request = agent.get(source);
-    if let Some(token) = credentials.get("bearerToken") {
-        let token = token
-            .as_deref()
-            .filter(|v| {
-                !v.is_empty()
-                    && v.bytes()
-                        .all(|c| c.is_ascii_alphanumeric() || b"._~+/=-".contains(&c))
-            })
-            .ok_or_else(|| error("invalid artifact credentials"))?;
-        request = request.header("Authorization", format!("Bearer {token}"));
-    }
-    if surrogate_path {
-        // Java accepts the UTF-16 URI but its HTTP encoder fails after credentials
-        // validation. Preserve that result without handing substituted bytes to I/O.
-        return Err(error(
-            "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
-        ));
-    }
-    let mut response = request
-        .call()
-        .map_err(|_| error("HTTPS artifact retrieval failed (TLS, timeout, status or redirect)"))?;
-    if response.status() != ureq::http::StatusCode::OK {
-        return Err(error(
-            "HTTPS artifact requires status 200; redirects are forbidden",
-        ));
-    }
-    response
-        .body_mut()
-        .with_config()
-        .limit(8 * 1024 * 1024)
-        .read_to_vec()
-        .map_err(|_| error("HTTPS artifact retrieval failed (timeout or size limit)"))
+    let token = match credentials.get("bearerToken") {
+        None => None,
+        Some(token) => Some(
+            token
+                .as_deref()
+                .filter(|v| {
+                    !v.is_empty()
+                        && v.bytes()
+                            .all(|c| c.is_ascii_alphanumeric() || b"._~+/=-".contains(&c))
+                })
+                .ok_or_else(|| error("invalid artifact credentials"))?
+                .to_owned(),
+        ),
+    };
+    Ok((agent, token))
 }
 fn credentials(origin: &str) -> Result<BTreeMap<&'static str, Option<String>>, String> {
     let override_path = std::env::var_os("UBNF_CREDENTIALS_FILE");

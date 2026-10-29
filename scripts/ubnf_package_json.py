@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-COUNT = 472
+COUNT = 481
 
 
 def fixtures():
@@ -20,7 +20,7 @@ def fixtures():
     assert len(cases) == COUNT, 'package JSON fixtures must not silently disappear'
     assert len({c['id'] for c in cases}) == COUNT
     added = [case for case in cases if case.get('surrogate939')]
-    assert len(added) == 72 and sum(case.get('generate', False) for case in added) == 13
+    assert len(added) == 81 and sum(case.get('generate', False) for case in added) == 13
     assert {case.get('loadError') is None for case in added if case.get('generate')} == {True, False}
     return cases
 

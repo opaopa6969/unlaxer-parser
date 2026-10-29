@@ -481,13 +481,17 @@ Java の Gson / SourceReader / FileSystemPort と受理集合は変更しない�
 | 未使用の files key / 本文 | 受理。取得・変換せず、resolve は元の artifact bytes と同じ lock を保存する |
 | 対応 file がある非 scalar entry | resolve は成功。Linux の読取りでは Java UnixPath と同じ `Malformed input or input contains unmappable characters: <name>` で失敗する。診断を wire に出す時だけ JDK と同じ `?` 表記になり、別名のファイルを開かない |
 | HTTPS source / 固定 cache load | source の URI 化・credentials 読取り・ネットワークを行わない |
-| HTTPS source の host / query / fragment / userinfo | 通常の構文では `HTTPS artifact URL must omit credentials, query and fragment`。不正 space / percent escape 等の構文は先に `invalid HTTPS artifact URL` |
+| HTTPS source の host / query / fragment / userinfo / port | Java の `URI.create` が受理した後、host が null（registry authority）・userinfo・query・fragment・port 0 / 65536以上なら `HTTPS artifact URL must omit credentials, query and fragment`。`URI.create` が拒否する構文（space・NBSP 等の空白文字、不正 percent escape、path の `[` `]`、2つ目の `#` など）は authority の位置によらず `invalid HTTPS artifact URL` |
 | HTTPS source の path | Java は URI を受理し、credentials → CA → token 検査の後で HTTP encoding が失敗する。Rust も同じ順で検査し `HTTPS artifact retrieval failed (TLS, timeout or size limit)` を返す |
 
-非 scalar URL は、URI/origin/credentials の検証専用の ASCII probe に変換する。これは送信先ではない。
-サロゲートを percent escape した probe を HTTP request に送らず、必ず transport の前で拒否する。
+非 scalar URL は、`rust/unlaxer-generator/src/packages/java_uri.rs` が JDK17/21 の `URI.create`（RFC 2396 parser）を
+UTF-16 units 上にそのまま移植した判定で分類し、credentials の origin（小文字 host、443 以外の port）だけを得る。
+置換した URL や percent escape した URL は作らず、HTTP request も組み立てない。credentials → CA → token の検査後、必ず transport の前で拒否する。
+移植した判定は JDK17/21 の `URI.create` と、単独サロゲートを含む fuzz 8万件・ユニットテスト58形で一致を確認した。
+通常の scalar URL は既存の `ureq::http::Uri` 経路のままで、ASCII だけの URL の構文差（path の `[` `]`、port、hostname label 等）は
+[#962](https://github.com/opaopa6969/unlaxer-parser/issues/962) で追跡する。
 未使用 credential の型、CA と token の優先順位、既存の exact origin・TLS・redirect・timeout・上限は維持する。
-通常の scalar URL は既存経路のままであり、#956 の transport 文言差と #958 の credentials 場所選択は変更しない。
+#956 の transport 文言差と #958 の credentials 場所選択も変更しない。
 この単位の path 診断は self-hosted Linux / JDK17・21 の境界で検証する。
 
 本文を実際に UBNF として読む場合は、package 型だけでは Rust の `&str` frontend、String の AST、
@@ -504,9 +508,9 @@ Java の `ubnf/packageSource` も、内部 UTF-16 String と stdio encoder が `
 Java は正常な非 ASCII path を percent encode し、既存 Rust は生 UTF-8 を送る。
 この対照4件の診断差と2件の request target 差も記録し、#939 の修正で通常 URL の挙動を変えない。
 
-共通 `spec-corpus/package-json-acceptance.json` は472件（既存400＋#939 の72）。両実 stdio では全件を実行し、
+共通 `spec-corpus/package-json-acceptance.json` は481件（既存400＋#939 の81）。両実 stdio では全件を実行し、
 本文の代表では definition の UTF-16 range・packageSource・後続 request も照合する。
-既存400件の生成は維持し、追加72件は `generate: true` の13形だけで Java-host Rust / native Rust / Java flag CLI の
+既存400件の生成は維持し、追加81件は `generate: true` の13形だけで Java-host Rust / native Rust / Java flag CLI の
 生成を比較する（失敗段階・正常対・未使用本文・read-only HTTPS を含む）。manifest / artifact と resolve 対象 lock は
 両 `deps resolve` に既存 snapshot の有無両方で与え、成功時の raw lock/cache bytes と失敗時の snapshot 不変を比較する。
 HTTPS の新規ケースはローカル TLS server のみを使い、固定 cache の生成中は request 0、非 scalar URL の resolve も

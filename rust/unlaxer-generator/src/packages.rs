@@ -6,6 +6,7 @@ use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use value::{Object, Value};
 
+mod java_uri;
 mod json;
 mod text;
 mod value;
@@ -406,7 +407,7 @@ fn resolve_one(
     let source = match source_text.as_str() {
         Some(source) => source,
         None => {
-            return crate::package_fetch::reject_surrogate_path(&source_text.https_probe()?)
+            return crate::package_fetch::reject_unencodable(&source_text.https_origin()?)
                 .map(|_| ())
         }
     };

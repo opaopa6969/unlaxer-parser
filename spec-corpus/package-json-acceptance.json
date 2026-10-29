@@ -8045,5 +8045,195 @@
     "credentials": "{\"$ORIGIN\":{\"caCertificate\":\"$CA\",\"bearerToken\":\"invalid token\"}}",
     "generate": false,
     "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-path-bracket",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a[\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-path-bracket",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a[\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-registry-fragment-hash",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800/#a#b"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-userinfo-path-bracket",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800@localhost:1/a["
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-registry-path-nbsp",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800/a\u00a0"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-port-range",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://localhost:65536/a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-hostname-label",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://-a:1/\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-userinfo-ipv6",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800@[::1]:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-origin-normalized",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://LOCALHOST:0443/a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read artifact CA certificate",
+    "tls": true,
+    "requests": 0,
+    "credentials": "{\"https://localhost\":{\"caCertificate\":\"$MISSING\"}}",
+    "generate": false,
+    "surrogate939": true
   }
 ]
