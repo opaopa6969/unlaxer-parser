@@ -254,6 +254,7 @@ const run = async () => {
   // No initialize response: explicit startup fails with the configured timeout, not an unrelated error.
   trace('timeout-test-start');
   const timeoutOffset = await configureHang(1000);
+  await receivedInitialize(timeoutOffset);
   const previousHangs = unresponsiveChildren.length;
   await assert.rejects(bounded(restart(), 'unresponsive startup timeout'), /Server initialization exceeded 1000 ms\./);
   trace('timeout-test-rejected');
