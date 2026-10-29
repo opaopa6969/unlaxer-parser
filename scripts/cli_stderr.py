@@ -1,4 +1,4 @@
-"""#937/#952: fixed stderr and output-path oracles for real CLIs, with LF/CRLF."""
+"""#937/#952/#953: fixed stderr and output-path oracles for real CLIs, with LF/CRLF."""
 import argparse
 import json
 import os
@@ -8,7 +8,7 @@ import resource
 import signal
 import tempfile
 
-from cli_input_errors import run, setup, snapshot
+from cli_input_errors import permissions_apply, run, setup, snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -70,7 +70,8 @@ def options(case, operation):
         'check': ['check', '--target', 'rust', '--format', 'json'],
         'generate': ['generate', '--target', 'rust', '--output', output] + case.get('flags', []),
         'playground': ['playground', '--output', output] + case.get('flags', []),
-    }[operation] + ['--grammar', 'main.ubnf']
+    }[operation] + (['--profile', case['profile']] if 'profile' in case
+                    else ['--grammar', 'main.ubnf'])
 
 
 def limited(case):
@@ -99,9 +100,12 @@ def expected_tree(case, operation, host, ending, trees):
         for name, value in trees[artifact['template']][ending].items():
             if 'include' in artifact and name not in artifact['include']:
                 continue
+            if name in artifact.get('exclude', []):
+                continue
             path = artifact['root'] + ('/' + name if name else '')
             mode, content = value
             result[path] = (mode[host] if isinstance(mode, dict) else mode, content)
+    result.update({name: tuple(value) for name, value in spec.get('files', {}).items()})
     return result
 
 
@@ -124,13 +128,15 @@ def observe(command, case, operation, work, native):
 
 
 def exercise(cases, directory, commands, evidence, trees=None):
+    read_permissions = permissions_apply(directory)
     permissions = write_permissions_apply(directory)
     file_permissions = file_write_permissions_apply(directory)
     for case in cases:
-        if ((case.get('readOnly') and not permissions)
+        if ((case.get('denied') and not read_permissions)
+                or (case.get('readOnly') and not permissions)
                 or (case.get('readOnlyFiles') and not file_permissions)):
             evidence['excluded'].append({'case': case['id'], 'observations': len(case['operations']) * 4,
-                'reason': 'Execution user can write chmod(555/444); permission denial is not exercised.'})
+                'reason': 'Execution user can access chmod(000/555/444); permission denial is not exercised.'})
             continue
         for ending, separator in [('LF', '\n'), ('CRLF', '\r\n')]:
             work = directory / (case['id'] + '-' + ending)
@@ -154,7 +160,7 @@ def exercise(cases, directory, commands, evidence, trees=None):
                         # Existing caller-owned output/file cases must remain byte-for-byte intact;
                         # only the fixture's listed paths (Java's per-file writes) may appear.
                         after = snapshot(work)
-                        if case['scope'] == 'paths':
+                        if case['scope'] == 'paths' or 'tree' in case:
                             entry['before'] = before
                             entry['after'] = after
                             assert after == {**before, **expected_tree(case, operation, host, ending, trees)}, (entry, 'tree')
@@ -171,6 +177,8 @@ def exercise(cases, directory, commands, evidence, trees=None):
                             assert new == created(case, operation, host), (entry, new)
                         remove_created(work, case, before)
             finally:
+                if 'denied' in case:
+                    (work / case['denied']).chmod(0o600)
                 for name in case.get('readOnly', []):
                     (work / name).chmod(0o755)
                 for name in case.get('readOnlyFiles', []):
@@ -186,7 +194,7 @@ def main():
     parser.add_argument('--java', required=True)
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
-    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax'], required=True)
+    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax', 'profile'], required=True)
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
     corpus = json.loads((ROOT / 'spec-corpus/cli-stderr.json').read_text())

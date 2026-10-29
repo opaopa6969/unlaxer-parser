@@ -337,7 +337,9 @@ fn run_playground(args: Vec<OsString>) -> Result<String, (u8, String)> {
         )
         .map_err(|message| (3, message))?
     } else if let Some(profile) = profile {
-        unlaxer_generator::playground::generate_profile(&profile).map_err(|message| (3, message))?
+        // Path.of in Java collapses separators for profile paths as for output paths.
+        unlaxer_generator::playground::generate_profile_with_errors(&output_path(&profile))
+            .map_err(file_error)?
     } else {
         unlaxer_generator::playground::generate_file_with_errors(&grammar.unwrap())
             .map_err(file_error)?

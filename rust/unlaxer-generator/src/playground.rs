@@ -4,25 +4,36 @@ use unlaxer_codegen::GeneratedFile;
 use unlaxer_ubnf::ast::TokenKind;
 
 pub fn generate_profile(path: &Path) -> Result<Vec<GeneratedFile>, String> {
-    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    generate_profile_with_errors(path).map_err(|error| error.to_string())
+}
+
+/// Profile Playground entry point preserving profile and module I/O categories.
+pub fn generate_profile_with_errors(
+    path: &Path,
+) -> Result<Vec<GeneratedFile>, crate::input::FileError> {
+    let text = crate::input::read_string(path).map_err(crate::input::FileError::Io)?;
     let profile = unlaxer_runtime::language_profile::LanguageProfile::parse(&text)?;
     let grammar_path = path
         .parent()
         .unwrap_or(Path::new("."))
         .join(profile.grammar_file());
-    let ast = crate::modules::load(&grammar_path)?;
+    let ast = crate::modules::load_with_errors(&grammar_path)?;
     if ast.grammars.len() != 1 {
-        return Err("profile requires exactly one grammar".into());
+        return Err(crate::input::FileError::Grammar(
+            "profile requires exactly one grammar".into(),
+        ));
     }
     let grammar = &ast.grammars[0];
     for entry in profile.entries.keys() {
         if profile.identity(entry)?.grammar != grammar.name
             || !grammar.rules.iter().any(|rule| rule.name == *entry)
         {
-            return Err("profile grammar/entry mismatch".into());
+            return Err(crate::input::FileError::Grammar(
+                "profile grammar/entry mismatch".into(),
+            ));
         }
     }
-    let mut files = generate_file(&grammar_path)?;
+    let mut files = generate_file_with_errors(&grammar_path)?;
     files.push(GeneratedFile {
         relative_path: "public/profile.tsv".into(),
         content: profile.canonical_tsv(),

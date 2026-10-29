@@ -4,7 +4,8 @@
     "utf8": 48,
     "readiness": 48,
     "syntax": 2,
-    "paths": 33
+    "paths": 33,
+    "profile": 74
   },
   "cases": [
     {
@@ -7241,6 +7242,2353 @@
       },
       "tree": {
         "generate": {}
+      }
+    },
+    {
+      "id": "profile-missing",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "p.tsv"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "p.tsv"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-denied",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "p.tsv"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "p.tsv"
+          }
+        }
+      },
+      "denied": "p.tsv"
+    },
+    {
+      "id": "profile-directory",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Is a directory"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Is a directory"
+          }
+        }
+      },
+      "directories": [
+        "p.tsv"
+      ]
+    },
+    {
+      "id": "profile-utf8-ff",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "ff"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-80",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "80"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-c2",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "c2"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-c220",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "c220"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-c080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "c080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-e282",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "e282"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-e220",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 2"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 2"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "e220"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-e28220",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "e28220"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-e08080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "e08080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-eda080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "eda080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-eda0",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "eda0"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-eda020",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "eda020"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-f09f98",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "f09f98"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-f09f9820",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "f09f9820"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-f0808080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "f0808080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-f4908080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "f4908080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-f5808080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "f5808080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-f880808080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "f880808080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-e2",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "e2"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-f0",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "f0"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-f090",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "f090"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-efbbbfff",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "efbbbfff"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-c2a2ff",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "c2a2ff"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "profile-utf8-at-start",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "p.tsv": "e28220"
+      }
+    },
+    {
+      "id": "grammar-missing",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/main.ubnf"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/main.ubnf"
+          }
+        }
+      }
+    },
+    {
+      "id": "grammar-denied",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n",
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/main.ubnf"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/main.ubnf"
+          }
+        }
+      },
+      "denied": "main.ubnf"
+    },
+    {
+      "id": "grammar-directory",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Is a directory"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Is a directory"
+          }
+        }
+      },
+      "directories": [
+        "main.ubnf"
+      ]
+    },
+    {
+      "id": "grammar-utf8-ff",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "ff"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-80",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "80"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-c2",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "c2"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-c220",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "c220"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-c080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "c080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-e282",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "e282"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-e220",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 2"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 2"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "e220"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-e28220",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "e28220"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-e08080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "e08080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-eda080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "eda080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-eda0",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "eda0"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-eda020",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "eda020"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-f09f98",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "f09f98"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-f09f9820",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "f09f9820"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-f0808080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "f0808080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-f4908080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "f4908080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-f5808080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 4"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "f5808080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-f880808080",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "f880808080"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-e2",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "e2"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-f0",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "f0"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-f090",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "f090"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-efbbbfff",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "efbbbfff"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-c2a2ff",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 1"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "c2a2ff"
+      },
+      "prefix": "// 😀\n"
+    },
+    {
+      "id": "grammar-utf8-at-start",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 3"
+          }
+        }
+      },
+      "bytes": {
+        "main.ubnf": "e28220"
+      }
+    },
+    {
+      "id": "profile-empty",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": ""
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-bom-only",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "﻿"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-bom-valid",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "﻿profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-missing-newline",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-blank",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-nul",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n\u0000"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-crlf",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/main.ubnf"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "invalid language profile"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-missing-relative-dot",
+      "scope": "profile",
+      "profile": "./p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "./p.tsv"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "./p.tsv"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-missing-absolute",
+      "scope": "profile",
+      "profile": "${WORK}/p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/p.tsv"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/p.tsv"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-missing-separators",
+      "scope": "profile",
+      "profile": "absent//p.tsv/",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "absent/p.tsv"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "absent/p.tsv"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-missing-unicode",
+      "scope": "profile",
+      "profile": "文法 😀/profile.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "文法 😀/profile.tsv"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "文法 😀/profile.tsv"
+          }
+        }
+      }
+    },
+    {
+      "id": "grammar-nested-profile",
+      "scope": "profile",
+      "profile": "profiles/p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "profiles/p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/profiles/main.ubnf"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/profiles/main.ubnf"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-import-missing",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n@import L from 'bad.ubnf'\n@ubnf: v2\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/bad.ubnf"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/bad.ubnf"
+          }
+        }
+      }
+    },
+    {
+      "id": "profile-import-denied",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n@import L from 'bad.ubnf'\n@ubnf: v2\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "bad.ubnf": "grammar Lib { token X ::= 'a'; }\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/bad.ubnf"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/bad.ubnf"
+          }
+        }
+      },
+      "denied": "bad.ubnf"
+    },
+    {
+      "id": "profile-import-directory",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n@import L from 'bad.ubnf'\n@ubnf: v2\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "E-MODULE: local import is not a regular file"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "E-MODULE: local import is not a regular file"
+          }
+        }
+      },
+      "directories": [
+        "bad.ubnf"
+      ]
+    },
+    {
+      "id": "profile-import-utf8",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n@import L from 'bad.ubnf'\n@ubnf: v2\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 2"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "Input length = 2"
+          }
+        }
+      },
+      "bytes": {
+        "bad.ubnf": "e28220"
+      }
+    },
+    {
+      "id": "profile-grammar-syntax",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { Start ::= ; }"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { Start ::= ; }"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { Start ::= ; }"
+          }
+        }
+      },
+      "nativeSyntax": {
+        "LF": "1:26: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+        "CRLF": "1:26: expected nonempty rule sequence (use an EMPTY token for epsilon)"
+      }
+    },
+    {
+      "id": "profile-grammar-bom",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: ﻿grammar Main { @root @mapping(Value) Start ::= 'a'; }"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: ﻿grammar Main { @root @mapping(Value) Start ::= 'a'; }"
+          }
+        }
+      },
+      "nativeSyntax": {
+        "LF": "1:1: unexpected character '\\u{feff}'",
+        "CRLF": "1:1: unexpected character '\\u{feff}'"
+      },
+      "bytes": {
+        "main.ubnf": "efbbbf6772616d6d6172204d61696e207b2040726f6f7420406d617070696e672856616c756529205374617274203a3a3d202761273b207d"
+      }
+    },
+    {
+      "id": "profile-grammar-empty",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": ""
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: "
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: "
+          }
+        }
+      },
+      "nativeSyntax": {
+        "LF": "1:1: expected at least one grammar",
+        "CRLF": "1:1: expected at least one grammar"
+      }
+    },
+    {
+      "id": "profile-readable",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "playground": {
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "out",
+              "exclude": [
+                "public/index.html"
+              ]
+            }
+          ],
+          "files": {
+            "out/public/index.html": [
+              33188,
+              "89f3686ba2d089a5b3b0680c9ddbded5cd25f96a2bed7baf38980201a3334403"
+            ],
+            "out/public/profile.tsv": [
+              33188,
+              "14fbb5452c3b120ddccd2f76db9c09abb6d423f0eda2eedc62eb308b994d002f"
+            ]
+          }
+        }
       }
     }
   ],

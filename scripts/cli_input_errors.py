@@ -60,6 +60,11 @@ def setup(work, case, separator):
         path = work / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(text.replace('\n', separator).encode())
+    # Profiles require LF even while their referenced grammar exercises CRLF.
+    for name, text in case.get('fixedFiles', {}).items():
+        path = work / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(text.encode())
     for name, target in case.get('symlinks', {}).items():
         (work / name).symlink_to(target)
     if 'denied' in case:

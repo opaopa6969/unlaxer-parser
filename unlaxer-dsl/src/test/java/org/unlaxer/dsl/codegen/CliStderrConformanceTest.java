@@ -28,6 +28,7 @@ public class CliStderrConformanceTest {
     @Test(timeout=300000) public void outputPathsMatchJavaAndRetainNativeLinkPolicy() throws Exception { check("paths"); }
     @Test(timeout=900000) public void malformedUtf8MatchesEachJavaReader() throws Exception { check("utf8"); }
     @Test(timeout=600000) public void readinessRendersEveryDiagnosticAsJavaRecords() throws Exception { check("readiness"); }
+    @Test(timeout=300000) public void profileInputIoAndReadableOutputsMatchJava() throws Exception { check("profile"); }
     @Test(timeout=120000) public void syntaxKeepsDocumentedNativeLocations() throws Exception { check("syntax"); }
 
     private static void check(String suite) throws Exception {
@@ -40,14 +41,15 @@ public class CliStderrConformanceTest {
             "--output", output.toString()), EVIDENCE.resolve("cli-stderr-" + suite + ".log"), 840);
         var evidence = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
         var excluded = evidence.getAsJsonArray("excluded");
-        int permissionCases = suite.equals("output") ? 4 : suite.equals("paths") ? 3 : 0;
-        assertTrue("only chmod(555/444) may be inapplicable", excluded.size() <= permissionCases);
+        int permissionCases = suite.equals("output") ? 4 : suite.equals("paths") || suite.equals("profile") ? 3 : 0;
+        assertTrue("only chmod(000/555/444) may be inapplicable", excluded.size() <= permissionCases);
         for (var entry : excluded) System.out.println("[fixture exclusion] " + entry);
         if (System.getenv("GITHUB_ACTIONS") != null)
-            assertEquals("CI must exercise chmod(555/444): " + excluded, 0, excluded.size());
+            assertEquals("CI must exercise chmod(000/555/444): " + excluded, 0, excluded.size());
         int observations = switch (suite) {
             case "output" -> 112;
             case "paths" -> 244;
+            case "profile" -> 296;
             case "utf8" -> 768;
             case "readiness" -> 384;
             default -> 16;
@@ -56,6 +58,7 @@ public class CliStderrConformanceTest {
         for (var entry : excluded) skipped += entry.getAsJsonObject().get("observations").getAsInt();
         assertEquals(observations - skipped, evidence.getAsJsonArray("observations").size());
         if (suite.equals("paths")) assertEquals(114, evidence.getAsJsonArray("checks").size());
+        if (suite.equals("profile")) assertEquals(4, evidence.getAsJsonArray("checks").size());
     }
 
     private static void run(List<String> command, Path log, int seconds) throws Exception {
