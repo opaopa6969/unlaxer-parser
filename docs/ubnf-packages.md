@@ -146,8 +146,9 @@ ASCII の固定 key だけを取得し、使用する文字列に限って単独
 未使用 member に `files` / `entry` / `dependencies` があっても package の schema や #939 の制限は適用しない。
 
 任意の HTTP header を指定する機能はない。`headers` object、header 名やその値は未使用 member であり、
-非文字列や単独サロゲートを含んでも送信されない。実際に送る header は
+非文字列や単独サロゲートを含んでも送信されない。資格情報から作る header は
 `Authorization: Bearer <token>` だけで、token は空でない `[A-Za-z0-9._~+/=-]+` に限定する。
+client 既定の `Host` / `User-Agent` と、Rust ureq だけが付ける `Accept: */*` は資格情報と無関係で、従来どおり。
 正常なサロゲート対もこの ASCII 制限では拒否する。JDK17 / JDK21 の `HttpRequest.Builder.header` を
 独立に測定すると、header 名・値の単独サロゲートは `IllegalArgumentException` になる。
 製品ではその前の token 検査で固定診断を返すため、JDK の値を含み得る例外文は出さない。
@@ -158,11 +159,14 @@ ASCII の固定 key だけを取得し、使用する文字列に限って単独
 transport 診断差として [#956](https://github.com/opaopa6969/unlaxer-parser/issues/956) に分離し、
 この変更では両版の TLS / HTTP 処理を維持する。
 
-共通 `spec-corpus/package-credentials.json` の65件を、両 `deps resolve`、Java-host Rust / native Rust /
-Java flag CLI に、既存 lock/cache の有無両方で与える。Java を独立の期待値として、最終診断・終了コード・
-成功時の lock/cache raw bytes・失敗時の snapshot 不変・ローカル TLS server が受け取る Authorization を比較する。
-生成は資格情報を読まず、固定 cache だけを使用する。stdio の authoring も同じ読取り専用経路を使い、
-明示 resolve を持たないため、credentials 用の stdio ケースは追加しない。
+共通 `spec-corpus/package-credentials.json` の65件を、両 `deps resolve` に既存 lock/cache の有無両方で与える。
+Java を独立の期待値として、最終診断・終了コード・成功時の lock/cache raw bytes・失敗時の snapshot 不変・
+ローカル TLS server が受け取る Authorization を比較する。生成は資格情報を読まず、固定 cache だけを使用する。
+Java-host Rust / native Rust / Java flag CLI の生成は、`generate: true` の代表5形（受理・既定パス・
+明示ファイルなし・読取り権限なし・不正 JSON）で同じ2状態を照合し、ネットワーク不使用と資格情報非依存を確かめる。
+生成を全形で繰り返さないため、CLI 起動は650回から290回（Java は390回から160回）になる（#954）。
+読取り権限なしの形は、root など chmod(000) を読める実行ユーザーでは除外を記録し、CI（非 root）では除外を許さない。
+stdio の authoring も同じ読取り専用経路を使い、明示 resolve を持たないため、credentials 用の stdio ケースは追加しない。
 検証記録には header 値を残さず一致/欠落だけを記録する。#956 の2形も skip せず既存の host 別診断を照合する。
 
 `HttpsPackageConformanceTest` はローカル TLS server を使い、認証、lock/hash と生成物、

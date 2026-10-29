@@ -558,7 +558,7 @@
       "issues": [
         943
       ],
-      "observation": "#943でJava本体を変えず、Files.readStringとJsonElementの受理をRustへ適用する。64 KiB上限→strict UTF-8→JSON全体→object/origin→CA→tokenの順。先頭BOM1つと単独サロゲートを受理し、不正JSONはcannot read artifact credentials、空白と非objectはinvalid artifact credentials。既存readerの深さ255・数値・重複keyを共用する。単独サロゲートtokenは送信前にASCII検査で拒否し、任意headersは未使用。共通65件を両deps resolveと3 CLIでsnapshot有無両方照合し、秘密値を記録しない。TLS失敗の既存文言差2形は別項目package-https-transportで追跡し、host別期待値で実行する。#943はPRのmerge待ち。",
+      "observation": "#943でJava本体を変えず、Files.readStringとJsonElementの受理をRustへ適用する。64 KiB上限→strict UTF-8→JSON全体→object/origin→CA→tokenの順。先頭BOM1つと単独サロゲートを受理し、不正JSONはcannot read artifact credentials、空白と非objectはinvalid artifact credentials。既存readerの深さ255・数値・重複keyを共用する。単独サロゲートtokenは送信前にASCII検査で拒否し、任意headersは未使用。共通65件を両deps resolveでsnapshot有無両方照合し、資格情報を読まない3 CLIの生成は代表5形で照合する。秘密値を記録しない。TLS失敗の既存文言差2形は別項目package-https-transportで追跡し、host別期待値で実行する。#943はPRのmerge待ち。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials.json",

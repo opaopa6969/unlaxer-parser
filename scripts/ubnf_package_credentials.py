@@ -25,7 +25,28 @@ TLS_ERROR = {
 def fixtures():
     cases = json.loads((ROOT / 'spec-corpus/package-credentials.json').read_text())
     assert len(cases) == len({case['id'] for case in cases}) == COUNT
+    # Generation never opens credentials, so it is exercised on a few representative
+    # forms (accepted, default path, missing override, unreadable, malformed) instead of
+    # repeating the same read-only check for every JSON form (#954 keeps CI time tight).
+    generated = [case for case in cases if case.get('generate')]
+    assert {case['error'] is None for case in generated} == {True, False}, 'generation needs both outcomes'
+    assert any(case.get('defaultPath') for case in generated), 'generation needs the default path'
     return cases
+
+
+def permissions_apply(directory):
+    probe = directory / 'permission-probe'
+    probe.write_bytes(b'probe')
+    probe.chmod(0)
+    try:
+        try:
+            probe.read_bytes()
+            return False
+        except PermissionError:
+            return True
+    finally:
+        probe.chmod(0o600)
+        probe.unlink()
 
 
 def credential_bytes(case, origin, ca, missing):
@@ -107,15 +128,21 @@ def receipt(files):
             for name, data in files.items()}
 
 
-def check(directory, args, evidence):
+def check(directory, args, evidence, excluded):
     artifact = (ROOT / 'unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json').read_bytes()
     baseline = {'ubnf.lock.json': lock_bytes({'std/layout': artifact}, {'std/layout': '1.0.0'}).hex(),
                 '.ubnf-cache/': 'directory', '.ubnf-cache/packages/': 'directory',
                 '.ubnf-cache/packages/' + digest(artifact) + '.json': artifact.hex()}
     started = time.monotonic()
+    denied_works = permissions_apply(directory)
     with local_tls(directory, artifact) as (origin, ca, received):
         for case in fixtures():
             if args.case and case['id'] not in args.case:
+                continue
+            if case.get('file') == 'unreadable' and not denied_works:
+                # chmod(000) is not an I/O failure for root/CAP_DAC_OVERRIDE. Do not claim it was tested.
+                excluded.append({'case': case['id'], 'reason':
+                                 'The execution user can read chmod(000); this permission combination is outside this run.'})
                 continue
             print('credentials CLI:', case['id'], flush=True)
             folder = directory / case['id']
@@ -131,7 +158,6 @@ def check(directory, args, evidence):
                 credentials.write_bytes(credential_bytes(case, origin, ca, directory / 'missing.pem'))
                 if kind == 'unreadable':
                     credentials.chmod(0)
-                    assert not os.access(credentials, os.R_OK), 'unreadable fixture needs an unprivileged test user'
             manifest = folder / 'ubnf.json'
             manifest.write_bytes(encode({'schemaVersion': 1, 'dependencies': {
                 'std/layout': {'version': '1.0.0', 'source': origin + '/artifact'}}}))
@@ -177,7 +203,7 @@ def check(directory, args, evidence):
                         else:
                             assert resolved[0] == resolved[1], (case['id'], 'reference/native result differs')
                 # Generation is read-only and must never parse credentials, with or without a pin.
-                for existing in [False, True]:
+                for existing in ([False, True] if case.get('generate') else []):
                     initial = baseline if existing else {}
                     reset(folder, initial)
                     generated = []
@@ -220,12 +246,14 @@ def main():
     parser.add_argument('--case', action='append')
     args = parser.parse_args()
     evidence = []
+    excluded = []
     elapsed = None
     try:
         with tempfile.TemporaryDirectory(prefix='package-credentials-', dir=os.environ.get('TMPDIR')) as temporary:
-            elapsed = check(Path(temporary), args, evidence)
+            elapsed = check(Path(temporary), args, evidence, excluded)
     finally:
-        args.output.write_text(json.dumps({'seconds': elapsed, 'cases': evidence}, ensure_ascii=True, indent=2) + '\n')
+        args.output.write_text(json.dumps({'seconds': elapsed, 'cases': evidence, 'excluded': excluded},
+                                          ensure_ascii=True, indent=2) + '\n')
 
 
 if __name__ == '__main__':

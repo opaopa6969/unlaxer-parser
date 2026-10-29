@@ -87,7 +87,12 @@ public class HttpsPackageConformanceTest {
             "--output", output.toString()), null, 720);
         assertEquals(result.output(), 0, result.code());
         var report = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
-        assertEquals("all credentials fixtures executed", 65, report.getAsJsonArray("cases").size());
+        var excluded = report.getAsJsonArray("excluded");
+        for (var entry : excluded) System.out.println("[fixture exclusion] " + entry);
+        assertTrue("only chmod(000) may be inapplicable", excluded.size() <= 1);
+        // The self-hosted runner is non-root; CI must not pass by silently dropping the permission case.
+        if (System.getenv("GITHUB_ACTIONS") != null) assertEquals("CI must exercise chmod(000): " + excluded, 0, excluded.size());
+        assertEquals("all credentials fixtures executed", 65 - excluded.size(), report.getAsJsonArray("cases").size());
         System.out.println("credentials CLI fixtures: " + report.get("seconds").getAsDouble() + " s");
     }
 
