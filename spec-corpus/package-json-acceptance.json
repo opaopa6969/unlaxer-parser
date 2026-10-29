@@ -1404,10 +1404,7 @@
       }
     ],
     "loadError": "missing UBNF package entry",
-    "resolveError": "missing UBNF package entry",
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": "missing UBNF package entry"
   },
   {
     "id": "artifact-unused-filename-high",
@@ -1422,10 +1419,7 @@
       }
     ],
     "loadError": null,
-    "resolveError": null,
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": null
   },
   {
     "id": "artifact-source-comment-high",
@@ -1441,9 +1435,13 @@
     ],
     "loadError": null,
     "resolveError": null,
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "gap": true,
+    "gapIssue": 959,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "SPACES"
+    }
   },
   {
     "id": "artifact-entry-low",
@@ -1457,10 +1455,7 @@
       }
     ],
     "loadError": "missing UBNF package entry",
-    "resolveError": "missing UBNF package entry",
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": "missing UBNF package entry"
   },
   {
     "id": "artifact-unused-filename-low",
@@ -1475,10 +1470,7 @@
       }
     ],
     "loadError": null,
-    "resolveError": null,
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": null
   },
   {
     "id": "artifact-source-comment-low",
@@ -1494,9 +1486,13 @@
     ],
     "loadError": null,
     "resolveError": null,
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "gap": true,
+    "gapIssue": 959,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "SPACES"
+    }
   },
   {
     "id": "artifact-entry-broken",
@@ -1510,10 +1506,7 @@
       }
     ],
     "loadError": "missing UBNF package entry",
-    "resolveError": "missing UBNF package entry",
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": "missing UBNF package entry"
   },
   {
     "id": "artifact-unused-filename-broken",
@@ -1528,10 +1521,7 @@
       }
     ],
     "loadError": null,
-    "resolveError": null,
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": null
   },
   {
     "id": "artifact-source-comment-broken",
@@ -1547,9 +1537,13 @@
     ],
     "loadError": null,
     "resolveError": null,
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "gap": true,
+    "gapIssue": 959,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "SPACES"
+    }
   },
   {
     "id": "source-literal-backslash",
@@ -1632,10 +1626,7 @@
         "value": "https://\ud800.invalid/x"
       }
     ],
-    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment"
   },
   {
     "id": "direct-https-low",
@@ -1651,10 +1642,7 @@
         "value": "https://\udc00.invalid/x"
       }
     ],
-    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment"
   },
   {
     "id": "transitive-https-high",
@@ -1670,10 +1658,7 @@
         "value": "https://\ud800.invalid/x"
       }
     ],
-    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment"
   },
   {
     "id": "transitive-https-low",
@@ -1689,10 +1674,7 @@
         "value": "https://\udc00.invalid/x"
       }
     ],
-    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
-    "rustLoadError": "invalid JSON",
-    "rustResolveError": "invalid JSON",
-    "gap": true
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment"
   },
   {
     "id": "artifact-valid-pair-entry",
@@ -6388,5 +6370,1870 @@
       }
     ],
     "resolveLock": true
+  },
+  {
+    "id": "surrogate-matched-entry-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\ud800.ubnf"
+      },
+      {
+        "path": [
+          "files",
+          "\ud800.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= 'x'; }"
+      }
+    ],
+    "loadError": "Malformed input or input contains unmappable characters: ?.ubnf",
+    "loadPrefix": "",
+    "resolveError": null,
+    "generate": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-matched-entry-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\udc00.ubnf"
+      },
+      {
+        "path": [
+          "files",
+          "\udc00.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= 'x'; }"
+      }
+    ],
+    "loadError": "Malformed input or input contains unmappable characters: ?.ubnf",
+    "loadPrefix": "",
+    "resolveError": null,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-matched-entry-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\ud800x\udc00.ubnf"
+      },
+      {
+        "path": [
+          "files",
+          "\ud800x\udc00.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= 'x'; }"
+      }
+    ],
+    "loadError": "Malformed input or input contains unmappable characters: ?x?.ubnf",
+    "loadPrefix": "",
+    "resolveError": null,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-unused-bodies",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "unused0.ubnf"
+        ],
+        "value": "\ud800"
+      },
+      {
+        "path": [
+          "files",
+          "unused1.ubnf"
+        ],
+        "value": "\udc00"
+      },
+      {
+        "path": [
+          "files",
+          "unused2.ubnf"
+        ],
+        "value": "\ud800x\udc00"
+      },
+      {
+        "path": [
+          "files",
+          "unused3.ubnf"
+        ],
+        "value": "\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "generate": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-distinct-filename-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\ud800.ubnf"
+      },
+      {
+        "path": [
+          "files",
+          "\udc00.ubnf"
+        ],
+        "value": ""
+      }
+    ],
+    "loadError": "missing UBNF package entry",
+    "resolveError": "missing UBNF package entry",
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-distinct-filename-replacement",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\ud800.ubnf"
+      },
+      {
+        "path": [
+          "files",
+          "\ufffd.ubnf"
+        ],
+        "value": ""
+      }
+    ],
+    "loadError": "missing UBNF package entry",
+    "resolveError": "missing UBNF package entry",
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-path-entry-control",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "a\u0001\ud800.ubnf"
+      }
+    ],
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-path-entry-parent",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "x/\ud800/../a"
+      }
+    ],
+    "loadError": "package file path escapes boundary",
+    "resolveError": "package file path escapes boundary",
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-path-key-control",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a\u0001\ud800.ubnf"
+        ],
+        "value": ""
+      }
+    ],
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "generate": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-path-key-parent",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "x/\ud800/../a"
+        ],
+        "value": ""
+      }
+    ],
+    "loadError": "package file path escapes boundary",
+    "resolveError": "package file path escapes boundary",
+    "generate": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-schema-priority-manifest",
+    "subject": "manifest",
+    "schema": 2,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800.invalid/x"
+      }
+    ],
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-schema-priority-artifact",
+    "subject": "artifact",
+    "schema": 2,
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": "\ud800.ubnf"
+      }
+    ],
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-id-priority",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "generate": false,
+    "surrogate939": true,
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/\\ud800\":{\"version\":\"1.0.0\",\"source\":\"https://\\ud800.invalid/x\"}}"
+      }
+    ]
+  },
+  {
+    "id": "surrogate-body-literal-unused-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= '\ud800'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": true,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-literal-used-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= '\ud800'; }"
+      }
+    ],
+    "loadError": "cannot write $OUTPUT/parser.rs: Input length = 1",
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": true,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "rootReference": "layout.T",
+    "loadPrefix": "",
+    "loadExit": 4,
+    "rustLoadExit": 3,
+    "flagsError": "I/O error: Input length = 1",
+    "flagsPrefix": "",
+    "flagsExit": 4,
+    "lspError": null,
+    "partialOutput": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-import-name-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @import child from '\ud800.ubnf' @ubnf: v2 token T ::= child.T; }"
+      },
+      {
+        "path": [
+          "files",
+          "\ud800.ubnf"
+        ],
+        "value": "grammar Child { @ubnf: v2 token T ::= 'x'; }"
+      }
+    ],
+    "loadError": "Malformed input or input contains unmappable characters: ?.ubnf",
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": true,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "loadPrefix": "",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-import-content-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @import child from 'child.ubnf' @ubnf: v2 token T ::= child.T; }"
+      },
+      {
+        "path": [
+          "files",
+          "child.ubnf"
+        ],
+        "value": "grammar Child { @ubnf: v2 token T ::= 'x'; } // \ud800\n"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": true,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-literal-unused-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= '\udc00'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-literal-used-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= '\udc00'; }"
+      }
+    ],
+    "loadError": "cannot write $OUTPUT/parser.rs: Input length = 1",
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "rootReference": "layout.T",
+    "loadPrefix": "",
+    "loadExit": 4,
+    "rustLoadExit": 3,
+    "flagsError": "I/O error: Input length = 1",
+    "flagsPrefix": "",
+    "flagsExit": 4,
+    "lspError": null,
+    "partialOutput": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-import-name-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @import child from '\udc00.ubnf' @ubnf: v2 token T ::= child.T; }"
+      },
+      {
+        "path": [
+          "files",
+          "\udc00.ubnf"
+        ],
+        "value": "grammar Child { @ubnf: v2 token T ::= 'x'; }"
+      }
+    ],
+    "loadError": "Malformed input or input contains unmappable characters: ?.ubnf",
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "loadPrefix": "",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-import-content-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @import child from 'child.ubnf' @ubnf: v2 token T ::= child.T; }"
+      },
+      {
+        "path": [
+          "files",
+          "child.ubnf"
+        ],
+        "value": "grammar Child { @ubnf: v2 token T ::= 'x'; } // \udc00\n"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-literal-unused-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= '\ud800x\udc00'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-literal-used-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= '\ud800x\udc00'; }"
+      }
+    ],
+    "loadError": "cannot write $OUTPUT/parser.rs: Input length = 1",
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "rootReference": "layout.T",
+    "loadPrefix": "",
+    "loadExit": 4,
+    "rustLoadExit": 3,
+    "flagsError": "I/O error: Input length = 1",
+    "flagsPrefix": "",
+    "flagsExit": 4,
+    "lspError": null,
+    "partialOutput": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-import-name-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @import child from '\ud800x\udc00.ubnf' @ubnf: v2 token T ::= child.T; }"
+      },
+      {
+        "path": [
+          "files",
+          "\ud800x\udc00.ubnf"
+        ],
+        "value": "grammar Child { @ubnf: v2 token T ::= 'x'; }"
+      }
+    ],
+    "loadError": "Malformed input or input contains unmappable characters: ?x?.ubnf",
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "loadPrefix": "",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-import-content-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @import child from 'child.ubnf' @ubnf: v2 token T ::= child.T; }"
+      },
+      {
+        "path": [
+          "files",
+          "child.ubnf"
+        ],
+        "value": "grammar Child { @ubnf: v2 token T ::= 'x'; } // \ud800x\udc00\n"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "rustLoadPrefix": "E-PACKAGE: ",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-literal-used-pair",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token T ::= '\ud83d\ude00'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": true,
+    "rootReference": "layout.T",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-import-name-pair",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @import child from '\ud83d\ude00.ubnf' @ubnf: v2 token T ::= child.T; }"
+      },
+      {
+        "path": [
+          "files",
+          "\ud83d\ude00.ubnf"
+        ],
+        "value": "grammar Child { @ubnf: v2 token T ::= 'x'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-body-import-content-pair",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @import child from 'child.ubnf' @ubnf: v2 token T ::= child.T; }"
+      },
+      {
+        "path": [
+          "files",
+          "child.ubnf"
+        ],
+        "value": "grammar Child { @ubnf: v2 token T ::= 'x'; } // \ud83d\ude00\n"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-literal-before-token-high",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token A ::= '\ud800'; token T ::= 'x'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-literal-before-token-low",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token A ::= '\udc00'; token T ::= 'x'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-literal-before-token-broken",
+    "subject": "artifact",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "value": "grammar Layout { @ubnf: v2 token A ::= '\ud800x\udc00'; token T ::= 'x'; }"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "gap": true,
+    "gapIssue": 959,
+    "rustLoadError": "package source contains unpaired UTF-16 surrogate",
+    "navigation": {
+      "file": "layout.ubnf",
+      "token": "T"
+    },
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-path-high",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "tls": true,
+    "requests": 0,
+    "generate": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-query-high",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/?a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-fragment-high",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/#a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-userinfo-high",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800@localhost:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-path-low",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-query-low",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/?a\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-fragment-low",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/#a\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-userinfo-low",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\udc00@localhost:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-host-broken",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://local\ud800x\udc00host:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-path-broken",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\ud800x\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-query-broken",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/?a\ud800x\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-fragment-broken",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/#a\ud800x\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-userinfo-broken",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800x\udc00@localhost:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-host-pair",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://local\ud83d\ude00host:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "gap": true,
+    "gapIssue": 960,
+    "rustResolveError": "invalid HTTPS artifact URL",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-path-pair",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "tls": true,
+    "requests": 1,
+    "generate": false,
+    "requestPath": {
+      "java": "/a%F0%9F%98%80",
+      "rust": "/a\u00f0\u009f\u0098\u0080"
+    },
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-query-pair",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/?a\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-fragment-pair",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/#a\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-userinfo-pair",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud83d\ude00@localhost:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "gap": true,
+    "gapIssue": 960,
+    "rustResolveError": "invalid HTTPS artifact URL",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-path-high",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "tls": true,
+    "requests": 0,
+    "generate": true,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-query-high",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/?a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-fragment-high",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/#a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-userinfo-high",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800@localhost:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-path-low",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-query-low",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/?a\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-fragment-low",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/#a\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-userinfo-low",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\udc00@localhost:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-host-broken",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://local\ud800x\udc00host:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-path-broken",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\ud800x\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-query-broken",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/?a\ud800x\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-fragment-broken",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/#a\ud800x\udc00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-userinfo-broken",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800x\udc00@localhost:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-host-pair",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://local\ud83d\ude00host:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "gap": true,
+    "gapIssue": 960,
+    "rustResolveError": "invalid HTTPS artifact URL",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-path-pair",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": null,
+    "tls": true,
+    "requests": 1,
+    "generate": false,
+    "requestPath": {
+      "java": "/a%F0%9F%98%80",
+      "rust": "/a\u00f0\u009f\u0098\u0080"
+    },
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-query-pair",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/?a\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-fragment-pair",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/#a\ud83d\ude00"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-userinfo-pair",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud83d\ude00@localhost:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "gap": true,
+    "gapIssue": 960,
+    "rustResolveError": "invalid HTTPS artifact URL",
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-syntax-space",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a \ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-syntax-percent",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a%\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-credentials-invalid-json",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read artifact credentials",
+    "tls": true,
+    "requests": 0,
+    "credentials": "{",
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-credentials-bad-ca",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read artifact CA certificate",
+    "tls": true,
+    "requests": 0,
+    "credentials": "{\"$ORIGIN\":{\"caCertificate\":\"$MISSING\",\"bearerToken\":\"invalid token\"}}",
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-credentials-bad-token",
+    "subject": "manifest",
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid artifact credentials",
+    "tls": true,
+    "requests": 0,
+    "credentials": "{\"$ORIGIN\":{\"caCertificate\":\"$CA\",\"bearerToken\":\"invalid token\"}}",
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-direct-path-bracket",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a[\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-transitive-path-bracket",
+    "subject": "artifact",
+    "transitive": true,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "$ORIGIN/a[\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-registry-fragment-hash",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800/#a#b"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-userinfo-path-bracket",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800@localhost:1/a["
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-registry-path-nbsp",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800/a\u00a0"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "invalid HTTPS artifact URL",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-port-range",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://localhost:65536/a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-hostname-label",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://-a:1/\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-userinfo-ipv6",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://\ud800@[::1]:1/x"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "tls": true,
+    "requests": 0,
+    "generate": false,
+    "surrogate939": true
+  },
+  {
+    "id": "surrogate-https-origin-normalized",
+    "subject": "manifest",
+    "transitive": false,
+    "edits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "source"
+        ],
+        "value": "https://LOCALHOST:0443/a\ud800"
+      }
+    ],
+    "loadError": null,
+    "resolveError": "cannot read artifact CA certificate",
+    "tls": true,
+    "requests": 0,
+    "credentials": "{\"https://localhost\":{\"caCertificate\":\"$MISSING\"}}",
+    "generate": false,
+    "surrogate939": true
   }
 ]

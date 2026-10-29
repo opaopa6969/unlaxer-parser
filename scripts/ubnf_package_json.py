@@ -1,5 +1,8 @@
 """#914/#926: raw package JSON through the reference/native CLI and stdio hosts."""
 import argparse
+from contextlib import nullcontext
+import copy
+import time
 import hashlib
 import json
 import os
@@ -9,13 +12,16 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-COUNT = 400
+COUNT = 481
 
 
 def fixtures():
     cases = json.loads((ROOT / 'spec-corpus/package-json-acceptance.json').read_text())
     assert len(cases) == COUNT, 'package JSON fixtures must not silently disappear'
     assert len({c['id'] for c in cases}) == COUNT
+    added = [case for case in cases if case.get('surrogate939')]
+    assert len(added) == 81 and sum(case.get('generate', False) for case in added) == 13
+    assert {case.get('loadError') is None for case in added if case.get('generate')} == {True, False}
     return cases
 
 
@@ -38,7 +44,11 @@ def lock_bytes(blobs, roots):
                       sort_keys=True, ensure_ascii=False, separators=(',', ':')) + '\n').encode()
 
 
-def setup(folder, case):
+def setup(folder, case, origin="https://localhost:1"):
+    case = copy.deepcopy(case)
+    for edit in case.get("edits", []):
+        if isinstance(edit["value"], str):
+            edit["value"] = edit["value"].replace("$ORIGIN", origin)
     folder.mkdir(parents=True)
     standard = (ROOT / 'unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json').read_bytes()
     transitive = case.get('transitive', False)
@@ -130,7 +140,8 @@ def setup(folder, case):
         (cache / (sha + '.json')).write_bytes(data + (b' ' if name in case.get('corruptCache', []) else b''))
     (folder / 'ubnf.lock.json').write_bytes(lock)
     declaration = f"@import layout from 'pkg:{package}'"
-    source = f"grammar Main {{ // 😀\r\n {declaration}\r\n @ubnf: v2\r\n @root @mapping(Value) Start ::= 'a';\r\n}}"
+    reference = case.get("rootReference", "'a'")
+    source = f"grammar Main {{ // 😀\r\n {declaration}\r\n @ubnf: v2\r\n @root @mapping(Value) Start ::= {reference};\r\n}}"
     grammar = folder / 'main space 😀.ubnf'
     grammar.write_text(source, newline='')
     return grammar, source, declaration, blobs, roots
@@ -166,31 +177,73 @@ def run(command, options, native):
     if native:
         env.update(PATH='', JAVA_HOME='/nonexistent-java')
     result = subprocess.run(command + options, capture_output=True, text=True, timeout=30, env=env)
-    return {'exit': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr,
-            'lastError': (result.stderr.strip().splitlines() or [''])[-1]}
+    record = {'exit': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr,
+              'lastError': (result.stderr.strip().splitlines() or [''])[-1]}
+    if '--output' in options:
+        output = Path(options[options.index('--output') + 1])
+        record['generatedHashes'] = {str(p.relative_to(output)): digest(p.read_bytes())
+                                     for p in output.rglob('*') if p.is_file()}
+    return record
 
 
-def check_cli(directory, commands, evidence):
-    for case in fixtures():
+def check_cli(directory, commands, evidence, cases=None):
+    from ubnf_package_credentials import local_tls
+    cases = fixtures() if cases is None else cases
+    tls = directory / 'tls'
+    tls.mkdir()
+    standard = (ROOT / 'unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json').read_bytes()
+    context = local_tls(tls, standard) if any(c.get('tls') for c in cases) else nullcontext(('https://localhost:1', None, []))
+    previous = os.environ.get('UBNF_CREDENTIALS_FILE')
+    try:
+        with context as connection:
+            _check_cli(directory, commands, evidence, cases, connection)
+    finally:
+        if previous is None:
+            os.environ.pop('UBNF_CREDENTIALS_FILE', None)
+        else:
+            os.environ['UBNF_CREDENTIALS_FILE'] = previous
+
+
+def _check_cli(directory, commands, evidence, cases, connection):
+    origin, ca, received = connection
+    for case in cases:
         print('package JSON CLI:', case['id'], flush=True)
         folder = directory / case['id']
-        grammar, _, _, blobs, roots = setup(folder, case)
+        grammar, _, _, blobs, roots = setup(folder, case, origin)
+        credentials = folder / 'credentials.json'
+        credentials.write_bytes(case.get('credentials', '{"$ORIGIN":{"caCertificate":"$CA"}}')
+                                .replace('$ORIGIN', origin).replace('$CA', str(ca))
+                                .replace('$MISSING', str(folder / 'missing.pem')).encode())
+        os.environ['UBNF_CREDENTIALS_FILE'] = str(credentials)
         before = snapshot(folder)
         record = {'case': case['id'], 'gap': case.get('gap', False), 'runs': []}
+        started = time.monotonic()
         evidence.append(record)
         generated = []
-        for host, command in commands:
+        for host, command in (commands if case.get('generate', True) else []):
             for flags in ([False, True] if host == 'java' else [False]):
                 output = folder / (host + ('-flags' if flags else '-rust'))
                 args = ['--grammar', str(grammar), '--output', str(output), '--generators', 'Parser'] if flags else [
                     'generate', '--target', 'rust', '--grammar', str(grammar), '--output', str(output)]
+                requests_before = len(received)
                 actual = run(command, args, host == 'rust')
+                assert len(received) == requests_before, (case['id'], 'fixed cache must not fetch')
                 record['runs'].append(dict(host=host, operation='flags' if flags else 'generate', **actual))
                 error = expected(case, host, 'load')
-                assert actual['exit'] == ((4 if flags else 3) if error else 0), (case['id'], host, actual)
-                assert actual['lastError'] == (('Generation failed: ' if flags else '') + 'E-PACKAGE: ' + error if error else ''), (case['id'], host, actual)
+                prefix = case.get('rustLoadPrefix', case.get('loadPrefix', 'E-PACKAGE: ')) if host == 'rust' else case.get('loadPrefix', 'E-PACKAGE: ')
+                exit_code = case.get('rustLoadExit', case.get('loadExit', 3)) if host == 'rust' else case.get('loadExit', 3)
+                if flags:
+                    error = case.get('flagsError', error)
+                    prefix = case.get('flagsPrefix', 'Generation failed: ' + prefix)
+                    exit_code = case.get('flagsExit', 4)
+                message = (prefix + error).replace('$OUTPUT', str(output)) if error else ''
+                assert actual['exit'] == (exit_code if error else 0), (case['id'], host, actual)
+                assert actual['lastError'] == message, (case['id'], host, actual, message)
                 if error:
-                    assert not output.exists(), (case['id'], host, 'partial output')
+                    if host == 'java' and case.get('partialOutput'):
+                        assert output.exists(), (case['id'], host, 'Java partial output boundary changed')
+                    else:
+                        assert not output.exists(), (case['id'], host, 'partial output')
                 elif not flags:
                     files = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob('*') if p.is_file()}
                     assert len(files) == 5, (case['id'], host, files.keys())
@@ -207,7 +260,13 @@ def check_cli(directory, commands, evidence):
             results = []
             for host, command in commands:
                 reset(folder, initial)
+                requests_before = len(received)
                 actual = run(command, ['deps', 'resolve', '--manifest', str(folder / 'ubnf.json')], host == 'rust')
+                if case.get('tls'):
+                    requests = received[requests_before:]
+                    assert len(requests) == case['requests'], (case['id'], host, 'HTTP request count', requests)
+                    if 'requestPath' in case:
+                        assert requests[0]['path'] == case['requestPath'][host], (case['id'], host, requests)
                 after = snapshot(folder)
                 # Keep multi-MiB generated fixtures out of the evidence JSON; assertions
                 # below still compare every raw byte, including failed snapshots.
@@ -227,8 +286,9 @@ def check_cli(directory, commands, evidence):
                     oracle.update({'.ubnf-cache/packages/' + digest(data) + '.json': data.hex() for data in blobs.values()})
                     assert after == oracle, (case['id'], host, 'raw lock/cache byte oracle differs')
                 results.append(after)
-            if len(results) == 2 and not case.get('gap'):
+            if len(results) == 2 and expected(case, 'java', 'resolve') == expected(case, 'rust', 'resolve'):
                 assert results[0] == results[1], (case['id'], 'Java/Rust lock/cache differ')
+        record['seconds'] = round(time.monotonic() - started, 3)
 
 
 def run_lsp(clients, directory):
@@ -240,16 +300,20 @@ def run_lsp(clients, directory):
         folder = directory / case['id']
         grammar, source, declaration, _, _ = setup(folder, case)
         before = snapshot(folder)
+        if 'navigation' in case:
+            reference = 'layout.' + case['navigation']['token']
+            source = source.replace(case.get('rootReference', "'a'") + ';', reference + ';')
         uri = grammar.as_uri()
         params = {'textDocument': {'uri': uri}, 'position': {'line': 3, 'character': 1}}
         record = {'case': case['id'], 'gap': case.get('gap', False), 'servers': []}
         for host, client in zip(['java', 'rust'], clients):
-            error = expected(case, host, 'load')
+            error = case.get('rustLspError', expected(case, host, 'load')) if host == 'rust' else case.get('lspError', case.get('loadError'))
+            prefix = case.get('rustLoadPrefix', case.get('loadPrefix', 'E-PACKAGE: ')) if host == 'rust' else case.get('loadPrefix', 'E-PACKAGE: ')
             oracle = [] if error is None else [{
                 'range': {'start': position(source, source.index('@import')),
                           'end': position(source, source.index('@import') + len(declaration))},
                 'severity': 1, 'code': 'E-MODULE', 'source': 'ubnf-module',
-                'message': 'import layout: E-PACKAGE: ' + error}]
+                'message': 'import layout: ' + prefix + error}]
             client.timeout = 20
             client.send('textDocument/didOpen', {'textDocument': {
                 'uri': uri, 'languageId': 'ubnf', 'version': 1, 'text': source}})
@@ -257,12 +321,43 @@ def run_lsp(clients, directory):
             assert actual == oracle, (case['id'], host, actual, oracle)
             completion = client.result('textDocument/completion', params)
             assert any(item['label'] == 'Start' for item in completion), (case['id'], host, completion)
+            navigation = check_navigation(client, case, host, folder, uri, source, error) if 'navigation' in case else None
             client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
+            if navigation and navigation['uri']:
+                assert client.result('ubnf/packageSource', {'uri': navigation['uri']}) is None
             assert client.result('textDocument/hover', params) is None
             assert snapshot(folder) == before
-            record['servers'].append({'host': host, 'diagnostics': actual, 'followup': 'completion + hover after close'})
+            record['servers'].append({'host': host, 'diagnostics': actual, 'followup': 'completion + hover after close', 'navigation': navigation})
         evidence.append(record)
     return evidence
+
+
+def check_navigation(client, case, host, folder, uri, source, error):
+    from urllib.parse import quote
+    position = __import__('importlib').import_module('check-ubnf-authoring-lsp').position
+    definition = client.result('textDocument/definition', {'textDocument': {'uri': uri},
+                               'position': position(source, source.index('layout.' + case['navigation']['token']))})
+    if error:
+        assert definition == [], (case['id'], host, definition)
+        return {'definition': definition, 'uri': None}
+    lock = json.loads((folder / 'ubnf.lock.json').read_bytes())
+    sha = lock['packages']['std/layout']['sha256']
+    document = json.loads((folder / '.ubnf-cache/packages' / (sha + '.json')).read_bytes())
+    filename, token = case['navigation']['file'], case['navigation']['token']
+    module = document['files'][filename]
+    package_uri = 'ubnf-package:/' + sha + '/' + quote(filename, safe="/-._~!$&'()*+,;=:@")
+    offset = module.index('token ' + token) + len('token ')
+    def unit_position(offset):
+        before = module[:offset]
+        return {'line': before.count('\n'), 'character': len(before.rsplit('\n', 1)[-1].encode('utf-16-le', 'surrogatepass')) // 2}
+    oracle = [{'uri': package_uri, 'range': {'start': unit_position(offset), 'end': unit_position(offset + len(token))}}]
+    assert definition == oracle, (case['id'], host, definition, oracle)
+    actual_source = client.result('ubnf/packageSource', {'uri': package_uri})
+    # The unchanged Java stdio encoder replaces unpaired units only on the wire.
+    # This is an oracle for transport, never a substituted input to either parser.
+    expected_source = module.encode('utf-8', 'replace').decode() if host == 'java' else module
+    assert actual_source == expected_source, (case['id'], host, 'packageSource differs')
+    return {'definition': definition, 'uri': package_uri, 'packageSource': actual_source}
 
 
 def main():
@@ -271,6 +366,7 @@ def main():
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust')
     parser.add_argument('--output', required=True)
+    parser.add_argument('--only-939', action='store_true')
     args = parser.parse_args()
     commands = [('java', [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'])]
     if args.rust:
@@ -278,7 +374,7 @@ def main():
     evidence = []
     try:
         with tempfile.TemporaryDirectory(prefix='package-json-', dir=os.environ.get('TMPDIR')) as temporary:
-            check_cli(Path(temporary), commands, evidence)
+            check_cli(Path(temporary), commands, evidence, [c for c in fixtures() if c.get('surrogate939')] if args.only_939 else None)
     finally:
         Path(args.output).write_text(json.dumps(evidence, ensure_ascii=True, indent=2) + '\n')
 

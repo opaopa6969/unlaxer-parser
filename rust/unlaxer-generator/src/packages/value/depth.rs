@@ -1,5 +1,6 @@
 //! Package JSON structure and numeric tokens, independent of serde_json features.
 //! Container depth is bounded; serde still decodes strings, booleans and null.
+use super::super::text::Text;
 use super::{Number, Object, Value};
 use serde::de::{DeserializeOwned, Error};
 use std::collections::{btree_map::Entry, BTreeMap};
@@ -24,9 +25,9 @@ enum State {
 enum Container {
     Array(Vec<Value>),
     Object {
-        members: Vec<(String, Value)>,
-        positions: BTreeMap<String, usize>,
-        key: Option<String>,
+        members: Vec<(Text, Value)>,
+        positions: BTreeMap<Text, usize>,
+        key: Option<Text>,
     },
 }
 
@@ -177,7 +178,7 @@ pub(super) fn parse(bytes: &[u8]) -> Result<Value> {
                         if token != b'"' {
                             return Err(invalid());
                         }
-                        *key = Some(input.scalar()?);
+                        *key = Some(input.scalar::<String>()?.into());
                         if input.peek() != Some(b':') {
                             return Err(invalid());
                         }
@@ -208,7 +209,7 @@ pub(super) fn parse(bytes: &[u8]) -> Result<Value> {
                 });
                 input.offset += 1;
             }
-            b'"' => completed = Some(Value::String(input.scalar()?)),
+            b'"' => completed = Some(Value::String(input.scalar::<String>()?.into())),
             b'n' => {
                 input.scalar::<()>()?;
                 completed = Some(Value::Null);

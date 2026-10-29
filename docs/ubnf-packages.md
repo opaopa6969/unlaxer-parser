@@ -462,21 +462,60 @@ ASCII 検証または不正パス検証を通らない NUL sentinel にし、既
 そのため schema/version エラーが source の取得より先に出て、正常な lock/cache の固定 load も維持される。
 外部 JSON parser / crate は追加せず、UBNF parser のホットパスには処理を追加しない。
 
-実際の UTF-16 文字列を使う以下の field は、置換で受理するとファイル同一性・文法本文・source 位置を変える。
-Java の受理集合を狭めず、Rust は従来の `invalid JSON` を維持する意図した暫定差とし、
-[#939](https://github.com/opaopa6969/unlaxer-parser/issues/939) の受け入れ条件で追跡する。
-これらは `local:` source を扱う #926 の範囲外で、#926 の受け入れ条件（`local:` source の拒否段階・診断と、
-無関係な field の既存診断の維持）は上の表で満たす。
+### package の UTF-16 文字列境界（#939）
 
-| 単独サロゲートを含む field | Java の実測 | Rust の暫定結果 |
-| --- | --- | --- |
-| artifact.entry（対応 file なし） | `missing UBNF package entry` | `invalid JSON` |
-| artifact.files の未使用ファイル名 | resolve / generate / inspect 成功 | `invalid JSON` |
-| artifact.files の本文（末尾コメント） | resolve / generate / inspect 成功 | `invalid JSON` |
-| manifest / artifact の HTTPS source host | cache load 成功、resolve は `HTTPS artifact URL must omit credentials, query and fragment` | load / resolve とも `invalid JSON` |
+Java の Gson / SourceReader / FileSystemPort と受理集合は変更しない。Rust は package 入力の
+`Text` に通常の `Box<str>` と、単独サロゲートを含む `Box<[u16]>` を持たせる。
+後者を使うのは artifact の entry / files key・本文、manifest / artifact の HTTPS source だけ。
+既存の rewrite marker をこの型へ復元し、上位・下位・壊れた組と本来の NUL を区別する。
+正常な対は従来の Unicode scalar。文字列の照合は lossless で、異なるサロゲート、U+FFFD、
+利用者が書いた marker 風の文字列は同じ key にならない。重複 key は最初の位置・最後の値を維持する。
+`Text` は24 bytes、入力 `Value` は32 bytesを保ち、通常入力を UTF-16 に変換しない。
+新しい crate / serde_json feature は追加せず、parser のホットパスと公開済み3.3.0は変更しない。
 
-共通 `spec-corpus/package-json-acceptance.json` の400件（#914/#926 の127件、#942 の69件、#941 の166件、#947 の38件。うち上記暫定差13件）を
-両実 stdio と Java-host Rust / native Rust / Java flag CLI、manifest / artifact と resolve 対象の lock は両 `deps resolve` に送る。
+| 境界 | Java を参照した結果 |
+| --- | --- |
+| JSON に単独サロゲート escape がある | JSON の構文・深さを最後まで検査後、schemaVersion → ID/version → files → entry → dependencies の既存順へ進む |
+| files key / entry の path | UTF-16 units にも空・ISO制御文字・`\`・先頭 `/`・`:` を先に検査し、その後で空成分・`.`・`..` を検査する |
+| 対応 file がない entry | `E-PACKAGE: missing UBNF package entry` |
+| 未使用の files key / 本文 | 受理。取得・変換せず、resolve は元の artifact bytes と同じ lock を保存する |
+| 対応 file がある非 scalar entry | resolve は成功。Linux の読取りでは Java UnixPath と同じ `Malformed input or input contains unmappable characters: <name>` で失敗する。診断を wire に出す時だけ JDK と同じ `?` 表記になり、別名のファイルを開かない |
+| HTTPS source / 固定 cache load | source の URI 化・credentials 読取り・ネットワークを行わない |
+| HTTPS source の host / query / fragment / userinfo / port | Java の `URI.create` が受理した後、host が null（registry authority）・userinfo・query・fragment・port 0 / 65536以上なら `HTTPS artifact URL must omit credentials, query and fragment`。`URI.create` が拒否する構文（space・NBSP 等の空白文字、不正 percent escape、path の `[` `]`、2つ目の `#` など）は authority の位置によらず `invalid HTTPS artifact URL` |
+| HTTPS source の path | Java は URI を受理し、credentials → CA → token 検査の後で HTTP encoding が失敗する。Rust も同じ順で検査し `HTTPS artifact retrieval failed (TLS, timeout or size limit)` を返す |
+
+非 scalar URL は、`rust/unlaxer-generator/src/packages/java_uri.rs` が JDK17/21 の `URI.create`（RFC 2396 parser）を
+UTF-16 units 上にそのまま移植した判定で分類し、credentials の origin（小文字 host、443 以外の port）だけを得る。
+置換した URL や percent escape した URL は作らず、HTTP request も組み立てない。credentials → CA → token の検査後、必ず transport の前で拒否する。
+移植した判定は JDK17/21 の `URI.create` と、単独サロゲートを含む fuzz 8万件・ユニットテスト58形で一致を確認した。
+通常の scalar URL は既存の `ureq::http::Uri` 経路のままで、ASCII だけの URL の構文差（path の `[` `]`、port、hostname label 等）は
+[#962](https://github.com/opaopa6969/unlaxer-parser/issues/962) で追跡する。
+未使用 credential の型、CA と token の優先順位、既存の exact origin・TLS・redirect・timeout・上限は維持する。
+#956 の transport 文言差と #958 の credentials 場所選択も変更しない。
+この単位の path 診断は self-hosted Linux / JDK17・21 の境界で検証する。
+
+本文を実際に UBNF として読む場合は、package 型だけでは Rust の `&str` frontend、String の AST、
+source snapshot と生成出力まで UTF-16 units を保持できない。Java の成功する comment や未使用 literal を
+U+FFFD / `?` / 私用文字に置換して解析する方法は採らず、**この残差は #959 に分離する**。
+Rust はその読取り境界で `E-PACKAGE: package source contains unpaired UTF-16 surrogate` を返す。
+resolve と未使用本文はこの拒否の対象ではない。Java では使用する literal が解析を通っても生成ファイルの
+UTF-8 書込みで `Input length = 1`（exit 4、部分生成物あり）になるため、JSON 拒否と同一視しない。
+Java の `ubnf/packageSource` も、内部 UTF-16 String と stdio encoder が `?` を出す実 wire を区別して測る。
+元の13 gap のうち10件は一致し、3 comment の resolve も一致する。残る3件の load と追加した実読取りの
+計18件は #959 の host 別期待値で実行し、完了扱いにしない。
+
+正常な対の HTTPS host / userinfo の既存診断差と path の request target encoding は #960 に分離する。
+Java は正常な非 ASCII path を percent encode し、既存 Rust は生 UTF-8 を送る。
+この対照4件の診断差と2件の request target 差も記録し、#939 の修正で通常 URL の挙動を変えない。
+
+共通 `spec-corpus/package-json-acceptance.json` は481件（既存400＋#939 の81）。両実 stdio では全件を実行し、
+本文の代表では definition の UTF-16 range・packageSource・後続 request も照合する。
+既存400件の生成は維持し、追加81件は `generate: true` の13形だけで Java-host Rust / native Rust / Java flag CLI の
+生成を比較する（失敗段階・正常対・未使用本文・read-only HTTPS を含む）。manifest / artifact と resolve 対象 lock は
+両 `deps resolve` に既存 snapshot の有無両方で与え、成功時の raw lock/cache bytes と失敗時の snapshot 不変を比較する。
+HTTPS の新規ケースはローカル TLS server のみを使い、固定 cache の生成中は request 0、非 scalar URL の resolve も
+request 0を必須とする。資格情報・header 値は出力しない。生成失敗の新規ケースでは Java の部分出力も観測する。
+
 #941 は空文書・非 object・BOM・配列/object の深さ境界、深い単独サロゲート・不正 escape・末尾余剰入力・
 上書きされる深い値・files の非文字列を含む。8 MiB の入れ子はテスト内で生成し、巨大な fixture を保存しない。
 上位・下位・壊れた組・正常な組・消える成分、NUL、escape された field 名、重複 source、
@@ -519,7 +558,7 @@ lock の出力には検証済みの文字列参照だけを既存の辞書順 JS
 raw bytes の reader・hash・UTF-8 の順序は変えない。この表現は package 入力だけに限定し、
 DAP / LSP の一般 JSON、UBNF parser のホットパスには適用しない。credentials は #943 で
 この reader を共用するが、JsonElement の受理と固定 field の検査を別経路で行う。
-#939 の file/entry/HTTPS の単独サロゲートに残る挙動も変更しない。
+#939 は上記 Text により file/entry/HTTPS を復元する。実読取りの未修正差は #959、通常 Unicode URL は #960 が追跡する。
 
 #941 の再測定（Linux x86_64、Rust 1.85.0、`deps resolve`、各3回の中央値、時間 s / peak RSS MiB）。
 基点は #946 merge 後の `a40c7513`。比較には同じ入力と固定した standalone binary を使う。
