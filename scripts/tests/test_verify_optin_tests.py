@@ -378,6 +378,22 @@ class WorkflowTest(unittest.TestCase):
             result = subprocess.run(['bash', '-eu', '-c', step['run']], env={'RESULT': status})
             self.assertEqual(result.returncode == 0, status == 'success', status)
 
+    def test_learning_browser_builds_its_site_in_the_same_job(self):
+        # DeclarativeTokenConformanceTest's CLI-side build cannot supply core's files.
+        checked = 0
+        for path in (ROOT / '.github/workflows').glob('*.yml'):
+            jobs = yaml.safe_load(path.read_text())['jobs'].values()
+            for job in (expanded for job in jobs for expanded in matrix_jobs(job)):
+                steps = job.get('steps', [])
+                for index, step in enumerate(steps):
+                    if 'node scripts/learning-browser.mjs' in step.get('run', ''):
+                        builders = [s for s in steps[:index]
+                                    if s.get('run', '').strip() == 'node scripts/build-learning.mjs']
+                        self.assertEqual(len(builders), 1, path)
+                        self.assertNotIn('working-directory', builders[0])
+                        checked += 1
+        self.assertEqual(checked, 2)  # core and the standalone learning-pages workflow
+
 
 if __name__ == '__main__':
     unittest.main()

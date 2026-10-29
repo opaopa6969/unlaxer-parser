@@ -326,6 +326,10 @@ jobs:
         cargo clippy --locked --manifest-path examples/resolver-tutorial/rust/Cargo.toml --all-targets -- -D warnings
         rustfmt --edition 2021 --config skip_children=true --check examples/resolver-tutorial/rust/src/main.rs examples/resolver-tutorial/rust/src/resolvers.rs
         test -s examples/resolver-tutorial/target/conformance.tsv
+    # DeclarativeTokenConformanceTest builds this too, but it now runs in the CLI shard.
+    - name: Build the learning site for core browser checks
+      if: matrix.shard == 'core'
+      run: node scripts/build-learning.mjs
     - name: Generated WASM playground in Chromium
       if: matrix.shard == 'core'
       working-directory: unlaxer-dsl/ubnf-vscode
