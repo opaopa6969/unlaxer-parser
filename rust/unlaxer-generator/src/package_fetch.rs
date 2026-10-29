@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
+#[cfg(unix)]
+mod passwd_home;
+
 fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
 }
@@ -122,11 +125,8 @@ fn credentials(origin: &str) -> Result<BTreeMap<&'static str, Option<String>>, S
     let override_path = std::env::var_os("UBNF_CREDENTIALS_FILE");
     let path = override_path
         .as_ref()
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME")
-                .map(|home| PathBuf::from(home).join(".config/unlaxer/credentials.json"))
-        })
+        .map(|value| java_override_path(value.as_os_str()))
+        .or_else(|| default_home().map(|home| home.join(".config/unlaxer/credentials.json")))
         .ok_or_else(|| error("cannot locate artifact credentials file"))?;
     if !path.exists() {
         return if override_path.is_some() {
@@ -144,4 +144,38 @@ fn credentials(origin: &str) -> Result<BTreeMap<&'static str, Option<String>>, S
     }
     let bytes = std::fs::read(path).map_err(|_| error("cannot read artifact credentials"))?;
     crate::packages::credential_fields(&bytes, origin)
+}
+
+// Java's UnixPath for Path.of(override): "" denotes the working directory, not a
+// missing file, and trailing slashes are dropped (so "file.json/" names the file).
+// Other bytes are kept; the kernel treats repeated inner slashes alike.
+fn java_override_path(value: &std::ffi::OsStr) -> PathBuf {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let bytes = value.as_bytes();
+        if bytes.is_empty() {
+            PathBuf::from(".")
+        } else {
+            let end = bytes.iter().rposition(|&b| b != b'/').map_or(1, |i| i + 1);
+            PathBuf::from(std::ffi::OsStr::from_bytes(&bytes[..end]))
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        PathBuf::from(value)
+    }
+}
+
+// Java's normal Unix user.home comes from the real uid's passwd entry.
+// Non-Unix retains the existing environment-based behavior.
+fn default_home() -> Option<PathBuf> {
+    #[cfg(unix)]
+    {
+        Some(passwd_home::get())
+    }
+    #[cfg(not(unix))]
+    {
+        std::env::var_os("HOME").map(PathBuf::from)
+    }
 }

@@ -240,7 +240,7 @@
       "org.unlaxer.dsl.bootstrap.PackageDocumentReaderTest": ["documentsRejectBeforeOpenAndNameTheirSubject", "documentBoundIsInclusiveAndStopsGrowthAtOneExtraByte", "openedHandleIsCheckedBeforeReadingAndAlwaysClosed", "lockIoPrecedesManifestAndCustomReadersStayInjectable"],
       "org.unlaxer.dsl.bootstrap.LocalImportReaderTest": ["rejectsBeforeOpeningNonFilesAndOversizedFiles", "exactLimitIsReadAndGrowthAfterStatStopsAtOneExtraByte", "utf8RemainsStrictAndSymlinksUseTheirTarget", "openedReplacementRejectsWriterFifoSocketAndOversizedFile"],
       "org.unlaxer.dsl.codegen.PackageResolverConformanceTest": ["packageResolutionFailuresMatchAcrossJavaAndNativeRust", "documentSizeLimitUsesUtf8Bytes", "failedTransitiveVerificationCannotPublishAParent", "lockedGenerationNeverConnectsToArtifactOrigin"],
-      "org.unlaxer.dsl.codegen.HttpsPackageConformanceTest": ["secureExplicitFetchAndPinnedOfflineGenerationMatch", "gsonStrictCredentialsAndHttpHeadersAreTheReference", "credentialsJsonMatchesAcrossClis"],
+      "org.unlaxer.dsl.codegen.HttpsPackageConformanceTest": ["secureExplicitFetchAndPinnedOfflineGenerationMatch", "gsonStrictCredentialsAndHttpHeadersAreTheReference", "credentialsJsonMatchesAcrossClis", "credentialsLocationsMatchJavaHomeAndPaths"],
       "org.unlaxer.dsl.codegen.VocabularyOriginsConformanceTest": ["sourceIdentityAndScalarRangesMatchAcrossHosts"],
       "org.unlaxer.dsl.semantic.SemanticRulesConformanceTest": ["generatedCstAndRulesDriveBothRuntimes", "invalidSchemasAreRejectedBeforeExecution"],
       "org.unlaxer.dsl.codegen.SemanticDiagnosticConformanceTest": ["semanticDiagnosticsUseOwnedDocumentsAndExactVersions"],

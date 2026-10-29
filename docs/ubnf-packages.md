@@ -108,6 +108,44 @@ HTTPS client と TLS は native target のみに含める。ブラウザー向�
 }
 ```
 
+credentials の場所は Java の `UBNFPackageFetcher` を参照する（#958）。Unix の通常の
+passwd entry では JDK17 / JDK21 と native Rust が次の規則で一致する。
+
+| 指定 | 選択する場所・診断 |
+| --- | --- |
+| `UBNF_CREDENTIALS_FILE` 未設定 | 実 UID の passwd home + `.config/unlaxer/credentials.json`。`HOME` が未設定・空・別ディレクトリでも通常の passwd home を優先する |
+| override が空文字列 | 作業ディレクトリ。通常は `cannot read artifact credentials`（サイズ検査は従来どおり先行） |
+| 空白だけ・相対パス・`~` 始まり | 文字列をそのままパスにする。trim・tilde 展開をしない。相対パスの基準はプロセスの cwd で、manifest の親ではない |
+| override が存在しない・親が非ディレクトリ・dangling symlink | `artifact credentials file is missing` |
+| override がディレクトリ・ディレクトリへの symlink | `cannot read artifact credentials`（サイズ検査が先行） |
+| override が通常ファイルへの symlink | リンク先を読む |
+| override の末尾の `/`（`file.json/`・`link//`） | Java の `UnixPath` と同じく末尾の `/` を取り除いた場所を読む（`/` だけならルート）。途中の `//` はそのまま |
+| Java の `-Duser.home=...` | override 未指定時だけ property を使う。空 property は cwd からの相対パス。native に JVM property はなく、同じ場所を指定するには両 CLI で `UBNF_CREDENTIALS_FILE` を明示する |
+
+Rust は既存依存の `libc::getpwuid_r(getuid(), ...)` を明示 HTTPS 取得時だけ呼ぶ。
+ERANGE は1 KiBから倍増して1 MiBまで再試行し、結果を所有する PathBuf へコピーする。
+FFI は専用の小さな関数だけで unsafe を許可し、generator の他のコードは deny、
+parser/runtime の workspace forbid は維持する。新しい crate と parser hot path の処理は追加しない。
+Unix 以外（Windows 等）の Rust は従来の `HOME` と override の挙動を維持し、passwd との一致は保証しない。
+
+passwd lookup の不在・エラー・2 バイト未満の home（空、systemd DynamicUser の `/` など）は JDK 間で規則が異なる。
+JDK21 は非空の `HOME`、なければ `?` を使う。JDK17 は不在・エラー時に `?`、見つかった home は短くてもそのまま使う。
+native はリポジトリの既定 JDK21 を参照し、残る JDK17 差と互換方針を
+[#964](https://github.com/opaopa6969/unlaxer-parser/issues/964) に分離する。
+この条件では同じ `UBNF_CREDENTIALS_FILE` の明示で差を避けられる。
+
+共通 `spec-corpus/package-credentials-location.json` の26形を既存の `HttpsPackageConformanceTest` から実行する。
+各形で両 `deps resolve`、Java-host Rust / native Rust / Java flag CLI と lock/cache の有無を検査する（260起動）。
+Java の独立 home probe と実 CLI の診断・exit・ローカル TLS server の Authorization 受信から選択ファイルを固定し、
+失敗時の snapshot 不変、生成時の無通信・固定 cache のみの利用を確認する。
+`-Duser.home` の2形は native の明示ファイル指定へ対応付けた検査であり、同じ環境だけで一致したとは扱わない。
+JDK17 の fallback 差3形と #956 の TLS 診断差は host 別期待値で実行し、skip しない。
+CI の cross-language job は JDK21 で実行する。JDK17 の期待値は現在の jdk17-parity job に含まれず、手元の JDK17 実行で確認している（CI 化は [#967](https://github.com/opaopa6969/unlaxer-parser/issues/967)）。
+非 UTF-8 ロケールで Java が非 ASCII のパスを扱えない差は [#966](https://github.com/opaopa6969/unlaxer-parser/issues/966) で追跡する。
+Linux のテスト専用 `LD_PRELOAD` shim は子プロセスだけへ仮の passwd home を返し、実 passwd lookup へ fallback しない。
+実 credentials は開かず、前後の存在・inode・size・mtime/ctime（symlink とリンク先）で不変を検査する。
+結果は `target/rust-package-credentials-location.json` に、値を含めず選択ファイルのラベルと所要時間で記録する。
+
 必要な場合は同じ entry に `caCertificate`（ユーザー/CI が管理する PEM CA bundle の
 絶対パス）を追加できる。明示 CA の trust store を使って TLS/hostname 検証を続ける。
 credential / CA 設定ファイルの上限は64 KiB。token は printable bearer 文字に限定する。

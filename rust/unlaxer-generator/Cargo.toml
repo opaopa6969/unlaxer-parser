@@ -24,5 +24,7 @@ ureq = { version = "3", default-features = false, features = ["rustls"] }
 name = "unlaxer"
 path = "src/main.rs"
 
-[lints]
-workspace = true
+# As in unlaxer-alloc-audit, keep unsafe denied except for the small POSIX
+# credentials-home adapter. Parser/runtime crates retain workspace forbid.
+[lints.rust]
+unsafe_code = "deny"
