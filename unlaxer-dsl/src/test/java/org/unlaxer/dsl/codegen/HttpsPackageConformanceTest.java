@@ -131,13 +131,14 @@ public class HttpsPackageConformanceTest {
             "--output", output.toString()), null, 240);
         assertEquals(result.output(), 0, result.code());
         var report = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
-        assertEquals("all transport fixtures executed", 42, report.getAsJsonArray("cases").size());
+        assertEquals("all transport fixtures executed", 102, report.getAsJsonArray("cases").size());
         int generated = 0;
         for (var entry : report.getAsJsonArray("cases")) {
-            // Both resolvers with and without a snapshot; three generation CLIs on two shapes.
+            // URI cases also resolve the same source through a transitive dependency.
+            boolean uri = entry.getAsJsonObject().get("case").getAsString().startsWith("uri-");
             boolean generation = entry.getAsJsonObject().get("generate").getAsBoolean();
             if (generation) generated++;
-            assertEquals("both snapshots and every CLI path", generation ? 10 : 4,
+            assertEquals("both snapshots and every CLI path", generation ? 10 : uri ? 8 : 4,
                 entry.getAsJsonObject().getAsJsonArray("runs").size());
         }
         assertEquals("generation boundary shapes", 2, generated);

@@ -1,7 +1,8 @@
 //! `java.net.URI.create` (JDK 17/21 RFC 2396 parser) over UTF-16 units, for HTTPS
-//! sources that a Rust string cannot hold. It only classifies the URL the way
-//! `UBNFPackageFetcher.fetch` does before credentials; it never builds a request.
-//! Ordinary scalar URLs keep the existing `fetch(&str)` path.
+//! sources, including those that a Rust string cannot hold. It only classifies the
+//! URL as `UBNFPackageFetcher.fetch` does before credentials; it never builds a request.
+//! ASCII scalar URLs share this classifier; Unicode scalar URLs retain their
+//! existing transport path until #960.
 
 const L_DIGIT: u64 = 0x3FF000000000000;
 const H_ALPHA: u64 = 0x7FFFFFE | 0x7FFFFFE00000000;
@@ -37,13 +38,19 @@ const H_SCOPE_ID: u64 = H_ALPHA | 0x80000000;
 
 /// What `UBNFPackageFetcher.fetch` decides before reading credentials.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) enum Https {
+pub(crate) enum Https {
     /// `URI.create` threw: `invalid HTTPS artifact URL`.
     Invalid,
     /// Parsed, but not an exact HTTPS origin without userinfo/query/fragment.
     Omit,
     /// Credentials are looked up for this origin.
     Origin(String),
+}
+
+/// Scalar entry point; parsing and origin checks are identical to the UTF-16 path.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn classify_str(source: &str) -> Https {
+    classify(&source.encode_utf16().collect::<Vec<_>>())
 }
 
 pub(super) fn classify(units: &[u16]) -> Https {

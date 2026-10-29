@@ -64,7 +64,7 @@ def credential_bytes(case, origin, ca, missing):
     return data + b' ' * (case.get('padBytes', 0) - len(data))
 
 
-def local_tls_context(directory):
+def local_tls_context(directory, names='DNS:localhost'):
     # Same local CA / hostname trust boundary as HttpsPackageConformanceTest.
     for command in [
         ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', 'ca.key', '-out', 'ca.pem',
@@ -74,7 +74,7 @@ def local_tls_context(directory):
         ['x509', '-req', '-in', 'server.csr', '-CA', 'ca.pem', '-CAkey', 'ca.key', '-CAcreateserial',
          '-out', 'server.pem', '-days', '1', '-extfile', 'extensions'],
     ]:
-        (directory / 'extensions').write_text('subjectAltName=DNS:localhost\nbasicConstraints=CA:FALSE\n'
+        (directory / 'extensions').write_text('subjectAltName=' + names + '\nbasicConstraints=CA:FALSE\n'
                                             'keyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n')
         result = subprocess.run(['openssl'] + command, cwd=directory, capture_output=True, timeout=30)
         assert result.returncode == 0, 'local TLS certificate setup failed'

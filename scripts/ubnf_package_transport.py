@@ -18,11 +18,13 @@ from ubnf_package_credentials import ROOT, local_tls_context, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
 LIMIT = 8 * 1024 * 1024
-COUNT = 42
+COUNT = 102
+URI_COUNT = 60
 TOKEN = 'transport-fixture-only-token'
 BODY = b'transport-fixture-private-response'
 HEADER = 'transport-fixture-private-header'
 TRANSPORT = 'HTTPS artifact retrieval failed (TLS, timeout or size limit)'
+LITERAL = '127.0.0.10'
 STATUS = 'HTTPS artifact requires status 200; redirects are forbidden'
 MISSING = 'E-PACKAGE: missing lock; run unlaxer deps resolve --manifest ubnf.json'
 # Product deadlines (connect 5 s, whole call 20 s) are measured unchanged. These
@@ -34,6 +36,8 @@ NO_BODY = [101, 204, 304]
 def fixtures():
     cases = json.loads((ROOT / 'spec-corpus/package-https-transport.json').read_text())
     assert len(cases) == len({c['id'] for c in cases}) == COUNT, 'transport fixture missing'
+    uri = [c for c in cases if c['kind'] == 'uri']
+    assert len(uri) == URI_COUNT and sum(c.get('unicodeControl', False) for c in uri) == 7
     # Generation never fetches: the boundary is checked on a success and a redirect shape.
     generated = [c for c in cases if c.get('generate')]
     assert len(generated) == 2 and {c['error'] is None for c in generated} == {True, False}
@@ -45,7 +49,8 @@ def fixtures():
 def transport_server(directory, artifact):
     # Reuse the existing certificate setup; this server supplies deliberately broken
     # HTTP framing that BaseHTTPRequestHandler / HttpsServer cannot express.
-    context = local_tls_context(directory)
+    # 127.0.0.10 is the decimal reading Java gives `127.0.0.010` (getaddrinfo: octal 8).
+    context = local_tls_context(directory, 'DNS:localhost,IP:' + LITERAL)
     ca = directory / 'ca.pem'
     receipts = []
     connections = []
@@ -65,17 +70,28 @@ def transport_server(directory, artifact):
                             return
                         request += part
                     lines = request.split(b'\r\n')
-                    path = lines[0].split(b' ')[1].decode('ascii')
+                    target = lines[0].split(b' ')[1]
+                    # URI fixtures have a public case ID as their first path component.
+                    path = target.decode('utf-8')
+                    case_id = path[1:].split('/', 1)[0]
+                    if case_id not in cases:
+                        case_id = path[1:]
                     auth = [line.split(b':', 1)[1].strip() for line in lines[1:]
                             if line.lower().startswith(b'authorization:')]
                     authorized = auth == [('Bearer ' + TOKEN).encode()]
-                    receipts.append({'case': path[1:], 'authorization':
-                                     'bearer' if authorized else 'absent' if not auth else 'unexpected'})
+                    received = {'case': case_id, 'authorization':
+                                'bearer' if authorized else 'absent' if not auth else 'unexpected'}
+                    if case_id in cases and cases[case_id]['kind'] == 'uri':
+                        received['targetHex'] = target.hex()
+                        if 'hostHeader' in cases[case_id]:
+                            received['host'] = [line.split(b':', 1)[1].strip().decode('ascii') for line in lines[1:]
+                                                if line.lower().startswith(b'host:')]
+                    receipts.append(received)
                     # A followed redirect is a test failure, including same-origin redirects.
                     if path == '/redirect-target':
                         stream.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n')
                         return
-                    case = cases[path[1:]]
+                    case = cases[case_id]
                     kind = case['kind']
                     if kind == 'disconnect':
                         return
@@ -124,7 +140,7 @@ def transport_server(directory, artifact):
             receipts.append({'serverError': True})
 
     with Server(('127.0.0.1', 0), Handler) as server, socket.socket() as refused, \
-            socket.socket() as blackhole:
+            socket.socket() as blackhole, Server((LITERAL, server.server_address[1]), Handler) as literal:
         refused.bind(('127.0.0.1', 0))  # Reserved but not listening: deterministic refusal.
         # Never accepted, and its queue is filled first: later SYNs get no answer, so only
         # the 5-second connect deadline ends the call (a queued one stalls in the handshake,
@@ -139,6 +155,8 @@ def transport_server(directory, artifact):
             fillers.append(filler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
+        literal_thread = threading.Thread(target=literal.serve_forever, daemon=True)
+        literal_thread.start()
         try:
             yield (server.server_address[1], refused.getsockname()[1], blackhole.getsockname()[1],
                    ca, receipts, connections)
@@ -147,8 +165,10 @@ def transport_server(directory, artifact):
             for filler in fillers:
                 filler.close()
             server.shutdown()
+            literal.shutdown()
             thread.join(timeout=5)
-            assert not thread.is_alive(), 'transport server did not stop'
+            literal_thread.join(timeout=5)
+            assert not thread.is_alive() and not literal_thread.is_alive(), 'transport server did not stop'
 
 
 def public(output, stderr, code):
@@ -157,6 +177,8 @@ def public(output, stderr, code):
     # Evidence contains only known public diagnostics, never an arbitrary server/JDK message.
     allowed = ['', MISSING, 'Generation failed: ' + MISSING] + ['E-PACKAGE: ' + e for e in
               [TRANSPORT, STATUS, 'expected object: document', 'invalid JSON',
+               'invalid HTTPS artifact URL', 'invalid artifact credentials',
+               'HTTPS artifact URL must omit credentials, query and fragment',
                'HTTPS artifact retrieval failed (TLS, timeout, status or redirect)',
                'HTTPS artifact retrieval failed (timeout or size limit)']]
     assert last in allowed, 'unexpected diagnostic (withheld to protect response/header values)'
@@ -222,7 +244,7 @@ def pinned(artifact):
             '.ubnf-cache/packages/' + digest(artifact) + '.json': artifact.hex()}
 
 
-def prepare(folder, case, ports, ca):
+def prepare(folder, case, ports, ca, transitive=False):
     port, refused, blackhole = ports
     folder.mkdir(parents=True)
     origin = 'https://' + case.get('hostname', 'localhost') + ':' + str(
@@ -232,15 +254,41 @@ def prepare(folder, case, ports, ca):
         entry['caCertificate'] = str(ca)
     if case.get('token', True):
         entry['bearerToken'] = TOKEN
-    credentials = encode({origin: entry, origin + '9': {'bearerToken': TOKEN}})
+    if case.get('invalidToken'):
+        entry['bearerToken'] = ''  # Accepted URI; stop before DNS / a fixed port is contacted.
+    credential_origin = case.get('credentialOrigin', origin).format(port=port)
+    credentials = encode({credential_origin: entry, origin + '9': {'bearerToken': TOKEN}})
     (folder / 'credentials.json').write_bytes(credentials)
     manifest = folder / 'ubnf.json'
-    manifest.write_bytes(encode({'schemaVersion': 1, 'dependencies': {
-        'std/layout': {'version': '1.0.0', 'source': origin + '/' + case['id']}}}))
+    source = case.get('url', origin + '/' + case['id']).format(port=port, id=case['id'])
+    dependency = {'version': '1.0.0', 'source': source}
+    if transitive:
+        parent = parent_bytes(source)
+        (folder / 'parent.json').write_bytes(parent)
+        dependencies = {'test/parent': {'version': '1.0.0', 'source': 'local:parent.json'}}
+    else:
+        dependencies = {'std/layout': dependency}
+    manifest.write_bytes(encode({'schemaVersion': 1, 'dependencies': dependencies}))
     return manifest, credentials
 
 
-def expected_receipt(case):
+def parent_bytes(source):
+    return encode({'schemaVersion': 1, 'id': 'test/parent', 'version': '1.0.0',
+                   'entry': 'parent.ubnf', 'files': {'parent.ubnf': "grammar Parent { @root Start ::= 'a'; }"},
+                   'dependencies': {'std/layout': {'version': '1.0.0', 'source': source}}})
+
+
+def expected_receipt(case, host='java', port=None):
+    if case['kind'] == 'uri':
+        error = case.get('rustError', case['error']) if host == 'rust' else case['error']
+        if error:
+            return None
+        suffix = case.get('rustTargetSuffix', case.get('targetSuffix', '')) if host == 'rust' else case.get('targetSuffix', '')
+        wanted = {'case': case['id'], 'authorization': 'bearer',
+                  'targetHex': ('/' + case['id'] + suffix).encode().hex()}
+        if 'hostHeader' in case:  # Java sends getHost() as written, plus a non-default port.
+            wanted['host'] = [case['hostHeader'].format(port=port)]
+        return wanted
     if not case.get('trust', True) or 'hostname' in case or case['kind'] in ['refused', 'connect-stall']:
         return None  # The request must not pass the TCP/TLS boundary.
     return {'case': case['id'], 'authorization': 'bearer' if case.get('token', True) else 'absent'}
@@ -259,7 +307,14 @@ def check(directory, args, records):
     java = [args.java, '--enable-preview', '-Djava.io.tmpdir=' + str(directory),
             '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']
 
-    def resolved(case, existing):
+    def resolved(case, existing, transitive, folder):
+        if transitive:
+            parent = (folder / 'parent.json').read_bytes()
+            blobs = {'std/layout': artifact, 'test/parent': parent}
+            result = pinned(artifact)
+            result['ubnf.lock.json'] = lock_bytes(blobs, {'test/parent': '1.0.0'}).hex()
+            result['.ubnf-cache/packages/' + digest(parent) + '.json'] = parent.hex()
+            return result
         if case['kind'] in ['limit', 'chunked-limit', 'close-limit']:
             wanted = pinned(artifact + b' ' * (LIMIT - len(artifact)))
             if existing:  # The old cache entry is kept beside the new pinned artifact.
@@ -267,15 +322,15 @@ def check(directory, args, records):
             return wanted
         return pinned(artifact)
 
-    def verify(case, host, existing, folder, actual, elapsed):
-        error = case['error']
+    def verify(case, host, existing, folder, actual, elapsed, transitive=False):
+        error = case.get('rustError', case['error']) if host == 'rust' else case['error']
         expected = {'exit': 3 if error else 0, 'lastError': 'E-PACKAGE: ' + error if error else ''}
         if not args.oracle:
             assert actual == expected, (case['id'], host, 'diagnostic/exit differs', actual)
         after = snapshot(folder)
-        assert after == ((baseline if existing else {}) if actual['exit'] else resolved(case, existing)), \
+        assert after == ((baseline if existing else {}) if actual['exit'] else resolved(case, existing, transitive, folder)), \
             (case['id'], host, 'snapshot differs')
-        return dict(host=host, operation='resolve', existingSnapshot=existing, **actual,
+        return dict(host=host, operation='resolve', existingSnapshot=existing, transitive=transitive, **actual,
                     seconds=elapsed, snapshot=receipt(after))
 
     with transport_server(directory, artifact) as (port, refused, blackhole, ca, received, connections), \
@@ -306,28 +361,34 @@ def check(directory, args, records):
             if case['id'] in slow_ids:
                 continue
             print('HTTPS transport:', case['id'], flush=True)
-            folder = directory / case['id']
-            manifest, credentials = prepare(folder, case, ports, ca)
-            env = dict(isolated_env(library, folder, folder), UBNF_CREDENTIALS_FILE=str(folder / 'credentials.json'))
-            for existing in [False, True]:
-                for host in hosts:
-                    reset(folder, baseline if existing else {})
-                    before = len(received)
-                    options = ['deps', 'resolve', '--manifest', str(manifest)]
-                    if host == 'java':
-                        (home / 'credentials.json').write_bytes(credentials)
-                        actual, elapsed = batch(options)
-                    else:
-                        actual, elapsed = invoke([args.rust], options, dict(env, PATH='', JAVA_HOME='/nonexistent-java'))
-                    run = verify(case, host, existing, folder, actual, elapsed)
-                    receipts = [r for r in received[before:] if r.get('case') not in slow_ids]
-                    wanted = expected_receipt(case)
-                    if wanted is None:
-                        assert not receipts, (case['id'], host, 'request passed TLS boundary')
-                    else:
-                        assert receipts and all(r == wanted for r in receipts), \
-                            (case['id'], host, 'request/auth/redirect differs')
-                    record_of[case['id']]['runs'].append(dict(run, requests=len(receipts)))
+            for transitive in ([False, True] if case['kind'] == 'uri' else [False]):
+                folder = directory / case['id'] / str(transitive)
+                manifest, credentials = prepare(folder, case, ports, ca, transitive)
+                env = dict(isolated_env(library, folder, folder), UBNF_CREDENTIALS_FILE=str(folder / 'credentials.json'))
+                for existing in [False, True]:
+                    for host in hosts:
+                        reset(folder, baseline if existing else {})
+                        before = len(received)
+                        connected = len(connections)
+                        options = ['deps', 'resolve', '--manifest', str(manifest)]
+                        if host == 'java':
+                            (home / 'credentials.json').write_bytes(credentials)
+                            actual, elapsed = batch(options)
+                        else:
+                            actual, elapsed = invoke([args.rust], options, dict(env, PATH='', JAVA_HOME='/nonexistent-java'))
+                        run = verify(case, host, existing, folder, actual, elapsed, transitive)
+                        receipts = [r for r in received[before:] if r.get('case') not in slow_ids]
+                        wanted = expected_receipt(case, host, port)
+                        if wanted is None:
+                            assert not receipts, (case['id'], host, 'request passed TLS boundary')
+                            if case['kind'] == 'uri':
+                                assert len(connections) == connected, (case['id'], host, 'rejected URI connected')
+                        else:
+                            assert receipts and all(r == wanted for r in receipts), \
+                                (case['id'], host, 'request/auth/redirect/target differs')
+                        wire = {'connections': len(connections) - connected,
+                                'targets': [r['targetHex'] for r in receipts]} if case['kind'] == 'uri' else {}
+                        record_of[case['id']]['runs'].append(dict(run, requests=len(receipts), **wire))
         for case, future in waiting:
             print('HTTPS transport (deadline):', case['id'], flush=True)
             record_of[case['id']]['runs'].append(future.result())
@@ -343,7 +404,7 @@ def check(directory, args, records):
         for case in cases:
             if not case.get('generate'):
                 continue
-            folder = directory / case['id']
+            folder = directory / case['id'] / 'False'
             grammar = folder / 'main.ubnf'
             grammar.write_text("grammar Main { @import layout from 'pkg:std/layout' @ubnf: v2 "
                                "@root @mapping(Value) Start ::= 'a'; }\n")
