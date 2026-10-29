@@ -1001,8 +1001,7 @@ Java 製品コード、既存の String を返す Rust API、`--grammar` の上�
 generate / deps inspect と同じ「Playground readiness と構文エラー」の意図した差（#937）になる。
 終了3・空 stdout・無出力は一致し、両 host の最終行を fixture の `nativeSyntax` で固定する。
 上記失敗の stdout は空で、出力先・staging は作らず、入力の mode / bytes も変えない。
-`--profile ' '` など空白だけの option 値を Java が `isBlank` で usage（終了2）にする差は、
-入力 I/O ではなく引数検査の別の意味単位として #974 で追跡する。
+空白だけの option 値の引数検査は [Playground の空白値](#playground-の空白値974) を参照。
 
 共通 `spec-corpus/cli-stderr.json` の `profile` suite は74形、LF/CRLF・両実 CLI の296観測。
 不正 UTF-8 は profile / grammar ごとに24形（1〜4の長さ、末尾途切れ、過長、surrogate、
@@ -1012,3 +1011,30 @@ generate / deps inspect と同じ「Playground readiness と構文エラー」�
 権限3形は実行ユーザーで `chmod(000)` の読取り拒否を probe し、効かない環境では理由付きで除外する。
 CI では除外0・skip0を必須とする。新クラスは追加せず、既存 `CliStderrConformanceTest` の
 必須メソッドを cli shard / JDK17 の両契約へ追加する。
+
+
+## Playground の空白値（#974）
+
+`--grammar` / `--profile` / `--package` / `--manifest` / `--output` は、空文字または
+Java `String.isBlank()` と同じ空白だけの値を usage 誤り（終了2）として拒否する。
+stdout は空で、出力先・staging を作らない。値を trim せず、空白で囲んだ非空白もそのまま渡す。
+JDK17 / JDK21 の `Character.isWhitespace` を全 code point で実測した集合は同じ25文字:
+`U+0009..U+000D`、`U+001C..U+0020`、`U+1680`、`U+2000..U+2006`、
+`U+2008..U+200A`、`U+2028`、`U+2029`、`U+205F`、`U+3000`。
+NBSP（`U+00A0`）・`U+2007`・`U+202F`・NEL（`U+0085`）は空白ではない。
+Rust の `char::is_whitespace` とは集合が異なるため、native はこの集合を明示して判定する。
+
+usage の `unlaxer ` 接頭辞は意図した差として維持する。Java は `Usage: playground ...`、
+native は `Usage: unlaxer playground ...`。既存 native の generate / check / impact と同じく
+実行ファイル名を含む案内を保ち、共通 fixture には両方の全文を固定する。
+既存 docs / ledger に接頭辞を統一する規約はなかったため、この表示契約を台帳に明記した。
+他サブコマンドの Java はこの値に `isBlank` を使わないので、空白拒否を一律には広げない。
+
+既存 `CliStderrConformanceTest` の `blank` suite は、25空白文字・空文字・混合空白と、
+上記非空白の境界（`U+180E` / `U+200B` / BOM / 空白で囲んだ文字列も含む）を5 optionへ渡す
+175形・両実 CLI の350観測。JDK17 / JDK21 の両方で、exit・全 stdout・stderr 最終行・
+全ツリー不変を独立期待値へ照合する。argv の制御文字は shell で展開せず subprocess へ直接渡す。
+入力ファイルのない検査なので LF/CRLF の重複実行は行わない。既存のテスト専用
+`CodegenBatchHost` から実際の `CodegenMain.run` を呼び、Java の起動を175回から1回にする。
+全呼出しの前後で空の作業ツリーを検査し、他の suite は従来の実 CLI 起動を維持する。
+既存 cli shard と JDK17 の必須メソッド契約へ追加し、新クラスや依存 crate は追加しない。

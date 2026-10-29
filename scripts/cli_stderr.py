@@ -1,10 +1,14 @@
-"""#937/#952/#953: fixed stderr and output-path oracles for real CLIs, with LF/CRLF."""
+"""#937/#952/#953/#974: fixed stderr and output-path oracles for real CLIs, with LF/CRLF."""
 import argparse
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
 import re
 import resource
+import queue
+import subprocess
+import threading
 import signal
 import tempfile
 
@@ -64,6 +68,8 @@ def prepare(work, case, separator):
 
 
 def options(case, operation):
+    if 'args' in case:
+        return case['args']
     output = case.get('output', 'out')
     return {
         'inspect': ['deps', 'inspect'],
@@ -122,7 +128,10 @@ def remove_created(work, case, before):
 
 def observe(command, case, operation, work, native):
     args = [arg.replace('${WORK}', str(work)) for arg in options(case, operation)]
-    actual = run(command, args, work, native, **limited(case))
+    actual = command(args) if callable(command) else run(command, args, work, native, **limited(case))
+    if 'args' in case:
+        # Unicode separators in a nonblank path are part of the diagnostic, not LF.
+        actual['lastError'] = actual['stderr'].removesuffix('\n').rsplit('\n', 1)[-1]
     return {key: normalize(actual[key], work) if isinstance(actual[key], str) else actual[key]
             for key in ('exit', 'stdout', 'lastError')}, actual
 
@@ -138,9 +147,13 @@ def exercise(cases, directory, commands, evidence, trees=None):
             evidence['excluded'].append({'case': case['id'], 'observations': len(case['operations']) * 4,
                 'reason': 'Execution user can access chmod(000/555/444); permission denial is not exercised.'})
             continue
-        for ending, separator in [('LF', '\n'), ('CRLF', '\r\n')]:
-            work = directory / (case['id'] + '-' + ending)
-            prepare(work, case, separator)
+        endings = [('argv', '\n')] if case['scope'] == 'blank' else [('LF', '\n'), ('CRLF', '\r\n')]
+        for ending, separator in endings:
+            # Blank argv cases have no inputs and require an empty tree after every call.
+            # Sharing this cwd lets CodegenBatchHost use one JVM for the whole table.
+            work = directory / ('blank-argv' if case['scope'] == 'blank' else case['id'] + '-' + ending)
+            if case['scope'] != 'blank' or not work.exists():
+                prepare(work, case, separator)
             try:
                 before = snapshot(work)
                 for operation in case['operations']:
@@ -160,7 +173,7 @@ def exercise(cases, directory, commands, evidence, trees=None):
                         # Existing caller-owned output/file cases must remain byte-for-byte intact;
                         # only the fixture's listed paths (Java's per-file writes) may appear.
                         after = snapshot(work)
-                        if case['scope'] == 'paths' or 'tree' in case:
+                        if case['scope'] in ('paths', 'blank') or 'tree' in case:
                             entry['before'] = before
                             entry['after'] = after
                             assert after == {**before, **expected_tree(case, operation, host, ending, trees)}, (entry, 'tree')
@@ -187,6 +200,60 @@ def exercise(cases, directory, commands, evidence, trees=None):
         assert not evidence['excluded'], evidence['excluded']
 
 
+def blank_option_cases(table):
+    """Expand fixed argv/expected tables; never derive an oracle from either CLI."""
+    for value in table['values']:
+        for option in table['options']:
+            expected = (dict(exit=2, stdout='', lastError=table['usage']['java']) if value['blank']
+                        else {key: text.replace('${VALUE}', value['value']) if isinstance(text, str) else text
+                              for key, text in option['nonblank'].items()})
+            case = dict(id='blank-' + option['option'] + '-' + value['id'], scope='blank',
+                        operations=['playground'], args=[arg.replace('${VALUE}', value['value'])
+                                                       for arg in option['args']],
+                        expected={'argv': {'playground': expected}})
+            if value['blank']:
+                case['nativeExpected'] = {'playground': dict(exit=2, stdout='', lastError=table['usage']['rust'])}
+            yield case
+
+
+@contextmanager
+def blank_java_host(java, classpath, work):
+    """Test-only batch host delegates every vector to the real CodegenMain.run."""
+    env = dict(os.environ, LC_ALL='C.UTF-8')
+    with tempfile.TemporaryFile() as errors:
+        process = subprocess.Popen([java, '-Djava.io.tmpdir=' + str(work), '-cp', classpath,
+                                    'org.unlaxer.dsl.CodegenBatchHost'], cwd=work, env=env,
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors)
+        lines = queue.Queue()
+        reader = threading.Thread(target=lambda: [lines.put(line) for line in process.stdout]
+                                  + [lines.put(None)], daemon=True)
+        reader.start()
+
+        def call(args):
+            process.stdin.write((json.dumps(args) + '\n').encode())
+            process.stdin.flush()
+            try:
+                line = lines.get(timeout=30)
+            except queue.Empty:
+                raise AssertionError('Java blank-option fixture timed out') from None
+            assert line is not None, 'Java blank-option host stopped'
+            actual = json.loads(line)
+            return actual
+
+        try:
+            yield call
+        finally:
+            process.stdin.close()
+            try:
+                assert process.wait(timeout=5) == 0, 'Java blank-option host failed'
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+                process.stdout.close()
+                reader.join(timeout=5)
+
+
 def main():
     # Fixed permission oracle, independent of the invoking shell's umask.
     os.umask(0o022)
@@ -194,20 +261,27 @@ def main():
     parser.add_argument('--java', required=True)
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
-    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax', 'profile'], required=True)
+    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax', 'profile', 'blank'], required=True)
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
     corpus = json.loads((ROOT / 'spec-corpus/cli-stderr.json').read_text())
-    cases = [c for c in corpus['cases'] if c['scope'] == args.suite]
+    cases = (list(blank_option_cases(corpus['blankOptions'])) if args.suite == 'blank'
+             else [c for c in corpus['cases'] if c['scope'] == args.suite])
     assert len(cases) == corpus['counts'][args.suite], 'fixtures must not silently disappear'
     evidence = dict(excluded=[], observations=[], checks=[])
     try:
         with tempfile.TemporaryDirectory(prefix='cli-stderr-', dir=os.environ.get('TMPDIR')) as directory:
-            exercise(cases, Path(directory), [
-                ('java', [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
-                ('rust', [args.rust])], evidence, corpus.get('trees'))
+            if args.suite == 'blank':
+                work = Path(directory) / 'blank-argv'
+                work.mkdir()
+                with blank_java_host(args.java, args.classpath, work) as host:
+                    exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence)
+            else:
+                exercise(cases, Path(directory), [
+                    ('java', [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
+                    ('rust', [args.rust])], evidence, corpus.get('trees'))
         excluded = {entry['case'] for entry in evidence['excluded']}
-        assert len(evidence['observations']) == sum(len(c['operations']) * 4 for c in cases
+        assert len(evidence['observations']) == sum(len(c['operations']) * (2 if args.suite == 'blank' else 4) for c in cases
                                                    if c['id'] not in excluded)
     finally:
         Path(args.output).write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n')
