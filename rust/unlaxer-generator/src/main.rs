@@ -1,4 +1,4 @@
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -281,6 +281,18 @@ fn io_error(error: io::Error) -> (u8, String) {
     (4, error.to_string())
 }
 
+// String.isBlank / Character.isWhitespace on JDK17 and JDK21. Rust's Unicode
+// White_Space includes NBSP/NEL and excludes U+001C..U+001F, so do not use it.
+fn java_option_is_blank(value: &OsStr) -> bool {
+    value.to_str().is_some_and(|value| {
+        value.chars().all(|ch| {
+            matches!(ch, '\u{0009}'..='\u{000d}' | '\u{001c}'..='\u{0020}'
+                | '\u{1680}' | '\u{2000}'..='\u{2006}' | '\u{2008}'..='\u{200a}'
+                | '\u{2028}' | '\u{2029}' | '\u{205f}' | '\u{3000}')
+        })
+    })
+}
+
 fn run_playground(args: Vec<OsString>) -> Result<String, (u8, String)> {
     if args == [OsString::from("playground"), OsString::from("--help")] {
         return Ok(PLAYGROUND_HELP.into());
@@ -299,7 +311,7 @@ fn run_playground(args: Vec<OsString>) -> Result<String, (u8, String)> {
             option,
             "--grammar" | "--profile" | "--package" | "--manifest" | "--output"
         ) || cursor + 1 == args.len()
-            || args[cursor + 1].is_empty()
+            || java_option_is_blank(&args[cursor + 1])
             || args[cursor + 1].to_string_lossy().starts_with("--")
         {
             return Err((2, PLAYGROUND_HELP.into()));
