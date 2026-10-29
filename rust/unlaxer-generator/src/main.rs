@@ -263,6 +263,7 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     if !warnings.is_empty() {
         eprintln!("{warnings}");
     }
+    let output = output_path(&output);
     write_artifacts(&output, &files, check).map_err(io_error)?;
     Ok(format!(
         "{} {} Rust module files in {}",
@@ -341,14 +342,22 @@ fn run_playground(args: Vec<OsString>) -> Result<String, (u8, String)> {
         unlaxer_generator::playground::generate_file_with_errors(&grammar.unwrap())
             .map_err(file_error)?
     };
+    let given = output_path(&output);
+    let given = if given.is_absolute() {
+        given
+    } else {
+        std::env::current_dir().map_err(io_error)?.join(given)
+    };
+    // Java checks both spellings: normalization must not hide a symlink in a/../b.
+    reject_symlink_ancestors(&given).map_err(io_error)?;
+    let output = unlaxer_generator::modules::normalize(&given).map_err(|e| (4, e))?;
     write_playground(&output, &files, check).map_err(io_error)?;
     Ok(format!("{} {} playground files in {}\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.",
         if check { "Verified" } else { "Generated" }, files.len(), output.display()))
 }
 
 fn write_playground(output: &Path, files: &[GeneratedFile], check: bool) -> io::Result<()> {
-    let output = std::path::absolute(output)?;
-    reject_symlink_ancestors(&output)?;
+    reject_symlink_ancestors(output)?;
     if check {
         for file in files {
             let destination = output.join(&file.relative_path);
@@ -401,7 +410,7 @@ fn write_playground(output: &Path, files: &[GeneratedFile], check: bool) -> io::
         if output.exists() {
             return Err(invalid("output was created during generation"));
         }
-        fs::rename(&staging, &output).map_err(|e| path_error(&output, e))
+        fs::rename(&staging, output).map_err(|e| path_error(output, e))
     })();
     result.map_err(|error| {
         invalid(format!(
@@ -414,24 +423,65 @@ fn invalid(message: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message.into())
 }
 
-fn reject_symlink_ancestors(path: &Path) -> io::Result<()> {
-    for ancestor in path.ancestors().filter(|p| !p.as_os_str().is_empty()) {
-        // A trailing slash or /. makes stat follow the link on Unix. Remove only
-        // lexical dot/slash decoration; do not resolve '..' through a symlink.
-        let normalized: PathBuf = ancestor.components().collect();
-        match fs::symlink_metadata(&normalized) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err(invalid(format!(
-                    "refusing symbolic link {}",
-                    ancestor.display()
-                )))
+// Unix Path.of collapses separators, but retains dot and parent components.
+// Path::components would also remove dots; canonicalize would follow symlinks.
+fn output_path(path: &Path) -> PathBuf {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+        let mut bytes = Vec::new();
+        for &byte in path.as_os_str().as_bytes() {
+            if byte != b'/' || bytes.last() != Some(&b'/') {
+                bytes.push(byte);
             }
-            Ok(_) => {}
-            // Java Files.isSymbolicLink returns false when attributes cannot be read.
-            Err(_) => {}
         }
+        if bytes.len() > 1 && bytes.last() == Some(&b'/') {
+            bytes.pop();
+        }
+        OsString::from_vec(bytes).into()
+    }
+    #[cfg(not(unix))]
+    path.to_owned()
+}
+
+fn reject_symlink_ancestors(path: &Path) -> io::Result<()> {
+    if let Some(link) = symbolic_link_ancestor(path) {
+        return Err(invalid(format!(
+            "refusing symbolic link {}",
+            link.display()
+        )));
     }
     Ok(())
+}
+
+fn symbolic_link_ancestor(path: &Path) -> Option<PathBuf> {
+    let mut cursor = Some(output_path(path));
+    while let Some(path) = cursor {
+        // Like Files.isSymbolicLink, mask attribute errors; the write reports them.
+        if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Some(path);
+        }
+        cursor = output_parent(&path);
+    }
+    None
+}
+
+// Java getParent retains dots: the parent of link/. is link, unlike Rust Path.
+fn output_parent(path: &Path) -> Option<PathBuf> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+        let bytes = path.as_os_str().as_bytes();
+        if bytes == b"/" {
+            return None;
+        }
+        bytes
+            .iter()
+            .rposition(|&b| b == b'/')
+            .map(|index| OsString::from_vec(bytes[..index.max(1)].to_vec()).into())
+    }
+    #[cfg(not(unix))]
+    path.parent().map(Path::to_owned)
 }
 
 // Java NIO path exceptions for output operations (EISDIR differs from input reads).
@@ -481,16 +531,33 @@ fn create_output_directories(path: &Path) -> io::Result<()> {
         Err(_) => {}
     }
     let absolute = std::path::absolute(path)?;
-    let mut missing = vec![absolute.as_path()];
-    for parent in absolute.ancestors().skip(1) {
-        match fs::metadata(parent) {
+    let mut parent = absolute.parent();
+    while let Some(candidate) = parent {
+        match fs::metadata(candidate) {
             Ok(_) => break,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => missing.push(parent),
-            Err(error) => return Err(path_error(parent, error)),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => parent = candidate.parent(),
+            Err(error) => return Err(path_error(candidate, error)),
         }
     }
-    for directory in missing.into_iter().rev() {
-        create(directory).map_err(|e| path_error(directory, e))?;
+    let parent = parent.ok_or_else(|| invalid("output needs an existing ancestor"))?;
+    // Java walks parent.relativize(absolute), which folds dot/parent pairs.
+    // Keep the original destination for the subsequent open and its error: when
+    // out is absent, out/../out2 creates only out2, then opening the file fails.
+    let mut relative = Vec::new();
+    for component in absolute.strip_prefix(parent).unwrap().components() {
+        use std::path::Component;
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir if matches!(relative.last(), Some(Component::Normal(_))) => {
+                relative.pop();
+            }
+            other => relative.push(other),
+        }
+    }
+    let mut directory = parent.to_owned();
+    for component in relative {
+        directory.push(component);
+        create(&directory).map_err(|e| path_error(&directory, e))?;
     }
     Ok(())
 }
@@ -503,7 +570,19 @@ fn cannot_write(destination: &Path, error: io::Error) -> io::Error {
 }
 
 fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::Result<()> {
-    reject_symlink_ancestors(output)?;
+    if fs::symlink_metadata(output).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(invalid(format!(
+            "output directory must not be a symbolic link: {}",
+            output.display()
+        )));
+    }
+    // Intentional native policy: do not write through caller-owned symlink ancestors.
+    if let Some(link) = symbolic_link_ancestor(output) {
+        return Err(invalid(format!(
+            "output directory must not have a symbolic link ancestor: {}",
+            link.display()
+        )));
+    }
     // Preflight every artifact. Unsupported input and handwritten files cause no writes.
     for file in files {
         let destination = output.join(&file.relative_path);
@@ -545,6 +624,20 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
         let destination = output.join(&file.relative_path);
         create_output_directories(destination.parent().unwrap())
             .map_err(|e| cannot_write(&destination, e))?;
+        // Rename alone bypasses a read-only existing artifact. Check the same
+        // write access as Java, without truncating it or following a raced link.
+        let mut access = OpenOptions::new();
+        access.write(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            access.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+        }
+        match access.open(&destination) {
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(cannot_write(&destination, path_error(&destination, error))),
+        }
         // A sibling temporary keeps Java's per-file directory permissions and write order.
         let temporary = destination
             .parent()

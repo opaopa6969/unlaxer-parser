@@ -83,6 +83,28 @@
    printf '%s\n' 'if(0,neg(2*3),4+5)' | rust/target/release/unlaxer-evolution-example
    ```
 
+## native CLI の出力先パス（#952）
+
+`unlaxer generate` の成功 stdout（`--check` の `Verified` も含む）は Java の `Path.of` と同じ綴りになります。
+例えば `--output out/` は `in out`、`out//x` は `in out/x`。相対パスと `.`・`..` は保持します。
+Playground の `Generated` / `Verified` は絶対・字句正規化したパスになります。
+作業ディレクトリが `/work` なら `./pg`・`pg/`・`pg/.` は `in /work/pg`、
+`missing/../pg2` は `in /work/pg2` です。stdout の引数の綴りに依存したスクリプトを更新してください。
+Playground の失敗文も同じ正規化先を指し、打ち消した `missing/` は作りません。
+
+generate で `out` が無い状態の `out/../out2` は Java と同じく `out2/` だけを作り、
+`cannot write out/../out2/mod.rs: out/../out2/mod.rs`（終了4）になります。
+この形で生成していた場合は `--output out2` を指定してください。
+既存生成物が mode 444 の場合も、rename で置換せず終了4で失敗します。
+書き換えるファイルの権限を利用者が明示的に変更してから再実行してください。
+
+generate の symlink 祖先拒否は、意図しない実体先へ書き込まない既存の native 方針として維持します。
+`link/out`（`link` が symlink）は `output directory must not have a symbolic link ancestor: link`。
+出力先自体の symlink / dangling symlink は Java と同じ
+`output directory must not be a symbolic link: P` です。詳細と共通 fixture は
+[出力先パスの契約](ubnf-packages.md#cli-の出力先パス952)を参照してください。
+正常な生成物の内容、`check --format json`、公開済み3.3.0は変更しません。
+
 ## 文法と生成 API
 
 | 対象・根拠 | 利用側の変更と詳しい契約 |

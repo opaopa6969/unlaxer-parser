@@ -1,4 +1,4 @@
-"""#937: fixed stderr oracles for both real CLIs, with LF/CRLF inputs."""
+"""#937/#952: fixed stderr and output-path oracles for real CLIs, with LF/CRLF."""
 import argparse
 import json
 import os
@@ -37,6 +37,21 @@ def write_permissions_apply(directory):
         probe.rmdir()
 
 
+def file_write_permissions_apply(directory):
+    probe = directory / 'file-permission-probe'
+    probe.write_bytes(b'probe')
+    probe.chmod(0o444)
+    try:
+        try:
+            with probe.open('r+b'):
+                return False
+        except PermissionError:
+            return True
+    finally:
+        probe.chmod(0o644)
+        probe.unlink()
+
+
 def prepare(work, case, separator):
     setup(work, case, separator)
     for name, encoded in case.get('bytes', {}).items():
@@ -44,6 +59,8 @@ def prepare(work, case, separator):
                                   + bytes.fromhex(encoded))
     for name in case.get('readOnly', []):
         (work / name).chmod(0o555)
+    for name in case.get('readOnlyFiles', []):
+        (work / name).chmod(0o444)
 
 
 def options(case, operation):
@@ -73,6 +90,21 @@ def created(case, operation, host):
     return expected[host] if isinstance(expected, dict) else expected
 
 
+def expected_tree(case, operation, host, ending, trees):
+    spec = case.get('tree', {}).get(operation, {})
+    if 'java' in spec:
+        spec = spec[host]
+    result = {name: (0o40755, 'directory') for name in spec.get('directories', [])}
+    for artifact in spec.get('artifacts', []):
+        for name, value in trees[artifact['template']][ending].items():
+            if 'include' in artifact and name not in artifact['include']:
+                continue
+            path = artifact['root'] + ('/' + name if name else '')
+            mode, content = value
+            result[path] = (mode[host] if isinstance(mode, dict) else mode, content)
+    return result
+
+
 def remove_created(work, case, before):
     readonly = [work / name for name in case.get('readOnly', [])]
     for path in readonly:
@@ -85,17 +117,20 @@ def remove_created(work, case, before):
 
 
 def observe(command, case, operation, work, native):
-    actual = run(command, options(case, operation), work, native, **limited(case))
+    args = [arg.replace('${WORK}', str(work)) for arg in options(case, operation)]
+    actual = run(command, args, work, native, **limited(case))
     return {key: normalize(actual[key], work) if isinstance(actual[key], str) else actual[key]
             for key in ('exit', 'stdout', 'lastError')}, actual
 
 
-def exercise(cases, directory, commands, evidence):
+def exercise(cases, directory, commands, evidence, trees=None):
     permissions = write_permissions_apply(directory)
+    file_permissions = file_write_permissions_apply(directory)
     for case in cases:
-        if case.get('readOnly') and not permissions:
+        if ((case.get('readOnly') and not permissions)
+                or (case.get('readOnlyFiles') and not file_permissions)):
             evidence['excluded'].append({'case': case['id'], 'observations': len(case['operations']) * 4,
-                'reason': 'Execution user can write chmod(555); permission denial is not exercised.'})
+                'reason': 'Execution user can write chmod(555/444); permission denial is not exercised.'})
             continue
         for ending, separator in [('LF', '\n'), ('CRLF', '\r\n')]:
             work = directory / (case['id'] + '-' + ending)
@@ -110,6 +145,8 @@ def exercise(cases, directory, commands, evidence):
                         evidence['observations'].append(entry)
                         print(json.dumps(entry, ensure_ascii=False), flush=True)
                         expected = case['expected'][ending][operation]
+                        if host == 'rust' and operation in case.get('nativeExpected', {}):
+                            expected = case['nativeExpected'][operation]
                         if host == 'rust' and 'nativeSyntax' in case:
                             expected = {**expected, 'lastError': case['nativeSyntax'][ending]}
                         assert observed == expected, (entry, expected)
@@ -117,34 +154,50 @@ def exercise(cases, directory, commands, evidence):
                         # Existing caller-owned output/file cases must remain byte-for-byte intact;
                         # only the fixture's listed paths (Java's per-file writes) may appear.
                         after = snapshot(work)
-                        assert {name: after.get(name) for name in before} == before, (entry, 'changed')
-                        new = sorted(normalize('/' + name, work)[1:] for name in set(after) - set(before))
-                        assert new == created(case, operation, host), (entry, new)
+                        if case['scope'] == 'paths':
+                            entry['before'] = before
+                            entry['after'] = after
+                            assert after == {**before, **expected_tree(case, operation, host, ending, trees)}, (entry, 'tree')
+                            if observed['exit'] == 0:
+                                checked, _ = observe(command, {**case, 'flags': ['--check']},
+                                                     operation, work, host == 'rust')
+                                evidence['checks'].append(dict(case=case['id'], ending=ending,
+                                                              operation=operation, host=host, observed=checked))
+                                assert checked == {**expected, 'stdout': expected['stdout'].replace('Generated ', 'Verified ', 1)}, checked
+                                assert snapshot(work) == after, (entry, '--check wrote files')
+                        else:
+                            assert {name: after.get(name) for name in before} == before, (entry, 'changed')
+                            new = sorted(normalize('/' + name, work)[1:] for name in set(after) - set(before))
+                            assert new == created(case, operation, host), (entry, new)
                         remove_created(work, case, before)
             finally:
                 for name in case.get('readOnly', []):
                     (work / name).chmod(0o755)
+                for name in case.get('readOnlyFiles', []):
+                    (work / name).chmod(0o644)
     if os.environ.get('GITHUB_ACTIONS'):
         assert not evidence['excluded'], evidence['excluded']
 
 
 def main():
+    # Fixed permission oracle, independent of the invoking shell's umask.
+    os.umask(0o022)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--java', required=True)
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
-    parser.add_argument('--suite', choices=['output', 'utf8', 'readiness', 'syntax'], required=True)
+    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax'], required=True)
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
     corpus = json.loads((ROOT / 'spec-corpus/cli-stderr.json').read_text())
     cases = [c for c in corpus['cases'] if c['scope'] == args.suite]
     assert len(cases) == corpus['counts'][args.suite], 'fixtures must not silently disappear'
-    evidence = dict(excluded=[], observations=[])
+    evidence = dict(excluded=[], observations=[], checks=[])
     try:
         with tempfile.TemporaryDirectory(prefix='cli-stderr-', dir=os.environ.get('TMPDIR')) as directory:
             exercise(cases, Path(directory), [
                 ('java', [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
-                ('rust', [args.rust])], evidence)
+                ('rust', [args.rust])], evidence, corpus.get('trees'))
         excluded = {entry['case'] for entry in evidence['excluded']}
         assert len(evidence['observations']) == sum(len(c['operations']) * 4 for c in cases
                                                    if c['id'] not in excluded)
