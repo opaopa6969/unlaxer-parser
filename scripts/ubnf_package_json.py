@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-COUNT = 127
+COUNT = 400
 
 
 def fixtures():
@@ -28,13 +28,13 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def lock_bytes(blobs, package):
+def lock_bytes(blobs, roots):
     packages = {}
     for name, data in blobs.items():
         document = json.loads(data.decode('utf-8-sig'))
-        packages[name] = {'id': name, 'version': '1.0.0', 'sha256': digest(data),
+        packages[name] = {'id': name, 'version': document['version'], 'sha256': digest(data),
                           'dependencies': {k: v['version'] for k, v in document['dependencies'].items()}}
-    return (json.dumps({'schemaVersion': 1, 'roots': {package: '1.0.0'}, 'packages': packages},
+    return (json.dumps({'schemaVersion': 1, 'roots': roots, 'packages': packages},
                       sort_keys=True, ensure_ascii=False, separators=(',', ':')) + '\n').encode()
 
 
@@ -42,7 +42,7 @@ def setup(folder, case):
     folder.mkdir(parents=True)
     standard = (ROOT / 'unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json').read_bytes()
     transitive = case.get('transitive', False)
-    package = 'team/parent' if transitive else 'std/layout'
+    package = case.get('package', 'team/parent' if transitive else 'std/layout')
     parent = {'schemaVersion': 1, 'id': package, 'version': '1.0.0', 'entry': 'parent.ubnf',
               'files': {'parent.ubnf': "grammar Parent { @ubnf: v2 token P ::= 'p'; }"},
               'dependencies': {'std/layout': {'version': '1.0.0', 'source': 'local:../artifact.json'}}}
@@ -50,7 +50,14 @@ def setup(folder, case):
     manifest = {'schemaVersion': 1, 'dependencies': {package: {'version': '1.0.0',
                 'source': 'local:nested/parent.json' if transitive else 'local:artifact.json'}}}
     blobs = {'std/layout': standard, **({package: primary} if transitive else {})}
-    lock = lock_bytes(blobs, package)
+    additional = case.get('additionalArtifacts', {})
+    if additional:
+        blobs = {}
+    for document in additional.values():
+        blobs[document['id']] = encode(document)
+    manifest = case.get('manifest', manifest)
+    roots = {name: dependency['version'] for name, dependency in manifest['dependencies'].items()}
+    lock = lock_bytes(blobs, roots)
     subject = case['subject']
     document = {'manifest': manifest, 'lock': json.loads(lock), 'artifact': json.loads(primary)}[subject]
     for edit in case.get('edits', []):
@@ -64,7 +71,28 @@ def setup(folder, case):
             field[key] = edit['value']
     if 'schema' in case:
         document['schemaVersion'] = case['schema']
+    # Raw member lists preserve duplicates and escape spellings that a dict would discard.
+    for index, edit in enumerate(case.get('rawEdits', [])):
+        field = document
+        for key in edit['path'][:-1]:
+            field = field[key]
+        field[edit['path'][-1]] = f'__raw_package_member_{index}__'
     raw = bytes.fromhex(case['bytesHex']) if 'bytesHex' in case else bytes.fromhex(case.get('prefixHex', '')) + encode(document) + case.get('suffix', '').encode()
+    for index, edit in enumerate(case.get('rawEdits', [])):
+        marker = encode(f'__raw_package_member_{index}__')
+        assert raw.count(marker) == 1
+        if 'nesting' in edit:
+            nesting = edit['nesting']
+            opening, closing = (b'[', b']') if nesting['shape'] == 'array' else (b'{"x":', b'}')
+            leaf = nesting.get('leaf', '0').encode('ascii')
+            budget = nesting.get('fillBytes', 0) - len(raw) + len(marker) - len(leaf)
+            depth = nesting.get('depth', budget // (len(opening) + len(closing)))
+            replacement = opening * depth + leaf + closing * depth
+            if 'fillBytes' in nesting:
+                replacement += b' ' * (budget - depth * (len(opening) + len(closing)))
+        else:
+            replacement = edit['json'].encode('ascii')
+        raw = raw.replace(marker, replacement + edit.get('after', '').encode('ascii'))
     if case.get('interiorBom'):
         raw = raw.replace(b',', b',\xef\xbb\xbf', 1)
     if case.get('uppercase'):
@@ -90,18 +118,22 @@ def setup(folder, case):
     (folder / 'art😀ifact.json').write_bytes(standard if transitive else primary)
     (folder / 'nested').mkdir()
     (folder / 'nested/parent.json').write_bytes(primary)
+    for name, document in additional.items():
+        path = folder / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(encode(document))
     # A valid pair in a removed component is allowed even without that directory.
     cache = folder / '.ubnf-cache/packages'
     cache.mkdir(parents=True)
     for name, data in blobs.items():
         sha = digest(standard if name == package and case.get('hashMismatch') else data)
-        (cache / (sha + '.json')).write_bytes(data)
+        (cache / (sha + '.json')).write_bytes(data + (b' ' if name in case.get('corruptCache', []) else b''))
     (folder / 'ubnf.lock.json').write_bytes(lock)
     declaration = f"@import layout from 'pkg:{package}'"
     source = f"grammar Main {{ // 😀\r\n {declaration}\r\n @ubnf: v2\r\n @root @mapping(Value) Start ::= 'a';\r\n}}"
     grammar = folder / 'main space 😀.ubnf'
     grammar.write_text(source, newline='')
-    return grammar, source, declaration, blobs, package
+    return grammar, source, declaration, blobs, roots
 
 
 def snapshot(folder):
@@ -142,7 +174,7 @@ def check_cli(directory, commands, evidence):
     for case in fixtures():
         print('package JSON CLI:', case['id'], flush=True)
         folder = directory / case['id']
-        grammar, _, _, blobs, package = setup(folder, case)
+        grammar, _, _, blobs, roots = setup(folder, case)
         before = snapshot(folder)
         record = {'case': case['id'], 'gap': case.get('gap', False), 'runs': []}
         evidence.append(record)
@@ -168,7 +200,7 @@ def check_cli(directory, commands, evidence):
                 assert snapshot(folder) == before, (case['id'], host, 'read-only snapshot changed')
         if len(generated) == 2:
             assert generated[0] == generated[1], (case['id'], 'generated bytes differ')
-        if case['subject'] == 'lock':
+        if case['subject'] == 'lock' and not case.get('resolveLock'):
             continue
         for existing in [False, True]:
             initial = before if existing else {}
@@ -177,7 +209,12 @@ def check_cli(directory, commands, evidence):
                 reset(folder, initial)
                 actual = run(command, ['deps', 'resolve', '--manifest', str(folder / 'ubnf.json')], host == 'rust')
                 after = snapshot(folder)
-                record['runs'].append(dict(host=host, operation='resolve', existingSnapshot=existing, snapshot=after, **actual))
+                # Keep multi-MiB generated fixtures out of the evidence JSON; assertions
+                # below still compare every raw byte, including failed snapshots.
+                recorded = {name: {'bytes': len(data) // 2, 'sha256': digest(bytes.fromhex(data))}
+                            if data != 'directory' else data for name, data in after.items()} if any(
+                                'fillBytes' in edit.get('nesting', {}) for edit in case.get('rawEdits', [])) else after
+                record['runs'].append(dict(host=host, operation='resolve', existingSnapshot=existing, snapshot=recorded, **actual))
                 error = expected(case, host, 'resolve')
                 assert actual['exit'] == (3 if error else 0), (case['id'], host, actual)
                 assert actual['lastError'] == ('E-PACKAGE: ' + error if error else ''), (case['id'], host, actual)
@@ -185,7 +222,7 @@ def check_cli(directory, commands, evidence):
                     assert after == initial, (case['id'], host, 'failed resolve published files')
                 else:
                     oracle = dict(initial)
-                    oracle.update({'ubnf.lock.json': lock_bytes(blobs, package).hex(),
+                    oracle.update({'ubnf.lock.json': lock_bytes(blobs, roots).hex(),
                                    '.ubnf-cache/': 'directory', '.ubnf-cache/packages/': 'directory'})
                     oracle.update({'.ubnf-cache/packages/' + digest(data) + '.json': data.hex() for data in blobs.values()})
                     assert after == oracle, (case['id'], host, 'raw lock/cache byte oracle differs')

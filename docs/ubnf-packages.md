@@ -113,9 +113,66 @@ HTTPS client と TLS は native target のみに含める。ブラウザー向�
 credential / CA 設定ファイルの上限は64 KiB。token は printable bearer 文字に限定する。
 設定ファイルと取得済み private artifact はユーザーが管理し、公開操作は行わない。
 
+資格情報 JSON は Java の `Files.readString` → Gson 2.13.2 STRICT の
+`fromJson(..., JsonElement.class)` を参照とする（#943）。JDK17 / JDK21 で同じ結果を確認した。
+検査順はファイルの有無 → 64 KiB 上限 → UTF-8 → JSON 全体 → 最上位 object →
+exact origin の object → `caCertificate` の型・CA 読取り → `bearerToken` の型・文字種。
+member の記述順にかかわらず CA の失敗が token の失敗より先になる。
+以下の診断にはすべて `E-PACKAGE: ` が付き、`deps resolve` の失敗は exit 3。
+
+| 入力 | 受理または診断 |
+| --- | --- |
+| 明示したファイルが存在しない | `artifact credentials file is missing` |
+| 既定ファイルが存在しない | 空の資格情報として続行 |
+| ディレクトリ・読取り権限なし・不正 UTF-8 | `cannot read artifact credentials` |
+| 65536 bytes | 上限内。UTF-8 / JSON の検査を続ける |
+| 65537 bytes 以上（8 MiB 超も同じ） | 内容を解析する前に `artifact credentials file exceeds limit` |
+| byte 0 の BOM 1つ + 有効 object | 受理 |
+| 空文書・JSON 空白だけ（BOM の有無を問わない） | `invalid artifact credentials` |
+| 有効な非 object（`null`・配列・文字列・数値・真偽値） | `invalid artifact credentials` |
+| 不正 JSON、BOM 2つ、空白の後の BOM、末尾余剰入力、深さ256以上 | `cannot read artifact credentials` |
+| exact origin がない / 別 origin の値が非 object | 空の資格情報として続行 / 別 origin は無視 |
+| exact origin の値が非 object | `invalid artifact credentials` |
+| `caCertificate` / `bearerToken` の値が文字列でない | その field の検査順で `invalid artifact credentials` |
+| 単独サロゲートを含む `bearerToken`（上位・下位・壊れた組） | JSON は受理し、token 検査で `invalid artifact credentials`。送信しない |
+| 単独サロゲートを含む `caCertificate` | JSON は受理し、パスの読取りで `cannot read artifact CA certificate` |
+| 単独サロゲートを含む origin key・field 名・未使用 member | JSON は受理。ASCII の exact origin / 固定 field と一致しない key は使わない |
+
+JSON 空白は space / tab / CR / LF だけ。重複 key は最初の位置・最後の値を保持するが、
+上書きされた値も含め構文を検査する。未使用の範囲外数値は表記のまま受理し、数値は1023文字まで、
+object / array の深さは最上位を含め255まで。Rust は package 専用 reader と BOM・サロゲート escape の
+処理を再利用し、package の `JsonObject` 用診断とは分ける。新しい crate / serde_json feature は使わない。
+ASCII の固定 key だけを取得し、使用する文字列に限って単独サロゲートを既存の不正パス / ASCII 検査へ渡す。
+未使用 member に `files` / `entry` / `dependencies` があっても package の schema や #939 の制限は適用しない。
+
+任意の HTTP header を指定する機能はない。`headers` object、header 名やその値は未使用 member であり、
+非文字列や単独サロゲートを含んでも送信されない。資格情報から作る header は
+`Authorization: Bearer <token>` だけで、token は空でない `[A-Za-z0-9._~+/=-]+` に限定する。
+client 既定の `Host` / `User-Agent` と、Rust ureq だけが付ける `Accept: */*` は資格情報と無関係で、従来どおり。
+正常なサロゲート対もこの ASCII 制限では拒否する。JDK17 / JDK21 の `HttpRequest.Builder.header` を
+独立に測定すると、header 名・値の単独サロゲートは `IllegalArgumentException` になる。
+製品ではその前の token 検査で固定診断を返すため、JDK の値を含み得る例外文は出さない。
+
+資格情報を受理しても CA がなければ通常の TLS trust 検証が続く。未信頼のローカル TLS server に対する
+既存の最終診断は Java が `HTTPS artifact retrieval failed (TLS, timeout or size limit)`、Rust が
+`HTTPS artifact retrieval failed (TLS, timeout, status or redirect)`。これは JSON の受理差とは別の
+transport 診断差として [#956](https://github.com/opaopa6969/unlaxer-parser/issues/956) に分離し、
+この変更では両版の TLS / HTTP 処理を維持する。
+
+共通 `spec-corpus/package-credentials.json` の65件を、両 `deps resolve` に既存 lock/cache の有無両方で与える。
+Java を独立の期待値として、最終診断・終了コード・成功時の lock/cache raw bytes・失敗時の snapshot 不変・
+ローカル TLS server が受け取る Authorization を比較する。生成は資格情報を読まず、固定 cache だけを使用する。
+Java-host Rust / native Rust / Java flag CLI の生成は、`generate: true` の代表5形（受理・既定パス・
+明示ファイルなし・読取り権限なし・不正 JSON）で同じ2状態を照合し、ネットワーク不使用と資格情報非依存を確かめる。
+生成を全形で繰り返さないため、CLI 起動は650回から290回（Java は390回から160回）になる（#954）。
+読取り権限なしの形は、root など chmod(000) を読める実行ユーザーでは除外を記録し、CI（非 root）では除外を許さない。
+stdio の authoring も同じ読取り専用経路を使い、明示 resolve を持たないため、credentials 用の stdio ケースは追加しない。
+検証記録には header 値を残さず一致/欠落だけを記録する。#956 の2形も skip せず既存の host 別診断を照合する。
+
 `HttpsPackageConformanceTest` はローカル TLS server を使い、認証、lock/hash と生成物、
 未信頼 TLS/hostname、別 origin、redirect、容量、本文 timeout、remote→local 拒否、
-server 停止後のオフライン生成を両 CLI で照合する。CI は `rust-package-https.tsv` を保存する。
+server 停止後のオフライン生成を両 CLI で照合する。CI は `rust-package-https.tsv` と
+`rust-package-credentials.json`（件数・所要時間・値を含まない比較結果）を保存する。
 
 ## 定義の出典を確認する
 
@@ -284,7 +341,7 @@ Java の writer なし FIFO への差替えで open が止まる競合、正確�
 ## artifact の不正 UTF-8 診断（#919）
 
 cache と明示 `local:` artifact は、両版とも **`E-PACKAGE: invalid UTF-8 artifact`** で拒否する。
-Java の既存 strict decoder と利用者に見える文言を参照とし、Rust は `serde_json` に渡す前に
+Java の既存 strict decoder と利用者に見える文言を参照とし、Rust は package JSON reader に渡す前に
 `std::str::from_utf8` で全 bytes を検査する。Java の既存経路を維持する最小の変更として、
 Java 本体は変更せず、両言語に同じ fixture の回帰テストを追加した。置換文字での復号はしない。
 8 MiB 上限 →（cache は graph budget と raw hash）→ strict UTF-8 → JSON の順とし、
@@ -342,7 +399,7 @@ CI の `cross-language` 契約で両テストメソッドの実行を必須に�
 この正規化は明示 resolve に限る。#913 の bounded reader、#919 の UTF-8 判定、固定 cache の
 読取り、既存 package corpus の期待値、parser のホットパスは変更しない。
 
-### package JSON の受理境界（#914 / #926、残り #939）
+### package JSON の受理境界（#914 / #926 / #941、残り #939）
 
 Java（Gson 2.13.2）を参照とし、Java 本体・既存の注入経路は変更しない。
 manifest / lock / artifact の**先頭にある UTF-8 BOM を1つだけ** JSON 解析直前に読み飛ばす。
@@ -358,18 +415,25 @@ artifact の raw bytes は一切変換せず、BOM も含む SHA-256 を lock �
 | BOM 1つ + 有効 JSON | 受理 |
 | BOM 1つ + JSON 空白 + 有効 JSON | 受理 |
 | BOM 2つ + 有効 JSON | `E-PACKAGE: invalid JSON` |
-| BOM だけ / BOM + JSON 空白だけ | `E-PACKAGE: expected object: document` |
+| 空文書 / JSON 空白だけ（BOM の有無を問わない） | `E-PACKAGE: expected object: document` |
+| 非 object の最上位（`null` / 配列 / 数値 / 文字列 / `true` / `false`、BOM の有無を問わない） | `E-PACKAGE: invalid JSON` |
+| 文書全体の object / array の深さが255以下 | 受理後に既存の field 検査。無視される metadata も同じ |
+| 深さ256以上（上書きされる重複 member の値も含む） | `E-PACKAGE: invalid JSON` |
 | BOM + 不正 JSON | `E-PACKAGE: invalid JSON` |
 | 空白の後の BOM / JSON token 間の U+FEFF | `E-PACKAGE: invalid JSON` |
 | JSON 文字列内の U+FEFF | 文字列の一部として保持 |
 | BOM + 不正 UTF-8 | manifest/lock は `invalid JSON`、artifact は `invalid UTF-8 artifact` |
 | cache の raw hash 不一致 | BOM・UTF-8・JSON の検証より先に `artifact hash mismatch: <id>` |
 
-BOM のない空文書・空白だけの文書と非 object の top-level（Java は前者が `expected object: document`、後者が `invalid JSON` で、Rust は逆）、
-serde_json の再帰上限を超える深い入れ子は、BOM とは別の既存差として
-[#941](https://github.com/opaopa6969/unlaxer-parser/issues/941) で扱う。
-複数の不正な依存の検査順（Java は記述順、Rust は key の辞書順）は [#942](https://github.com/opaopa6969/unlaxer-parser/issues/942)、
-HTTPS の credentials ファイルの BOM・単独サロゲート・不正 JSON の差は [#943](https://github.com/opaopa6969/unlaxer-parser/issues/943) で扱う。
+JSON 空白は space / tab / CR / LF の4種類だけで、form feed / vertical tab は `invalid JSON`。
+Gson の `fromJson(String, JsonObject.class)` は空文書で Java の `null` を返す一方、JSON の `null` は
+`JsonSyntaxException` になるため、両者の診断を分ける（#941）。
+深さは最上位 object を1と数える。例えば `{"meta":` に配列254段を続けた文書は受理し、255段は拒否する。
+Gson 2.13.2 STRICT の既定 nesting limit を実 JDK17 / JDK21 で測定し、旧 Rust 境界127/128と
+Gson 境界255/256の前後、8 MiB までの入れ子を確認した。後者も `JsonSyntaxException` で拒否され、
+`StackOverflowError` は観測しなかった。Java の設定・実装は変えず、Rust も255を超えて受理しない。
+object の検査順は下記 #942 のとおり Java の記述順に揃える。
+HTTPS の credentials ファイルは上記の資格情報節の規則を使う（#943）。空文書と非 object の診断は package 文書と異なる。
 
 単独サロゲート escape は有効な ASCII bytes なので、不正 UTF-8 とは別に扱う。
 Gson が受理する `\ud800` / `\udc00` と壊れた組について、次のようにフィールド検証まで進める。
@@ -390,13 +454,13 @@ Gson が受理する `\ud800` / `\udc00` と壊れた組について、次のよ
 | 未使用の metadata 文字列 | 受理。raw artifact bytes をそのまま cache へ保存 |
 | 正常なサロゲート対の `local:`、artifact file/entry、本文 | Unicode scalar として従来どおり受理 |
 
-Rust は通常の `serde_json` 解析が失敗した場合だけ、JSON 文字列中の単独サロゲート escape を検出する。
-正常な組、escape された backslash/quote は変えず、JSON の構造・一般の不正 escape・末尾余剰入力は
-引き続き `serde_json` が全体を検査する。重複 member は最後の値を使用する。
+Rust は package JSON 解析が失敗した場合だけ、JSON 文字列中の単独サロゲート escape を検出する。
+正常な組、escape された backslash/quote は変えない。下記の package 専用 reader が JSON 全体の構造・数値・
+末尾余剰入力を、既存 `serde_json` が各文字列と一般の escape を検査する。重複 member は最後の値を使用する。
 内部 marker は既存 NUL と区別して符号化し、既存 NUL を復元する。単独サロゲートを含む metadata は
 ASCII 検証または不正パス検証を通らない NUL sentinel にし、既存の検証順で診断する。
 そのため schema/version エラーが source の取得より先に出て、正常な lock/cache の固定 load も維持される。
-新しい JSON parser / 外部 crate は追加せず、UBNF parser のホットパスには処理を追加しない。
+外部 JSON parser / crate は追加せず、UBNF parser のホットパスには処理を追加しない。
 
 実際の UTF-16 文字列を使う以下の field は、置換で受理するとファイル同一性・文法本文・source 位置を変える。
 Java の受理集合を狭めず、Rust は従来の `invalid JSON` を維持する意図した暫定差とし、
@@ -411,14 +475,145 @@ Java の受理集合を狭めず、Rust は従来の `invalid JSON` を維持す
 | artifact.files の本文（末尾コメント） | resolve / generate / inspect 成功 | `invalid JSON` |
 | manifest / artifact の HTTPS source host | cache load 成功、resolve は `HTTPS artifact URL must omit credentials, query and fragment` | load / resolve とも `invalid JSON` |
 
-共通 `spec-corpus/package-json-acceptance.json` の127件（共通結果114件、上記暫定差13件）を
-両実 stdio と Java-host Rust / native Rust / Java flag CLI、manifest / artifact は両 `deps resolve` に送る。
+共通 `spec-corpus/package-json-acceptance.json` の400件（#914/#926 の127件、#942 の69件、#941 の166件、#947 の38件。うち上記暫定差13件）を
+両実 stdio と Java-host Rust / native Rust / Java flag CLI、manifest / artifact と resolve 対象の lock は両 `deps resolve` に送る。
+#941 は空文書・非 object・BOM・配列/object の深さ境界、深い単独サロゲート・不正 escape・末尾余剰入力・
+上書きされる深い値・files の非文字列を含む。8 MiB の入れ子はテスト内で生成し、巨大な fixture を保存しない。
 上位・下位・壊れた組・正常な組・消える成分、NUL、escape された field 名、重複 source、
 一般の不正 JSON と schema の優先順を含む。stdio の message/code/severity/UTF-16 range 全体と後続 request、
 CLI の最終診断行と既存の終了コード（generate / resolve は3、Java flag CLI は4）、
 成功時の lock/cache raw bytes 一致、失敗時の snapshot 不変（既存 snapshot の有無両方）を照合する。
 暫定差の13件も実行し、host 別 oracle を台帳に記録する。テストを skip して一致扱いにはしない。
 既存 package corpus の期待値は変更しない。
+
+
+### package JSON の member 順序（#942）
+
+入力の object は Java の Gson `JsonObject` と同じ記述順で検査・走査する。
+例えば `dependencies` の `b!`（不正 ID）が `a/x`（不正 version）より前なら
+`invalid package ID`、逆なら `exact package version required` を先に報告する。
+単独サロゲートを含む不正 ID も同じ順序で既存の検証へ渡す。
+
+Gson 2.13.2 STRICT を JDK17 / JDK21 で実測すると、重複 key は拒否せず、
+**最初の記述位置を保持し、最後の値で置き換える**。`"b"` と `"\u0062"` は同じ key、
+`"b\ud800"` と `"b\uD800"` も同じ key になる。最初の値が不正でも最後の値が有効なら
+その field は有効だが、上書きされた値を含め JSON 全体の構文検査は省かない。
+object の等値比較は順序に依存しないため、正常な lock の roots や dependencies の並べ替えで
+stale lock / identity conflict にしてはならない。
+
+Rust の `packages/value.rs` は入力だけの木を持つ。member は記述順の `Vec`、key 順の索引は
+同じ `Vec` の要素に置き、各 key は一度だけ保持する。lookup は二分探索、object の等値比較は key 順で行う。
+#947 で数値トークンをそのまま保持するため、#941 の `packages/value/depth.rs` の明示スタックを
+浅い入力にも共用する。object / array / 区切り / 数値の構文を検査し、key・文字列・真偽値・null の復号は
+既存 serde_json に任せる。`serde_json::Value` や numeric map protocol を入力に使わないため、
+DAP の `arbitrary_precision` が workspace で統合されても、package の受理と診断は単独 build と同じになる。
+重複 key は一時 BTreeMap で逐次置換し、最初の位置と最後の値を保持する。深さは最上位を含め最大255 frame。
+既存の surrogate 復元・木の解放も255段以下に制限し、debug / release の2 MiB thread stackで検証する。
+
+数値は変換せず表記を保持する。22 bytes 以下は inline、それより長い表記だけを heap に置くため、
+小さい数値の配列で個別の割当てを増やさず、`Value` は32 bytes（従来の serde_json::Value 以下）を維持する。
+lock の出力には検証済みの文字列参照だけを既存の辞書順 JSON object へ移す。
+未使用 metadata とその数値を再エンコードせず、cache は元の artifact bytes のままとする。
+
+新しい crate / feature / license 依存は追加しない。#940 の BOM・サロゲート復元はこの木に適用し、
+raw bytes の reader・hash・UTF-8 の順序は変えない。この表現は package 入力だけに限定し、
+DAP / LSP の一般 JSON、UBNF parser のホットパスには適用しない。credentials は #943 で
+この reader を共用するが、JsonElement の受理と固定 field の検査を別経路で行う。
+#939 の file/entry/HTTPS の単独サロゲートに残る挙動も変更しない。
+
+#941 の再測定（Linux x86_64、Rust 1.85.0、`deps resolve`、各3回の中央値、時間 s / peak RSS MiB）。
+基点は #946 merge 後の `a40c7513`。比較には同じ入力と固定した standalone binary を使う。
+共有マシンなので時間には実行負荷による変動があるが、通常入力のメモリ水準を維持する。
+性能作業の凍結（#197）に従い、性能改善や CI の速度判定は追加していない。
+
+| 入力 | 基点 release | #941 release |
+| --- | --- | --- |
+| 数値400万個の配列 | 0.25 / 133.4 | 0.25 / 133.8 |
+| `{"a":{"b":0}}` 50万個の配列 | 1.98 / 849.4 | 1.68 / 849.4 |
+| 60万 key の object | 0.63 / 208.3 | 0.66 / 207.9 |
+| 55万 key の逆順 object（値は配列） | 0.76 / 265.4 | 0.84 / 265.1 |
+| 10 key を計110万回書く重複 object | 0.17 / 10.1 | 0.18 / 9.9 |
+| 配列120段 | <0.01 / 3.9 | <0.01 / 3.9 |
+
+深い入力でも reader の8 MiB上限を維持する。最大深さ255の数値配列を横に伸ばす場合と、
+入力全体を入れ子にして256段で拒否する場合の測定は次のとおり。
+
+| 入力サイズ | 深さ255で受理 release | 同 debug | 深さ超過で拒否 release | 同 debug |
+| --- | --- | --- | --- | --- |
+| 約1 MiB | 0.05 / 20.8 | 0.19 / 25.4 | <0.01 / 5.7 | 0.01 / 10.1 |
+| 約2 MiB | 0.09 / 37.7 | 0.39 / 42.1 | <0.01 / 7.8 | 0.02 / 12.2 |
+| 約4 MiB | 0.18 / 71.8 | 0.88 / 76.2 | 0.01 / 11.6 | 0.04 / 16.3 |
+| 8 MiB | 0.45 / 139.5 | 1.76 / 143.0 | 0.05 / 19.7 | 0.09 / 24.0 |
+
+深さ255の object で重複 key を増やす入力も1/2/4/8 MiBで測定した。
+release は0.02/0.04/0.08/0.14 s、debug は0.18/0.30/0.86/1.43 sで、
+8 MiB時の peak RSS は11.7/16.0 MiBだった。入力サイズに対する二乗の増加は観測しなかった。
+深さ255/256・単独サロゲートとの組合せ・8 MiBの入れ子は、明示的に2 MiB stackを指定した
+Rust threadでも debug / release の両方で検証し、stack overflow は起きなかった。
+巨大入力は生成して測り、repository に実体は置かない。
+
+| object / 経路 | 入力の検査・走査順と観測可能な結果 | 出力の扱い |
+| --- | --- | --- |
+| manifest / lock / artifact の最上位と各固定 field | JSON 全体を読む。その後は既存の schema → 対象 field の固定順で検査し、最上位 member の並べ替えでは優先順を変えない。未知 metadata は使わない | artifact は元の bytes を保持 |
+| manifest `dependencies` の検証 | 記述順に ID → dependency の object 型 → version → source 型を検査。複数の不正 member の最初の診断に影響 | roots の出力は辞書順 |
+| manifest `dependencies` の `resolveOne` | 記述順に深さ優先で取得・内容検査。最初の取得失敗、identity conflict、cycle / 上限診断に影響 | 全 graph 成功後だけ lock/cache を書く |
+| artifact `files` | 記述順に path → 本文の型を検査。複数の不正 file の最初の診断に影響。その後の entry は key lookup。path は空・制御文字・backslash・先頭 `/`・`:`、次に各成分の空・`.`・`..` の順で検査 (#947) | files を再エンコードしない。cache は raw bytes |
+| artifact `dependencies` の検証・明示 resolve | 記述順に field 検証、その後同じ順の深さ優先走査 | pinned dependencies の出力は辞書順 |
+| lock `packages` の audit | 記述順に ID、locked package の object 型、pinned ID/version/SHA、各 dependencies を検査。最初の診断に影響 | 読取りでは lock を変更しない |
+| lock `packages.*.dependencies` の audit | 記述順に ID → version → locked dependency の object 型 → pinned version の文字列型・一致を検査。最初の診断に影響 | 同上 |
+| lock `roots` | object 型を確認し、manifest から作った参照と順序を無視して比較。不正な追加/値の変更は audit より先に stale lock。その後は記述順で pinned version を確認 | 同上 |
+| lock `packages` / `packages.*.dependencies` の cycle audit | 各 object の記述順で DFS。複数 cycle があると報告する ID に影響 | 同上 |
+| artifact の dependencies から作る `actual`（固定 cache load） | 記述順を保持して pinned 参照と順序を無視して比較し、同順に子を load。複数 cache の hash 不正などで最初の診断に影響 | 検証済み親は全依存の成功後だけ memo に載せる |
+| lock `packages` の `owner` | 記述順で SHA を照合し、最初に一致した所有者を選ぶ。正常な artifact は ID / raw hash 検証も通る必要がある | identity JSON の field 順は既存どおり |
+| lock / cache の生成 | Java は `TreeMap` で packages、roots、pinned dependencies と cache hash を整列。Rust は出力時だけ既存の辞書順へ変換 | lock の field 順・末尾 LF と既存 corpus の raw bytes を維持 |
+| generator / LSP の利用 | 上記の検証・走査を共用。失敗は最初の原因、CLI の既存 exit code、LSP の `E-MODULE`・severity 1・import 全体の UTF-16 range に現れる | 正常時の生成物・LSP JSON の順序は既存どおり |
+| `package_fetch` の credentials | JSON 全体を検査した後、origin / caCertificate / bearerToken の固定 key lookup。未知 member の schema 検査はしない (#943) | 資格情報は lock/cache に書かない |
+
+#942 の共通69件は ID/version、単独サロゲート ID、files、roots、重複 key と escape、
+package / dependency の cycle、直接・推移的 fetch、固定 cache load の順序を含む。
+両実 stdio の全診断と後続 completion / hover、3 CLI、両 `deps resolve` を照合する。
+lock 用の新 fixture も resolve へ渡し、入力 lock の不正を読み直さず正常な lock に再生成することを確認する。
+成功ケースは記述順を逆にした multi-package graph の lock/cache を Java と固定 byte 期待値に比較し、
+失敗ケースは既存 snapshot の有無両方で不変を検証する。既存127件の期待値は維持する。
+
+
+### package JSON の schema と数値（#947）
+
+Java（Gson 2.13.2 STRICT、UBNFPackageResolver）を参照し、Java の経路・受理集合・診断文は変更しない。
+文書全体の JSON 検査後、既存の固定 field 順と上表の記述順で次を検査する。
+
+| 入力 | 診断または受理 |
+| --- | --- |
+| manifest / artifact の `dependencies` の値が非 object（文字列・配列・重複 key の最後の値を含む） | ID の検査後に `expected object: dependency` |
+| artifact の files key / entry が空、ISO制御文字（U+0000–001F / U+007F–009F）、backslash、先頭 `/`、`:` を含む | `invalid package file path`。本文型や成分の検査より先 |
+| path 成分が空・`.`・`..` | `package file path escapes boundary` |
+| lock の roots が欠落・非 object | stale lock 比較より先に `expected object: roots` |
+| lock の packages に root がない | `expected object: locked root` |
+| lock の packages の値が非 object | `expected object: locked package` |
+| locked dependency の参照先が欠落・非 object | `expected object: locked dependency` |
+| 参照先の version が非文字列 | 一致比較より先に `expected string: version` |
+| 未使用 metadata の `1e999` / `-1e999` / 巨大整数 / `1e-999` | 数値に変換せず受理 |
+| `schemaVersion` | JSON 表記が `1` の数値だけを受理。`1.0` / `1e0` / `1E+0` / `1e999` / 文字列 / object は `unsupported schemaVersion` |
+| 数値を version / source / file 本文などの文字列用 field に置く | その field の既存の型診断。数値の範囲による `invalid JSON` にしない |
+| 数値トークンの長さ | Gson の reader buffer に合わせ1023文字まで受理、1024文字以上は `invalid JSON`。未使用でも同じ |
+| `{"$serde_json::private::Number":"1.5"}` など | 通常の object。key の位置・値によらず数値と解釈しない。単独 / workspace build 共通 |
+
+追加38件は各 schema 行・優先順・使用/未使用の数値・1023/1024境界・深さ255と単独サロゲートの
+組合せを含む。数値の代表は各文書で同じ metadata 配列にまとめ、同型のケース数を増やさない。
+既存362件を保持し、両実 stdio・3 CLI・両 deps resolve を実行する。新 lock ケースの resolve は
+入力 lock を検査せず再生成する既存仕様も確認する。Java の独立 oracle は JDK17 / JDK21 で同一。
+
+#947 のメモリ退行確認（基点 `1f9cdace`、同一入力・固定 standalone release binary、Rust 1.85.0、
+Linux x86_64、3回の中央値。時間 s / peak RSS MiB）。性能改善や CI 時間の判定は追加しない (#197)。
+
+| 入力 | 基点 | #947 |
+| --- | --- | --- |
+| 数値400万個の配列 | 0.26 / 133.8 | 0.17 / 133.0 |
+| `{"a":{"b":0}}` 50万個の配列 | 1.55 / 850.0 | 0.23 / 131.9 |
+| 60万 key の object | 0.82 / 208.8 | 0.46 / 155.0 |
+| 55万 key の逆順 object（値は `[0]`） | 0.51 / 265.9 | 0.35 / 218.0 |
+| 10 key を計110万回書く重複 object | 0.10 / 11.3 | 0.13 / 10.5 |
+| 配列120段 | <0.01 / 4.2 | <0.01 / 3.4 |
 
 
 ## grammar / manifest の基準ディレクトリ（#928）

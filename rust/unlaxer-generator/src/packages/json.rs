@@ -1,28 +1,84 @@
 //! Package-envelope compatibility with Gson, without changing raw artifact bytes.
-use serde_json::Value;
+use super::value::{Object, Value};
+
+/// Gson STRICT's JsonElement adapter, followed by the credentials object's fixed
+/// lookups. A present non-string stays `None` so fetch validates CA before token.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn credential_fields(
+    bytes: &[u8],
+    origin: &str,
+) -> Result<std::collections::BTreeMap<&'static str, Option<String>>, String> {
+    let unreadable = || super::error("cannot read artifact credentials");
+    let invalid = || super::error("invalid artifact credentials");
+    // Files.readString rejects malformed UTF-8 before Gson sees any of the text.
+    std::str::from_utf8(bytes).map_err(|_| unreadable())?;
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
+    if bytes
+        .iter()
+        .all(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
+    {
+        return Err(invalid());
+    }
+    // Unlike the package JsonObject adapter, JsonElement parses scalars too:
+    // malformed JSON is a read error; a valid non-object is a credentials error.
+    let (value, rewritten) = match super::value::parse(bytes) {
+        Ok(value) => (value, false),
+        Err(_) => {
+            let rewritten = rewrite(bytes).ok_or_else(unreadable)?;
+            (
+                super::value::parse(&rewritten).map_err(|_| unreadable())?,
+                true,
+            )
+        }
+    };
+    let document = value.as_object().ok_or_else(invalid)?;
+    let mut fields = std::collections::BTreeMap::new();
+    if let Some(entry) = document.get(origin) {
+        let entry = entry.as_object().ok_or_else(invalid)?;
+        for name in ["caCertificate", "bearerToken"] {
+            if let Some(value) = entry.get(name) {
+                // Origins and consumed member names are ASCII. Surrogate-bearing
+                // keys cannot match; leave unused members (including #939 names)
+                // alone. Consumed strings use the existing invalid-path/ASCII
+                // sentinel: neither boundary can accept an unpaired surrogate.
+                fields.insert(
+                    name,
+                    value
+                        .as_str()
+                        .map(|s| if rewritten { text(s).0 } else { s.to_owned() }),
+                );
+            }
+        }
+    }
+    Ok(fields)
+}
 
 pub(super) fn parse(bytes: &[u8], artifact: bool) -> Result<Value, String> {
     // Gson ignores exactly one BOM, only at byte zero. Hashing/UTF-8/size checks
     // belong to the caller and must continue to see the original bytes.
-    let bytes = if let Some(rest) = bytes.strip_prefix(b"\xef\xbb\xbf") {
-        if rest
-            .iter()
-            .all(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
-        {
-            return Err(super::error("expected object: document"));
-        }
-        rest
-    } else {
-        bytes
-    };
-    if let Ok(value) = serde_json::from_slice(bytes) {
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
+    if bytes
+        .iter()
+        .all(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
+    {
+        return Err(super::error("expected object: document"));
+    }
+    // Gson's JsonObject adapter rejects even a JSON null (unlike an empty document).
+    if bytes
+        .iter()
+        .find(|b| !matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
+        != Some(&b'{')
+    {
+        return Err(super::error("invalid JSON"));
+    }
+    if let Ok(value) = super::value::parse(bytes) {
         return Ok(value);
     }
-    // Only unpaired UTF-16 escapes get a compatibility pass. serde_json still
+    // Only unpaired UTF-16 escapes get a compatibility pass. The package reader
     // validates the entire JSON (including trailing input) before any field use.
     let invalid = || super::error("invalid JSON");
     let rewritten = rewrite(bytes).ok_or_else(invalid)?;
-    let mut value = serde_json::from_slice(&rewritten).map_err(|_| invalid())?;
+    let mut value = super::value::parse(&rewritten).map_err(|_| invalid())?;
     restore(&mut value, &mut Vec::new(), artifact).map_err(|_| invalid())?;
     Ok(value)
 }
@@ -118,8 +174,8 @@ fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<
             *s = decoded;
         }
         Value::Object(fields) => {
-            let mut restored = serde_json::Map::new();
-            for (key, mut child) in std::mem::take(fields) {
+            let mut restored = Vec::with_capacity(fields.len());
+            for (key, mut child) in std::mem::take(fields).into_entries() {
                 let (key, surrogate) = text(&key);
                 if surrogate && artifact && path.first().is_some_and(|p| p == "files") {
                     return Err(());
@@ -127,9 +183,10 @@ fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<
                 path.push(key.clone());
                 restore(&mut child, path, artifact)?;
                 path.pop();
-                restored.insert(key, child);
+                restored.push((key, child));
             }
-            *fields = restored;
+            // Distinct surrogate escapes may decode to the same sentinel key.
+            *fields = Object::from_entries(restored);
         }
         Value::Array(items) => {
             for child in items {
@@ -146,6 +203,306 @@ fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn credentials_distinguish_read_errors_from_document_and_origin_types() {
+        let origin = "https://localhost";
+        for bom in [b"".as_slice(), b"\xef\xbb\xbf"] {
+            for input in [
+                b"".as_slice(),
+                b" \r\n\t",
+                b"null",
+                b"[]",
+                b"true",
+                b"1e999",
+            ] {
+                assert_eq!(
+                    credential_fields(&[bom, input].concat(), origin).unwrap_err(),
+                    super::super::error("invalid artifact credentials")
+                );
+            }
+            for input in [
+                b"{".as_slice(),
+                b"{} true",
+                b"null true",
+                b"\xef\xbb\xbf\xef\xbb\xbf{}",
+                b"{\"unused\":\"\xff\"}",
+                br#"{"unused":"\ud800\q"}"#,
+            ] {
+                assert_eq!(
+                    credential_fields(&[bom, input].concat(), origin).unwrap_err(),
+                    super::super::error("cannot read artifact credentials")
+                );
+            }
+            assert!(credential_fields(&[bom, b"{}"].concat(), origin)
+                .unwrap()
+                .is_empty());
+        }
+        assert_eq!(
+            credential_fields(br#"{"https://localhost":null}"#, origin).unwrap_err(),
+            super::super::error("invalid artifact credentials")
+        );
+        assert!(
+            credential_fields(br#"{"https://unused.invalid":null}"#, origin)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn credentials_keep_fixed_lookup_types_duplicates_and_surrogate_boundaries() {
+        let fields = credential_fields(
+            br#"{"https://localhost":null,"https://localhost":{"caCertificate":null,"bearerToken":"\ud800","bearer\u0054oken":"fixture","bearerToken\ud800":false},"dependencies":{"x":{"source":"https://\ud800.invalid/"}}}"#,
+            "https://localhost",
+        )
+        .unwrap();
+        assert_eq!(fields["caCertificate"], None);
+        assert!(fields["bearerToken"].as_deref() == Some("fixture"));
+        for token in [r"\ud800", r"\udc00", r"\ud800x\udc00"] {
+            let input = format!(
+                r#"{{"https://localhost":{{"bearerToken":"{token}","caCertificate":"a\u0000sd800"}}}}"#
+            );
+            let fields = credential_fields(input.as_bytes(), "https://localhost").unwrap();
+            assert!(fields["bearerToken"].as_ref().unwrap().contains('\0'));
+            assert_eq!(fields["caCertificate"].as_deref(), Some("a\0sd800"));
+        }
+        let fields = credential_fields(
+            br#"{"https://localhost":{"caCertificate":"\ud83d\ude00.pem","bearerToken":"\\ud800"},"unused":"\ud800"}"#,
+            "https://localhost",
+        )
+        .unwrap();
+        assert_eq!(fields["caCertificate"].as_deref(), Some("😀.pem"));
+        assert!(fields["bearerToken"].as_deref() == Some(r"\ud800"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn credentials_reuse_gson_depth_numbers_and_validate_overwritten_values() {
+        for depth in [128, 255, 256] {
+            let input = format!(
+                r#"{{"unused":{}"\ud800"{},"unused":1e999}}"#,
+                "[".repeat(depth - 1),
+                "]".repeat(depth - 1)
+            );
+            assert_eq!(
+                credential_fields(input.as_bytes(), "https://localhost").is_ok(),
+                depth <= 255
+            );
+        }
+        for length in [1023, 1024] {
+            let input = format!(r#"{{"unused":{},"unused":0}}"#, "9".repeat(length));
+            assert_eq!(
+                credential_fields(input.as_bytes(), "https://localhost").is_ok(),
+                length == 1023
+            );
+        }
+    }
+
+    #[test]
+    fn objects_keep_first_position_last_value_and_order_independent_equality() {
+        let value = parse(
+            br#"{"b":{"a":2,"z":1,"z":3},"a":0,"\u0062":{"z":4,"a":5}}"#,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            value.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["b", "a"]
+        );
+        assert_eq!(
+            value["b"].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["z", "a"]
+        );
+        assert_eq!(value["b"]["z"], serde_json::json!(4));
+        let reordered = parse(br#"{"a":0,"b":{"a":5,"z":4}}"#, false).unwrap();
+        assert_eq!(value, reordered);
+        let value = parse(br#"{"b\ud800":1,"a":2,"b\uD800":3}"#, false).unwrap();
+        assert_eq!(
+            value.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["b\0", "a"]
+        );
+        assert_eq!(value["b\0"], serde_json::json!(3));
+    }
+
+    #[test]
+    fn wide_objects_and_mixed_arrays_keep_order_lookup_and_sorted_output() {
+        // Reverse-ordered wide object with duplicates, and scalar runs around nested objects.
+        let mut text = String::from("{");
+        for i in (0..3000).rev() {
+            text.push_str(&format!("\"k{i:04}\":{i},"));
+        }
+        text.push_str(r#""k0005":"last","x":[1,2,{"b":1,"a":2},3,[{"d":1,"c":2}],4]}"#);
+        let value = parse(text.as_bytes(), false).unwrap();
+        let object = value.as_object().unwrap();
+        assert_eq!(object.len(), 3001);
+        let keys: Vec<_> = object.keys().cloned().collect();
+        assert_eq!(keys[0], "k2999");
+        assert_eq!(keys[2994], "k0005");
+        assert_eq!(keys[2999], "k0000");
+        assert_eq!(keys[3000], "x");
+        for i in 0..3000 {
+            assert!(object.contains_key(&format!("k{i:04}")));
+        }
+        assert!(object.get("k3000").is_none() && object.get("").is_none());
+        assert_eq!(value["k0005"], "last");
+        assert_eq!(value["k0006"], serde_json::json!(6));
+        let x = |i: usize| match &value["x"] {
+            Value::Array(items) => items[i].clone(),
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            x(2).as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["b", "a"]
+        );
+        let Value::Array(inner) = x(4) else {
+            unreachable!()
+        };
+        assert_eq!(
+            inner[0].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["d", "c"]
+        );
+        let dependencies = parse(
+            br#"{"b":{"version":"1.0.0"},"a":{"version":"2.0.0"}}"#,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            super::super::output_references(&dependencies)
+                .unwrap()
+                .to_string(),
+            r#"{"a":"2.0.0","b":"1.0.0"}"#
+        );
+        // The ordered tree must not grow each JSON value beyond serde_json's own node.
+        assert!(std::mem::size_of::<Value>() <= std::mem::size_of::<serde_json::Value>());
+    }
+
+    #[test]
+    fn document_kind_and_gson_depth_limit() {
+        for bom in ["", "\u{feff}"] {
+            for input in ["", " \r\n\t"] {
+                assert_eq!(
+                    parse(format!("{bom}{input}").as_bytes(), false).unwrap_err(),
+                    super::super::error("expected object: document")
+                );
+            }
+            for input in [
+                "null",
+                "[]",
+                "1",
+                "\"x\"",
+                "true",
+                "false",
+                "\u{000b}",
+                "\u{000c}",
+                "{\"x\":1} true",
+                "{\"b\":1,\"b\":}",
+            ] {
+                assert_eq!(
+                    parse(format!("{bom}{input}").as_bytes(), false).unwrap_err(),
+                    super::super::error("invalid JSON")
+                );
+            }
+        }
+        // Explicitly exercise the default Rust test-thread stack even if RUST_MIN_STACK is set.
+        std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(|| {
+                for (open, close) in [("[", "]"), ("{\"x\":", "}"), ("[{\"x\":", "}]")] {
+                    for depth in [126, 127, 128, 253, 254, 255, 256] {
+                        for leaf in ["0", "\"\\ud800\"", "{\"b\":1,\"a\":2,\"b\":3}"] {
+                            let text = format!(
+                                "{{\"meta\":{}{leaf}{}}}",
+                                open.repeat(depth),
+                                close.repeat(depth)
+                            );
+                            let total =
+                                1 + depth * close.len() + usize::from(leaf.starts_with('{'));
+                            let result = parse(text.as_bytes(), false);
+                            assert_eq!(result.is_ok(), total <= 255, "depth={total}: {result:?}");
+                        }
+                    }
+                }
+                let bytes = format!(
+                    "{{\"meta\":{}0{}}}",
+                    "[".repeat(4_194_299),
+                    "]".repeat(4_194_299)
+                );
+                assert_eq!(bytes.len(), super::super::MAX_BYTES);
+                assert_eq!(
+                    parse(bytes.as_bytes(), false).unwrap_err(),
+                    super::super::error("invalid JSON")
+                );
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn numeric_tokens_and_reserved_keys_are_feature_independent() {
+        // Identical oracle for standalone and workspace (DAP arbitrary_precision).
+        for token in [
+            "1",
+            "1.0",
+            "1e0",
+            "1E+0",
+            "-0",
+            "1e999",
+            "-1e999",
+            "1e-999",
+            "123456789012345678901234567890",
+            "1234567890123456789012",
+            "12345678901234567890123",
+        ] {
+            let value = parse(format!("{{\"schemaVersion\":{token}}}").as_bytes(), false).unwrap();
+            let Value::Number(number) = &value["schemaVersion"] else {
+                panic!("numeric token")
+            };
+            assert_eq!(number.as_str(), token);
+            assert_eq!(super::super::versioned(&value).is_ok(), token == "1");
+        }
+        for depth in [0, 126, 253] {
+            for leaf in [
+                r#"{"$serde_json::private::Number":"1.5"}"#,
+                r#"{"$serde_json::private::Number":null,"x":1}"#,
+            ] {
+                let raw = format!(
+                    "{{\"meta\":{}{leaf}{}}}",
+                    "[".repeat(depth),
+                    "]".repeat(depth)
+                );
+                let value = parse(raw.as_bytes(), false).unwrap();
+                let mut value = &value["meta"];
+                for _ in 0..depth {
+                    let Value::Array(items) = value else {
+                        panic!("array")
+                    };
+                    value = &items[0];
+                }
+                assert!(value
+                    .as_object()
+                    .unwrap()
+                    .contains_key("$serde_json::private::Number"));
+            }
+        }
+        for length in [1023, 1024] {
+            let text = format!("{{\"meta\":{}}}", "9".repeat(length));
+            assert_eq!(parse(text.as_bytes(), false).is_ok(), length == 1023);
+        }
+        // Even an unused/overwritten token is fully validated before schema checks.
+        for token in [
+            "01", "-01", "+1", ".1", "1.", "1e", "1e+", "--1", "NaN", "Infinity", "1e999x",
+        ] {
+            let text = format!("{{\"schemaVersion\":2,\"meta\":{token},\"meta\":0}}");
+            assert_eq!(
+                parse(text.as_bytes(), false).unwrap_err(),
+                super::super::error("invalid JSON"),
+                "{token}"
+            );
+        }
+    }
 
     #[test]
     fn bom_is_single_initial_and_keeps_empty_document_diagnostic() {

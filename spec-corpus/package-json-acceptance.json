@@ -1793,5 +1793,4600 @@
       }
     ],
     "resolveError": "cannot read local artifact"
+  },
+  {
+    "id": "order-manifest-id-id-first",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-id-version-first",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-high-id-first",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-high-version-first",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-low-id-first",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-low-version-first",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-broken-pair-id-first",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800x\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-broken-pair-version-first",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800x\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-duplicate-first-position-last-value",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"b/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-duplicate-escaped-key",
+    "subject": "manifest",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"b/\\u0078\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-manifest-duplicate-surrogate",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800\":{\"version\":\"2.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-id-id-first",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-id-version-first",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-high-id-first",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-high-version-first",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-low-id-first",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-low-version-first",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-broken-pair-id-first",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800x\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-broken-pair-version-first",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800x\\udc00\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-duplicate-first-position-last-value",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"b/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-duplicate-escaped-key",
+    "subject": "artifact",
+    "loadError": "exact package version required",
+    "resolveError": "exact package version required",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a!\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"b/\\u0078\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-duplicate-surrogate",
+    "subject": "artifact",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"},\"a/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b\\ud800\":{\"version\":\"2.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-packages-id-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b!\":{\"id\":\"b!\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-id-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b!\":{\"id\":\"b!\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-high-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b\\ud800\":{\"id\":\"b\\ud800\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-high-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b\\ud800\":{\"id\":\"b\\ud800\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-low-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b\\udc00\":{\"id\":\"b\\udc00\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-low-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b\\udc00\":{\"id\":\"b\\udc00\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-broken-pair-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b\\ud800x\\udc00\":{\"id\":\"b\\ud800x\\udc00\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-broken-pair-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b\\ud800x\\udc00\":{\"id\":\"b\\ud800x\\udc00\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-duplicate-first-position-last-value",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b/x\":{\"id\":\"b/x\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a!\":{\"id\":\"a!\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b/x\":{\"id\":\"b/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-duplicate-escaped-key",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b/x\":{\"id\":\"b/x\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a!\":{\"id\":\"a!\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b/\\u0078\":{\"id\":\"b/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-packages-duplicate-surrogate",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"b\\ud800\":{\"id\":\"b\\ud800\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"a/x\":{\"id\":\"a/x\",\"version\":\"bad\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}},\"b\\ud800\":{\"id\":\"b\\ud800\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-id-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b!\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-id-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b!\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-high-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-high-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b\\ud800\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-low-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b\\udc00\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-low-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b\\udc00\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-broken-pair-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800x\\udc00\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-broken-pair-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b\\ud800x\\udc00\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-duplicate-first-position-last-value",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b/x\":\"1.0.0\",\"a!\":\"1.0.0\",\"b/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-duplicate-escaped-key",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b/x\":\"1.0.0\",\"a!\":\"1.0.0\",\"b/\\u0078\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-locked-dependencies-duplicate-surrogate",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "json": "{\"b\\ud800\":\"1.0.0\",\"a/x\":\"bad\",\"b\\ud800\":\"2.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-files-path-first",
+    "subject": "artifact",
+    "loadError": "package file path escapes boundary",
+    "resolveError": "package file path escapes boundary",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"z/../bad.ubnf\":\"text\",\"a.ubnf\":7}"
+      }
+    ]
+  },
+  {
+    "id": "order-roots-id-first",
+    "subject": "lock",
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"b\\ud800\":\"1.0.0\",\"a/x\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-files-text-first",
+    "subject": "artifact",
+    "loadError": "package file must contain source text",
+    "resolveError": "package file must contain source text",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"a.ubnf\":7,\"z/../bad.ubnf\":\"text\"}"
+      }
+    ]
+  },
+  {
+    "id": "order-roots-version-first",
+    "subject": "lock",
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"a/x\":\"bad\",\"b\\ud800\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-files-duplicate-first-position-last-value",
+    "subject": "artifact",
+    "loadError": "package file must contain source text",
+    "resolveError": "package file must contain source text",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"z.ubnf\":\"text\",\"a/../bad.ubnf\":\"text\",\"z.ubnf\":7}"
+      }
+    ]
+  },
+  {
+    "id": "order-roots-duplicate-valid-last",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"std/layout\":\"bad\",\"std/layout\":\"1.0.0\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-roots-duplicate-bad-last",
+    "subject": "lock",
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"std/layout\":\"1.0.0\",\"std/layout\":\"bad\"}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-manifest-duplicate-final-valid",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"std/layout\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-artifact-duplicate-final-valid",
+    "subject": "artifact",
+    "loadError": "artifact dependencies differ from lock",
+    "resolveError": "package name/version mismatch: b/x",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"b/x\":{\"version\":\"bad\",\"source\":\"local:artifact.json\"},\"b/x\":{\"version\":\"1.0.0\",\"source\":\"local:artifact.json\"}}"
+      }
+    ]
+  },
+  {
+    "id": "order-sorted-lock-za",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "package": "team/z",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        },
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    }
+  },
+  {
+    "id": "order-roots-fetch-za",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": "unsupported artifact source; use HTTPS, local: or builtin:",
+    "package": "team/z",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/z": {
+          "version": "1.0.0",
+          "source": "unsupported:artifact"
+        },
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:missing.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    }
+  },
+  {
+    "id": "order-loaded-children-za",
+    "subject": "manifest",
+    "loadError": "artifact hash mismatch: team/z",
+    "resolveError": null,
+    "corruptCache": [
+      "team/z",
+      "team/a"
+    ],
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/z": {
+            "version": "1.0.0",
+            "source": "local:z.json"
+          },
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:a.json"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "order-nested-fetch-za",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": "unsupported artifact source; use HTTPS, local: or builtin:",
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/z": {
+            "version": "1.0.0",
+            "source": "unsupported:artifact"
+          },
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:missing.json"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "order-audit-package-cycles-za",
+    "subject": "lock",
+    "loadError": "cyclic package dependency: team/z",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"team/z\":{\"id\":\"team/z\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\"}},\"team/a\":{\"id\":\"team/a\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\"}}}"
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        },
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        }
+      }
+    },
+    "package": "team/z",
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-audit-dependency-cycles-za",
+    "subject": "lock",
+    "loadError": "cyclic package dependency: team/z",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"team/parent\":{\"id\":\"team/parent\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\",\"team/a\":\"1.0.0\"}},\"team/z\":{\"id\":\"team/z\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\"}},\"team/a\":{\"id\":\"team/a\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\"}}}"
+      }
+    ],
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/z": {
+            "version": "1.0.0",
+            "source": "local:z.json"
+          },
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:a.json"
+          }
+        }
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-roots-equality-za",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"team/a\":\"1.0.0\",\"team/z\":\"1.0.0\"}"
+      }
+    ],
+    "package": "team/z",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        },
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-sorted-lock-az",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "package": "team/a",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        },
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    }
+  },
+  {
+    "id": "order-roots-fetch-az",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": "missing local artifact",
+    "package": "team/a",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:missing.json"
+        },
+        "team/z": {
+          "version": "1.0.0",
+          "source": "unsupported:artifact"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    }
+  },
+  {
+    "id": "order-loaded-children-az",
+    "subject": "manifest",
+    "loadError": "artifact hash mismatch: team/a",
+    "resolveError": null,
+    "corruptCache": [
+      "team/a",
+      "team/z"
+    ],
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:a.json"
+          },
+          "team/z": {
+            "version": "1.0.0",
+            "source": "local:z.json"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "order-nested-fetch-az",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": "missing local artifact",
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:missing.json"
+          },
+          "team/z": {
+            "version": "1.0.0",
+            "source": "unsupported:artifact"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "order-audit-package-cycles-az",
+    "subject": "lock",
+    "loadError": "cyclic package dependency: team/a",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"team/a\":{\"id\":\"team/a\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\"}},\"team/z\":{\"id\":\"team/z\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\"}}}"
+      }
+    ],
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        },
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        }
+      }
+    },
+    "package": "team/a",
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-audit-dependency-cycles-az",
+    "subject": "lock",
+    "loadError": "cyclic package dependency: team/a",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"team/parent\":{\"id\":\"team/parent\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\",\"team/z\":\"1.0.0\"}},\"team/a\":{\"id\":\"team/a\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/a\":\"1.0.0\"}},\"team/z\":{\"id\":\"team/z\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"team/z\":\"1.0.0\"}}}"
+      }
+    ],
+    "package": "team/parent",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/parent": {
+          "version": "1.0.0",
+          "source": "local:parent.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "parent.json": {
+        "schemaVersion": 1,
+        "id": "team/parent",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {
+          "team/a": {
+            "version": "1.0.0",
+            "source": "local:a.json"
+          },
+          "team/z": {
+            "version": "1.0.0",
+            "source": "local:z.json"
+          }
+        }
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-roots-equality-az",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "json": "{\"team/z\":\"1.0.0\",\"team/a\":\"1.0.0\"}"
+      }
+    ],
+    "package": "team/a",
+    "manifest": {
+      "schemaVersion": 1,
+      "dependencies": {
+        "team/a": {
+          "version": "1.0.0",
+          "source": "local:a.json"
+        },
+        "team/z": {
+          "version": "1.0.0",
+          "source": "local:z.json"
+        }
+      }
+    },
+    "additionalArtifacts": {
+      "a.json": {
+        "schemaVersion": 1,
+        "id": "team/a",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      },
+      "z.json": {
+        "schemaVersion": 1,
+        "id": "team/z",
+        "version": "1.0.0",
+        "entry": "entry.ubnf",
+        "files": {
+          "z-unused.ubnf": "// z",
+          "entry.ubnf": "grammar Library { @ubnf: v2 token T ::= 't'; }",
+          "a-unused.ubnf": "// a"
+        },
+        "dependencies": {}
+      }
+    },
+    "resolveLock": true
+  },
+  {
+    "id": "order-duplicate-package-last-child-order-id-first",
+    "subject": "lock",
+    "loadError": "invalid package ID",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"std/layout\":{\"id\":\"std/layout\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"a/x\":\"bad\",\"b!\":\"1.0.0\"}},\"std/layout\":{\"id\":\"std/layout\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"b!\":\"1.0.0\",\"a/x\":\"bad\"}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "order-duplicate-package-last-child-order-version-first",
+    "subject": "lock",
+    "loadError": "exact package version required",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "json": "{\"std/layout\":{\"id\":\"std/layout\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"b!\":\"1.0.0\",\"a/x\":\"bad\"}},\"std/layout\":{\"id\":\"std/layout\",\"version\":\"1.0.0\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"dependencies\":{\"a/x\":\"bad\",\"b!\":\"1.0.0\"}}}"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-manifest-empty",
+    "subject": "manifest",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": ""
+  },
+  {
+    "id": "document-manifest-whitespace",
+    "subject": "manifest",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "200d0a09"
+  },
+  {
+    "id": "document-manifest-null",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "6e756c6c"
+  },
+  {
+    "id": "document-manifest-array",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "5b5d"
+  },
+  {
+    "id": "document-manifest-number",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "31"
+  },
+  {
+    "id": "document-manifest-string",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "227822"
+  },
+  {
+    "id": "document-manifest-true",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "74727565"
+  },
+  {
+    "id": "document-manifest-false",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "66616c7365"
+  },
+  {
+    "id": "document-manifest-formfeed",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "0c"
+  },
+  {
+    "id": "document-manifest-vertical-tab",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "0b"
+  },
+  {
+    "id": "document-manifest-array-126",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 126
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-array-127",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 127
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-array-128",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 128
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-array-253",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 253
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-array-254",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 254
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-array-255",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 255
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-array-256",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 256
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-object-126",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 126
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-object-127",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 127
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-object-128",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 128
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-object-253",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 253
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-object-254",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 254
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-object-255",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 255
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-object-256",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 256
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-empty",
+    "subject": "manifest",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf"
+  },
+  {
+    "id": "document-manifest-bom-whitespace",
+    "subject": "manifest",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf200d0a09"
+  },
+  {
+    "id": "document-manifest-bom-null",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf6e756c6c"
+  },
+  {
+    "id": "document-manifest-bom-array",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf5b5d"
+  },
+  {
+    "id": "document-manifest-bom-number",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf31"
+  },
+  {
+    "id": "document-manifest-bom-string",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf227822"
+  },
+  {
+    "id": "document-manifest-bom-true",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf74727565"
+  },
+  {
+    "id": "document-manifest-bom-false",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf66616c7365"
+  },
+  {
+    "id": "document-manifest-bom-formfeed",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf0c"
+  },
+  {
+    "id": "document-manifest-bom-vertical-tab",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf0b"
+  },
+  {
+    "id": "document-manifest-bom-array-126",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 126
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-array-127",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 127
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-array-128",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 128
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-array-253",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 253
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-array-254",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 254
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-array-255",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 255
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-array-256",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 256
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-object-126",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 126
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-object-127",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 127
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-object-128",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 128
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-object-253",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 253
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-object-254",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 254
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-object-255",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 255
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-bom-object-256",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 256
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-deep-surrogate",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "suffix": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "\"\\ud800\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-deep-bad-escape",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "suffix": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "\"\\q\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-deep-trailing",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "suffix": " true",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "0"
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-deep-mixed",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "suffix": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "{\"z\":1,\"a\":2,\"z\":3}"
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-deep-overwritten-254",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 254
+        },
+        "after": ",\"meta\":0"
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-deep-overwritten-255",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 255
+        },
+        "after": ",\"meta\":0"
+      }
+    ]
+  },
+  {
+    "id": "document-manifest-max-bytes-depth",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "fillBytes": 8388608
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-lock-empty",
+    "subject": "lock",
+    "loadError": "expected object: document",
+    "resolveError": null,
+    "bytesHex": "",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-whitespace",
+    "subject": "lock",
+    "loadError": "expected object: document",
+    "resolveError": null,
+    "bytesHex": "200d0a09",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-null",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "6e756c6c",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-array",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "5b5d",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-number",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "31",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-string",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "227822",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-true",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "74727565",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-false",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "66616c7365",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-formfeed",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "0c",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-vertical-tab",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "0b",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-array-126",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 126
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-array-127",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 127
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-array-128",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 128
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-array-253",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 253
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-array-254",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 254
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-array-255",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 255
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-array-256",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 256
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-object-126",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 126
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-object-127",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 127
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-object-128",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 128
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-object-253",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 253
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-object-254",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 254
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-object-255",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 255
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-object-256",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 256
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-empty",
+    "subject": "lock",
+    "loadError": "expected object: document",
+    "resolveError": null,
+    "bytesHex": "efbbbf",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-whitespace",
+    "subject": "lock",
+    "loadError": "expected object: document",
+    "resolveError": null,
+    "bytesHex": "efbbbf200d0a09",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-null",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "efbbbf6e756c6c",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-array",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "efbbbf5b5d",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-number",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "efbbbf31",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-string",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "efbbbf227822",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-true",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "efbbbf74727565",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-false",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "efbbbf66616c7365",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-formfeed",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "efbbbf0c",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-vertical-tab",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "bytesHex": "efbbbf0b",
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-array-126",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 126
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-array-127",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 127
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-array-128",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 128
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-array-253",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 253
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-array-254",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 254
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-array-255",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 255
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-array-256",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 256
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-object-126",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 126
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-object-127",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 127
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-object-128",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 128
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-object-253",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 253
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-object-254",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 254
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-object-255",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 255
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-bom-object-256",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 256
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-deep-surrogate",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "suffix": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "\"\\ud800\""
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-deep-bad-escape",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "suffix": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "\"\\q\""
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-deep-trailing",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "suffix": " true",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "0"
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-deep-mixed",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "suffix": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "{\"z\":1,\"a\":2,\"z\":3}"
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-deep-overwritten-254",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 254
+        },
+        "after": ",\"meta\":0"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-deep-overwritten-255",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 255
+        },
+        "after": ",\"meta\":0"
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-lock-max-bytes-depth",
+    "subject": "lock",
+    "loadError": "invalid JSON",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "fillBytes": 8388608
+        }
+      }
+    ],
+    "resolveLock": true
+  },
+  {
+    "id": "document-artifact-empty",
+    "subject": "artifact",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": ""
+  },
+  {
+    "id": "document-artifact-whitespace",
+    "subject": "artifact",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "200d0a09"
+  },
+  {
+    "id": "document-artifact-null",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "6e756c6c"
+  },
+  {
+    "id": "document-artifact-array",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "5b5d"
+  },
+  {
+    "id": "document-artifact-number",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "31"
+  },
+  {
+    "id": "document-artifact-string",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "227822"
+  },
+  {
+    "id": "document-artifact-true",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "74727565"
+  },
+  {
+    "id": "document-artifact-false",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "66616c7365"
+  },
+  {
+    "id": "document-artifact-formfeed",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "0c"
+  },
+  {
+    "id": "document-artifact-vertical-tab",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "0b"
+  },
+  {
+    "id": "document-artifact-array-126",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 126
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-array-127",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 127
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-array-128",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 128
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-array-253",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 253
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-array-254",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 254
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-array-255",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 255
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-array-256",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 256
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-object-126",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 126
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-object-127",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 127
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-object-128",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 128
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-object-253",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 253
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-object-254",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 254
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-object-255",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 255
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-object-256",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 256
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-empty",
+    "subject": "artifact",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf"
+  },
+  {
+    "id": "document-artifact-bom-whitespace",
+    "subject": "artifact",
+    "loadError": "expected object: document",
+    "resolveError": "expected object: document",
+    "bytesHex": "efbbbf200d0a09"
+  },
+  {
+    "id": "document-artifact-bom-null",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf6e756c6c"
+  },
+  {
+    "id": "document-artifact-bom-array",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf5b5d"
+  },
+  {
+    "id": "document-artifact-bom-number",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf31"
+  },
+  {
+    "id": "document-artifact-bom-string",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf227822"
+  },
+  {
+    "id": "document-artifact-bom-true",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf74727565"
+  },
+  {
+    "id": "document-artifact-bom-false",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf66616c7365"
+  },
+  {
+    "id": "document-artifact-bom-formfeed",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf0c"
+  },
+  {
+    "id": "document-artifact-bom-vertical-tab",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "bytesHex": "efbbbf0b"
+  },
+  {
+    "id": "document-artifact-bom-array-126",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 126
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-array-127",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 127
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-array-128",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 128
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-array-253",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 253
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-array-254",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 254
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-array-255",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 255
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-array-256",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 256
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-object-126",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 126
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-object-127",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 127
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-object-128",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 128
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-object-253",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 253
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-object-254",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 254
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-object-255",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 255
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-bom-object-256",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "prefixHex": "efbbbf",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "object",
+          "depth": 256
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-deep-surrogate",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "suffix": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "\"\\ud800\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-deep-bad-escape",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "suffix": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "\"\\q\""
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-deep-trailing",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "suffix": " true",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "0"
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-deep-mixed",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "suffix": "",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 252,
+          "leaf": "{\"z\":1,\"a\":2,\"z\":3}"
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-deep-overwritten-254",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 254
+        },
+        "after": ",\"meta\":0"
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-deep-overwritten-255",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 255
+        },
+        "after": ",\"meta\":0"
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-max-bytes-depth",
+    "subject": "artifact",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "rawEdits": [
+      {
+        "path": [
+          "meta"
+        ],
+        "nesting": {
+          "shape": "array",
+          "fillBytes": 8388608
+        }
+      }
+    ]
+  },
+  {
+    "id": "document-artifact-deep-files-value",
+    "subject": "artifact",
+    "loadError": "package file must contain source text",
+    "resolveError": "package file must contain source text",
+    "rawEdits": [
+      {
+        "path": [
+          "files",
+          "extra.ubnf"
+        ],
+        "nesting": {
+          "shape": "array",
+          "depth": 253
+        }
+      }
+    ]
+  },
+  {
+    "id": "schema-manifest-dependency-string",
+    "subject": "manifest",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":\"1.0.0\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-manifest-dependency-array",
+    "subject": "manifest",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":[]}"
+      }
+    ]
+  },
+  {
+    "id": "schema-manifest-dependency-duplicate-last-string",
+    "subject": "manifest",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":{},\"a!\":0,\"std/layout\":\"1.0.0\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-artifact-dependency-string",
+    "subject": "artifact",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":\"1.0.0\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-artifact-dependency-array",
+    "subject": "artifact",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":[]}"
+      }
+    ]
+  },
+  {
+    "id": "schema-artifact-dependency-duplicate-last-string",
+    "subject": "artifact",
+    "loadError": "expected object: dependency",
+    "resolveError": "expected object: dependency",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"std/layout\":{},\"a!\":0,\"std/layout\":\"1.0.0\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-dependency-id-before-object",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"bad!\":[]}"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-empty",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          ""
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-absolute",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "/a.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-backslash",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a\\b.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-colon",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a:b.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-control",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a\u0001.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-nul",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a\u0000.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-file-iso-control",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "files",
+          "a\u0085.ubnf"
+        ],
+        "value": "x"
+      }
+    ]
+  },
+  {
+    "id": "schema-entry-empty",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "edits": [
+      {
+        "path": [
+          "entry"
+        ],
+        "value": ""
+      }
+    ]
+  },
+  {
+    "id": "schema-files-boundary-first",
+    "subject": "artifact",
+    "loadError": "package file path escapes boundary",
+    "resolveError": "package file path escapes boundary",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"b/../x\":0,\"a:b\":0}"
+      }
+    ]
+  },
+  {
+    "id": "schema-files-invalid-first",
+    "subject": "artifact",
+    "loadError": "invalid package file path",
+    "resolveError": "invalid package file path",
+    "rawEdits": [
+      {
+        "path": [
+          "files"
+        ],
+        "json": "{\"b:c\":0,\"a/../x\":0}"
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-roots-missing",
+    "subject": "lock",
+    "loadError": "expected object: roots",
+    "resolveError": null,
+    "resolveLock": true,
+    "bytesHex": "7b22736368656d6156657273696f6e223a312c227061636b61676573223a7b7d7d"
+  },
+  {
+    "id": "schema-lock-roots-array",
+    "subject": "lock",
+    "loadError": "expected object: roots",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "roots"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-root-missing",
+    "subject": "lock",
+    "loadError": "expected object: locked root",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages"
+        ],
+        "value": {}
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-package-null",
+    "subject": "lock",
+    "loadError": "expected object: locked package",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-dependency-missing",
+    "subject": "lock",
+    "loadError": "expected object: locked dependency",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "value": {
+          "z/pkg": "1.0.0"
+        }
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-dependency-null",
+    "subject": "lock",
+    "loadError": "expected object: locked dependency",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "value": {
+          "z/pkg": "1.0.0"
+        }
+      },
+      {
+        "path": [
+          "packages",
+          "z/pkg"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-dependency-version-number",
+    "subject": "lock",
+    "loadError": "expected string: version",
+    "resolveError": null,
+    "resolveLock": true,
+    "edits": [
+      {
+        "path": [
+          "packages",
+          "std/layout",
+          "dependencies"
+        ],
+        "value": {
+          "z/pkg": "1.0.0"
+        }
+      },
+      {
+        "path": [
+          "packages",
+          "z/pkg"
+        ],
+        "value": {
+          "version": 1
+        }
+      }
+    ]
+  },
+  {
+    "id": "schema-manifest-unused-numbers",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "[1e999,-1e999,123456789012345678901234567890,1e-999,{\"$serde_json::private::Number\":\"1.5\"},{\"$serde_json::private::Number\":null}]"
+      }
+    ]
+  },
+  {
+    "id": "schema-lock-unused-numbers",
+    "subject": "lock",
+    "loadError": null,
+    "resolveError": null,
+    "resolveLock": true,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "[1e999,-1e999,123456789012345678901234567890,1e-999,{\"$serde_json::private::Number\":\"1.5\"},{\"$serde_json::private::Number\":null}]"
+      }
+    ]
+  },
+  {
+    "id": "schema-artifact-unused-numbers",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "[1e999,-1e999,123456789012345678901234567890,1e-999,{\"$serde_json::private::Number\":\"1.5\"},{\"$serde_json::private::Number\":null}]"
+      }
+    ]
+  },
+  {
+    "id": "schema-reserved-key-is-object",
+    "subject": "manifest",
+    "loadError": "invalid package ID",
+    "resolveError": "invalid package ID",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies"
+        ],
+        "json": "{\"$serde_json::private::Number\":\"1.5\"}"
+      }
+    ]
+  },
+  {
+    "id": "schema-version-decimal",
+    "subject": "manifest",
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "rawEdits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "json": "1.0"
+      }
+    ]
+  },
+  {
+    "id": "schema-version-exponent",
+    "subject": "lock",
+    "loadError": "unsupported schemaVersion",
+    "resolveError": null,
+    "resolveLock": true,
+    "rawEdits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "json": "1e0"
+      }
+    ]
+  },
+  {
+    "id": "schema-version-huge-exponent",
+    "subject": "artifact",
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "rawEdits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "json": "1e999"
+      }
+    ]
+  },
+  {
+    "id": "schema-version-negative-huge",
+    "subject": "manifest",
+    "loadError": "unsupported schemaVersion",
+    "resolveError": "unsupported schemaVersion",
+    "rawEdits": [
+      {
+        "path": [
+          "schemaVersion"
+        ],
+        "json": "-1e999"
+      }
+    ]
+  },
+  {
+    "id": "schema-number-length-1023",
+    "subject": "manifest",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999"
+      }
+    ]
+  },
+  {
+    "id": "schema-number-length-1024",
+    "subject": "manifest",
+    "loadError": "invalid JSON",
+    "resolveError": "invalid JSON",
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999"
+      }
+    ]
+  },
+  {
+    "id": "schema-number-deep-surrogate",
+    "subject": "artifact",
+    "loadError": null,
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "metadata"
+        ],
+        "json": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[1e999,{\"x\":\"\\ud800\"}]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+      }
+    ]
+  },
+  {
+    "id": "schema-used-version-number",
+    "subject": "manifest",
+    "loadError": "expected string: version",
+    "resolveError": "expected string: version",
+    "rawEdits": [
+      {
+        "path": [
+          "dependencies",
+          "std/layout",
+          "version"
+        ],
+        "json": "1e999"
+      }
+    ]
+  },
+  {
+    "id": "schema-used-file-number",
+    "subject": "artifact",
+    "loadError": "package file must contain source text",
+    "resolveError": "package file must contain source text",
+    "rawEdits": [
+      {
+        "path": [
+          "files",
+          "layout.ubnf"
+        ],
+        "json": "1e999"
+      }
+    ]
+  },
+  {
+    "id": "schema-used-root-number",
+    "subject": "lock",
+    "loadError": "stale lock; run unlaxer deps resolve --manifest ubnf.json",
+    "resolveError": null,
+    "rawEdits": [
+      {
+        "path": [
+          "roots",
+          "std/layout"
+        ],
+        "json": "1e999"
+      }
+    ],
+    "resolveLock": true
   }
 ]

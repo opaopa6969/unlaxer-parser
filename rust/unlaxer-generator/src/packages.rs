@@ -1,11 +1,16 @@
 //! Explicit artifact resolution and read-only pinned module loading. No runtime dependencies.
-use serde_json::{json, Map, Value};
+use serde_json::{json, Map, Value as OutputValue};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
+use value::{Object, Value};
 
 mod json;
+mod value;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use json::credential_fields;
 
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 // Share the package graph budget; individual pinned artifacts still have their 8 MiB limit.
@@ -130,7 +135,7 @@ const STANDARD: &[u8] =
 fn error(message: impl std::fmt::Display) -> String {
     format!("E-PACKAGE: {message}")
 }
-fn object<'a>(value: &'a Value, name: &str) -> Result<&'a Map<String, Value>, String> {
+fn object<'a>(value: &'a Value, name: &str) -> Result<&'a Object, String> {
     value
         .as_object()
         .ok_or_else(|| error(format!("expected object: {name}")))
@@ -141,7 +146,7 @@ fn string<'a>(value: &'a Value, name: &str) -> Result<&'a str, String> {
         .ok_or_else(|| error(format!("expected string: {name}")))
 }
 fn versioned(value: &Value) -> Result<(), String> {
-    if value["schemaVersion"] != 1 {
+    if !matches!(&value["schemaVersion"], Value::Number(number) if number.as_str() == "1") {
         return Err(error("unsupported schemaVersion"));
     }
     Ok(())
@@ -178,10 +183,14 @@ fn version(value: &str) -> Result<(), String> {
     Ok(())
 }
 fn file(value: &str) -> Result<(), String> {
-    if value.chars().any(char::is_control)
+    if value.is_empty()
+        || value.chars().any(char::is_control)
         || value.contains(['\\', ':'])
-        || value.split('/').any(|v| matches!(v, "" | "." | ".."))
+        || value.starts_with('/')
     {
+        return Err(error("invalid package file path"));
+    }
+    if value.split('/').any(|v| matches!(v, "" | "." | "..")) {
         return Err(error("package file path escapes boundary"));
     }
     Ok(())
@@ -200,6 +209,7 @@ fn parse_document(bytes: &[u8], artifact: bool) -> Result<Value, String> {
 fn dependencies(value: &Value) -> Result<(), String> {
     for (name, dependency) in object(value, "dependencies")? {
         id(name)?;
+        object(dependency, "dependency")?;
         version(string(dependency, "version")?)?;
         string(dependency, "source")?;
     }
@@ -235,14 +245,23 @@ fn artifact(bytes: &[u8]) -> Result<Value, String> {
     Ok(value)
 }
 fn references(value: &Value) -> Result<Value, String> {
-    let mut result = Map::new();
+    let mut result = Vec::new();
     for (name, dependency) in object(value, "dependencies")? {
-        result.insert(
+        result.push((
             name.clone(),
             Value::String(string(dependency, "version")?.into()),
-        );
+        ));
     }
-    Ok(Value::Object(result))
+    Ok(Value::Object(Object::from_entries(result)))
+}
+// Only validated string references cross into the output JSON tree. Input
+// numbers/metadata are never re-encoded; cached artifacts retain their raw bytes.
+fn output_references(value: &Value) -> Result<OutputValue, String> {
+    let mut result = Map::new();
+    for (name, dependency) in object(value, "dependencies")? {
+        result.insert(name.clone(), string(dependency, "version")?.into());
+    }
+    Ok(OutputValue::Object(result))
 }
 fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
@@ -280,7 +299,7 @@ fn read_bytes<R: Read>(
     )
 }
 /// This command explicitly updates the dependency snapshot. Parsing never calls it.
-pub fn resolve(manifest: &Path) -> Result<Value, String> {
+pub fn resolve(manifest: &Path) -> Result<OutputValue, String> {
     // Match Java's absolute, lexical manifest base without following symlinks.
     let manifest = if manifest.is_absolute() {
         manifest.to_owned()
@@ -311,7 +330,7 @@ pub fn resolve(manifest: &Path) -> Result<Value, String> {
     if packages.len() > 128 || blobs.values().map(Vec::len).sum::<usize>() > MAX_LOCAL_BYTES {
         return Err(error("package graph exceeds cache limits"));
     }
-    let lock = json!({"schemaVersion":1,"roots":references(roots)?,"packages":packages});
+    let lock = json!({"schemaVersion":1,"roots":output_references(roots)?,"packages":packages});
     let cache = directory.join(".ubnf-cache/packages");
     std::fs::create_dir_all(&cache).map_err(|_| error("cannot create package cache"))?;
     for (sha, bytes) in blobs {
@@ -359,7 +378,7 @@ fn resolve_one(
     name: &str,
     dependency: &Value,
     directory: &Path,
-    packages: &mut Map<String, Value>,
+    packages: &mut Map<String, OutputValue>,
     blobs: &mut BTreeMap<String, Vec<u8>>,
     visiting: &mut BTreeSet<String>,
     remote: bool,
@@ -415,7 +434,7 @@ fn resolve_one(
         return Err(error(format!("package name/version mismatch: {name}")));
     }
     let sha = hash(&bytes);
-    let pinned = json!({"id":name,"version":string(&value,"version")?,"sha256":sha,"dependencies":references(&value["dependencies"])?});
+    let pinned = json!({"id":name,"version":string(&value,"version")?,"sha256":sha,"dependencies":output_references(&value["dependencies"])?});
     if let Some(previous) = packages.get(name) {
         if previous != &pinned {
             return Err(error(format!("conflicting package identity: {name}")));
@@ -449,6 +468,7 @@ fn audit(lock: &Value) -> Result<(), String> {
     }
     for (name, pinned) in packages {
         id(name)?;
+        object(pinned, "locked package")?;
         if name != string(pinned, "id")? {
             return Err(error("locked package ID mismatch"));
         }
@@ -468,13 +488,15 @@ fn audit(lock: &Value) -> Result<(), String> {
                     .as_str()
                     .ok_or_else(|| error("invalid locked dependency version"))?,
             )?;
-            if packages.get(name).and_then(|p| p.get("version")) != Some(required) {
+            object(&packages[name], "locked dependency")?;
+            if Some(string(&packages[name], "version")?) != required.as_str() {
                 return Err(error("locked transitive version mismatch"));
             }
         }
     }
     for (name, required) in object(&lock["roots"], "roots")? {
-        if packages.get(name).and_then(|p| p.get("version")) != Some(required) {
+        object(&packages[name], "locked root")?;
+        if Some(string(&packages[name], "version")?) != required.as_str() {
             return Err(error("locked root version mismatch"));
         }
     }
@@ -486,7 +508,7 @@ fn audit(lock: &Value) -> Result<(), String> {
 }
 fn audit_node(
     name: &str,
-    packages: &Map<String, Value>,
+    packages: &Object,
     visiting: &mut BTreeSet<String>,
     done: &mut BTreeSet<String>,
 ) -> Result<(), String> {
@@ -561,6 +583,7 @@ impl Resolver {
             dependencies(&configuration["dependencies"])?;
             let lock = parse(&bytes)?;
             versioned(&lock)?;
+            object(&lock["roots"], "roots")?;
             if lock["roots"] != references(&configuration["dependencies"])? {
                 return Err(error(
                     "stale lock; run unlaxer deps resolve --manifest ubnf.json",
@@ -647,7 +670,7 @@ impl Resolver {
         Err(error("unknown package source identity"))
     }
     /// Return only identities whose cached artifact has already passed hash validation.
-    pub fn identity(&mut self, path: &Path) -> Result<Option<Value>, String> {
+    pub fn identity(&mut self, path: &Path) -> Result<Option<OutputValue>, String> {
         let Some(name) = self.owner(path)? else {
             return Ok(None);
         };
@@ -726,6 +749,7 @@ impl Resolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     #[test]
     fn artifact_utf8_fixtures_preserve_hash_and_json_order() {

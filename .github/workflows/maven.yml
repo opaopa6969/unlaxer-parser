@@ -26,7 +26,9 @@ jobs:
     runs-on: [unlaxer-parser-ci, Linux, X64]
     env:
       RUSTUP_TOOLCHAIN: '1.85.0'
-    timeout-minutes: 60
+    # master already reached the 60-minute limit (run 40748957067) and #941 adds ~2 minutes
+    # of package JSON CLI cases. Splitting the job is tracked in #954; keep the same tests.
+    timeout-minutes: 75
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
@@ -356,6 +358,7 @@ jobs:
       run: |
         test -s unlaxer-dsl/target/rust-packages.tsv
         test -s unlaxer-dsl/target/rust-package-https.tsv
+        test -s unlaxer-dsl/target/rust-package-credentials.json
         test -s unlaxer-dsl/target/rust-vocabulary-origins.tsv
     - name: Require transactional scope conformance evidence
       run: test -s unlaxer-dsl/target/rust-scope-store.tsv
@@ -495,6 +498,7 @@ jobs:
           unlaxer-dsl/target/rust-name-predicate.tsv
           unlaxer-dsl/target/rust-packages.tsv
           unlaxer-dsl/target/rust-package-https.tsv
+          unlaxer-dsl/target/rust-package-credentials.json
           unlaxer-dsl/target/rust-vocabulary-origins.tsv
           unlaxer-dsl/target/rust-scope-store.tsv
           unlaxer-dsl/target/rust-scope-annotations.tsv

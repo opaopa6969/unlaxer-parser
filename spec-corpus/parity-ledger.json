@@ -28,6 +28,8 @@
     "949": {"state": "OPEN", "title": "parity(frontend): REGEX 宣言後の余分なセミコロンで Java の P-SYNTAX と native の E-REGEX-RETIRED が異なる"},
     "952": {"state": "OPEN", "title": "parity(cli): native generate/Playground の出力先パスの扱い（symlink 祖先・`..`・読取り専用の既存生成物・成功時 stdout の綴り）が Java と違う（#937 レビュー由来）"},
     "953": {"state": "OPEN", "title": "parity(cli): playground --profile の profile ファイル入力 I/O で native の終了コードと stderr が Java と違う（#937 レビュー由来）"},
+    "943": {"state": "OPEN", "title": "HTTPS package の credentials JSON の受理と診断"},
+    "956": {"state": "OPEN", "title": "credentials 受理後の TLS・HTTP 失敗診断を Java に揃える"},
     "923": {"state": "OPEN", "title": "parity(check): 字句エラーと @whitespace の組込み名の同居を Java 参照契約へ揃える"},
     "910": {"state": "OPEN", "title": "parity(generator): feature と E-LEXICAL の check/generate 診断を Java-host に揃える"},
     "916": {"state": "OPEN", "title": "parity(check): @lexicalContext と字句エラーが同居すると Java の check が例外で終わる（#910 レビュー由来）"},
@@ -525,7 +527,7 @@
       "title": "package local: 依存のパス解決が Java（字句的 normalize）と Rust（OS 解決）で異なる"
     },
     "926": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "package local: source の単独サロゲートは Java のパス拒否と Rust の JSON 拒否で診断が異なる（#921 残り）"
     },
     "928": {
@@ -546,26 +548,62 @@
     },
     "939": {"state": "OPEN", "title": "package JSON: 単独サロゲートを含む artifact の file/entry/source 本文と HTTPS source の残差（#926 後続）"},
     "914": {
-      "state": "OPEN",
+      "state": "CLOSED",
       "title": "package JSON の先頭 BOM: Java は受理、Rust は invalid JSON で拒否する"
     }
   },
   "entries": [
     {
+      "id": "package-credentials-json",
+      "category": "contract",
+      "title": "HTTPS credentials JSON の Java 参照契約",
+      "hosts": "Java Gson STRICT / Rust package reader（両 deps resolve・3 CLI）",
+      "issues": [
+        943
+      ],
+      "observation": "#943でJava本体を変えず、Files.readStringとJsonElementの受理をRustへ適用する。64 KiB上限→strict UTF-8→JSON全体→object/origin→CA→tokenの順。先頭BOM1つと単独サロゲートを受理し、不正JSONはcannot read artifact credentials、空白と非objectはinvalid artifact credentials。既存readerの深さ255・数値・重複keyを共用する。単独サロゲートtokenは送信前にASCII検査で拒否し、任意headersは未使用。共通65件を両deps resolveでsnapshot有無両方照合し、資格情報を読まない3 CLIの生成は代表5形で照合する。秘密値を記録しない。TLS失敗の既存文言差2形は別項目package-https-transportで追跡し、host別期待値で実行する。#943はPRのmerge待ち。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-credentials.json",
+        "scripts/ubnf_package_credentials.py",
+        "rust/unlaxer-generator/src/packages/json.rs",
+        "rust/unlaxer-generator/src/package_fetch.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java"
+      ]
+    },
+    {
+      "id": "package-https-transport",
+      "category": "unresolved",
+      "title": "資格情報受理後の HTTPS transport 失敗診断",
+      "hosts": "Java java.net.http / Rust ureq（両 deps resolve）",
+      "issues": [
+        956
+      ],
+      "observation": "ローカル未信頼TLS serverに、既定資格情報なし・BOM付き空objectで空の資格情報として進むと、JavaはHTTPS artifact retrieval failed (TLS, timeout or size limit)、RustはHTTPS artifact retrieval failed (TLS, timeout, status or redirect)。両版exit 3、lock/cacheは不変。JSON修正前から存在するtransport分類差であり、#943では変更せず#956へ分離する。共通credentials fixtureの該当2形はskipせずhost別期待値を照合する。TLS/HTTP status/redirect/timeout/body上限の全診断分類は後続issueの受け入れ条件。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-credentials.json",
+        "scripts/ubnf_package_credentials.py",
+        "rust/unlaxer-generator/src/package_fetch.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFPackageFetcher.java"
+      ]
+    },
+    {
       "id": "package-json-surrogate-text",
       "category": "contract",
       "title": "package JSON の単独サロゲート文字列の暫定境界",
-      "hosts": "Java Gson / Rust serde_json（両 stdio・Java-host Rust/native Rust/Java flag CLI）",
+      "hosts": "Java Gson / Rust package JSON reader（両 stdio・Java-host Rust/native Rust/Java flag CLI）",
       "issues": [
         926,
         939
       ],
-      "observation": "#914は先頭BOMを1つだけ受理。#926のlocal source・ASCII形式のID/version/lock・未使用metadataはJavaの受理と診断に揃える。artifact.entry、filesのkey/本文、dependencies.*.sourceのHTTPSはUTF-16をlosslessに表せないため、Javaを狭めずRustの既存invalid JSONを維持する意図した暫定差。共通127件のうち13件は両hostを実行してhost別oracleを照合し、skipしない。これらのfieldとsource位置/取得境界の完全対応は#939の受け入れ条件で追跡する。#926のlocal sourceの受け入れ条件は満たす（issueはmerge待ちでOPEN）。raw hash→strict UTF-8→JSON、readerとpath規則は維持する。",
+      "observation": "#914は先頭BOMを1つだけ受理。#926のlocal source・ASCII形式のID/version/lock・未使用metadataはJavaの受理と診断に揃える。artifact.entry、filesのkey/本文、dependencies.*.sourceのHTTPSはUTF-16をlosslessに表せないため、Javaを狭めずRustの既存invalid JSONを維持する意図した暫定差。共通400件（#942の順序69件・#941の文書166件・#947のschema38件を含む）のうち13件は両hostを実行してhost別oracleを照合し、skipしない。これらのfieldとsource位置/取得境界の完全対応は#939の受け入れ条件で追跡する。#914/#926はPR #940でCLOSED。#942で入力objectの記述順と重複keyの位置/値をJavaに揃え、lock/cacheの辞書順出力は維持する。raw hash→strict UTF-8→JSON、readerとpath規則は維持する。#941で空文書・非object最上位の診断とGsonの深さ255/256境界を揃える。#947でdependency・files/entry・lockのschema診断をJavaに揃える。数値を表記のまま保持し、未使用の範囲外数値も受理する。package専用の明示スタックを浅い入力にも共用し、feature統合に依存せず深さ・順序・メモリ水準を維持する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",
         "scripts/ubnf_package_json.py",
         "rust/unlaxer-generator/src/packages/json.rs",
+        "rust/unlaxer-generator/src/packages/value.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/PackageJsonAcceptanceConformanceTest.java",
         "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
       ]
