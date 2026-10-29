@@ -6,6 +6,8 @@ use std::time::Duration;
 #[cfg(unix)]
 mod passwd_home;
 
+const BODY_LIMIT: usize = 8 * 1024 * 1024;
+
 fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
 }
@@ -43,18 +45,27 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
     }
     let mut response = request
         .call()
-        .map_err(|_| error("HTTPS artifact retrieval failed (TLS, timeout, status or redirect)"))?;
+        .map_err(|_| error("HTTPS artifact retrieval failed (TLS, timeout or size limit)"))?;
+    // Java's sendAsync completes its bounded body before checking the status.
+    // A failed/oversized body therefore takes precedence even for 3xx/4xx/5xx.
+    let bytes = response
+        .body_mut()
+        .with_config()
+        // ureq's limit is exclusive: probe one extra byte to accept exactly 8 MiB.
+        .limit((BODY_LIMIT + 1) as u64)
+        .read_to_vec()
+        .map_err(|_| error("HTTPS artifact retrieval failed (TLS, timeout or size limit)"))?;
+    if bytes.len() > BODY_LIMIT {
+        return Err(error(
+            "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+        ));
+    }
     if response.status() != ureq::http::StatusCode::OK {
         return Err(error(
             "HTTPS artifact requires status 200; redirects are forbidden",
         ));
     }
-    response
-        .body_mut()
-        .with_config()
-        .limit(8 * 1024 * 1024)
-        .read_to_vec()
-        .map_err(|_| error("HTTPS artifact retrieval failed (timeout or size limit)"))
+    Ok(bytes)
 }
 
 /// A source with an unpaired UTF-16 unit: Java's `URI.create` accepts it, then its
@@ -72,6 +83,7 @@ fn client(origin: &str) -> Result<(ureq::Agent, Option<String>), String> {
     let credentials = credentials(origin)?;
     let mut configuration = ureq::Agent::config_builder()
         .max_redirects(0)
+        .http_status_as_error(false)
         .proxy(None)
         .timeout_connect(Some(Duration::from_secs(5)))
         .timeout_global(Some(Duration::from_secs(20)));
