@@ -1,0 +1,243 @@
+[
+  {
+    "id": "authenticated",
+    "kind": "artifact",
+    "error": null,
+    "generate": true
+  },
+  {
+    "id": "untrusted",
+    "kind": "artifact",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "trust": false
+  },
+  {
+    "id": "hostname",
+    "kind": "artifact",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "hostname": "127.0.0.1"
+  },
+  {
+    "id": "connection-refused",
+    "kind": "refused",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "connect-timeout",
+    "kind": "connect-stall",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "exact-origin",
+    "kind": "auth",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "token": false
+  },
+  {
+    "id": "limit-exact",
+    "kind": "limit",
+    "error": null
+  },
+  {
+    "id": "chunked-limit-exact",
+    "kind": "chunked-limit",
+    "error": null
+  },
+  {
+    "id": "close-delimited-limit-exact",
+    "kind": "close-limit",
+    "error": null
+  },
+  {
+    "id": "status-404-limit-exact",
+    "kind": "limit",
+    "status": 404,
+    "error": "HTTPS artifact requires status 200; redirects are forbidden"
+  },
+  {
+    "id": "body-over-limit",
+    "kind": "oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "chunked-over-limit",
+    "kind": "chunked-oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "close-delimited-over-limit",
+    "kind": "close-oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "content-length-too-large",
+    "kind": "truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "content-length-too-small",
+    "kind": "extra",
+    "error": null
+  },
+  {
+    "id": "empty-body",
+    "kind": "empty",
+    "error": "expected object: document"
+  },
+  {
+    "id": "disconnect-before-headers",
+    "kind": "disconnect",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "chunked-truncated",
+    "kind": "chunked-truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "read-timeout",
+    "kind": "stall",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "status-101",
+    "kind": "status",
+    "status": 101,
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "status-201",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 201
+  },
+  {
+    "id": "status-204",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 204
+  },
+  {
+    "id": "status-204-content-length",
+    "kind": "status",
+    "status": 204,
+    "framing": "length",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "status-204-transfer-encoding",
+    "kind": "status",
+    "status": 204,
+    "framing": "chunked",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "status-206",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 206
+  },
+  {
+    "id": "status-300",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 300
+  },
+  {
+    "id": "status-301",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 301
+  },
+  {
+    "id": "status-302",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 302,
+    "generate": true
+  },
+  {
+    "id": "status-303",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 303
+  },
+  {
+    "id": "status-304",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 304
+  },
+  {
+    "id": "status-307",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 307
+  },
+  {
+    "id": "status-308",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 308
+  },
+  {
+    "id": "status-401",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 401
+  },
+  {
+    "id": "status-403",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 403
+  },
+  {
+    "id": "status-404",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 404
+  },
+  {
+    "id": "status-500",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 500
+  },
+  {
+    "id": "status-302-oversize",
+    "kind": "oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 302
+  },
+  {
+    "id": "status-302-truncated",
+    "kind": "truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 302
+  },
+  {
+    "id": "status-404-oversize",
+    "kind": "oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 404
+  },
+  {
+    "id": "status-404-truncated",
+    "kind": "truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 404
+  },
+  {
+    "id": "status-500-oversize",
+    "kind": "oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 500
+  },
+  {
+    "id": "status-500-truncated",
+    "kind": "truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 500
+  }
+]

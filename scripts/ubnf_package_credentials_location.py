@@ -127,7 +127,7 @@ def check(directory, args, records):
                     actual = invoke(command, ['deps', 'resolve', '--manifest', str(manifest)], process_env, folder)
                     error = case.get('error')
                     if error == 'tls':
-                        error = TLS_ERROR[host]  # #956 is intentionally unchanged.
+                        error = TLS_ERROR[host]  # Java transport classification (#956).
                     expected = {'exit': 3 if error else 0, 'lastError': 'E-PACKAGE: ' + error if error else ''}
                     assert actual == expected, (case['id'], host, 'resolve diagnostic/exit differs')
                     after = snapshot(project)

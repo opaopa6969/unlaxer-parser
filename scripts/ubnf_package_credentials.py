@@ -19,7 +19,7 @@ COUNT = 65
 TOKEN = 'credentials-fixture-only-token'
 TLS_ERROR = {
     'java': 'HTTPS artifact retrieval failed (TLS, timeout or size limit)',
-    'rust': 'HTTPS artifact retrieval failed (TLS, timeout, status or redirect)',
+    'rust': 'HTTPS artifact retrieval failed (TLS, timeout or size limit)',
 }
 
 
@@ -64,9 +64,7 @@ def credential_bytes(case, origin, ca, missing):
     return data + b' ' * (case.get('padBytes', 0) - len(data))
 
 
-@contextmanager
-def local_tls(directory, artifact, tokens=None):
-    tokens = {TOKEN: "bearer"} if tokens is None else tokens
+def local_tls_context(directory):
     # Same local CA / hostname trust boundary as HttpsPackageConformanceTest.
     for command in [
         ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', 'ca.key', '-out', 'ca.pem',
@@ -80,6 +78,15 @@ def local_tls(directory, artifact, tokens=None):
                                             'keyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n')
         result = subprocess.run(['openssl'] + command, cwd=directory, capture_output=True, timeout=30)
         assert result.returncode == 0, 'local TLS certificate setup failed'
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(directory / 'server.pem', directory / 'server.key')
+    return context
+
+
+@contextmanager
+def local_tls(directory, artifact, tokens=None):
+    tokens = {TOKEN: "bearer"} if tokens is None else tokens
+    context = local_tls_context(directory)
     received = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -100,8 +107,6 @@ def local_tls(directory, artifact, tokens=None):
             self.wfile.write(artifact)
 
     server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(directory / 'server.pem', directory / 'server.key')
     server.socket = context.wrap_socket(server.socket, server_side=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -190,7 +195,7 @@ def check(directory, args, evidence, excluded):
                         actual = run(command, ['deps', 'resolve', '--manifest', str(manifest)], process_env)
                         error = case['error']
                         if error == 'tls':
-                            error = TLS_ERROR[host]  # Existing transport diagnostics, outside JSON acceptance.
+                            error = TLS_ERROR[host]  # Java transport classification (#956).
                         expected = {'exit': 3 if error else 0, 'lastError': 'E-PACKAGE: ' + error if error else ''}
                         assert actual == expected, (case['id'], host, 'resolve result differs', actual)
                         after = snapshot(folder)
@@ -202,10 +207,7 @@ def check(directory, args, evidence, excluded):
                                                    **actual, headers=headers, snapshot=receipt(after)))
                         resolved.append((actual, after, headers))
                     if len(resolved) == 2:
-                        if case['error'] == 'tls':
-                            assert resolved[0][1:] == resolved[1][1:]
-                        else:
-                            assert resolved[0] == resolved[1], (case['id'], 'reference/native result differs')
+                        assert resolved[0] == resolved[1], (case['id'], 'reference/native result differs')
                 # Generation is read-only and must never parse credentials, with or without a pin.
                 for existing in ([False, True] if case.get('generate') else []):
                     initial = baseline if existing else {}
