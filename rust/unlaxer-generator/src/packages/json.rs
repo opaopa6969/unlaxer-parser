@@ -1,6 +1,58 @@
 //! Package-envelope compatibility with Gson, without changing raw artifact bytes.
 use super::value::{Object, Value};
 
+/// Gson STRICT's JsonElement adapter, followed by the credentials object's fixed
+/// lookups. A present non-string stays `None` so fetch validates CA before token.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn credential_fields(
+    bytes: &[u8],
+    origin: &str,
+) -> Result<std::collections::BTreeMap<&'static str, Option<String>>, String> {
+    let unreadable = || super::error("cannot read artifact credentials");
+    let invalid = || super::error("invalid artifact credentials");
+    // Files.readString rejects malformed UTF-8 before Gson sees any of the text.
+    std::str::from_utf8(bytes).map_err(|_| unreadable())?;
+    let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
+    if bytes
+        .iter()
+        .all(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n'))
+    {
+        return Err(invalid());
+    }
+    // Unlike the package JsonObject adapter, JsonElement parses scalars too:
+    // malformed JSON is a read error; a valid non-object is a credentials error.
+    let (value, rewritten) = match super::value::parse(bytes) {
+        Ok(value) => (value, false),
+        Err(_) => {
+            let rewritten = rewrite(bytes).ok_or_else(unreadable)?;
+            (
+                super::value::parse(&rewritten).map_err(|_| unreadable())?,
+                true,
+            )
+        }
+    };
+    let document = value.as_object().ok_or_else(invalid)?;
+    let mut fields = std::collections::BTreeMap::new();
+    if let Some(entry) = document.get(origin) {
+        let entry = entry.as_object().ok_or_else(invalid)?;
+        for name in ["caCertificate", "bearerToken"] {
+            if let Some(value) = entry.get(name) {
+                // Origins and consumed member names are ASCII. Surrogate-bearing
+                // keys cannot match; leave unused members (including #939 names)
+                // alone. Consumed strings use the existing invalid-path/ASCII
+                // sentinel: neither boundary can accept an unpaired surrogate.
+                fields.insert(
+                    name,
+                    value
+                        .as_str()
+                        .map(|s| if rewritten { text(s).0 } else { s.to_owned() }),
+                );
+            }
+        }
+    }
+    Ok(fields)
+}
+
 pub(super) fn parse(bytes: &[u8], artifact: bool) -> Result<Value, String> {
     // Gson ignores exactly one BOM, only at byte zero. Hashing/UTF-8/size checks
     // belong to the caller and must continue to see the original bytes.
@@ -151,6 +203,102 @@ fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn credentials_distinguish_read_errors_from_document_and_origin_types() {
+        let origin = "https://localhost";
+        for bom in [b"".as_slice(), b"\xef\xbb\xbf"] {
+            for input in [
+                b"".as_slice(),
+                b" \r\n\t",
+                b"null",
+                b"[]",
+                b"true",
+                b"1e999",
+            ] {
+                assert_eq!(
+                    credential_fields(&[bom, input].concat(), origin).unwrap_err(),
+                    super::super::error("invalid artifact credentials")
+                );
+            }
+            for input in [
+                b"{".as_slice(),
+                b"{} true",
+                b"null true",
+                b"\xef\xbb\xbf\xef\xbb\xbf{}",
+                b"{\"unused\":\"\xff\"}",
+                br#"{"unused":"\ud800\q"}"#,
+            ] {
+                assert_eq!(
+                    credential_fields(&[bom, input].concat(), origin).unwrap_err(),
+                    super::super::error("cannot read artifact credentials")
+                );
+            }
+            assert!(credential_fields(&[bom, b"{}"].concat(), origin)
+                .unwrap()
+                .is_empty());
+        }
+        assert_eq!(
+            credential_fields(br#"{"https://localhost":null}"#, origin).unwrap_err(),
+            super::super::error("invalid artifact credentials")
+        );
+        assert!(
+            credential_fields(br#"{"https://unused.invalid":null}"#, origin)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn credentials_keep_fixed_lookup_types_duplicates_and_surrogate_boundaries() {
+        let fields = credential_fields(
+            br#"{"https://localhost":null,"https://localhost":{"caCertificate":null,"bearerToken":"\ud800","bearer\u0054oken":"fixture","bearerToken\ud800":false},"dependencies":{"x":{"source":"https://\ud800.invalid/"}}}"#,
+            "https://localhost",
+        )
+        .unwrap();
+        assert_eq!(fields["caCertificate"], None);
+        assert!(fields["bearerToken"].as_deref() == Some("fixture"));
+        for token in [r"\ud800", r"\udc00", r"\ud800x\udc00"] {
+            let input = format!(
+                r#"{{"https://localhost":{{"bearerToken":"{token}","caCertificate":"a\u0000sd800"}}}}"#
+            );
+            let fields = credential_fields(input.as_bytes(), "https://localhost").unwrap();
+            assert!(fields["bearerToken"].as_ref().unwrap().contains('\0'));
+            assert_eq!(fields["caCertificate"].as_deref(), Some("a\0sd800"));
+        }
+        let fields = credential_fields(
+            br#"{"https://localhost":{"caCertificate":"\ud83d\ude00.pem","bearerToken":"\\ud800"},"unused":"\ud800"}"#,
+            "https://localhost",
+        )
+        .unwrap();
+        assert_eq!(fields["caCertificate"].as_deref(), Some("😀.pem"));
+        assert!(fields["bearerToken"].as_deref() == Some(r"\ud800"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn credentials_reuse_gson_depth_numbers_and_validate_overwritten_values() {
+        for depth in [128, 255, 256] {
+            let input = format!(
+                r#"{{"unused":{}"\ud800"{},"unused":1e999}}"#,
+                "[".repeat(depth - 1),
+                "]".repeat(depth - 1)
+            );
+            assert_eq!(
+                credential_fields(input.as_bytes(), "https://localhost").is_ok(),
+                depth <= 255
+            );
+        }
+        for length in [1023, 1024] {
+            let input = format!(r#"{{"unused":{},"unused":0}}"#, "9".repeat(length));
+            assert_eq!(
+                credential_fields(input.as_bytes(), "https://localhost").is_ok(),
+                length == 1023
+            );
+        }
+    }
 
     #[test]
     fn objects_keep_first_position_last_value_and_order_independent_equality() {

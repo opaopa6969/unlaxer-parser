@@ -1,5 +1,5 @@
 //! Explicit HTTPS retrieval. User/CI credentials are scoped to an exact origin.
-use serde_json::Value;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -41,7 +41,7 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
         .timeout_global(Some(Duration::from_secs(20)));
     if let Some(path) = credentials.get("caCertificate") {
         let path = path
-            .as_str()
+            .as_deref()
             .ok_or_else(|| error("invalid artifact credentials"))?;
         if std::fs::metadata(path)
             .map_err(|_| error("cannot read artifact CA certificate"))?
@@ -72,7 +72,7 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
     let mut request = agent.get(source);
     if let Some(token) = credentials.get("bearerToken") {
         let token = token
-            .as_str()
+            .as_deref()
             .filter(|v| {
                 !v.is_empty()
                     && v.bytes()
@@ -96,7 +96,7 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
         .read_to_vec()
         .map_err(|_| error("HTTPS artifact retrieval failed (timeout or size limit)"))
 }
-fn credentials(origin: &str) -> Result<Value, String> {
+fn credentials(origin: &str) -> Result<BTreeMap<&'static str, Option<String>>, String> {
     let override_path = std::env::var_os("UBNF_CREDENTIALS_FILE");
     let path = override_path
         .as_ref()
@@ -110,7 +110,7 @@ fn credentials(origin: &str) -> Result<Value, String> {
         return if override_path.is_some() {
             Err(error("artifact credentials file is missing"))
         } else {
-            Ok(serde_json::json!({}))
+            Ok(BTreeMap::new())
         };
     }
     if std::fs::metadata(&path)
@@ -121,17 +121,5 @@ fn credentials(origin: &str) -> Result<Value, String> {
         return Err(error("artifact credentials file exceeds limit"));
     }
     let bytes = std::fs::read(path).map_err(|_| error("cannot read artifact credentials"))?;
-    let document: Value =
-        serde_json::from_slice(&bytes).map_err(|_| error("invalid artifact credentials"))?;
-    let document = document
-        .as_object()
-        .ok_or_else(|| error("invalid artifact credentials"))?;
-    let entry = document
-        .get(origin)
-        .cloned()
-        .unwrap_or_else(|| serde_json::json!({}));
-    if !entry.is_object() {
-        return Err(error("invalid artifact credentials"));
-    }
-    Ok(entry)
+    crate::packages::credential_fields(&bytes, origin)
 }

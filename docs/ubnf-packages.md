@@ -113,9 +113,62 @@ HTTPS client と TLS は native target のみに含める。ブラウザー向�
 credential / CA 設定ファイルの上限は64 KiB。token は printable bearer 文字に限定する。
 設定ファイルと取得済み private artifact はユーザーが管理し、公開操作は行わない。
 
+資格情報 JSON は Java の `Files.readString` → Gson 2.13.2 STRICT の
+`fromJson(..., JsonElement.class)` を参照とする（#943）。JDK17 / JDK21 で同じ結果を確認した。
+検査順はファイルの有無 → 64 KiB 上限 → UTF-8 → JSON 全体 → 最上位 object →
+exact origin の object → `caCertificate` の型・CA 読取り → `bearerToken` の型・文字種。
+member の記述順にかかわらず CA の失敗が token の失敗より先になる。
+以下の診断にはすべて `E-PACKAGE: ` が付き、`deps resolve` の失敗は exit 3。
+
+| 入力 | 受理または診断 |
+| --- | --- |
+| 明示したファイルが存在しない | `artifact credentials file is missing` |
+| 既定ファイルが存在しない | 空の資格情報として続行 |
+| ディレクトリ・読取り権限なし・不正 UTF-8 | `cannot read artifact credentials` |
+| 65536 bytes | 上限内。UTF-8 / JSON の検査を続ける |
+| 65537 bytes 以上（8 MiB 超も同じ） | 内容を解析する前に `artifact credentials file exceeds limit` |
+| byte 0 の BOM 1つ + 有効 object | 受理 |
+| 空文書・JSON 空白だけ（BOM の有無を問わない） | `invalid artifact credentials` |
+| 有効な非 object（`null`・配列・文字列・数値・真偽値） | `invalid artifact credentials` |
+| 不正 JSON、BOM 2つ、空白の後の BOM、末尾余剰入力、深さ256以上 | `cannot read artifact credentials` |
+| exact origin がない / 別 origin の値が非 object | 空の資格情報として続行 / 別 origin は無視 |
+| exact origin の値が非 object | `invalid artifact credentials` |
+| `caCertificate` / `bearerToken` の値が文字列でない | その field の検査順で `invalid artifact credentials` |
+| 単独サロゲートを含む `bearerToken`（上位・下位・壊れた組） | JSON は受理し、token 検査で `invalid artifact credentials`。送信しない |
+| 単独サロゲートを含む `caCertificate` | JSON は受理し、パスの読取りで `cannot read artifact CA certificate` |
+| 単独サロゲートを含む origin key・field 名・未使用 member | JSON は受理。ASCII の exact origin / 固定 field と一致しない key は使わない |
+
+JSON 空白は space / tab / CR / LF だけ。重複 key は最初の位置・最後の値を保持するが、
+上書きされた値も含め構文を検査する。未使用の範囲外数値は表記のまま受理し、数値は1023文字まで、
+object / array の深さは最上位を含め255まで。Rust は package 専用 reader と BOM・サロゲート escape の
+処理を再利用し、package の `JsonObject` 用診断とは分ける。新しい crate / serde_json feature は使わない。
+ASCII の固定 key だけを取得し、使用する文字列に限って単独サロゲートを既存の不正パス / ASCII 検査へ渡す。
+未使用 member に `files` / `entry` / `dependencies` があっても package の schema や #939 の制限は適用しない。
+
+任意の HTTP header を指定する機能はない。`headers` object、header 名やその値は未使用 member であり、
+非文字列や単独サロゲートを含んでも送信されない。実際に送る header は
+`Authorization: Bearer <token>` だけで、token は空でない `[A-Za-z0-9._~+/=-]+` に限定する。
+正常なサロゲート対もこの ASCII 制限では拒否する。JDK17 / JDK21 の `HttpRequest.Builder.header` を
+独立に測定すると、header 名・値の単独サロゲートは `IllegalArgumentException` になる。
+製品ではその前の token 検査で固定診断を返すため、JDK の値を含み得る例外文は出さない。
+
+資格情報を受理しても CA がなければ通常の TLS trust 検証が続く。未信頼のローカル TLS server に対する
+既存の最終診断は Java が `HTTPS artifact retrieval failed (TLS, timeout or size limit)`、Rust が
+`HTTPS artifact retrieval failed (TLS, timeout, status or redirect)`。これは JSON の受理差とは別の
+transport 診断差として [#956](https://github.com/opaopa6969/unlaxer-parser/issues/956) に分離し、
+この変更では両版の TLS / HTTP 処理を維持する。
+
+共通 `spec-corpus/package-credentials.json` の65件を、両 `deps resolve`、Java-host Rust / native Rust /
+Java flag CLI に、既存 lock/cache の有無両方で与える。Java を独立の期待値として、最終診断・終了コード・
+成功時の lock/cache raw bytes・失敗時の snapshot 不変・ローカル TLS server が受け取る Authorization を比較する。
+生成は資格情報を読まず、固定 cache だけを使用する。stdio の authoring も同じ読取り専用経路を使い、
+明示 resolve を持たないため、credentials 用の stdio ケースは追加しない。
+検証記録には header 値を残さず一致/欠落だけを記録する。#956 の2形も skip せず既存の host 別診断を照合する。
+
 `HttpsPackageConformanceTest` はローカル TLS server を使い、認証、lock/hash と生成物、
 未信頼 TLS/hostname、別 origin、redirect、容量、本文 timeout、remote→local 拒否、
-server 停止後のオフライン生成を両 CLI で照合する。CI は `rust-package-https.tsv` を保存する。
+server 停止後のオフライン生成を両 CLI で照合する。CI は `rust-package-https.tsv` と
+`rust-package-credentials.json`（件数・所要時間・値を含まない比較結果）を保存する。
 
 ## 定義の出典を確認する
 
@@ -376,7 +429,7 @@ Gson 2.13.2 STRICT の既定 nesting limit を実 JDK17 / JDK21 で測定し、�
 Gson 境界255/256の前後、8 MiB までの入れ子を確認した。後者も `JsonSyntaxException` で拒否され、
 `StackOverflowError` は観測しなかった。Java の設定・実装は変えず、Rust も255を超えて受理しない。
 object の検査順は下記 #942 のとおり Java の記述順に揃える。
-HTTPS の credentials ファイルの BOM・単独サロゲート・不正 JSON の差は [#943](https://github.com/opaopa6969/unlaxer-parser/issues/943) で扱う。
+HTTPS の credentials ファイルは上記の資格情報節の規則を使う（#943）。空文書と非 object の診断は package 文書と異なる。
 
 単独サロゲート escape は有効な ASCII bytes なので、不正 UTF-8 とは別に扱う。
 Gson が受理する `\ud800` / `\udc00` と壊れた組について、次のようにフィールド検証まで進める。
@@ -460,7 +513,8 @@ lock の出力には検証済みの文字列参照だけを既存の辞書順 JS
 
 新しい crate / feature / license 依存は追加しない。#940 の BOM・サロゲート復元はこの木に適用し、
 raw bytes の reader・hash・UTF-8 の順序は変えない。この表現は package 入力だけに限定し、
-DAP / LSP の一般 JSON、credentials (#943)、UBNF parser のホットパスには適用しない。
+DAP / LSP の一般 JSON、UBNF parser のホットパスには適用しない。credentials は #943 で
+この reader を共用するが、JsonElement の受理と固定 field の検査を別経路で行う。
 #939 の file/entry/HTTPS の単独サロゲートに残る挙動も変更しない。
 
 #941 の再測定（Linux x86_64、Rust 1.85.0、`deps resolve`、各3回の中央値、時間 s / peak RSS MiB）。
@@ -509,7 +563,7 @@ Rust threadでも debug / release の両方で検証し、stack overflow は起�
 | lock `packages` の `owner` | 記述順で SHA を照合し、最初に一致した所有者を選ぶ。正常な artifact は ID / raw hash 検証も通る必要がある | identity JSON の field 順は既存どおり |
 | lock / cache の生成 | Java は `TreeMap` で packages、roots、pinned dependencies と cache hash を整列。Rust は出力時だけ既存の辞書順へ変換 | lock の field 順・末尾 LF と既存 corpus の raw bytes を維持 |
 | generator / LSP の利用 | 上記の検証・走査を共用。失敗は最初の原因、CLI の既存 exit code、LSP の `E-MODULE`・severity 1・import 全体の UTF-16 range に現れる | 正常時の生成物・LSP JSON の順序は既存どおり |
-| `package_fetch` の credentials | origin / caCertificate / bearerToken の固定 key lookup。object の全走査はない | この変更の対象外 (#943) |
+| `package_fetch` の credentials | JSON 全体を検査した後、origin / caCertificate / bearerToken の固定 key lookup。未知 member の schema 検査はしない (#943) | 資格情報は lock/cache に書かない |
 
 #942 の共通69件は ID/version、単独サロゲート ID、files、roots、重複 key と escape、
 package / dependency の cycle、直接・推移的 fetch、固定 cache load の順序を含む。

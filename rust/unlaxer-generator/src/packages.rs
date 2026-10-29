@@ -9,6 +9,9 @@ use value::{Object, Value};
 mod json;
 mod value;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use json::credential_fields;
+
 const MAX_BYTES: usize = 8 * 1024 * 1024;
 // Share the package graph budget; individual pinned artifacts still have their 8 MiB limit.
 const MAX_LOCAL_BYTES: usize = 64 * 1024 * 1024;

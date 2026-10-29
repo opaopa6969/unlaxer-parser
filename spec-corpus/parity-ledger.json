@@ -25,6 +25,8 @@
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
+    "943": {"state": "OPEN", "title": "HTTPS package の credentials JSON の受理と診断"},
+    "956": {"state": "OPEN", "title": "credentials 受理後の TLS・HTTP 失敗診断を Java に揃える"},
     "923": {"state": "OPEN", "title": "parity(check): 字句エラーと @whitespace の組込み名の同居を Java 参照契約へ揃える"},
     "910": {"state": "OPEN", "title": "parity(generator): feature と E-LEXICAL の check/generate 診断を Java-host に揃える"},
     "916": {"state": "OPEN", "title": "parity(check): @lexicalContext と字句エラーが同居すると Java の check が例外で終わる（#910 レビュー由来）"},
@@ -548,6 +550,41 @@
     }
   },
   "entries": [
+    {
+      "id": "package-credentials-json",
+      "category": "contract",
+      "title": "HTTPS credentials JSON の Java 参照契約",
+      "hosts": "Java Gson STRICT / Rust package reader（両 deps resolve・3 CLI）",
+      "issues": [
+        943
+      ],
+      "observation": "#943でJava本体を変えず、Files.readStringとJsonElementの受理をRustへ適用する。64 KiB上限→strict UTF-8→JSON全体→object/origin→CA→tokenの順。先頭BOM1つと単独サロゲートを受理し、不正JSONはcannot read artifact credentials、空白と非objectはinvalid artifact credentials。既存readerの深さ255・数値・重複keyを共用する。単独サロゲートtokenは送信前にASCII検査で拒否し、任意headersは未使用。共通65件を両deps resolveと3 CLIでsnapshot有無両方照合し、秘密値を記録しない。TLS失敗の既存文言差2形は別項目package-https-transportで追跡し、host別期待値で実行する。#943はPRのmerge待ち。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-credentials.json",
+        "scripts/ubnf_package_credentials.py",
+        "rust/unlaxer-generator/src/packages/json.rs",
+        "rust/unlaxer-generator/src/package_fetch.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java"
+      ]
+    },
+    {
+      "id": "package-https-transport",
+      "category": "unresolved",
+      "title": "資格情報受理後の HTTPS transport 失敗診断",
+      "hosts": "Java java.net.http / Rust ureq（両 deps resolve）",
+      "issues": [
+        956
+      ],
+      "observation": "ローカル未信頼TLS serverに、既定資格情報なし・BOM付き空objectで空の資格情報として進むと、JavaはHTTPS artifact retrieval failed (TLS, timeout or size limit)、RustはHTTPS artifact retrieval failed (TLS, timeout, status or redirect)。両版exit 3、lock/cacheは不変。JSON修正前から存在するtransport分類差であり、#943では変更せず#956へ分離する。共通credentials fixtureの該当2形はskipせずhost別期待値を照合する。TLS/HTTP status/redirect/timeout/body上限の全診断分類は後続issueの受け入れ条件。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-credentials.json",
+        "scripts/ubnf_package_credentials.py",
+        "rust/unlaxer-generator/src/package_fetch.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFPackageFetcher.java"
+      ]
+    },
     {
       "id": "package-json-surrogate-text",
       "category": "contract",
