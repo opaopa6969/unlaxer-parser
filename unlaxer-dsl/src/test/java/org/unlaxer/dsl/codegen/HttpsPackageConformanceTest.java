@@ -96,6 +96,27 @@ public class HttpsPackageConformanceTest {
         System.out.println("credentials CLI fixtures: " + report.get("seconds").getAsDouble() + " s");
     }
 
+    @Test(timeout=300000) public void credentialsLocationsMatchJavaHomeAndPaths() throws Exception {
+        if (!Boolean.getBoolean("rustConformance"))
+            System.out.println("[assumption] credentials locations require -DrustConformance=true");
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        assertEquals(0, run(List.of("cargo", "build", "--locked", "--manifest-path",
+            repository.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), null, 180).code());
+        Path output = Path.of("target/rust-package-credentials-location.json").toAbsolutePath();
+        Run result = run(List.of("python3", repository.resolve("scripts/ubnf_package_credentials_location.py").toString(),
+            "--java", Path.of(System.getProperty("java.home"), "bin/java").toString(),
+            "--classpath", System.getProperty("java.class.path"),
+            "--rust", repository.resolve("rust/target/debug/unlaxer").toString(),
+            "--output", output.toString()), null, 240);
+        assertEquals(result.output(), 0, result.code());
+        var report = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
+        assertEquals("all location fixtures executed", 23, report.getAsJsonArray("cases").size());
+        for (var entry : report.getAsJsonArray("cases"))
+            assertEquals("both snapshots and all five CLI paths", 10,
+                entry.getAsJsonObject().getAsJsonArray("runs").size());
+        System.out.println("credentials location fixtures: " + report.get("seconds").getAsDouble() + " s");
+    }
+
     @Test public void secureExplicitFetchAndPinnedOfflineGenerationMatch() throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] HTTPS package conformance requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));

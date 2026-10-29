@@ -12,6 +12,7 @@ import threading
 import time
 
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
+from ubnf_credentials_home import compile_passwd_shim, isolated_env, protect_real_credentials
 
 ROOT = Path(__file__).resolve().parents[1]
 COUNT = 65
@@ -64,7 +65,8 @@ def credential_bytes(case, origin, ca, missing):
 
 
 @contextmanager
-def local_tls(directory, artifact):
+def local_tls(directory, artifact, tokens=None):
+    tokens = {TOKEN: "bearer"} if tokens is None else tokens
     # Same local CA / hostname trust boundary as HttpsPackageConformanceTest.
     for command in [
         ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', 'ca.key', '-out', 'ca.pem',
@@ -87,8 +89,9 @@ def local_tls(directory, artifact):
         def do_GET(self):
             authorization = self.headers.get_all('Authorization', [])
             # Compare the actual bytes-as-header-text in memory; receipts contain labels only.
-            received.append({'authorization': 'bearer' if authorization == ['Bearer ' + TOKEN]
-                             else 'absent' if not authorization else 'unexpected',
+            received.append({'authorization': next((label for token, label in tokens.items()
+                                                    if authorization == ['Bearer ' + token]),
+                                                   'absent' if not authorization else 'unexpected'),
                              'extraHeader': any(k.lower().startswith('x-') for k in self.headers),
                              'path': self.path})
             self.send_response(200)
@@ -135,6 +138,7 @@ def check(directory, args, evidence, excluded):
                 '.ubnf-cache/packages/' + digest(artifact) + '.json': artifact.hex()}
     started = time.monotonic()
     denied_works = permissions_apply(directory)
+    library = compile_passwd_shim(directory)
     with local_tls(directory, artifact) as (origin, ca, received):
         for case in fixtures():
             if args.case and case['id'] not in args.case:
@@ -165,7 +169,7 @@ def check(directory, args, evidence, excluded):
             grammar.write_text("grammar Main { @import layout from 'pkg:std/layout' @ubnf: v2 "
                                "@root @mapping(Value) Start ::= 'a'; }\n")
             # Override only child-process homes, never the developer's real configuration.
-            env = dict(os.environ, HOME=str(home))
+            env = isolated_env(library, home, home)
             env.pop('UBNF_CREDENTIALS_FILE', None)
             if not case.get('defaultPath'):
                 env['UBNF_CREDENTIALS_FILE'] = str(credentials)
@@ -249,7 +253,8 @@ def main():
     excluded = []
     elapsed = None
     try:
-        with tempfile.TemporaryDirectory(prefix='package-credentials-', dir=os.environ.get('TMPDIR')) as temporary:
+        with protect_real_credentials(), tempfile.TemporaryDirectory(
+                prefix='package-credentials-', dir=os.environ.get('TMPDIR')) as temporary:
             elapsed = check(Path(temporary), args, evidence, excluded)
     finally:
         args.output.write_text(json.dumps({'seconds': elapsed, 'cases': evidence, 'excluded': excluded},

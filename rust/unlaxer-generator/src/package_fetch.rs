@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
+#[cfg(unix)]
+mod passwd_home;
+
 fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
 }
@@ -122,11 +125,15 @@ fn credentials(origin: &str) -> Result<BTreeMap<&'static str, Option<String>>, S
     let override_path = std::env::var_os("UBNF_CREDENTIALS_FILE");
     let path = override_path
         .as_ref()
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME")
-                .map(|home| PathBuf::from(home).join(".config/unlaxer/credentials.json"))
+        .map(|value| {
+            // Path.of("") denotes the working directory in Java, not a missing file.
+            if cfg!(unix) && value.is_empty() {
+                PathBuf::from(".")
+            } else {
+                PathBuf::from(value)
+            }
         })
+        .or_else(|| default_home().map(|home| home.join(".config/unlaxer/credentials.json")))
         .ok_or_else(|| error("cannot locate artifact credentials file"))?;
     if !path.exists() {
         return if override_path.is_some() {
@@ -144,4 +151,17 @@ fn credentials(origin: &str) -> Result<BTreeMap<&'static str, Option<String>>, S
     }
     let bytes = std::fs::read(path).map_err(|_| error("cannot read artifact credentials"))?;
     crate::packages::credential_fields(&bytes, origin)
+}
+
+// Java's normal Unix user.home comes from the real uid's passwd entry.
+// Non-Unix retains the existing environment-based behavior.
+fn default_home() -> Option<PathBuf> {
+    #[cfg(unix)]
+    {
+        Some(passwd_home::get())
+    }
+    #[cfg(not(unix))]
+    {
+        std::env::var_os("HOME").map(PathBuf::from)
+    }
 }
