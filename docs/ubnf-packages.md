@@ -738,7 +738,7 @@ Rust の既存 `Result<_, String>` API は残し、CLI 用の `FileError` で I/
 parser のホットパスに変更はない。
 local import の bounded reader の失敗（非通常ファイル・64 MiB 超過・不正 UTF-8）も、Java と同じく
 generate では I/O として終了4になる（変更前の native は3）。不正 UTF-8 の原因文の差
-（Java `Input length = 1` / Rust `stream did not contain valid UTF-8`）は今回の対象外で、#937 に残す。
+は #937 の下記 UTF-8 表で解消する。
 
 同じ bounded reader の文言は native authoring LSP の `E-MODULE` 診断にも届く。local import の欠落・権限拒否は
 `import ALIAS: P` となり、Java LSP と message まで一致する（変更前の native は `No such file or directory (os error 2)`）。
@@ -752,10 +752,106 @@ generate では I/O として終了4になる（変更前の native は3）。�
 追加の `@ubnf` 省略/v1/v3/block の4形は、Playground が I/O より先に capability 判定で停止するため、
 inspect・check・generate を対象とし、既存 `P-IMPORT` / `P-SETTING` JSON の全体を固定する。
 この4形の Playground の一般的な描画形式は今回変更しない（`P-MODULE` 以外の readiness 描画差と
-出力先の書込み失敗の文言差は #937）。
+出力先の書込み失敗の文言差は下記 #937 で解消する）。
 
 権限 fixture は同じ実行ユーザーで `chmod(000)` の読取りが `PermissionDenied` になることを先に確認する。
 root / `CAP_DAC_OVERRIDE` 等で読める環境では入口/import の各1形を組合せから除外し、
 証跡 JSON の `excluded` に理由を残す。JUnit を skip したり権限拒否が成功したと数えたりしない。
 通常の非 root CI は全400観測（両 host、LF/CRLF）と生成後 `--check` 16回を実行し、必須3メソッドの skip は0とする。
 GitHub Actions 上（`GITHUB_ACTIONS` あり）では除外が1件でもあればテストを失敗させ、権限 fixture が黙って抜けないようにする。
+
+
+## CLI の書込み・UTF-8・readiness 診断（#937）
+
+参照は変更していない Java `CodegenMain`（Oracle JDK 17.0.12 / 21.0.9）。
+`spec-corpus/cli-stderr.json` は実 Java CLI から確認して固定した独立期待値で、実行時に
+片方の出力から期待値を作らない。両 CLI に LF/CRLF を送り、終了コード・stdout 全文・stderr 最終行と
+実行前後のファイルツリー（既存ファイルの bytes・mode を含む）を照合する。
+
+### 出力先 I/O
+
+`W` は作業ディレクトリ、`D` は生成物の出力先、`P` は失敗したパス。
+`generate` の書込み段階は `cannot write D: <原因>`、Playground は原因文を直接表示する。
+Rust の数値 errno 接尾辞は付けない。失敗時の終了コード4と空 stdout は従来どおり。
+
+| OS / 失敗箇所 | Java 実 CLI の最終行（Rust も同じ） |
+| --- | --- |
+| EEXIST: `out` が通常ファイル、generate | `cannot write out/mod.rs: out`（createDirectories の最初の mkdir） |
+| ENOTDIR: `file/out` の `file` が通常ファイル、generate | `cannot write file/out/mod.rs: W/file/out: Not a directory`（絶対パスで親から再試行） |
+| EACCES: `ro` が555、未作成 `ro/out`、generate | `cannot write ro/out/mod.rs: W/ro/out` |
+| EACCES: `ro` が555、出力先 `ro`、generate | `cannot write ro/mod.rs: ro/mod.rs` |
+| EACCES: `ro` が555、Playground `ro/out` | `W/ro/.ubnf-playground-<乱数>` |
+| EEXIST: Playground `file/out` の親 `file` が通常ファイル | `W/file` |
+| 既存出力先: Playground `out`（通常ファイル / directory） | `output already exists; choose a new directory: W/out`。mkdir 前に拒否する。 |
+| EISDIR 相当: generate の `out/mod.rs` が directory | `refusing to overwrite non-generated file out/mod.rs`。実 CLI は書込み前の preflight で拒否するため、EISDIR 自体は発生しない。書込み中の EISDIR は `cannot write D: P: Is a directory`。 |
+| その他: ENAMETOOLONG（256文字の成分 X）、generate `X/out` | `cannot write X/out/mod.rs: W/X: File name too long` |
+| 同じ ENAMETOOLONG、Playground `X/out` | `W/X: File name too long` |
+| 書込み失敗（EFBIG。ENOSPC / EIO と同じ経路）、generate | `cannot write out/mod.rs: File too large`。開いた channel への write の失敗は Java ではパスを付けない |
+| 同じ書込み失敗、Playground | `Generation failed; partial staging retained at W/.ubnf-playground-<乱数>: File too large` |
+| EACCES: 既存 `out` が555で `out/grammar_a` などの子 directory は書込み可、複数 grammar の generate | `cannot write out/mod.rs: out/mod.rs`。Java の書込み順どおり子 directory の生成物を書いた後、root の `mod.rs` で失敗する |
+| `--check`: 生成物が無い・directory・出力先が通常ファイル | generate は `generated file differs: out/mod.rs`、Playground は `generated file differs: W/out/src/generated/mod.rs`（`Files.isRegularFile` が偽） |
+| `--check` / 上書き前検査: 既存生成物が不正 UTF-8（例 `E2 82 20`） | `Input length = 3`（`Files.readString` の長さ。下記 UTF-8 表） |
+
+Java の `Files.createDirectories` に合わせ、最初に指定パスを mkdir し、EEXIST 以外の失敗は
+絶対パスの既存親から作成を試みる。symlink 拒否と native の排他的な一時ファイル作成・置換は維持する。
+一時ファイルは各生成物と同じ directory に作る。Java が生成物ごとにその directory へ直接書く順序と
+権限の判定を保つためである。意図した差として、書込み失敗時に Java は途中まで書いた
+（`RLIMIT_FSIZE` 0 では空の）生成物を残すが、native は一時ファイルを消して既存の生成物を切り詰めない。
+fixture はこの違いを host ごとの作成物一覧として固定する。
+Playground の乱数/PID部分だけを `.ubnf-playground-${TEMP}` に正規化し、親パスを比較から除かない。
+対象 fixture では staging が作られる前に失敗し、一時ディレクトリも残らない。
+生成途中の失敗で task-owned staging を保持する既存の両版の契約は変更しない。
+権限 probe は同じ実行ユーザーで555の directory に書けないことを確かめる。書ける環境では
+該当 fixture を理由付きで除外するが、GitHub Actions では除外を失敗とし、JUnit skip は許さない。
+
+### 不正 UTF-8
+
+入口の generate/check/Playground は `Files.readString`、inspect の入口と全 local import は
+bounded reader の `CharsetDecoder` が Java の参照であり、両者の malformed length は同一ではない。
+Rust は通常入力を一度だけ strict decode し、失敗した場合だけ invalid suffix から同じ長さを求める。
+
+| 不正 bytes（先頭の正常な bytes / LF/CRLF は長さに影響しない） | Files.readString | strict decoder |
+| --- | --- | --- |
+| `FF`, `80`, `C2`, `C2 20`, `C0 80` | `Input length = 1` | `Input length = 1` |
+| `E2 82`（末尾途切れ） | `Input length = 1` | `Input length = 2` |
+| `E2 20` | `Input length = 2` | `Input length = 1` |
+| `E2 82 20` | `Input length = 3` | `Input length = 2` |
+| `E0 80 80`（過長） | `Input length = 3` | `Input length = 1` |
+| `ED A0 80`（surrogate） | `Input length = 3` | `Input length = 3` |
+| `ED A0`, `ED A0 20` | `Input length = 1`, `3` | `Input length = 2`, `2` |
+| `F0 9F 98`（末尾途切れ） | `Input length = 1` | `Input length = 3` |
+| `F0 9F 98 20` | `Input length = 4` | `Input length = 3` |
+| `F0 80 80 80`, `F4 90 80 80`, `F5 80 80 80` | `Input length = 4` | `Input length = 1` |
+
+入口は inspect が終了3、他は4（check のみ `I/O error: ` 接頭辞）。import は inspect が3、
+generate が4、check/Playground は3と従来の `P-MODULE`。check の JSON は変更しない。
+同じ local reader を使う LSP の import message にもこの文が届く。package artifact の
+`E-PACKAGE: invalid UTF-8 artifact`、raw hash → strict UTF-8 → JSON と reader 上限は #924 のまま。
+
+### Playground readiness と構文エラー
+
+Playground は `P-MODULE` だけの特別扱いをやめ、全診断を Java record と同じ
+`[Diagnostic[code=..., span=Span[start=..., end=...], subject=...], ...]` に描画する。
+位置が無ければ `span=null`。順序・重複・code point 範囲・subject の改行や引用符をそのまま保ち、
+JSON の escape や severity を混ぜない。grammar / profile / package は同じ描画を使う。
+構文、構造、inventory、module、parameterized rule の各失敗を共通 fixture で固定し、
+check は従来の JSON 全体を独立期待値と照合する。
+
+意図した差として、generate / deps inspect の構文エラーは Java の
+`UBNF パース失敗: <ソースの先頭80文字（UTF-16 単位）>`（未消費の入力がある場合は
+`UBNF パース失敗: <行:列> に未消費の入力があります: <続く80文字>`）と、native の行・列・原因付き診断を維持する。
+Java の文は複数行のソースを含むため、stderr 最終行がソースの途中の行になることがある。
+利用者が誤りの位置を特定できる既存の情報を削らず、parser ホットパスを変更しない最小の選択である。
+単一行と複数行・非BMP・LF/CRLF の両 host の最終行を固定し、終了3・空 stdout・無出力を検証する。
+この差は parity ledger の `cli-stderr-presentation` / #937 に記録する。
+
+
+調査中に見つけた別の既存差は #949 へ分離した。旧 token 宣言に余分なセミコロンを付けた
+`grammar Main { token X = REGEX('x'); @root Start ::= X; }` は、Java 17/21 が
+`P-SYNTAX`、native が `E-REGEX-RETIRED` を選ぶ。変更前の master 21dac030 でも再現する。
+Playground の record 表示自体は一致させるが、ここでは check の code/span/subject が異なる。
+#937 の「check JSON を変えない」という制約を守り、parser のエラー選択順の変更を別の意味単位にした。
+#949 は両版・LF/CRLF・import・独立期待値・mutation を受け入れ条件に持つ。
+CLI から到達する readiness の50 code は本変更の48入力で固定する。
+手組みASTだけの `P-GRAMMAR-COUNT` / `P-GRAMMAR-NAME` / `P-TOKEN-KIND` も同じ分岐のない描画を使うが、
+実 CLI の corpus 件数には含めない。
