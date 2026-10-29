@@ -893,3 +893,48 @@ Playground の record 表示自体は一致させるが、ここでは check の
 CLI から到達する readiness の50 code は本変更の48入力で固定する。
 手組みASTだけの `P-GRAMMAR-COUNT` / `P-GRAMMAR-NAME` / `P-TOKEN-KIND` も同じ分岐のない描画を使うが、
 実 CLI の corpus 件数には含めない。
+
+## CLI の出力先パス（#952）
+
+参照は Java `CodegenMain`。Java 製品コード、上記 #932/#934 の入力 I/O 表、#937 の出力 I/O 表、
+check JSON と正常な生成物の内容は変更しない。`W` は作業ディレクトリ。
+
+| 操作・前提 | 契約（空 stdout・終了4と書かれた失敗以外は終了0） |
+| --- | --- |
+| generate `link/out`、`link` が directory symlink | 意図した差: Java は実体先へ生成。native は空 stdout・終了4、`output directory must not have a symbolic link ancestor: link`。意図しない実体先への書込みを防ぐ既存方針を維持する。`link/.`・`link/../out`・`--check` も同じ方針。 |
+| generate の祖先が dangling / ループ / file への symlink（`dang/out` など） | 両版とも空 stdout・終了4。最終行だけが意図した差で、Java は `cannot write dang/out/mod.rs: W/dang` などの作成失敗、native は上と同じ祖先拒否文。 |
+| generate `out/l` が symlink、または `out` が dangling symlink | 両版とも空 stdout・終了4、`output directory must not be a symbolic link: P`。 |
+| generate `out/../out2`、`out` が無い | 両版とも `out2/` だけを作り、空 stdout・終了4、`cannot write out/../out2/mod.rs: out/../out2/mod.rs`。`out` が既存 directory なら成功し、stdout は `in out/../out2` のまま。 |
+| generate の既存生成物 `out/mod.rs` が mode 444 | 書込み権限の無いユーザーでは空 stdout・終了4、`cannot write out/mod.rs: out/mod.rs`。既存ファイルの bytes/mode は不変。一時ファイルや置換後のファイルを残さない。 |
+| generate `file/./out` / `file/.`、`file` が通常ファイル | 両版とも空 stdout・終了4、`cannot write file/./out/mod.rs: W/file/.: Not a directory` / `cannot write file/./mod.rs: W/file`。Java の `toAbsolutePath`・`getParent` と同じく `.` を残したまま既存の親を探す。 |
+| generate の生成先 directory `m/grammar_a` が symlink で、その中の `mod.rs` も symlink | 両版とも空 stdout・終了4、`refusing symbolic link m/grammar_a`。Java の `validateGeneratedParents` と同じく近い親から検査し、ファイル自体は最後。 |
+| generate `out/` / `out//x` | stdout は `Generated 5 Rust module files in out` / `in out/x`（末尾 LF）。`--check` は `Verified`。`.`・`..` はここで畳まない。 |
+| Playground `./pg` / `pg/` / `pg/.` / `pg//x` / `pg/../pg2` | stdout は絶対・字句正規化した `W/pg` / `W/pg/x` / `W/pg2`。`Generated` / `Verified` と続く `Next:` 行の他の内容は維持。 |
+| Playground `missing/../pg2`、`pg2` が既存 file / directory | 空 stdout・終了4、`output already exists; choose a new directory: W/pg2`。`missing/` や staging を作らない。`pg2` が無ければ `W/pg2` への生成が成功し、やはり `missing/` は作らない。 |
+| Playground `missing/../pg2 --check`、生成物なし | 空 stdout・終了4、`generated file differs: W/pg2/src/generated/mod.rs`。書込みは無い。 |
+
+generate の directory 作成は Java `Files.createDirectories` と同じく、指定されたパスへの作成を
+まず試み、失敗時だけ既存の親から `relativize` した成分を順に作る。この相対化では `..` の対を畳むが、
+その後のファイル open は元のパスで行う。Playground は正規化前後の両方で symlink を検査するので、
+`link/../pg2` の `link` を正規化で隠すことはできない。
+
+generate の祖先拒否は引数の綴りに現れる成分だけを `lstat` で検査する。相対パスでは作業ディレクトリより上を見ないが、
+絶対パスでは `/` まで見るので、macOS の `/tmp` のように symlink を含む綴りは拒否される（Java の Playground と同じ性質）。
+検査は書込み前の1回で、検査後に祖先が symlink に差し替わる競合は防がない（Java も同じ）。
+
+mode 444 の判定は各生成物の書込み順で、既存ファイルを truncate せず書込み用に open する。
+Unix では `O_NOFOLLOW | O_NONBLOCK` を付け、事前検査後に末尾成分が symlink へ差し替わっても追わない。
+失敗時にそれ以前の生成物だけが残る順序も Java と一致する。
+#937 の各生成物と同じ directory への排他的な一時ファイル作成・rename と、書込み失敗時に
+既存生成物を切り詰めない契約は維持する。この rename 方式のため、上書きに成功した場合の mode・hard link と、
+mode 555 の directory 内で書込み可能な既存生成物を置き換える場合は Java と異なる。これは #971 で追跡する。
+
+`spec-corpus/cli-stderr.json` の追加 `paths` suite は33形、LF/CRLF・両実 CLI の244観測と、
+成功後の `--check` 114回。終了コード・stdout全文・stderr最終行・全ツリーの名前/type/mode/内容ハッシュを
+固定期待値で検証する。正常な5生成ファイルと67 Playgroundファイルの期待値は変更前の Java と
+native の bytes 一致を確認して固定した。Playground root の既存 mode 差（Java の一時 directory は700、
+native は umask 022 で755）は今回変更せず host 別の期待値に記録する。
+chmod(444) の file と chmod(555) の directory は実行ユーザーで別々に probe し、効かない場合だけ
+理由付きで除外する。CI は除外0・skip0を必須とする。
+既存 `CliStderrConformanceTest` に必須メソッドを追加し、cli shard と JDK17 契約の両方で実行する。
+成功 stdout の変更に伴う移行手順は [3.3.0 以降の移行](migration-after-3.3.0.md#native-cli-の出力先パス952)を参照。

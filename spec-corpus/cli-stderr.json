@@ -3,7 +3,8 @@
     "output": 15,
     "utf8": 48,
     "readiness": 48,
-    "syntax": 2
+    "syntax": 2,
+    "paths": 33
   },
   "cases": [
     {
@@ -5505,6 +5506,2410 @@
         "LF": "3:12: expected nonempty rule sequence (use an EMPTY token for epsilon)",
         "CRLF": "3:12: expected nonempty rule sequence (use an EMPTY token for epsilon)"
       }
+    },
+    {
+      "id": "path-ancestor",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "link/out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "real/deep"
+      ],
+      "symlinks": {
+        "link": "real"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in link/out\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/link"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in link/out\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/link"
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "java": {
+            "directories": [],
+            "artifacts": [
+              {
+                "template": "generate",
+                "root": "real/out"
+              }
+            ]
+          },
+          "rust": {}
+        }
+      },
+      "nativeExpected": {
+        "generate": {
+          "exit": 4,
+          "stdout": "",
+          "lastError": "output directory must not have a symbolic link ancestor: link"
+        }
+      }
+    },
+    {
+      "id": "path-ancestor-dot",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "link/.",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "real/deep"
+      ],
+      "symlinks": {
+        "link": "real"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in link/.\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/link"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in link/.\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/link"
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "java": {
+            "directories": [],
+            "artifacts": [
+              {
+                "template": "generate",
+                "root": "real"
+              }
+            ]
+          },
+          "rust": {}
+        }
+      },
+      "nativeExpected": {
+        "generate": {
+          "exit": 4,
+          "stdout": "",
+          "lastError": "output directory must not have a symbolic link ancestor: link"
+        }
+      }
+    },
+    {
+      "id": "path-ancestor-parent",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "link/../out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "real/deep"
+      ],
+      "symlinks": {
+        "link": "real/deep"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in link/../out\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/link"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in link/../out\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/link"
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "java": {
+            "directories": [],
+            "artifacts": [
+              {
+                "template": "generate",
+                "root": "real/out"
+              }
+            ]
+          },
+          "rust": {}
+        }
+      },
+      "nativeExpected": {
+        "generate": {
+          "exit": 4,
+          "stdout": "",
+          "lastError": "output directory must not have a symbolic link ancestor: link"
+        }
+      }
+    },
+    {
+      "id": "path-direct",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out/l",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "out",
+        "real"
+      ],
+      "symlinks": {
+        "out/l": "../real"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output directory must not be a symbolic link: out/l"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/out/l"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output directory must not be a symbolic link: out/l"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/out/l"
+          }
+        }
+      },
+      "tree": {}
+    },
+    {
+      "id": "path-direct-slash",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out/l/",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "out",
+        "real"
+      ],
+      "symlinks": {
+        "out/l": "../real"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output directory must not be a symbolic link: out/l"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/out/l"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output directory must not be a symbolic link: out/l"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/out/l"
+          }
+        }
+      },
+      "tree": {}
+    },
+    {
+      "id": "path-dangling",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {
+        "out": "missing"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output directory must not be a symbolic link: out"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/out"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output directory must not be a symbolic link: out"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/out"
+          }
+        }
+      },
+      "tree": {}
+    },
+    {
+      "id": "path-missing-parent",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out/../out2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/../out2/mod.rs: out/../out2/mod.rs"
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/../out2/mod.rs: out/../out2/mod.rs"
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [
+            "out2"
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "out2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-existing-parent",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out/../out2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "out"
+      ],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in out/../out2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in out/../out2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "out2"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "out2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-readonly-first",
+      "scope": "paths",
+      "operations": [
+        "generate"
+      ],
+      "output": "out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "out/mod.rs": "// Generated by unlaxer RustBackend. old\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/mod.rs: out/mod.rs"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/mod.rs: out/mod.rs"
+          }
+        }
+      },
+      "tree": {
+        "generate": {}
+      },
+      "readOnlyFiles": [
+        "out/mod.rs"
+      ]
+    },
+    {
+      "id": "path-readonly-later",
+      "scope": "paths",
+      "operations": [
+        "generate"
+      ],
+      "output": "out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "out/ast.rs": "// Generated by unlaxer RustBackend. old\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/ast.rs: out/ast.rs"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write out/ast.rs: out/ast.rs"
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "out",
+              "include": [
+                "mod.rs"
+              ]
+            }
+          ]
+        }
+      },
+      "readOnlyFiles": [
+        "out/ast.rs"
+      ]
+    },
+    {
+      "id": "path-slash",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out/",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in out\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in out\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "out"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "out"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-slashes",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out//x",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in out/x\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in out/x\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [
+            "out"
+          ],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "out/x"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [
+            "out"
+          ],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "out/x"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-dot-prefix",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "./pg",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in ./pg\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in ./pg\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "pg"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "pg"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-pg-slash",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "pg/",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "pg"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "pg"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-dot-tail",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "pg/.",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg/.\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg/.\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "pg"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "pg"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-pg-slashes",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "pg//x",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg/x\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg/x\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [
+            "pg"
+          ],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "pg/x"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [
+            "pg"
+          ],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "pg/x"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-dot-middle",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "out/./x",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in out/./x\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in out/./x\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [
+            "out"
+          ],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "out/x"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [
+            "out"
+          ],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "out/x"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-pg-parent",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "pg/../pg2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "pg"
+      ],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg/../pg2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg/../pg2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "pg2"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "pg2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-missing",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "missing/../pg2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write missing/../pg2/mod.rs: missing/../pg2/mod.rs"
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write missing/../pg2/mod.rs: missing/../pg2/mod.rs"
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [
+            "pg2"
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "pg2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-pg-missing",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "pg/../pg2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write pg/../pg2/mod.rs: pg/../pg2/mod.rs"
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write pg/../pg2/mod.rs: pg/../pg2/mod.rs"
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [
+            "pg2"
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "pg2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-unicode",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "出 力😀/../pg2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "出 力😀"
+      ],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in 出 力😀/../pg2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in 出 力😀/../pg2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "pg2"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "pg2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-absolute",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "${WORK}/pg/../pg2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "pg"
+      ],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in ${WORK}/pg/../pg2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in ${WORK}/pg/../pg2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "pg2"
+            }
+          ]
+        },
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "pg2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-existing-dir",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "pg/../pg2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "pg",
+        "pg2"
+      ],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg/../pg2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/pg2"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 0,
+            "stdout": "Generated 5 Rust module files in pg/../pg2\n",
+            "lastError": ""
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/pg2"
+          }
+        }
+      },
+      "tree": {
+        "generate": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "generate",
+              "root": "pg2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-existing-dir-missing",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "missing/../pg2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "pg2"
+      ],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write missing/../pg2/mod.rs: missing/../pg2/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/pg2"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write missing/../pg2/mod.rs: missing/../pg2/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/pg2"
+          }
+        }
+      },
+      "tree": {
+        "generate": {}
+      }
+    },
+    {
+      "id": "path-existing-file",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "missing/../pg2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "pg2": "occupied"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write missing/../pg2/mod.rs: ${WORK}/pg2"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/pg2"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write missing/../pg2/mod.rs: ${WORK}/pg2"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/pg2"
+          }
+        }
+      },
+      "tree": {}
+    },
+    {
+      "id": "path-cancel-file",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "file/../out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "file": "occupied"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/../out/mod.rs: ${WORK}/file/..: Not a directory"
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/../out/mod.rs: ${WORK}/file/..: Not a directory"
+          },
+          "playground": {
+            "exit": 0,
+            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "lastError": ""
+          }
+        }
+      },
+      "tree": {
+        "playground": {
+          "directories": [],
+          "artifacts": [
+            {
+              "template": "playground",
+              "root": "out"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "path-cancel-dot",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "missing/..",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write missing/../mod.rs: missing/../mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write missing/../mod.rs: missing/../mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}"
+          }
+        }
+      },
+      "tree": {}
+    },
+    {
+      "id": "path-normalized-link",
+      "scope": "paths",
+      "operations": [
+        "playground"
+      ],
+      "output": "missing/../link/out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "real"
+      ],
+      "symlinks": {
+        "link": "real"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/link"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link ${WORK}/link"
+          }
+        }
+      },
+      "tree": {}
+    },
+    {
+      "id": "path-check-missing",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "missing/../pg2",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: missing/../pg2/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: ${WORK}/pg2/src/generated/mod.rs"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: missing/../pg2/mod.rs"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "generated file differs: ${WORK}/pg2/src/generated/mod.rs"
+          }
+        }
+      },
+      "tree": {},
+      "flags": [
+        "--check"
+      ]
+    },
+    {
+      "id": "path-normalized-denied",
+      "scope": "paths",
+      "operations": [
+        "playground"
+      ],
+      "output": "missing/../ro/out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n"
+      },
+      "directories": [
+        "ro"
+      ],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/ro/.ubnf-playground-${TEMP}"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/ro/.ubnf-playground-${TEMP}"
+          }
+        }
+      },
+      "tree": {},
+      "readOnly": [
+        "ro"
+      ]
+    },
+    {
+      "id": "path-file-dot-child",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "file/./out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "file": "occupied"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/./out/mod.rs: ${WORK}/file/.: Not a directory"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/file"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/./out/mod.rs: ${WORK}/file/.: Not a directory"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/file"
+          }
+        }
+      },
+      "tree": {
+        "generate": {},
+        "playground": {}
+      }
+    },
+    {
+      "id": "path-file-dot",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "file/.",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "file": "occupied"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/./mod.rs: ${WORK}/file"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/file"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/./mod.rs: ${WORK}/file"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/file"
+          }
+        }
+      },
+      "tree": {
+        "generate": {},
+        "playground": {}
+      }
+    },
+    {
+      "id": "path-nested-link-order",
+      "scope": "paths",
+      "operations": [
+        "generate"
+      ],
+      "output": "m",
+      "files": {
+        "main.ubnf": "grammar A { @root @mapping(Value,params=[text]) Root ::= 'a' @text; }\ngrammar B { @root @mapping(Value,params=[text]) Root ::= 'b' @text; }\n"
+      },
+      "directories": [
+        "m",
+        "real"
+      ],
+      "symlinks": {
+        "m/grammar_a": "../real",
+        "real/mod.rs": "missing"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link m/grammar_a"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link m/grammar_a"
+          }
+        }
+      },
+      "tree": {
+        "generate": {}
+      }
     }
-  ]
+  ],
+  "trees": {
+    "generate": {
+      "LF": {
+        "": [
+          16877,
+          "directory"
+        ],
+        "ast.rs": [
+          33188,
+          "95b00af34ae0e1311a5ef77fd80d9557eede4d0788b98bca191dd314f4dedbb5"
+        ],
+        "evaluator.rs": [
+          33188,
+          "349d28fbbc90a3ec2bc51c1c43d54b26c07d0119e00aeeed576e71f6c5bf1a46"
+        ],
+        "mapper.rs": [
+          33188,
+          "45dd519b825124cbddb9f80b6737478fdba2ccb1e0a9bbb5727efdc874489406"
+        ],
+        "mod.rs": [
+          33188,
+          "b6c6f5d53cc67a4ac1b794ac147b6c211f17d96dbac95697352e9a8c5a1d041f"
+        ],
+        "parser.rs": [
+          33188,
+          "6c571179272407b59d2c3cd1a95be70ab21c2d71fbee697880f85ff8a5cacbf5"
+        ]
+      },
+      "CRLF": {
+        "": [
+          16877,
+          "directory"
+        ],
+        "ast.rs": [
+          33188,
+          "95b00af34ae0e1311a5ef77fd80d9557eede4d0788b98bca191dd314f4dedbb5"
+        ],
+        "evaluator.rs": [
+          33188,
+          "349d28fbbc90a3ec2bc51c1c43d54b26c07d0119e00aeeed576e71f6c5bf1a46"
+        ],
+        "mapper.rs": [
+          33188,
+          "45dd519b825124cbddb9f80b6737478fdba2ccb1e0a9bbb5727efdc874489406"
+        ],
+        "mod.rs": [
+          33188,
+          "b6c6f5d53cc67a4ac1b794ac147b6c211f17d96dbac95697352e9a8c5a1d041f"
+        ],
+        "parser.rs": [
+          33188,
+          "6c571179272407b59d2c3cd1a95be70ab21c2d71fbee697880f85ff8a5cacbf5"
+        ]
+      }
+    },
+    "playground": {
+      "LF": {
+        "": [
+          {
+            "java": 16832,
+            "rust": 16877
+          },
+          "directory"
+        ],
+        ".cargo": [
+          16877,
+          "directory"
+        ],
+        ".cargo/config.toml": [
+          33188,
+          "35cd62ebd209f9080178674687059b74473e4fb8b4bd43b6f5144fe86a3b008d"
+        ],
+        "Cargo.toml": [
+          33188,
+          "94e72d8ee6556ff23a695b20a8204570b632838da9df0cfe80d4f8a8fb28a8d2"
+        ],
+        "README.txt": [
+          33188,
+          "e32760382621837fce05d88859f84fe274d771b48aa01427440974709ae45cda"
+        ],
+        "build.mjs": [
+          33188,
+          "040ffa4f94e8a2877864803acc65b19febf5db3c37a04cfe0869484fc3ed7fdf"
+        ],
+        "package.json": [
+          33188,
+          "27079c5e451a10e50d719b9ea69a363f7e614a431918f6cecefc68a27598a2bc"
+        ],
+        "public": [
+          16877,
+          "directory"
+        ],
+        "public/UNICODE-LICENSE.txt": [
+          33188,
+          "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+        ],
+        "public/grammar.ubnf": [
+          33188,
+          "05c65aee28f977fe681c058faedf6367a34872a9fcd926c6f7f89759c799cc1c"
+        ],
+        "public/help": [
+          16877,
+          "directory"
+        ],
+        "public/help/catalog.json": [
+          33188,
+          "f4cbb281f251b659a94d85741cc253582392ea01b258e992023d522e5457ddde"
+        ],
+        "public/help/help.css": [
+          33188,
+          "ec683058567e3305db1ebfbb12c845c2f7543c0514c284ea763407ceae3abf84"
+        ],
+        "public/help/help.js": [
+          33188,
+          "14930ef53da899fd2b9778d864c370190fbbdd71b162f834ed21e46102e5a987"
+        ],
+        "public/help/index.html": [
+          33188,
+          "a82ab42add9f8569820359792e7535b56f89558047ede103868a6c6175f9ec69"
+        ],
+        "public/index.html": [
+          33188,
+          "c7e6414862e0154385bfe05d57a534034dabb602ba3ac1ebd828823d0176b3ab"
+        ],
+        "public/playground.css": [
+          33188,
+          "f9806d79ef32ba13ce14e75672316c921414a8f174d319ba90fcd29a2b10c47e"
+        ],
+        "public/playground.js": [
+          33188,
+          "a6a5154dc0493c2f24eeb3959ba334c25b38620588463cf368954556a53d6867"
+        ],
+        "public/vocabulary.json": [
+          33188,
+          "ed52390f40675be911f25058a165f0b5c19f1424beb5fc5076cebb2616c30a65"
+        ],
+        "public/worker.js": [
+          33188,
+          "b7279aca5e9df7728ea626db2cea32476a0dcfb767301871d982684b77fe56eb"
+        ],
+        "runtime": [
+          16877,
+          "directory"
+        ],
+        "runtime/Cargo.toml": [
+          33188,
+          "1f69ebd11651752994d9fafaecf3332fc7775085edfdee5c5996a72beb627d8a"
+        ],
+        "runtime/LICENSE": [
+          33188,
+          "c7f48e41f8fe4a95c449aab0ce11ac5705e3f57e5d01670eb3d244b3422a7c9e"
+        ],
+        "runtime/UNICODE-LICENSE.txt": [
+          33188,
+          "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+        ],
+        "runtime/src": [
+          16877,
+          "directory"
+        ],
+        "runtime/src/call_inference.rs": [
+          33188,
+          "03191e3685ec2e0f08d58058b5c6ed2ccad52f1056ef2374cd834e437b2e82cd"
+        ],
+        "runtime/src/capture_tree.rs": [
+          33188,
+          "289c5b0267b70efb2347bed3843ffa58cd6288dd6e4b54bdbc94efee6839ce18"
+        ],
+        "runtime/src/editor.rs": [
+          33188,
+          "1e5f51d8498038f4b39b4122ef38315ded5b42ce288e9b8a0c4c95d85ba73d87"
+        ],
+        "runtime/src/editor_cst.rs": [
+          33188,
+          "7de46ef9cefa74df2f3f285efa2cac8a160eb6476ed430e2525db0f5a70f6112"
+        ],
+        "runtime/src/editor_queries.rs": [
+          33188,
+          "f609f935147690502573da6d6472615715b0cf8922119a21a7c4204c81d33a9c"
+        ],
+        "runtime/src/embedded.rs": [
+          33188,
+          "414b4973f2c4a56ec067e3c496bde452c660e88cd2a7d8e43dee46bdba2f5dc4"
+        ],
+        "runtime/src/first.rs": [
+          33188,
+          "fec2e1c98a533170c3fe72f0af22789e3763b8050b5c5f1b2be2fbb89cfa8bb9"
+        ],
+        "runtime/src/grapheme.rs": [
+          33188,
+          "14c37d910c7ed052fda63ce517035362de7bb3fc64c36d21871dd29bb504ac6f"
+        ],
+        "runtime/src/incremental.rs": [
+          33188,
+          "245b2adfbcd9b490736c89121247db1c9900d49098643b0a63aa6db2f5c352a8"
+        ],
+        "runtime/src/language_profile.rs": [
+          33188,
+          "42f93b09b04edfaec20805ac167f81062efa5ff69b1fc02add84552730fb07c5"
+        ],
+        "runtime/src/language_queries.rs": [
+          33188,
+          "f98a2f3a22d14170b2079545a7ef148aec99bd9cb38193070ca693e2c6416fe7"
+        ],
+        "runtime/src/lexical.rs": [
+          33188,
+          "8169dac32670bd14e0fccfa3dce8d2b3abec1343463160440a07da0c6afc1186"
+        ],
+        "runtime/src/lexing.rs": [
+          33188,
+          "f10fe9ade1c56e6460829644ff8dc9956073985dea0475d228fb8543fbe01d0d"
+        ],
+        "runtime/src/lib.rs": [
+          33188,
+          "31366ecbc863953b567e34f7252e03b1f1aeff0d0b6d91c9577fd8ea179ab81f"
+        ],
+        "runtime/src/long_code_fence.rs": [
+          33188,
+          "5e4cf2b55edb3ddd10bed7dfd57c5493284ce08d1cf52e51e2a7a03c030d64e7"
+        ],
+        "runtime/src/mapping.rs": [
+          33188,
+          "23a2fbfcec3c73a66bb04788a7dfbafcd2b1151d3df836be4fe04fa91e6155dc"
+        ],
+        "runtime/src/memo_retention_tests.rs": [
+          33188,
+          "79f6f3582d6e4346e3d2f90ecd068707dce23d7e75276ba17df02da59ba1130e"
+        ],
+        "runtime/src/names.rs": [
+          33188,
+          "2a174340bc41b59023d27f1102b8d3733b8f24fd42ea557fa1661d2d668a595a"
+        ],
+        "runtime/src/pipeline.rs": [
+          33188,
+          "7323ed7acb94227c51a0504aa0b9ee57900b0508dc4b64c317d7b4c041b532e5"
+        ],
+        "runtime/src/provider_process.rs": [
+          33188,
+          "562da6cc611e927fb4fdd44080def9c031f0b3cea98e1cbc0734d6073346d594"
+        ],
+        "runtime/src/provider_protocol.rs": [
+          33188,
+          "5803a1f8221d8c7303a9dade5cc6b94156875b971c264d7b29bcdb81314204b3"
+        ],
+        "runtime/src/rule_stack.rs": [
+          33188,
+          "9648e00185e481f65f918421edae51c60db7e17b1bd1b5cae48287d8c1771742"
+        ],
+        "runtime/src/scope.rs": [
+          33188,
+          "d27166ba55fb48d14cba663a585dab5706f82320421401f5e4c1463a76e7719c"
+        ],
+        "runtime/src/semantic.rs": [
+          33188,
+          "dcfaa27755691fca28b0f4af013b13938ec3cd404697e311acd8a9e8454d2770"
+        ],
+        "runtime/src/semantic_project.rs": [
+          33188,
+          "0a5b3c800c8be3213dfb2b05fd18e3d8928b7d74186e75dc092bf42c895204f5"
+        ],
+        "runtime/src/semantic_queries.rs": [
+          33188,
+          "886e9dadcc93d10b7c8af225563ecc87bd33dad54a64cb75c8c1e2fb6bd7a36c"
+        ],
+        "runtime/src/semantic_query_cache.rs": [
+          33188,
+          "a81216a172bdd0bc1e93774a480dfaf9db123ce823498783108df53d17252208"
+        ],
+        "runtime/src/semantic_rename.rs": [
+          33188,
+          "001941c6df87c0b5888a1f9120f44e14a2524ad3130ff58cb5d34aabd1c8b997"
+        ],
+        "runtime/src/semantic_rules.rs": [
+          33188,
+          "2ef2660b28ee484db1f82c1bf1c836e16761b9c903f3b6491c1f326f47a4707c"
+        ],
+        "runtime/src/shared_calls.rs": [
+          33188,
+          "d1aaa5cb55bdce5796263486685772e351dce2632c3dc20d8932ac91ac857ad6"
+        ],
+        "runtime/src/source.rs": [
+          33188,
+          "e13ac77773fcee6e886d554520e9bfa0e98444f8d049fc8b21e9043ed52b075b"
+        ],
+        "runtime/src/source_edits.rs": [
+          33188,
+          "f33deda776eb08957aef9cf3132b1fbdba803cfe7e2776775fcfe51498109bee"
+        ],
+        "runtime/src/token.rs": [
+          33188,
+          "a3309a7bd657f734d21b26a384ddc15d2ee3067baaeeb72aeba1e1a959fdda40"
+        ],
+        "runtime/src/token_trace.rs": [
+          33188,
+          "ce3a12b46db1641b74731e6e08b496f6b2393d6f2b0537848ee46383f8c0fea4"
+        ],
+        "runtime/src/type_system.rs": [
+          33188,
+          "e54894843fd6e25c014beb1a51c8b59424d061be1dfb771ba52e6f7e77594535"
+        ],
+        "runtime/src/unicode_case_data.rs": [
+          33188,
+          "6b3512e6dbe25ccf2f3dccf0ca968815913b705d129d1cd3b9d8c6bb27facdfe"
+        ],
+        "runtime/src/unicode_grapheme_data.rs": [
+          33188,
+          "708136c4d4394e8cc39b86595f89c40937bde1919c35f36d0024b9f08e2fedfd"
+        ],
+        "runtime/src/unicode_xid.rs": [
+          33188,
+          "98c390dc4b93566c1376bff6453102c2003c2cd828803d3843fadf1537cb7316"
+        ],
+        "serve.mjs": [
+          33188,
+          "1a9916c19ed9a43e8a80960d07b690bd6a616f62b546f2bbffdd2534155e6369"
+        ],
+        "src": [
+          16877,
+          "directory"
+        ],
+        "src/editor_adapter.rs": [
+          33188,
+          "8a47ff2e7e31825b56ff88c7e1fe6b4529f7bc74cf176d6e4f13a24dbcbbfda4"
+        ],
+        "src/generated": [
+          16877,
+          "directory"
+        ],
+        "src/generated/ast.rs": [
+          33188,
+          "95b00af34ae0e1311a5ef77fd80d9557eede4d0788b98bca191dd314f4dedbb5"
+        ],
+        "src/generated/evaluator.rs": [
+          33188,
+          "349d28fbbc90a3ec2bc51c1c43d54b26c07d0119e00aeeed576e71f6c5bf1a46"
+        ],
+        "src/generated/mapper.rs": [
+          33188,
+          "45dd519b825124cbddb9f80b6737478fdba2ccb1e0a9bbb5727efdc874489406"
+        ],
+        "src/generated/mod.rs": [
+          33188,
+          "b6c6f5d53cc67a4ac1b794ac147b6c211f17d96dbac95697352e9a8c5a1d041f"
+        ],
+        "src/generated/parser.rs": [
+          33188,
+          "6c571179272407b59d2c3cd1a95be70ab21c2d71fbee697880f85ff8a5cacbf5"
+        ],
+        "src/lib.rs": [
+          33188,
+          "e7f06c6db2fbe5d59e670c3353558ffd51ac8c892bce42f09b31bcfd7e9f98e1"
+        ],
+        "src/query_adapter.rs": [
+          33188,
+          "46b91f956f4503d1572ad15c2619ac390213a37274b743ff49583bdcb3ce80a6"
+        ],
+        "src/region_adapter.rs": [
+          33188,
+          "d2e525b734d31f168427db305e1c04dc92247803597d6b74555596c4f97a9309"
+        ]
+      },
+      "CRLF": {
+        "": [
+          {
+            "java": 16832,
+            "rust": 16877
+          },
+          "directory"
+        ],
+        ".cargo": [
+          16877,
+          "directory"
+        ],
+        ".cargo/config.toml": [
+          33188,
+          "35cd62ebd209f9080178674687059b74473e4fb8b4bd43b6f5144fe86a3b008d"
+        ],
+        "Cargo.toml": [
+          33188,
+          "94e72d8ee6556ff23a695b20a8204570b632838da9df0cfe80d4f8a8fb28a8d2"
+        ],
+        "README.txt": [
+          33188,
+          "e32760382621837fce05d88859f84fe274d771b48aa01427440974709ae45cda"
+        ],
+        "build.mjs": [
+          33188,
+          "040ffa4f94e8a2877864803acc65b19febf5db3c37a04cfe0869484fc3ed7fdf"
+        ],
+        "package.json": [
+          33188,
+          "27079c5e451a10e50d719b9ea69a363f7e614a431918f6cecefc68a27598a2bc"
+        ],
+        "public": [
+          16877,
+          "directory"
+        ],
+        "public/UNICODE-LICENSE.txt": [
+          33188,
+          "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+        ],
+        "public/grammar.ubnf": [
+          33188,
+          "8bfe43c1d2945979cd604b8733d861be94840ba03297e161bb93fcd12d42f88b"
+        ],
+        "public/help": [
+          16877,
+          "directory"
+        ],
+        "public/help/catalog.json": [
+          33188,
+          "f4cbb281f251b659a94d85741cc253582392ea01b258e992023d522e5457ddde"
+        ],
+        "public/help/help.css": [
+          33188,
+          "ec683058567e3305db1ebfbb12c845c2f7543c0514c284ea763407ceae3abf84"
+        ],
+        "public/help/help.js": [
+          33188,
+          "14930ef53da899fd2b9778d864c370190fbbdd71b162f834ed21e46102e5a987"
+        ],
+        "public/help/index.html": [
+          33188,
+          "a82ab42add9f8569820359792e7535b56f89558047ede103868a6c6175f9ec69"
+        ],
+        "public/index.html": [
+          33188,
+          "c7e6414862e0154385bfe05d57a534034dabb602ba3ac1ebd828823d0176b3ab"
+        ],
+        "public/playground.css": [
+          33188,
+          "f9806d79ef32ba13ce14e75672316c921414a8f174d319ba90fcd29a2b10c47e"
+        ],
+        "public/playground.js": [
+          33188,
+          "a6a5154dc0493c2f24eeb3959ba334c25b38620588463cf368954556a53d6867"
+        ],
+        "public/vocabulary.json": [
+          33188,
+          "ed52390f40675be911f25058a165f0b5c19f1424beb5fc5076cebb2616c30a65"
+        ],
+        "public/worker.js": [
+          33188,
+          "b7279aca5e9df7728ea626db2cea32476a0dcfb767301871d982684b77fe56eb"
+        ],
+        "runtime": [
+          16877,
+          "directory"
+        ],
+        "runtime/Cargo.toml": [
+          33188,
+          "1f69ebd11651752994d9fafaecf3332fc7775085edfdee5c5996a72beb627d8a"
+        ],
+        "runtime/LICENSE": [
+          33188,
+          "c7f48e41f8fe4a95c449aab0ce11ac5705e3f57e5d01670eb3d244b3422a7c9e"
+        ],
+        "runtime/UNICODE-LICENSE.txt": [
+          33188,
+          "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+        ],
+        "runtime/src": [
+          16877,
+          "directory"
+        ],
+        "runtime/src/call_inference.rs": [
+          33188,
+          "03191e3685ec2e0f08d58058b5c6ed2ccad52f1056ef2374cd834e437b2e82cd"
+        ],
+        "runtime/src/capture_tree.rs": [
+          33188,
+          "289c5b0267b70efb2347bed3843ffa58cd6288dd6e4b54bdbc94efee6839ce18"
+        ],
+        "runtime/src/editor.rs": [
+          33188,
+          "1e5f51d8498038f4b39b4122ef38315ded5b42ce288e9b8a0c4c95d85ba73d87"
+        ],
+        "runtime/src/editor_cst.rs": [
+          33188,
+          "7de46ef9cefa74df2f3f285efa2cac8a160eb6476ed430e2525db0f5a70f6112"
+        ],
+        "runtime/src/editor_queries.rs": [
+          33188,
+          "f609f935147690502573da6d6472615715b0cf8922119a21a7c4204c81d33a9c"
+        ],
+        "runtime/src/embedded.rs": [
+          33188,
+          "414b4973f2c4a56ec067e3c496bde452c660e88cd2a7d8e43dee46bdba2f5dc4"
+        ],
+        "runtime/src/first.rs": [
+          33188,
+          "fec2e1c98a533170c3fe72f0af22789e3763b8050b5c5f1b2be2fbb89cfa8bb9"
+        ],
+        "runtime/src/grapheme.rs": [
+          33188,
+          "14c37d910c7ed052fda63ce517035362de7bb3fc64c36d21871dd29bb504ac6f"
+        ],
+        "runtime/src/incremental.rs": [
+          33188,
+          "245b2adfbcd9b490736c89121247db1c9900d49098643b0a63aa6db2f5c352a8"
+        ],
+        "runtime/src/language_profile.rs": [
+          33188,
+          "42f93b09b04edfaec20805ac167f81062efa5ff69b1fc02add84552730fb07c5"
+        ],
+        "runtime/src/language_queries.rs": [
+          33188,
+          "f98a2f3a22d14170b2079545a7ef148aec99bd9cb38193070ca693e2c6416fe7"
+        ],
+        "runtime/src/lexical.rs": [
+          33188,
+          "8169dac32670bd14e0fccfa3dce8d2b3abec1343463160440a07da0c6afc1186"
+        ],
+        "runtime/src/lexing.rs": [
+          33188,
+          "f10fe9ade1c56e6460829644ff8dc9956073985dea0475d228fb8543fbe01d0d"
+        ],
+        "runtime/src/lib.rs": [
+          33188,
+          "31366ecbc863953b567e34f7252e03b1f1aeff0d0b6d91c9577fd8ea179ab81f"
+        ],
+        "runtime/src/long_code_fence.rs": [
+          33188,
+          "5e4cf2b55edb3ddd10bed7dfd57c5493284ce08d1cf52e51e2a7a03c030d64e7"
+        ],
+        "runtime/src/mapping.rs": [
+          33188,
+          "23a2fbfcec3c73a66bb04788a7dfbafcd2b1151d3df836be4fe04fa91e6155dc"
+        ],
+        "runtime/src/memo_retention_tests.rs": [
+          33188,
+          "79f6f3582d6e4346e3d2f90ecd068707dce23d7e75276ba17df02da59ba1130e"
+        ],
+        "runtime/src/names.rs": [
+          33188,
+          "2a174340bc41b59023d27f1102b8d3733b8f24fd42ea557fa1661d2d668a595a"
+        ],
+        "runtime/src/pipeline.rs": [
+          33188,
+          "7323ed7acb94227c51a0504aa0b9ee57900b0508dc4b64c317d7b4c041b532e5"
+        ],
+        "runtime/src/provider_process.rs": [
+          33188,
+          "562da6cc611e927fb4fdd44080def9c031f0b3cea98e1cbc0734d6073346d594"
+        ],
+        "runtime/src/provider_protocol.rs": [
+          33188,
+          "5803a1f8221d8c7303a9dade5cc6b94156875b971c264d7b29bcdb81314204b3"
+        ],
+        "runtime/src/rule_stack.rs": [
+          33188,
+          "9648e00185e481f65f918421edae51c60db7e17b1bd1b5cae48287d8c1771742"
+        ],
+        "runtime/src/scope.rs": [
+          33188,
+          "d27166ba55fb48d14cba663a585dab5706f82320421401f5e4c1463a76e7719c"
+        ],
+        "runtime/src/semantic.rs": [
+          33188,
+          "dcfaa27755691fca28b0f4af013b13938ec3cd404697e311acd8a9e8454d2770"
+        ],
+        "runtime/src/semantic_project.rs": [
+          33188,
+          "0a5b3c800c8be3213dfb2b05fd18e3d8928b7d74186e75dc092bf42c895204f5"
+        ],
+        "runtime/src/semantic_queries.rs": [
+          33188,
+          "886e9dadcc93d10b7c8af225563ecc87bd33dad54a64cb75c8c1e2fb6bd7a36c"
+        ],
+        "runtime/src/semantic_query_cache.rs": [
+          33188,
+          "a81216a172bdd0bc1e93774a480dfaf9db123ce823498783108df53d17252208"
+        ],
+        "runtime/src/semantic_rename.rs": [
+          33188,
+          "001941c6df87c0b5888a1f9120f44e14a2524ad3130ff58cb5d34aabd1c8b997"
+        ],
+        "runtime/src/semantic_rules.rs": [
+          33188,
+          "2ef2660b28ee484db1f82c1bf1c836e16761b9c903f3b6491c1f326f47a4707c"
+        ],
+        "runtime/src/shared_calls.rs": [
+          33188,
+          "d1aaa5cb55bdce5796263486685772e351dce2632c3dc20d8932ac91ac857ad6"
+        ],
+        "runtime/src/source.rs": [
+          33188,
+          "e13ac77773fcee6e886d554520e9bfa0e98444f8d049fc8b21e9043ed52b075b"
+        ],
+        "runtime/src/source_edits.rs": [
+          33188,
+          "f33deda776eb08957aef9cf3132b1fbdba803cfe7e2776775fcfe51498109bee"
+        ],
+        "runtime/src/token.rs": [
+          33188,
+          "a3309a7bd657f734d21b26a384ddc15d2ee3067baaeeb72aeba1e1a959fdda40"
+        ],
+        "runtime/src/token_trace.rs": [
+          33188,
+          "ce3a12b46db1641b74731e6e08b496f6b2393d6f2b0537848ee46383f8c0fea4"
+        ],
+        "runtime/src/type_system.rs": [
+          33188,
+          "e54894843fd6e25c014beb1a51c8b59424d061be1dfb771ba52e6f7e77594535"
+        ],
+        "runtime/src/unicode_case_data.rs": [
+          33188,
+          "6b3512e6dbe25ccf2f3dccf0ca968815913b705d129d1cd3b9d8c6bb27facdfe"
+        ],
+        "runtime/src/unicode_grapheme_data.rs": [
+          33188,
+          "708136c4d4394e8cc39b86595f89c40937bde1919c35f36d0024b9f08e2fedfd"
+        ],
+        "runtime/src/unicode_xid.rs": [
+          33188,
+          "98c390dc4b93566c1376bff6453102c2003c2cd828803d3843fadf1537cb7316"
+        ],
+        "serve.mjs": [
+          33188,
+          "1a9916c19ed9a43e8a80960d07b690bd6a616f62b546f2bbffdd2534155e6369"
+        ],
+        "src": [
+          16877,
+          "directory"
+        ],
+        "src/editor_adapter.rs": [
+          33188,
+          "8a47ff2e7e31825b56ff88c7e1fe6b4529f7bc74cf176d6e4f13a24dbcbbfda4"
+        ],
+        "src/generated": [
+          16877,
+          "directory"
+        ],
+        "src/generated/ast.rs": [
+          33188,
+          "95b00af34ae0e1311a5ef77fd80d9557eede4d0788b98bca191dd314f4dedbb5"
+        ],
+        "src/generated/evaluator.rs": [
+          33188,
+          "349d28fbbc90a3ec2bc51c1c43d54b26c07d0119e00aeeed576e71f6c5bf1a46"
+        ],
+        "src/generated/mapper.rs": [
+          33188,
+          "45dd519b825124cbddb9f80b6737478fdba2ccb1e0a9bbb5727efdc874489406"
+        ],
+        "src/generated/mod.rs": [
+          33188,
+          "b6c6f5d53cc67a4ac1b794ac147b6c211f17d96dbac95697352e9a8c5a1d041f"
+        ],
+        "src/generated/parser.rs": [
+          33188,
+          "6c571179272407b59d2c3cd1a95be70ab21c2d71fbee697880f85ff8a5cacbf5"
+        ],
+        "src/lib.rs": [
+          33188,
+          "e7f06c6db2fbe5d59e670c3353558ffd51ac8c892bce42f09b31bcfd7e9f98e1"
+        ],
+        "src/query_adapter.rs": [
+          33188,
+          "46b91f956f4503d1572ad15c2619ac390213a37274b743ff49583bdcb3ce80a6"
+        ],
+        "src/region_adapter.rs": [
+          33188,
+          "d2e525b734d31f168427db305e1c04dc92247803597d6b74555596c4f97a9309"
+        ]
+      }
+    }
+  }
 }

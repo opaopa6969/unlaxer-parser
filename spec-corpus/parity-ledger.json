@@ -613,6 +613,10 @@
       "state": "OPEN",
       "title": "parity(cli): playground --profile の profile ファイル入力 I/O で native の終了コードと stderr が Java と違う（#937 レビュー由来）"
     },
+    "971": {
+      "state": "OPEN",
+      "title": "parity(cli): native generate が既存生成物を rename で置き換えるため mode・hard link・読取り専用 directory の扱いが Java と違う（#952 レビュー由来）"
+    },
     "956": {
       "state": "OPEN",
       "title": "credentials 受理後の TLS・HTTP 失敗診断を Java に揃える"
@@ -2243,17 +2247,22 @@
     },
     {
       "id": "cli-output-path-policy",
-      "category": "unresolved",
+      "category": "contract",
       "title": "generate / Playground の出力先パスの symlink・`..`・読取り専用生成物・成功時 stdout",
       "hosts": "Java CodegenMain / native Rust unlaxer",
       "issues": [
         952
       ],
-      "observation": "#937の失敗文の統一とは別の既存差で、変更前master 21dac030のnativeでも同じ。generateの出力先祖先がsymlinkの場合Javaは書き込みnativeは拒否、出力先自体のsymlinkはJava `output directory must not be a symbolic link: P`に対しnative `refusing symbolic link P`。不存在成分の`out/../out2`はJavaが失敗しnativeは成功、mode 444の既存生成物はJavaが書込み失敗しnativeはrenameで置換。成功時stdoutはJavaがPath正規化（generate）/絶対正規化（Playground）、nativeは引数の綴り。揃えるか意図した差かを#952で決める。",
+      "observation": "#952でJava製品コードを変えずnativeの出力先自体のsymlink拒否文、generateの不存在成分を含むout/../out2の失敗とout2だけを残す副作用、mode444既存生成物の書込み失敗をJavaへ統一する。generateのstdoutはPath.of相当の連続/末尾separator整理（dot/parentは保持）、Playgroundは正規化前後のsymlink検査と絶対・字句正規化後の出力/成功stdout/失敗文へ揃える。missing/../pg2はmissingを作らない。意図した差: generateの祖先symlinkは意図しない実体先へ書かない既存native方針を維持し、output directory must not have a symbolic link ancestor: Pで拒否する（Javaは生成する）。#937の同directory一時ファイル・rename・失敗時に既存生成物をtruncateしない契約を維持し、書込み直前の非truncate openで権限を検査する。generateの作成先探索はJavaのtoAbsolutePath/getParentと同じく.を保持し（file/./outはW/file/.で失敗、file/.は既存のW/file）、生成先の親のsymlink/非directoryをファイル自体より先に検査する。祖先がdangling/ループ/fileへのsymlinkの場合は両版とも終了4で最終行だけが祖先拒否文になる。祖先検査は綴りに現れる成分だけで、書込み前の1回（祖先の差替え競合は防がない）。Playground rootの既存mode差（Java700/native755、umask022）も正常生成を変えずhost別に固定。共通33形/LF・CRLFの244観測と成功後--check114回でexit・全stdout・stderr最終行・全ツリーの名前/type/mode/hashを独立期待値に照合する。入力/出力I/Oの既存表、check JSON、生成内容、公開3.3.0と#197の性能凍結は不変。#953と#949は別issueのまま。上書き成功時のmode・hard link・555 directoryのrename由来の差は#971。",
       "evidence": [
         "rust/unlaxer-generator/src/main.rs",
         "unlaxer-dsl/src/main/java/org/unlaxer/dsl/RustGenerateCommand.java",
-        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/PlaygroundCommand.java"
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/PlaygroundCommand.java",
+        "spec-corpus/cli-stderr.json",
+        "scripts/cli_stderr.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
+        "docs/ubnf-packages.md",
+        "docs/migration-after-3.3.0.md"
       ]
     },
     {
@@ -2269,18 +2278,34 @@
         "rust/unlaxer-generator/src/playground.rs",
         "unlaxer-dsl/src/main/java/org/unlaxer/dsl/codegen/rust/PlaygroundGenerator.java"
       ]
+    },
+    {
+      "id": "cli-output-replacement-metadata",
+      "category": "unresolved",
+      "title": "generate の既存生成物の置換（mode・hard link・読取り専用 directory）",
+      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "issues": [
+        971
+      ],
+      "observation": "Javaは既存生成物へFiles.writeStringでその場に書き、nativeは同じdirectoryの一時ファイルをrenameで置き換える（#937の書込み失敗時に切り詰めない契約）。上書き成功時、既存のmode 600/640はJavaで保持、nativeはumaskの新規値。hard linkはJavaで両名が更新されnativeは切れる。mode 555のdirectory内の書込み可能な既存生成物はJavaが成功しnativeは一時ファイルを作れず終了4。#952の表の外で、PR #969の前のnativeでも同じ。",
+      "evidence": [
+        "rust/unlaxer-generator/src/main.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/RustGenerateCommand.java"
+      ]
     }
   ],
   "corpora": [
     {
       "path": "spec-corpus/cli-stderr.json",
       "fields": {
-        "java": 1,
+        "java": 6,
+        "nativeExpected": 3,
         "nativeSyntax": 2,
-        "rust": 1
+        "rust": 6
       },
       "entries": [
-        "cli-stderr-presentation"
+        "cli-stderr-presentation",
+        "cli-output-path-policy"
       ]
     },
     {
