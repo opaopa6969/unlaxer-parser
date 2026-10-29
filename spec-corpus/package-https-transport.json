@@ -2,7 +2,8 @@
   {
     "id": "authenticated",
     "kind": "artifact",
-    "error": null
+    "error": null,
+    "generate": true
   },
   {
     "id": "untrusted",
@@ -19,6 +20,11 @@
   {
     "id": "connection-refused",
     "kind": "refused",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "connect-timeout",
+    "kind": "connect-stall",
     "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
   },
   {
@@ -94,6 +100,12 @@
     "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
   },
   {
+    "id": "status-101",
+    "kind": "status",
+    "status": 101,
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
     "id": "status-201",
     "kind": "status",
     "error": "HTTPS artifact requires status 200; redirects are forbidden",
@@ -104,6 +116,20 @@
     "kind": "status",
     "error": "HTTPS artifact requires status 200; redirects are forbidden",
     "status": 204
+  },
+  {
+    "id": "status-204-content-length",
+    "kind": "status",
+    "status": 204,
+    "framing": "length",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "status-204-transfer-encoding",
+    "kind": "status",
+    "status": 204,
+    "framing": "chunked",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
   },
   {
     "id": "status-206",
@@ -127,7 +153,8 @@
     "id": "status-302",
     "kind": "status",
     "error": "HTTPS artifact requires status 200; redirects are forbidden",
-    "status": 302
+    "status": 302,
+    "generate": true
   },
   {
     "id": "status-303",

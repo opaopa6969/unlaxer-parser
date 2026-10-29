@@ -46,6 +46,11 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
     let mut response = request
         .call()
         .map_err(|_| error("HTTPS artifact retrieval failed (TLS, timeout or size limit)"))?;
+    if rejected_by_java_exchange(&response) {
+        return Err(error(
+            "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+        ));
+    }
     // Java's sendAsync completes its bounded body before checking the status.
     // A failed/oversized body therefore takes precedence even for 3xx/4xx/5xx.
     let bytes = response
@@ -66,6 +71,24 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
         ));
     }
     Ok(bytes)
+}
+
+/// java.net.http fails the exchange itself (not the status check) for an unrequested
+/// `101` (`Exchange`: "Unexpected 101 response, when not upgrading") and for a `204`
+/// whose first `Content-Length` is not `0` or which has any `Transfer-Encoding`
+/// (`MultiExchange.bodyIsPresent`; a non-numeric length also fails there).
+fn rejected_by_java_exchange(response: &ureq::http::Response<ureq::Body>) -> bool {
+    use ureq::http::{header, StatusCode};
+    match response.status() {
+        StatusCode::SWITCHING_PROTOCOLS => true,
+        StatusCode::NO_CONTENT => {
+            let headers = response.headers();
+            headers.get(header::CONTENT_LENGTH).is_some_and(|value| {
+                value.to_str().ok().and_then(|v| v.parse::<i64>().ok()) != Some(0)
+            }) || headers.contains_key(header::TRANSFER_ENCODING)
+        }
+        _ => false,
+    }
 }
 
 /// A source with an unpaired UTF-16 unit: Java's `URI.create` accepts it, then its

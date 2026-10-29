@@ -199,10 +199,11 @@ redirect は従来どおり0回で、Location の先には接続しない。下�
 | 条件 | 最終診断 | `deps resolve` exit |
 | --- | --- | --- |
 | TLS trust 失敗・hostname 不一致・接続拒否 | `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
-| 接続 timeout・本文 read timeout | `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
+| 接続 timeout（5秒）・本文 read timeout（全体20秒） | `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
+| 要求していない `101`、本文を宣言した `204`（`Content-Length` が `0` 以外、または `Transfer-Encoding` あり） | Java の exchange 失敗と同じ `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
 | 本文が8 MiB超（Content-Length・chunked・close-delimited） | `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
 | Content-Length より短い本文で切断・chunk の途中切断・応答 header 前の切断 | `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
-| 本文が完了した200以外（201/204/206、300/301/302/303/304/307/308、401/403/404/500） | `HTTPS artifact requires status 200; redirects are forbidden` | 3 |
+| 本文が完了した200以外（201/204/206、300/301/302/303/304/307/308、401/403/404/500。204 は本文なし） | `HTTPS artifact requires status 200; redirects are forbidden` | 3 |
 | 302/404/500 で本文が上限超過・途中切断 | status より先に `HTTPS artifact retrieval failed (TLS, timeout or size limit)` | 3 |
 | 200・空 body（Content-Length: 0） | 取得後の JSON 検査で `expected object: document` | 3 |
 | 200・有効 artifact・8 MiBちょうど（末尾JSON空白を含む） | 成功。chunked・close-delimited でも同じ | 0 |
@@ -211,15 +212,24 @@ redirect は従来どおり0回で、Location の先には接続しない。下�
 Content-Length の値だけで上限超過と判定せず、HTTP framing に従って読んだ実 bytes を制限する。
 ureq の `limit` は指定量を読み切るとエラーになるため、上限＋1バイトを probe し、8 MiBまでは受理する。
 接続5秒・全体20秒の製品設定は変更しない。本文が未完了なら status の種類によらず全体期限が適用される。
-接続 timeout はローカルで確実に再現するための OS/network 改変をせず、Java の
-`ExecutionException | TimeoutException` → 上記固定診断という経路と、Rust の `.call()` エラー写像で確認する。
-実時間の長い fixture は本文 read timeout の1種類だけとし、製品の20秒をそのまま測る。
+`101` と本文を宣言した `204` は、java.net.http が status 判定より前に exchange を失敗させる
+（`Exchange` の "Unexpected 101 response"、`MultiExchange.bodyIsPresent`）。Rust も応答 header の時点で同じ規則を適用する。
+期限の fixture は製品の値をそのまま測る。接続 timeout は accept しない listen socket（backlog を先に埋める）への接続で
+5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満を要求し、期限を外すと落ちる。
+待つだけの2形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
 
-共通 `spec-corpus/package-https-transport.json` の38形を `HttpsPackageConformanceTest` から実行する。
-JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` と3生成 CLIを snapshot 有無の両方で照合する。
+共通 `spec-corpus/package-https-transport.json` の42形を `HttpsPackageConformanceTest` から実行する。
+JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を snapshot 有無の両方で照合する。
+待たない形の Java `deps resolve` は、テスト専用の `CodegenBatchHost` が1つの JVM で `CodegenMain.run` を順に呼ぶ
+（JVM 起動を1回にするため。呼出しごとに credentials override を読み直す）。両 JDK で、1呼出し1 JVM の実 CLI と
+診断・exit・snapshot が全76呼出しで一致することを確認した。
+生成は fetch しないため、3生成 CLI（Java-host Rust / native Rust / Java flag CLI）は `generate: true` の代表2形
+（成功・302）で snapshot 有無の両方を照合する。
 失敗時の lock/cache 不変、成功時の raw bytes、認証の exact origin、TLS境界、redirect 先の接続0、
 生成時の接続0と固定cache使用を検査する。空bodyの診断は transport ではなく後続 JSON 検査である。
-接続 timeout 以外はローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
+42形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
+形の崩れた応答（Content-Length と chunked の併記、header の大きさ・行数、重複・負の Content-Length 等）の
+framing 解釈の差は [#972](https://github.com/opaopa6969/unlaxer-parser/issues/972) で追跡する。
 証跡 `target/rust-package-transport.json` には既知の診断・exit・件数・hash・所要時間だけを記録し、
 資格情報・header値・server body・任意の例外文を残さない。
 

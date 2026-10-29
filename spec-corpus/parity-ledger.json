@@ -703,7 +703,7 @@
       "issues": [
         956
       ],
-      "observation": "Java製品コードを変えず、TLS/接続/本文読取り失敗を共通のretrieval failed (TLS, timeout or size limit)へ写す。本文完了後だけstatus 200を要求し、302/404/500でも過大・途中切断が先行する。ureqの排他的limitは上限+1バイトで8MiBちょうどを受理。38形を両deps resolve・3生成CLI・snapshot有無で照合し、JDK17/21独立oracle、秘密値非記録、exact origin/TLS/redirect禁止/期限、失敗時snapshot不変・生成時接続0を検証する。時間のかかる実測は本文timeout1形、接続timeoutはJavaの例外分類とRustのcall写像で確認する。#956はPRのmerge待ち。",
+      "observation": "Java製品コードを変えず、TLS/接続/本文読取り失敗を共通のretrieval failed (TLS, timeout or size limit)へ写す。本文完了後だけstatus 200を要求し、302/404/500でも過大・途中切断が先行する。ureqの排他的limitは上限+1バイトで8MiBちょうどを受理。要求していない101と本文を宣言した204はJavaのexchange失敗に揃える。42形を両deps resolve・snapshot有無で、3生成CLIを代表2形で照合し、JDK17/21独立oracle、秘密値非記録、exact origin/TLS/redirect禁止、失敗時snapshot不変・生成時接続0を検証する。接続5秒・全体20秒は実測し、待つ形は並行、他のJava呼出しは1 JVMで実行する。形の崩れた応答のframing差は#972。#956はPRのmerge待ち。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials.json",
@@ -712,7 +712,8 @@
         "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFPackageFetcher.java",
         "spec-corpus/package-https-transport.json",
         "scripts/ubnf_package_transport.py",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/CodegenBatchHost.java"
       ]
     },
     {

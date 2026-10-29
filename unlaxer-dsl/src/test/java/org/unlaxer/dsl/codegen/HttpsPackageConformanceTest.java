@@ -117,7 +117,7 @@ public class HttpsPackageConformanceTest {
         System.out.println("credentials location fixtures: " + report.get("seconds").getAsDouble() + " s");
     }
 
-    @Test(timeout=600000) public void transportDiagnosticsMatchJavaAcrossClis() throws Exception {
+    @Test(timeout=300000) public void transportDiagnosticsMatchJavaAcrossClis() throws Exception {
         if (!Boolean.getBoolean("rustConformance"))
             System.out.println("[assumption] HTTPS transport conformance requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
@@ -128,13 +128,19 @@ public class HttpsPackageConformanceTest {
             "--java", Path.of(System.getProperty("java.home"), "bin/java").toString(),
             "--classpath", System.getProperty("java.class.path"),
             "--rust", repository.resolve("rust/target/debug/unlaxer").toString(),
-            "--output", output.toString()), null, 400);
+            "--output", output.toString()), null, 240);
         assertEquals(result.output(), 0, result.code());
         var report = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
-        assertEquals("all transport fixtures executed", 38, report.getAsJsonArray("cases").size());
-        for (var entry : report.getAsJsonArray("cases"))
-            assertEquals("both snapshots and all five CLI paths", 10,
+        assertEquals("all transport fixtures executed", 42, report.getAsJsonArray("cases").size());
+        int generated = 0;
+        for (var entry : report.getAsJsonArray("cases")) {
+            // Both resolvers with and without a snapshot; three generation CLIs on two shapes.
+            boolean generation = entry.getAsJsonObject().get("generate").getAsBoolean();
+            if (generation) generated++;
+            assertEquals("both snapshots and every CLI path", generation ? 10 : 4,
                 entry.getAsJsonObject().getAsJsonArray("runs").size());
+        }
+        assertEquals("generation boundary shapes", 2, generated);
         System.out.println("HTTPS transport fixtures: " + report.get("seconds").getAsDouble() + " s");
     }
 
