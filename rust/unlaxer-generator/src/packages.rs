@@ -7,6 +7,7 @@ use std::path::{Component, Path, PathBuf};
 use value::{Object, Value};
 
 mod json;
+mod text;
 mod value;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -208,10 +209,12 @@ fn parse_document(bytes: &[u8], artifact: bool) -> Result<Value, String> {
 }
 fn dependencies(value: &Value) -> Result<(), String> {
     for (name, dependency) in object(value, "dependencies")? {
-        id(name)?;
+        id(name.ascii_candidate())?;
         object(dependency, "dependency")?;
         version(string(dependency, "version")?)?;
-        string(dependency, "source")?;
+        if !dependency["source"].is_string() {
+            return Err(error("expected string: source"));
+        }
     }
     Ok(())
 }
@@ -231,14 +234,16 @@ fn artifact(bytes: &[u8]) -> Result<Value, String> {
         return Err(error("package requires 1..128 files"));
     }
     for (name, content) in files {
-        file(name)?;
+        name.validate_file()?;
         if !content.is_string() {
             return Err(error("package file must contain source text"));
         }
     }
-    let entry = string(&value, "entry")?;
-    file(entry)?;
-    if !entry.ends_with(".ubnf") || !files.contains_key(entry) {
+    let entry = value["entry"]
+        .as_text()
+        .ok_or_else(|| error("expected string: entry"))?;
+    entry.validate_file()?;
+    if !entry.ends_with_ubnf() || !files.contains_text(entry) {
         return Err(error("missing UBNF package entry"));
     }
     dependencies(&value["dependencies"])?;
@@ -259,7 +264,10 @@ fn references(value: &Value) -> Result<Value, String> {
 fn output_references(value: &Value) -> Result<OutputValue, String> {
     let mut result = Map::new();
     for (name, dependency) in object(value, "dependencies")? {
-        result.insert(name.clone(), string(dependency, "version")?.into());
+        result.insert(
+            name.ascii_candidate().to_owned(),
+            string(dependency, "version")?.into(),
+        );
     }
     Ok(OutputValue::Object(result))
 }
@@ -318,7 +326,7 @@ pub fn resolve(manifest: &Path) -> Result<OutputValue, String> {
     let mut blobs = BTreeMap::new();
     for (name, dependency) in object(roots, "dependencies")? {
         resolve_one(
-            name,
+            name.ascii_candidate(),
             dependency,
             directory,
             &mut packages,
@@ -392,7 +400,16 @@ fn resolve_one(
     if !packages.contains_key(name) && packages.len() >= 128 {
         return Err(error("package count exceeds 128"));
     }
-    let source = string(dependency, "source")?;
+    let source_text = dependency["source"]
+        .as_text()
+        .ok_or_else(|| error("expected string: source"))?;
+    let source = match source_text.as_str() {
+        Some(source) => source,
+        None => {
+            return crate::package_fetch::reject_surrogate_path(&source_text.https_probe()?)
+                .map(|_| ())
+        }
+    };
     let builtin: Option<&[u8]> = match source {
         "builtin:std/layout@1.0.0" => Some(STANDARD),
         "builtin:lang/java@0.1.0" => Some(include_bytes!(
@@ -447,7 +464,7 @@ fn resolve_one(
         blobs.insert(sha, bytes);
         for (name, dependency) in object(&value["dependencies"], "dependencies")? {
             resolve_one(
-                name,
+                name.ascii_candidate(),
                 dependency,
                 &child_directory,
                 packages,
@@ -467,9 +484,9 @@ fn audit(lock: &Value) -> Result<(), String> {
         return Err(error("package count exceeds 128"));
     }
     for (name, pinned) in packages {
-        id(name)?;
+        id(name.ascii_candidate())?;
         object(pinned, "locked package")?;
-        if name != string(pinned, "id")? {
+        if name.ascii_candidate() != string(pinned, "id")? {
             return Err(error("locked package ID mismatch"));
         }
         version(string(pinned, "version")?)?;
@@ -482,27 +499,32 @@ fn audit(lock: &Value) -> Result<(), String> {
             return Err(error("invalid locked SHA-256"));
         }
         for (name, required) in object(&pinned["dependencies"], "dependencies")? {
-            id(name)?;
+            id(name.ascii_candidate())?;
             version(
                 required
                     .as_str()
                     .ok_or_else(|| error("invalid locked dependency version"))?,
             )?;
-            object(&packages[name], "locked dependency")?;
-            if Some(string(&packages[name], "version")?) != required.as_str() {
+            object(&packages[name.ascii_candidate()], "locked dependency")?;
+            if Some(string(&packages[name.ascii_candidate()], "version")?) != required.as_str() {
                 return Err(error("locked transitive version mismatch"));
             }
         }
     }
     for (name, required) in object(&lock["roots"], "roots")? {
-        object(&packages[name], "locked root")?;
-        if Some(string(&packages[name], "version")?) != required.as_str() {
+        object(&packages[name.ascii_candidate()], "locked root")?;
+        if Some(string(&packages[name.ascii_candidate()], "version")?) != required.as_str() {
             return Err(error("locked root version mismatch"));
         }
     }
     let mut done = BTreeSet::new();
     for name in packages.keys() {
-        audit_node(name, packages, &mut BTreeSet::new(), &mut done)?;
+        audit_node(
+            name.ascii_candidate(),
+            packages,
+            &mut BTreeSet::new(),
+            &mut done,
+        )?;
     }
     Ok(())
 }
@@ -520,7 +542,7 @@ fn audit_node(
     }
     if done.insert(name.into()) {
         for child in object(&packages[name]["dependencies"], "dependencies")?.keys() {
-            audit_node(child, packages, visiting, done)?;
+            audit_node(child.ascii_candidate(), packages, visiting, done)?;
         }
     }
     visiting.remove(name);
@@ -641,12 +663,12 @@ impl Resolver {
             return Err(error("artifact dependencies differ from lock"));
         }
         for (name, version) in object(&actual, "dependencies")? {
-            if version != &self.pinned(name)?["version"] {
+            if version != &self.pinned(name.ascii_candidate())?["version"] {
                 return Err(error("locked transitive version mismatch"));
             }
         }
         for name in object(&actual, "dependencies")?.keys() {
-            self.loaded(name)?;
+            self.loaded(name.ascii_candidate())?;
         }
         // A failed dependency must not leave a parent reusable as verified.
         self.artifacts.insert(name.into(), value.clone());
@@ -664,7 +686,7 @@ impl Resolver {
             .to_string_lossy();
         for (name, package) in object(&self.lock()?["packages"], "packages")? {
             if string(package, "sha256")? == hash {
-                return Ok(Some(name.clone()));
+                return Ok(Some(name.ascii_candidate().to_owned()));
             }
         }
         Err(error("unknown package source identity"))
@@ -705,7 +727,7 @@ impl Resolver {
             return Ok(self
                 .virtual_root
                 .join(string(&pinned, "sha256")?)
-                .join(string(&value, "entry")?));
+                .join(value["entry"].as_text().unwrap().path_text()?));
         }
         let target = normalize(&current.parent().unwrap().join(reference));
         if let Some(owner) = owner {
@@ -739,6 +761,12 @@ impl Resolver {
             .map_err(|_| error("package boundary"))?
             .to_string_lossy()
             .replace('\\', "/");
+        if value["files"][&relative]
+            .as_text()
+            .is_some_and(|text| text.as_str().is_none())
+        {
+            return Err(error("package source contains unpaired UTF-16 surrogate").into());
+        }
         value["files"][&relative]
             .as_str()
             .map(str::to_owned)

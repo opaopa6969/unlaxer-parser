@@ -1,4 +1,5 @@
 //! Package-envelope compatibility with Gson, without changing raw artifact bytes.
+use super::text::Text;
 use super::value::{Object, Value};
 
 /// Gson STRICT's JsonElement adapter, followed by the credentials object's fixed
@@ -79,7 +80,7 @@ pub(super) fn parse(bytes: &[u8], artifact: bool) -> Result<Value, String> {
     let invalid = || super::error("invalid JSON");
     let rewritten = rewrite(bytes).ok_or_else(invalid)?;
     let mut value = super::value::parse(&rewritten).map_err(|_| invalid())?;
-    restore(&mut value, &mut Vec::new(), artifact).map_err(|_| invalid())?;
+    restore(&mut value, &mut Vec::new(), artifact);
     Ok(value)
 }
 
@@ -155,49 +156,49 @@ fn text(value: &str) -> (String, bool) {
     (output, surrogate)
 }
 
-fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) -> Result<(), ()> {
+fn restore(value: &mut Value, path: &mut Vec<String>, artifact: bool) {
     match value {
         Value::String(s) => {
-            let (decoded, surrogate) = text(s);
-            if surrogate
-                && ((artifact
-                    && matches!(path.first().map(String::as_str), Some("entry" | "files")))
-                    || (path.len() == 3
-                        && path[0] == "dependencies"
-                        && path[2] == "source"
-                        && decoded.starts_with("https:")))
-            {
-                // These fields can expose the actual UTF-16 text. Keep the old
-                // JSON rejection until they have a lossless cross-host contract.
-                return Err(());
-            }
-            *s = decoded;
+            let marked = s.as_str().expect("rewrite produces scalar strings");
+            let (decoded, _) = text(marked);
+            let lossless = (artifact
+                && matches!(path.first().map(String::as_str), Some("entry" | "files")))
+                || (path.len() == 3
+                    && path[0] == "dependencies"
+                    && path[2] == "source"
+                    && decoded.starts_with("https:"));
+            *s = if lossless {
+                Text::from_marked(marked)
+            } else {
+                decoded.into()
+            };
         }
         Value::Object(fields) => {
             let mut restored = Vec::with_capacity(fields.len());
             for (key, mut child) in std::mem::take(fields).into_entries() {
-                let (key, surrogate) = text(&key);
-                if surrogate && artifact && path.first().is_some_and(|p| p == "files") {
-                    return Err(());
-                }
-                path.push(key.clone());
-                restore(&mut child, path, artifact)?;
+                let marked = key.as_str().expect("rewrite produces scalar keys");
+                let (decoded, _) = text(marked);
+                let key = if artifact && path.first().is_some_and(|p| p == "files") {
+                    Text::from_marked(marked)
+                } else {
+                    decoded.clone().into()
+                };
+                path.push(decoded);
+                restore(&mut child, path, artifact);
                 path.pop();
                 restored.push((key, child));
             }
-            // Distinct surrogate escapes may decode to the same sentinel key.
             *fields = Object::from_entries(restored);
         }
         Value::Array(items) => {
             for child in items {
                 path.push(String::new());
-                restore(child, path, artifact)?;
+                restore(child, path, artifact);
                 path.pop();
             }
         }
         _ => {}
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -593,18 +594,71 @@ mod tests {
     }
 
     #[test]
-    fn unresolved_source_text_and_https_are_not_lossily_accepted() {
-        for bytes in [
-            br#"{"entry":"\ud800.ubnf"}"#.as_slice(),
-            br#"{"files":{"\ud800.ubnf":"text"}}"#,
-            br#"{"files":{"ok.ubnf":"\udc00"}}"#,
-            br#"{"dependencies":{"a":{"source":"https://host/\ud800"}}}"#,
+    fn package_text_is_lossless_and_duplicate_file_keys_do_not_collide() {
+        let value = parse(br#"{"entry":"a\ud800.ubnf","files":{"a\ud800.ubnf":"\ud800","a\udc00.ubnf":"\udc00","a\u0000sd800.ubnf":"literal marker","a\uD800.ubnf":"last"},"dependencies":{"a":{"source":"https://host/\ud800"}}}"#, true).unwrap();
+        let files = value["files"].as_object().unwrap();
+        assert_eq!(files.len(), 3);
+        let entry = value["entry"].as_text().unwrap();
+        assert!(files.contains_text(entry));
+        assert!(entry.as_str().is_none());
+        assert_eq!(
+            entry,
+            &Text::Units(vec![0x61, 0xd800, 0x2e, 0x75, 0x62, 0x6e, 0x66].into_boxed_slice())
+        );
+        assert_eq!(
+            Text::from_marked("\0sd800x\0sdc00"),
+            Text::Units(vec![0xd800, 0x78, 0xdc00].into_boxed_slice())
+        );
+        assert_eq!(
+            Text::from_marked("\0sd800\0sd800\0sdc00"),
+            Text::Units(vec![0xd800, 0xd800, 0xdc00].into_boxed_slice())
+        );
+        assert_eq!(Text::from_marked("\0sd800\0sdc00"), Text::from("𐀀"));
+
+        assert!(entry.ends_with_ubnf());
+        assert!(entry.validate_file().is_ok());
+        let members: Vec<_> = files.into_iter().collect();
+        assert_eq!(members[0].1, &Value::String("last".into()));
+        assert_ne!(members[0].0, members[1].0);
+        assert_ne!(members[0].0, members[2].0);
+        assert!(matches!(
+            value["dependencies"]["a"]["source"].as_text(),
+            Some(Text::Units(_))
+        ));
+        assert!(parse(br#"{"unknown":{"files":{"name":"\ud800"}}}"#, true).is_ok());
+    }
+
+    #[test]
+    fn surrogate_paths_keep_java_schema_and_two_stage_path_order() {
+        let input = |entry: &str, name: &str| {
+            format!(
+                r#"{{"schemaVersion":1,"id":"std/layout","version":"1.0.0","entry":"{entry}","files":{{"{name}":""}},"dependencies":{{}}}}"#
+            )
+        };
+        for (name, expected) in [
+            (r"a\u0001\ud800.ubnf", "invalid package file path"),
+            (r"x/\ud800/../a", "package file path escapes boundary"),
         ] {
+            for (entry, key) in [(name, "layout.ubnf"), ("layout.ubnf", name)] {
+                assert_eq!(
+                    super::super::artifact(input(entry, key).as_bytes()).unwrap_err(),
+                    super::super::error(expected)
+                );
+            }
+        }
+        for escaped in [r"\ud800", r"\udc00", r"\ud800x\udc00"] {
+            let name = format!("{escaped}.ubnf");
+            assert!(super::super::artifact(input(&name, &name).as_bytes()).is_ok());
             assert_eq!(
-                parse(bytes, true).unwrap_err(),
-                super::super::error("invalid JSON")
+                super::super::artifact(input(&name, "other.ubnf").as_bytes()).unwrap_err(),
+                super::super::error("missing UBNF package entry")
             );
         }
-        assert!(parse(br#"{"unknown":{"files":{"name":"\ud800"}}}"#, true).is_ok());
+        let raw =
+            input(r"\ud800.ubnf", "other.ubnf").replace("schemaVersion\":1", "schemaVersion\":2");
+        assert_eq!(
+            super::super::artifact(raw.as_bytes()).unwrap_err(),
+            super::super::error("unsupported schemaVersion")
+        );
     }
 }

@@ -7,6 +7,15 @@ fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
 }
 pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
+    fetch_checked(source, false)
+}
+
+// The probe is only for URI/origin/credentials checks. Never send a rewritten URL.
+pub(crate) fn reject_surrogate_path(probe: &str) -> Result<Vec<u8>, String> {
+    fetch_checked(probe, true)
+}
+
+fn fetch_checked(source: &str, surrogate_path: bool) -> Result<Vec<u8>, String> {
     let uri: ureq::http::Uri = source
         .parse()
         .map_err(|_| error("invalid HTTPS artifact URL"))?;
@@ -80,6 +89,13 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
             })
             .ok_or_else(|| error("invalid artifact credentials"))?;
         request = request.header("Authorization", format!("Bearer {token}"));
+    }
+    if surrogate_path {
+        // Java accepts the UTF-16 URI but its HTTP encoder fails after credentials
+        // validation. Preserve that result without handing substituted bytes to I/O.
+        return Err(error(
+            "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+        ));
     }
     let mut response = request
         .call()

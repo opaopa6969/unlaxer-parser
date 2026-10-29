@@ -169,6 +169,9 @@ pub mod vocabulary_origins;
 
 #[cfg(target_arch = "wasm32")]
 mod package_fetch {
+    pub(crate) fn reject_surrogate_path(probe: &str) -> Result<Vec<u8>, String> {
+        fetch(probe)
+    }
     pub fn fetch(_source: &str) -> Result<Vec<u8>, String> {
         Err("E-PACKAGE: HTTPS retrieval requires the native deps resolve command".into())
     }

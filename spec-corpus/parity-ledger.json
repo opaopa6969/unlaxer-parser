@@ -25,6 +25,8 @@
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
   ],
   "issues": {
+    "959": {"state": "OPEN", "title": "package UTF-16 本文を UBNF・AST・LSP・生成出力まで lossless に扱う"},
+    "960": {"state": "OPEN", "title": "正常 Unicode HTTPS URL の診断と request target encoding"},
     "943": {"state": "OPEN", "title": "HTTPS package の credentials JSON の受理と診断"},
     "956": {"state": "OPEN", "title": "credentials 受理後の TLS・HTTP 失敗診断を Java に揃える"},
     "923": {"state": "OPEN", "title": "parity(check): 字句エラーと @whitespace の組込み名の同居を Java 参照契約へ揃える"},
@@ -588,21 +590,54 @@
     {
       "id": "package-json-surrogate-text",
       "category": "contract",
-      "title": "package JSON の単独サロゲート文字列の暫定境界",
+      "title": "package JSON の lossless UTF-16 と field 境界",
       "hosts": "Java Gson / Rust package JSON reader（両 stdio・Java-host Rust/native Rust/Java flag CLI）",
       "issues": [
         926,
-        939
+        939,
+        959,
+        960
       ],
-      "observation": "#914は先頭BOMを1つだけ受理。#926のlocal source・ASCII形式のID/version/lock・未使用metadataはJavaの受理と診断に揃える。artifact.entry、filesのkey/本文、dependencies.*.sourceのHTTPSはUTF-16をlosslessに表せないため、Javaを狭めずRustの既存invalid JSONを維持する意図した暫定差。共通400件（#942の順序69件・#941の文書166件・#947のschema38件を含む）のうち13件は両hostを実行してhost別oracleを照合し、skipしない。これらのfieldとsource位置/取得境界の完全対応は#939の受け入れ条件で追跡する。#914/#926はPR #940でCLOSED。#942で入力objectの記述順と重複keyの位置/値をJavaに揃え、lock/cacheの辞書順出力は維持する。raw hash→strict UTF-8→JSON、readerとpath規則は維持する。#941で空文書・非object最上位の診断とGsonの深さ255/256境界を揃える。#947でdependency・files/entry・lockのschema診断をJavaに揃える。数値を表記のまま保持し、未使用の範囲外数値も受理する。package専用の明示スタックを浅い入力にも共用し、feature統合に依存せず深さ・順序・メモリ水準を維持する。",
+      "observation": "#939 は package 入力に通常 UTF-8 / 非 scalar UTF-16 units の Text を導入し、entry・files key/未使用本文・HTTPS source を復元する。Java の経路・受理集合・診断と raw bytes は不変。schema/ID/path の順序、entry照合、Linux Path拒否、URI→credentials→HTTP encoding の境界をJavaへ揃える。正常URLのtransportは変えず、非scalarURLのprobeは送信しない。既存13 gapの10件と全13件のresolveは一致。実読取り3 commentのloadと追加15件は#959、正常対URLの4診断差とrequest targetは#960へ分離し、完了扱いにしない。共通472件で両stdio/両resolve、既存400＋代表追加13形で3 CLI生成を比較。raw hash→UTF-8→JSON、8MiB reader、深さ255、記述順、数値表記、32byte Value、parserホットパスを維持する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",
         "scripts/ubnf_package_json.py",
         "rust/unlaxer-generator/src/packages/json.rs",
         "rust/unlaxer-generator/src/packages/value.rs",
+        "rust/unlaxer-generator/src/packages/text.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/PackageJsonAcceptanceConformanceTest.java",
         "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
+      ]
+    },
+    {
+      "id": "package-source-utf16",
+      "category": "unresolved",
+      "title": "package 本文の UTF-16 と UBNF/AST/stdio/生成出力",
+      "hosts": "Java / Rust native",
+      "issues": [
+        959
+      ],
+      "observation": "Java は単独サロゲートを含む comment・未使用 literal を解析し、使用 literal は生成UTF-8書込みで失敗する。Rust は Text にlossless保持するが実読取りを明示診断で拒否する。共通18件をskipせずhost別oracleで比較し、definitionのUTF-16 range、packageSourceのwire、生成時の部分出力を含める。resolve/未使用本文は一致する。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-json-acceptance.json",
+        "scripts/ubnf_package_json.py"
+      ]
+    },
+    {
+      "id": "package-unicode-url",
+      "category": "unresolved",
+      "title": "正常 Unicode HTTPS URL の診断と request target",
+      "hosts": "Java / Rust native",
+      "issues": [
+        960
+      ],
+      "observation": "正常対のhost/userinfoはJavaのomit診断とRustのinvalid URLが異なる。正常pathはJavaがpercent encode、Rustが生UTF-8のrequest targetを送る。#939は通常URL経路を変えず、共通4診断差と直接/推移的pathのwireをlocal TLSで記録する。不正percentの受理も#960で追跡する。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-json-acceptance.json",
+        "scripts/ubnf_package_json.py"
       ]
     },
     {
@@ -2033,11 +2068,17 @@
     {
       "path": "spec-corpus/package-json-acceptance.json",
       "fields": {
-        "rustLoadError": 13,
-        "rustResolveError": 13
+        "java": 2,
+        "rust": 2,
+        "rustLoadError": 18,
+        "rustLoadExit": 3,
+        "rustLoadPrefix": 12,
+        "rustResolveError": 4
       },
       "entries": [
-        "package-json-surrogate-text"
+        "package-json-surrogate-text",
+        "package-source-utf16",
+        "package-unicode-url"
       ]
     },
     {"path": "spec-corpus/feature-diagnostics/ubnf-version.json", "fields": {"javaFirst": 72}, "entries": ["host-bindings"]},

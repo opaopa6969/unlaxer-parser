@@ -73,7 +73,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=900000) public void packageJsonAcceptanceMatchesAcrossServers() throws Exception {
-        runProtocol("package-json", 400);
+        runProtocol("package-json", 472);
     }
 
     private void runProtocol(String suite, int count) throws Exception {
