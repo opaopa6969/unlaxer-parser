@@ -875,7 +875,7 @@ JSON の escape や severity を混ぜない。grammar / profile / package は�
 構文、構造、inventory、module、parameterized rule の各失敗を共通 fixture で固定し、
 check は従来の JSON 全体を独立期待値と照合する。
 
-意図した差として、generate / deps inspect の構文エラーは Java の
+意図した差として、generate / deps inspect（と `playground --profile` の参照 grammar、#953）の構文エラーは Java の
 `UBNF パース失敗: <ソースの先頭80文字（UTF-16 単位）>`（未消費の入力がある場合は
 `UBNF パース失敗: <行:列> に未消費の入力があります: <続く80文字>`）と、native の行・列・原因付き診断を維持する。
 Java の文は複数行のソースを含むため、stderr 最終行がソースの途中の行になることがある。
@@ -955,13 +955,20 @@ Java 製品コード、既存の String を返す Rust API、`--grammar` の上�
 | profile / 参照 grammar が directory | 4、`Is a directory` |
 | profile / 参照 grammar の不正 UTF-8 | 4、`Input length = N`（既存の `Files.readString` の長さ規則） |
 | 空 profile・BOM のみ・BOM 付き profile・末尾 LF なし・空行・NUL・CRLF | 3、`invalid language profile` |
+| 参照 grammar の構文エラー（BOM 付き・空を含む） | 3、Java は `UBNF パース失敗: <ソースの先頭80文字>`、native は行・列・原因付き診断（意図した差） |
 | profile の参照 grammar が local import を読めない | 4、module loader の原因文。欠落・権限は絶対パス、不正 UTF-8 は strict decoder の長さ、directory は `E-MODULE: local import is not a regular file` |
 
 最後の行は profile の検証が readiness より前に module を解決する Java の順序による。
 同じ import が `--grammar` で終了3の readiness 診断になる既存の契約とは入口が異なる。
+参照 grammar の構文エラーも同じ順序で readiness より前に module loader が報告する。
+`--grammar` の Playground は両 host とも `P-SYNTAX` の readiness 表示で一致するが、`--profile` では
+generate / deps inspect と同じ「Playground readiness と構文エラー」の意図した差（#937）になる。
+終了3・空 stdout・無出力は一致し、両 host の最終行を fixture の `nativeSyntax` で固定する。
 上記失敗の stdout は空で、出力先・staging は作らず、入力の mode / bytes も変えない。
+`--profile ' '` など空白だけの option 値を Java が `isBlank` で usage（終了2）にする差は、
+入力 I/O ではなく引数検査の別の意味単位として #974 で追跡する。
 
-共通 `spec-corpus/cli-stderr.json` の `profile` suite は71形、LF/CRLF・両実 CLI の284観測。
+共通 `spec-corpus/cli-stderr.json` の `profile` suite は74形、LF/CRLF・両実 CLI の296観測。
 不正 UTF-8 は profile / grammar ごとに24形（1〜4の長さ、末尾途切れ、過長、surrogate、
 上限超過、BOM / 非BMP前置文字を含む）。TSV の LF 制約が grammar の失敗を隠さないよう、
 `fixedFiles` の profile は LF のまま grammar を LF/CRLF にし、profile 自体を CRLF にした形も別途検証する。

@@ -5,7 +5,7 @@
     "readiness": 48,
     "syntax": 2,
     "paths": 33,
-    "profile": 71
+    "profile": 74
   },
   "cases": [
     {
@@ -9433,6 +9433,109 @@
       },
       "bytes": {
         "bad.ubnf": "e28220"
+      }
+    },
+    {
+      "id": "profile-grammar-syntax",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { Start ::= ; }"
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { Start ::= ; }"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { Start ::= ; }"
+          }
+        }
+      },
+      "nativeSyntax": {
+        "LF": "1:26: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+        "CRLF": "1:26: expected nonempty rule sequence (use an EMPTY token for epsilon)"
+      }
+    },
+    {
+      "id": "profile-grammar-bom",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {},
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: ﻿grammar Main { @root @mapping(Value) Start ::= 'a'; }"
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: ﻿grammar Main { @root @mapping(Value) Start ::= 'a'; }"
+          }
+        }
+      },
+      "nativeSyntax": {
+        "LF": "1:1: unexpected character '\\u{feff}'",
+        "CRLF": "1:1: unexpected character '\\u{feff}'"
+      },
+      "bytes": {
+        "main.ubnf": "efbbbf6772616d6d6172204d61696e207b2040726f6f7420406d617070696e672856616c756529205374617274203a3a3d202761273b207d"
+      }
+    },
+    {
+      "id": "profile-grammar-empty",
+      "scope": "profile",
+      "profile": "p.tsv",
+      "operations": [
+        "playground"
+      ],
+      "files": {
+        "main.ubnf": ""
+      },
+      "fixedFiles": {
+        "p.tsv": "profile\t1\nlanguage\tprobe\npackage\tlang/probe\t0.1.0\ntarget\t21\tsource\ntool\tjavac\t21.0.9\ngrammar\tMain\tmain.ubnf\nsource\thttps://example.com/spec\t1\tfixture\nfixture\tcorpus.tsv\nentry\tStart\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+      },
+      "expected": {
+        "LF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: "
+          }
+        },
+        "CRLF": {
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: "
+          }
+        }
+      },
+      "nativeSyntax": {
+        "LF": "1:1: expected at least one grammar",
+        "CRLF": "1:1: expected at least one grammar"
       }
     },
     {

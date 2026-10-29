@@ -49,7 +49,7 @@ public class CliStderrConformanceTest {
         int observations = switch (suite) {
             case "output" -> 112;
             case "paths" -> 244;
-            case "profile" -> 284;
+            case "profile" -> 296;
             case "utf8" -> 768;
             case "readiness" -> 384;
             default -> 16;
