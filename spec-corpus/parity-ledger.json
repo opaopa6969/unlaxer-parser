@@ -782,7 +782,7 @@
       "issues": [
         962
       ],
-      "observation": "Java製品コードを変えず、ASCII scalar URLをjava_uri.rsの既存UTF-16 parserで構文検査し、scheme/host/userinfo/query/fragment/portを同順で検査してから元URLをureqへ渡す。ASCII49形とUnicode対照7形を直接/推移的依存・snapshot有無の両方で実行し、拒否時request/接続0、成功時raw lock/cache bytes、失敗時snapshot不変を検証する。Unicode scalar経路と#960のhost別期待値、#939の非scalar送信禁止、credentials/CA/token・#956/#958を維持する。全長65535 bytes以上はJava/移植parserが受理してもureq http::Uriの65534 bytes上限で追加拒否される。65534/65535/65536のparser境界実測をdocs/PRへ記録し、backend制限として残す（Javaの取得成功は未測定）。#962はPRのmerge待ち。",
+      "observation": "Java製品コードを変えず、ASCII scalar URLをjava_uri.rsの既存UTF-16 parserで構文検査し、scheme/host/userinfo/query/fragment/portを同順で検査してから元URLをureqへ渡す。接続先もJavaに揃え、15文字までの先頭0のIPv4 octetは10進literalへ接続してJavaと同じHost headerを送り、それより長い数字host（InetAddressの曖昧表記拒否）と末尾dot・63文字超label（SNIHostName例外）は接続前に取得失敗とする。ASCII53形とUnicode対照7形を直接/推移的依存・snapshot有無の両方で実行し、拒否時request/接続0、成功時raw lock/cache bytes、失敗時snapshot不変を検証する。Unicode scalar経路と#960のhost別期待値、#939の非scalar送信禁止、credentials/CA/token・#956/#958を維持する。全長65535 bytes以上はJava/移植parserが受理してもureq http::Uriの65534 bytes上限で追加拒否される。65534/65535/65536のparser境界実測をdocs/PRへ記録し、backend制限として残す。Javaは65,624/100,024 bytesの取得に成功し、この差は#977で追跡する。#962はPRのmerge待ち。",
       "evidence": [
         "docs/ubnf-packages.md",
         "rust/unlaxer-generator/src/package_fetch.rs",

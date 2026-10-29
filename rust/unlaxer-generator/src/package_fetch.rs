@@ -12,7 +12,7 @@ fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
 }
 pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
-    let origin = if source.is_ascii() {
+    let (origin, route) = if source.is_ascii() {
         use crate::packages::java_uri::{classify_str, Https};
         // Match URI.create and the Java fetcher's checks before credentials or I/O.
         match classify_str(source) {
@@ -22,7 +22,10 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
                     "HTTPS artifact URL must omit credentials, query and fragment",
                 ));
             }
-            Https::Origin(origin) => origin,
+            Https::Origin(origin) => {
+                let route = java_route(source, &origin);
+                (origin, route)
+            }
         }
     } else {
         // Unicode acceptance and request-target encoding are tracked in #960.
@@ -45,16 +48,26 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
                 "HTTPS artifact URL must omit credentials, query and fragment",
             ));
         }
-        format!(
+        let origin = format!(
             "https://{}{}",
             host.to_ascii_lowercase(),
             uri.port_u16()
                 .filter(|p| *p != 443)
                 .map_or(String::new(), |p| format!(":{p}"))
-        )
+        );
+        (origin, Route::Direct)
     };
     let (agent, token) = client(&origin)?;
-    let mut request = agent.get(source);
+    let mut request = match route {
+        Route::Direct => agent.get(source),
+        Route::Literal { url, host } => agent.get(&url).header("Host", host),
+        // Java fails after the credentials, CA and token checks, before connecting.
+        Route::Unreachable => {
+            return Err(error(
+                "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+            ))
+        }
+    };
     if let Some(token) = token {
         request = request.header("Authorization", format!("Bearer {token}"));
     }
@@ -86,6 +99,64 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
         ));
     }
     Ok(bytes)
+}
+
+/// How java.net.http reaches the host of a URL that `java_uri` accepted (#962).
+#[derive(Debug, PartialEq, Eq)]
+enum Route {
+    /// ureq connects to the URL's own host, as Java does.
+    Direct,
+    /// `IPAddressUtil.textToNumericFormatV4` (`Utils.getServerName`, `InetAddress`) reads
+    /// four dotted octets of at most 15 characters as decimal, so `127.0.0.010` is
+    /// 127.0.0.10 (getaddrinfo would read octal 8). Connect to the canonical literal
+    /// (TLS by IP, no SNI) but keep Java's raw `Host` header.
+    Literal { url: String, host: String },
+    /// Java fails before any connection: a longer numeric host is not a literal and
+    /// `InetAddress` rejects it as ambiguous (or finds no DNS name); any other host
+    /// becomes an `SNIHostName`, which throws for a trailing `.` or a label over 63
+    /// (`IDN.toASCII` with STD3 rules).
+    Unreachable,
+}
+
+fn java_route(source: &str, origin: &str) -> Route {
+    // An accepted origin has an `https://` authority without userinfo/query/fragment.
+    let Some(authority) = source.strip_prefix("https://") else {
+        return Route::Direct;
+    };
+    let host = &authority[..authority.find([':', '/']).unwrap_or(authority.len())];
+    let octets: Vec<&str> = host.split('.').collect();
+    if octets.len() == 4 && octets.iter().all(|o| o.bytes().all(|c| c.is_ascii_digit())) {
+        if host.len() > 15 {
+            return Route::Unreachable;
+        }
+        let Ok(octets) = octets
+            .iter()
+            .map(|o| o.parse::<u8>())
+            .collect::<Result<Vec<_>, _>>()
+        else {
+            return Route::Direct;
+        };
+        let canonical = octets
+            .iter()
+            .map(u8::to_string)
+            .collect::<Vec<_>>()
+            .join(".");
+        if canonical == host {
+            return Route::Direct;
+        }
+        // Java's Host is getHost() plus the port unless it is absent or 443, as in origin.
+        let port = origin
+            .get("https://".len() + host.len()..)
+            .unwrap_or_default();
+        return Route::Literal {
+            url: format!("https://{canonical}{}", &authority[host.len()..]),
+            host: format!("{host}{port}"),
+        };
+    }
+    if host.ends_with('.') || host.split('.').any(|label| label.len() > 63) {
+        return Route::Unreachable;
+    }
+    Route::Direct
 }
 
 /// java.net.http fails the exchange itself (not the status check) for an unrequested
@@ -227,5 +298,94 @@ fn default_home() -> Option<PathBuf> {
     #[cfg(not(unix))]
     {
         std::env::var_os("HOME").map(PathBuf::from)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{java_route, Route};
+
+    fn literal(url: &str, host: &str) -> Route {
+        Route::Literal {
+            url: url.into(),
+            host: host.into(),
+        }
+    }
+
+    #[test]
+    fn java_route_follows_java_transport() {
+        // Expected values follow Oracle JDK 17.0.12 / 21.0.9 InetAddress / SNIHostName.
+        let label = |n: usize| "a".repeat(n);
+        for (source, origin, expected) in [
+            (
+                "https://localhost:1/x",
+                "https://localhost:1",
+                Route::Direct,
+            ),
+            (
+                "https://127.0.0.1:1/x",
+                "https://127.0.0.1:1",
+                Route::Direct,
+            ),
+            ("https://0.0.0.0/x", "https://0.0.0.0", Route::Direct),
+            (
+                "https://127.0.0.010:8443/a/b",
+                "https://127.0.0.010:8443",
+                literal("https://127.0.0.10:8443/a/b", "127.0.0.010:8443"),
+            ),
+            (
+                "https://00127.000.0.08:443/x",
+                "https://00127.000.0.08",
+                literal("https://127.0.0.8:443/x", "00127.000.0.08"),
+            ),
+            (
+                "https://127.0.0.01:/x",
+                "https://127.0.0.01",
+                literal("https://127.0.0.1:/x", "127.0.0.01"),
+            ),
+            (
+                "https://127.0.0.01",
+                "https://127.0.0.01",
+                literal("https://127.0.0.1", "127.0.0.01"),
+            ),
+            (
+                "https://0127.0.000.010/x",
+                "https://0127.0.000.010",
+                literal("https://127.0.0.10/x", "0127.0.000.010"),
+            ),
+            (
+                "https://00127.000.000.010:1/x",
+                "https://00127.000.000.010:1",
+                Route::Unreachable,
+            ),
+            (
+                "https://0000000128.0.0.1:1/x",
+                "https://0000000128.0.0.1:1",
+                Route::Unreachable,
+            ),
+            (
+                "https://localhost.:1/x",
+                "https://localhost.:1",
+                Route::Unreachable,
+            ),
+            ("https://a.b./x", "https://a.b.", Route::Unreachable),
+            (
+                &format!("https://{}.b:1/x", label(63)),
+                &format!("https://{}.b:1", label(63)),
+                Route::Direct,
+            ),
+            (
+                &format!("https://{}.b:1/x", label(64)),
+                &format!("https://{}.b:1", label(64)),
+                Route::Unreachable,
+            ),
+            (
+                &format!("https://b.{}/x", label(64)),
+                &format!("https://b.{}", label(64)),
+                Route::Unreachable,
+            ),
+        ] {
+            assert_eq!(java_route(source, origin), expected, "{source}");
+        }
     }
 }

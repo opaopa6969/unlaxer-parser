@@ -294,13 +294,15 @@
     "id": "uri-plain",
     "kind": "uri",
     "url": "https://localhost:{port}/{id}",
-    "error": null
+    "error": null,
+    "hostHeader": "localhost:{port}"
   },
   {
     "id": "uri-padded-port",
     "kind": "uri",
     "url": "https://LOCALHOST:{port:06d}/{id}",
-    "error": null
+    "error": null,
+    "hostHeader": "LOCALHOST:{port}"
   },
   {
     "id": "uri-port-0",
@@ -411,6 +413,13 @@
     "invalidToken": true
   },
   {
+    "id": "uri-host-trailing-dot-fetch",
+    "kind": "uri",
+    "url": "https://localhost.:{port}/{id}",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "credentialOrigin": "https://localhost.:{port}"
+  },
+  {
     "id": "uri-host-hyphen",
     "kind": "uri",
     "url": "https://a-b:{port}/{id}",
@@ -469,6 +478,29 @@
     "kind": "uri",
     "url": "https://127.1:{port}/{id}",
     "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv4-leading-zero",
+    "kind": "uri",
+    "url": "https://127.0.0.010:{port}/{id}",
+    "error": null,
+    "credentialOrigin": "https://127.0.0.010:{port}",
+    "hostHeader": "127.0.0.010:{port}"
+  },
+  {
+    "id": "uri-host-ipv4-padded",
+    "kind": "uri",
+    "url": "https://0127.0.000.010:{port}/{id}",
+    "error": null,
+    "credentialOrigin": "https://0127.0.000.010:{port}",
+    "hostHeader": "0127.0.000.010:{port}"
+  },
+  {
+    "id": "uri-host-ipv4-long",
+    "kind": "uri",
+    "url": "https://00127.000.000.010:{port}/{id}",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "credentialOrigin": "https://00127.000.000.010:{port}"
   },
   {
     "id": "uri-host-ipv6",

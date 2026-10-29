@@ -18,12 +18,13 @@ from ubnf_package_credentials import ROOT, local_tls_context, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
 LIMIT = 8 * 1024 * 1024
-COUNT = 98
-URI_COUNT = 56
+COUNT = 102
+URI_COUNT = 60
 TOKEN = 'transport-fixture-only-token'
 BODY = b'transport-fixture-private-response'
 HEADER = 'transport-fixture-private-header'
 TRANSPORT = 'HTTPS artifact retrieval failed (TLS, timeout or size limit)'
+LITERAL = '127.0.0.10'
 STATUS = 'HTTPS artifact requires status 200; redirects are forbidden'
 MISSING = 'E-PACKAGE: missing lock; run unlaxer deps resolve --manifest ubnf.json'
 # Product deadlines (connect 5 s, whole call 20 s) are measured unchanged. These
@@ -48,7 +49,8 @@ def fixtures():
 def transport_server(directory, artifact):
     # Reuse the existing certificate setup; this server supplies deliberately broken
     # HTTP framing that BaseHTTPRequestHandler / HttpsServer cannot express.
-    context = local_tls_context(directory)
+    # 127.0.0.10 is the decimal reading Java gives `127.0.0.010` (getaddrinfo: octal 8).
+    context = local_tls_context(directory, 'DNS:localhost,IP:' + LITERAL)
     ca = directory / 'ca.pem'
     receipts = []
     connections = []
@@ -81,6 +83,9 @@ def transport_server(directory, artifact):
                                 'bearer' if authorized else 'absent' if not auth else 'unexpected'}
                     if case_id in cases and cases[case_id]['kind'] == 'uri':
                         received['targetHex'] = target.hex()
+                        if 'hostHeader' in cases[case_id]:
+                            received['host'] = [line.split(b':', 1)[1].strip().decode('ascii') for line in lines[1:]
+                                                if line.lower().startswith(b'host:')]
                     receipts.append(received)
                     # A followed redirect is a test failure, including same-origin redirects.
                     if path == '/redirect-target':
@@ -135,7 +140,7 @@ def transport_server(directory, artifact):
             receipts.append({'serverError': True})
 
     with Server(('127.0.0.1', 0), Handler) as server, socket.socket() as refused, \
-            socket.socket() as blackhole:
+            socket.socket() as blackhole, Server((LITERAL, server.server_address[1]), Handler) as literal:
         refused.bind(('127.0.0.1', 0))  # Reserved but not listening: deterministic refusal.
         # Never accepted, and its queue is filled first: later SYNs get no answer, so only
         # the 5-second connect deadline ends the call (a queued one stalls in the handshake,
@@ -150,6 +155,8 @@ def transport_server(directory, artifact):
             fillers.append(filler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
+        literal_thread = threading.Thread(target=literal.serve_forever, daemon=True)
+        literal_thread.start()
         try:
             yield (server.server_address[1], refused.getsockname()[1], blackhole.getsockname()[1],
                    ca, receipts, connections)
@@ -158,8 +165,10 @@ def transport_server(directory, artifact):
             for filler in fillers:
                 filler.close()
             server.shutdown()
+            literal.shutdown()
             thread.join(timeout=5)
-            assert not thread.is_alive(), 'transport server did not stop'
+            literal_thread.join(timeout=5)
+            assert not thread.is_alive() and not literal_thread.is_alive(), 'transport server did not stop'
 
 
 def public(output, stderr, code):
@@ -269,14 +278,17 @@ def parent_bytes(source):
                    'dependencies': {'std/layout': {'version': '1.0.0', 'source': source}}})
 
 
-def expected_receipt(case, host='java'):
+def expected_receipt(case, host='java', port=None):
     if case['kind'] == 'uri':
         error = case.get('rustError', case['error']) if host == 'rust' else case['error']
         if error:
             return None
         suffix = case.get('rustTargetSuffix', case.get('targetSuffix', '')) if host == 'rust' else case.get('targetSuffix', '')
-        return {'case': case['id'], 'authorization': 'bearer',
-                'targetHex': ('/' + case['id'] + suffix).encode().hex()}
+        wanted = {'case': case['id'], 'authorization': 'bearer',
+                  'targetHex': ('/' + case['id'] + suffix).encode().hex()}
+        if 'hostHeader' in case:  # Java sends getHost() as written, plus a non-default port.
+            wanted['host'] = [case['hostHeader'].format(port=port)]
+        return wanted
     if not case.get('trust', True) or 'hostname' in case or case['kind'] in ['refused', 'connect-stall']:
         return None  # The request must not pass the TCP/TLS boundary.
     return {'case': case['id'], 'authorization': 'bearer' if case.get('token', True) else 'absent'}
@@ -366,7 +378,7 @@ def check(directory, args, records):
                             actual, elapsed = invoke([args.rust], options, dict(env, PATH='', JAVA_HOME='/nonexistent-java'))
                         run = verify(case, host, existing, folder, actual, elapsed, transitive)
                         receipts = [r for r in received[before:] if r.get('case') not in slow_ids]
-                        wanted = expected_receipt(case, host)
+                        wanted = expected_receipt(case, host, port)
                         if wanted is None:
                             assert not receipts, (case['id'], host, 'request passed TLS boundary')
                             if case['kind'] == 'uri':

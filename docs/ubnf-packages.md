@@ -99,14 +99,23 @@ Rust は `packages/java_uri.rs` の UTF-16 parser に `classify_str(&str)` の�
 ASCII URL に限って同じ parser と origin 判定を使う。URL 全体の構文検査後、scheme →
 `getHost()`（null・ASCII DNS/IPv4 文字種）→ userinfo → query → fragment → port の順で検査し、
 受理した元の URL だけを ureq に渡す。Java の製品コード・診断と parser のホットパスは変更しない。
+ただし接続先は java.net.http の扱いに合わせる（レビューで追加）。4つの数字 octet の host は
+`InetAddress` が10進で読む literal なので、先頭0を含む `127.0.0.010` は 127.0.0.10 へ接続する
+（getaddrinfo は8進で 127.0.0.8 と読む）。Rust はこの場合だけ 10進正規形の literal を接続・TLS（IP 照合、SNI なし）に使い、
+`Host` header は Java と同じ `getHost()` の表記と既定以外の port を送る。request target は変えない。
+ただし Java の literal 判定（`IPAddressUtil.textToNumericFormatV4`）は15文字までで、`00127.000.000.010` のような
+長い数字 host は literal にならず `InetAddress` が曖昧な表記として拒否する（接続しない）。
+それ以外の host は Java が `SNIHostName` を作り、末尾の `.` や63文字を超える label では接続前に例外となるため、
+これらは Rust も credentials → CA → token の検査後に接続せず `HTTPS artifact retrieval failed (TLS, timeout or size limit)` とする。
 この UTF-16 化は明示 package fetch の URL だけで、package JSON 全体には行わない。
 JDK17/21 の独立 oracle と ASCII fuzz 8万件で、構文受理・scheme・getHost/port・
 userinfo/query/fragment の有無・exact origin が一致した。そのうち fetch の事前検査を通過した
 10,182件はすべて `ureq::http::Uri` も受理した。別途、全長65534 / 65535 / 65536 bytes の
 ASCII URL を独立に測ると、Java と移植 parser はすべて受理し、ureq の `http::Uri` は
 65535 bytes 以上を拒否した（内部上限65534 bytes）。これは取得 backend の追加制約として残す。
-URL の切詰め・書換えや独自 HTTP transport は追加せず、credentials / CA / token の検査後に
-既存の取得失敗診断へ進む。長さ境界の測定は parser の受理比較であり、Java の取得成功を意味しない。
+長い URL の切詰めや独自 HTTP transport は追加せず、credentials / CA / token の検査後に
+既存の取得失敗診断へ進む。レビューでローカル TLS へ実際に送ると、全長65,624 / 100,024 bytes の URL を
+Java は取得に成功し Rust は取得失敗となった。この差は [#977](https://github.com/opaopa6969/unlaxer-parser/issues/977) で追跡する。
 
 | ASCII source の形 | credentials より前の結果 |
 | --- | --- |
@@ -115,7 +124,7 @@ URL の切詰め・書換えや独自 HTTP transport は追加せず、credentia
 | port 0 / 65536以上、非数字・`+`・`;`・整数overflow | 同じ omit 診断。DNS・TLS に進まない |
 | hostname の先頭/末尾 `-`、空 label、数字だけの最終 label、percent authority | registry authority に fallback して `getHost()` が null となり、同じ omit 診断 |
 | IPv6 literal（構文は有効） | Java の既存 ASCII host 文字種制約で omit。IPv6 の取得を新たに許可しない |
-| IPv4、末尾の dot、63/64文字の label | URI と host の検査を通過。URI は DNS label の63文字上限を課さない |
+| IPv4、末尾の dot、63/64文字の label | URI と host の検査を通過。URI は DNS label の63文字上限を課さない。取得時は上記の接続先規則（15文字までの先頭0の IPv4 は10進 literal、それより長い数字 host・末尾 dot・64文字以上の label は接続前に取得失敗） |
 | 空 port、65535、先頭0付きの port、path の `%5B%5D` | URI と port の検査を通過。空 port は既定443、origin の port は数値化して443を省略 |
 
 構文の拒否は host / query 等の拒否より先になる。たとえば不正 hostname と path の `[` を
@@ -125,12 +134,14 @@ request target の percent-encoding は [#960](https://github.com/opaopa6969/unl
 今回の7対照形でも host 別の既存診断と request target bytes を固定する。
 非 scalar URL は従来どおり origin の検査だけに parser を使い、HTTP request を作らず送信しない（#939）。
 
-共通 `spec-corpus/package-https-transport.json` に ASCII49形・Unicode対照7形を追加し、
+共通 `spec-corpus/package-https-transport.json` に ASCII53形・Unicode対照7形を追加し、
 既存 `HttpsPackageConformanceTest#transportDiagnosticsMatchJavaAcrossClis` で実行する。
 各形は直接依存とローカル親 artifact 経由の推移的依存を両 `deps resolve` に与え、
 snapshot 有無の両方で診断・exit・成功時 lock/cache raw bytes・失敗時 snapshot 不変を照合する。
 拒否した URL はローカル TLS server の request / 接続とも0を要求する。
 65535・空 port・任意 hostname の構文受理は不正なダミー token で通信前に止め、固定ポートや外部DNSを利用しない。
+末尾 dot の localhost は正しい token と CA で送り、両方とも接続0の取得失敗になることを確かめる。
+先頭0の IPv4 は 127.0.0.10 にも同じ port の listener（証明書に IP SAN）を置き、受信先・`Host`・request target を照合し、16文字以上の数字 host は接続0の取得失敗を確かめる。
 成功する localhost URL はローカル TLS で認証・request target bytes も照合する。
 3生成 CLI・両 stdio の固定 cache 読取りは既存の共通試験で通信しないことを検証する。
 Java の順次呼出しは既存 `CodegenBatchHost` の1 JVM方式を使い、CIの新クラス・メソッド・shardは増やさない。
@@ -259,7 +270,7 @@ ureq の `limit` は指定量を読み切るとエラーになるため、上限
 5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満を要求し、期限を外すと落ちる。
 待つだけの2形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
 
-共通 `spec-corpus/package-https-transport.json` の transport42形と URL56形を `HttpsPackageConformanceTest` から実行する。
+共通 `spec-corpus/package-https-transport.json` の transport42形と URL60形を `HttpsPackageConformanceTest` から実行する。
 JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を snapshot 有無の両方で照合する。
 待たない形の Java `deps resolve` は、テスト専用の `CodegenBatchHost` が1つの JVM で `CodegenMain.run` を順に呼ぶ
 （JVM 起動を1回にするため。呼出しごとに credentials override を読み直す）。両 JDK で、1呼出し1 JVM の実 CLI と

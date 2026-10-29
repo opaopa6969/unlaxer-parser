@@ -131,7 +131,7 @@ public class HttpsPackageConformanceTest {
             "--output", output.toString()), null, 240);
         assertEquals(result.output(), 0, result.code());
         var report = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
-        assertEquals("all transport fixtures executed", 98, report.getAsJsonArray("cases").size());
+        assertEquals("all transport fixtures executed", 102, report.getAsJsonArray("cases").size());
         int generated = 0;
         for (var entry : report.getAsJsonArray("cases")) {
             // URI cases also resolve the same source through a transitive dependency.
