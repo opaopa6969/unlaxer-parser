@@ -776,18 +776,21 @@
     },
     {
       "id": "package-ascii-url",
-      "category": "unresolved",
+      "category": "contract",
       "title": "ASCII HTTPS URL の構文受理と診断",
-      "hosts": "Java URI.create / Rust ureq::http::Uri（両 deps resolve）",
+      "hosts": "Java URI.create / Rust Java URI parser 移植（両 deps resolve）",
       "issues": [
         962
       ],
-      "observation": "単独サロゲートを含まないASCIIのHTTPS sourceで、pathの[ ]をJavaはinvalid HTTPS artifact URLで拒否しRustは送信して成功する。port 65536以上・;・非数字・+、hostname labelの先頭/末尾-や空label、percent escapeを含むauthorityはJavaがomit診断、Rustは接続失敗またはinvalid URL。#939の非scalar URLはjava_uri.rsでJavaと一致させたが、scalar URLの既存経路は変えず#962で追跡する。#956のtransport文言、#958のcredentials場所、#960の正常Unicode URLとは別。",
+      "observation": "Java製品コードを変えず、ASCII scalar URLをjava_uri.rsの既存UTF-16 parserで構文検査し、scheme/host/userinfo/query/fragment/portを同順で検査してから元URLをureqへ渡す。ASCII49形とUnicode対照7形を直接/推移的依存・snapshot有無の両方で実行し、拒否時request/接続0、成功時raw lock/cache bytes、失敗時snapshot不変を検証する。Unicode scalar経路と#960のhost別期待値、#939の非scalar送信禁止、credentials/CA/token・#956/#958を維持する。全長65535 bytes以上はJava/移植parserが受理してもureq http::Uriの65534 bytes上限で追加拒否される。65534/65535/65536のparser境界実測をdocs/PRへ記録し、backend制限として残す（Javaの取得成功は未測定）。#962はPRのmerge待ち。",
       "evidence": [
         "docs/ubnf-packages.md",
         "rust/unlaxer-generator/src/package_fetch.rs",
         "rust/unlaxer-generator/src/packages/java_uri.rs",
-        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFPackageFetcher.java"
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFPackageFetcher.java",
+        "spec-corpus/package-https-transport.json",
+        "scripts/ubnf_package_transport.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java"
       ]
     },
     {
@@ -2938,6 +2941,17 @@
       "entries": [
         "package-credentials-location",
         "package-credentials-home-fallback"
+      ]
+    },
+    {
+      "path": "spec-corpus/package-https-transport.json",
+      "fields": {
+        "rustError": 7,
+        "rustTargetSuffix": 3
+      },
+      "entries": [
+        "package-ascii-url",
+        "package-unicode-url"
       ]
     }
   ],

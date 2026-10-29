@@ -94,6 +94,47 @@ userinfo、query、fragment と redirect は拒否する。TLS の証明書と h
 リモート artifact の推移的依存に `local:` を指定できない。取得後は同じ ID/版/hash
 検証を行い、生成時は固定 cache を使う。生成/check/Playground が取得や認証を行うことはない。
 
+ASCII の HTTPS source は Java の `URI.create`（JDK17/21）を構文の参照にする（#962）。
+Rust は `packages/java_uri.rs` の UTF-16 parser に `classify_str(&str)` の入口を追加し、
+ASCII URL に限って同じ parser と origin 判定を使う。URL 全体の構文検査後、scheme →
+`getHost()`（null・ASCII DNS/IPv4 文字種）→ userinfo → query → fragment → port の順で検査し、
+受理した元の URL だけを ureq に渡す。Java の製品コード・診断と parser のホットパスは変更しない。
+この UTF-16 化は明示 package fetch の URL だけで、package JSON 全体には行わない。
+JDK17/21 の独立 oracle と ASCII fuzz 8万件で、構文受理・scheme・getHost/port・
+userinfo/query/fragment の有無・exact origin が一致した。そのうち fetch の事前検査を通過した
+10,182件はすべて `ureq::http::Uri` も受理した。別途、全長65534 / 65535 / 65536 bytes の
+ASCII URL を独立に測ると、Java と移植 parser はすべて受理し、ureq の `http::Uri` は
+65535 bytes 以上を拒否した（内部上限65534 bytes）。これは取得 backend の追加制約として残す。
+URL の切詰め・書換えや独自 HTTP transport は追加せず、credentials / CA / token の検査後に
+既存の取得失敗診断へ進む。長さ境界の測定は parser の受理比較であり、Java の取得成功を意味しない。
+
+| ASCII source の形 | credentials より前の結果 |
+| --- | --- |
+| path の `[` / `]`、不正 percent escape、2つ目の `#`、不正 IPv6 | `invalid HTTPS artifact URL` |
+| query / fragment の `[` / `]`、userinfo（空も含む） | 構文は受理し `HTTPS artifact URL must omit credentials, query and fragment` |
+| port 0 / 65536以上、非数字・`+`・`;`・整数overflow | 同じ omit 診断。DNS・TLS に進まない |
+| hostname の先頭/末尾 `-`、空 label、数字だけの最終 label、percent authority | registry authority に fallback して `getHost()` が null となり、同じ omit 診断 |
+| IPv6 literal（構文は有効） | Java の既存 ASCII host 文字種制約で omit。IPv6 の取得を新たに許可しない |
+| IPv4、末尾の dot、63/64文字の label | URI と host の検査を通過。URI は DNS label の63文字上限を課さない |
+| 空 port、65535、先頭0付きの port、path の `%5B%5D` | URI と port の検査を通過。空 port は既定443、origin の port は数値化して443を省略 |
+
+構文の拒否は host / query 等の拒否より先になる。たとえば不正 hostname と path の `[` を
+同時に含む URL は invalid になる。既存の credentials → CA → token と transport の順は維持する。
+Unicode を含む scalar URL は従来の ureq 経路に残す。正常 Unicode の診断・不正 percent と
+request target の percent-encoding は [#960](https://github.com/opaopa6969/unlaxer-parser/issues/960) の対象で、
+今回の7対照形でも host 別の既存診断と request target bytes を固定する。
+非 scalar URL は従来どおり origin の検査だけに parser を使い、HTTP request を作らず送信しない（#939）。
+
+共通 `spec-corpus/package-https-transport.json` に ASCII49形・Unicode対照7形を追加し、
+既存 `HttpsPackageConformanceTest#transportDiagnosticsMatchJavaAcrossClis` で実行する。
+各形は直接依存とローカル親 artifact 経由の推移的依存を両 `deps resolve` に与え、
+snapshot 有無の両方で診断・exit・成功時 lock/cache raw bytes・失敗時 snapshot 不変を照合する。
+拒否した URL はローカル TLS server の request / 接続とも0を要求する。
+65535・空 port・任意 hostname の構文受理は不正なダミー token で通信前に止め、固定ポートや外部DNSを利用しない。
+成功する localhost URL はローカル TLS で認証・request target bytes も照合する。
+3生成 CLI・両 stdio の固定 cache 読取りは既存の共通試験で通信しないことを検証する。
+Java の順次呼出しは既存 `CodegenBatchHost` の1 JVM方式を使い、CIの新クラス・メソッド・shardは増やさない。
+
 HTTPS client と TLS は native target のみに含める。ブラウザー向け WASM での依存取得は
 明示エラーとし、native `deps resolve` で準備した package の明示ロードを利用する。
 
@@ -218,7 +259,7 @@ ureq の `limit` は指定量を読み切るとエラーになるため、上限
 5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満を要求し、期限を外すと落ちる。
 待つだけの2形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
 
-共通 `spec-corpus/package-https-transport.json` の42形を `HttpsPackageConformanceTest` から実行する。
+共通 `spec-corpus/package-https-transport.json` の transport42形と URL56形を `HttpsPackageConformanceTest` から実行する。
 JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を snapshot 有無の両方で照合する。
 待たない形の Java `deps resolve` は、テスト専用の `CodegenBatchHost` が1つの JVM で `CodegenMain.run` を順に呼ぶ
 （JVM 起動を1回にするため。呼出しごとに credentials override を読み直す）。両 JDK で、1呼出し1 JVM の実 CLI と
@@ -562,8 +603,7 @@ Java の Gson / SourceReader / FileSystemPort と受理集合は変更しない�
 UTF-16 units 上にそのまま移植した判定で分類し、credentials の origin（小文字 host、443 以外の port）だけを得る。
 置換した URL や percent escape した URL は作らず、HTTP request も組み立てない。credentials → CA → token の検査後、必ず transport の前で拒否する。
 移植した判定は JDK17/21 の `URI.create` と、単独サロゲートを含む fuzz 8万件・ユニットテスト58形で一致を確認した。
-通常の scalar URL は既存の `ureq::http::Uri` 経路のままで、ASCII だけの URL の構文差（path の `[` `]`、port、hostname label 等）は
-[#962](https://github.com/opaopa6969/unlaxer-parser/issues/962) で追跡する。
+ASCII scalar URL も #962 で同じ parser を使う。Unicode を含む scalar URL の既存経路と #960 の差は維持する。
 未使用 credential の型、CA と token の優先順位、既存の exact origin・TLS・redirect・timeout・上限は維持する。
 #956 の transport 文言差と #958 の credentials 場所選択も変更しない。
 この単位の path 診断は self-hosted Linux / JDK17・21 の境界で検証する。

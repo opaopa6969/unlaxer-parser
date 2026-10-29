@@ -6,7 +6,7 @@ use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use value::{Object, Value};
 
-mod java_uri;
+pub(crate) mod java_uri;
 mod json;
 mod text;
 mod value;

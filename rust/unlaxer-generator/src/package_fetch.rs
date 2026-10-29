@@ -12,32 +12,47 @@ fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
 }
 pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
-    let uri: ureq::http::Uri = source
-        .parse()
-        .map_err(|_| error("invalid HTTPS artifact URL"))?;
-    let host = uri
-        .host()
-        .ok_or_else(|| error("invalid HTTPS artifact URL"))?;
-    if uri.scheme_str() != Some("https")
-        || source.contains(['?', '#'])
-        || uri.authority().is_some_and(|v| v.as_str().contains('@'))
-        || host.is_empty()
-        || !host
-            .bytes()
-            .all(|c| c.is_ascii_alphanumeric() || b".-".contains(&c))
-        || uri.port_u16() == Some(0)
-    {
-        return Err(error(
-            "HTTPS artifact URL must omit credentials, query and fragment",
-        ));
-    }
-    let origin = format!(
-        "https://{}{}",
-        host.to_ascii_lowercase(),
-        uri.port_u16()
-            .filter(|p| *p != 443)
-            .map_or(String::new(), |p| format!(":{p}"))
-    );
+    let origin = if source.is_ascii() {
+        use crate::packages::java_uri::{classify_str, Https};
+        // Match URI.create and the Java fetcher's checks before credentials or I/O.
+        match classify_str(source) {
+            Https::Invalid => return Err(error("invalid HTTPS artifact URL")),
+            Https::Omit => {
+                return Err(error(
+                    "HTTPS artifact URL must omit credentials, query and fragment",
+                ));
+            }
+            Https::Origin(origin) => origin,
+        }
+    } else {
+        // Unicode acceptance and request-target encoding are tracked in #960.
+        let uri: ureq::http::Uri = source
+            .parse()
+            .map_err(|_| error("invalid HTTPS artifact URL"))?;
+        let host = uri
+            .host()
+            .ok_or_else(|| error("invalid HTTPS artifact URL"))?;
+        if uri.scheme_str() != Some("https")
+            || source.contains(['?', '#'])
+            || uri.authority().is_some_and(|v| v.as_str().contains('@'))
+            || host.is_empty()
+            || !host
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b".-".contains(&c))
+            || uri.port_u16() == Some(0)
+        {
+            return Err(error(
+                "HTTPS artifact URL must omit credentials, query and fragment",
+            ));
+        }
+        format!(
+            "https://{}{}",
+            host.to_ascii_lowercase(),
+            uri.port_u16()
+                .filter(|p| *p != 443)
+                .map_or(String::new(), |p| format!(":{p}"))
+        )
+    };
     let (agent, token) = client(&origin)?;
     let mut request = agent.get(source);
     if let Some(token) = token {

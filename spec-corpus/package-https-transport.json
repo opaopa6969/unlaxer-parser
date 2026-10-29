@@ -239,5 +239,380 @@
     "kind": "truncated",
     "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
     "status": 500
+  },
+  {
+    "id": "uri-path-left",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a[x",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-query-left",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?a[x",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-fragment-left",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#a[x",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-path-right",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a]x",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-query-right",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?a]x",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-fragment-right",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#a]x",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-path-escaped",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/%5B%5D",
+    "error": null,
+    "targetSuffix": "/%5B%5D"
+  },
+  {
+    "id": "uri-path-reserved",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/:@;!$&'()*+,=-._~",
+    "error": null,
+    "targetSuffix": "/:@;!$&'()*+,=-._~"
+  },
+  {
+    "id": "uri-plain",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}",
+    "error": null
+  },
+  {
+    "id": "uri-padded-port",
+    "kind": "uri",
+    "url": "https://LOCALHOST:{port:06d}/{id}",
+    "error": null
+  },
+  {
+    "id": "uri-port-0",
+    "kind": "uri",
+    "url": "https://localhost:0/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-65535",
+    "kind": "uri",
+    "url": "https://localhost:65535/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://localhost:65535",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-port-65536",
+    "kind": "uri",
+    "url": "https://localhost:65536/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-70000",
+    "kind": "uri",
+    "url": "https://localhost:70000/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-2147483647",
+    "kind": "uri",
+    "url": "https://localhost:2147483647/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-2147483648",
+    "kind": "uri",
+    "url": "https://localhost:2147483648/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-empty",
+    "kind": "uri",
+    "url": "https://localhost:/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://localhost",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-port-1a",
+    "kind": "uri",
+    "url": "https://localhost:1a/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-plus1",
+    "kind": "uri",
+    "url": "https://localhost:+1/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-1-x",
+    "kind": "uri",
+    "url": "https://localhost:1;x/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-minus1",
+    "kind": "uri",
+    "url": "https://localhost:-1/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-leading-hyphen",
+    "kind": "uri",
+    "url": "https://-a:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-trailing-hyphen",
+    "kind": "uri",
+    "url": "https://a-:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-empty-label",
+    "kind": "uri",
+    "url": "https://localhost..:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-numeric-last",
+    "kind": "uri",
+    "url": "https://a.1:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-underscore",
+    "kind": "uri",
+    "url": "https://a_b:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-trailing-dot",
+    "kind": "uri",
+    "url": "https://localhost.:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://localhost.:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-hyphen",
+    "kind": "uri",
+    "url": "https://a-b:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://a-b:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-digit-first",
+    "kind": "uri",
+    "url": "https://1a.b:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://1a.b:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-label-63",
+    "kind": "uri",
+    "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-label-64",
+    "kind": "uri",
+    "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-ipv4",
+    "kind": "uri",
+    "url": "https://127.0.0.1:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://127.0.0.1:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-ipv4-max",
+    "kind": "uri",
+    "url": "https://255.255.255.255:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://255.255.255.255:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-ipv4-over",
+    "kind": "uri",
+    "url": "https://256.0.0.1:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv4-short",
+    "kind": "uri",
+    "url": "https://127.1:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv6",
+    "kind": "uri",
+    "url": "https://[::1]:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv6-v4",
+    "kind": "uri",
+    "url": "https://[::ffff:127.0.0.1]:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv6-scope",
+    "kind": "uri",
+    "url": "https://[fe80::1%25lo]:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv6-broken",
+    "kind": "uri",
+    "url": "https://[:::1]:{port}/{id}",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-percent-host",
+    "kind": "uri",
+    "url": "https://%6Cocalhost/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-percent-dot",
+    "kind": "uri",
+    "url": "https://local%2ehost/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-percent-bad",
+    "kind": "uri",
+    "url": "https://local%zzhost/{id}",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-percent-short",
+    "kind": "uri",
+    "url": "https://localhost%/{id}",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-percent-user",
+    "kind": "uri",
+    "url": "https://%41@localhost/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-percent-port",
+    "kind": "uri",
+    "url": "https://localhost:%31/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-syntax-before-host",
+    "kind": "uri",
+    "url": "https://-a:{port}/{id}/a[",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-syntax-before-query",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?a%zz",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-syntax-before-fragment",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#a#b",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-userinfo",
+    "kind": "uri",
+    "url": "https://user@localhost:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-unicode-host",
+    "kind": "uri",
+    "url": "https://local\ud83d\ude00host:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "rustError": "invalid HTTPS artifact URL",
+    "unicodeControl": true
+  },
+  {
+    "id": "uri-unicode-user",
+    "kind": "uri",
+    "url": "https://\ud83d\ude00@localhost:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "rustError": "invalid HTTPS artifact URL",
+    "unicodeControl": true
+  },
+  {
+    "id": "uri-unicode-path",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a\ud83d\ude00",
+    "error": null,
+    "rustError": null,
+    "unicodeControl": true,
+    "targetSuffix": "/a%F0%9F%98%80",
+    "rustTargetSuffix": "/a\ud83d\ude00"
+  },
+  {
+    "id": "uri-unicode-bmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a\u00e9",
+    "error": null,
+    "rustError": null,
+    "unicodeControl": true,
+    "targetSuffix": "/a%C3%A9",
+    "rustTargetSuffix": "/a\u00e9"
+  },
+  {
+    "id": "uri-unicode-percent",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a%\ud83d\ude00",
+    "error": "invalid HTTPS artifact URL",
+    "rustError": null,
+    "unicodeControl": true,
+    "rustTargetSuffix": "/a%\ud83d\ude00"
+  },
+  {
+    "id": "uri-unicode-query",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?\ud83d\ude00",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "rustError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicodeControl": true
+  },
+  {
+    "id": "uri-unicode-fragment",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#\ud83d\ude00",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "rustError": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicodeControl": true
   }
 ]
