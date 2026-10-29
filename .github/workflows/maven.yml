@@ -741,10 +741,10 @@ jobs:
 
     - name: Prepare required tests (jdk17-parity)
       run: python3 scripts/verify-optin-tests.py jdk17-parity --prepare
-    - name: Require Unicode-pinned CI parity on the Java 17 JVM
+    - name: Require Unicode-pinned and credentials CI parity on the Java 17 JVM
       run: |
         mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am test \
-          -Dtest=UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,RustUbnfFrontendConformanceTest,CliStderrConformanceTest \
+          -Dtest=UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,RustUbnfFrontendConformanceTest,CliStderrConformanceTest,HttpsPackageConformanceTest#credentialsLocationsMatchJavaHomeAndPaths+credentialsJsonMatchesAcrossClis \
           -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
         test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
         test -s unlaxer-dsl/target/case-insensitive-java.tsv
