@@ -2267,16 +2267,23 @@
     },
     {
       "id": "playground-profile-input-io",
-      "category": "unresolved",
+      "category": "contract",
       "title": "playground --profile の profile ファイル入力 I/O",
       "hosts": "Java CodegenMain / native Rust unlaxer",
       "issues": [
         953
       ],
-      "observation": "profileファイルの欠落・directory・不正UTF-8でJavaはFiles.readStringのIOExceptionを終了4（`missing.tsv` / `Is a directory` / `Input length = 1`）、nativeは文字列エラーとして終了3（`No such file or directory (os error 2)` など）。#932/#934/#937の--grammar入口とlocal importの表の外で、変更前のnativeでも同じ。",
+      "observation": "Java製品コードを維持し、nativeのprofile読取りに既存input::read_string、参照grammarにmodule loaderのFileErrorを使う。欠落・権限・directory・不正UTF-8を終了4へ揃え、profileは指定パス、grammarは絶対・字句正規化パス、Files.readStringのmalformed lengthを保持する。空/BOM/末尾LFなし/空行/NUL/CRLFは終了3の形式エラー。profileが先にmodule解決するためlocal importのI/Oも終了4（directoryはE-MODULE、UTF-8はstrict decoderの長さ）で、--grammarのreadiness終了3やcheck JSONは変更しない。共通71形/LF・CRLFの284観測と正常68ファイルの固定hash/生成後check4回で独立期待値を検証する。LF profileを固定して参照grammarをLF/CRLFにする形とTSV自体のCRLF拒否を分ける。実行ユーザーでchmod(000)をprobeし権限3形の除外理由を残し、CIは除外0/skip0を必須にする。既存String API・公開3.3.0・#197性能凍結を維持し、新規crateは追加しない。対象入力I/Oに未対応差は残さない。",
       "evidence": [
+        "spec-corpus/cli-stderr.json",
+        "scripts/cli_stderr.py",
+        "scripts/cli_input_errors.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
+        "rust/unlaxer-generator/src/input.rs",
         "rust/unlaxer-generator/src/playground.rs",
-        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/codegen/rust/PlaygroundGenerator.java"
+        "rust/unlaxer-generator/src/main.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/codegen/rust/PlaygroundGenerator.java",
+        "docs/ubnf-packages.md"
       ]
     },
     {
@@ -2305,7 +2312,8 @@
       },
       "entries": [
         "cli-stderr-presentation",
-        "cli-output-path-policy"
+        "cli-output-path-policy",
+        "playground-profile-input-io"
       ]
     },
     {

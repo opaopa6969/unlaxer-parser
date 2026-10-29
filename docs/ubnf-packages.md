@@ -938,3 +938,34 @@ chmod(444) の file と chmod(555) の directory は実行ユーザーで別々�
 理由付きで除外する。CI は除外0・skip0を必須とする。
 既存 `CliStderrConformanceTest` に必須メソッドを追加し、cli shard と JDK17 契約の両方で実行する。
 成功 stdout の変更に伴う移行手順は [3.3.0 以降の移行](migration-after-3.3.0.md#native-cli-の出力先パス952)を参照。
+
+
+## Playground profile 入力の I/O エラー（#953）
+
+`playground --profile` は Java `CodegenMain`（JDK17 / JDK21）を参照する。
+profile 自体は `Path.of` 相当で連続・末尾 separator を整理した指定パスで読み、
+参照 grammar は profile の親から解決した絶対・字句正規化パスで読む。
+既存の `input::read_string` と module loader の `FileError` を使い、I/O の分類を CLI まで保持する。
+Java 製品コード、既存の String を返す Rust API、`--grammar` の上記 I/O 表と `check` JSON は変更しない。
+
+| 入力の形 | 終了コード・stderr 最終行 |
+| --- | --- |
+| profile の欠落・権限拒否 | 4、指定された profile パス（絶対化しない） |
+| 参照 grammar の欠落・権限拒否 | 4、絶対・字句正規化した grammar パス |
+| profile / 参照 grammar が directory | 4、`Is a directory` |
+| profile / 参照 grammar の不正 UTF-8 | 4、`Input length = N`（既存の `Files.readString` の長さ規則） |
+| 空 profile・BOM のみ・BOM 付き profile・末尾 LF なし・空行・NUL・CRLF | 3、`invalid language profile` |
+| profile の参照 grammar が local import を読めない | 4、module loader の原因文。欠落・権限は絶対パス、不正 UTF-8 は strict decoder の長さ、directory は `E-MODULE: local import is not a regular file` |
+
+最後の行は profile の検証が readiness より前に module を解決する Java の順序による。
+同じ import が `--grammar` で終了3の readiness 診断になる既存の契約とは入口が異なる。
+上記失敗の stdout は空で、出力先・staging は作らず、入力の mode / bytes も変えない。
+
+共通 `spec-corpus/cli-stderr.json` の `profile` suite は71形、LF/CRLF・両実 CLI の284観測。
+不正 UTF-8 は profile / grammar ごとに24形（1〜4の長さ、末尾途切れ、過長、surrogate、
+上限超過、BOM / 非BMP前置文字を含む）。TSV の LF 制約が grammar の失敗を隠さないよう、
+`fixedFiles` の profile は LF のまま grammar を LF/CRLF にし、profile 自体を CRLF にした形も別途検証する。
+正常な profile は68生成ファイルの全 bytes を固定ハッシュと照合し、生成後の `--check` 4回も検証する。
+権限3形は実行ユーザーで `chmod(000)` の読取り拒否を probe し、効かない環境では理由付きで除外する。
+CI では除外0・skip0を必須とする。新クラスは追加せず、既存 `CliStderrConformanceTest` の
+必須メソッドを cli shard / JDK17 の両契約へ追加する。
