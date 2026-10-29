@@ -96,6 +96,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Java / Rust の grammar・manifest の基準を絶対・字句正規化したパスの親に統一し、deps inspect・package Playground・generate/check・authoring LSP の symlink / `..` による参照先の差を修正した。共通14形を両実 CLI・stdio・file API で検証する (#928)。
 - package JSON の先頭 UTF-8 BOM を Java と同じく1つだけ受理し、Rust の単独サロゲート escape を local source・ID/version/lock 等の既存診断へ接続した。raw hash と Java の受理集合を維持し、共通127件で両 stdio・3 CLI・両 deps resolve を検証する。artifact file/entry/本文と HTTPS source の残差は #939 に分離する (#914, #926)。
 - Rust の package JSON（manifest / lock / artifact）の検査・走査を Java の記述順に揃え、複数不正 member の最初の診断と重複 key の扱いを統一した。package 専用の入力表現で実装し、lock/cache の出力 bytes と workspace の JSON feature は維持する (#942)。
+- HTTPS package の credentials JSON を既存 reader で読み、BOM・不正 JSON・空白・非 object・単独サロゲートの受理と診断を Java（Gson STRICT）に揃えた。CA/token の検査順と秘密値を出さない境界を共通 fixture で検証する (#943)。
 - package JSON の空文書・非 object 最上位・深さの診断を Java（Gson 2.13.2 STRICT）に統一した。Rust は空文書を `expected object: document`、非 object と深さ256以上を `invalid JSON` とし、深さ255までを受理する。明示スタックと共通166件で BOM・snapshot・既存の記述順を検証する (#941)。
 - package JSON の dependency・files/entry・lock の schema 診断を Java に揃えた。未使用の範囲外数値は表記のまま受理し、serde_json の feature 統合によらない数値・object 読取りと共通38件で検証する (#947)。
 - native Rust CLI の入口 grammar / import 先の欠落・ディレクトリ・権限拒否で、終了コードと stderr 最終行を Java に揃えた。generate の import I/O と Playground の入口 I/O は4、check の既存 JSON は維持し、共通26形を実 CLI で照合する。native authoring LSP の local import `E-MODULE` message も Java と一致する (#932, #934)。

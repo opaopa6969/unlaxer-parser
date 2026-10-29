@@ -23,11 +23,14 @@ public class HttpsPackageConformanceTest {
     private static final String TOKEN = "conformance-only-token";
     private record Run(int code, String output) {}
     private Run run(List<String> command, Path credentials) throws Exception {
+        return run(command, credentials, 90);
+    }
+    private Run run(List<String> command, Path credentials, int seconds) throws Exception {
         Path log = temporary.newFile().toPath();
         ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         if (credentials != null) builder.environment().put("UBNF_CREDENTIALS_FILE", credentials.toString());
         Process process = builder.start();
-        if (!process.waitFor(90, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("HTTPS fixture process timed out"); }
+        if (!process.waitFor(seconds, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("HTTPS fixture process timed out"); }
         String output = Files.readString(log);
         assertFalse("credential leaked into process output", output.contains(TOKEN));
         return new Run(process.exitValue(), output);
@@ -48,6 +51,51 @@ public class HttpsPackageConformanceTest {
         Process process = new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(directory.resolve("openssl.log").toFile()).start();
         assertTrue(process.waitFor(30, TimeUnit.SECONDS)); assertEquals(Files.readString(directory.resolve("openssl.log")), 0, process.exitValue());
     }
+
+    @Test public void gsonStrictCredentialsAndHttpHeadersAreTheReference() {
+        var gson = new GsonBuilder().setStrictness(Strictness.STRICT).create();
+        for (String bom : List.of("", "\ufeff")) {
+            assertNull(gson.fromJson(bom + " \r\n\t", JsonElement.class));
+            assertTrue(gson.fromJson(bom + "{}", JsonElement.class).isJsonObject());
+            for (String value : List.of("null", "[]", "1e999", "true", "\"\\ud800\""))
+                assertFalse(gson.fromJson(bom + value, JsonElement.class).isJsonObject());
+            assertThrows(JsonParseException.class, () -> gson.fromJson(bom + "{", JsonElement.class));
+            assertThrows(JsonParseException.class, () -> gson.fromJson(bom + "null true", JsonElement.class));
+        }
+        // Measure java.net.http independently: no send/network and no exception text
+        // (the JDK's exception may contain the rejected header value).
+        for (String value : List.of("\ud800", "\udc00", "\ud800x\udc00", "\ud83d\ude00")) {
+            assertFalse(value.matches("[A-Za-z0-9._~+/=-]+"));
+            assertThrows(IllegalArgumentException.class, () -> java.net.http.HttpRequest
+                .newBuilder(URI.create("https://localhost/")).header("Authorization", "Bearer " + value));
+            assertThrows(IllegalArgumentException.class, () -> java.net.http.HttpRequest
+                .newBuilder(URI.create("https://localhost/")).header("X-" + value, "dummy"));
+        }
+    }
+
+    @Test(timeout=900000) public void credentialsJsonMatchesAcrossClis() throws Exception {
+        if (!Boolean.getBoolean("rustConformance"))
+            System.out.println("[assumption] HTTPS credentials conformance requires -DrustConformance=true");
+        assumeTrue(Boolean.getBoolean("rustConformance"));
+        assertEquals(0, run(List.of("cargo", "build", "--locked", "--manifest-path",
+            repository.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator"), null, 180).code());
+        Path output = Path.of("target/rust-package-credentials.json").toAbsolutePath();
+        Run result = run(List.of("python3", repository.resolve("scripts/ubnf_package_credentials.py").toString(),
+            "--java", Path.of(System.getProperty("java.home"), "bin/java").toString(),
+            "--classpath", System.getProperty("java.class.path"),
+            "--rust", repository.resolve("rust/target/debug/unlaxer").toString(),
+            "--output", output.toString()), null, 720);
+        assertEquals(result.output(), 0, result.code());
+        var report = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
+        var excluded = report.getAsJsonArray("excluded");
+        for (var entry : excluded) System.out.println("[fixture exclusion] " + entry);
+        assertTrue("only chmod(000) may be inapplicable", excluded.size() <= 1);
+        // The self-hosted runner is non-root; CI must not pass by silently dropping the permission case.
+        if (System.getenv("GITHUB_ACTIONS") != null) assertEquals("CI must exercise chmod(000): " + excluded, 0, excluded.size());
+        assertEquals("all credentials fixtures executed", 65 - excluded.size(), report.getAsJsonArray("cases").size());
+        System.out.println("credentials CLI fixtures: " + report.get("seconds").getAsDouble() + " s");
+    }
+
     @Test public void secureExplicitFetchAndPinnedOfflineGenerationMatch() throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] HTTPS package conformance requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
