@@ -518,8 +518,14 @@ fn read_output(path: &Path) -> io::Result<String> {
 // existing absolute parent. Preserve that path spelling in failures (#937).
 fn create_output_directories(path: &Path) -> io::Result<()> {
     fn create(path: &Path) -> io::Result<()> {
+        // createAndCheckIsDirectory: an existing entry must be a directory, not a link to one.
         match fs::create_dir(path) {
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists && path.is_dir() => Ok(()),
+            Err(error)
+                if error.kind() == io::ErrorKind::AlreadyExists
+                    && fs::symlink_metadata(path).is_ok_and(|m| m.is_dir()) =>
+            {
+                Ok(())
+            }
             result => result,
         }
     }
@@ -530,16 +536,28 @@ fn create_output_directories(path: &Path) -> io::Result<()> {
         }
         Err(_) => {}
     }
-    let absolute = std::path::absolute(path)?;
-    let mut parent = absolute.parent();
+    // toAbsolutePath and getParent retain dot components (std::path::absolute and
+    // Path::parent drop them), so file/./out fails at file/. as in Java (#952).
+    let absolute = if path.is_absolute() {
+        path.to_owned()
+    } else {
+        std::env::current_dir()?.join(path)
+    };
+    let mut parent = output_parent(&absolute);
     while let Some(candidate) = parent {
-        match fs::metadata(candidate) {
-            Ok(_) => break,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => parent = candidate.parent(),
-            Err(error) => return Err(path_error(candidate, error)),
+        match fs::metadata(&candidate) {
+            Ok(_) => {
+                parent = Some(candidate);
+                break;
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                parent = output_parent(&candidate)
+            }
+            Err(error) => return Err(path_error(&candidate, error)),
         }
     }
     let parent = parent.ok_or_else(|| invalid("output needs an existing ancestor"))?;
+    let parent = parent.as_path();
     // Java walks parent.relativize(absolute), which folds dot/parent pairs.
     // Keep the original destination for the subsequent open and its error: when
     // out is absent, out/../out2 creates only out2, then opening the file fails.
@@ -555,6 +573,11 @@ fn create_output_directories(path: &Path) -> io::Result<()> {
         }
     }
     let mut directory = parent.to_owned();
+    // An empty relativize result still has one empty name: Java re-checks the parent,
+    // so file/. reports the existing non-directory file rather than a later open.
+    if relative.is_empty() {
+        return create(&directory).map_err(|e| path_error(&directory, e));
+    }
     for component in relative {
         directory.push(component);
         create(&directory).map_err(|e| path_error(&directory, e))?;
@@ -586,14 +609,28 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
     // Preflight every artifact. Unsupported input and handwritten files cause no writes.
     for file in files {
         let destination = output.join(&file.relative_path);
-        reject_symlink_ancestors(&destination)?;
-        for parent in destination.ancestors().skip(1).take_while(|p| *p != output) {
-            if parent.exists() && !parent.is_dir() {
+        // Java validateGeneratedParents: nearest generated parent first, then the file.
+        let mut parent = output_parent(&destination);
+        while let Some(directory) = parent.filter(|p| p.as_os_str() != output.as_os_str()) {
+            if fs::symlink_metadata(&directory).is_ok_and(|m| m.file_type().is_symlink()) {
                 return Err(invalid(format!(
-                    "refusing non-directory {}",
-                    parent.display()
+                    "refusing symbolic link {}",
+                    directory.display()
                 )));
             }
+            if directory.exists() && !directory.is_dir() {
+                return Err(invalid(format!(
+                    "refusing non-directory {}",
+                    directory.display()
+                )));
+            }
+            parent = output_parent(&directory);
+        }
+        if fs::symlink_metadata(&destination).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err(invalid(format!(
+                "refusing symbolic link {}",
+                destination.display()
+            )));
         }
         // Java Files.exists / isRegularFile mask attribute errors (the write reports them);
         // --check reports any missing or non-regular file as differing.
@@ -622,8 +659,9 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
     // destination symlink introduced after preflight. This is not a directory transaction.
     for (i, file) in files.iter().enumerate() {
         let destination = output.join(&file.relative_path);
-        create_output_directories(destination.parent().unwrap())
-            .map_err(|e| cannot_write(&destination, e))?;
+        // Java createDirectories(destination.getParent()) keeps out/. spelled as given.
+        let directory = output_parent(&destination).unwrap();
+        create_output_directories(&directory).map_err(|e| cannot_write(&destination, e))?;
         // Rename alone bypasses a read-only existing artifact. Check the same
         // write access as Java, without truncating it or following a raced link.
         let mut access = OpenOptions::new();
@@ -639,10 +677,7 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
             Err(error) => return Err(cannot_write(&destination, path_error(&destination, error))),
         }
         // A sibling temporary keeps Java's per-file directory permissions and write order.
-        let temporary = destination
-            .parent()
-            .unwrap()
-            .join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
+        let temporary = directory.join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
         let mut handle = OpenOptions::new()
             .write(true)
             .create_new(true)

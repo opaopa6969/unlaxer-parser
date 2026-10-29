@@ -47,7 +47,7 @@ public class CliStderrConformanceTest {
             assertEquals("CI must exercise chmod(555/444): " + excluded, 0, excluded.size());
         int observations = switch (suite) {
             case "output" -> 112;
-            case "paths" -> 224;
+            case "paths" -> 244;
             case "utf8" -> 768;
             case "readiness" -> 384;
             default -> 16;

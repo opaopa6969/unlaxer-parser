@@ -4,7 +4,7 @@
     "utf8": 48,
     "readiness": 48,
     "syntax": 2,
-    "paths": 30
+    "paths": 33
   },
   "cases": [
     {
@@ -7114,6 +7114,134 @@
       "readOnly": [
         "ro"
       ]
+    },
+    {
+      "id": "path-file-dot-child",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "file/./out",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "file": "occupied"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/./out/mod.rs: ${WORK}/file/.: Not a directory"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/file"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/./out/mod.rs: ${WORK}/file/.: Not a directory"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "${WORK}/file"
+          }
+        }
+      },
+      "tree": {
+        "generate": {},
+        "playground": {}
+      }
+    },
+    {
+      "id": "path-file-dot",
+      "scope": "paths",
+      "operations": [
+        "generate",
+        "playground"
+      ],
+      "output": "file/.",
+      "files": {
+        "main.ubnf": "grammar Main {\n @root @mapping(Value) Start ::= 'a';\n}\n",
+        "file": "occupied"
+      },
+      "directories": [],
+      "symlinks": {},
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/./mod.rs: ${WORK}/file"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/file"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "cannot write file/./mod.rs: ${WORK}/file"
+          },
+          "playground": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "output already exists; choose a new directory: ${WORK}/file"
+          }
+        }
+      },
+      "tree": {
+        "generate": {},
+        "playground": {}
+      }
+    },
+    {
+      "id": "path-nested-link-order",
+      "scope": "paths",
+      "operations": [
+        "generate"
+      ],
+      "output": "m",
+      "files": {
+        "main.ubnf": "grammar A { @root @mapping(Value,params=[text]) Root ::= 'a' @text; }\ngrammar B { @root @mapping(Value,params=[text]) Root ::= 'b' @text; }\n"
+      },
+      "directories": [
+        "m",
+        "real"
+      ],
+      "symlinks": {
+        "m/grammar_a": "../real",
+        "real/mod.rs": "missing"
+      },
+      "expected": {
+        "LF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link m/grammar_a"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 4,
+            "stdout": "",
+            "lastError": "refusing symbolic link m/grammar_a"
+          }
+        }
+      },
+      "tree": {
+        "generate": {}
+      }
     }
   ],
   "trees": {
