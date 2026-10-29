@@ -266,7 +266,7 @@ def _check_cli(directory, commands, evidence, cases, connection):
                     requests = received[requests_before:]
                     assert len(requests) == case['requests'], (case['id'], host, 'HTTP request count', requests)
                     if 'requestPath' in case:
-                        assert requests[0]['path'] == case['requestPath'][host], (case['id'], host, requests)
+                        assert requests[0]['path'] == case['requestPath'], (case['id'], host, requests)
                 after = snapshot(folder)
                 # Keep multi-MiB generated fixtures out of the evidence JSON; assertions
                 # below still compare every raw byte, including failed snapshots.
@@ -292,13 +292,26 @@ def _check_cli(directory, commands, evidence, cases, connection):
 
 
 def run_lsp(clients, directory):
+    # Fixed cache loads must not even open a TCP/TLS connection, including the
+    # Unicode URL controls. Reuse the transport listener's private connection count.
+    from ubnf_package_transport import transport_server
+    tls = directory / 'tls'
+    tls.mkdir()
+    artifact = (ROOT / 'unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json').read_bytes()
+    with transport_server(tls, artifact) as (port, _, _, _, _, connections):
+        result = _run_lsp(clients, directory, 'https://localhost:' + str(port), connections)
+    assert not connections, 'fixed cache stdio connected'
+    return result
+
+
+def _run_lsp(clients, directory, origin, connections):
     from importlib import import_module
     position = import_module('check-ubnf-authoring-lsp').position
     evidence = []
     for case in fixtures():
         print('package JSON stdio:', case['id'], flush=True)
         folder = directory / case['id']
-        grammar, source, declaration, _, _ = setup(folder, case)
+        grammar, source, declaration, _, _ = setup(folder, case, origin)
         before = snapshot(folder)
         if 'navigation' in case:
             reference = 'layout.' + case['navigation']['token']
@@ -327,7 +340,8 @@ def run_lsp(clients, directory):
                 assert client.result('ubnf/packageSource', {'uri': navigation['uri']}) is None
             assert client.result('textDocument/hover', params) is None
             assert snapshot(folder) == before
-            record['servers'].append({'host': host, 'diagnostics': actual, 'followup': 'completion + hover after close', 'navigation': navigation})
+            assert not connections, (case['id'], host, 'fixed cache stdio connected')
+            record['servers'].append({'host': host, 'diagnostics': actual, 'followup': 'completion + hover after close', 'navigation': navigation, 'connections': 0})
         evidence.append(record)
     return evidence
 

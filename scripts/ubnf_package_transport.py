@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
 import socket
 import socketserver
 import subprocess
@@ -18,8 +19,9 @@ from ubnf_package_credentials import ROOT, local_tls_context, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
 LIMIT = 8 * 1024 * 1024
-COUNT = 102
-URI_COUNT = 60
+COUNT = 174
+URI_COUNT = 132
+UNICODE_COUNT = 79
 TOKEN = 'transport-fixture-only-token'
 BODY = b'transport-fixture-private-response'
 HEADER = 'transport-fixture-private-header'
@@ -37,10 +39,14 @@ def fixtures():
     cases = json.loads((ROOT / 'spec-corpus/package-https-transport.json').read_text())
     assert len(cases) == len({c['id'] for c in cases}) == COUNT, 'transport fixture missing'
     uri = [c for c in cases if c['kind'] == 'uri']
-    assert len(uri) == URI_COUNT and sum(c.get('unicodeControl', False) for c in uri) == 7
+    assert len(uri) == URI_COUNT and sum(c.get('unicode960', False) for c in uri) == UNICODE_COUNT
+    # Only the separately tracked NFC -> backtick backend boundary has host errors.
+    assert {c['id'] for c in uri if 'rustError' in c} == {'uri-unicode-grave', 'uri-unicode-grave-mixed'}
+    assert all(c.get('backendIssue') == 979 for c in uri if 'rustError' in c)
+    assert not any('rustTargetSuffix' in c for c in uri), 'no raw Unicode targets'
     # Generation never fetches: the boundary is checked on a success and a redirect shape.
     generated = [c for c in cases if c.get('generate')]
-    assert len(generated) == 2 and {c['error'] is None for c in generated} == {True, False}
+    assert len(generated) == 4 and {c['error'] is None for c in generated} == {True, False}
     assert {c['kind'] for c in cases} >= set(SLOW), 'deadline fixtures missing'
     return cases
 
@@ -263,27 +269,31 @@ def prepare(folder, case, ports, ca, transitive=False):
     source = case.get('url', origin + '/' + case['id']).format(port=port, id=case['id'])
     dependency = {'version': '1.0.0', 'source': source}
     if transitive:
-        parent = parent_bytes(source)
+        parent = parent_bytes(source, case.get('rawUnicode', False))
         (folder / 'parent.json').write_bytes(parent)
         dependencies = {'test/parent': {'version': '1.0.0', 'source': 'local:parent.json'}}
     else:
         dependencies = {'std/layout': dependency}
-    manifest.write_bytes(encode({'schemaVersion': 1, 'dependencies': dependencies}))
+    manifest.write_bytes(json.dumps({'schemaVersion': 1, 'dependencies': dependencies},
+                                   ensure_ascii=not case.get('rawUnicode', False),
+                                   separators=(',', ':')).encode())
     return manifest, credentials
 
 
-def parent_bytes(source):
-    return encode({'schemaVersion': 1, 'id': 'test/parent', 'version': '1.0.0',
+def parent_bytes(source, raw_unicode=False):
+    return json.dumps({'schemaVersion': 1, 'id': 'test/parent', 'version': '1.0.0',
                    'entry': 'parent.ubnf', 'files': {'parent.ubnf': "grammar Parent { @root Start ::= 'a'; }"},
-                   'dependencies': {'std/layout': {'version': '1.0.0', 'source': source}}})
+                   'dependencies': {'std/layout': {'version': '1.0.0', 'source': source}}},
+                      ensure_ascii=not raw_unicode, separators=(',', ':')).encode()
 
 
-def expected_receipt(case, host='java', port=None):
+def expected_receipt(case, host='java', port=None, java17=False):
     if case['kind'] == 'uri':
-        error = case.get('rustError', case['error']) if host == 'rust' else case['error']
-        if error:
+        if (case.get('rustError', case['error']) if host == 'rust' else case['error']):
             return None
-        suffix = case.get('rustTargetSuffix', case.get('targetSuffix', '')) if host == 'rust' else case.get('targetSuffix', '')
+        suffix = case.get('targetSuffix', '')
+        if host == 'java' and java17:
+            suffix = case.get('javaJdk17TargetSuffix', suffix)
         wanted = {'case': case['id'], 'authorization': 'bearer',
                   'targetHex': ('/' + case['id'] + suffix).encode().hex()}
         if 'hostHeader' in case:  # Java sends getHost() as written, plus a non-default port.
@@ -306,6 +316,8 @@ def check(directory, args, records):
     host_env = dict(isolated_env(library, home, home), UBNF_CREDENTIALS_FILE=str(home / 'credentials.json'))
     java = [args.java, '--enable-preview', '-Djava.io.tmpdir=' + str(directory),
             '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']
+    version = subprocess.check_output([args.java, '--version'], timeout=10).decode('ascii')
+    java17 = re.search(r'\b17\.', version) is not None
 
     def resolved(case, existing, transitive, folder):
         if transitive:
@@ -364,6 +376,8 @@ def check(directory, args, records):
             for transitive in ([False, True] if case['kind'] == 'uri' else [False]):
                 folder = directory / case['id'] / str(transitive)
                 manifest, credentials = prepare(folder, case, ports, ca, transitive)
+                raw_manifest = manifest.read_bytes()
+                raw_parent = (folder / 'parent.json').read_bytes() if transitive else None
                 env = dict(isolated_env(library, folder, folder), UBNF_CREDENTIALS_FILE=str(folder / 'credentials.json'))
                 for existing in [False, True]:
                     for host in hosts:
@@ -377,8 +391,11 @@ def check(directory, args, records):
                         else:
                             actual, elapsed = invoke([args.rust], options, dict(env, PATH='', JAVA_HOME='/nonexistent-java'))
                         run = verify(case, host, existing, folder, actual, elapsed, transitive)
+                        assert manifest.read_bytes() == raw_manifest, 'resolve rewrote raw source URL'
+                        if transitive:
+                            assert (folder / 'parent.json').read_bytes() == raw_parent, 'resolve rewrote parent source'
                         receipts = [r for r in received[before:] if r.get('case') not in slow_ids]
-                        wanted = expected_receipt(case, host, port)
+                        wanted = expected_receipt(case, host, port, java17)
                         if wanted is None:
                             assert not receipts, (case['id'], host, 'request passed TLS boundary')
                             if case['kind'] == 'uri':
@@ -387,7 +404,9 @@ def check(directory, args, records):
                             assert receipts and all(r == wanted for r in receipts), \
                                 (case['id'], host, 'request/auth/redirect/target differs')
                         wire = {'connections': len(connections) - connected,
-                                'targets': [r['targetHex'] for r in receipts]} if case['kind'] == 'uri' else {}
+                                'targets': [r['targetHex'] for r in receipts],
+                                'sourceDocumentSha256': digest(raw_manifest),
+                                'hostChecked': bool(receipts and 'hostHeader' in case)} if case['kind'] == 'uri' else {}
                         record_of[case['id']]['runs'].append(dict(run, requests=len(receipts), **wire))
         for case, future in waiting:
             print('HTTPS transport (deadline):', case['id'], flush=True)

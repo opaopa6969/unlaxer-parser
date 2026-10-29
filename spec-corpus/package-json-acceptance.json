@@ -7459,9 +7459,6 @@
     "tls": true,
     "requests": 0,
     "generate": false,
-    "gap": true,
-    "gapIssue": 960,
-    "rustResolveError": "invalid HTTPS artifact URL",
     "surrogate939": true
   },
   {
@@ -7483,10 +7480,7 @@
     "tls": true,
     "requests": 1,
     "generate": false,
-    "requestPath": {
-      "java": "/a%F0%9F%98%80",
-      "rust": "/a\u00f0\u009f\u0098\u0080"
-    },
+    "requestPath": "/a%F0%9F%98%80",
     "surrogate939": true
   },
   {
@@ -7550,9 +7544,6 @@
     "tls": true,
     "requests": 0,
     "generate": false,
-    "gap": true,
-    "gapIssue": 960,
-    "rustResolveError": "invalid HTTPS artifact URL",
     "surrogate939": true
   },
   {
@@ -7847,9 +7838,6 @@
     "tls": true,
     "requests": 0,
     "generate": false,
-    "gap": true,
-    "gapIssue": 960,
-    "rustResolveError": "invalid HTTPS artifact URL",
     "surrogate939": true
   },
   {
@@ -7871,10 +7859,7 @@
     "tls": true,
     "requests": 1,
     "generate": false,
-    "requestPath": {
-      "java": "/a%F0%9F%98%80",
-      "rust": "/a\u00f0\u009f\u0098\u0080"
-    },
+    "requestPath": "/a%F0%9F%98%80",
     "surrogate939": true
   },
   {
@@ -7938,9 +7923,6 @@
     "tls": true,
     "requests": 0,
     "generate": false,
-    "gap": true,
-    "gapIssue": 960,
-    "rustResolveError": "invalid HTTPS artifact URL",
     "surrogate939": true
   },
   {

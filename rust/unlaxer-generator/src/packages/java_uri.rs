@@ -1,8 +1,35 @@
 //! `java.net.URI.create` (JDK 17/21 RFC 2396 parser) over UTF-16 units, for HTTPS
 //! sources, including those that a Rust string cannot hold. It only classifies the
 //! URL as `UBNFPackageFetcher.fetch` does before credentials; it never builds a request.
-//! ASCII scalar URLs share this classifier; Unicode scalar URLs retain their
-//! existing transport path until #960.
+//! All scalar URLs share this classifier. Only accepted scalar URLs can be encoded
+//! for transport; the non-scalar entry point still never builds a request.
+
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "java_uri/nfc.rs"]
+mod nfc;
+
+/// `URI.toASCIIString` / HttpClient `Utils.encode`: NFC, then escape non-ASCII
+/// UTF-8 bytes with uppercase hex. Existing ASCII (including `%xx`) stays verbatim.
+/// Call only after classification; no URI syntax is repaired by this encoder.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn ascii_url(source: &str) -> std::borrow::Cow<'_, str> {
+    if source.is_ascii() {
+        return std::borrow::Cow::Borrowed(source);
+    }
+    let normalized = nfc::normalize(source);
+    let mut encoded = String::with_capacity(normalized.len());
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    for b in normalized.bytes() {
+        if b.is_ascii() {
+            encoded.push(char::from(b));
+        } else {
+            encoded.push('%');
+            encoded.push(char::from(HEX[(b >> 4) as usize]));
+            encoded.push(char::from(HEX[(b & 15) as usize]));
+        }
+    }
+    std::borrow::Cow::Owned(encoded)
+}
 
 const L_DIGIT: u64 = 0x3FF000000000000;
 const H_ALPHA: u64 = 0x7FFFFFE | 0x7FFFFFE00000000;
