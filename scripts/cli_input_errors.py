@@ -66,13 +66,13 @@ def setup(work, case, separator):
         (work / case['denied']).chmod(0)
 
 
-def run(command, options, work, native):
+def run(command, options, work, native, **popen):
     env = dict(os.environ)
     # Non-ASCII paths must not depend on the runner locale (Java's sun.jnu/stderr encodings).
     env.update(LC_ALL='C.UTF-8')
     if native:
         env.update(PATH='', JAVA_HOME='/nonexistent-java')
-    result = subprocess.run(command + options, cwd=work, env=env, capture_output=True, timeout=30)
+    result = subprocess.run(command + options, cwd=work, env=env, capture_output=True, timeout=30, **popen)
     stderr = result.stderr.decode('utf-8')
     return {'exit': result.returncode, 'stdout': result.stdout.decode('utf-8'), 'stderr': stderr,
             'lastError': (stderr.splitlines() or [''])[-1]}
