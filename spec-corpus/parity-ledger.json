@@ -2328,16 +2328,20 @@
     },
     {
       "id": "playground-option-blank-values",
-      "category": "unresolved",
+      "category": "contract",
       "title": "playground の空白だけの option 値",
       "hosts": "Java CodegenMain / native Rust unlaxer",
       "issues": [
         974
       ],
-      "observation": "JavaのPlaygroundCommandはoption値をisBlank（Character.isWhitespaceのcode pointだけ）なら終了2のusageにする。nativeのrun_playgroundは空文字列だけを拒否し、--profile ' 'や--grammar ' 'は空白1文字のパスとして読んで終了4、--output ' 'は引数検査を通過する。空文字列の値は両方終了2だが、usage文の先頭はJavaがUsage: playground、nativeがUsage: unlaxer playground。#953の入力I/Oの表の外で、PR #973の前のnativeでも同じ。",
+      "observation": "#974でnativeのrun_playgroundの既存検査位置だけをString.isBlank相当へ変更する。JDK17/21のCharacter.isWhitespaceを全code pointで実測し、同じ25文字であることを確認。空文字と混合空白を含め5 optionを終了2・空stdout・無出力に揃える。U+001C〜U+001F・U+2028・U+2029は拒否し、NBSP/U+2007/U+202F/NEL/U+180E/U+200B/BOMと空白で囲んだ文字列は引数検査を通す（trimしない）。共通175形を両実CLIの350観測でexit・stdout・stderr最終行と全ツリー不変へ照合する。blank suiteは既存CodegenBatchHostでJavaの起動を175回から1回にし、各呼出し前後に空ツリーを検査する。既存I/O表・check JSON・正常生成物を維持する。意図した差: usageはJavaのUsage: playgroundに対しnativeのUsage: unlaxer playgroundを維持する。既存nativeのgenerate/check/impactと同じ実行ファイル付きの案内で、引数検証と別の表示契約として両全文をfixtureに固定する。generate/check/deps/profile/impactはJava自身がisBlankを使わないため空白を拒否せず、実CLIで確認してその契約を維持する。Java製品コード・公開3.3.0・#197性能凍結を変更せず新規crateなし。",
       "evidence": [
         "rust/unlaxer-generator/src/main.rs",
-        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/PlaygroundCommand.java"
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/PlaygroundCommand.java",
+        "spec-corpus/cli-stderr.json",
+        "scripts/cli_stderr.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
+        "docs/ubnf-packages.md"
       ]
     },
     {
@@ -2359,15 +2363,16 @@
     {
       "path": "spec-corpus/cli-stderr.json",
       "fields": {
-        "java": 6,
+        "java": 7,
         "nativeExpected": 3,
         "nativeSyntax": 5,
-        "rust": 6
+        "rust": 7
       },
       "entries": [
         "cli-stderr-presentation",
         "cli-output-path-policy",
-        "playground-profile-input-io"
+        "playground-profile-input-io",
+        "playground-option-blank-values"
       ]
     },
     {

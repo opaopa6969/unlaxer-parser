@@ -5,7 +5,8 @@
     "readiness": 48,
     "syntax": 2,
     "paths": 33,
-    "profile": 74
+    "profile": 74,
+    "blank": 175
   },
   "cases": [
     {
@@ -10259,5 +10260,269 @@
         ]
       }
     }
+  },
+  "blankOptions": {
+    "usage": {
+      "java": "Usage: playground (--grammar <file.ubnf> | --profile <profile.tsv> | --package <id> --manifest <ubnf.json>) --output <new-directory> [--check]",
+      "rust": "Usage: unlaxer playground (--grammar <file.ubnf> | --profile <profile.tsv> | --package <id> --manifest <ubnf.json>) --output <new-directory> [--check]"
+    },
+    "values": [
+      {
+        "id": "empty",
+        "value": "",
+        "blank": true
+      },
+      {
+        "id": "u0009",
+        "value": "\t",
+        "blank": true
+      },
+      {
+        "id": "u000a",
+        "value": "\n",
+        "blank": true
+      },
+      {
+        "id": "u000b",
+        "value": "\u000b",
+        "blank": true
+      },
+      {
+        "id": "u000c",
+        "value": "\f",
+        "blank": true
+      },
+      {
+        "id": "u000d",
+        "value": "\r",
+        "blank": true
+      },
+      {
+        "id": "u001c",
+        "value": "\u001c",
+        "blank": true
+      },
+      {
+        "id": "u001d",
+        "value": "\u001d",
+        "blank": true
+      },
+      {
+        "id": "u001e",
+        "value": "\u001e",
+        "blank": true
+      },
+      {
+        "id": "u001f",
+        "value": "\u001f",
+        "blank": true
+      },
+      {
+        "id": "u0020",
+        "value": " ",
+        "blank": true
+      },
+      {
+        "id": "u1680",
+        "value": "\u1680",
+        "blank": true
+      },
+      {
+        "id": "u2000",
+        "value": "\u2000",
+        "blank": true
+      },
+      {
+        "id": "u2001",
+        "value": "\u2001",
+        "blank": true
+      },
+      {
+        "id": "u2002",
+        "value": "\u2002",
+        "blank": true
+      },
+      {
+        "id": "u2003",
+        "value": "\u2003",
+        "blank": true
+      },
+      {
+        "id": "u2004",
+        "value": "\u2004",
+        "blank": true
+      },
+      {
+        "id": "u2005",
+        "value": "\u2005",
+        "blank": true
+      },
+      {
+        "id": "u2006",
+        "value": "\u2006",
+        "blank": true
+      },
+      {
+        "id": "u2008",
+        "value": "\u2008",
+        "blank": true
+      },
+      {
+        "id": "u2009",
+        "value": "\u2009",
+        "blank": true
+      },
+      {
+        "id": "u200a",
+        "value": "\u200a",
+        "blank": true
+      },
+      {
+        "id": "u2028",
+        "value": "\u2028",
+        "blank": true
+      },
+      {
+        "id": "u2029",
+        "value": "\u2029",
+        "blank": true
+      },
+      {
+        "id": "u205f",
+        "value": "\u205f",
+        "blank": true
+      },
+      {
+        "id": "u3000",
+        "value": "\u3000",
+        "blank": true
+      },
+      {
+        "id": "mixed",
+        "value": " \t\u001c\u2028\u3000",
+        "blank": true
+      },
+      {
+        "id": "u0085",
+        "value": "\u0085",
+        "blank": false
+      },
+      {
+        "id": "u00a0",
+        "value": "\u00a0",
+        "blank": false
+      },
+      {
+        "id": "u2007",
+        "value": "\u2007",
+        "blank": false
+      },
+      {
+        "id": "u202f",
+        "value": "\u202f",
+        "blank": false
+      },
+      {
+        "id": "u180e",
+        "value": "\u180e",
+        "blank": false
+      },
+      {
+        "id": "u200b",
+        "value": "\u200b",
+        "blank": false
+      },
+      {
+        "id": "ufeff",
+        "value": "\ufeff",
+        "blank": false
+      },
+      {
+        "id": "padded-text",
+        "value": " x ",
+        "blank": false
+      }
+    ],
+    "options": [
+      {
+        "option": "grammar",
+        "args": [
+          "playground",
+          "--grammar",
+          "${VALUE}",
+          "--output",
+          "out"
+        ],
+        "nonblank": {
+          "exit": 4,
+          "stdout": "",
+          "lastError": "${WORK}/${VALUE}"
+        }
+      },
+      {
+        "option": "profile",
+        "args": [
+          "playground",
+          "--profile",
+          "${VALUE}",
+          "--output",
+          "out"
+        ],
+        "nonblank": {
+          "exit": 4,
+          "stdout": "",
+          "lastError": "${VALUE}"
+        }
+      },
+      {
+        "option": "package",
+        "args": [
+          "playground",
+          "--package",
+          "${VALUE}",
+          "--manifest",
+          "missing.json",
+          "--output",
+          "out"
+        ],
+        "nonblank": {
+          "exit": 3,
+          "stdout": "",
+          "lastError": "expected ubnf.json manifest"
+        }
+      },
+      {
+        "option": "manifest",
+        "args": [
+          "playground",
+          "--package",
+          "demo",
+          "--manifest",
+          "${VALUE}",
+          "--output",
+          "out"
+        ],
+        "nonblank": {
+          "exit": 3,
+          "stdout": "",
+          "lastError": "expected ubnf.json manifest"
+        }
+      },
+      {
+        "option": "output",
+        "args": [
+          "playground",
+          "--grammar",
+          "missing.ubnf",
+          "--output",
+          "${VALUE}"
+        ],
+        "nonblank": {
+          "exit": 4,
+          "stdout": "",
+          "lastError": "${WORK}/missing.ubnf"
+        }
+      }
+    ]
   }
 }
