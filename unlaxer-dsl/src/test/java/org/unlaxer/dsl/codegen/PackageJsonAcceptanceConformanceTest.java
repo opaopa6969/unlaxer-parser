@@ -47,6 +47,26 @@ public class PackageJsonAcceptanceConformanceTest {
         assertEquals(3, value.get("b\ud800").getAsInt());
     }
 
+    @Test public void gsonStrictNumericTokensAreTheReference() {
+        var gson = new com.google.gson.GsonBuilder().setStrictness(com.google.gson.Strictness.STRICT).create();
+        for (String token : List.of("1", "1.0", "1e0", "1E+0", "-0", "1e999", "-1e999", "1e-999",
+                "123456789012345678901234567890", "9".repeat(1023))) {
+            var value = gson.fromJson("{\"schemaVersion\":" + token + "}", com.google.gson.JsonObject.class);
+            assertTrue(value.get("schemaVersion").getAsJsonPrimitive().isNumber());
+            assertEquals(token, value.get("schemaVersion").toString());
+            // UBNFPackageResolver.versioned compares the JSON spelling, not numeric equality.
+            assertEquals(token.equals("1"), value.get("schemaVersion").toString().equals("1"));
+        }
+        for (String token : List.of("9".repeat(1024), "1e" + "9".repeat(1022), "01", "1e+", "NaN", "Infinity"))
+            assertThrows(com.google.gson.JsonSyntaxException.class,
+                () -> gson.fromJson("{\"meta\":" + token + "}", com.google.gson.JsonObject.class));
+        for (String member : List.of("\"1.5\"", "null", "[]")) {
+            var value = gson.fromJson("{\"$serde_json::private::Number\":" + member + "}", com.google.gson.JsonObject.class);
+            assertTrue(value.has("$serde_json::private::Number"));
+            assertEquals(1, value.size());
+        }
+    }
+
     @Test(timeout=1200000) public void packageJsonAcceptanceMatchesAcrossClis() throws Exception {
         if (!Boolean.getBoolean("rustConformance"))
             System.out.println("[assumption] package JSON conformance requires -DrustConformance=true");
@@ -60,7 +80,7 @@ public class PackageJsonAcceptanceConformanceTest {
             "--classpath", System.getProperty("java.class.path"),
             "--rust", root.resolve("rust/target/debug/unlaxer").toString(),
             "--output", output.toString()), Path.of("target/package-json-cli.log"), 1000);
-        assertEquals("all raw JSON cases executed", 362,
+        assertEquals("all raw JSON cases executed", 400,
             JsonParser.parseString(Files.readString(output)).getAsJsonArray().size());
     }
 

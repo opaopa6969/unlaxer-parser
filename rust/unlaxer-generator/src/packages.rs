@@ -143,7 +143,7 @@ fn string<'a>(value: &'a Value, name: &str) -> Result<&'a str, String> {
         .ok_or_else(|| error(format!("expected string: {name}")))
 }
 fn versioned(value: &Value) -> Result<(), String> {
-    if value["schemaVersion"] != Value::Number(1.into()) {
+    if !matches!(&value["schemaVersion"], Value::Number(number) if number.as_str() == "1") {
         return Err(error("unsupported schemaVersion"));
     }
     Ok(())
@@ -180,10 +180,14 @@ fn version(value: &str) -> Result<(), String> {
     Ok(())
 }
 fn file(value: &str) -> Result<(), String> {
-    if value.chars().any(char::is_control)
+    if value.is_empty()
+        || value.chars().any(char::is_control)
         || value.contains(['\\', ':'])
-        || value.split('/').any(|v| matches!(v, "" | "." | ".."))
+        || value.starts_with('/')
     {
+        return Err(error("invalid package file path"));
+    }
+    if value.split('/').any(|v| matches!(v, "" | "." | "..")) {
         return Err(error("package file path escapes boundary"));
     }
     Ok(())
@@ -202,6 +206,7 @@ fn parse_document(bytes: &[u8], artifact: bool) -> Result<Value, String> {
 fn dependencies(value: &Value) -> Result<(), String> {
     for (name, dependency) in object(value, "dependencies")? {
         id(name)?;
+        object(dependency, "dependency")?;
         version(string(dependency, "version")?)?;
         string(dependency, "source")?;
     }
@@ -245,6 +250,15 @@ fn references(value: &Value) -> Result<Value, String> {
         ));
     }
     Ok(Value::Object(Object::from_entries(result)))
+}
+// Only validated string references cross into the output JSON tree. Input
+// numbers/metadata are never re-encoded; cached artifacts retain their raw bytes.
+fn output_references(value: &Value) -> Result<OutputValue, String> {
+    let mut result = Map::new();
+    for (name, dependency) in object(value, "dependencies")? {
+        result.insert(name.clone(), string(dependency, "version")?.into());
+    }
+    Ok(OutputValue::Object(result))
 }
 fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
@@ -313,7 +327,7 @@ pub fn resolve(manifest: &Path) -> Result<OutputValue, String> {
     if packages.len() > 128 || blobs.values().map(Vec::len).sum::<usize>() > MAX_LOCAL_BYTES {
         return Err(error("package graph exceeds cache limits"));
     }
-    let lock = json!({"schemaVersion":1,"roots":references(roots)?,"packages":packages});
+    let lock = json!({"schemaVersion":1,"roots":output_references(roots)?,"packages":packages});
     let cache = directory.join(".ubnf-cache/packages");
     std::fs::create_dir_all(&cache).map_err(|_| error("cannot create package cache"))?;
     for (sha, bytes) in blobs {
@@ -417,7 +431,7 @@ fn resolve_one(
         return Err(error(format!("package name/version mismatch: {name}")));
     }
     let sha = hash(&bytes);
-    let pinned = json!({"id":name,"version":string(&value,"version")?,"sha256":sha,"dependencies":references(&value["dependencies"])?});
+    let pinned = json!({"id":name,"version":string(&value,"version")?,"sha256":sha,"dependencies":output_references(&value["dependencies"])?});
     if let Some(previous) = packages.get(name) {
         if previous != &pinned {
             return Err(error(format!("conflicting package identity: {name}")));
@@ -451,6 +465,7 @@ fn audit(lock: &Value) -> Result<(), String> {
     }
     for (name, pinned) in packages {
         id(name)?;
+        object(pinned, "locked package")?;
         if name != string(pinned, "id")? {
             return Err(error("locked package ID mismatch"));
         }
@@ -470,13 +485,15 @@ fn audit(lock: &Value) -> Result<(), String> {
                     .as_str()
                     .ok_or_else(|| error("invalid locked dependency version"))?,
             )?;
-            if packages.get(name).and_then(|p| p.get("version")) != Some(required) {
+            object(&packages[name], "locked dependency")?;
+            if Some(string(&packages[name], "version")?) != required.as_str() {
                 return Err(error("locked transitive version mismatch"));
             }
         }
     }
     for (name, required) in object(&lock["roots"], "roots")? {
-        if packages.get(name).and_then(|p| p.get("version")) != Some(required) {
+        object(&packages[name], "locked root")?;
+        if Some(string(&packages[name], "version")?) != required.as_str() {
             return Err(error("locked root version mismatch"));
         }
     }
@@ -563,6 +580,7 @@ impl Resolver {
             dependencies(&configuration["dependencies"])?;
             let lock = parse(&bytes)?;
             versioned(&lock)?;
+            object(&lock["roots"], "roots")?;
             if lock["roots"] != references(&configuration["dependencies"])? {
                 return Err(error(
                     "stale lock; run unlaxer deps resolve --manifest ubnf.json",
