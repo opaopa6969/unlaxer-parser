@@ -14,6 +14,8 @@ import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_PARAMS = object()
+OMIT_PARAMS = object()
 
 
 class Client:
@@ -96,15 +98,17 @@ class Client:
         except Exception as error:
             self.messages.put(error)
 
-    def send(self, method, params=None, request=False):
+    def send(self, method, params=DEFAULT_PARAMS, request=False):
         previous = self.last_request
         self.last_request = f'{method} (previous: {previous.split(" (previous:")[0]})'
         if self.process.poll() is not None:
             raise self.failure('unexpected process exit before send')
-        message = {'jsonrpc': '2.0', 'method': method, 'params': params or {}}
+        message = {'jsonrpc': '2.0', 'method': method}
         if request:
             self.serial += 1
             message['id'] = self.serial
+        if params is not OMIT_PARAMS:
+            message['params'] = {} if params is DEFAULT_PARAMS else params
         data = json.dumps(message, ensure_ascii=False).encode()
         try:
             self.process.stdin.write(f'Content-Length: {len(data)}\r\n\r\n'.encode() + data)
@@ -135,17 +139,27 @@ class Client:
                 return item
             self.pending.append(item)
 
-    def request(self, method, params=None):
+    def request(self, method, params=DEFAULT_PARAMS):
         serial = self.send(method, params, True)
         return self.receive(lambda message: message.get('id') == serial)
 
-    def result(self, method, params=None):
+    def result(self, method, params=DEFAULT_PARAMS):
         response = self.request(method, params)
         assert 'result' in response, response
         return response['result']
 
+    def diagnostics_params(self, uri):
+        message = self.receive(lambda m: m.get('method') == 'textDocument/publishDiagnostics' and m['params']['uri'] == uri)
+        params = message['params']
+        assert message == {'jsonrpc': '2.0', 'method': 'textDocument/publishDiagnostics', 'params': params}, message
+        return params
+
     def diagnostics(self, uri):
-        return self.receive(lambda m: m.get('method') == 'textDocument/publishDiagnostics' and m['params']['uri'] == uri)['params']['diagnostics']
+        params = self.diagnostics_params(uri)
+        # Check every params field, including version and unexpected keys, even
+        # in older suites whose independent oracle is a diagnostics array.
+        assert params == {'uri': uri, 'version': 0, 'diagnostics': params['diagnostics']}, params
+        return params['diagnostics']
 
     def close(self):
         if self.process.poll() is None:
@@ -430,7 +444,7 @@ def main():
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents', 'package-artifacts', 'package-artifact-utf8', 'package-grammar-paths', 'package-json', 'configuration'], default='baseline')
+    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents', 'package-artifacts', 'package-artifact-utf8', 'package-grammar-paths', 'package-json', 'configuration', 'jsonrpc'], default='baseline')
     args = parser.parse_args()
     # The 64 MiB boundary needs more than 4 GiB; bound each test JVM instead of
     # letting host-wide ergonomics reserve ~22 GiB per concurrently live JVM.
@@ -439,7 +453,10 @@ def main():
     native = Client([args.rust], native=True)
     try:
         with tempfile.TemporaryDirectory(prefix='ubnf-authoring-', dir=os.environ.get('TMPDIR')) as directory:
-            if args.suite == 'configuration':
+            if args.suite == 'jsonrpc':
+                from ubnf_authoring_jsonrpc import run_jsonrpc
+                evidence = run_jsonrpc([java, native], Path(directory), OMIT_PARAMS)
+            elif args.suite == 'configuration':
                 from ubnf_authoring_configuration import run_configuration
                 evidence = run_configuration([java, native], Path(directory))
             elif args.suite == 'package-json':

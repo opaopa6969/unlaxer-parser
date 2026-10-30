@@ -210,3 +210,15 @@ Classicのparser生成は`Expr`combinator定義を生成し、共通runtimeで�
 - [#157](https://github.com/opaopa6969/unlaxer-parser/issues/157): portability検査と機械可読な診断レポート（上記範囲を実装）。
 - [#158](https://github.com/opaopa6969/unlaxer-parser/issues/158): target-neutralなtoken adapter契約（上記範囲を実装）。
 - [#159](https://github.com/opaopa6969/unlaxer-parser/issues/159): 文法進化に伴う生成API影響レポート（上記範囲を実装）。
+
+### UBNF authoring JSON-RPC (#994)
+
+Java 固定 revision `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34` を参照に、native の
+initialize/configure params の失敗、Gson Integer の version 受理域、診断通知の `version: 0`、
+未知/`$/`/lsp4j 宣言済み未実装 request を揃える。手書き168ケースの独立全 JSON oracle を
+両実 stdio に送り、初期化失敗後の再試行と configure 失敗後の設定・既存文書・新入力を検証する。
+JVM/Gson 固有 error.data だけを除外し、code/message/result/id と他のキーは比較する。
+#901 の3機能は残る。reader のキー順・positional arity・capabilities null の無応答は #1001。
+型検査は params 自体と capabilities の型だけで、InitializeParams の他欄・入れ子 DTO の型違い、`id: null`、
+JSON 数値の f64 overflow の差も #1001 に記録した。
+[固定対応表と検証境界](../docs/ubnf-authoring-lsp.md#json-rpc-層の固定契約994) を参照。

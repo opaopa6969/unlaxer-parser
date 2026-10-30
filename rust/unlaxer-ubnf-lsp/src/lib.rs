@@ -4,6 +4,7 @@ mod configuration;
 mod features;
 mod index;
 mod navigation;
+mod rpc;
 mod text;
 use index::Index;
 use serde_json::{json, Value};
@@ -28,16 +29,6 @@ pub struct Server {
 type Error = (i64, String);
 fn invalid(message: &str) -> Error {
     (-32602, message.into())
-}
-// lsp4j reads the version as Integer: absent/null and 32-bit integers are
-// accepted, other JSON numbers drop the notification (#895).
-fn notified_version(document: &Value) -> Result<(), Error> {
-    let version = &document["version"];
-    if version.is_null() || version.as_i64().is_some_and(|v| i32::try_from(v).is_ok()) {
-        Ok(())
-    } else {
-        Err(invalid("document version must be a 32-bit integer"))
-    }
 }
 impl Server {
     fn configure(&mut self, params: &Value) -> Result<Value, Error> {
@@ -78,7 +69,7 @@ impl Server {
         } else {
             return;
         };
-        out.push(json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"diagnostics":diagnostics}}));
+        out.push(json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"version":0,"diagnostics":diagnostics}}));
     }
     pub fn handle(&mut self, message: Value) -> Vec<Value> {
         let mut out = Vec::new();
@@ -95,6 +86,15 @@ impl Server {
         }
         let params = &message["params"];
         let result = (|| -> Result<Value, Error> {
+            // Gson deserializes typed params before the lifecycle endpoint runs.
+            if matches!(method, "initialize" | "unlaxer/configure") {
+                rpc::initialize_shape(params)?;
+            }
+            let params = if matches!(method, "initialize" | "unlaxer/configure") {
+                rpc::initialize_params(params)
+            } else {
+                params
+            };
             if method == "exit" && !request {
                 self.exited = true;
                 return Ok(Value::Null);
@@ -147,7 +147,7 @@ impl Server {
                                 .as_str()
                                 .ok_or_else(|| invalid("document text required"))?
                                 .to_owned();
-                            notified_version(doc)?;
+                            rpc::notified_version(doc)?;
                             self.documents.insert(uri.into(), Document { source });
                             self.publish(uri, &mut out);
                         }
@@ -161,7 +161,7 @@ impl Server {
                                 .as_str()
                                 .ok_or_else(|| invalid("change text required"))?
                                 .to_owned();
-                            notified_version(doc)?;
+                            rpc::notified_version(doc)?;
                             // Java Ext parseDocument also opens a URI that was never opened.
                             self.documents.insert(uri.into(), Document { source });
                             self.publish(uri, &mut out);
@@ -269,7 +269,9 @@ impl Server {
                         _ => Ok(navigation::linked(&source, uri, &index, offset)),
                     }
                 }
-                _ => Err((-32601, "Method not found".into())),
+                _ if request && method.starts_with("$/") => Ok(Value::Null),
+                _ if request && rpc::unimplemented_request(method) => Err(rpc::internal()),
+                _ => Err((-32601, format!("Unsupported request method: {method}"))),
             }
         })();
         if request {

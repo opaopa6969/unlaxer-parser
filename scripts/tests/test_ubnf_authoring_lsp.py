@@ -23,6 +23,37 @@ class AuthoringClientTest(unittest.TestCase):
         client.timeout = 10
         return client
 
+    def test_explicit_params_are_preserved_including_falsy_values_and_omission(self):
+        # Echo the actual framed message so fixture corruption cannot turn an
+        # invalid-input test into a successful default-params test.
+        client = self.client("""import sys, json
+while True:
+    header = sys.stdin.buffer.readline()
+    if not header: break
+    count = int(header.split(b':')[1])
+    assert sys.stdin.buffer.readline() == b'\\r\\n'
+    message = json.loads(sys.stdin.buffer.read(count))
+    data = json.dumps({'jsonrpc': '2.0', 'id': message['id'], 'result': message}).encode()
+    sys.stdout.buffer.write(('Content-Length: %d\\r\\n\\r\\n' % len(data)).encode() + data)
+    sys.stdout.buffer.flush()
+""")
+        for params in (None, [], False, 0, '', {}, [None], lsp.OMIT_PARAMS):
+            with self.subTest(params=params):
+                actual = client.result('initialize', params)
+                expected = {'jsonrpc': '2.0', 'method': 'initialize', 'id': client.serial}
+                if params is not lsp.OMIT_PARAMS:
+                    expected['params'] = params
+                self.assertEqual(expected, actual)
+
+    def test_diagnostic_envelope_rejects_missing_wrong_or_extra_version_fields(self):
+        for extra in ({}, {'version': 1}, {'version': 0, 'extra': True}):
+            with self.subTest(extra=extra):
+                client = self.client('import time; time.sleep(10)')
+                client.messages.put({'jsonrpc': '2.0', 'method': 'textDocument/publishDiagnostics',
+                                     'params': {'uri': 'file:///test.ubnf', 'diagnostics': [], **extra}})
+                with self.assertRaises(AssertionError):
+                    client.diagnostics('file:///test.ubnf')
+
     def test_exit_before_shutdown_reports_backend_fixture_request_status_and_safe_tail(self):
         for backend in ('java', 'rust'):
             with self.subTest(backend=backend):
