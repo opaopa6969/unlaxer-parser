@@ -1194,7 +1194,6 @@
     "unicode960": true,
     "targetSuffix": "/`",
     "hostHeader": "localhost:{port}",
-    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
     "backendIssue": 979
   },
   {
@@ -1205,7 +1204,6 @@
     "unicode960": true,
     "targetSuffix": "/`%C3%A9%2f%F0%9F%98%80",
     "hostHeader": "localhost:{port}",
-    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
     "backendIssue": 979
   },
   {
@@ -1466,5 +1464,177 @@
     "kind": "framing",
     "error": null,
     "shape": "te-ows"
+  },
+  {
+    "id": "uri-length-65534",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 65534,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-length-65535",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 65535,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-length-65536",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 65536,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-length-100000",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 100000,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-unicode-backend-bmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef\u00e9",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/`%C3%A9",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-unicode-backend-nonbmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef\ud83d\ude00",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/`%F0%9F%98%80",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-unicode-backend-percent",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef%60%2f%41%ff",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/`%60%2f%41%ff",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-unicode-backend-semicolon",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u037e",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/;",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-raw-backtick",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/`",
+    "error": "invalid HTTPS artifact URL",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-unicode-expanded-length",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 65534,
+    "urlSuffix": "\u00e9%2f\ud83d\ude00",
+    "targetSuffix": "%C3%A9%2f%F0%9F%98%80",
+    "error": null,
+    "unicode960": true,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-backend-length-credentials",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "error": "cannot read artifact credentials",
+    "backendIssue": 977,
+    "invalidToken": true,
+    "urlBytes": 100000,
+    "invalidCA": true,
+    "invalidCredentials": true
+  },
+  {
+    "id": "uri-backend-length-ca",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "error": "cannot read artifact CA certificate",
+    "backendIssue": 977,
+    "invalidToken": true,
+    "urlBytes": 100000,
+    "invalidCA": true
+  },
+  {
+    "id": "uri-backend-length-token",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "error": "invalid artifact credentials",
+    "backendIssue": 977,
+    "invalidToken": true,
+    "urlBytes": 100000
+  },
+  {
+    "id": "uri-backend-grave-credentials",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef",
+    "error": "cannot read artifact credentials",
+    "backendIssue": 979,
+    "invalidToken": true,
+    "unicode960": true,
+    "invalidCA": true,
+    "invalidCredentials": true
+  },
+  {
+    "id": "uri-backend-grave-ca",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef",
+    "error": "cannot read artifact CA certificate",
+    "backendIssue": 979,
+    "invalidToken": true,
+    "unicode960": true,
+    "invalidCA": true
+  },
+  {
+    "id": "uri-backend-grave-token",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef",
+    "error": "invalid artifact credentials",
+    "backendIssue": 979,
+    "invalidToken": true,
+    "unicode960": true
+  },
+  {
+    "id": "uri-length-200000",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 200000,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "request-stall",
+    "kind": "request-stall",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 7000000,
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "backendIssue": 977
   }
 ]

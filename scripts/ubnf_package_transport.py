@@ -19,9 +19,9 @@ from ubnf_package_credentials import ROOT, local_tls_context, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
 LIMIT = 8 * 1024 * 1024
-COUNT = 213
-URI_COUNT = 133
-UNICODE_COUNT = 80
+COUNT = 231
+URI_COUNT = 150
+UNICODE_COUNT = 88
 TOKEN = 'transport-fixture-only-token'
 BODY = b'transport-fixture-private-response'
 HEADER = 'transport-fixture-private-header'
@@ -31,7 +31,9 @@ STATUS = 'HTTPS artifact requires status 200; redirects are forbidden'
 MISSING = 'E-PACKAGE: missing lock; run unlaxer deps resolve --manifest ubnf.json'
 # Product deadlines (connect 5 s, whole call 20 s) are measured unchanged. These
 # shapes only wait, so all of their invocations run concurrently in their own folders.
-SLOW = {'stall': (19.5, 45), 'connect-stall': (4.5, 19)}
+# A peer that stops reading a request larger than the socket buffers must still end at
+# 20 s (Java future.get); ureq re-arms its budget per write, so bound it tightly (#977).
+SLOW = {'stall': (19.5, 45), 'connect-stall': (4.5, 19), 'request-stall': (19.5, 30)}
 NO_BODY = [101, 204, 304]
 
 
@@ -42,14 +44,16 @@ def fixtures():
     assert len(framing) == 38, 'HTTP framing fixtures missing'
     uri = [c for c in cases if c['kind'] == 'uri']
     assert len(uri) == URI_COUNT and sum(c.get('unicode960', False) for c in uri) == UNICODE_COUNT
-    # Only the separately tracked NFC -> backtick backend boundary has host errors.
-    assert {c['id'] for c in uri if 'rustError' in c} == {'uri-unicode-grave', 'uri-unicode-grave-mixed'}
-    assert all(c.get('backendIssue') == 979 for c in uri if 'rustError' in c)
+    assert not any('rustError' in c for c in uri), 'request targets must match both hosts'
+    assert {c['urlBytes'] for c in uri if c['id'].startswith('uri-length-')} == {65534, 65535, 65536, 100000, 200000}
+    assert sum(c.get('backendIssue') == 977 for c in uri) == 9
+    assert sum(c.get('backendIssue') == 979 for c in uri) == 10
     assert not any('rustTargetSuffix' in c for c in uri), 'no raw Unicode targets'
     # Generation never fetches: the boundary is checked on a success and a redirect shape.
     generated = [c for c in cases if c.get('generate')]
     assert len(generated) == 4 and {c['error'] is None for c in generated} == {True, False}
     assert {c['kind'] for c in cases} >= set(SLOW), 'deadline fixtures missing'
+    assert [c['urlBytes'] for c in cases if c['kind'] == 'request-stall'] == [7000000], 'request stall missing'
     return cases
 
 
@@ -116,7 +120,7 @@ def transport_server(directory, artifact):
                 with context.wrap_socket(self.request, server_side=True) as stream:
                     stream.settimeout(5)
                     request = b''
-                    while b'\r\n\r\n' not in request and len(request) < 65536:
+                    while b'\r\n\r\n' not in request and len(request) < 256 * 1024:
                         part = stream.recv(4096)
                         if not part:
                             return
@@ -138,6 +142,11 @@ def transport_server(directory, artifact):
                         if 'hostHeader' in cases[case_id]:
                             received['host'] = [line.split(b':', 1)[1].strip().decode('ascii') for line in lines[1:]
                                                 if line.lower().startswith(b'host:')]
+                    if case_id in cases and cases[case_id]['kind'] == 'request-stall':
+                        # Read only the first 256 KiB: the rest of the multi-MB target exceeds
+                        # the socket buffers, so the client blocks while writing the request.
+                        stop.wait(90)
+                        return
                     receipts.append(received)
                     # A followed redirect is a test failure, including same-origin redirects.
                     if path == '/redirect-target':
@@ -233,6 +242,7 @@ def public(output, stderr, code):
     allowed = ['', MISSING, 'Generation failed: ' + MISSING] + ['E-PACKAGE: ' + e for e in
               [TRANSPORT, STATUS, 'expected object: document', 'invalid JSON',
                'invalid HTTPS artifact URL', 'invalid artifact credentials',
+               'cannot read artifact credentials', 'cannot read artifact CA certificate',
                'HTTPS artifact URL must omit credentials, query and fragment',
                'HTTPS artifact retrieval failed (TLS, timeout, status or redirect)',
                'HTTPS artifact retrieval failed (timeout or size limit)']]
@@ -299,6 +309,18 @@ def pinned(artifact):
             '.ubnf-cache/packages/' + digest(artifact) + '.json': artifact.hex()}
 
 
+def source_url(case, port, origin=None):
+    source = case.get('url', origin + '/' + case['id'] if origin else '').format(port=port, id=case['id'])
+    if 'urlBytes' in case:
+        # ASCII prefix before a possible Unicode suffix: count absolute URL bytes,
+        # not path bytes or JSON escape spelling. No huge strings in the corpus.
+        assert source.isascii() and len(source) <= case['urlBytes']
+        source += 'a' * (case['urlBytes'] - len(source))
+        assert len(source.encode('ascii')) == case['urlBytes']
+        source += case.get('urlSuffix', '')
+    return source
+
+
 def prepare(folder, case, ports, ca, transitive=False):
     port, refused, blackhole = ports
     folder.mkdir(parents=True)
@@ -309,13 +331,17 @@ def prepare(folder, case, ports, ca, transitive=False):
         entry['caCertificate'] = str(ca)
     if case.get('token', True):
         entry['bearerToken'] = TOKEN
+    if case.get('invalidCA'):
+        entry['caCertificate'] = str(folder / 'missing-ca.pem')
     if case.get('invalidToken'):
         entry['bearerToken'] = ''  # Accepted URI; stop before DNS / a fixed port is contacted.
     credential_origin = case.get('credentialOrigin', origin).format(port=port)
     credentials = encode({credential_origin: entry, origin + '9': {'bearerToken': TOKEN}})
+    if case.get('invalidCredentials'):
+        credentials = b'{'
     (folder / 'credentials.json').write_bytes(credentials)
     manifest = folder / 'ubnf.json'
-    source = case.get('url', origin + '/' + case['id']).format(port=port, id=case['id'])
+    source = source_url(case, port, origin)
     dependency = {'version': '1.0.0', 'source': source}
     if transitive:
         parent = parent_bytes(source, case.get('rawUnicode', False))
@@ -343,13 +369,17 @@ def expected_receipt(case, host='java', port=None, java17=False):
         suffix = case.get('targetSuffix', '')
         if host == 'java' and java17:
             suffix = case.get('javaJdk17TargetSuffix', suffix)
-        wanted = {'case': case['id'], 'authorization': 'bearer',
-                  'targetHex': ('/' + case['id'] + suffix).encode().hex()}
+        target = '/' + case['id'] + suffix
+        if 'urlBytes' in case:
+            base = source_url(dict(case, urlSuffix=''), port)
+            target = '/' + base.split('/', 3)[3] + suffix
+            assert len(base.encode('ascii')) == case['urlBytes']
+        wanted = {'case': case['id'], 'authorization': 'bearer', 'targetHex': target.encode().hex()}
         if 'hostHeader' in case:  # Java sends getHost() as written, plus a non-default port.
             wanted['host'] = [case['hostHeader'].format(port=port)]
         return wanted
-    if not case.get('trust', True) or 'hostname' in case or case['kind'] in ['refused', 'connect-stall']:
-        return None  # The request must not pass the TCP/TLS boundary.
+    if not case.get('trust', True) or 'hostname' in case or case['kind'] in ['refused', 'connect-stall', 'request-stall']:
+        return None  # No complete request passes the TCP/TLS boundary (request-stall: never fully read).
     return {'case': case['id'], 'authorization': 'bearer' if case.get('token', True) else 'absent'}
 
 
@@ -405,7 +435,7 @@ def check(directory, args, records):
                     seconds=elapsed, snapshot=receipt(after))
 
     with transport_server(directory, artifact) as (port, refused, blackhole, ca, received, connections), \
-            java_host(args, host_env, directory) as batch, ThreadPoolExecutor(max_workers=8) as pool:
+            java_host(args, host_env, directory) as batch, ThreadPoolExecutor(max_workers=12) as pool:
         ports = (port, refused, blackhole)
 
         def slow_run(case, host, existing):
@@ -462,6 +492,10 @@ def check(directory, args, records):
                         else:
                             assert receipts and all(r == wanted for r in receipts), \
                                 (case['id'], host, 'request/auth/redirect/target differs')
+                        if case['kind'] == 'uri' and wanted is not None:
+                            assert len(receipts) == 1, (case['id'], host, 'URI request count differs')
+                            if 'backendIssue' in case:
+                                assert len(connections) == connected + 1, (case['id'], host, 'URI connection count differs')
                         wire = {'connections': len(connections) - connected,
                                 'targets': [r['targetHex'] for r in receipts],
                                 'sourceDocumentSha256': digest(raw_manifest),

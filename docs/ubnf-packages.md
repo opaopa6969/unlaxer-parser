@@ -109,14 +109,43 @@ Java の製品コード・診断と parser のホットパスは変更しない�
 これらは Rust も credentials → CA → token の検査後に接続せず `HTTPS artifact retrieval failed (TLS, timeout or size limit)` とする。
 この UTF-16 化は明示 package fetch の URL だけで、package JSON 全体には行わない。
 JDK17/21 の独立 oracle と ASCII fuzz 8万件で、構文受理・scheme・getHost/port・
-userinfo/query/fragment の有無・exact origin が一致した。そのうち fetch の事前検査を通過した
-10,182件はすべて `ureq::http::Uri` も受理した。別途、全長65534 / 65535 / 65536 bytes の
-ASCII URL を独立に測ると、Java と移植 parser はすべて受理し、ureq の `http::Uri` は
-65535 bytes 以上を拒否した（内部上限65534 bytes）。これは取得 backend の追加制約として残す。
-長い URL の切詰めや独自 HTTP transport は追加せず、credentials / CA / token の検査後に
-既存の取得失敗診断へ進む。レビューでローカル TLS へ実際に送ると、全長65,624 / 100,024 bytes の URL を
-Java は取得に成功し Rust は取得失敗となった。Unicode URL も送信用の encoding 後に同じ backend 上限を受ける。
-この長さ境界は [#977](https://github.com/opaopa6969/unlaxer-parser/issues/977) で追跡する。
+userinfo/query/fragment の有無・exact origin が一致した。
+
+**HTTP request target の渡し方（#977・#979）**: ureq 3.4.2 / http 1.5.0 / ureq-proto 0.6.4 の
+公開 API を試作した。`Uri::from_maybe_shared` / parse は全長65534 bytesまでで、
+`Uri::builder` / `from_parts` は成分ごとの検査なので65535/65536 bytesの URL を組み立てられるが、
+`PathAndQuery` 自体の65534 bytes上限と backtick 拒否は残る。ureq-proto は request の `Uri` から
+request line を作り、target だけを直接指定する API はない。
+
+native は公開 `Agent::with_parts` と `DefaultConnector::chain` を使う取得専用の
+`package_fetch/request_target.rs` で揃える。検証済みの同じ接続先の URI に placeholder `/` を渡し、
+ureq が作った `GET / HTTP/1.1` の `/` だけを **TLS transport の外側**で元の request target に置換する。
+ASCII の元の綴り、Unicode の既存 NFC/percent encoding をそのまま送り、切詰めや追加 escape はしない。
+Host・認証を含む後続 header bytes は移動するだけで、再構築しない。先頭0の IPv4 の10進接続先と元の Host も維持する。
+接続・hostname/trust 検証・TLS・request header 作成・応答の framing/header 上限・本文読取りは引き続き ureq が担う。
+独自 HTTP client、TLS 実装、応答 parser、新しい crate、unsafe は追加しない。
+
+送信 buffer は既定128 KiBに target の長さを足し、既存8 MiBの入力文書上限と encoding の伸びの範囲で確保する。
+置換に使った経過時間を元の timeout から引き、1回の underlying transmit に渡す。期限切れでは書き込まず、分割ごとに期限を延長しない。
+ただし ureq は1回の TLS transmit の中でも socket write ごとに残り期限を設定し直すため、受信を止めた peer に
+socket buffer を超える target を送ると、全体20秒を数倍超えて待ち得る（6 MB の target で約62秒を実測）。
+Java は `future.get(20秒)` で交換全体を打ち切るので、native も取得全体を worker で実行し、20秒で同じ取得失敗を返す。
+打ち切った worker は自身の接続だけを保持し、process 終了で消える。共通 fixture の `request-stall` 形
+（7000000 bytes、server は先頭256 KiBだけ読んで止まる）で両版とも19.5秒以上30秒未満を要求する。
+agent は1回の fetch 専用で接続を pool に保持せず、redirect は0回のまま。
+この公開 API は ureq の `unversioned` 名前空間にあり、依存更新時は共通 transport fixture を再実行する。
+TLS 未確立、想定外の prelude、buffer 不足、ASCII origin-form 外の target は書込み前に拒否する。
+全 URL の構文・origin の検査、credentials → CA → token の順と既存診断、非 scalar URL の送信禁止は維持する。
+encoding の計算だけは buffer 設定のため credentials より前に行うが、I/O・診断・送信は行わない。
+
+共通 fixture は絶対 URL 全長65534 / 65535 / 65536 / 100000 / 200000 bytesを生成し、
+Oracle JDK17.0.12 / 21.0.9 と native の両 `deps resolve` で、直接/推移的依存・snapshot 有無の全組合せを比較する。
+この5つの長さでは両 Java と native が成功し、target の実 bytes・Host・lock/cache raw bytes が一致する。
+これは server が受理するこの範囲の実測であり、Java の有限な最大長が200000という意味ではない。
+Unicode の encoding 後に65534 bytesを超える形も同じ wire に揃える。
+大きな URL は JSON に展開せず `urlBytes`（ASCII prefix の絶対 URL byte 長）と任意の `urlSuffix` で表す。
+検査順の対照は長い URL / U+1FEF と不正 credentials・欠落 CA・不正 token を組み合わせ、
+両版の既存診断・接続0・snapshot 不変を固定する。
 
 | ASCII source の形 | credentials より前の結果 |
 | --- | --- |
@@ -137,7 +166,7 @@ Unicode userinfo / query / fragment は URI が構文受理しても omit、不�
 全角 `／？＃＠：％` は ASCII の区切りへ変換しない。
 非 scalar URL は従来どおり origin の検査だけに parser を使い、HTTP request を作らず送信しない（#939）。
 
-共通 `spec-corpus/package-https-transport.json` の ASCII53形・Unicode80形を、
+共通 `spec-corpus/package-https-transport.json` の ASCII62形・Unicode88形を、
 既存 `HttpsPackageConformanceTest#transportDiagnosticsMatchJavaAcrossClis` で実行する。
 各形は直接依存とローカル親 artifact 経由の推移的依存を両 `deps resolve` に与え、
 snapshot 有無の両方で診断・exit・成功時 lock/cache raw bytes・失敗時 snapshot 不変を照合する。
@@ -182,13 +211,10 @@ U+1E4EC を含む非 BMP の対照も共通 fixture の `javaJdk17TargetSuffix` 
 native は主 CI の JDK21 を参照する。入力だけでは実行する JDK の版を選べないための契約であり、
 JDK17 の URI 受理・診断を変更したり、この2形を skip したりしない。
 
-**取得 backend の残差**: U+1FEF（GREEK VARIA）は NFC で ASCII backtick（U+0060）になり、
-Java はその byte `60` を送って成功するが、ureq の `http::Uri` は backtick を拒否する。
-native は credentials / CA / token の後に取得失敗（接続0）となる。
-`%60` への追加 escape では Java と同じ bytes にならないため、その置換や unsafe / 独自 transport は追加しない。
-この差は [#979](https://github.com/opaopa6969/unlaxer-parser/issues/979) に受け入れ条件付きで分離し、
-単独と BMP/非BMP/percent 混在の2形を host 別期待値で実行する（skip しない）。
-raw ASCII backtick は従来どおり URI 構文エラーであり、この残差とは区別する。
+**NFC が作る ASCII の target（#979）**: U+1FEF（GREEK VARIA）は NFC で backtick（U+0060）になり、
+Java/native とも byte `60` をそのまま送る。単独、BMP、非 BMP、正常 percent との混在、すべての混在を
+共通 fixture で照合する。`%60` への追加 escape はしない。U+037E → ASCII `;` は一致の対照とする。
+raw ASCII backtick は従来どおり URI 構文エラーであり、credentials を読む前に拒否する。
 
 共通 fixture は JSON の raw UTF-8 と BMP escape / 正常な surrogate pair escape の両方を与える。
 encoding は送信専用。manifest は書き換えず、取得した cache の raw bytes も変えない。
@@ -339,10 +365,11 @@ ureq の `limit` は指定量を読み切るとエラーになるため、上限
 `101` と本文を宣言した `204` は、java.net.http が status 判定より前に exchange を失敗させる
 （`Exchange` の "Unexpected 101 response"、`MultiExchange.bodyIsPresent`）。Rust も応答 header の時点で同じ規則を適用する。
 期限の fixture は製品の値をそのまま測る。接続 timeout は accept しない listen socket（backlog を先に埋める）への接続で
-5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満を要求し、期限を外すと落ちる。
-待つだけの2形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
+5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満、
+送信途中で受信を止める `request-stall` は19.5秒以上30秒未満を要求し、期限を外すと落ちる。
+待つだけの3形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
 
-共通 `spec-corpus/package-https-transport.json` の transport42形と URL133形を `HttpsPackageConformanceTest` から実行する。
+共通 `spec-corpus/package-https-transport.json` の transport43形と URL150形を `HttpsPackageConformanceTest` から実行する。
 JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を snapshot 有無の両方で照合する。
 待たない形の Java `deps resolve` は、テスト専用の `CodegenBatchHost` が1つの JVM で `CodegenMain.run` を順に呼ぶ
 （JVM 起動を1回にするため。呼出しごとに credentials override を読み直す）。両 JDK で、1呼出し1 JVM の実 CLI と
@@ -351,7 +378,7 @@ JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を 
 （成功・302・Unicode path・Unicode と不正 percent）で snapshot 有無の両方を照合する。
 失敗時の lock/cache 不変、成功時の raw bytes、認証の exact origin、TLS境界、redirect 先の接続0、
 生成時の接続0と固定cache使用を検査する。空bodyの診断は transport ではなく後続 JSON 検査である。
-42形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
+43形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
 HTTP/1.1 の境界・不正 framing は追加38形を同じメソッドで実行し、host 別期待値も skip しない（#972）。
 Java 製品コード・診断は維持し、native は以下の安全側の契約を使う。
 表の「取得失敗」は `HTTPS artifact retrieval failed (TLS, timeout or size limit)`（exit 3）、
