@@ -14,6 +14,8 @@
 
 初期化応答の待機上限は `server.startupTimeoutMs`（既定30000ms、1000〜300000ms）で設定できる。応答しないserverも、設定変更・再起動・拡張終了時には初期化待ちを中断して所有processを終了する。 初期化応答だけで開始完了とは扱わず、`initialized` 通知を含む client の開始処理が完了してから通常の LSP shutdown を許可する。開始途中の送信失敗・中断では所有 process を終了し、失敗した開始の後も明示的に再起動できる。
 
+開始済み LSP の正常終了には Java/Rust 共通で最大 5000 ms を使う。`shutdown` 応答と `exit` 通知の送信に加え、残りの時間で所有 process の自然終了を待つ。CPU quota が混雑した際の応答遅延を許容し、通知送信直後の正常な JVM を SIGTERM で打ち切らないための上限である。期限超過・通信失敗・開始途中の中断では SIGTERM、さらに 500 ms 後に SIGKILL へ進み、終了確認の上限は 3000 ms。開始途中には正常終了の 5000 ms 待機を加えない。
+
 設定変更時にLSPを再起動し、以降に作るDAP sessionは選択されたbackendを使用する。開始済みのdebug sessionはそのまま継続する。コマンドパレットの「Restart Language Server」で明示的にも再起動できる。空のRust実行ファイル設定・未知のbackend・不正な引数は起動前に拒否する。異常終了時の自動再起動は3分以内に5回までとし、繰り返す場合は設定を修正して明示的に再起動する。
 
 DAPのAST/token操作は構造のinspectionであり、実評価器の実行停止ではない。言語の補完・hover・definition等の内容は選択した生成サーバーとproviderに依存する。既定のTinyCalcにはdefinition providerがない。
@@ -40,7 +42,7 @@ TinyCalc と新規生成する拡張は VS Code 1.97.2 以上を必要とする�
 xvfb-run -a npm run test:vsix -- target/tinycalc.vsix
 ```
 
-配布VSIXを一時directoryへ展開し、実際の拡張hostでJava/Rust両方を起動する。空白を含む実行パス、補完、同期後hover、既定definition非提供、Unicode診断、AST/token DAP、異常終了からの再起動、設定不正からの復帰、停止時のchild process終了を確認する。初期化に応答せずTERMも無視するfixtureを使い、timeout・設定修正・deactivate時の中断と強制終了、未処理Promise rejectionがないことも検査する。実 backend の初期化応答後に writer を破棄済み Node stream へ差し替える試験では、reader の close 通知より先に送信失敗が届く順序を再現し、開始途中の shutdown 禁止・開始失敗の通知・再起動後の LSP 復旧を確認する。この注入は試験内に限り、backend の障害そのものを再現したとは扱わない。観測値は `target/ide-java.json` と `target/ide-rust.json` に保存し、両者を比較する。ユーザーのVS Code profileは使わない。
+配布VSIXを一時directoryへ展開し、実際の拡張hostでJava/Rust両方を起動する。空白を含む実行パス、補完、同期後hover、既定definition非提供、Unicode診断、AST/token DAP、異常終了からの再起動、設定不正からの復帰、停止時のchild process終了を確認する。初期化に応答せずTERMも無視するfixtureを使い、timeout・設定修正・deactivate時の中断と強制終了、未処理Promise rejectionがないことも検査する。実 backend の初期化応答後に writer を破棄済み Node stream へ差し替える試験では、reader の close 通知より先に送信失敗が届く順序を再現し、開始途中の shutdown 禁止・開始失敗の通知・再起動後の LSP 復旧を確認する。正常 shutdown では実 backend の終了コード 0・終了シグナルなし・SIGTERM への移行なしも確認する。実 shutdown 要求の送信を 1500 ms 遅らせる回帰ケースで、旧 1000 ms 期限を超えても正常終了できることを両 backend で検査する。timeline には自然な終了と注入による遅延を区別して通信終了・process 終了の所要時間を残す。これらの注入は試験内に限り、backend の障害そのものを再現したとは扱わない。観測値は `target/ide-java.json` と `target/ide-rust.json` に保存し、両者を比較する。ユーザーのVS Code profileは使わない。
 
 生成DAP launcherは `disconnect` の応答を書き出してflushしてからtransportを終了する。Java/Rustとも初期化前の切断も受理し、正常切断・相手EOFでは終了code0となる。入力を閉じずに応答を待つclientでもJavaの所有workerが残らず、後続sessionは新adapterで開始できる。
 

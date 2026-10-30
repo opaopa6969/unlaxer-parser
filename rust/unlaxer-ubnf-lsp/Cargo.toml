@@ -1,0 +1,20 @@
+[package]
+name = "unlaxer-ubnf-lsp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+unlaxer-lsp = { path = "../unlaxer-lsp" }
+unlaxer-ubnf = { path = "../unlaxer-ubnf" }
+unlaxer-generator = { path = "../unlaxer-generator" }
+serde_json = "1"
+
+[[bin]]
+name = "ubnf-language-server"
+path = "src/main.rs"
+
+[lints]
+workspace = true

@@ -31,6 +31,47 @@ grammar Example {
 内包するという意味ではない。[文字列](tiny-string-token.md)と [code fence](tiny-code-fence.md) の
 受理範囲・raw capture・mapper の変換・行境界契約は変更しない。
 
+## 診断の順序・空白（#897）
+
+Java の `TokenAdapterRegistry.build(grammar, null)` を参照し、Rust の
+`AdapterRegistry::from_grammar` は宣言と全 `ADAPTER(...)` 参照の診断をまとめて、
+code → subject（UTF-16 順）で安定整列する。`token_contract_diagnostics` は
+`TokenContractRegistry.build(grammar, null)` と同じ code のみの安定順序とし、
+重複した `token` key の subject には最初の値を残す。
+lowering の先頭エラーと authoring の全件収集はこの共有結果を使う。
+
+`check --target rust` は両 host とも最後にソース CP 範囲 → code → subject で並べるため、
+整列だけの修正で既存 JSON の順序は変わらない。重複 key・空白の誤判定は
+Java-host の code/subject/受理に修正される。Java-target の従来 CLI は
+`CodegenRunner` が grammar/rule/code/message で再整列するため、同一 code の
+contract が `Z, A` の順なら Java-host Rust 生成と `validateOrThrow` は `Z`、
+Java-target CLI は `A` を最初に表示する。この既存の経路差は維持する。
+
+`accepts` の空判定と `context` 全体の空判定は Java の `String.isBlank` に合わせる。
+NBSP (U+00A0)、figure space (U+2007)、narrow NBSP (U+202F)、NEL (U+0085) は
+空白とみなさない。空白だけの `context` は空集合になる。
+カンマ区切りの各 accessor は `String.trim` と同じく U+0020 以下だけを削るので、
+NBSP や em space・全角空白 (U+3000) に囲まれた `source` は不正。U+0001 などの制御文字は削る。
+重複・末尾の空 accessor も拒否する。全角空白・U+001F だけの `accepts` は Java と同じく空とみなす。
+
+独立期待値は [diagnostics.json](../spec-corpus/token-adapters/diagnostics.json)。
+46 文法を LF/CRLF で両 host の registry / validator / check / generate に渡し、
+code・subject・順序・CP 範囲・終了コード・最初のエラーと成功時の全5生成ファイルを比較する。
+Java-target CLI も成功/拒否を検査する。既存 LSP の全 JSON corpus は維持する。
+参照の診断は registry の結果に含まれるため、native の generate でも Java-host の
+`validateOrThrow` と同じく contract・feature・comment・whitespace・mapping・未定義参照より先に報告する
+（変更前の native は後段の診断を先に返していた）。
+[generate-order.json](../spec-corpus/token-adapters/generate-order.json) の5文法で両 host の先頭エラーを比較する。
+
+変更前の `caa13a51` で実 CLI を測定すると、36 文法中 check の不一致は17件。
+整列だけの例では check は一致し、generate の先頭だけが異なった。
+`tokenContract` の重複 key は Java の `T` に対し native が `Last`、
+空白 context / NBSP accepts は Java の成功に対し native が終了3、
+NBSP で囲んだ context は Java の終了3に対し native が成功していた。
+共有関数修正後は全36件が一致する。PR #909 のレビューで全角空白・U+001F・制御文字の trim を10件足した（計46件）。既存 `spec-corpus/**/*.ubnf`、portability の
+UBNF と `structure-priority.json`（LF/CRLF）の計330入力は変更前後で check JSON・
+終了コード・generate の診断が不変で、成功101入力の全生成ファイルの SHA-256 も一致した。
+
 ## 独自 adapter の登録
 
 ```ubnf

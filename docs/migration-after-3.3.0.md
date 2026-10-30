@@ -83,6 +83,28 @@
    printf '%s\n' 'if(0,neg(2*3),4+5)' | rust/target/release/unlaxer-evolution-example
    ```
 
+## native CLI の出力先パス（#952）
+
+`unlaxer generate` の成功 stdout（`--check` の `Verified` も含む）は Java の `Path.of` と同じ綴りになります。
+例えば `--output out/` は `in out`、`out//x` は `in out/x`。相対パスと `.`・`..` は保持します。
+Playground の `Generated` / `Verified` は絶対・字句正規化したパスになります。
+作業ディレクトリが `/work` なら `./pg`・`pg/`・`pg/.` は `in /work/pg`、
+`missing/../pg2` は `in /work/pg2` です。stdout の引数の綴りに依存したスクリプトを更新してください。
+Playground の失敗文も同じ正規化先を指し、打ち消した `missing/` は作りません。
+
+generate で `out` が無い状態の `out/../out2` は Java と同じく `out2/` だけを作り、
+`cannot write out/../out2/mod.rs: out/../out2/mod.rs`（終了4）になります。
+この形で生成していた場合は `--output out2` を指定してください。
+既存生成物が mode 444 の場合も、rename で置換せず終了4で失敗します。
+書き換えるファイルの権限を利用者が明示的に変更してから再実行してください。
+
+generate の symlink 祖先拒否は、意図しない実体先へ書き込まない既存の native 方針として維持します。
+`link/out`（`link` が symlink）は `output directory must not have a symbolic link ancestor: link`。
+出力先自体の symlink / dangling symlink は Java と同じ
+`output directory must not be a symbolic link: P` です。詳細と共通 fixture は
+[出力先パスの契約](ubnf-packages.md#cli-の出力先パス952)を参照してください。
+正常な生成物の内容、`check --format json`、公開済み3.3.0は変更しません。
+
 ## 文法と生成 API
 
 | 対象・根拠 | 利用側の変更と詳しい契約 |
@@ -125,7 +147,8 @@
 | LSP lifecycle（PR #553） | `initialize` 成功前に通常 request を送らず、再設定のための2度目の `initialize` を `unlaxer/configure` へ置き換えます。省略した設定は既定値へ戻るため、必要な capability 設定も再送します。[移行例](classic-lsp-lifecycle.md#migration-from-repeated-initialize)。 |
 | VS Code 拡張（PR #689） | TinyCalc と新規 scaffold の拡張を使う editor を VS Code 1.97.2 以上へ更新します。Java / Rust backend の設定・ビルド手順は [起動案内](rust-vscode-launch.md)にあります。 |
 | 生成の警告と CLI（PR #778 / issue #715、PR #796 / issue #777） | native の `unlaxer generate` と Java-host の `generate --target rust` は、生成物を変えない警告を stderr に `warning: CP <start>..<end>: <message>` の形で出します。新しい `--strict` / `--fail-on warning` を付けると、警告があれば何も書かずに終了コード 5 で失敗します。Java の flag CLI は `W-ANNOTATION-IGNORED`・`W-AUTO-COMMIT-SKIPPED`・`W-COMMENT-IGNORED` を同じ1行の message で報告し、`--strict` で失敗します。text 表示と JSON の `issues[]` の `W-COMMENT-IGNORED` は、`message` が subject（`comment`）から上の1行に、`rule` が空から `comment` に、hint が `Remove this @comment setting (docs/rule-trivia.md).` に変わります。stderr や検証 report を解析するスクリプトを更新します。`GrammarValidator.validate` の戻り値は変わりません。[生成の警告](simple-annotations.md#生成の警告を-cli-まで届ける)、[global comment](rule-trivia.md#global-comment712)。 |
-| `check` の位置・件数・構造診断の優先順位（PR #824 / issue #776、issue #825、#833 / #834 / #835） | Java-host / native Rust の `check --target rust` は、import 解決後も root ソース由来の診断に元の CP 範囲を返し、別 grammar・別位置の同じ code/subject を別件として残します。従来 null・1件になっていた診断の期待値を更新します。import 由来・出典不明は null のままで、同じ code/subject の null 診断の重複除去と root CP 順は維持します。複数の構造エラーが同居するときは Java-host に揃え、commonField schema のエラーを eval・enum・embedding 等より先に、その規則の CP 範囲で返します（bounded/precedence/nested と前段診断は先行）。単一エラーと schemaVersion 1・フィールドは変えません。[契約](portability-check.md)。 |
+| `check` の位置・件数・構造診断の優先順位（PR #824 / issue #776、PR #831 / issue #825、issue #832、#833 / #834 / #835） | Java-host / native Rust の `check --target rust` は、import 解決後も root ソース由来の診断に元の CP 範囲を返し、別 grammar・別位置の同じ code/subject を別件として残します。従来 null・1件になっていた診断の期待値を更新します。import 由来・出典不明は null のままで、同じ code/subject の null 診断の重複除去と root CP 順は維持します。複数の構造エラーが同居するときは Java-host に揃え、commonField schema のエラーを eval・enum・embedding 等より先に、その規則の CP 範囲で返します（bounded/precedence/nested と前段診断は先行）。#832 では Java-host も nested leaf と通常 leaf を直接混ぜた commonField を Rust 生成と同じく拒否し、`P-COMMONFIELD`・規則の CP span・終了コード 3 を返します。Java 向け生成は維持します。schemaVersion 1・フィールドは変えません。[契約](portability-check.md)。 |
+| commonField の型比較（issue #869） | native の `check --target rust` / `generate --target rust` は、nested の `{x}` / `(x)+` と `[x]` / `(x)?`、通常 leaf の `(NUM\|NUM)` / `('x'\|'y')` を Java-host と同じく受理します。以前の `P-COMMONFIELD`・終了コード 3 は `passed`・診断なし・終了コード 0 に変わります。両 host の Rust 生成物は byte 一致します。通常 leaf の容器の綴り違い、nested leaf の数値/text の違い、nested / 通常 leaf の直接混在は引き続き拒否します。[型比較](portability-check.md#commonfield-の正規化した型比較869)。 |
 | Rust lowering / generator の spec corpus 診断（issue #833 / #834 / #835） | 参照・mapping・whitespace・結合性/precedence・profile のエラーは Java validator と同じ `E-*:` を先頭に付け、root 欠如より先に返します。Java-host の `Rust subset: ` は説明部分に残ります。直接呼び出す Java-host lowering / generator も、結合性のみ・precedence のみの不正な宣言を拒否するようになります。メッセージを完全一致で扱う利用者は期待値を更新してください。check JSON の code・CP 範囲・終了コード・schema は変わりません。 |
 | Rust lowering / generator の残る宣言診断（issue #843） | 重複 `@interleave` / `@scopeTree`、precedence が1つある結合性の mapping 欠如・params の left/op/right 欠落（`E-ASSOC-MAPPING-PARAM`）・repeat 欠如（`E-ASSOC-NO-REPEAT`）・rightAssoc 非canonical、`@longestChoice` の形状、import なし修飾参照にも Java と同じ `E-*:` を付けます。修飾参照は `E-RULE-UNDEFINED: Rust subset: qualified rule reference` / `E-RULE-UNDEFINED: unsupported qualified rule reference` となり、従来の説明を残します。root なしでもこれらの診断を先に返すため、完全一致の期待値を更新してください。結合性は root 投影の失敗を含む従来の説明を保ち（例: `@leftAssoc requires left { op right } … on R` が `E-ASSOC-MAPPING-PARAM: @leftAssoc requires …` になる）、precedence 欠如・重複の既存優先順位も維持します。単一エラーの CP 範囲・終了コード、check JSON の code・span・schemaVersion 1、成功時生成物は変わりません。 |
 | UBNF LSP の生成警告（PR #806 / issue #798） | `W-COMMENT-IGNORED` は文書先頭ではなく設定のソース範囲に表示され、`W-ANNOTATION-IGNORED` も表示されるようになります。どちらも CLI と同じ code・message で、文書ごとに一度だけ出ます。editor の診断の件数・範囲・message を固定したテストや拡張を見直します。 |

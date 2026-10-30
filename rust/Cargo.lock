@@ -333,6 +333,7 @@ dependencies = [
 name = "unlaxer-generator"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "serde",
  "serde_json",
  "sha2",
@@ -373,6 +374,16 @@ version = "0.1.0"
 [[package]]
 name = "unlaxer-ubnf"
 version = "0.1.0"
+
+[[package]]
+name = "unlaxer-ubnf-lsp"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "unlaxer-generator",
+ "unlaxer-lsp",
+ "unlaxer-ubnf",
+]
 
 [[package]]
 name = "untrusted"

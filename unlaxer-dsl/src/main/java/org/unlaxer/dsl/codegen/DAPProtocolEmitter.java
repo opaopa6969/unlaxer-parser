@@ -263,8 +263,8 @@ class DAPProtocolEmitter {
         w.line("return CompletableFuture.completedFuture(response);");
         w.dedent();
         w.line("}");
-        w.line("int charOffset = current.source.offsetFromRoot().value();");
-        w.line("int endOffset = charOffset + current.source.codePointLength().value();");
+        w.line("int[] tokenSpan = tokenSourceSpan(current);");
+        w.line("int charOffset = tokenSpan[0], endOffset = tokenSpan[1];");
         w.line("if (isAstRuntimeMode()) {");
         w.indent();
         w.line("int[] span = currentAstSpan();");

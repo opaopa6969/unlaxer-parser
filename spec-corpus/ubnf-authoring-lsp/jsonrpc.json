@@ -1,0 +1,921 @@
+{
+  "reference": "384fcf3eb1c0ce3e207ac580cec5fcac4b478b34",
+  "invalidParams": [
+    {
+      "id": "missing",
+      "omitParams": true,
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "id": "null",
+      "params": null,
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "id": "array",
+      "params": [],
+      "expected": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      }
+    },
+    {
+      "id": "positional-number",
+      "params": [
+        7
+      ],
+      "expected": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      }
+    },
+    {
+      "id": "positional-null",
+      "params": [
+        null
+      ],
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "id": "string",
+      "params": "",
+      "expected": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      }
+    },
+    {
+      "id": "number",
+      "params": 7,
+      "expected": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      }
+    },
+    {
+      "id": "boolean",
+      "params": false,
+      "expected": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      }
+    },
+    {
+      "id": "cap-number",
+      "params": {
+        "capabilities": 7
+      },
+      "expected": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      }
+    },
+    {
+      "id": "cap-array",
+      "params": {
+        "capabilities": []
+      },
+      "expected": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      }
+    },
+    {
+      "id": "cap-string",
+      "params": {
+        "capabilities": ""
+      },
+      "expected": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      }
+    },
+    {
+      "id": "cap-bool",
+      "params": {
+        "capabilities": true
+      },
+      "expected": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      }
+    }
+  ],
+  "versions": [
+    {
+      "id": "version-missing",
+      "omitVersion": true,
+      "accepted": true
+    },
+    {
+      "id": "version-accept-0",
+      "version": null,
+      "accepted": true
+    },
+    {
+      "id": "version-accept-1",
+      "version": 0,
+      "accepted": true
+    },
+    {
+      "id": "version-accept-2",
+      "version": 1,
+      "accepted": true
+    },
+    {
+      "id": "version-accept-3",
+      "version": -2147483648,
+      "accepted": true
+    },
+    {
+      "id": "version-accept-4",
+      "version": 2147483647,
+      "accepted": true
+    },
+    {
+      "id": "version-accept-5",
+      "version": "1",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-6",
+      "version": " 1",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-7",
+      "version": "1 ",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-8",
+      "version": "1.0",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-9",
+      "version": "-2147483648",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-10",
+      "version": "2147483647",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-11",
+      "version": 1.0,
+      "accepted": true
+    },
+    {
+      "id": "version-accept-12",
+      "version": 1000.0,
+      "accepted": true
+    },
+    {
+      "id": "version-accept-13",
+      "version": "1e3",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-14",
+      "version": "+1",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-15",
+      "version": "-0",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-16",
+      "version": "\t1\r\n",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-17",
+      "version": "١",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-18",
+      "version": "１",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-19",
+      "version": "0x1p0",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-20",
+      "version": "0X1.8p1",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-21",
+      "version": "1D",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-22",
+      "version": "1f",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-23",
+      "version": "1e-9999",
+      "accepted": true
+    },
+    {
+      "id": "version-accept-24",
+      "version": "0x1p-9999",
+      "accepted": true
+    },
+    {
+      "id": "version-drop-0",
+      "version": 2147483648,
+      "accepted": false
+    },
+    {
+      "id": "version-drop-1",
+      "version": -2147483649,
+      "accepted": false
+    },
+    {
+      "id": "version-drop-2",
+      "version": 1.5,
+      "accepted": false
+    },
+    {
+      "id": "version-drop-3",
+      "version": "1.5",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-4",
+      "version": true,
+      "accepted": false
+    },
+    {
+      "id": "version-drop-5",
+      "version": false,
+      "accepted": false
+    },
+    {
+      "id": "version-drop-6",
+      "version": {},
+      "accepted": false
+    },
+    {
+      "id": "version-drop-7",
+      "version": [],
+      "accepted": false
+    },
+    {
+      "id": "version-drop-8",
+      "version": "x",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-9",
+      "version": "",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-10",
+      "version": " ",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-11",
+      "version": "2147483648",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-12",
+      "version": "-2147483649",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-13",
+      "version": "NaN",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-14",
+      "version": "Infinity",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-15",
+      "version": "inf",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-16",
+      "version": "0x1",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-17",
+      "version": "0x1p-1",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-18",
+      "version": " 1",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-19",
+      "version": " ١",
+      "accepted": false
+    },
+    {
+      "id": "version-drop-20",
+      "version": "𝟙",
+      "accepted": false
+    }
+  ],
+  "methods": [
+    {
+      "method": "unknown",
+      "expected": {
+        "error": {
+          "code": -32601,
+          "message": "Unsupported request method: unknown"
+        }
+      }
+    },
+    {
+      "method": "textDocument/unknown",
+      "expected": {
+        "error": {
+          "code": -32601,
+          "message": "Unsupported request method: textDocument/unknown"
+        }
+      }
+    },
+    {
+      "method": "unlaxer/unknown",
+      "expected": {
+        "error": {
+          "code": -32601,
+          "message": "Unsupported request method: unlaxer/unknown"
+        }
+      }
+    },
+    {
+      "method": "foo/$/bar",
+      "expected": {
+        "error": {
+          "code": -32601,
+          "message": "Unsupported request method: foo/$/bar"
+        }
+      }
+    },
+    {
+      "method": "$/foo",
+      "expected": {
+        "result": null
+      }
+    },
+    {
+      "method": "$/cancelRequest",
+      "expected": {
+        "result": null
+      }
+    },
+    {
+      "method": "$/progress",
+      "expected": {
+        "result": null
+      }
+    },
+    {
+      "method": "$/",
+      "expected": {
+        "result": null
+      }
+    },
+    {
+      "method": "completionItem/resolve",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/declaration",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/typeDefinition",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/implementation",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/documentHighlight",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "codeAction/resolve",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/codeLens",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "codeLens/resolve",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/formatting",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/rangeFormatting",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/onTypeFormatting",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/willSaveWaitUntil",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/documentLink",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "documentLink/resolve",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/documentColor",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/colorPresentation",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/prepareRename",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/prepareTypeHierarchy",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "typeHierarchy/supertypes",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "typeHierarchy/subtypes",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/prepareCallHierarchy",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "callHierarchy/incomingCalls",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "callHierarchy/outgoingCalls",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/selectionRange",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/semanticTokens/full/delta",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/semanticTokens/range",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/moniker",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/inlayHint",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "inlayHint/resolve",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/inlineValue",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "textDocument/diagnostic",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "workspace/executeCommand",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "workspace/symbol",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "workspaceSymbol/resolve",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "workspace/willCreateFiles",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "workspace/willRenameFiles",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "workspace/willDeleteFiles",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "workspace/diagnostic",
+      "expected": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      }
+    },
+    {
+      "method": "$/setTrace",
+      "expected": {
+        "error": {
+          "code": -32600,
+          "message": "Notification method requires a notification"
+        }
+      }
+    }
+  ],
+  "freshDocument": {
+    "source": "grammar Fresh { @root FreshStart ::= Absent; }",
+    "hover": {
+      "contents": {
+        "kind": "markdown",
+        "value": "Valid UBNF"
+      }
+    },
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 22
+          },
+          "end": {
+            "line": 0,
+            "character": 32
+          }
+        },
+        "severity": 1,
+        "code": "E-RULE-UNDEFINED",
+        "source": "ubnf-validator",
+        "message": "rule FreshStart references undefined rule or token 'Absent' — Define a rule or token named 'Absent'."
+      }
+    ]
+  },
+  "oldDocument": {
+    "source": "grammar Old { @root OldStart ::= 'o'; }",
+    "symbols": [
+      {
+        "name": "Old",
+        "kind": 3,
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 39
+          }
+        },
+        "selectionRange": {
+          "start": {
+            "line": 0,
+            "character": 8
+          },
+          "end": {
+            "line": 0,
+            "character": 11
+          }
+        },
+        "children": [
+          {
+            "name": "OldStart",
+            "kind": 5,
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 20
+              },
+              "end": {
+                "line": 0,
+                "character": 28
+              }
+            },
+            "selectionRange": {
+              "start": {
+                "line": 0,
+                "character": 20
+              },
+              "end": {
+                "line": 0,
+                "character": 28
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "keptSymbols": [
+    {
+      "name": "G",
+      "kind": 3,
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 38
+        }
+      },
+      "selectionRange": {
+        "start": {
+          "line": 0,
+          "character": 8
+        },
+        "end": {
+          "line": 0,
+          "character": 9
+        }
+      },
+      "children": [
+        {
+          "name": "Start",
+          "kind": 5,
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 18
+            },
+            "end": {
+              "line": 0,
+              "character": 23
+            }
+          },
+          "selectionRange": {
+            "start": {
+              "line": 0,
+              "character": 18
+            },
+            "end": {
+              "line": 0,
+              "character": 23
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

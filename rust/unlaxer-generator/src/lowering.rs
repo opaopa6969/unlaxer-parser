@@ -128,16 +128,37 @@ fn validate_name_predicates(grammar: &ast::GrammarDecl) -> Result<Vec<(String, S
     Ok(name_versions)
 }
 
+fn validate_ubnf_format(grammar: &ast::GrammarDecl) -> Result<()> {
+    // Count first: duplicates win even when the first version is invalid or a block.
+    let mut versions = grammar.settings.iter().filter(|s| s.key == "ubnf");
+    let first = versions.next();
+    if versions.next().is_some() {
+        return Err("duplicate global @ubnf setting".into());
+    }
+    if first.is_some_and(|s| !matches!(&s.value, SettingValue::String(v) if v == "v1" || v == "v2"))
+    {
+        return Err("@ubnf must be format version v1 or v2".into());
+    }
+    Ok(())
+}
+
 /// The syntax-only diagnostics from Java GrammarValidator, in validator order.
 /// Run after the existing schema checks (#825), before Rust's root requirement.
 fn validate_declarations(
     grammar: &ast::GrammarDecl,
     lexical: &HashMap<String, unlaxer_codegen::lexical::LexicalExpression>,
 ) -> Result<()> {
+    let version_result = validate_ubnf_format(grammar);
+    // RustGenerateCommand omits exactly `@whitespace: none` from the common
+    // validator. If ubnf fails there, only the remaining global styles precede it.
+    // Valid versions retain the original lowering checks on all whitespace settings.
     let whitespace: Vec<_> = grammar
         .settings
         .iter()
         .filter(|s| s.key == "whitespace")
+        .filter(|s| {
+            version_result.is_ok() || !matches!(&s.value, SettingValue::String(v) if v == "none")
+        })
         .collect();
     if whitespace.len() > 1 {
         return Err("E-WHITESPACE-GLOBAL-DUPLICATE: duplicate setting whitespace".into());
@@ -150,6 +171,7 @@ fn validate_declarations(
             format!("E-WHITESPACE-GLOBAL-STYLE: unsupported setting whitespace: {style}")
         })?;
     }
+    version_result?;
     for rule in &grammar.rules {
         let mut whitespace_count = 0;
         let mut mapping = None;
@@ -781,7 +803,8 @@ impl Lowering<'_> {
         for rule in &self.grammar.rules {
             validate_typeof(rule)?;
         }
-        let lexical = crate::lexical::compile(self.grammar)?;
+        let lexical = crate::lexical::compile(self.grammar)
+            .map_err(|message| format!("E-LEXICAL: {message}"))?;
         if !self.grammar.imports.is_empty() {
             return Err("unsupported imports".into());
         }
@@ -843,7 +866,7 @@ impl Lowering<'_> {
         for setting in &self.grammar.settings {
             if matches!(
                 setting.key.as_str(),
-                "tokenAdapter" | "tokenContract" | "embedded" | "embedding" | "comment"
+                "ubnf" | "tokenAdapter" | "tokenContract" | "embedded" | "embedding" | "comment"
             ) {
                 continue;
             }
@@ -860,7 +883,6 @@ impl Lowering<'_> {
                 return Err(format!("unsupported block setting {}", setting.key));
             };
             match setting.key.as_str() {
-                "ubnf" if value == "v1" || value == "v2" => {}
                 "feature"
                     if matches!(
                         value.as_str(),

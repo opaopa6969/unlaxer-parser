@@ -10,6 +10,8 @@ UBNF を Rust backend へ渡す前に、未対応の token・annotation・型指
 Java 向け生成の可否を調べる `--target java` は未実装で、引数エラーになる。
 
 `portable: true` は、現在の Rust backend の対応範囲・構造検証を通ったという意味。
+同じ入力の Rust 生成も構造エラーなく成功することを契約とする（出力先の I/O エラーや
+`--strict` による警告の失敗は別）。
 生成コードのコンパイル、手書き semantics の実装、言語間の評価結果、LSP/DAP、全機能の
 移植完了まで保証しない。対応範囲は [FULL-SPEC 対応表](../rust/FULL-SPEC.md) を参照する。
 `ADAPTER` / `@tokenAdapter` は [token adapter 契約](token-adapters.md) に従って検査する。
@@ -50,6 +52,8 @@ java -cp "unlaxer-dsl/target/classes:$(tr -d '\n' < unlaxer-dsl/target/rust-clas
   `P-STRUCTURE` は診断対象が root の grammar 宣言なので、その宣言の範囲を返す。
   schemaVersion 1 と既存フィールドを維持し、source 識別子は追加しない。root と位置不明の
   出典区分は内部で管理する。import 先のファイル名・位置の出力は引き続き未対応。
+
+`@whitespace` の値・規則注釈（引数なしは `javaStyle`）は、Java と同じく字句コンパイルに成功してから解決する（#923）。字句エラーがあると組込み `javaStyle` / `none` も `P-WHITESPACE` となり、値／注釈の元 span・subject を保持して `structure: blocked`・終了3を返す。`@comment` の宣言 whitespace 判定も字句エラー時には解決失敗とし、追加の `E-COMMENT-WHITESPACE` は出さない。generate は従来の先頭 `E-LEXICAL:` を維持する。独立期待値は [whitespace.json](../spec-corpus/feature-diagnostics/whitespace.json)。
 
 | 終了コード | stdout | stderr |
 |---|---|---|
@@ -109,6 +113,8 @@ JSON 値と配列順を両 host で比較する。空白や `\n` / `\u000a` 等�
 構造エラーやその最小位置を列挙するものではない。例外文言の正規表現解析で code や位置を
 推測しない。UBNF 構文失敗 `P-SYNTAX` は Java frontend の精密な位置 API がないため
 両 host とも `span: null`。部分 AST からの recovery は行わない。
+
+`@lexicalContext` の検査中に宣言的 token の `E-LEXICAL:` が発生しても、inventory は例外で中断せず構造検査へ委ねる（#916）。他の inventory 診断がない場合、両 host とも終了コード3・`failed`・grammar 全体の `P-STRUCTURE` を返す。`E-LEXICAL-CONTEXT-*` の診断位置と、generate が返す最初の `E-LEXICAL:` は従来どおり。terminal 数の上限（`E-LEXICAL-CONTEXT-LIMIT`）と字句エラーが同居する場合も、native は Java と同じく字句エラーを優先し、check は `P-STRUCTURE`、generate は最初の `E-LEXICAL:` を返す。
 
 ## 診断コード（schemaVersion 1）
 
@@ -192,6 +198,45 @@ precedence 欠如、未定義参照の順に検証し、root 欠如より先に�
 位置不明は最後に置く。同じ code・subject でも位置が違えば別件。
 単一エラーの出力、JSON schemaVersion 1、公開済み 3.3.0 は変更しない。
 
+## nested と通常 field の Rust 型検証（#832）
+
+Java-host の `check --target rust` は、Rust emitter と同じ commonField の型判定を使う。
+Java 型が等しくても、Rust の nested field は recursive schema を持つ別の内部表現なので、
+nested leaf と通常 leaf を同じ common field に直接混ぜると `P-COMMONFIELD` を返す。
+この判定は #825 の commonField 検証段階で行い、後段の eval や別規則の schema エラーで
+隠さない。IR ができた後にも emitter と共通の field 比較を行う。#832 では native の受理・拒否を維持する。
+
+issue の入力（`A` だけに `@nestedCaptures`、両 leaf が scalar text `value` を持つ）では、
+両 host とも `portable: false` / `structure: failed` / 終了コード 3、subject は
+`commonField schema`。span は annotation を含む `Root` 規則で、LF は `{start:13,end:70}`、
+CRLF は `{start:14,end:72}` となる。Rust 生成も従来どおり `E-COMMONFIELD-MISMATCH` で失敗する。
+
+Java 向け生成の受理条件は変更しない。この入力は Java 向けには生成できる。
+現行の Java CLI は `--grammar ... --output ... --generators Parser,AST,Mapper,Evaluator` を使い、
+`generate --target java` という構文は持たない。ここでの拒否は Rust target の契約であり、
+Java 向けの適否を表すものではない。
+
+現在、nested leaf と通常 leaf を直接混ぜて Rust の field 型が一致する組合せはない。
+正常例として、両 leaf の nested schema が等しい family、nested な sum 規則の下に通常 leaf を
+置く family、通常 leaf の common field が同じ nested node を参照する family は引き続き
+`passed` となり、両 Rust host の生成が成功する。共有 fixture でこれらを LF/CRLF とも確認する。
+
+## commonField の正規化した型比較（#869）
+
+両 leaf が `@nestedCaptures` の場合、`{ 'x' }` と `('x')+` は同じ `MANY TEXT`、
+`[ 'x' ]` と `('x')?` は同じ `OPTIONAL TEXT` として比較する。通常 field の場合、
+`(NUM | NUM)` と `('x' | 'y')` はどちらも Java の `Object` / Rust の `String` になる。
+これら3入力の `check --target rust` は両 host とも `portable: true`、`structure: passed`、
+診断なし、終了コード 0 を返し、`generate --target rust` の全生成ファイルも byte 一致する。
+
+native の source 検証は nested の構造・leaf kind・mapped node の名義型を比較し、
+生成直前には Rust IR field の一致を確認する。通常 group の子要素を再び名義型として比較しない。
+通常 leaf の `{ 'x' }` / `('x')+` と `[ 'x' ]` / `('x')?`、および nested leaf の
+`(NUM | NUM)` / `('x' | 'y')` は異なる型なので、従来どおり `P-COMMONFIELD`・終了コード 3 となる。
+#832 の nested / 通常 field の直接混在の拒否も維持する。
+正規化した shape が同じでも、`{ X }` と `( Y )+` のように mapped node の名義型が違えば
+`P-COMMONFIELD` となる（`{ X }` と `( X )+` は受理し、両 host の Rust 型は `Vec<Box<Ast>>`）。
+
 ## 境界と回帰修正
 
 - 両 host の Rust lowering で構造分析の深度上限を 256 に揃える。これは単なる rule 数ではなく、
@@ -221,14 +266,23 @@ LF/CRLF で比較し、`target/rust-portability.tsv` に 40 ケースの JSON・
 同じ code/subject の root 出現と null 出現、作り直された rule/element/@lexicalContext、解決失敗と成功を固定する。
 非 BMP 文字を含む9ケースを LF/CRLF で読み、両 host の JSON 全体を固定期待値（配列順・件数・CP 範囲を含む）と照合し、
 `target/rust-portability-imports.tsv` に18ケースの証拠を残す。native の workspace test も同じ fixture を使う。
-`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む92ケースを
+`structure-priority.json` は再現例と既存の `annotation-parity.ubnf` を含む114ケースを
 LF/CRLF で検証する。enum・eval・embedding・typeof・未定義参照・IR 検証のエラー、
 前段の syntax/module/inventory、bounded/precedence/nested、二規則の schema エラー、
 複数 grammar の順序、既存 commonField corpus の型・cardinality、共有 mapping の不一致が
 後の field・leaf・規則の schema エラーより先に `P-STRUCTURE` になることも固定する。
 annotation・capture・再帰を持つ正常な enum alias も受理し、別の eval エラーを隠さないことを確認する。
 両 host の JSON 全体と終了コードを比較し、`target/rust-portability-structure-priority.tsv`
-に184ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
+に228ケースの証拠を残す。native workspace test も同じ固定期待値を読む。
+#832 の8入力は直接混在の拒否・choice 順の反転・正常な3構成・eval/後続 schema との競合・
+非 BMP 文字を含む複数 grammar の診断順を固定する。うち7入力は Rust 生成の終了コードと
+失敗時の無出力、正常な3構成は両 host の全5生成ファイルの byte 一致も確認する。
+直接混在の2入力と正常な3構成は Java 向け生成の成功も固定する。
+#869 の14入力は3再現例・choice 順反転・非 BMP 文字の各3例と、従来の拒否を維持する3例、
+mapped node の受理例とその名義型違いの拒否例。
+LF/CRLF の全 JSON・終了コード・生成可否を検査する。成功する10入力では全5ファイルの byte 一致に加え、
+両 host の生成物をそれぞれ compile・実行し、common accessor の Rust 型、空/複数/optional/choice/node の値、
+AST variant と CP span、無効入力の拒否を共通の固定期待値に照合する。
 既存の生成可能な 122 文法でも両 host の check 成功と 610 生成ファイルの byte 一致を検査する。
 native CLI は `PATH=''` で実行し、入力・手書きファイルが変更されないことも確認する。
 

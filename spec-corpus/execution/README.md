@@ -32,7 +32,7 @@ validate は元入力のまま、syntax 受理後に validator / lowering / gene
 OPEN issue を必須とし、`observation` の backtick で列挙する corpus ID と既知差の集合を完全一致させる。
 解消後に未修正項目だけ残すことも検査で落ちる。
 
-`diagnostic-priority.json` は別途、単一・複数エラーを持つ 51 入力を root なし／root 付きで
+`diagnostic-priority.json` は別途、単一・複数エラーを持つ 61 入力を root なし／root 付きで
 実行する。Java validator の最初の ERROR と独立期待値を照合し、両 Rust host の lowering / generator が
 同じコードを選ぶことを確認する。既存入力は独立した有効な root を追加し、#843 の入力は
 `rootRule` で指定した対象規則に root を付ける。`detail` がある入力は両 host の従来説明も
@@ -61,6 +61,8 @@ Java-host の既存 `Rust subset: ` は説明内へ残し、対象コードを�
 Java validator と両 Rust host に照合する。さらに、全規則の名前述語を検証してから snapshot version の
 整合性を調べるため、後の規則の不正 capture / kind が前の version 競合より先になる2入力も比較する。
 `name-predicate/invalid.json` の assoc-conflict も、旧 native 専用の説明から共通の `E-NAME-PREDICATE-CONFLICT` へ揃えた。
+対象規則自身の root、optional/repeat/node/choice の capture と元の assoc-conflict も共通 fixture に含める。
+`@ubnf` の不正値・重複との組合せは LF / CRLF を固定し、名前述語の診断が先になることを比較する。
 名前述語なしの診断、単一エラーの説明と既存 check JSON は維持する。
 import なし修飾参照（`ns.Name`）は両 host とも従来の説明（qualified rule reference）を残して
 `E-RULE-UNDEFINED:` を付け、root 欠如より先に返す（#843）。import の解決経路は変更しない。
