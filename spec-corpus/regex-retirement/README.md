@@ -20,6 +20,13 @@ check JSON 全文と stderr、Playground stderr、generate/deps inspect の終�
 でも読み、Java の通常/snapshot 入口と native inspect の全 span・行・列を比較します。
 追加 CLI suite は `CodegenBatchHost` の1 JVMで処理し、native は空 PATHで起動します。
 
+`../cli-stderr.json` の `scope=value` は #983 の途中値検証の oracle です。
+79形 × 入口/local import × LF/CRLF × 4操作 × 両 CLI の2,528観測と、
+158 frontend入力を固定します。値エラー・旧 REGEX/旧 adapter の前後入替、
+前後の構文不正、末尾入力・複数 grammar・非 BMPを含み、各 host の既存の文面を保持します。
+Java が構文で拒否する字句 repeat / recovery と、mapper の最初の値エラーの対照も含みます。
+規則本体の native 入れ子上限後の安全な走査は #996 の残差です。
+
 `RegexRetirementConformanceTest` はこれを Java21 と Rust1.85 の両 frontend、両 host の
 生成 Rust byte 一致、実 javac/rustc consumer の parse/map で確認します。
 手順:

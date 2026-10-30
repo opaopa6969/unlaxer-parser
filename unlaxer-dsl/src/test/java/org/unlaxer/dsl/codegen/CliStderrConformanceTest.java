@@ -37,6 +37,8 @@ public class CliStderrConformanceTest {
 
     @Test(timeout=120000) public void qualifiedReferenceSyntaxMatchesJavaBeforeOutput() throws Exception { check("qualified"); }
 
+    @Test(timeout=120000) public void valueSyntaxPriorityMatchesJavaBeforeOutput() throws Exception { check("value"); }
+
     @Test(timeout=240000) public void localePathsRetainHostLimitsAndUtf8FileBytes() throws Exception {
         String classpath = Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
             .map(path -> Path.of(path).toAbsolutePath().toString()).collect(Collectors.joining(File.pathSeparator));
@@ -71,6 +73,7 @@ public class CliStderrConformanceTest {
             case "replacement" -> 60;
             case "regex" -> 640;
             case "qualified" -> 608;
+            case "value" -> 2528;
             case "blank" -> 350;
             case "output" -> 112;
             case "paths" -> 244;
