@@ -971,7 +971,8 @@ Java の `Files.createDirectories` に合わせ、最初に指定パスを mkdir
 絶対パスの既存親から作成を試みる。symlink 拒否と native の排他的な一時ファイル作成・置換は維持する。
 一時ファイルは各生成物と同じ directory に作る。Java が生成物ごとにその directory へ直接書く順序と
 権限の判定を保つためである。意図した差として、書込み失敗時に Java は途中まで書いた
-（`RLIMIT_FSIZE` 0 では空の）生成物を残すが、native は一時ファイルを消して既存の生成物を切り詰めない。
+（`RLIMIT_FSIZE` 0 では空の）生成物を残すが、native の通常の rename 経路では一時ファイルを消して既存の生成物を切り詰めない。
+#971 の hard link と一時ファイル作成権限のない directory の2経路だけは、下記のとおり Java と同じその場書込みに退避する。
 fixture はこの違いを host ごとの作成物一覧として固定する。
 Playground の乱数/PID部分だけを `.ubnf-playground-${TEMP}` に正規化し、親パスを比較から除かない。
 対象 fixture では staging が作られる前に失敗し、一時ディレクトリも残らない。
@@ -1065,8 +1066,7 @@ mode 444 の判定は各生成物の書込み順で、既存ファイルを trun
 Unix では `O_NOFOLLOW | O_NONBLOCK` を付け、事前検査後に末尾成分が symlink へ差し替わっても追わない。
 失敗時にそれ以前の生成物だけが残る順序も Java と一致する。
 #937 の各生成物と同じ directory への排他的な一時ファイル作成・rename と、書込み失敗時に
-既存生成物を切り詰めない契約は維持する。この rename 方式のため、上書きに成功した場合の mode・hard link と、
-mode 555 の directory 内で書込み可能な既存生成物を置き換える場合は Java と異なる。これは #971 で追跡する。
+既存生成物を切り詰めない契約は、下記 #971 の2つの退避経路を除いて維持する。
 
 `spec-corpus/cli-stderr.json` の追加 `paths` suite は33形、LF/CRLF・両実 CLI の244観測と、
 成功後の `--check` 114回。終了コード・stdout全文・stderr最終行・全ツリーの名前/type/mode/内容ハッシュを
@@ -1078,6 +1078,53 @@ chmod(444) の file と chmod(555) の directory は実行ユーザーで別々�
 既存 `CliStderrConformanceTest` に必須メソッドを追加し、cli shard と JDK17 契約の両方で実行する。
 成功 stdout の変更に伴う移行手順は [3.3.0 以降の移行](migration-after-3.3.0.md#native-cli-の出力先パス952)を参照。
 
+
+## 既存生成物の mode・hard link・directory 権限（#971）
+
+Java `CodegenMain` の `Files.writeString` が参照実装で、Java 製品コードは変更しない。
+native の `generate` は通常、既存ファイルを truncate せず書込み用に open して権限を確認し、
+同じ directory の一時ファイルへ書き、既存の permission bits を写してから rename する。
+既存ファイルがあるとき一時ファイルは mode 600 で作り、内容を書き始める前に既存の permission bits を写す。
+書込み後には写し直さないので、Java のその場書込みと同じく非 root の書込みで set-user-ID と
+group execute 付きの set-group-ID が OS により解除される。
+新規ファイルには既存 mode を写さず、`0666 & ~umask` を用いる。
+
+| 形 | Java / native の結果 |
+| --- | --- |
+| 既存生成物が mode 600 / 640 | 成功し、既存の mode を保つ。native は rename 前に mode を写す。 |
+| 既存生成物が mode 4755 / 2755 / 2645、hard link 付き 4755 | 成功し、非 root では 755 / 755 / 2645 / 755 になる（書込みによる解除）。 |
+| 既存生成物の nlink > 1 | 成功し、全 hard link の内容と nlink を保つ。native は既に開いた同じ handle へのその場書込みに切り替える。 |
+| 出力 directory が555、既存生成物は書込み可能 | 成功し、mode・nlink を保つ。一時ファイル作成が PermissionDenied になったときだけ、既存の書込み用 handle へその場書込みする。 |
+| 既存生成物が444、非 root | 両方とも終了4。既存内容は変えず、後続ファイルを書かない（#952 のまま）。 |
+| 新規ファイル、umask 022 / 002 / 077 | 両方とも mode 644 / 664 / 600。新規 Playground の生成物も同じ。Playground root の Java 700 / native umask 由来の既存差は #952 のまま。 |
+| root で既存生成物が444（未実測の推定） | 書込み用 open が成功すれば両方とも成功して444を保持する見込み。runner は非 root、sudo 不可なので root の実測とは扱わない。 |
+
+その場書込みへの退避は **hard link と既存ファイルの sibling 一時ファイルを作成できない権限拒否の2経路だけ**。
+既に開いた handle を使い、truncate のためにパスを開き直さない。Unix の末尾 symlink 拒否
+（`O_NOFOLLOW | O_NONBLOCK`）と既存の preflight は維持する。
+衝突（AlreadyExists）・容量不足等の別の一時ファイル作成失敗では退避せず、元の失敗を返す。
+新規出力しかない555 directory の失敗文・順序は #937 の表から変わらない。
+Playground は既存出力先を拒否し新しい staging に書くので、その場書込みへの退避は発生しない。
+
+この2経路では #937 の「書込み失敗時に既存生成物を切り詰めない」保証が Java と同じ水準へ下がる。
+truncate 後の write に失敗すると空または部分内容を残し、hard link の別名にも反映される。
+通常の rename 経路では失敗時に既存 bytes を保持する。ファイル群全体の transaction は保証しない。
+
+**意図した差**: rename 経路は inode を置き換えるため、mode 以外の所有者・ACL・xattr は保存しない。
+新しいファイルの所有者と directory 由来の ACL 等になる。Java のその場書込みは同じ inode の属性を保持する。
+#937 の失敗時の bytes 保護を維持し、新しい依存 crate や特権による属性移植を加えない最小の選択である。
+その場書込みの2経路では、同じ inode を保つため所有者・ACL・xattr も Java と同じく保たれる
+（OS が書込みで更新・解除する属性は OS の規則による）。台帳 `cli-output-replacement-metadata` に記録する。
+
+共通 `replacement` suite は15形、LF/CRLF・両 CLI の60観測と成功後 check 44回。
+exit・stdout 全文・stderr 最終行と全ツリーの mode・nlink・内容ハッシュを独立期待値に照合する。
+各 host の前に古い生成物を作り直し、一方の成功を他方の入力にしない。
+通常成功ケースは既存 `CodegenBatchHost` から実 `CodegenMain.run` を1 JVMで呼び、
+umask と RLIMIT_FSIZE を変えるケースは実 CLI process を起動する。
+hard link / 555 directory の途中書込み失敗と通常 rename の既存 bytes 保護も対照検証する。
+chmod(555/444) を迂回できる実行ユーザーと、set-ID を解除しない root では該当の非 root ケースだけを理由付き除外し、
+root 専用の行は推定として残す。CI は非 root で除外0・JUnit skip0を必須とする。
+cli shard と JDK17 の既存クラス登録を使い、両契約に新メソッドを必須登録する。
 
 ## Playground profile 入力の I/O エラー（#953）
 
