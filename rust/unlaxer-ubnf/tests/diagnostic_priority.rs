@@ -101,6 +101,9 @@ fn recognition_after_the_ast_limit_is_iterative_and_keeps_syntax_priority() {
                 ("CATCH(", ",'fallback',tag)"),
                 ("CATCH('fallback',", ",tag)"),
                 ("P(", ")"),
+                // Every argument of a multi-argument call is recognized.
+                ("Q('b', 'c', ", ")"),
+                ("Q(", ", 'b', 'c')"),
                 ("(", ") % ','"),
                 ("',' % (", ")"),
                 ("(", ")?"),
@@ -121,7 +124,7 @@ fn recognition_after_the_ast_limit_is_iterative_and_keeps_syntax_priority() {
                     ),
                 ] {
                     let source =
-                        format!("grammar G {{ {retired} R ::= {body}; {tail} P(x) ::= x; }}");
+                        format!("grammar G {{ {retired} R ::= {body}; {tail} P(x) ::= x; Q(x, y, z) ::= x y z; }}");
                     let error = unlaxer_ubnf::parse(&source).unwrap_err();
                     assert_eq!(error.kind, kind, "{open} / {tail}: {error}");
                     if !retired.is_empty() && tail.is_empty() {

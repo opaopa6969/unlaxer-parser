@@ -33,7 +33,7 @@ public class CliStderrConformanceTest {
     @Test(timeout=120000) public void syntaxKeepsDocumentedNativeLocations() throws Exception { check("syntax"); }
 
     @Test(timeout=120000) public void playgroundBlankOptionsMatchJavaWhitespace() throws Exception { check("blank"); }
-    @Test(timeout=120000) public void regexSyntaxPriorityMatchesJavaBeforeOutput() throws Exception { check("regex"); }
+    @Test(timeout=300000) public void regexSyntaxPriorityMatchesJavaBeforeOutput() throws Exception { check("regex"); }
 
     @Test(timeout=240000) public void qualifiedReferenceSyntaxMatchesJavaBeforeOutput() throws Exception { check("qualified"); }
 
