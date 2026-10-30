@@ -1212,8 +1212,8 @@ generate / deps inspect は出力の作成前に終了3となり、エラー本�
 
 構文として正しい未解決参照の generate は、既存の Java validator の詳細と native の
 `E-RULE-UNDEFINED: unsupported qualified rule reference` という説明を維持する（#843）。
-rule を含む module の拒否で native の `E-MODULE` に元ファイルのパスがない既存差は
-[#988](https://github.com/opaopa6969/unlaxer-parser/issues/988) へ分離した。
+rule を含む module の拒否の元パスは [#988](https://github.com/opaopa6969/unlaxer-parser/issues/988) で
+共通期待値へ統合し、下記の4形を加えた42ケース・672観測に拡張する。
 この名前空間参照の修正では値検証の順序を変えない（別途 #983）。Java の製品コード・診断文、公開3.3.0 は変更しない。
 
 ## CLI の出力先パス（#952）
@@ -1370,3 +1370,30 @@ native は `Usage: unlaxer playground ...`。既存 native の generate / check 
 `CodegenBatchHost` から実際の `CodegenMain.run` を呼び、Java の起動を175回から1回にする。
 全呼出しの前後で空の作業ツリーを検査し、他の suite は従来の実 CLI 起動を維持する。
 既存 cli shard と JDK17 の必須メソッド契約へ追加し、新クラスや依存 crate は追加しない。
+
+## rule を含む local module の拒否（#988）
+
+Java の既存診断を基準に、native も `generate --target rust` / `deps inspect` で
+`E-MODULE: only declarative token modules can be imported: <元ファイルの絶対パス>` を返す。
+パスは入口や途中の bridge ではなく、拒否された module 自体の絶対・字句正規化したパスである。
+構文認識後、module の import を辿る前に拒否し、終了3、入力不変、出力と staging 不在を維持する。
+`check --format json` と Playground の `P-MODULE` は変えない。
+authoring LSP も同じ loader を使うため、import 宣言の range と `import <alias>: ` を保ち、
+診断 message の元パスが Java に揃う。失敗後の文書更新・要求も引き続き処理する。
+
+`spec-corpus/cli-stderr.json` の qualified suite は、入口・推移的 import、
+`é😀 space/part.ubnf`、LF/CRLF の4形を手書きの独立期待値で固定する。
+追加ケースは Java の実 launcher と JVM 不要の native CLI、同じ入力の両 authoring stdio に送る。
+既存の正常 declarative token import の生成 bytes と `--check` は維持する。
+JVM がパスへ変換できない文字・生 bytes、および C ロケールの表示については、
+上記「JVM のファイル名変換制約」（#966 / PR #991）と同じ恒久差とする。
+native の UTF-8 表示や利用可能なパスの読取りを故意に失敗させない。
+この非 ASCII module パスも C ロケールでは、両 JDK が module の読取り前に
+`Malformed input or input contains unmappable characters: ?? space/part.ubnf`
+（推移的 import の記述は `./?? space/part.ubnf`）で終了3となる。
+native は同じ終了3で UTF-8 の絶対元パス付き `E-MODULE` を返す。
+
+隣接する拒否のうち、`import requires exactly one grammar` の絶対元パスと
+`network imports are unsupported` の URL が native に付かない表示差は #999 で追跡する。
+両方とも generate / deps inspect の終了3と無出力は一致する。#988 は rule を含む module の
+拒否だけを扱い、この2つの既存診断は変更しない。

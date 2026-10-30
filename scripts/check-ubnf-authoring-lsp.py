@@ -171,6 +171,7 @@ def run(java, native, directory):
             assert client.result('textDocument/hover', params) is None
             assert client.result('textDocument/completion', params) == []
         evidence.append({'case': case['id'], 'completionItems': len(completions[0]), 'diagnosticContract': 'syntax-accept-reject-only' if case.get('syntaxError') else 'module-exact' if case.get('moduleError') else 'validator-pending' if case.get('validatorGap') else 'exact'})
+    evidence.extend(module_rejections(clients, directory))
     evidence.extend(import_buffers(clients, directory))
     evidence.extend(packages(clients, directory))
     evidence.extend(validator_diagnostics(clients, directory))
@@ -179,6 +180,41 @@ def run(java, native, directory):
         assert client.request('textDocument/hover')['error']['code'] == -32600
         client.send('exit')
         assert client.process.wait(timeout=10) == 0
+    return evidence
+
+
+def module_rejections(clients, directory):
+    """#988: the same independent CLI fixtures pin full authoring diagnostics."""
+    from cli_input_errors import setup, snapshot
+    cases = [case for case in json.loads((ROOT / 'spec-corpus/cli-stderr.json').read_text())['cases']
+             if case.get('moduleRejection')]
+    assert len(cases) == 4, 'module rejection fixtures must not silently disappear'
+    evidence = []
+    for case in cases:
+        for ending, separator in [('LF', '\n'), ('CRLF', '\r\n')]:
+            folder = directory / (case['id'] + '-' + ending)
+            setup(folder, case, separator)
+            before = snapshot(folder)
+            uri = (folder / 'main.ubnf').as_uri()
+            source = case['files']['main.ubnf'].replace('\n', separator)
+            expected = json.loads(json.dumps(case['lspExpected'], ensure_ascii=False)
+                                  .replace('${WORK}', str(folder)))
+            observations = []
+            for host, client in zip(('java', 'rust'), clients):
+                client.send('textDocument/didOpen', {'textDocument': {
+                    'uri': uri, 'languageId': 'ubnf', 'version': 1, 'text': source}})
+                actual = client.diagnostics(uri)
+                assert actual == expected, (case['id'], ending, host, actual, expected)
+                observations.append(dict(host=host, diagnostics=actual))
+                client.send('textDocument/didChange', {'textDocument': {'uri': uri, 'version': 2},
+                            'contentChanges': [{'text': "grammar Fixed { @root Start ::= 'x'; }"}]})
+                assert client.diagnostics(uri) == []
+                assert client.result('textDocument/completion', {'textDocument': {'uri': uri},
+                    'position': {'line': 0, 'character': 37}}) is not None
+                client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
+                assert snapshot(folder) == before, (case['id'], ending, host, 'filesystem changed')
+            evidence.append(dict(case=case['id'], ending=ending, observations=observations,
+                                 before=before, after=snapshot(folder)))
     return evidence
 
 

@@ -9,7 +9,7 @@
     "blank": 175,
     "replacement": 15,
     "regex": 40,
-    "qualified": 38,
+    "qualified": 42,
     "value": 158
   },
   "cases": [
@@ -17580,36 +17580,6 @@
             "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
           }
         }
-      },
-      "nativeByEnding": {
-        "LF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          }
-        },
-        "CRLF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          }
-        }
       }
     },
     {
@@ -18015,36 +17985,6 @@
             "stdout": "",
             "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf",
             "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
-          }
-        }
-      },
-      "nativeByEnding": {
-        "LF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          }
-        },
-        "CRLF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
           }
         }
       }
@@ -18454,36 +18394,6 @@
             "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
           }
         }
-      },
-      "nativeByEnding": {
-        "LF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          }
-        },
-        "CRLF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          }
-        }
       }
     },
     {
@@ -18889,36 +18799,6 @@
             "stdout": "",
             "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf",
             "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
-          }
-        }
-      },
-      "nativeByEnding": {
-        "LF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          }
-        },
-        "CRLF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
           }
         }
       }
@@ -19328,36 +19208,6 @@
             "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
           }
         }
-      },
-      "nativeByEnding": {
-        "LF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          }
-        },
-        "CRLF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          }
-        }
       }
     },
     {
@@ -19763,36 +19613,6 @@
             "stdout": "",
             "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf",
             "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
-          }
-        }
-      },
-      "nativeByEnding": {
-        "LF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          }
-        },
-        "CRLF": {
-          "generate": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
-          },
-          "inspect": {
-            "exit": 3,
-            "stdout": "",
-            "lastError": "E-MODULE: only declarative token modules can be imported",
-            "stderr": "E-MODULE: only declarative token modules can be imported\n"
           }
         }
       }
@@ -37970,6 +37790,364 @@
           }
         }
       }
+    },
+    {
+      "id": "module-reject-direct",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'part.ubnf'\n @ubnf: v2\n @root Start ::= m.Start;\n}\n",
+        "part.ubnf": "grammar G {\n @import absent from 'must-not-be-read.ubnf'\n @root Start ::= a.N; N ::= 'x';\n}\n"
+      },
+      "realCli": true,
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 27
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: only declarative token modules can be imported: ${WORK}/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-reject-transitive",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'bridge.ubnf'\n @ubnf: v2\n @root Start ::= m.Start;\n}\n",
+        "lib/part.ubnf": "grammar G {\n @import absent from 'must-not-be-read.ubnf'\n @root Start ::= a.N; N ::= 'x';\n}\n",
+        "bridge.ubnf": "grammar Bridge {\n @import inner from './lib/part.ubnf'\n @ubnf: v2\n token Start ::= inner.Start;\n}\n"
+      },
+      "realCli": true,
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/lib/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/lib/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/lib/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/lib/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/lib/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/lib/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/lib/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/lib/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 29
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: only declarative token modules can be imported: ${WORK}/lib/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-reject-unicode-direct",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'é😀 space/part.ubnf'\n @ubnf: v2\n @root Start ::= m.Start;\n}\n",
+        "é😀 space/part.ubnf": "grammar G {\n @import absent from 'must-not-be-read.ubnf'\n @root Start ::= a.N; N ::= 'x';\n}\n"
+      },
+      "realCli": true,
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 37
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-reject-unicode-transitive",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'bridge.ubnf'\n @ubnf: v2\n @root Start ::= m.Start;\n}\n",
+        "é😀 space/part.ubnf": "grammar G {\n @import absent from 'must-not-be-read.ubnf'\n @root Start ::= a.N; N ::= 'x';\n}\n",
+        "bridge.ubnf": "grammar Bridge {\n @import inner from './é😀 space/part.ubnf'\n @ubnf: v2\n token Start ::= inner.Start;\n}\n"
+      },
+      "realCli": true,
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 29
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: only declarative token modules can be imported: ${WORK}/é😀 space/part.ubnf"
+        }
+      ],
+      "tree": {}
     }
   ],
   "trees": {
