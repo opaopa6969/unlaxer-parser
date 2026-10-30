@@ -1207,5 +1207,264 @@
     "hostHeader": "localhost:{port}",
     "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
     "backendIssue": 979
+  },
+  {
+    "id": "framing-header-bytes-71680",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 71680
+  },
+  {
+    "id": "framing-header-bytes-204800",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 204800
+  },
+  {
+    "id": "framing-header-bytes-512000",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 512000,
+    "javaJdk17Error": null
+  },
+  {
+    "id": "framing-header-bytes-2097152",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 2097152,
+    "javaJdk17Error": null
+  },
+  {
+    "id": "framing-header-bytes-393215",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393215,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-header-bytes-393216",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393216,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-header-bytes-393217",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393217,
+    "javaJdk17Error": null
+  },
+  {
+    "id": "framing-header-bytes-393064",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393064
+  },
+  {
+    "id": "framing-header-bytes-393065",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393065
+  },
+  {
+    "id": "framing-header-bytes-393066",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393066
+  },
+  {
+    "id": "framing-header-lines-127",
+    "kind": "framing",
+    "error": null,
+    "headerLines": 127
+  },
+  {
+    "id": "framing-header-lines-128",
+    "kind": "framing",
+    "error": null,
+    "headerLines": 128
+  },
+  {
+    "id": "framing-header-lines-129",
+    "kind": "framing",
+    "error": null,
+    "headerLines": 129,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-header-lines-200",
+    "kind": "framing",
+    "error": null,
+    "headerLines": 200,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-cl-te",
+    "kind": "framing",
+    "error": "invalid JSON",
+    "shape": "cl-te",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-gzip-chunked",
+    "kind": "framing",
+    "error": "invalid JSON",
+    "shape": "gzip-chunked",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-chunked-gzip",
+    "kind": "framing",
+    "error": "invalid JSON",
+    "shape": "chunked-gzip",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-repeated-te",
+    "kind": "framing",
+    "error": "invalid JSON",
+    "shape": "repeated-te",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-duplicate-cl",
+    "kind": "framing",
+    "error": null,
+    "shape": "duplicate-cl"
+  },
+  {
+    "id": "framing-duplicate-cl-different",
+    "kind": "framing",
+    "error": null,
+    "shape": "duplicate-cl",
+    "delta": 1,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-negative-cl",
+    "kind": "framing",
+    "error": null,
+    "shape": "negative-cl",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-colonless",
+    "kind": "framing",
+    "error": null,
+    "shape": "colonless",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-obs-fold",
+    "kind": "framing",
+    "error": null,
+    "shape": "obs-fold",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-plus-cl",
+    "kind": "framing",
+    "error": null,
+    "shape": "plus-cl",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-204-plus-cl",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "plus-cl",
+    "status": 204,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-header-bytes-393070",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393070
+  },
+  {
+    "id": "framing-header-bytes-393071",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393071
+  },
+  {
+    "id": "framing-header-bytes-393072",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393072
+  },
+  {
+    "id": "framing-header-bytes-393073",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393073
+  },
+  {
+    "id": "framing-header-bytes-393074",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393074
+  },
+  {
+    "id": "framing-header-bytes-393075",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393075,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-header-bytes-393076",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393076,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-header-bytes-393077",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393077,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-404-cl-te",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "cl-te",
+    "status": 404
+  },
+  {
+    "id": "framing-500-gzip-chunked",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "gzip-chunked",
+    "status": 500
+  },
+  {
+    "id": "framing-404-negative-cl",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "negative-cl",
+    "status": 404,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-te-mixed-case",
+    "kind": "framing",
+    "error": null,
+    "shape": "te-mixed-case"
+  },
+  {
+    "id": "framing-te-ows",
+    "kind": "framing",
+    "error": null,
+    "shape": "te-ows"
   }
 ]
