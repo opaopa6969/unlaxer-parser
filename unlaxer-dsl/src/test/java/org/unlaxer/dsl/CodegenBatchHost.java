@@ -3,6 +3,8 @@ package org.unlaxer.dsl;
 import com.google.gson.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
+import java.util.Base64;
 
 /**
  * Test-only fixture host: runs {@link CodegenMain#run} for one JSON argument vector per
@@ -30,16 +32,36 @@ public final class CodegenBatchHost {
             protocol.println(limited ? "limited" : "unlimited");
             return;
         }
+        // Locale fixtures cross the OS argv byte boundary and capture the same stream
+        // encoders as the launcher. The UTF-8 protocol must not hide C-locale failures.
+        boolean localePaths = options.length == 1 && options[0].equals("--locale-paths");
+        Charset filenames = Charset.forName(System.getProperty("sun.jnu.encoding"));
+        Charset stdout = localePaths ? Charset.forName(System.getProperty(
+            "stdout.encoding", System.getProperty("sun.stdout.encoding", Charset.defaultCharset().name()))) : StandardCharsets.UTF_8;
+        Charset stderr = localePaths ? Charset.forName(System.getProperty(
+            "stderr.encoding", System.getProperty("sun.stderr.encoding", Charset.defaultCharset().name()))) : StandardCharsets.UTF_8;
+        if (options.length == 1 && options[0].equals("--locale-info")) {
+            JsonObject info = new JsonObject();
+            info.addProperty("jdk", System.getProperty("java.specification.version"));
+            info.addProperty("filenames", filenames.name());
+            info.addProperty("files", Charset.defaultCharset().name());
+            info.addProperty("stdout", System.getProperty("stdout.encoding", System.getProperty("sun.stdout.encoding", Charset.defaultCharset().name())));
+            info.addProperty("stderr", System.getProperty("stderr.encoding", System.getProperty("sun.stderr.encoding", Charset.defaultCharset().name())));
+            protocol.println(info);
+            return;
+        }
         PrintStream originalOut = System.out, originalErr = System.err;
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         for (String line; (line = input.readLine()) != null; ) {
             JsonArray vector = JsonParser.parseString(line).getAsJsonArray();
             String[] args = new String[vector.size()];
-            for (int i = 0; i < args.length; i++) args[i] = vector.get(i).getAsString();
+            for (int i = 0; i < args.length; i++) args[i] = localePaths
+                ? new String(Base64.getDecoder().decode(vector.get(i).getAsString()), filenames)
+                : vector.get(i).getAsString();
             ByteArrayOutputStream out = new ByteArrayOutputStream(), err = new ByteArrayOutputStream();
             int exit;
-            try (PrintStream o = new PrintStream(out, true, StandardCharsets.UTF_8);
-                 PrintStream e = new PrintStream(err, true, StandardCharsets.UTF_8)) {
+            try (PrintStream o = new PrintStream(out, true, stdout);
+                 PrintStream e = new PrintStream(err, true, stderr)) {
                 // Stray writes to the global streams are captured with the call's own output.
                 System.setOut(o); System.setErr(e);
                 try { exit = CodegenMain.run(args, o, e); }
@@ -51,8 +73,8 @@ public final class CodegenBatchHost {
             }
             JsonObject answer = new JsonObject();
             answer.addProperty("exit", exit);
-            answer.addProperty("stdout", out.toString(StandardCharsets.UTF_8));
-            answer.addProperty("stderr", err.toString(StandardCharsets.UTF_8));
+            answer.addProperty("stdout", out.toString(stdout));
+            answer.addProperty("stderr", err.toString(stderr));
             protocol.println(answer);
         }
     }

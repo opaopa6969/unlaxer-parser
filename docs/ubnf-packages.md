@@ -265,10 +265,67 @@ Java の独立 home probe と実 CLI の診断・exit を使い、同じ子環�
 JDK17 の差は `javaSelected17` として記録し、skip しない。TLS の最終診断は #956 で共通化した。
 CI の cross-language job（cli shard）は JDK21、JDK17 も既存の jdk17-parity step の
 `credentialsLocationsMatchJavaHomeAndPaths` で全形を実行する（#967 / #975）。
-非 UTF-8 ロケールで Java が非 ASCII のパスを扱えない差は [#966](https://github.com/opaopa6969/unlaxer-parser/issues/966) で追跡する。
+非 UTF-8 ロケールと生バイト名の恒久差は、下記「CLI のロケールとファイル名」（#966）の契約に従う。
 Linux のテスト専用 `LD_PRELOAD` shim は子プロセスだけへ仮の passwd home を返し、実 passwd lookup へ fallback しない。
 実 credentials は開かず、前後の存在・inode・size・mtime/ctime（symlink とリンク先）で不変を検査する。
 結果は `target/rust-package-credentials-location.json` に、値を含めず選択ファイルのラベルと所要時間で記録する。
+
+## CLI のロケールとファイル名（#966）
+
+Linux の Java CLI は OS の argv・環境変数・passwd home を JVM の
+`sun.jnu.encoding` で復号し、`Path.of` は同じ文字コードへ再変換する。
+Oracle JDK17.0.12 / 21.0.9 では `LC_ALL` が未設定なら `LANG`、両方未設定または
+有効値が `C` なら US-ASCII、`C.UTF-8` なら UTF-8 になる。`LC_ALL` は `LANG` に優先する。
+CI 自身のロケールは変更せず、子だけで全9組合せを検証する。
+
+この制約による Java の失敗を native に移植しない。native は OS のパス bytes を保持し、
+利用可能なファイルを読み書きできる契約を維持する。利用者の成功する操作を意図的に
+失敗させる利益がなく、言語仕様・parser の機能差でもないための恒久差である。
+Java 製品コード・診断・公開済み3.3.0・parser ホットパスは変更しない。
+
+| パスの形 | Java（JDK17 / 21） | native Rust | 判断 |
+| --- | --- | --- | --- |
+| UTF-8 の非 ASCII manifest / grammar / 出力先 / import / credentials override / passwd home、有効ロケール `C` または未設定 | exit 3、最終行 `Malformed input or input contains unmappable characters: ...`。lock/cache・出力は不変 | exit 0、指定したファイルを使用 | JVM のパス変換による恒久差 |
+| 同じ6形、有効ロケール `C.UTF-8` | exit 0 | exit 0、同じ lock/cache・生成 bytes | 一致を固定 |
+| 非 UTF-8 の `raw-FF`（FF は単一 byte）の manifest、`C.UTF-8` | exit 3、`E-PACKAGE: missing manifest; run unlaxer deps resolve --manifest ubnf.json` | exit 0、生 bytes の名前を使用 | JVM が FF を U+FFFD に復号する恒久差 |
+| 同じ生バイト名の grammar / import を含む親ディレクトリ | exit 4、置換後の絶対パス（`raw-�`） | exit 0、生 bytes の名前を使用 | 同上 |
+| 同じ生バイト名の出力先 | exit 0、`raw-�` という **別の名前** を作る | exit 0、元の FF を含む名前を作る | ファイル名は恒久差。両方の生成内容 bytes は一致 |
+| 同じ生バイト名の credentials override | exit 3、`E-PACKAGE: artifact credentials file is missing` | exit 0、指定ファイルでローカル TLS 取得 | JVM の復号による恒久差 |
+| 同じ生バイト名の passwd home | 置換後の home に既定 credentials がなく、fixture の私有 CA を得られない。exit 3、`E-PACKAGE: HTTPS artifact retrieval failed (TLS, timeout or size limit)` | exit 0、元の home の credentials を使用 | 同上。Java の診断は TLS fixture の条件下の値 |
+| 生バイト名、有効ロケール `C` または未設定（ASCII 名の symlink を経る import を除く） | exit 3、`Malformed input ...` | exit 0 | JVM のパス変換による恒久差 |
+| ASCII 名の import symlink の target に生バイト名がある | 両ロケールで exit 0。target の bytes は OS が辿る | exit 0 | 同じ生成 bytes |
+
+UTF-8 の grammar 本文には FF のファイル名を直接書けない。共通 fixture は任意の
+置換文字をその名前の代用にせず、ASCII import → 生バイト target の symlink と、
+生バイト親ディレクトリ → ASCII の相対 import の両境界を測る。
+UTF-16 の単独 surrogate を文法に通す #959 は扱わない。
+argv は OS bytes から復号するため、`é😀` は C で6個の置換文字になる。
+UTF-8 本文から読む import の `é😀` は2コードポイントのままで、最終 stderr は
+ASCII encoder により `??` と表示する。この区別も独立した実 CLI の期待値で固定する。
+
+**本文 bytes はファイル名と別の契約**とする。JDK17 の `file.encoding` は C で
+US-ASCII、JDK21 は UTF-8 だが、対象 CLI の grammar / manifest / credentials reader と
+生成 writer は UTF-8 を使う。ASCII パス上の非 ASCII grammar・manifest・credentials・
+取得 cache・生成物・Playground/profile の bytes は両 JDK/native とも一致する。
+不正 UTF-8 grammar/import は `Input length = 1` / exit 4、manifest は
+`E-PACKAGE: invalid JSON` / exit 3、credentials は
+`E-PACKAGE: cannot read artifact credentials` / exit 3。
+既存の手書き出力は `refusing to overwrite non-generated file ...` / exit 4。
+これらの両方失敗する形は診断・exit・全入力/lock/cache/出力不変を一致させる。
+今回の実測では本文 I/O や共通失敗条件に実装修正を要する差はなかった。
+
+共通 `spec-corpus/cli-locale-paths.json` の23形を既存
+`CliStderrConformanceTest#localePathsRetainHostLimitsAndUtf8FileBytes` で実行する。
+9環境 × 両 host × 既存 lock/cache 有無の828観測を、host 別の固定期待値と照合する。
+生バイト名は証跡のツリーで hex にして lossless に記録し、生成ファイルは全内容の
+SHA-256 を固定する。成功時も意図しない別名・追加ファイルを検出する。
+Java は同じ環境内を `CodegenBatchHost --locale-paths` の1 JVMにまとめ、OS argv の
+復号と実 CLI の stdout/stderr encoder を再現する。`--unbatched` は実 CLI の独立照合用。
+JVM の起動と `sun.jnu.encoding` / default charset を毎環境で確認し、fixture を skip しない。
+credentials は child-only の passwd/HOME shim、ローカル TLS、ダミー値だけを使う。
+実ユーザーの credentials は開かず、前後の metadata 不変も検査する。
+結果と runner のロケールは `target/cli-stderr-locale.json` に記録する。
+既存 cli shard と jdk17-parity の必須メソッド登録で両 JDK が実行する。
 
 必要な場合は同じ entry に `caCertificate`（ユーザー/CI が管理する PEM CA bundle の
 絶対パス）を追加できる。明示 CA の trust store を使って TLS/hostname 検証を続ける。
