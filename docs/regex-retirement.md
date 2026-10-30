@@ -4,6 +4,12 @@
 
 旧 REGEX、旧 adapter の短いクラス名／完全修飾名は、両 frontend で該当 keyword／クラス名の CP 範囲と行・列を示して拒否します。直接 AST を生成器へ渡した場合も同じ code で拒否し、ソースのない AST には位置を捏造しません。Java の deprecated `TokenDecl.Regex` と Rust の `TokenKind::Regex` はこの拒否検査用の AST 形状としてだけ残します。生成 Java／Rust に REGEX 実行器を出力しません。文字列・コメント内の `REGEX`、利用者定義の `token REGEX ::= ...;` は合法です。
 
+診断の選択は Java を基準に、ファイル全体の構文解析・末尾チェックの後で移行診断を出します (#949)。旧 `token X = REGEX('x')` に終端の `;` はありません。`REGEX('x');`、複数の `;`、引数や後続 grammar の構文不正があれば、check は `P-SYNTAX`（span=null、subject=`UBNF syntax`）です。空白・`//` 行コメントだけの追加では移行診断を維持します。複数の旧宣言では最初の宣言の位置を使い、非 BMP 前置文字を UTF-16 の2単位として数えず CP で報告します。
+
+local import 先の失敗は check / Playground では `P-MODULE` に包まれ、generate / deps inspect は import 先の原因を表示します。generate / deps inspect の本文は既存契約どおり、Java の先頭80 UTF-16単位または未消費入力表示と、native の行・CP列・原因表示に分かれます。共通 fixture は各 host の独立期待値と出力先・staging 不在を検証します。Rust は旧宣言の解析中に移行診断を保留しますが、部分 AST を返さず、展開・生成・実行へ渡しません。runtime parser のホットパスは変更しません。
+
+既存の残差: `REGEX('x')` の後に値が不正な `CHAR_RANGE('z','a')`、そのさらに後に構文エラーがある場合、native は途中の値検証で止まります。Java の `P-SYNTAX` に対して最初の `E-REGEX-RETIRED` が残る一般の値検証順の差は [#983](https://github.com/opaopa6969/unlaxer-parser/issues/983) で追跡します。後続構文エラーのない場合は両版とも最初の移行診断を維持します。
+
 次は同等の正規表現へ自動変換する規則ではなく、目的を明示して選び直す例です。
 
 ```ubnf

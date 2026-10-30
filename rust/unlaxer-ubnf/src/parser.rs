@@ -15,13 +15,27 @@ pub(crate) fn parse(source: &str, tokens: Vec<Token>) -> Result<UbnfFile> {
         depth: 0,
         calls: Vec::new(),
         rule_params: Vec::new(),
+        retired_regex: None,
     };
     let mut grammars = Vec::new();
     while parser.current().kind != Kind::Eof {
-        grammars.push(parser.grammar()?);
+        grammars.push(parser.grammar().map_err(|error| {
+            // Keep the first mapping error when a later value validation fails.
+            // Syntax errors, unlike value errors, take precedence over migration.
+            if error.kind == DiagnosticKind::InvalidValue {
+                parser.retired_regex.clone().unwrap_or(error)
+            } else {
+                error
+            }
+        })?);
     }
     if grammars.is_empty() {
         return Err(parser.error("expected at least one grammar"));
+    }
+    // Java reports migration errors while mapping, only after the entire syntax
+    // (including trailing input and subsequent grammars) has been recognized.
+    if let Some(error) = parser.retired_regex {
+        return Err(error);
     }
     let span = Span::default().through(parser.current().span);
     // Expansion follows the complete syntax parse, as in the Java frontend.
@@ -44,6 +58,7 @@ struct Parser<'a> {
     parameterized: std::collections::HashSet<String>,
     calls: Vec<crate::params::Call>,
     rule_params: Vec<Vec<Option<Vec<crate::params::Param>>>>,
+    retired_regex: Option<Diagnostic>,
 }
 
 impl Parser<'_> {
@@ -265,8 +280,21 @@ impl Parser<'_> {
             || value == "RegexTokenParser"
             || value == "org.unlaxer.dsl.runtime.RegexTokenParser"
         {
-            return Err(self.invalid(value_start.through(self.previous()),
-                "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)"));
+            let error = self.invalid(value_start.through(self.previous()),
+                "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)");
+            if value == "REGEX" {
+                self.expect('(')?;
+                self.quoted()?;
+                self.expect(')')?;
+            }
+            self.retired_regex.get_or_insert(error);
+            // A private placeholder lets syntax recognition finish. No removed
+            // token can escape parse(), reach expansion, or execute a pattern.
+            return Ok(TokenDecl {
+                name,
+                kind: TokenKind::Empty,
+                span: self.span_from(start),
+            });
         }
         let kind = match value.as_str() {
             "ANY" => TokenKind::Any,

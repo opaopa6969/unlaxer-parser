@@ -6,7 +6,8 @@
     "syntax": 2,
     "paths": 33,
     "profile": 74,
-    "blank": 175
+    "blank": 175,
+    "regex": 38
   },
   "cases": [
     {
@@ -9588,6 +9589,4281 @@
               33188,
               "14fbb5452c3b120ddccd2f76db9c09abb6d423f0eda2eedc62eb308b994d002f"
             ]
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-no-semicolon-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":25,\"end\":30},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":25,\"end\":30},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              25,
+              30,
+              25,
+              30
+            ],
+            "line": 1,
+            "column": 26
+          }
+        },
+        "CRLF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              25,
+              30,
+              25,
+              30
+            ],
+            "line": 1,
+            "column": 26
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-no-semicolon-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-semicolon-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x'); @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-semicolon-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x'); @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-multiple-semicolons-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x');;; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-multiple-semicolons-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x');;; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x');;; @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-space-before-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:39: expected ASCII identifier",
+            "stderr": "1:39: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:39: expected ASCII identifier",
+            "stderr": "1:39: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:39: expected ASCII identifier",
+            "stderr": "1:39: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:39: expected ASCII identifier",
+            "stderr": "1:39: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              38,
+              39,
+              38,
+              39
+            ],
+            "line": 1,
+            "column": 39
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              38,
+              39,
+              38,
+              39
+            ],
+            "line": 1,
+            "column": 39
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-space-before-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') \t ; @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:39: expected ASCII identifier",
+            "stderr": "1:39: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:39: expected ASCII identifier",
+            "stderr": "1:39: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:39: expected ASCII identifier",
+            "stderr": "1:39: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:39: expected ASCII identifier",
+            "stderr": "1:39: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-space-after-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-space-after-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); \t  @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-comment-before-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x') // before\n ; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\n ; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\n ; @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\r\n ; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\r\n ; @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:2: expected ASCII identifier",
+            "stderr": "2:2: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:2: expected ASCII identifier",
+            "stderr": "2:2: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:2: expected ASCII identifier",
+            "stderr": "2:2: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:2: expected ASCII identifier",
+            "stderr": "2:2: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\n ; @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              47,
+              48,
+              47,
+              48
+            ],
+            "line": 2,
+            "column": 2
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\r\n ; @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              48,
+              49,
+              48,
+              49
+            ],
+            "line": 2,
+            "column": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-comment-before-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x') // before\n ; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\n ; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\n ; @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\r\n ; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " ; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') // before\r\n ; @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:2: expected ASCII identifier",
+            "stderr": "2:2: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:2: expected ASCII identifier",
+            "stderr": "2:2: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:2: expected ASCII identifier",
+            "stderr": "2:2: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:2: expected ASCII identifier",
+            "stderr": "2:2: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-comment-after-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x'); // after\n  @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\n  @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\n  @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\r\n  @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\r\n  @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\n  @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\r\n  @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-comment-after-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x'); // after\n  @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\n  @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\n  @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\r\n  @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "  @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x'); // after\r\n  @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ASCII identifier",
+            "stderr": "1:36: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-unicode-no-semicolon-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { // 😀𐐀\n token X = REGEX('x') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":32,\"end\":37},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=32, end=37], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=32, end=37], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [32,37), line 2, column 12",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [32,37), line 2, column 12\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [32,37), line 2, column 12",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [32,37), line 2, column 12\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":33,\"end\":38},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=33, end=38], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=33, end=38], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [33,38), line 2, column 12",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [33,38), line 2, column 12\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [33,38), line 2, column 12",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [33,38), line 2, column 12\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [32,37), line 2, column 12",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              38,
+              43,
+              32,
+              37
+            ],
+            "line": 2,
+            "column": 12
+          }
+        },
+        "CRLF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [33,38), line 2, column 12",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              39,
+              44,
+              33,
+              38
+            ],
+            "line": 2,
+            "column": 12
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-unicode-no-semicolon-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { // 😀𐐀\n token X = REGEX('x') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [32,37), line 2, column 12",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [32,37), line 2, column 12\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [32,37), line 2, column 12",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [32,37), line 2, column 12\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [33,38), line 2, column 12",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [33,38), line 2, column 12\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [33,38), line 2, column 12",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [33,38), line 2, column 12\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "2:12: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-unicode-semicolon-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { // 😀𐐀\n token X = REGEX('x'); @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { // 😀𐐀\n token X = REGEX('x'); @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { // 😀𐐀\n token X = REGEX('x'); @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { // 😀𐐀\r\n token X = REGEX('x'); @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { // 😀𐐀\r\n token X = REGEX('x'); @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:22: expected ASCII identifier",
+            "stderr": "2:22: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:22: expected ASCII identifier",
+            "stderr": "2:22: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:22: expected ASCII identifier",
+            "stderr": "2:22: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:22: expected ASCII identifier",
+            "stderr": "2:22: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { // 😀𐐀\n token X = REGEX('x'); @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              48,
+              49,
+              42,
+              43
+            ],
+            "line": 2,
+            "column": 22
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { // 😀𐐀\r\n token X = REGEX('x'); @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              49,
+              50,
+              43,
+              44
+            ],
+            "line": 2,
+            "column": 22
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-unicode-semicolon-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { // 😀𐐀\n token X = REGEX('x'); @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { // 😀𐐀\n token X = REGEX('x'); @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { // 😀𐐀\n token X = REGEX('x'); @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { // 😀𐐀\r\n token X = REGEX('x'); @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": " token X = REGEX('x'); @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { // 😀𐐀\r\n token X = REGEX('x'); @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:22: expected ASCII identifier",
+            "stderr": "2:22: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:22: expected ASCII identifier",
+            "stderr": "2:22: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:22: expected ASCII identifier",
+            "stderr": "2:22: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "2:22: expected ASCII identifier",
+            "stderr": "2:22: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-syntax-before-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { ; token X = REGEX('x') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:16: expected ASCII identifier",
+            "stderr": "1:16: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:16: expected ASCII identifier",
+            "stderr": "1:16: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:16: expected ASCII identifier",
+            "stderr": "1:16: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:16: expected ASCII identifier",
+            "stderr": "1:16: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              15,
+              16,
+              15,
+              16
+            ],
+            "line": 1,
+            "column": 16
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              15,
+              16,
+              15,
+              16
+            ],
+            "line": 1,
+            "column": 16
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-syntax-before-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { ; token X = REGEX('x') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { ; token X = REGEX('x') @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:16: expected ASCII identifier",
+            "stderr": "1:16: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:16: expected ASCII identifier",
+            "stderr": "1:16: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:16: expected ASCII identifier",
+            "stderr": "1:16: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:16: expected ASCII identifier",
+            "stderr": "1:16: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-syntax-after-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= ; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+          "native": {
+            "error": "expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "span": [
+              52,
+              53,
+              52,
+              53
+            ],
+            "line": 1,
+            "column": 53
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+          "native": {
+            "error": "expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "span": [
+              52,
+              53,
+              52,
+              53
+            ],
+            "line": 1,
+            "column": 53
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-syntax-after-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= ; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x') @root Start ::= ; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:53: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-empty-argument-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX() @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:32: expected single-quoted literal",
+            "stderr": "1:32: expected single-quoted literal\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:32: expected single-quoted literal",
+            "stderr": "1:32: expected single-quoted literal\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:32: expected single-quoted literal",
+            "stderr": "1:32: expected single-quoted literal\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:32: expected single-quoted literal",
+            "stderr": "1:32: expected single-quoted literal\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+          "native": {
+            "error": "expected single-quoted literal",
+            "span": [
+              31,
+              32,
+              31,
+              32
+            ],
+            "line": 1,
+            "column": 32
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+          "native": {
+            "error": "expected single-quoted literal",
+            "span": [
+              31,
+              32,
+              31,
+              32
+            ],
+            "line": 1,
+            "column": 32
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-empty-argument-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX() @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX() @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:32: expected single-quoted literal",
+            "stderr": "1:32: expected single-quoted literal\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:32: expected single-quoted literal",
+            "stderr": "1:32: expected single-quoted literal\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:32: expected single-quoted literal",
+            "stderr": "1:32: expected single-quoted literal\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:32: expected single-quoted literal",
+            "stderr": "1:32: expected single-quoted literal\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-missing-close-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x' @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ')'",
+            "stderr": "1:36: expected ')'\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ')'",
+            "stderr": "1:36: expected ')'\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ')'",
+            "stderr": "1:36: expected ')'\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ')'",
+            "stderr": "1:36: expected ')'\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+          "native": {
+            "error": "expected ')'",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+          "native": {
+            "error": "expected ')'",
+            "span": [
+              35,
+              36,
+              35,
+              36
+            ],
+            "line": 1,
+            "column": 36
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-missing-close-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x' @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = REGEX('x' @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ')'",
+            "stderr": "1:36: expected ')'\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ')'",
+            "stderr": "1:36: expected ')'\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ')'",
+            "stderr": "1:36: expected ')'\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:36: expected ')'",
+            "stderr": "1:36: expected ')'\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-trailing-input-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= X; } !"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:58: unexpected character '!'",
+            "stderr": "1:58: unexpected character '!'\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:58: unexpected character '!'",
+            "stderr": "1:58: unexpected character '!'\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:58: unexpected character '!'",
+            "stderr": "1:58: unexpected character '!'\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:58: unexpected character '!'",
+            "stderr": "1:58: unexpected character '!'\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+          "native": {
+            "error": "unexpected character '!'",
+            "span": [
+              57,
+              58,
+              57,
+              58
+            ],
+            "line": 1,
+            "column": 58
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+          "native": {
+            "error": "unexpected character '!'",
+            "span": [
+              57,
+              58,
+              57,
+              58
+            ],
+            "line": 1,
+            "column": 58
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-trailing-input-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= X; } !"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: !\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:58: unexpected character '!'",
+            "stderr": "1:58: unexpected character '!'\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:58: unexpected character '!'",
+            "stderr": "1:58: unexpected character '!'\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:58: unexpected character '!'",
+            "stderr": "1:58: unexpected character '!'\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:58: unexpected character '!'",
+            "stderr": "1:58: unexpected character '!'\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-later-grammar-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= X; } grammar Bad { R ::= ; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+          "native": {
+            "error": "expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "span": [
+              77,
+              78,
+              77,
+              78
+            ],
+            "line": 1,
+            "column": 78
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+          "native": {
+            "error": "expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "span": [
+              77,
+              78,
+              77,
+              78
+            ],
+            "line": 1,
+            "column": 78
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-later-grammar-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= X; } grammar Bad { R ::= ; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }",
+            "stderr": "UBNF パース失敗: line 1, column 58 に未消費の入力があります: grammar Bad { R ::= ; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)",
+            "stderr": "1:78: expected nonempty rule sequence (use an EMPTY token for epsilon)\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-adapter-semicolon-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = RegexTokenParser; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:42: expected ASCII identifier",
+            "stderr": "1:42: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:42: expected ASCII identifier",
+            "stderr": "1:42: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:42: expected ASCII identifier",
+            "stderr": "1:42: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:42: expected ASCII identifier",
+            "stderr": "1:42: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              41,
+              42,
+              41,
+              42
+            ],
+            "line": 1,
+            "column": 42
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              41,
+              42,
+              41,
+              42
+            ],
+            "line": 1,
+            "column": 42
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-adapter-semicolon-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = RegexTokenParser; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }",
+            "stderr": "UBNF パース失敗: grammar Main { token X = RegexTokenParser; @root Start ::= X; }\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:42: expected ASCII identifier",
+            "stderr": "1:42: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:42: expected ASCII identifier",
+            "stderr": "1:42: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:42: expected ASCII identifier",
+            "stderr": "1:42: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:42: expected ASCII identifier",
+            "stderr": "1:42: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-qualified-adapter-semicolon-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+            "stderr": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+            "stderr": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"P-SYNTAX\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF syntax\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-SYNTAX, span=null, subject=UBNF syntax]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+            "stderr": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+            "stderr": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:66: expected ASCII identifier",
+            "stderr": "1:66: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:66: expected ASCII identifier",
+            "stderr": "1:66: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:66: expected ASCII identifier",
+            "stderr": "1:66: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:66: expected ASCII identifier",
+            "stderr": "1:66: expected ASCII identifier\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              65,
+              66,
+              65,
+              66
+            ],
+            "line": 1,
+            "column": 66
+          }
+        },
+        "CRLF": {
+          "javaError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+          "native": {
+            "error": "expected ASCII identifier",
+            "span": [
+              65,
+              66,
+              65,
+              66
+            ],
+            "line": 1,
+            "column": 66
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-qualified-adapter-semicolon-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+            "stderr": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+            "stderr": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+            "stderr": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :",
+            "stderr": "UBNF パース失敗: grammar Main { token X = org.unlaxer.dsl.runtime.RegexTokenParser; @root Start :\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:66: expected ASCII identifier",
+            "stderr": "1:66: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:66: expected ASCII identifier",
+            "stderr": "1:66: expected ASCII identifier\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:66: expected ASCII identifier",
+            "stderr": "1:66: expected ASCII identifier\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:66: expected ASCII identifier",
+            "stderr": "1:66: expected ASCII identifier\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-two-retired-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x') token Y = REGEX('y') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":25,\"end\":30},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":25,\"end\":30},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              25,
+              30,
+              25,
+              30
+            ],
+            "line": 1,
+            "column": 26
+          }
+        },
+        "CRLF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              25,
+              30,
+              25,
+              30
+            ],
+            "line": 1,
+            "column": 26
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-two-retired-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x') token Y = REGEX('y') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-later-invalid-value-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x') token Y = CHAR_RANGE('z','a') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":25,\"end\":30},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":25,\"end\":30},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              25,
+              30,
+              25,
+              30
+            ],
+            "line": 1,
+            "column": 26
+          }
+        },
+        "CRLF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              25,
+              30,
+              25,
+              30
+            ],
+            "line": 1,
+            "column": 26
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-later-invalid-value-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x') token Y = CHAR_RANGE('z','a') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
           }
         }
       }

@@ -32,6 +32,7 @@ public class CliStderrConformanceTest {
     @Test(timeout=120000) public void syntaxKeepsDocumentedNativeLocations() throws Exception { check("syntax"); }
 
     @Test(timeout=120000) public void playgroundBlankOptionsMatchJavaWhitespace() throws Exception { check("blank"); }
+    @Test(timeout=120000) public void regexSyntaxPriorityMatchesJavaBeforeOutput() throws Exception { check("regex"); }
 
     private static void check(String suite) throws Exception {
         String classpath = Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
@@ -49,6 +50,7 @@ public class CliStderrConformanceTest {
         if (System.getenv("GITHUB_ACTIONS") != null)
             assertEquals("CI must exercise chmod(000/555/444): " + excluded, 0, excluded.size());
         int observations = switch (suite) {
+            case "regex" -> 608;
             case "blank" -> 350;
             case "output" -> 112;
             case "paths" -> 244;

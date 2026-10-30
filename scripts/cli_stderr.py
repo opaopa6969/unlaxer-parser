@@ -128,12 +128,19 @@ def remove_created(work, case, before):
 
 def observe(command, case, operation, work, native):
     args = [arg.replace('${WORK}', str(work)) for arg in options(case, operation)]
+    if callable(command) and case['scope'] == 'regex':
+        # One batch JVM for this suite; resolve each case's inputs/output explicitly.
+        for option in ('--grammar', '--output'):
+            if option in args:
+                index = args.index(option) + 1
+                args[index] = str(work / args[index])
     actual = command(args) if callable(command) else run(command, args, work, native, **limited(case))
-    if 'args' in case:
+    if 'args' in case or callable(command):
         # Unicode separators in a nonblank path are part of the diagnostic, not LF.
         actual['lastError'] = actual['stderr'].removesuffix('\n').rsplit('\n', 1)[-1]
+    keys = ('exit', 'stdout', 'lastError', 'stderr') if case['scope'] == 'regex' else ('exit', 'stdout', 'lastError')
     return {key: normalize(actual[key], work) if isinstance(actual[key], str) else actual[key]
-            for key in ('exit', 'stdout', 'lastError')}, actual
+            for key in keys}, actual
 
 
 def exercise(cases, directory, commands, evidence, trees=None):
@@ -166,6 +173,8 @@ def exercise(cases, directory, commands, evidence, trees=None):
                         expected = case['expected'][ending][operation]
                         if host == 'rust' and operation in case.get('nativeExpected', {}):
                             expected = case['nativeExpected'][operation]
+                        if host == 'rust' and operation in case.get('nativeByEnding', {}).get(ending, {}):
+                            expected = case['nativeByEnding'][ending][operation]
                         if host == 'rust' and 'nativeSyntax' in case:
                             expected = {**expected, 'lastError': case['nativeSyntax'][ending]}
                         assert observed == expected, (entry, expected)
@@ -261,7 +270,7 @@ def main():
     parser.add_argument('--java', required=True)
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
-    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax', 'profile', 'blank'], required=True)
+    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax', 'profile', 'blank', 'regex'], required=True)
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
     corpus = json.loads((ROOT / 'spec-corpus/cli-stderr.json').read_text())
@@ -275,6 +284,9 @@ def main():
                 work = Path(directory) / 'blank-argv'
                 work.mkdir()
                 with blank_java_host(args.java, args.classpath, work) as host:
+                    exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence)
+            elif args.suite == 'regex':
+                with blank_java_host(args.java, args.classpath, Path(directory)) as host:
                     exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence)
             else:
                 exercise(cases, Path(directory), [
