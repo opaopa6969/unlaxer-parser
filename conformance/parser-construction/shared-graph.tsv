@@ -1,0 +1,28 @@
+# Concurrent parses of one frozen shared graph (#1007). UTF8 hex, ~ = empty. Every round builds
+# fresh graphs on the main thread, then N threads, each with its own contexts, parse them at once
+# (a latch releases them together) for M rounds. Each thread runs every row of this table and of
+# cases.tsv on every construction route of ParserConstructionParityTest.java and
+# rust/unlaxer-runtime/tests/parser_construction.rs, plus the root-indicator-scope-* inputs of
+# construction.tsv, in a rotated memo x diagnostics mode, and compares each row with its expected
+# columns, not with a single-threaded run. Rust shares an immutable Arc grammar; Java shares the
+# parser instances whose lazy caches (reference targets, name lookups, roots, lazy children) the
+# first parses fill. Grammar (rule IDs in declaration order):
+#   0 List ::= Elem*                       (nullable: Java ZeroOrMore / Rust repeat_java(0, None))
+#   1 Elem ::= '(' List ')' | 'é' | '😀'   (recursion through List)
+#   2 Top  ::= List '!'
+# References are by name (Java ReferenceByNameParser / Rust RuleNames) and by predicate (Java
+# ReferenceParser, a lazy cache per reference / Rust positions resolved at construction).
+# first-use-parked: thread A stops inside the first resolution of Elem's reference to List (Java:
+# the ReferenceParser predicate; Rust: a Custom expression delegating to List) on list-nested
+# while thread B parses list-nested on the same graph to the end; then A resumes. Both must match
+# the row. Same-context concurrency and graph mutation during a parse are not part of this table.
+# failureCP and ruleStack follow cases.tsv (0 / ~ under DETAILED_ON_FAILURE; ruleStack: the
+# farthest failed rule invocation, then more frames, then the earliest). leaves are the retained
+# terminal tokens; an empty List keeps one empty token.
+# id	root	inputHex	success	consumedCP	failureCP	leaves	ruleStack
+list-empty	List	~	true	0	0	consumed@0:0:~	~
+list-nested	List	28c3a928f09f98802929c3a9	true	7	7	consumed@0:1:28;consumed@1:1:c3a9;consumed@2:1:28;consumed@3:1:f09f9880;consumed@4:1:29;consumed@5:1:29;consumed@6:1:c3a9	~
+list-unclosed	List	28c3a9	true	0	2	consumed@0:0:~	~
+top-bang	Top	c3a9f09f988021	true	3	2	consumed@0:1:c3a9;consumed@1:1:f09f9880;consumed@2:1:21	~
+top-empty	Top	~	false	0	0	~	Top@0>List@0>Elem@0
+top-unclosed	Top	2828c3a929	false	0	4	~	Top@0>List@0>Elem@0>List@1>Elem@4

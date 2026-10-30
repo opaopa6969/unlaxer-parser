@@ -5,7 +5,8 @@ use std::cell::Cell;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{mpsc, Arc, Barrier, Condvar, Mutex, OnceLock};
+use std::time::Duration;
 
 use unlaxer_runtime::token::{TokenKind, TokenSource};
 use unlaxer_runtime::{
@@ -260,6 +261,83 @@ fn rows(corpus: &'static str, columns: usize) -> Vec<Vec<&'static str>> {
     rows
 }
 
+/// Parses one cases.tsv row in a fresh context: the mismatch against the row, if any, and the
+/// whole CST for the comparison across construction routes.
+fn case_observation(
+    grammar: &SharedGrammar,
+    c: &[&str],
+    memo: Memoization,
+    diagnostics: Diagnostics,
+) -> (Option<String>, String) {
+    let input = decode(c[2]);
+    let options = ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+    let mut context = ParseContext::with_options(&input, options);
+    let root = NAMES.iter().position(|name| *name == c[1]).unwrap();
+    let parsed = context.parse_with_token_mode(
+        &Grammar(Arc::clone(grammar), root),
+        kind(c[3]),
+        c[4] == "true",
+    );
+    let mut originals = Vec::new();
+    let mut committed = Vec::new();
+    if let Ok(parsed) = &parsed {
+        for &node in &parsed.nodes {
+            originals.extend(java_original(&mut context, node));
+        }
+        committed.extend(parsed.nodes.iter().copied());
+    }
+    let mut terminal = Vec::new();
+    for &node in &committed {
+        leaves(&mut context, node, &mut terminal);
+    }
+    let deferred = diagnostics == Diagnostics::DetailedOnFailure;
+    let actual = [
+        parsed.is_ok().to_string(),
+        context.position().to_string(),
+        context.matched_position().to_string(),
+        context.failure().offset.to_string(),
+        signatures(&mut context, &originals),
+        signatures(&mut context, &committed),
+        signatures(&mut context, &terminal),
+        render(context.rule_stack()),
+    ]
+    .join("\t");
+    let expected = [
+        c[5],
+        c[6],
+        c[7],
+        if deferred { "0" } else { c[8] },
+        c[9],
+        c[10],
+        c[11],
+        if deferred { "~" } else { c[12] },
+    ]
+    .join("\t");
+    let mismatch =
+        (actual != expected).then(|| format!("\n  expected {expected}\n  actual   {actual}"));
+    let tree: Vec<_> = committed
+        .iter()
+        .map(|&node| shape(&mut context, node))
+        .collect();
+    (mismatch, tree.join(";"))
+}
+
+/// NotProbe is a different expression in the Custom-source routes: Custom is CST-transparent,
+/// invert_match keeps a NotPropagatableSource boundary.
+fn shape_key(
+    c: &[&str],
+    variant_name: &str,
+    memo: Memoization,
+    diagnostics: Diagnostics,
+) -> String {
+    let source = if c[1] == "NotProbe" && CUSTOM_SOURCE.contains(&variant_name) {
+        "custom"
+    } else {
+        "builtin"
+    };
+    format!("{}/{memo:?}/{diagnostics:?}/{source}", c[0])
+}
+
 #[test]
 fn every_construction_route_reproduces_the_shared_parse_oracle() {
     let rows = rows(
@@ -279,70 +357,12 @@ fn every_construction_route_reproduces_the_shared_parse_oracle() {
             ] {
                 for c in &rows {
                     let label = format!("{}/{variant_name}/{memo:?}/{diagnostics:?}", c[0]);
-                    let input = decode(c[2]);
-                    let options =
-                        ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
-                    let mut context = ParseContext::with_options(&input, options);
-                    let root = NAMES.iter().position(|name| *name == c[1]).unwrap();
-                    let parsed = context.parse_with_token_mode(
-                        &Grammar(grammar(), root),
-                        kind(c[3]),
-                        c[4] == "true",
-                    );
-                    let mut originals = Vec::new();
-                    let mut committed = Vec::new();
-                    if let Ok(parsed) = &parsed {
-                        for &node in &parsed.nodes {
-                            originals.extend(java_original(&mut context, node));
-                        }
-                        committed.extend(parsed.nodes.iter().copied());
+                    let (mismatch, tree) = case_observation(&grammar(), c, memo, diagnostics);
+                    if let Some(mismatch) = mismatch {
+                        failures.push(format!("{label}{mismatch}"));
                     }
-                    let mut terminal = Vec::new();
-                    for &node in &committed {
-                        leaves(&mut context, node, &mut terminal);
-                    }
-                    let deferred = diagnostics == Diagnostics::DetailedOnFailure;
-                    let actual = [
-                        parsed.is_ok().to_string(),
-                        context.position().to_string(),
-                        context.matched_position().to_string(),
-                        context.failure().offset.to_string(),
-                        signatures(&mut context, &originals),
-                        signatures(&mut context, &committed),
-                        signatures(&mut context, &terminal),
-                        render(context.rule_stack()),
-                    ]
-                    .join("\t");
-                    let expected = [
-                        c[5],
-                        c[6],
-                        c[7],
-                        if deferred { "0" } else { c[8] },
-                        c[9],
-                        c[10],
-                        c[11],
-                        if deferred { "~" } else { c[12] },
-                    ]
-                    .join("\t");
-                    if actual != expected {
-                        failures.push(format!(
-                            "{label}\n  expected {expected}\n  actual   {actual}"
-                        ));
-                    }
-                    let tree: Vec<_> = committed
-                        .iter()
-                        .map(|&node| shape(&mut context, node))
-                        .collect();
-                    let tree = tree.join(";");
-                    // NotProbe is a different expression in the Custom-source routes: Custom is
-                    // CST-transparent, invert_match keeps a NotPropagatableSource boundary.
-                    let source = if c[1] == "NotProbe" && CUSTOM_SOURCE.contains(&variant_name) {
-                        "custom"
-                    } else {
-                        "builtin"
-                    };
                     let first = shapes
-                        .entry(format!("{}/{memo:?}/{diagnostics:?}/{source}", c[0]))
+                        .entry(shape_key(c, variant_name, memo, diagnostics))
                         .or_insert_with(|| (variant_name, tree.clone()));
                     if first.1 != tree {
                         failures.push(format!(
@@ -355,6 +375,299 @@ fn every_construction_route_reproduces_the_shared_parse_oracle() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+// ---- concurrent parses of one frozen shared grammar (#1007)
+
+const THREADS: usize = 8;
+const ROUNDS: usize = 40;
+const MODES: [(Memoization, Diagnostics); 6] = [
+    (Memoization::Off, Diagnostics::Auto),
+    (Memoization::Off, Diagnostics::Detailed),
+    (Memoization::Off, Diagnostics::DetailedOnFailure),
+    (Memoization::SafeFailures, Diagnostics::Auto),
+    (Memoization::SafeFailures, Diagnostics::Detailed),
+    (Memoization::SafeFailures, Diagnostics::DetailedOnFailure),
+];
+const LIST_NAMES: [&str; 3] = ["List", "Elem", "Top"];
+const LIST: usize = 0;
+
+/// The shared-graph.tsv grammar: List ::= Elem*; Elem ::= '(' List ')' | 'é' | '😀';
+/// Top ::= List '!'. `elem_list` is Elem's reference to List.
+fn list_rules(reference: impl Fn(&str) -> Expr, elem_list: Expr) -> Vec<Rule> {
+    vec![
+        rule("List", seq([reference("Elem").repeat_java(0, None)])),
+        rule(
+            "Elem",
+            Expr::choice([seq([w("("), elem_list, w(")")]), w("é"), w("😀")]),
+        ),
+        rule("Top", seq([reference("List"), w("!")])),
+    ]
+}
+
+fn list_position(name: &str) -> Expr {
+    Expr::Rule(LIST_NAMES.iter().position(|n| *n == name).unwrap())
+}
+
+fn list_by_names() -> SharedGrammar {
+    let names = RuleNames::new(LIST_NAMES).unwrap();
+    names
+        .share(list_rules(
+            |name| names.reference_or_never(name),
+            names.reference_or_never("List"),
+        ))
+        .unwrap()
+}
+
+/// Java `parser.parse(context)`: the Classic consumed mode under an outermost
+/// `ParseContext::parse`, which records the outcome, so a successful parse reports no rule
+/// stack. `parse_with_token_mode` as the outermost entry does not record it and reports the
+/// speculative stack of a success (a separate residue, found by #1007's fixture).
+struct ClassicEntry(Grammar);
+impl Parser for ClassicEntry {
+    fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult {
+        context.parse_with_token_mode(&self.0, TokenKind::Consumed, false)
+    }
+}
+
+/// Parses one shared-graph.tsv row in a fresh context: the mismatch against the row, if any.
+fn graph_observation(
+    grammar: &SharedGrammar,
+    c: &[&str],
+    memo: Memoization,
+    diagnostics: Diagnostics,
+) -> Option<String> {
+    let input = decode(c[2]);
+    let options = ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+    let mut context = ParseContext::with_options(&input, options);
+    let root = LIST_NAMES.iter().position(|name| *name == c[1]).unwrap();
+    let parsed = context.parse(&ClassicEntry(Grammar(Arc::clone(grammar), root)));
+    let mut terminal = Vec::new();
+    if let Ok(parsed) = &parsed {
+        for &node in &parsed.nodes {
+            leaves(&mut context, node, &mut terminal);
+        }
+    }
+    let deferred = diagnostics == Diagnostics::DetailedOnFailure;
+    let actual = [
+        parsed.is_ok().to_string(),
+        context.position().to_string(),
+        context.failure().offset.to_string(),
+        signatures(&mut context, &terminal),
+        render(context.rule_stack()),
+    ]
+    .join("\t");
+    let expected = [
+        c[3],
+        c[4],
+        if deferred { "0" } else { c[5] },
+        c[6],
+        if deferred { "~" } else { c[7] },
+    ]
+    .join("\t");
+    (actual != expected).then(|| format!("\n  expected {expected}\n  actual   {actual}"))
+}
+
+/// The prefix observation of `scope_observation` in one rotated mode per input.
+fn scope_prefixes(scoped: &SharedGrammar, control: &SharedGrammar, mut mode: usize) -> String {
+    let calls = [(scoped, 0, "a"), (scoped, 0, "(x)"), (control, 1, "a")];
+    let observed: Vec<_> = calls
+        .into_iter()
+        .map(|(grammar, root, input)| {
+            let (memo, diagnostics) = MODES[mode % MODES.len()];
+            mode += 1;
+            let options = ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+            let mut context = ParseContext::with_options(input, options);
+            let parsed = context.parse_shared_grammar(grammar, root, false);
+            format!("{}/{}", parsed.is_ok(), context.position())
+        })
+        .collect();
+    observed.join(";")
+}
+
+#[test]
+fn a_frozen_shared_grammar_parses_concurrently_like_the_shared_oracle() {
+    let cases = rows(
+        include_str!("../../../conformance/parser-construction/cases.tsv"),
+        13,
+    );
+    let graph_rows = rows(
+        include_str!("../../../conformance/parser-construction/shared-graph.tsv"),
+        8,
+    );
+    assert_eq!(graph_rows.len(), 6);
+    let construction = rows(
+        include_str!("../../../conformance/parser-construction/construction.tsv"),
+        4,
+    );
+    let scope_expected = |id: &str| construction.iter().find(|row| row[0] == id).unwrap()[2];
+    let failures = Mutex::new(Vec::new());
+    let shapes = Mutex::new(HashMap::new());
+    let parses = AtomicUsize::new(0);
+    for round in 0..ROUNDS {
+        // Built before the threads start; every thread parses clones of the same Arc grammars.
+        let case_grammars: Vec<_> = VARIANTS
+            .iter()
+            .map(|name| (*name, variant(name)()))
+            .collect();
+        let list_grammars = [
+            ("rule-names", list_by_names()),
+            (
+                "predicate-position",
+                share_grammar(list_rules(list_position, list_position("List"))),
+            ),
+        ];
+        let scopes = [
+            (
+                "root-indicator-scope-by-name",
+                scoped_outer(call_scope_by_name),
+            ),
+            (
+                "root-indicator-scope-predicate",
+                scoped_outer(call_scope_by_position),
+            ),
+        ];
+        let control = unscoped_outer();
+        let barrier = Barrier::new(THREADS);
+        std::thread::scope(|scope| {
+            for thread in 0..THREADS {
+                let (cases, graph_rows, case_grammars, list_grammars, scopes, control) = (
+                    &cases,
+                    &graph_rows,
+                    &case_grammars,
+                    &list_grammars,
+                    &scopes,
+                    &control,
+                );
+                let (barrier, failures, shapes, parses) = (&barrier, &failures, &shapes, &parses);
+                scope.spawn(move || {
+                    barrier.wait();
+                    // Even threads share one order and so start on the same rows; odd ones rotate.
+                    let shift = if thread % 2 == 0 { 0 } else { thread };
+                    let mut mode = thread + round;
+                    let mut local = Vec::new();
+                    for (variant_name, grammar) in case_grammars {
+                        for row in 0..cases.len() {
+                            let c = &cases[(row + shift) % cases.len()];
+                            let (memo, diagnostics) = MODES[mode % MODES.len()];
+                            mode += 1;
+                            let label = format!(
+                                "{}/{variant_name}/{memo:?}/{diagnostics:?}/thread{thread}/round{round}",
+                                c[0]
+                            );
+                            let (mismatch, tree) = case_observation(grammar, c, memo, diagnostics);
+                            if let Some(mismatch) = mismatch {
+                                local.push(format!("{label}{mismatch}"));
+                            }
+                            let mut shapes = shapes.lock().unwrap();
+                            let first = shapes
+                                .entry(shape_key(c, variant_name, memo, diagnostics))
+                                .or_insert_with(|| tree.clone());
+                            if *first != tree {
+                                local.push(format!("{label} intermediate CST\n  {first}\n  {tree}"));
+                            }
+                            parses.fetch_add(1, Ordering::SeqCst);
+                        }
+                    }
+                    for (variant_name, grammar) in list_grammars {
+                        for row in 0..graph_rows.len() {
+                            let c = &graph_rows[(row + shift) % graph_rows.len()];
+                            let (memo, diagnostics) = MODES[mode % MODES.len()];
+                            mode += 1;
+                            if let Some(mismatch) = graph_observation(grammar, c, memo, diagnostics)
+                            {
+                                local.push(format!(
+                                    "{}/{variant_name}/{memo:?}/{diagnostics:?}/thread{thread}/round{round}{mismatch}",
+                                    c[0]
+                                ));
+                            }
+                            parses.fetch_add(1, Ordering::SeqCst);
+                        }
+                    }
+                    for (id, scoped) in scopes {
+                        let actual = scope_prefixes(scoped, control, mode);
+                        mode += 3;
+                        if actual != scope_expected(id) {
+                            local.push(format!(
+                                "{id}/thread{thread}/round{round}: expected {} actual {actual}",
+                                scope_expected(id)
+                            ));
+                        }
+                        parses.fetch_add(3, Ordering::SeqCst);
+                    }
+                    failures.lock().unwrap().extend(local);
+                });
+            }
+        });
+    }
+    let failures = failures.into_inner().unwrap();
+    assert!(
+        failures.is_empty(),
+        "{} failures\n{}",
+        failures.len(),
+        failures[..failures.len().min(20)].join("\n")
+    );
+    let per_thread = VARIANTS.len() * cases.len() + 2 * graph_rows.len() + 2 * 3;
+    assert_eq!(parses.load(Ordering::SeqCst), THREADS * ROUNDS * per_thread);
+}
+
+/// 0 = not reached, 1 = the first caller is parked, 2 = released.
+static PARK: (Mutex<u8>, Condvar) = (Mutex::new(0), Condvar::new());
+
+/// Elem's reference to List; the first call parks until the test releases it.
+fn parked_list(context: &mut ParseContext<'_>) -> ParseResult {
+    let (state, signal) = &PARK;
+    let mut current = state.lock().unwrap();
+    if *current == 0 {
+        *current = 1;
+        signal.notify_all();
+        while *current != 2 {
+            current = signal.wait(current).unwrap();
+        }
+    }
+    drop(current);
+    let mode = context.token_mode();
+    context.parse_with_token_mode(&Expr::Rule(LIST), mode.kind, mode.invert)
+}
+
+/// first-use-parked in shared-graph.tsv: a context stopped in the middle of a parse holds
+/// nothing another context on the same Arc grammar waits for; both match the row.
+#[test]
+fn a_context_parked_mid_parse_does_not_block_or_corrupt_another() {
+    let graph_rows = rows(
+        include_str!("../../../conformance/parser-construction/shared-graph.tsv"),
+        8,
+    );
+    let row: Vec<&'static str> = graph_rows
+        .iter()
+        .find(|c| c[0] == "list-nested")
+        .unwrap()
+        .clone();
+    let grammar = share_grammar(list_rules(list_position, Expr::Custom(parked_list)));
+    let observe = {
+        let (grammar, row) = (Arc::clone(&grammar), row.clone());
+        move || graph_observation(&grammar, &row, Memoization::Off, Diagnostics::Detailed)
+    };
+    let stopped = std::thread::spawn(observe.clone());
+    let (state, signal) = &PARK;
+    let (current, timeout) = signal
+        .wait_timeout_while(state.lock().unwrap(), Duration::from_secs(60), |current| {
+            *current == 0
+        })
+        .unwrap();
+    assert!(!timeout.timed_out(), "the first call was reached");
+    drop(current);
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || sender.send(observe()).unwrap());
+    let other = receiver.recv_timeout(Duration::from_secs(60)).unwrap();
+    assert_eq!(other, None);
+    assert!(
+        !stopped.is_finished(),
+        "still parked while the other context finished"
+    );
+    *state.lock().unwrap() = 2;
+    signal.notify_all();
+    assert_eq!(stopped.join().unwrap(), None);
 }
 
 // ---- construction and identity observations

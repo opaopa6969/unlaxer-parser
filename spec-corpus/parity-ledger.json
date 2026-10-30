@@ -19,6 +19,7 @@
     "2026-10-27 #843: 残る7入力の診断コード・順序を両Rust hostでJava validatorに揃えた。rootあり/なし、単一エラー説明とcheck JSONを共通fixtureで固定する。precedence欠如・重複の#835契約は維持する。性能作業・parser実行経路は対象外。 レビューでvalidateAssocのparams欠落・repeat欠如もJavaの最初のERRORに揃え、nativeの名前述語の隠れは#858へ分離した。",
     "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。",
     "2026-10-27 #845: parser構築・名前参照・identity の移植境界を conformance/parser-construction に固定した。Java 6経路（ReferenceByName・ReferenceParser名前/predicate・Class/Supplier factory・newInstance）と Rust 5経路（Rule index・RuleNames・構築時predicate・OnceLock・都度構築）が同じ cases.tsv を全memo/diagnosticsで実行する。台帳全体の再監査ではない。",
+    "2026-10-31 #1007: 凍結した共有 parser graph を別 context で並行解析する契約を conformance/parser-construction/shared-graph.tsv と cases.tsv の N thread × M round 実行で固定した。台帳全体の再監査ではない。",
     "2026-10-27 #826: 正の先読みの到達位置、Classic capture の失敗 frame、native UNTIL の失敗した終端候補を記録。既存の Java oracle 値は変更せず nested/frame-start の全診断列を両Rust host・通常/mappingで一致させる。差分表は実測に一致する memo 会計差だけを保持する。個別修正であり台帳全体の監査日・revision は更新しない。",
     "2026-10-27 #827: failure/success hit は公開 context API と Classic harness に現れる host 依存の内部会計であり、Java/Rust 間の数値一致を契約しないと決定。marker・rule/inline group の cache 粒度と Chain 対照を確認し、非nested Outer を追加。runtime/生成器を変えず、実測全行と memo OFF/SAFE_FAILURES の結果不変を検証する。個別の契約判断であり台帳全体の監査日・revision は更新しない。",
     "2026-10-27 #872/#876: 先行先読みのない通常呼出の成功診断をJava実測に揃える。両issueは成功記録の既存watermark必須条件が共通原因。生成grammarのJava互換経路と独立native PEG式入口を区別し、後者の別診断列を維持する。個別修正であり台帳全体の監査日・revisionは更新しない。",
@@ -689,6 +690,10 @@
     "1001": {
       "state": "OPEN",
       "title": "parity(lsp): JSON-RPC reader のキー順・positional arity・capabilities null による id 回復と無応答を照合する"
+    },
+    "1007": {
+      "state": "OPEN",
+      "title": "fix(parser): Java 共有 parser graph の遅延cacheを並行解析へ安全に公開する"
     }
   },
   "entries": [
@@ -2558,12 +2563,14 @@
       "title": "parser構築・名前参照・identity の言語別表現",
       "hosts": "Java runtime / Rust runtime",
       "issues": [
-        845
+        845,
+        1007
       ],
-      "observation": "construction.tsv の java/rust 列は各言語の構築観測。同じ契約の行は同値を共有し、`-` と値の違いは意図した差: Java は parser instance・親pointer・反射名・PseudoRoot・共有sourceの反転状態を持ち、Rust は構築時に名前を Rule index へ解決（RuleNames の重複/未登録/順序不一致は構築エラー）し、反転は context の token_mode に置く。左再帰は両方とも資源上限（Java ParseLimitException 1024、Rust rule nesting 256）。RootParserIndicator の範囲は、Java は親走査、Rust は scope ごとの grammar と RuleNames で表し、受理と RuleStack は一致する。名前参照の hit と root は Java では instance に cache され、Rust の共有済み grammar も Rule ID を変えない。parse 結果（cursor・根と葉の CST・失敗位置・RuleStack）は cases.tsv で差を許さない。中間 node は言語間で比べず、各言語で構築経路間の一致を検査する。Java の共有 graph の可変状態について、並行時の同値は主張しない。",
+      "observation": "construction.tsv の java/rust 列は各言語の構築観測。同じ契約の行は同値を共有し、`-` と値の違いは意図した差: Java は parser instance・親pointer・反射名・PseudoRoot・共有sourceの反転状態を持ち、Rust は構築時に名前を Rule index へ解決（RuleNames の重複/未登録/順序不一致は構築エラー）し、反転は context の token_mode に置く。左再帰は両方とも資源上限（Java ParseLimitException 1024、Rust rule nesting 256）。RootParserIndicator の範囲は、Java は親走査、Rust は scope ごとの grammar と RuleNames で表し、受理と RuleStack は一致する。名前参照の hit と root は Java では instance に cache され、Rust の共有済み grammar も Rule ID を変えない。parse 結果（cursor・根と葉の CST・失敗位置・RuleStack）は cases.tsv で差を許さない。中間 node は言語間で比べず、各言語で構築経路間の一致を検査する。凍結した共有 graph の別 context 並行解析は shared-graph.tsv・cases.tsv・scope を両言語で N thread × M round 照合する（#1007、Java は遅延 cache を不変 Optional と ConcurrentHashMap で公開、Rust は不変 Arc grammar）。同じ context の同時利用・解析中の graph 変更は対象外、computedInvertMatch は表示だけが読む直前の呼び出しの値。",
       "evidence": [
         "conformance/parser-construction/cases.tsv",
         "conformance/parser-construction/construction.tsv",
+        "conformance/parser-construction/shared-graph.tsv",
         "unlaxer-common/src/test/java/org/unlaxer/parser/ParserConstructionParityTest.java",
         "rust/unlaxer-runtime/tests/parser_construction.rs",
         "docs/java-api-rust-parity.md"

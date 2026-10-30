@@ -59,10 +59,17 @@ Java の `Parser.get(Class)` / `Parser.get(Supplier)` / `newInstance`、lazy chi
   deadlock する）。循環は `Expr::Rule(id)` で書く。
 - capture・scope・user state は `ParseContext` が持ち、共有 grammar には残らない。新しい context は
   前の解析の state を引き継がない（Java の global scope map も同じ）。
-- Java の共有 graph には可変の状態がある（`AbstractParser.root`・`parserByName`、
-  `ReferenceParser` の cache、`AbstractPropagatableSource.computedInvertMatch`、
-  `ParserFactoryByClass` の初期化 map）。これらの並行時の動作は検証していないため、
-  不変の Rust grammar との並行時の同値は主張しない。
+- Java の共有 graph は、初回の解析で遅延 cache を埋める（`AbstractParser.root`・`parserByName`、
+  `ReferenceParser` などの参照先、lazy children、`ParserFactoryByClass` の初期化 map）。#1007 から、
+  これらは別々の context が同時に解析しても安全に公開される。参照先と root は不変の `Optional` を
+  1 本の field で公開し、名前の map は `ConcurrentHashMap`、lazy children は従来どおり同期する。
+  初回を同時に迎えた thread は、それぞれ同じ結果を計算して公開する。解決中に lock は持たない。
+  `shared-graph.tsv` と cases.tsv を、凍結した graph（Rust は不変の `Arc` grammar）上で
+  8 thread × 40 round 実行し、各行の期待値と照合する。対象外は二つある。
+  一つは同じ `ParseContext` の同時利用、もう一つは解析中の graph の変更（子の追加・付け替え）である。
+  `AbstractPropagatableSource.computedInvertMatch` は解析に使わない。読むのは TokenPrinter の
+  `(inverted)` 表示だけで、その値は直前の呼び出しのものであり、token の性質ではない
+  （別の context が上書きし得る）。Rust には対応する共有状態がない。
 - Classic の反転は共有 graph ではなく `ParseContext::token_mode()` にある。利用者定義の
   `AbstractPropagatableSource` 相当は、`Expr::Custom` の中で mode を反転して子を
   `parse_with_token_mode` する。

@@ -90,6 +90,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- Java の共有 parser graph を別々の `ParseContext` から同時に解析しても、遅延 cache が安全に公開されるようにした (#1007)。`ReferenceParser`・`MatchedChoiceParser`・`MatchedNonOrderedParser` は「解決済み flag と値」を不変の `Optional` 1 本にまとめ、`AbstractParser.getRoot()` は field を一度だけ読む。`AbstractParser.parserByName` と `ParserFactoryByClass` の初期化 map は `ConcurrentHashMap` にした。解決中の lock は持たず、初回の同時解決は各 thread が同じ結果を計算して公開する。同じ context の同時利用と、解析中の graph の変更は対象外。`computedInvertMatch`（TokenPrinter の `(inverted)` 表示）は直前の呼び出しの値で、token の性質ではないと明記した。共通 fixture `conformance/parser-construction/shared-graph.tsv` と cases.tsv を、Java・Rust の両方で 8 thread × 40 round 実行する。
 - Java の `ParserFactoryByClass.ClassAndKind(Class).kind()` が `NullPointerException` ではなく空の `Optional` を返し、`HasChildrenParser.newWithoutRecursive` が入れ子の子を自身の複製に置き換えずに各 combinator の型のまま一致した子孫だけを除くよう修正した。`ParserNameContext` は複数の親から届く同一 parser を重複にしない（別 parser の同名は従来どおり `IllegalStateException`）(#845)。
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
 - Java / Rust の local import を通常ファイル・64 MiB以下に制限し、stat後の増大も上限＋1バイトで打ち切る。デバイス・FIFO・socket・directory・過大ファイルは同じ `E-MODULE` で拒否し、両 authoring stdio server の後続応答と CLI を共通fixtureで検証 (#890)。

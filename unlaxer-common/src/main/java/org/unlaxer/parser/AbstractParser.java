@@ -1,12 +1,12 @@
 package org.unlaxer.parser;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import org.unlaxer.Name;
@@ -33,9 +33,15 @@ public abstract class AbstractParser implements Parser {
 
 	public Optional<Parser> parent;
 	
+	/**
+	 * Lazily resolved root. Several contexts may parse a shared graph at once (#1007): the field is
+	 * read once per call and only ever holds an immutable Optional, so a racing reader sees either
+	 * empty or a complete value (final field semantics, JLS 17.5) and recomputes the same root.
+	 */
 	Optional<Parser> root = Optional.empty();
 	
-	Map<Name,Parser> parserByName = new HashMap<>();
+	/** Name lookups resolved from the root; concurrent parses of a shared graph read and fill it (#1007). */
+	Map<Name,Parser> parserByName = new ConcurrentHashMap<>();
 	
 	volatile boolean donePrepareChildren = false;
 	
@@ -130,10 +136,12 @@ public abstract class AbstractParser implements Parser {
 	
 	@Override
 	public Parser getRoot(){
-		if(false == root.isPresent()){
-			root = Optional.of(findFirstToParent(Parser.isRoot).orElse(this));
+		Optional<Parser> resolved = root;
+		if(false == resolved.isPresent()){
+			resolved = Optional.of(findFirstToParent(Parser.isRoot).orElse(this));
+			root = resolved;
 		}
-		return root.get();
+		return resolved.get();
 	}
 
 	@Override
@@ -175,6 +183,10 @@ public abstract class AbstractParser implements Parser {
 	@Override
 	public Optional<Parser> getParser(Name name) {
 		
+		if(name == null){
+			// The concurrent map has no null key; the HashMap answered this from the root uncached.
+			return findFirstFromRoot(parser->parser.getName().equals(name));
+		}
 		Parser matched = parserByName.get(name);
 		if(matched == null ){
 			Optional<Parser> findFirstFromRoot = findFirstFromRoot(parser->parser.getName().equals(name));
