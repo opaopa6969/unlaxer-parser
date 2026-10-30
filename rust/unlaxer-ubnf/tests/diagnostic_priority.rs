@@ -72,11 +72,65 @@ fn shared_frontend_errors_keep_the_first_syntax_value_or_migration_diagnostic() 
             *checked.entry(scope.to_owned()).or_default() += 1;
         }
     }
-    // Fixtures must not silently disappear (79 value, 20 regex, 12 qualified forms × LF/CRLF).
+    // Fixtures must not silently disappear (79 value, 127 regex, 12 qualified forms × LF/CRLF).
     let expected: std::collections::BTreeMap<String, usize> =
-        [("qualified", 24), ("regex", 40), ("value", 158)]
+        [("qualified", 24), ("regex", 254), ("value", 158)]
             .into_iter()
             .map(|(scope, count)| (scope.to_owned(), count))
             .collect();
     assert_eq!(checked, expected);
+}
+
+/// #996: recognition owns a flat continuation stack; even hostile inputs must
+/// finish on the same 2 MiB debug stack as the native CLI (#805).
+#[test]
+fn recognition_after_the_ast_limit_is_iterative_and_keeps_syntax_priority() {
+    std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(|| {
+            for (open, close) in [
+                ("(", ")"),
+                ("[", "]"),
+                ("{", "}"),
+                ("('b' | ", ")"),
+                ("(", " | 'b')"),
+                ("CAPTURE(v,", ")"),
+                ("CAPTURE_SCOPE(", ")"),
+                ("COMMIT(", ",'message')"),
+                ("LABEL(tag,", ")"),
+                ("CATCH(", ",'fallback',tag)"),
+                ("CATCH('fallback',", ",tag)"),
+                ("P(", ")"),
+                ("(", ") % ','"),
+                ("',' % (", ")"),
+                ("(", ")?"),
+                ("(", "){1,2}"),
+            ] {
+                let body = format!("{}'a'{}", open.repeat(10_000), close.repeat(10_000));
+                for (retired, tail, kind) in [
+                    ("", "", unlaxer_ubnf::DiagnosticKind::NestingLimit),
+                    (
+                        "token X = REGEX('x')",
+                        "",
+                        unlaxer_ubnf::DiagnosticKind::InvalidValue,
+                    ),
+                    (
+                        "token X = REGEX('x')",
+                        " S ::= ;",
+                        unlaxer_ubnf::DiagnosticKind::Syntax,
+                    ),
+                ] {
+                    let source =
+                        format!("grammar G {{ {retired} R ::= {body}; {tail} P(x) ::= x; }}");
+                    let error = unlaxer_ubnf::parse(&source).unwrap_err();
+                    assert_eq!(error.kind, kind, "{open} / {tail}: {error}");
+                    if !retired.is_empty() && tail.is_empty() {
+                        assert!(error.message.starts_with("E-REGEX-RETIRED:"));
+                    }
+                }
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
 }

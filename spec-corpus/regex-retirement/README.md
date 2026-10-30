@@ -10,11 +10,12 @@
 1-based line/CP-column を固定します。家族 emoji と CRLF を前置した例を含みます。
 
 `../cli-stderr.json` の `scope=regex` は診断選択の共通 oracle (#949) です。
-20形 × 入口/local import × LF/CRLF × 4操作 × 両 CLI の640観測を固定します。
+127形 × 入口/local import × LF/CRLF × 4操作 × 両 CLI の4,064観測を固定します。
 セミコロンの有無・複数・前後の空白/行コメント、前後の構文エラー、引数不正、
 末尾入力・後続 grammar・旧 adapter・最初の移行診断・非 BMP の CP位置、
-native だけの入れ子上限（128段）を含みます。
-check JSON 全文と stderr、Playground stderr、generate/deps inspect の終了3・原因・位置、
+native だけの AST 入れ子上限（128段）後の反復認識 (#996)、group128〜168段、各構文のJava最終／次段を含みます。
+Java frame 上限の次段は通常構文エラーと区別し、通常/snapshot API の型・code・limit・CP offset も照合します。
+check JSON 全文と stderr、Playground stderr、generate/deps inspect の終了コード・原因・位置、
 入力不変と出力先/staging不在を照合します。import 入口は `@ubnf: v2` を指定して
 実際に import を解決します。`frontend` 期待値は既存 `RustUbnfFrontendConformanceTest`
 でも読み、Java の通常/snapshot 入口と native inspect の全 span・行・列を比較します。
@@ -25,7 +26,7 @@ check JSON 全文と stderr、Playground stderr、generate/deps inspect の終�
 158 frontend入力を固定します。値エラー・旧 REGEX/旧 adapter の前後入替、
 前後の構文不正、末尾入力・複数 grammar・非 BMPを含み、各 host の既存の文面を保持します。
 Java が構文で拒否する字句 repeat / recovery と、mapper の最初の値エラーの対照も含みます。
-規則本体の native 入れ子上限後の安全な走査は #996 の残差です。
+規則本体の native 入れ子上限後も #996 の反復走査で全体構文を確認します。Java frame 上限との差は文書の境界表を参照してください。
 
 `RegexRetirementConformanceTest` はこれを Java21 と Rust1.85 の両 frontend、両 host の
 生成 Rust byte 一致、実 javac/rustc consumer の parse/map で確認します。
