@@ -1,5 +1,6 @@
 //! JVM-free UBNF authoring server. Capability scope is recorded in
 //! docs/ubnf-authoring-lsp.md; generated-language LSPs keep their own backend.
+mod configuration;
 mod features;
 mod index;
 mod navigation;
@@ -9,9 +10,9 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::io::{self, BufRead, Write};
 
+// Java Ext ignores LSP document versions; only their wire type is checked.
 struct Document {
     source: String,
-    version: i64,
 }
 #[derive(Default)]
 pub struct Server {
@@ -19,6 +20,7 @@ pub struct Server {
     // Only snapshots verified during prior indexing. packageSource must never
     // build an index, resolve a URI, read a file, or mutate this cache.
     package_indexes: BTreeMap<String, BTreeMap<String, String>>,
+    configuration: configuration::Configuration,
     initialized: bool,
     shutdown: bool,
     exited: bool,
@@ -27,7 +29,26 @@ type Error = (i64, String);
 fn invalid(message: &str) -> Error {
     (-32602, message.into())
 }
+// lsp4j reads the version as Integer: absent/null and 32-bit integers are
+// accepted, other JSON numbers drop the notification (#895).
+fn notified_version(document: &Value) -> Result<(), Error> {
+    let version = &document["version"];
+    if version.is_null() || version.as_i64().is_some_and(|v| i32::try_from(v).is_ok()) {
+        Ok(())
+    } else {
+        Err(invalid("document version must be a 32-bit integer"))
+    }
+}
 impl Server {
+    fn configure(&mut self, params: &Value) -> Result<Value, Error> {
+        // Validate before committing: failed configuration preserves all session state.
+        let configuration = configuration::Configuration::read(params)?;
+        let result = configuration.capabilities();
+        self.configuration = configuration;
+        // Parsing and queries are rebuilt from current buffers, never cached across
+        // configurations. Verified package snapshots have the Java Ext index lifetime.
+        Ok(result)
+    }
     fn index(&mut self, uri: &str) -> Option<Index> {
         let source = &self.documents.get(uri)?.source;
         let buffers = self
@@ -45,9 +66,19 @@ impl Server {
         Some(index)
     }
     fn publish(&mut self, uri: &str, out: &mut Vec<Value>) {
-        if let Some(index) = self.index(uri) {
-            out.push(json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"diagnostics":index.diagnostics}}));
-        }
+        // Java skips additionalDiagnostics/ensureIndex entirely when VALIDATE is
+        // disabled. Do not populate verified package snapshots as a side effect.
+        let diagnostics = if self.configuration.allows("VALIDATE") {
+            let Some(index) = self.index(uri) else {
+                return;
+            };
+            index.diagnostics
+        } else if self.documents.contains_key(uri) {
+            Vec::new()
+        } else {
+            return;
+        };
+        out.push(json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"diagnostics":diagnostics}}));
     }
     pub fn handle(&mut self, message: Value) -> Vec<Value> {
         let mut out = Vec::new();
@@ -69,22 +100,15 @@ impl Server {
                 return Ok(Value::Null);
             }
             if self.shutdown || self.exited {
-                return Err((-32600, "Server has stopped".into()));
+                return Err((-32600, "Server has shut down".into()));
             }
             if method == "initialize" && request {
                 if self.initialized {
                     return Err((-32600, "Server already initialized".into()));
                 }
-                if params
-                    .get("initializationOptions")
-                    .is_some_and(|v| !v.is_null() && v != &json!({}))
-                {
-                    return Err(invalid("Authoring profile options are not yet supported"));
-                }
+                let result = self.configure(params)?;
                 self.initialized = true;
-                return Ok(
-                    json!({"capabilities":{"textDocumentSync":1,"hoverProvider":true,"definitionProvider":true,"referencesProvider":true,"renameProvider":true,"documentSymbolProvider":true,"foldingRangeProvider":true,"linkedEditingRangeProvider":true,"completionProvider":{"resolveProvider":false,"triggerCharacters":["@","=","."]}}}),
-                );
+                return Ok(result);
             }
             if !self.initialized {
                 return Err((-32002, "Server not initialized".into()));
@@ -93,7 +117,11 @@ impl Server {
                 self.shutdown = true;
                 return Ok(Value::Null);
             }
+            if request && configuration::notification_method(method) {
+                return Err((-32600, "Notification method requires a notification".into()));
+            }
             match method {
+                "unlaxer/configure" if request => self.configure(params),
                 "initialized"
                 | "$/setTrace"
                 | "$/cancelRequest"
@@ -119,11 +147,8 @@ impl Server {
                                 .as_str()
                                 .ok_or_else(|| invalid("document text required"))?
                                 .to_owned();
-                            let version = doc["version"]
-                                .as_i64()
-                                .ok_or_else(|| invalid("document version required"))?;
-                            self.documents
-                                .insert(uri.into(), Document { source, version });
+                            notified_version(doc)?;
+                            self.documents.insert(uri.into(), Document { source });
                             self.publish(uri, &mut out);
                         }
                         "textDocument/didChange" => {
@@ -131,22 +156,14 @@ impl Server {
                                 .as_array()
                                 .ok_or_else(|| invalid("contentChanges required"))?;
                             let change = changes.first().ok_or_else(|| invalid("empty change"))?;
-                            if change.get("range").is_some_and(|v| !v.is_null()) {
-                                return Err(invalid("full text change required"));
-                            }
+                            // Java Ext ignores range and applies the first text as a full snapshot.
                             let source = change["text"]
                                 .as_str()
                                 .ok_or_else(|| invalid("change text required"))?
                                 .to_owned();
-                            let version = doc["version"]
-                                .as_i64()
-                                .ok_or_else(|| invalid("document version required"))?;
-                            let state = self
-                                .documents
-                                .get_mut(uri)
-                                .ok_or_else(|| invalid("document not open"))?;
-                            state.source = source;
-                            state.version = version;
+                            notified_version(doc)?;
+                            // Java Ext parseDocument also opens a URI that was never opened.
+                            self.documents.insert(uri.into(), Document { source });
                             self.publish(uri, &mut out);
                         }
                         "textDocument/didClose" => {

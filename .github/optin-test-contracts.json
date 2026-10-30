@@ -4,7 +4,7 @@
     "reports": ["unlaxer-dsl/ubnf-vscode/target/surefire-reports"],
     "properties": {"rustConformance": "true"},
     "required": {
-      "org.unlaxer.dsl.lsp.ubnf.UbnfAuthoringProtocolConformanceTest": ["authoringDataMatchesTheJavaReference", "bundledParserCandidatesMatchJavaClasspath", "nativeAndJavaServersShareAuthoringFixtures", "nativeAndJavaServersShareNavigationFixtures", "localImportsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageDocumentsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageArtifactsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageArtifactUtf8DiagnosticsAndHashOrderMatchAcrossHosts", "packageGrammarBasesMatchAcrossServers", "packageJsonAcceptanceMatchesAcrossServers"]
+      "org.unlaxer.dsl.lsp.ubnf.UbnfAuthoringProtocolConformanceTest": ["authoringDataMatchesTheJavaReference", "bundledParserCandidatesMatchJavaClasspath", "nativeAndJavaServersShareAuthoringFixtures", "nativeAndJavaServersShareNavigationFixtures", "nativeAndJavaServersShareConfigurationFixtures", "localImportsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageDocumentsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageArtifactsRejectUnsafeFilesWithoutBlockingServersOrClis", "packageArtifactUtf8DiagnosticsAndHashOrderMatchAcrossHosts", "packageGrammarBasesMatchAcrossServers", "packageJsonAcceptanceMatchesAcrossServers"]
     }
   },
   "cross-language": {
