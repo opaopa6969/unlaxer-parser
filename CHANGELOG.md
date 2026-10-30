@@ -167,6 +167,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - LSP の最遠構文失敗位置、Java 生成補完 literal の escaping、DAP 切断後の終了と transport 失敗通知、初期化未完了の LSP 起動失敗後の cleanup を修正 (PR #554、#561、#562、#691)。[LSP 診断](docs/classic-lsp-diagnostics.md)、[起動と終了](docs/rust-vscode-launch.md)。
 - Java/Rust の packaged IDE 検証で、意図的な 1000 ms の起動タイムアウトを回復起動へ持ち越す flake を修正 (#874)。正常起動前に元の制限へ戻し、1 秒を超える起動完了でも回復することを両 backend で検証する。
 - Java/Rust の VS Code 拡張と scaffold で、正常 LSP shutdown と process の自然終了に共通の 5000 ms 上限を設け、CPU quota 飽和時の 1000 ms 期限超過と通知直後の強制終了を修正 (#880)。packaged IDE 検証で遅延した shutdown、終了コード 0、強制終了なしを確認する。
+- Java/Rust の packaged IDE 検証で、応答しない server の initialize 受信記録を読み出す前に子が終了すると失敗する競合を修正 (#981)。明示 restart の 1000 ms タイムアウト後に同じ PID の受信履歴・TERM 無視・SIGKILL 終了を確認し、起動中断の試験では生存確認を別に行う。
 - memo 再試行で資源の深さ制限を飛び越えないようにした (PR #639)。`E-RAISING-REPETITION` の検査を実際に捕まえる失敗種別へ揃え、Rust CATCH の循環検査での stack overflow を修正 (PR #727、#733)。[cut / label の契約](docs/cut-and-labeled-failures.md)。
 
 ## [3.3.0] - 2026-10-16
