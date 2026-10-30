@@ -19,7 +19,8 @@ class AuthoringClientTest(unittest.TestCase):
         client = lsp.Client([sys.executable, '-c', code], backend=backend)
         self.addCleanup(client.close)
         client.fixture = 'exact-limit'
-        client.timeout = 2
+        # Generous for a loaded shared runner; timeout tests set their own bound.
+        client.timeout = 10
         return client
 
     def test_exit_before_shutdown_reports_backend_fixture_request_status_and_safe_tail(self):
@@ -30,7 +31,7 @@ class AuthoringClientTest(unittest.TestCase):
                     "+ 'grammar Private { secret body }\\n'"
                     "+ 'thread main panicked at secret-value\\n'"
                     "+ 'java.lang.OutOfMemoryError: Java heap space\\n'); sys.exit(7)", backend)
-                client.process.wait(timeout=2)
+                client.process.wait(timeout=10)
                 with self.assertRaises(RuntimeError) as caught:
                     client.result('shutdown')
                 message = str(caught.exception)
@@ -49,6 +50,7 @@ class AuthoringClientTest(unittest.TestCase):
         self.assertIn(f'exit={-signal.SIGTERM} (SIGTERM)', message)
         self.assertIn('initialize', message)
         self.assertIn('backend=rust fixture=exact-limit', message)
+        self.assertIn('invalid protocol frame (EOFError)', message)
         self.assertNotIn('secret', message)
 
     def test_broken_pipe_diagnostic_survives_cleanup(self):
@@ -76,7 +78,7 @@ class AuthoringClientTest(unittest.TestCase):
             "import sys; sys.stderr.write('secret-body' * 100000); sys.stderr.flush(); "
             "sys.stderr.write('\\nmemory allocation of 67108864 bytes failed\\n'); sys.exit(9)")
         # A full stderr pipe would prevent exit and hit this finite wait.
-        client.process.wait(timeout=2)
+        client.process.wait(timeout=10)
         with self.assertRaises(RuntimeError) as caught:
             client.result('shutdown')
         message = str(caught.exception)
@@ -103,7 +105,7 @@ class AuthoringClientTest(unittest.TestCase):
         with self.assertRaises(RuntimeError) as caught:
             client.result('initialize')
         self.assertIn('backend=java fixture=exact-limit', str(caught.exception))
-        self.assertIn('invalid protocol frame', str(caught.exception))
+        self.assertIn('invalid protocol frame (ValueError)', str(caught.exception))
         rendered = ''.join(traceback.format_exception(caught.exception))
         self.assertNotIn('private-body', rendered)
         self.assertLess(len(rendered.encode()), 5000)

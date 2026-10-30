@@ -129,7 +129,8 @@ class Client:
             if isinstance(item, Exception):
                 # Parser exceptions can embed an arbitrary header/body in their
                 # message. Keep transport context without echoing that payload.
-                raise self.failure('server closed stdout or invalid protocol frame') from None
+                raise self.failure('server closed stdout or invalid protocol frame '
+                                   f'({type(item).__name__})') from None
             if predicate(item):
                 return item
             self.pending.append(item)
