@@ -147,7 +147,11 @@ impl Loader<'_> {
                     .iter()
                     .any(|t| !matches!(t.kind, TokenKind::Declarative { .. }))
             {
-                return Err(error("only declarative token modules can be imported").into());
+                return Err(error(format!(
+                    "only declarative token modules can be imported: {}",
+                    path.display()
+                ))
+                .into());
             }
             if !crate::adapters::feature_diagnostics(grammar).is_empty() {
                 return Err(error("invalid module features").into());
