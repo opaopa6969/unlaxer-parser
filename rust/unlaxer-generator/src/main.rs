@@ -669,8 +669,9 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
     if check {
         return Ok(());
     }
-    // Per-file replacement avoids truncation on a failed write and does not follow a
-    // destination symlink introduced after preflight. This is not a directory transaction.
+    // Sibling replacement preserves contents on failure except for Java-compatible
+    // in-place writes to hard links or existing files in unwritable directories.
+    // This is not a directory transaction.
     for (i, file) in files.iter().enumerate() {
         let destination = output.join(&file.relative_path);
         // Java createDirectories(destination.getParent()) keeps out/. spelled as given.
@@ -685,29 +686,59 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
             use std::os::unix::fs::OpenOptionsExt;
             access.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
         }
-        match access.open(&destination) {
-            Ok(_) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        let existing = match access.open(&destination) {
+            Ok(handle) => Some(handle),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
             Err(error) => return Err(cannot_write(&destination, path_error(&destination, error))),
+        };
+        let metadata = existing
+            .as_ref()
+            .map(fs::File::metadata)
+            .transpose()
+            .map_err(|e| cannot_write(&destination, path_error(&destination, e)))?;
+        #[cfg(unix)]
+        if metadata.as_ref().is_some_and(|m| {
+            use std::os::unix::fs::MetadataExt;
+            m.nlink() > 1
+        }) {
+            write_in_place(existing.unwrap(), &file.content)
+                .map_err(|e| cannot_write(&destination, e))?;
+            continue;
         }
         // A sibling temporary keeps Java's per-file directory permissions and write order.
         let temporary = directory.join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
-        let mut handle = OpenOptions::new()
+        let mut handle = match OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&temporary)
-            .map_err(|e| {
-                let failed = if e.kind() == io::ErrorKind::AlreadyExists {
+        {
+            Ok(handle) => handle,
+            // Only an existing, already opened writable file can use this fallback.
+            // A collision or other I/O failure must retain the replacement contract.
+            Err(error) if error.kind() == io::ErrorKind::PermissionDenied && existing.is_some() => {
+                write_in_place(existing.unwrap(), &file.content)
+                    .map_err(|e| cannot_write(&destination, e))?;
+                continue;
+            }
+            Err(error) => {
+                let failed = if error.kind() == io::ErrorKind::AlreadyExists {
                     &temporary
                 } else {
                     &destination
                 };
-                cannot_write(&destination, path_error(failed, e))
-            })?;
+                return Err(cannot_write(&destination, path_error(failed, error)));
+            }
+        };
         let result = (|| {
             handle
                 .write_all(file.content.as_bytes())
                 .map_err(write_error)?;
+            // Apply the existing mode after writing (writes can clear set-ID bits).
+            if let Some(metadata) = &metadata {
+                handle
+                    .set_permissions(metadata.permissions())
+                    .map_err(|e| path_error(&destination, e))?;
+            }
             handle.sync_all().map_err(write_error)?;
             drop(handle);
             fs::rename(&temporary, &destination).map_err(|e| path_error(&destination, e))
@@ -718,6 +749,12 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
         result.map_err(|e| cannot_write(&destination, e))?;
     }
     Ok(())
+}
+
+// Reuse the non-following handle checked above; do not reopen a raced destination.
+fn write_in_place(mut handle: fs::File, content: &str) -> io::Result<()> {
+    handle.set_len(0).map_err(write_error)?;
+    handle.write_all(content.as_bytes()).map_err(write_error)
 }
 
 #[cfg(test)]

@@ -1,7 +1,10 @@
-"""#937/#952/#953/#974: fixed stderr and output-path oracles for real CLIs, with LF/CRLF."""
+"""#937/#952/#953/#974/#971: fixed stderr and output-path oracles for real CLIs, with LF/CRLF."""
 import argparse
 from contextlib import contextmanager
 import json
+import hashlib
+import stat
+import shutil
 import os
 from pathlib import Path
 import re
@@ -129,7 +132,7 @@ def remove_created(work, case, before):
 def observe(command, case, operation, work, native):
     args = [arg.replace('${WORK}', str(work)) for arg in options(case, operation)]
     actual = command(args) if callable(command) else run(command, args, work, native, **limited(case))
-    if 'args' in case:
+    if callable(command) or 'args' in case:
         # Unicode separators in a nonblank path are part of the diagnostic, not LF.
         actual['lastError'] = actual['stderr'].removesuffix('\n').rsplit('\n', 1)[-1]
     return {key: normalize(actual[key], work) if isinstance(actual[key], str) else actual[key]
@@ -200,6 +203,130 @@ def exercise(cases, directory, commands, evidence, trees=None):
         assert not evidence['excluded'], evidence['excluded']
 
 
+def replacement_snapshot(work):
+    """Include link counts for every entry, including independent directory counts."""
+    return {name: (mode, (work / name).lstat().st_nlink, content)
+            for name, (mode, content) in snapshot(work).items()}
+
+
+def replacement_expected(work, case, ending, trees, before, host):
+    # Fixed generated hashes come from the shared corpus, never a CLI observation.
+    operation = case['operations'][0]
+    spec = expected_tree(case, operation, host, ending, trees)
+    result = dict(before)
+    for name, (mode, content) in spec.items():
+        if stat.S_ISREG(mode):
+            mode = stat.S_IFREG | case.get('modes', {}).get(name, 0o666 & ~case.get('umask', 0o022))
+        elif name in case.get('readOnly', []):
+            mode = stat.S_IFDIR | 0o555
+        elif stat.S_ISDIR(mode) and not (operation == 'playground' and name == 'out' and host == 'java'):
+            mode = stat.S_IFDIR | (0o777 & ~case.get('umask', 0o022))
+        result[name] = (mode, 1, content)
+    for alias, target in case.get('hardlinks', {}).items():
+        result[alias] = result[target]
+    for name, (mode, _, content) in list(result.items()):
+        if stat.S_ISDIR(mode):
+            links = 2 + sum(stat.S_ISDIR(v[0]) and str(Path(child).parent) == name
+                            for child, v in result.items())
+        else:
+            links = 1 + sum(target == name for target in case.get('hardlinks', {}).values())
+            if name in case.get('hardlinks', {}):
+                links = result[case['hardlinks'][name]][1]
+        result[name] = (mode, links, content)
+    # An alias can sort before its target.
+    for alias, target in case.get('hardlinks', {}).items():
+        result[alias] = result[target]
+    return result
+
+
+def replacement_cases(cases, directory, commands, evidence, trees):
+    """Reset the same cwd before *each* host; one JVM serves successful writes."""
+    work = directory / 'replacement'
+    work.mkdir(exist_ok=True)
+    permissions = write_permissions_apply(directory)
+    file_permissions = file_write_permissions_apply(directory)
+    for case in cases:
+        if ((case.get('readOnly') and not permissions)
+                or (case.get('readOnlyFiles') and not file_permissions)):
+            evidence['excluded'].append(dict(case=case['id'], observations=4,
+                reason='Execution user bypasses chmod(555/444); non-root permission behavior cannot be exercised.'))
+            continue
+        for ending, separator in [('LF', '\n'), ('CRLF', '\r\n')]:
+            for host, command in commands:
+                os.umask(case.get('umask', 0o022))
+                # Keep cwd itself for the batch host, recreate all caller-owned inputs.
+                seed = work / 'fixture-seed'
+                prepare(seed, {**case, 'readOnly': [], 'readOnlyFiles': []}, separator)
+                for child in seed.iterdir():
+                    child.rename(work / child.name)
+                seed.rmdir()
+                for name in case.get('readOnly', []):
+                    (work / name).chmod(0o555)
+                for name in case.get('readOnlyFiles', []):
+                    (work / name).chmod(0o444)
+                for name, mode in case.get('modes', {}).items():
+                    (work / name).chmod(mode)
+                for alias, target in case.get('hardlinks', {}).items():
+                    os.link(work / target, work / alias)
+                before = replacement_snapshot(work)
+                initial = {}
+                mask = case.get('umask', 0o022)
+                for name, text in case['files'].items():
+                    initial[name] = (stat.S_IFREG | case.get('modes', {}).get(name,
+                        0o444 if name in case.get('readOnlyFiles', []) else 0o666 & ~mask),
+                        hashlib.sha256(text.replace('\n', separator).encode()).hexdigest())
+                    for parent in Path(name).parents:
+                        if str(parent) != '.':
+                            initial[str(parent)] = (stat.S_IFDIR | (
+                                0o555 if str(parent) in case.get('readOnly', []) else 0o777 & ~mask), 'directory')
+                for alias, target in case.get('hardlinks', {}).items():
+                    initial[alias] = initial[target]
+                # Reuse only the metadata-count expansion, with no generated artifacts.
+                initial_case = {**case, 'tree': {}}
+                wanted_before = replacement_expected(work, initial_case, ending, trees,
+                    {name: (mode, 1, content) for name, (mode, content) in initial.items()}, host)
+                assert before == wanted_before, (case['id'], 'fixture preparation', before, wanted_before)
+                try:
+                    actual, raw = observe(command, case, case['operations'][0], work, host == 'rust')
+                    expected = case['expected'][ending][case['operations'][0]]
+                    after = replacement_snapshot(work)
+                    entry = dict(case=case['id'], ending=ending, host=host,
+                                 observed=actual, raw=raw, before=before, after=after)
+                    evidence['observations'].append(entry)
+                    print(json.dumps(entry, ensure_ascii=False), flush=True)
+                    assert actual == expected, (entry, expected)
+                    if 'failureBytes' in case:
+                        wanted = dict(before)
+                        digest = (before['out/mod.rs'][2] if host == 'rust' and case.get('preserveOnFailure')
+                                  else hashlib.sha256(case['failureBytes'].encode()).hexdigest())
+                        wanted['out/mod.rs'] = (*before['out/mod.rs'][:2], digest)
+                        for alias in case.get('hardlinks', {}):
+                            wanted[alias] = wanted['out/mod.rs']
+                    else:
+                        # Playground uses its own fixed tree and preexisting host-specific root mode.
+                        wanted = replacement_expected(work, case, ending, trees, before, host)
+                    assert after == wanted, (entry, wanted)
+                    if actual['exit'] == 0:
+                        checked, _ = observe(command, {**case, 'flags': ['--check']},
+                                             case['operations'][0], work, host == 'rust')
+                        evidence['checks'].append(dict(case=case['id'], ending=ending, host=host, observed=checked))
+                        assert checked == {**expected, 'stdout': expected['stdout'].replace('Generated ', 'Verified ', 1)}, checked
+                        assert replacement_snapshot(work) == after, '--check changed metadata/content'
+                finally:
+                    for name in case.get('readOnly', []):
+                        (work / name).chmod(0o755)
+                    for name in case.get('readOnlyFiles', []):
+                        (work / name).chmod(0o644)
+                    for child in work.iterdir():
+                        if child.is_dir():
+                            shutil.rmtree(child)
+                        else:
+                            child.unlink()
+    os.umask(0o022)
+    if os.environ.get('GITHUB_ACTIONS'):
+        assert not evidence['excluded'], evidence['excluded']
+
+
 def blank_option_cases(table):
     """Expand fixed argv/expected tables; never derive an oracle from either CLI."""
     for value in table['values']:
@@ -261,7 +388,7 @@ def main():
     parser.add_argument('--java', required=True)
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
-    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax', 'profile', 'blank'], required=True)
+    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax', 'profile', 'blank', 'replacement'], required=True)
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
     corpus = json.loads((ROOT / 'spec-corpus/cli-stderr.json').read_text())
@@ -271,7 +398,21 @@ def main():
     evidence = dict(excluded=[], observations=[], checks=[])
     try:
         with tempfile.TemporaryDirectory(prefix='cli-stderr-', dir=os.environ.get('TMPDIR')) as directory:
-            if args.suite == 'blank':
+            if args.suite == 'replacement':
+                work = Path(directory) / 'replacement'
+                work.mkdir()
+                # Permission/size failure vectors use real processes with rlimits; successful
+                # vectors use the existing real CodegenMain.run batch protocol.
+                batch_cases = [c for c in cases if 'fileSizeLimit' not in c and c.get('umask', 0o022) == 0o022]
+                direct_cases = [c for c in cases if c not in batch_cases]
+                with blank_java_host(args.java, args.classpath, work) as host:
+                    replacement_cases(batch_cases, Path(directory),
+                                      [('java', host), ('rust', [args.rust])], evidence, corpus['trees'])
+                work.rmdir()
+                replacement_cases(direct_cases, Path(directory), [
+                    ('java', [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
+                    ('rust', [args.rust])], evidence, corpus['trees'])
+            elif args.suite == 'blank':
                 work = Path(directory) / 'blank-argv'
                 work.mkdir()
                 with blank_java_host(args.java, args.classpath, work) as host:

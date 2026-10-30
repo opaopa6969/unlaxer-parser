@@ -2257,7 +2257,7 @@
       "issues": [
         937
       ],
-      "observation": "Java製品コードを維持しnativeの書込み失敗をJava NIOの失敗パス・原因文に統一する。errno接尾辞は除去し、Playground stagingの乱数/PID部分だけ比較時に正規化する。UTF-8はFiles.readStringとstrict decoderの異なるmalformed lengthを入口/inspect/importに応じて保持する。check JSON・入力OS I/O表・package artifactのraw hash→strict UTF-8→JSONは不変。readinessは全種別をDiagnostic/Spanのrecord表記にし、順序・null・CP位置・subjectを保つ。共通113形（出力15: --check・書込み失敗・子directoryの書込み順を含む、UTF-8 48、readiness48、構文2）をLF/CRLFで両実CLIの1280観測・無出力/既存入力不変と比較する。権限probeが効かない環境の4形は理由付きで除外し、CIでは除外0/skip0を必須とする。意図した差: generate/deps inspectの構文エラーはJavaのソース先頭80文字表示に対しnativeの既存の行/列/原因を維持する。書込み失敗時にJavaは途中まで書いた生成物を残すがnativeは同じdirectoryの一時ファイルを消し既存生成物を切り詰めない（作成物をhostごとに固定）。利用者の位置情報を失わせずparserホットパスを変えない最小・可逆の選択。nativeSyntaxにLF/CRLFの独立期待値を固定する。変更は公開3.3.0へ適用しない。",
+      "observation": "Java製品コードを維持しnativeの書込み失敗をJava NIOの失敗パス・原因文に統一する。errno接尾辞は除去し、Playground stagingの乱数/PID部分だけ比較時に正規化する。UTF-8はFiles.readStringとstrict decoderの異なるmalformed lengthを入口/inspect/importに応じて保持する。check JSON・入力OS I/O表・package artifactのraw hash→strict UTF-8→JSONは不変。readinessは全種別をDiagnostic/Spanのrecord表記にし、順序・null・CP位置・subjectを保つ。共通113形（出力15: --check・書込み失敗・子directoryの書込み順を含む、UTF-8 48、readiness48、構文2）をLF/CRLFで両実CLIの1280観測・無出力/既存入力不変と比較する。権限probeが効かない環境の4形は理由付きで除外し、CIでは除外0/skip0を必須とする。意図した差: generate/deps inspectの構文エラーはJavaのソース先頭80文字表示に対しnativeの既存の行/列/原因を維持する。書込み失敗時にJavaは途中まで書いた生成物を残すがnativeの通常rename経路は同じdirectoryの一時ファイルを消し既存生成物を切り詰めない（作成物をhostごとに固定）。#971でhard linkと一時ファイル作成権限のないdirectoryの既存生成物だけをその場書込みへ退避し、この2経路の失敗時保護はJavaと同じ水準へ下がる。利用者の位置情報を失わせずparserホットパスを変えない最小・可逆の選択。nativeSyntaxにLF/CRLFの独立期待値を固定する。変更は公開3.3.0へ適用しない。",
       "evidence": [
         "spec-corpus/cli-stderr.json",
         "scripts/cli_stderr.py",
@@ -2293,7 +2293,7 @@
       "issues": [
         952
       ],
-      "observation": "#952でJava製品コードを変えずnativeの出力先自体のsymlink拒否文、generateの不存在成分を含むout/../out2の失敗とout2だけを残す副作用、mode444既存生成物の書込み失敗をJavaへ統一する。generateのstdoutはPath.of相当の連続/末尾separator整理（dot/parentは保持）、Playgroundは正規化前後のsymlink検査と絶対・字句正規化後の出力/成功stdout/失敗文へ揃える。missing/../pg2はmissingを作らない。意図した差: generateの祖先symlinkは意図しない実体先へ書かない既存native方針を維持し、output directory must not have a symbolic link ancestor: Pで拒否する（Javaは生成する）。#937の同directory一時ファイル・rename・失敗時に既存生成物をtruncateしない契約を維持し、書込み直前の非truncate openで権限を検査する。generateの作成先探索はJavaのtoAbsolutePath/getParentと同じく.を保持し（file/./outはW/file/.で失敗、file/.は既存のW/file）、生成先の親のsymlink/非directoryをファイル自体より先に検査する。祖先がdangling/ループ/fileへのsymlinkの場合は両版とも終了4で最終行だけが祖先拒否文になる。祖先検査は綴りに現れる成分だけで、書込み前の1回（祖先の差替え競合は防がない）。Playground rootの既存mode差（Java700/native755、umask022）も正常生成を変えずhost別に固定。共通33形/LF・CRLFの244観測と成功後--check114回でexit・全stdout・stderr最終行・全ツリーの名前/type/mode/hashを独立期待値に照合する。入力/出力I/Oの既存表、check JSON、生成内容、公開3.3.0と#197の性能凍結は不変。#953と#949は別issueのまま。上書き成功時のmode・hard link・555 directoryのrename由来の差は#971。",
+      "observation": "#952でJava製品コードを変えずnativeの出力先自体のsymlink拒否文、generateの不存在成分を含むout/../out2の失敗とout2だけを残す副作用、mode444既存生成物の書込み失敗をJavaへ統一する。generateのstdoutはPath.of相当の連続/末尾separator整理（dot/parentは保持）、Playgroundは正規化前後のsymlink検査と絶対・字句正規化後の出力/成功stdout/失敗文へ揃える。missing/../pg2はmissingを作らない。意図した差: generateの祖先symlinkは意図しない実体先へ書かない既存native方針を維持し、output directory must not have a symbolic link ancestor: Pで拒否する（Javaは生成する）。#937の同directory一時ファイル・rename・失敗時に既存生成物をtruncateしない契約は#971の2つの退避経路を除いて維持し、書込み直前の非truncate openで権限を検査する。generateの作成先探索はJavaのtoAbsolutePath/getParentと同じく.を保持し（file/./outはW/file/.で失敗、file/.は既存のW/file）、生成先の親のsymlink/非directoryをファイル自体より先に検査する。祖先がdangling/ループ/fileへのsymlinkの場合は両版とも終了4で最終行だけが祖先拒否文になる。祖先検査は綴りに現れる成分だけで、書込み前の1回（祖先の差替え競合は防がない）。Playground rootの既存mode差（Java700/native755、umask022）も正常生成を変えずhost別に固定。共通33形/LF・CRLFの244観測と成功後--check114回でexit・全stdout・stderr最終行・全ツリーの名前/type/mode/hashを独立期待値に照合する。入力/出力I/Oの既存表、check JSON、生成内容、公開3.3.0と#197の性能凍結は不変。#953と#949は別issueのまま。上書き成功時のmode・hard link・555 directoryは#971でJavaへ揃え、rename時の所有者・ACL・xattrの差と退避時の部分書込みを同項目に記録する。",
       "evidence": [
         "rust/unlaxer-generator/src/main.rs",
         "unlaxer-dsl/src/main/java/org/unlaxer/dsl/RustGenerateCommand.java",
@@ -2346,16 +2346,20 @@
     },
     {
       "id": "cli-output-replacement-metadata",
-      "category": "unresolved",
-      "title": "generate の既存生成物の置換（mode・hard link・読取り専用 directory）",
+      "category": "contract",
+      "title": "既存生成物のmode・hard link・directory権限とrenameの属性保存境界",
       "hosts": "Java CodegenMain / native Rust unlaxer",
       "issues": [
         971
       ],
-      "observation": "Javaは既存生成物へFiles.writeStringでその場に書き、nativeは同じdirectoryの一時ファイルをrenameで置き換える（#937の書込み失敗時に切り詰めない契約）。上書き成功時、既存のmode 600/640はJavaで保持、nativeはumaskの新規値。hard linkはJavaで両名が更新されnativeは切れる。mode 555のdirectory内の書込み可能な既存生成物はJavaが成功しnativeは一時ファイルを作れず終了4。#952の表の外で、PR #969の前のnativeでも同じ。",
+      "observation": "Java Files.writeStringが参照。nativeは既存の書込み権限をtruncateせず確認し、通常のsibling一時ファイルへ既存permission bitsを写してrenameする。mode 600/640を保存、新規ファイルはumask 022/002/077で644/664/600となりJavaと一致。hard link (nlink>1)と一時ファイル作成のPermissionDenied時の既存ファイルだけは、同じ書込み用handleでその場書込みへ退避する。この2経路のみ#937の書込み失敗時に切り詰めない保証がJavaと同じ水準へ下がり、truncate後の失敗で部分内容が全hard linkへ残る。通常renameは既存bytesを保護する。mode444の非root拒否は#952のまま。所有者・ACL・xattrはrename経路で保存しない意図した差（inode置換と#937のbytes保護を維持し、新依存・特権を加えない最小の選択）。その場書込みの経路は同じinodeでJavaと同じ属性を保持する。rootで444の成功とmode保持はrunnerがsudo不可のため未実測の推定として残す。共通14形をLF/CRLFで両CLIへ送り56観測とcheck40回を独立期待値へ照合し、mode/nlink/全内容を比較。chmod555/444を迂回できるユーザーでは非rootの権限ケースを理由付き除外しCIは除外0。Java製品コード・#937/#952/#953/#974の既存表・check JSON・正常生成bytesは不変。",
       "evidence": [
         "rust/unlaxer-generator/src/main.rs",
-        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/RustGenerateCommand.java"
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/RustGenerateCommand.java",
+        "spec-corpus/cli-stderr.json",
+        "scripts/cli_stderr.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
+        "docs/ubnf-packages.md"
       ]
     }
   ],
@@ -2372,7 +2376,8 @@
         "cli-stderr-presentation",
         "cli-output-path-policy",
         "playground-profile-input-io",
-        "playground-option-blank-values"
+        "playground-option-blank-values",
+        "cli-output-replacement-metadata"
       ]
     },
     {
