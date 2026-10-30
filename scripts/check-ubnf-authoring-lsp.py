@@ -279,37 +279,41 @@ def run(java, native, directory):
 
 
 def module_rejections(clients, directory):
-    """#988: the same independent CLI fixtures pin full authoring diagnostics."""
+    """#988/#999: the same independent CLI fixtures pin full authoring diagnostics."""
     from cli_input_errors import setup, snapshot
+    from cli_stderr import module_fixture
     cases = [case for case in json.loads((ROOT / 'spec-corpus/cli-stderr.json').read_text())['cases']
              if case.get('moduleRejection')]
-    assert len(cases) == 4, 'module rejection fixtures must not silently disappear'
+    assert len(cases) == 24, 'module rejection fixtures must not silently disappear'
     evidence = []
     for case in cases:
         for ending, separator in [('LF', '\n'), ('CRLF', '\r\n')]:
             folder = directory / (case['id'] + '-' + ending)
-            setup(folder, case, separator)
-            before = snapshot(folder)
-            uri = (folder / 'main.ubnf').as_uri()
-            source = case['files']['main.ubnf'].replace('\n', separator)
-            expected = json.loads(json.dumps(case['lspExpected'], ensure_ascii=False)
-                                  .replace('${WORK}', str(folder)))
-            observations = []
-            for host, client in zip(('java', 'rust'), clients):
-                client.send('textDocument/didOpen', {'textDocument': {
-                    'uri': uri, 'languageId': 'ubnf', 'version': 1, 'text': source}})
-                actual = client.diagnostics(uri)
-                assert actual == expected, (case['id'], ending, host, actual, expected)
-                observations.append(dict(host=host, diagnostics=actual))
-                client.send('textDocument/didChange', {'textDocument': {'uri': uri, 'version': 2},
-                            'contentChanges': [{'text': "grammar Fixed { @root Start ::= 'x'; }"}]})
-                assert client.diagnostics(uri) == []
-                assert client.result('textDocument/completion', {'textDocument': {'uri': uri},
-                    'position': {'line': 0, 'character': 37}}) is not None
-                client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
-                assert snapshot(folder) == before, (case['id'], ending, host, 'filesystem changed')
-            evidence.append(dict(case=case['id'], ending=ending, observations=observations,
-                                 before=before, after=snapshot(folder)))
+            with module_fixture(case, folder) as prepared:
+                setup(folder, prepared, separator)
+                before = snapshot(folder)
+                uri = (folder / case.get('lspGrammar', 'main.ubnf')).as_uri()
+                source = prepared['files']['main.ubnf'].replace('\n', separator)
+                expected = json.loads(json.dumps(prepared['lspExpected'], ensure_ascii=False)
+                                      .replace('${WORK}', str(folder)))
+                observations = []
+                for host, client in zip(('java', 'rust'), clients):
+                    client.send('textDocument/didOpen', {'textDocument': {
+                        'uri': uri, 'languageId': 'ubnf', 'version': 1, 'text': source}})
+                    actual = client.diagnostics(uri)
+                    assert actual == expected, (case['id'], ending, host, actual, expected)
+                    observations.append(dict(host=host, diagnostics=actual))
+                    client.send('textDocument/didChange', {'textDocument': {'uri': uri, 'version': 2},
+                                'contentChanges': [{'text': "grammar Fixed { @root Start ::= 'x'; }"}]})
+                    assert client.diagnostics(uri) == []
+                    assert client.result('textDocument/completion', {'textDocument': {'uri': uri},
+                        'position': {'line': 0, 'character': 37}}) is not None
+                    client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
+                    assert snapshot(folder) == before, (case['id'], ending, host, 'filesystem changed')
+                evidence.append(dict(case=case['id'], ending=ending, observations=observations,
+                                     before=before, after=snapshot(folder)))
+            if case.get('networkProbe'):
+                evidence[-1]['networkConnections'] = 0
     return evidence
 
 

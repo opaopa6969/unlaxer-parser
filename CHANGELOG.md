@@ -116,6 +116,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - native Rust frontend の旧 REGEX 移行診断をファイル全体の構文解析後へ移し、余分なセミコロンや前後の構文エラーでは Java と同じ `P-SYNTAX` を選ぶようにした。旧宣言の実行拒否と CP 位置を維持し、入口/local import・LF/CRLF・非 BMP の共通 fixture で両 CLI を検証する (#949)。
 - native UBNF frontend の名前空間参照を Java に揃え、`a .N`・`a. b.N` など連続しない接頭辞を移行診断より先に構文エラーにする。最後の名前の前の空白・コメント（`a. N`）は Java 同様に受理し、正常な import の生成物を維持する (#986)。
 - native Rust の rule を含む local module の拒否診断に絶対元パスを付け、generate / deps inspect と authoring LSP の表示を Java に揃えた。入口・推移的 import、非 ASCII・非 BMP・空白パスと LF/CRLF を共通 fixture で検証し、check / Playground の P-MODULE は維持する (#988)。
+- native Rust の複数 grammar・不正 module feature・network import の E-MODULE 拒否末尾へ対象パス/URLを付け、Java の全診断と揃えた。字句正規化・symlink 非解決・推移的 import、URL の元表記と通信前拒否を共通 CLI / authoring stdio fixture で固定した (#999)。
 - native UBNF frontend の CHAR_RANGE・v2 escape・宣言的字句 range・重複 annotation 引数の値エラーを全体構文認識後へ保留し、後続構文不正を Java と同じく優先する。最初の値／移行診断を維持し、native 固有の入れ子上限後の走査は #996 に分離した (#983)。
 - native Rust の generate / Playground の出力先パスを Java に揃えた。成功 stdout は generate の末尾・連続 `/` を整理し、Playground は絶対・字句正規化したパスを表示する。不存在成分を含む `..`・`.` を含む作成先の失敗文、生成先の親の symlink の検査順と mode 444 の既存生成物の書込み失敗も一致させ、generate の symlink 祖先拒否は理由付きの意図した差として維持する。[移行案内](docs/migration-after-3.3.0.md) (#952)。
 - native Rust の generate が既存生成物の mode を保持し、hard link と書込み不可 directory 内の書込み可能な既存ファイルは Java と同じその場書込みへ退避する。通常 rename の失敗時保護を維持し、退避時の部分書込みと所有者・ACL・xattr の保存境界を共通 fixture・台帳に明記した (#971)。

@@ -45,7 +45,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=240000) public void nativeAndJavaServersShareAuthoringFixtures() throws Exception {
-        runProtocol("baseline", 135);
+        runProtocol("baseline", 175);
     }
 
     @Test(timeout=240000) public void nativeAndJavaServersShareNavigationFixtures() throws Exception {

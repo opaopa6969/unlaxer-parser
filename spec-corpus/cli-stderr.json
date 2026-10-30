@@ -9,7 +9,7 @@
     "blank": 175,
     "replacement": 15,
     "regex": 40,
-    "qualified": 42,
+    "qualified": 62,
     "value": 158
   },
   "cases": [
@@ -38148,6 +38148,1873 @@
         }
       ],
       "tree": {}
+    },
+    {
+      "id": "module-target-dotdot",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'sub/../part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar A { @import absent from 'must-not-be-read.ubnf' @feature: nosuch @root R ::= 'x'; } grammar B {}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 34
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-missing-dotdot",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'nosuch/../part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar G { @import absent from 'must-not-be-read.ubnf' @feature: nosuch token T ::= 'x'; }\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 37
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: invalid module features: ${WORK}/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-symlink-dir",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'link/part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "real/part.ubnf": "grammar A { @import absent from 'must-not-be-read.ubnf' @feature: nosuch @root R ::= 'x'; } grammar B {}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/link/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/link/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/link/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/link/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/link/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/link/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/link/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/link/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 32
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: import requires exactly one grammar: ${WORK}/link/part.ubnf"
+        }
+      ],
+      "tree": {},
+      "symlinks": {
+        "link": "real"
+      }
+    },
+    {
+      "id": "module-target-symlink-file",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'alias.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar G { @import absent from 'must-not-be-read.ubnf' @feature: nosuch token T ::= 'x'; }\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/alias.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/alias.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/alias.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/alias.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/alias.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/alias.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/alias.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/alias.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 28
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: invalid module features: ${WORK}/alias.ubnf"
+        }
+      ],
+      "tree": {},
+      "symlinks": {
+        "alias.ubnf": "part.ubnf"
+      }
+    },
+    {
+      "id": "module-target-symlink-dotdot",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'link/../part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar A { @import absent from 'must-not-be-read.ubnf' @feature: nosuch @root R ::= 'x'; } grammar B {}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 35
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf"
+        }
+      ],
+      "tree": {},
+      "symlinks": {
+        "link": "real"
+      },
+      "directories": [
+        "real"
+      ]
+    },
+    {
+      "id": "module-target-cwd-parent",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar G { @import absent from 'must-not-be-read.ubnf' @feature: nosuch token T ::= 'x'; }\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 27
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: invalid module features: ${WORK}/part.ubnf"
+        }
+      ],
+      "tree": {},
+      "cwd": "sub",
+      "grammar": "../main.ubnf",
+      "directories": [
+        "sub"
+      ]
+    },
+    {
+      "id": "module-target-transitive-parent",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'sub/bridge.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar A { @import absent from 'must-not-be-read.ubnf' @feature: nosuch @root R ::= 'x'; } grammar B {}\n",
+        "sub/bridge.ubnf": "grammar Bridge {\n @import inner from '../part.ubnf'\n token T ::= inner.T;\n}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 33
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-absolute-slashes",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from '/${WORK}//part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar G { @import absent from 'must-not-be-read.ubnf' @feature: nosuch token T ::= 'x'; }\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": "${WORK_UTF16}+30"
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: invalid module features: ${WORK}/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-past-root",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from '/../../${WORK}/part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar A { @import absent from 'must-not-be-read.ubnf' @feature: nosuch @root R ::= 'x'; } grammar B {}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": "${WORK_UTF16}+35"
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: import requires exactly one grammar: ${WORK}/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-file-dot",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'part.ubnf/.'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar G { @import absent from 'must-not-be-read.ubnf' @feature: nosuch token T ::= 'x'; }\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 29
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: invalid module features: ${WORK}/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-backslash",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'part\\\\name.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part\\name.ubnf": "grammar A { @import absent from 'must-not-be-read.ubnf' @feature: nosuch @root R ::= 'x'; } grammar B {}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part\\name.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part\\name.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part\\name.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part\\name.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part\\name.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part\\name.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/part\\name.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/part\\name.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 33
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: import requires exactly one grammar: ${WORK}/part\\name.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-symlink-entry",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "part.ubnf": "grammar G { @import absent from 'must-not-be-read.ubnf' @feature: nosuch token T ::= 'x'; }\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/entry/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/entry/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/entry/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/entry/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/entry/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/entry/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/entry/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/entry/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 27
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: invalid module features: ${WORK}/entry/part.ubnf"
+        }
+      ],
+      "tree": {},
+      "grammar": "${WORK}/entry/main.ubnf",
+      "lspGrammar": "entry/main.ubnf",
+      "symlinks": {
+        "entry": "."
+      }
+    },
+    {
+      "id": "module-target-grammar-unicode-direct",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'missing/../é😀 space/part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "é😀 space/part.ubnf": "grammar A { @import absent from 'must-not-be-read.ubnf' @feature: nosuch @root R ::= 'x'; } grammar B {}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 48
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-grammar-unicode-transitive",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'bridge.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "é😀 space/part.ubnf": "grammar A { @import absent from 'must-not-be-read.ubnf' @feature: nosuch @root R ::= 'x'; } grammar B {}\n",
+        "bridge.ubnf": "grammar Bridge {\n @import inner from 'missing/../é😀 space/part.ubnf'\n token T ::= inner.T;\n}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 29
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: import requires exactly one grammar: ${WORK}/é😀 space/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-features-unicode-direct",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'missing/../é😀 space/part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "é😀 space/part.ubnf": "grammar G { @import absent from 'must-not-be-read.ubnf' @feature: nosuch token T ::= 'x'; }\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 48
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-features-unicode-transitive",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'bridge.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "é😀 space/part.ubnf": "grammar G { @import absent from 'must-not-be-read.ubnf' @feature: nosuch token T ::= 'x'; }\n",
+        "bridge.ubnf": "grammar Bridge {\n @import inner from 'missing/../é😀 space/part.ubnf'\n token T ::= inner.T;\n}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf",
+            "stderr": "E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 29
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: invalid module features: ${WORK}/é😀 space/part.ubnf"
+        }
+      ],
+      "tree": {}
+    },
+    {
+      "id": "module-target-network-http",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag'\n @ubnf: v2\n @root Start ::= m.T;\n}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag",
+            "stderr": "E-MODULE: network imports are unsupported: http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag",
+            "stderr": "E-MODULE: network imports are unsupported: http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag",
+            "stderr": "E-MODULE: network imports are unsupported: http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag",
+            "stderr": "E-MODULE: network imports are unsupported: http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": "${PORT_UTF16}+61"
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: network imports are unsupported: http://127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag"
+        }
+      ],
+      "tree": {},
+      "networkProbe": true
+    },
+    {
+      "id": "module-target-network-https-userinfo",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'bridge.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "bridge.ubnf": "grammar Bridge {\n @import inner from 'HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag'\n token T ::= inner.T;\n}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag",
+            "stderr": "E-MODULE: network imports are unsupported: HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag",
+            "stderr": "E-MODULE: network imports are unsupported: HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag",
+            "stderr": "E-MODULE: network imports are unsupported: HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag",
+            "stderr": "E-MODULE: network imports are unsupported: HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 29
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: network imports are unsupported: HtTpS://dummy:dummy@127.0.0.1:${PORT}/a/../part.ubnf?x=%2f#frag"
+        }
+      ],
+      "tree": {},
+      "networkProbe": true
+    },
+    {
+      "id": "module-target-network-ftp",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'ftp://127.0.0.1:${PORT}//part.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: ftp://127.0.0.1:${PORT}//part.ubnf",
+            "stderr": "E-MODULE: network imports are unsupported: ftp://127.0.0.1:${PORT}//part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: ftp://127.0.0.1:${PORT}//part.ubnf",
+            "stderr": "E-MODULE: network imports are unsupported: ftp://127.0.0.1:${PORT}//part.ubnf\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: ftp://127.0.0.1:${PORT}//part.ubnf",
+            "stderr": "E-MODULE: network imports are unsupported: ftp://127.0.0.1:${PORT}//part.ubnf\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: ftp://127.0.0.1:${PORT}//part.ubnf",
+            "stderr": "E-MODULE: network imports are unsupported: ftp://127.0.0.1:${PORT}//part.ubnf\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": "${PORT_UTF16}+45"
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: network imports are unsupported: ftp://127.0.0.1:${PORT}//part.ubnf"
+        }
+      ],
+      "tree": {},
+      "networkProbe": true
+    },
+    {
+      "id": "module-target-network-unicode",
+      "scope": "qualified",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry {\n @import m from 'bridge.ubnf'\n @ubnf: v2\n @root Start ::= m.T;\n}\n",
+        "bridge.ubnf": "grammar Bridge {\n @import inner from 'https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀'\n token T ::= inner.T;\n}\n"
+      },
+      "realCli": [
+        "generate",
+        "inspect"
+      ],
+      "moduleRejection": true,
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀",
+            "stderr": "E-MODULE: network imports are unsupported: https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀",
+            "stderr": "E-MODULE: network imports are unsupported: https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀",
+            "stderr": "E-MODULE: network imports are unsupported: https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-MODULE: network imports are unsupported: https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀",
+            "stderr": "E-MODULE: network imports are unsupported: https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀\n"
+          }
+        }
+      },
+      "lspExpected": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 1
+            },
+            "end": {
+              "line": 1,
+              "character": 29
+            }
+          },
+          "severity": 1,
+          "code": "E-MODULE",
+          "source": "ubnf-module",
+          "message": "import m: E-MODULE: network imports are unsupported: https://127.0.0.1:${PORT}/é😀 space/part.ubnf?q=é#😀"
+        }
+      ],
+      "tree": {},
+      "networkProbe": true
     }
   ],
   "trees": {
