@@ -72,7 +72,7 @@ public class CliStderrConformanceTest {
         int observations = switch (suite) {
             case "replacement" -> 60;
             case "regex" -> 640;
-            case "qualified" -> 672;
+            case "qualified" -> 992;
             case "value" -> 2528;
             case "blank" -> 350;
             case "output" -> 112;

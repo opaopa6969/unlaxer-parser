@@ -1393,8 +1393,39 @@ native の UTF-8 表示や利用可能なパスの読取りを故意に失敗さ
 （推移的 import の記述は `./?? space/part.ubnf`）で終了3となる。
 native は同じ終了3で UTF-8 の絶対元パス付き `E-MODULE` を返す。
 
-隣接する拒否のうち、`import requires exactly one grammar` と `invalid module features`
-（`@feature` が不正な declarative token module）の絶対元パス、`network imports are unsupported` の
-URL が native に付かない表示差は #999 で追跡する。
-いずれも generate / deps inspect の終了3と無出力は一致する。#988 は rule を含む module の
-拒否だけを扱い、この3つの既存診断は変更しない。
+## module 拒否の対象表示（#999）
+
+Java の既存診断を基準に、native の `generate --target rust` / `deps inspect` も
+次の全文（末尾 LF）を表示し、終了3、stdout 空、入力不変、出力と staging 不在を維持する。
+
+| 拒否条件 | 共通の診断 |
+| --- | --- |
+| import 先が複数 grammar | `E-MODULE: import requires exactly one grammar: <絶対パス>` |
+| declarative token module の `@feature` が不正 | `E-MODULE: invalid module features: <絶対パス>` |
+| import 宣言のパスに `://` を含む | `E-MODULE: network imports are unsupported: <宣言中の文字列>` |
+
+ローカルパスは #988 と同じ `normalize()` と `path.display()` を使う。
+`..` は字句的に畳み、存在しない中間成分の確認や symlink の実体解決を行わない。
+推移的 import は入口や bridge でなく拒否された module 自身を示す。
+module の grammar 数、declarative token 限定、feature、子 import の順に検査する。
+network は URL の解析・正規化・接続より前に拒否する。scheme の大小文字、`..`、
+二重 slash、percent escape、userinfo・query・fragment、非 ASCII 文字を元のまま表示する。
+userinfo を含む診断も Java の既存仕様どおりであり、fixture はダミー値だけを使う。
+`check --format json` / Playground の `P-MODULE` は維持する。
+
+共通 `cli-stderr.json` の qualified suite に20形を追加（42→62形、992観測/JDK）。
+#1000 のレビューで Java と照合した12形のパス、非 ASCII・非 BMP・空白の入口/推移的 import、
+4形のローカル network URL を LF/CRLF で、全 stdout/stderr・終了値・全ツリーへ照合する。
+追加形の generate / deps inspect は両実 CLI を起動し、Java の check / Playground は
+既存の `CodegenBatchHost` から実 `CodegenMain.run` を呼ぶ。native は全操作で JVM 不要の実 CLI を使う。
+期待値は実測から作らず、Java の分岐と公開診断/JSON型に基づいて独立に手書きする。
+`${WORK}` / `${PORT}` は一時ディレクトリ/loopback listener の port だけを置換し、
+LSP range の `${WORK_UTF16}+N` / `${PORT_UTF16}+N` は既知の接頭辞の UTF-16 幅に
+手書きした固定幅 N を足す。製品出力から位置や期待値を算出しない。
+同じ24形（#988 の4形を含む）を両 authoring 実 stdio に送り、診断 JSON 全体、
+文書修正後の空診断、後続 completion、入力不変も検査する（baseline 135→175形）。
+CLI と stdio の network fixture は loopback listener への接続が0であることを検査し、外部へ接続しない。
+正常な declarative token import の生成 bytes / `--check`、#988 の rule-module 拒否を維持する。
+JDK17/21 は C.UTF-8 で比較し、JVM のパス変換制約・生 bytes 名・C ロケールの表示は
+#991 / #966 の恒久差として引き続き区別する。Java 製品コード、公開済み3.3.0、
+parser ホットパス（#197）、依存 crate と CI の2 shard / self-hosted 設定は変更しない。

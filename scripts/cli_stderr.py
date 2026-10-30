@@ -13,6 +13,8 @@ import queue
 import subprocess
 import threading
 import signal
+import socket
+import select
 import tempfile
 
 from cli_input_errors import permissions_apply, run, setup, snapshot
@@ -59,6 +61,37 @@ def file_write_permissions_apply(directory):
         probe.unlink()
 
 
+@contextmanager
+def module_fixture(case, work):
+    """Expand authored paths; a loopback listener proves rejection precedes I/O."""
+    if not (case.get('moduleRejection') or case.get('networkProbe')):
+        yield case
+        return
+    with socket.socket() as listener:
+        port = ''
+        if case.get('networkProbe'):
+            listener.bind(('127.0.0.1', 0))
+            listener.listen()
+            listener.setblocking(False)
+            port = str(listener.getsockname()[1])
+            case = json.loads(json.dumps(case, ensure_ascii=False).replace('${PORT}', port))
+        encoded = json.dumps(case, ensure_ascii=False)
+        for name, value in (('WORK', str(work)), ('PORT', port)):
+            width = len(value.encode('utf-16-le')) // 2
+            encoded = re.sub(r'"\$\{' + name + r'_UTF16\}\+(\d+)"',
+                             lambda match: str(width + int(match[1])), encoded)
+        case = json.loads(encoded)
+        case = {**case, 'files': {name: text.replace('${WORK}', str(work))
+                                 for name, text in case.get('files', {}).items()}}
+        yield case
+        if case.get('networkProbe'):
+            # Allow the loopback handshake/close to reach the accept queue even
+            # when a client immediately disconnects before this check runs.
+            assert not select.select([listener], [], [], 0.1)[0], (
+                case['id'], 'network import connected before rejection')
+
+
+
 def prepare(work, case, separator):
     setup(work, case, separator)
     for name, encoded in case.get('bytes', {}).items():
@@ -80,7 +113,7 @@ def options(case, operation):
         'generate': ['generate', '--target', 'rust', '--output', output] + case.get('flags', []),
         'playground': ['playground', '--output', output] + case.get('flags', []),
     }[operation] + (['--profile', case['profile']] if 'profile' in case
-                    else ['--grammar', 'main.ubnf'])
+                    else ['--grammar', case.get('grammar', 'main.ubnf')])
 
 
 def limited(case):
@@ -130,14 +163,15 @@ def remove_created(work, case, before):
 
 
 def observe(command, case, operation, work, native):
+    cwd = work / case.get('cwd', '.')
     args = [arg.replace('${WORK}', str(work)) for arg in options(case, operation)]
     if callable(command) and case['scope'] in ('regex', 'qualified', 'value'):
         # One batch JVM for this suite; resolve each case's inputs/output explicitly.
         for option in ('--grammar', '--output'):
             if option in args:
                 index = args.index(option) + 1
-                args[index] = str(work / args[index])
-    actual = command(args) if callable(command) else run(command, args, work, native, **limited(case))
+                args[index] = str(cwd / args[index])
+    actual = command(args) if callable(command) else run(command, args, cwd, native, **limited(case))
     if 'args' in case or callable(command):
         # Unicode separators in a nonblank path are part of the diagnostic, not LF.
         actual['lastError'] = actual['stderr'].removesuffix('\n').rsplit('\n', 1)[-1]
@@ -162,53 +196,59 @@ def exercise(cases, directory, commands, evidence, trees=None, direct_java=None)
             # Blank argv cases have no inputs and require an empty tree after every call.
             # Sharing this cwd lets CodegenBatchHost use one JVM for the whole table.
             work = directory / ('blank-argv' if case['scope'] == 'blank' else case['id'] + '-' + ending)
-            if case['scope'] != 'blank' or not work.exists():
-                prepare(work, case, separator)
-            try:
-                before = snapshot(work)
-                for operation in case['operations']:
-                    for host, command in commands:
-                        selected = direct_java if host == 'java' and case.get('realCli') else command
-                        observed, raw = observe(selected, case, operation, work, host == 'rust')
-                        entry = dict(case=case['id'], ending=ending, operation=operation, host=host,
-                                     observed=observed, raw=raw)
-                        evidence['observations'].append(entry)
-                        print(json.dumps(entry, ensure_ascii=False), flush=True)
-                        expected = case['expected'][ending][operation]
-                        if host == 'rust' and operation in case.get('nativeExpected', {}):
-                            expected = case['nativeExpected'][operation]
-                        if host == 'rust' and operation in case.get('nativeByEnding', {}).get(ending, {}):
-                            expected = case['nativeByEnding'][ending][operation]
-                        if host == 'rust' and 'nativeSyntax' in case:
-                            expected = {**expected, 'lastError': case['nativeSyntax'][ending]}
-                        assert observed == expected, (entry, expected)
-                        # Includes absence of output, partial files, and playground staging.
-                        # Existing caller-owned output/file cases must remain byte-for-byte intact;
-                        # only the fixture's listed paths (Java's per-file writes) may appear.
-                        after = snapshot(work)
-                        if case['scope'] in ('paths', 'blank') or 'tree' in case:
-                            entry['before'] = before
-                            entry['after'] = after
-                            assert after == {**before, **expected_tree(case, operation, host, ending, trees)}, (entry, 'tree')
-                            if observed['exit'] == 0 and operation in ('generate', 'playground'):
-                                checked, _ = observe(command, {**case, 'flags': ['--check']},
-                                                     operation, work, host == 'rust')
-                                evidence['checks'].append(dict(case=case['id'], ending=ending,
-                                                              operation=operation, host=host, observed=checked))
-                                assert checked == {**expected, 'stdout': expected['stdout'].replace('Generated ', 'Verified ', 1)}, checked
-                                assert snapshot(work) == after, (entry, '--check wrote files')
-                        else:
-                            assert {name: after.get(name) for name in before} == before, (entry, 'changed')
-                            new = sorted(normalize('/' + name, work)[1:] for name in set(after) - set(before))
-                            assert new == created(case, operation, host), (entry, new)
-                        remove_created(work, case, before)
-            finally:
-                if 'denied' in case:
-                    (work / case['denied']).chmod(0o600)
-                for name in case.get('readOnly', []):
-                    (work / name).chmod(0o755)
-                for name in case.get('readOnlyFiles', []):
-                    (work / name).chmod(0o644)
+            with module_fixture(case, work) as prepared:
+                if case['scope'] != 'blank' or not work.exists():
+                    prepare(work, prepared, separator)
+                try:
+                    before = snapshot(work)
+                    for operation in case['operations']:
+                        for host, command in commands:
+                            real_cli = case.get('realCli', [])
+                            selected = (direct_java if host == 'java'
+                                        and (real_cli is True or operation in (real_cli or [])) else command)
+                            observed, raw = observe(selected, prepared, operation, work, host == 'rust')
+                            entry = dict(case=case['id'], ending=ending, operation=operation, host=host,
+                                         observed=observed, raw=raw)
+                            evidence['observations'].append(entry)
+                            print(json.dumps(entry, ensure_ascii=False), flush=True)
+                            expected = prepared['expected'][ending][operation]
+                            if host == 'rust' and operation in case.get('nativeExpected', {}):
+                                expected = case['nativeExpected'][operation]
+                            if host == 'rust' and operation in case.get('nativeByEnding', {}).get(ending, {}):
+                                expected = case['nativeByEnding'][ending][operation]
+                            if host == 'rust' and 'nativeSyntax' in case:
+                                expected = {**expected, 'lastError': case['nativeSyntax'][ending]}
+                            assert observed == expected, (entry, expected)
+                            # Includes absence of output, partial files, and playground staging.
+                            # Existing caller-owned output/file cases must remain byte-for-byte intact;
+                            # only the fixture's listed paths (Java's per-file writes) may appear.
+                            after = snapshot(work)
+                            if case['scope'] in ('paths', 'blank') or 'tree' in case:
+                                entry['before'] = before
+                                entry['after'] = after
+                                assert after == {**before, **expected_tree(case, operation, host, ending, trees)}, (entry, 'tree')
+                                if observed['exit'] == 0 and operation in ('generate', 'playground'):
+                                    checked, _ = observe(command, {**case, 'flags': ['--check']},
+                                                         operation, work, host == 'rust')
+                                    evidence['checks'].append(dict(case=case['id'], ending=ending,
+                                                                  operation=operation, host=host, observed=checked))
+                                    assert checked == {**expected, 'stdout': expected['stdout'].replace('Generated ', 'Verified ', 1)}, checked
+                                    assert snapshot(work) == after, (entry, '--check wrote files')
+                            else:
+                                assert {name: after.get(name) for name in before} == before, (entry, 'changed')
+                                new = sorted(normalize('/' + name, work)[1:] for name in set(after) - set(before))
+                                assert new == created(case, operation, host), (entry, new)
+                            remove_created(work, case, before)
+                finally:
+                    if 'denied' in case:
+                        (work / case['denied']).chmod(0o600)
+                    for name in case.get('readOnly', []):
+                        (work / name).chmod(0o755)
+                    for name in case.get('readOnlyFiles', []):
+                        (work / name).chmod(0o644)
+            if case.get('networkProbe'):
+                evidence.setdefault('networkProbes', []).append(
+                    dict(case=case['id'], ending=ending, connections=0))
     if os.environ.get('GITHUB_ACTIONS'):
         assert not evidence['excluded'], evidence['excluded']
 

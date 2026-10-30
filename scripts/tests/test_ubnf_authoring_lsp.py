@@ -15,6 +15,24 @@ SPEC.loader.exec_module(lsp)
 
 
 class AuthoringClientTest(unittest.TestCase):
+    def test_module_network_probe_detects_an_immediately_closed_connection(self):
+        import socket
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        try:
+            from cli_stderr import module_fixture
+        finally:
+            sys.path.pop(0)
+        case = dict(id='loopback-control', networkProbe=True,
+                    files={'url': 'http://127.0.0.1:${PORT}/'})
+        with module_fixture(case, Path.cwd()):
+            pass
+        for _ in range(3):
+            with self.assertRaisesRegex(AssertionError, 'connected before rejection'):
+                with module_fixture(case, Path.cwd()) as prepared:
+                    port = int(prepared['files']['url'].split(':')[2].split('/')[0])
+                    with socket.create_connection(('127.0.0.1', port), timeout=2):
+                        pass
+
     def client(self, code, backend='java'):
         client = lsp.Client([sys.executable, '-c', code], backend=backend)
         self.addCleanup(client.close)
