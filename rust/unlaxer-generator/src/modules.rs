@@ -138,7 +138,11 @@ impl Loader<'_> {
             let source = self.packages.read_with_errors(&path)?;
             let mut file = parse(&source).map_err(|e| e.to_string())?;
             if file.grammars.len() != 1 {
-                return Err(error("import requires exactly one grammar").into());
+                return Err(error(format!(
+                    "import requires exactly one grammar: {}",
+                    path.display()
+                ))
+                .into());
             }
             let grammar = &mut file.grammars[0];
             if !grammar.rules.is_empty()
@@ -154,7 +158,7 @@ impl Loader<'_> {
                 .into());
             }
             if !crate::adapters::feature_diagnostics(grammar).is_empty() {
-                return Err(error("invalid module features").into());
+                return Err(error(format!("invalid module features: {}", path.display())).into());
             }
             self.link(grammar, &path)?;
             let exports: Exports = crate::lexical::compile_syntax(grammar)
@@ -178,7 +182,11 @@ impl Loader<'_> {
                 return Err(error(format!("duplicate import alias: {}", declaration.alias)).into());
             }
             if declaration.path.contains("://") {
-                return Err(error("network imports are unsupported").into());
+                return Err(error(format!(
+                    "network imports are unsupported: {}",
+                    declaration.path
+                ))
+                .into());
             }
             let target = self.packages.import_path(path, &declaration.path)?;
             for (name, expression) in self.module(&target)? {

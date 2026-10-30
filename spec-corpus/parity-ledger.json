@@ -2464,7 +2464,7 @@
       "issues": [
         986
       ],
-      "observation": "Java製品を維持し、(IDENTIFIER dot)*の接頭辞内の空白・改行・行コメントをnativeでも構文エラーにする。a .N / a. b.NはP-SYNTAX/null/UBNF syntax、a. N / a.b. N / 最後の名前の前のコメントはJava同様に構文受理する。旧REGEXより全体構文を優先する#949の順序、importのP-MODULEラップ、#937のhost別構文表示を維持する。18形×入口/local importと正常token import2形、LF/CRLFの608CLI観測・成功後--check16回・frontend36入力を固定期待値に照合し、無出力/入力不変と正常生成物の全hashを検証する。authoringのspaced-namespace-*は既存の編集拒否を維持。正常な未解決参照のE-RULE-UNDEFINED本文は既存#843契約、module拒否のパスは#988で共通期待値へ統合し、追加4形と合わせて672CLI観測を固定する。途中値検証は#983で追跡する。公開3.3.0とJava診断は不変。",
+      "observation": "Java製品を維持し、(IDENTIFIER dot)*の接頭辞内の空白・改行・行コメントをnativeでも構文エラーにする。a .N / a. b.NはP-SYNTAX/null/UBNF syntax、a. N / a.b. N / 最後の名前の前のコメントはJava同様に構文受理する。旧REGEXより全体構文を優先する#949の順序、importのP-MODULEラップ、#937のhost別構文表示を維持する。18形×入口/local importと正常token import2形、LF/CRLFの608CLI観測・成功後--check16回・frontend36入力を固定期待値に照合し、無出力/入力不変と正常生成物の全hashを検証する。authoringのspaced-namespace-*は既存の編集拒否を維持。正常な未解決参照のE-RULE-UNDEFINED本文は既存#843契約、module拒否のパスは#988で共通期待値へ統合し、追加4形と合わせて672CLI観測、#999の20形と合わせて992CLI観測を固定する。途中値検証は#983で追跡する。公開3.3.0とJava診断は不変。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/cli-stderr.json",
@@ -2533,17 +2533,22 @@
     },
     {
       "id": "module-rejection-target-context",
-      "category": "unresolved",
+      "category": "contract",
       "title": "複数grammar module・module feature・network importの拒否対象表示",
-      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "hosts": "Java CodegenMain / native Rust unlaxer / authoring LSP",
       "issues": [
         999
       ],
-      "observation": "rule-moduleの元パスは#988で共通化するが、import requires exactly one grammarとinvalid module features（@feature不正のdeclarative token module）の絶対元パス、network imports are unsupportedのURLはnativeでは未表示。Java21/Rust1.85のgenerate/deps inspectはどちらも終了3・入力不変・出力/staging不在を確認した。Java製品を基準に共通fixtureと両JDK/両stdioの検証を#999で行い、本修正の範囲へ混ぜない。",
+      "observation": "Java製品コードを基準にnativeの複数grammar・invalid module features拒否へ絶対・字句正規化したmodule自身のパス、network拒否へ宣言中のURLを付ける。#988と同じnormalize/path.displayを使いsymlinkを解決しない。#1000レビューの12形、非ASCII/非BMP/空白の入口・推移的import、LF/CRLF、userinfo/query/fragment/大小文字/percent escapeを含む4 network URLを共通qualified suiteの手書き独立期待値へ固定（20形追加、62形992観測/JDK）。generate/deps inspectは両実CLI、Java check/Playgroundは既存CodegenBatchHostのCodegenMain.runで全stderr/stdout・終了3・拒否順序・全入力不変・出力/staging不在、check JSON/PlaygroundのP-MODULEと正常token生成bytesを検証。同じ24形（#988を含む）×LF/CRLFの両authoring実stdio全診断JSONと失敗後復帰を照合し、loopback listenerへの接続0をCLI/stdioで検査する。JDK17/21・Rust1.85で比較し、JVMのパス変換/Cロケール/生bytesの制約は#991/#966と同じ恒久差。Java既存診断・公開3.3.0・parserホットパス・依存crate・CI構成を維持する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "rust/unlaxer-generator/src/modules.rs",
-        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFModuleLoader.java"
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFModuleLoader.java",
+        "spec-corpus/cli-stderr.json",
+        "scripts/cli_stderr.py",
+        "scripts/check-ubnf-authoring-lsp.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
+        "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
       ]
     },
     {
@@ -2587,7 +2592,8 @@
         "readiness-regex-syntax-priority",
         "qualified-reference-prefix-trivia",
         "local-rule-module-error-path",
-        "frontend-value-validation-before-syntax"
+        "frontend-value-validation-before-syntax",
+        "module-rejection-target-context"
       ]
     },
     {
