@@ -885,6 +885,28 @@ fn custom_callbacks_generated_text_and_reuse_keep_exact_budget_boundaries() {
             Expr::Sequence(vec![word("|"), word("x")]).match_only(),
         ]))
     }
+    fn here(context: &mut ParseContext<'_>) -> ParseResult {
+        assert!(context.declare_complete_token_trace());
+        context.parse(&word("|"))
+    }
+    fn generated(context: &mut ParseContext<'_>) -> ParseResult {
+        assert!(context.declare_complete_token_trace());
+        let id = context
+            .add_token_node(
+                0,
+                TokenKind::VirtualMatchOnly,
+                unlaxer_runtime::token::TokenSource::Generated {
+                    anchor: 1,
+                    text: "😀".into(),
+                },
+            )
+            .unwrap();
+        Ok(ParseMatch {
+            span: Span { start: 1, end: 1 },
+            nodes: vec![id.index()],
+            captures: vec![],
+        })
+    }
     let tail = || Expr::Sequence(vec![word("|"), word("x")]).match_only();
     let exact = [
         (
@@ -894,8 +916,6 @@ fn custom_callbacks_generated_text_and_reuse_keep_exact_budget_boundaries() {
             "WordParser,consumed,0,1,a;WordParser,consumed,1,2,|;WordParser,matchOnly,2,3,x",
         ),
         (
-            // The inner collector removes the counted callback leaf and returns its
-            // count and bytes before the following leaf is recorded.
             "collector removes a counted custom leaf",
             Expr::Sequence(vec![
                 Expr::Sequence(vec![word("a"), Expr::Custom(foreign).text_value()]),
@@ -903,6 +923,41 @@ fn custom_callbacks_generated_text_and_reuse_keep_exact_budget_boundaries() {
             ]),
             "a|",
             "WordParser,consumed,0,1,a;WordParser,consumed,1,2,|",
+        ),
+        (
+            // The callback's leaf is counted until the value node takes its match-only
+            // kind, which the consumed collector removes; a Limit it raised is undone.
+            "value node of a removed kind",
+            Expr::Sequence(vec![word("a"), Expr::Custom(foreign).text_value()]),
+            "a|",
+            "WordParser,consumed,0,1,a",
+        ),
+        (
+            // Removed when the value node completes, before the following leaf.
+            "leaf after a removed value node",
+            Expr::Sequence(vec![
+                word("a"),
+                Expr::Custom(foreign).text_value(),
+                word("|"),
+            ]),
+            "a|",
+            "WordParser,consumed,0,1,a;WordParser,consumed,1,2,|",
+        ),
+        (
+            "generated text below a removed value node",
+            Expr::Sequence(vec![word("a"), Expr::Custom(generated).value_boundary()]),
+            "a",
+            "WordParser,consumed,0,1,a",
+        ),
+        (
+            // Below collectors of different kinds nothing survives: never counted.
+            "custom below collectors of different kinds",
+            Expr::Sequence(vec![
+                word("a"),
+                Expr::Sequence(vec![Expr::Custom(here).text_value()]).match_only(),
+            ]),
+            "a|",
+            "WordParser,consumed,0,1,a",
         ),
         (
             "custom result to collector",
@@ -958,19 +1013,103 @@ fn custom_callbacks_generated_text_and_reuse_keep_exact_budget_boundaries() {
         )
         .syntax
     );
-    // Rust-only conservative boundary: the callback's match-only leaf is counted and
-    // then removed with the value node. The budget then reports Limit, never a
-    // partial or wrong trace, and syntax is unchanged.
-    let conservative = Expr::Sequence(vec![word("a"), Expr::Custom(foreign).text_value()]);
-    let ample = run(&conservative, "a|", Limits::default());
-    assert_eq!(ample.leaves, "WordParser,consumed,0,1,a");
-    for (limit, fits) in [(1, false), (2, true)] {
+    // An Unsupported the Limit masked keeps that Limit: removing the counted leaves
+    // must not turn an unsupported callback into a valid trace.
+    fn undeclared(context: &mut ParseContext<'_>) -> ParseResult {
+        context.parse(&Expr::Sequence(vec![]))
+    }
+    fn masks(context: &mut ParseContext<'_>) -> ParseResult {
+        assert!(context.declare_complete_token_trace());
+        let first = context.parse_with_token_mode(&word("|"), TokenKind::MatchOnly, false)?;
+        context.parse(&Expr::Custom(undeclared))?;
+        Ok(first)
+    }
+    let masked = Expr::Sequence(vec![word("a"), Expr::Custom(masks).text_value()]);
+    let ample = run(&masked, "a|", Limits::default());
+    assert!(ample.accepted);
+    assert!(matches!(ample.trace, Err(Error::Unsupported(_))));
+    let limited = run(
+        &masked,
+        "a|",
+        Limits {
+            leaves: 1,
+            source_bytes: 1 << 20,
+        },
+    );
+    assert_eq!(limited.syntax, ample.syntax);
+    assert_eq!(limited.trace, Err(Error::Limit));
+    // Below collectors of different kinds the callback's leaves are never counted,
+    // so no Limit masks its Unsupported at any budget.
+    let never_counted = Expr::Sequence(vec![
+        word("a"),
+        Expr::Sequence(vec![Expr::Custom(masks).text_value()]).match_only(),
+    ]);
+    let ample = run(&never_counted, "a|", Limits::default());
+    assert!(ample.accepted);
+    assert!(matches!(ample.trace, Err(Error::Unsupported(_))));
+    let limited = run(
+        &never_counted,
+        "a|",
+        Limits {
+            leaves: 1,
+            source_bytes: 1,
+        },
+    );
+    assert_eq!(limited.syntax, ample.syntax);
+    assert_eq!(limited.trace, ample.trace);
+
+    // Rust-only conservative boundary: a callback can recognize terminals it does not
+    // return. Their leaves are counted until a collector removes them, so the budget
+    // can report Limit although the retained trace fits; never a partial trace.
+    fn unreturned(context: &mut ParseContext<'_>) -> ParseResult {
+        assert!(context.declare_complete_token_trace());
+        context.parse(&word("b"))?;
+        context.parse(&word("c"))
+    }
+    let conservative = Expr::Sequence(vec![word("a"), Expr::Custom(unreturned)]);
+    let ample = run(&conservative, "abc", Limits::default());
+    assert_eq!(
+        ample.leaves,
+        "WordParser,consumed,0,1,a;WordParser,consumed,2,3,c"
+    );
+    for (limit, fits) in [(2, false), (3, true)] {
         let limited = run(
             &conservative,
-            "a|",
+            "abc",
             Limits {
                 leaves: limit,
                 source_bytes: 1 << 20,
+            },
+        );
+        assert_eq!(limited.syntax, ample.syntax);
+        assert_eq!(
+            limited.trace,
+            if fits {
+                ample.trace.clone()
+            } else {
+                Err(Error::Limit)
+            }
+        );
+    }
+
+    // The collector that removes such a leaf returns its count and bytes before the
+    // following leaf: only the peak inside the callback is conservative.
+    let after = Expr::Sequence(vec![
+        Expr::Sequence(vec![word("a"), Expr::Custom(unreturned)]),
+        word("d"),
+    ]);
+    let ample = run(&after, "abcd", Limits::default());
+    assert_eq!(
+        ample.leaves,
+        "WordParser,consumed,0,1,a;WordParser,consumed,2,3,c;WordParser,consumed,3,4,d"
+    );
+    for (bytes, fits) in [(2, false), (3, true)] {
+        let limited = run(
+            &after,
+            "abcd",
+            Limits {
+                leaves: 1 << 10,
+                source_bytes: bytes,
             },
         );
         assert_eq!(limited.syntax, ample.syntax);

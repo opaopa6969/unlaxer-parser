@@ -39,6 +39,14 @@ impl Leaf {
             },
         }
     }
+    /// The UTF-8 length this leaf was counted with against the byte budget.
+    fn source_len(&self, byte_offsets: &[usize]) -> usize {
+        match &self.source {
+            TokenSource::Input(span) => byte_offsets[span.end] - byte_offsets[span.start],
+            TokenSource::Generated { text, .. } => text.len(),
+            TokenSource::Projected { text, .. } => text.len(),
+        }
+    }
     pub fn text<'a>(&'a self, source: &'a str) -> Option<&'a str> {
         match &self.source {
             TokenSource::Generated { text, .. } => Some(text),
@@ -148,6 +156,11 @@ pub(crate) struct Trace {
     bytes: u32,
     scope: Scope,
     error: Option<Error>,
+    /// While `error` is a Limit: a node-less leaf or an Unsupported was dropped, or the
+    /// Limit came from a node-less leaf. Removing node leaves then cannot undo it.
+    /// Set whenever a Limit is raised; a restored Limit keeps it (a stale `true` only
+    /// keeps that Limit), and it means nothing without one.
+    suppressed: bool,
 }
 impl Trace {
     pub(crate) fn new(limits: Limits) -> Self {
@@ -162,6 +175,7 @@ impl Trace {
             bytes: 0,
             scope: Scope::OPEN,
             error: None,
+            suppressed: false,
         }
     }
     fn result(&self) -> Result<&[Leaf], Error> {
@@ -254,6 +268,15 @@ impl ParseContext<'_> {
         kind: TokenKind,
         source: &TokenSource,
     ) {
+        self.record_trace_leaf(label, kind, source, None);
+    }
+    fn record_trace_leaf(
+        &mut self,
+        label: &'static str,
+        kind: TokenKind,
+        source: &TokenSource,
+        node: Option<usize>,
+    ) {
         if self.token_trace.is_none() {
             return;
         }
@@ -266,6 +289,7 @@ impl ParseContext<'_> {
         let matched = self.matched_position();
         let trace = self.token_trace.as_mut().unwrap();
         if trace.error.is_some() {
+            trace.suppressed |= node.is_none();
             return;
         }
         if trace.leaves.len() >= trace.limits.leaves
@@ -276,11 +300,12 @@ impl ParseContext<'_> {
                     .saturating_sub(trace.bytes as usize)
         {
             trace.error = Some(Error::Limit);
+            trace.suppressed = node.is_none();
             return;
         }
         // Within the 4 MiB hard ceiling checked above.
         trace.bytes += bytes as u32;
-        trace.nodes.push(None);
+        trace.nodes.push(node);
         trace.leaves.push(Leaf {
             label,
             kind,
@@ -296,18 +321,12 @@ impl ParseContext<'_> {
         source: &TokenSource,
         node: usize,
     ) {
-        let before = match &self.token_trace {
-            None => return,
+        match &self.token_trace {
+            None => {}
             // The active collectors remove this node, so its leaf never takes budget
             // and generated text is not copied (#866).
-            Some(trace) if trace.scope.hides(kind) => return,
-            Some(trace) => trace.leaves.len(),
-        };
-        self.record_trace(label, kind, source);
-        if let Some(trace) = self.token_trace.as_mut() {
-            if trace.leaves.len() > before {
-                trace.nodes[before] = Some(node);
-            }
+            Some(trace) if trace.scope.hides(kind) => {}
+            Some(_) => self.record_trace_leaf(label, kind, source, Some(node)),
         }
     }
     pub(crate) fn rename_trace_node(&mut self, node: usize, label: &'static str) {
@@ -321,11 +340,13 @@ impl ParseContext<'_> {
     }
     /// Directly below an AST value node, a custom callback's mixed-kind result can
     /// reach the outer collectors under a node of its first node's kind, so they do
-    /// not decide the callback's leaves. Returns the scope to reinstate afterwards.
+    /// not decide the callback's leaves until the value node completes. Below two
+    /// collectors of different kinds no node survives, whatever its kind. Returns the
+    /// scope to reinstate afterwards.
     pub(crate) fn open_trace_scope(&mut self) -> Option<Scope> {
         let trace = self.token_trace.as_mut()?;
         let scope = trace.scope;
-        if scope.value_node {
+        if scope.value_node && scope.retains != Retains::Nothing {
             trace.scope = Scope::OPEN;
         }
         Some(scope)
@@ -345,11 +366,19 @@ impl ParseContext<'_> {
             return;
         };
         trace.scope = mark.scope;
-        // An AST value node only leaves its scope; it is not a collector.
+        let start = mark.leaves as usize;
+        // An AST value node is not a collector. Once its kind is known, the enclosing
+        // collectors are certain to remove it (and every node leaf counted below it,
+        // e.g. by a custom callback) if the enclosing scope hides that kind.
         if matches!(expression, Expr::TextValue(_) | Expr::ValueBoundary(_)) {
+            if roots
+                .first()
+                .is_some_and(|&node| mark.scope.hides(self.token_kind_at(node)))
+            {
+                self.remove_hidden_trace(mark, start);
+            }
             return;
         }
-        let start = mark.leaves as usize;
         let mut retained = std::collections::BTreeSet::new();
         let mut pending = roots.to_vec();
         while let Some(node) = pending.pop() {
@@ -367,17 +396,33 @@ impl ParseContext<'_> {
                 trace.leaves.push(leaf);
                 trace.nodes.push(node);
             } else {
-                removed += match &leaf.source {
-                    TokenSource::Input(span) => {
-                        self.byte_offsets[span.end] - self.byte_offsets[span.start]
-                    }
-                    TokenSource::Generated { text, .. } => text.len(),
-                    TokenSource::Projected { text, .. } => text.len(),
-                };
+                removed += leaf.source_len(&self.byte_offsets);
             }
         }
         // Removed leaves were counted in bytes, which stays within the hard ceiling.
         trace.bytes -= removed as u32;
+    }
+    /// Drops the node leaves recorded since `mark` below a value node the enclosing
+    /// collectors remove. A Limit raised after `mark` only by such leaves does not
+    /// describe the retained trace, so it returns to the mark's state; any dropped
+    /// node-less leaf or Unsupported keeps it.
+    fn remove_hidden_trace(&mut self, mark: &Mark, start: usize) {
+        let trace = self.token_trace.as_mut().unwrap();
+        let mut removed = 0;
+        let leaves = trace.leaves.split_off(start);
+        let nodes = trace.nodes.split_off(start);
+        for (leaf, node) in leaves.into_iter().zip(nodes) {
+            if node.is_none() {
+                trace.leaves.push(leaf);
+                trace.nodes.push(node);
+            } else {
+                removed += leaf.source_len(&self.byte_offsets);
+            }
+        }
+        trace.bytes -= removed as u32;
+        if mark.error.is_none() && trace.error == Some(Error::Limit) && !trace.suppressed {
+            trace.error = None;
+        }
     }
     pub(crate) fn trace_empty(&mut self, label: &'static str) {
         if self.token_trace.is_some() {
@@ -413,6 +458,8 @@ impl ParseContext<'_> {
         if let Some(trace) = self.token_trace.as_mut() {
             if trace.error.is_none() {
                 trace.error = Some(Error::Unsupported(label));
+            } else {
+                trace.suppressed = true;
             }
         }
     }
@@ -483,5 +530,52 @@ impl ParseContext<'_> {
                 end: self.code_point(end),
             }),
         );
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ParseOptions;
+
+    // No public token-mode path records a node-less leaf below a value node today,
+    // so the guard that keeps such a Limit is checked directly.
+    #[test]
+    fn removing_hidden_node_leaves_keeps_a_limit_that_dropped_a_retained_leaf() {
+        let a = TokenSource::Input(Span { start: 0, end: 1 });
+        let b = TokenSource::Input(Span { start: 1, end: 2 });
+        // (node of the leaf that raises the Limit, a later node-less leaf, Limit kept)
+        for (raising, later, kept) in [
+            (Some(2), false, false),
+            (Some(2), true, true),
+            (None, false, true),
+        ] {
+            let mut context = ParseContext::with_options(
+                "ab",
+                ParseOptions::default().with_token_trace(Limits {
+                    leaves: 2,
+                    source_bytes: 2,
+                }),
+            );
+            let mark = Mark::of(context.token_trace.as_ref());
+            // A node-less leaf is retained by every collector.
+            context.record_trace("Atom", TokenKind::Consumed, &a);
+            context.record_trace_leaf("A", TokenKind::Consumed, &b, Some(0));
+            context.record_trace_leaf("B", TokenKind::Consumed, &b, raising);
+            if later {
+                context.record_trace("Atom", TokenKind::Consumed, &b);
+            }
+            assert_eq!(context.token_trace(), Some(Err(Error::Limit)));
+            context.remove_hidden_trace(&mark, 0);
+            let trace = context.token_trace().unwrap().map(|leaves| {
+                let labels = leaves.iter().map(|leaf| leaf.label).collect::<Vec<_>>();
+                (labels, context.token_trace.as_ref().unwrap().bytes)
+            });
+            let expected = if kept {
+                Err(Error::Limit)
+            } else {
+                Ok((vec!["Atom"], 1))
+            };
+            assert_eq!(trace, expected, "{raising:?} {later}");
+        }
     }
 }

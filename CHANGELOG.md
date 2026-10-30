@@ -88,7 +88,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
-- Rust の token trace 予算が、Classic collector が後で除く leaf（consumed 親の下の match-only token、virtual 親の下の `stop_consume` 終端など）まで数え、最終 trace が予算内でも `Error::Limit` を残していた不具合を修正した (#866)。最終 trace に残る leaf だけを件数・UTF-8 bytes に数え、本当に超えた場合は従来どおり Limit とする。受理・cursor・CST・capture・state、hard ceiling、generated text の複製前の検査、既定 OFF は変えない。Java の実 leaf を基準とする共通 corpus と、Rust の n-1/n/n+1・DAP protocol で検証する。AST value node 直下の custom callback は保守的に数える。[上限と collector の scope](docs/token-trace.md#上限custom-parsermemo)。
+- Rust の token trace 予算が、Classic collector が後で除く leaf（consumed 親の下の match-only token、virtual 親の下の `stop_consume` 終端など）まで数え、最終 trace が予算内でも `Error::Limit` を残していた不具合を修正した (#866)。最終 trace に残る leaf だけを件数・UTF-8 bytes に数え、本当に超えた場合は従来どおり Limit とする。受理・cursor・CST・capture・state、hard ceiling、generated text の複製前の検査、既定 OFF は変えない。Java の実 leaf を基準とする共通 corpus と、Rust の n-1/n/n+1・DAP protocol で検証する。AST value node 直下の custom callback の leaf は value node の kind が決まった時点で判定し、除かれる区間の leaf だけで生じた Limit は戻す。callback が認識したが返さない terminal の leaf は、collector が除くまで数える（Rust 側の保守的な境界）。[上限と collector の scope](docs/token-trace.md#上限custom-parsermemo)。
 
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
 - Java / Rust の local import を通常ファイル・64 MiB以下に制限し、stat後の増大も上限＋1バイトで打ち切る。デバイス・FIFO・socket・directory・過大ファイルは同じ `E-MODULE` で拒否し、両 authoring stdio server の後続応答と CLI を共通fixtureで検証 (#890)。
