@@ -812,6 +812,9 @@ jobs:
         export PATH="$HOME/.cargo/bin:$PATH"
         bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
 
+    - name: Test authoring transport failure diagnostics (#995)
+      run: python3 scripts/run-required-unittests.py scripts.tests.test_ubnf_authoring_lsp
+
     - name: Prepare required tests (ubnf-authoring)
       run: python3 scripts/verify-optin-tests.py ubnf-authoring --prepare
 

@@ -17,6 +17,7 @@ def run_configuration(clients, directory):
         return {'initializationOptions': {'languageProfile': {'entry': 'UBNFFile', 'tsv': profiles[name]}}}
 
     def response(client, method, params, expected, label):
+        client.fixture = "configuration/" + "/".join(label[1:])
         actual = client.request(method, params)
         # IDs are independently assigned by Client; no response fields are discarded.
         oracle = {'jsonrpc': '2.0', 'id': client.serial, **expected}
@@ -93,6 +94,7 @@ def run_configuration(clients, directory):
     evidence.extend(import_queries(hosts, directory, configuration))
     evidence.extend(package_snapshots(hosts, directory, configuration))
     for host, client in hosts:
+        client.fixture = 'shutdown-rejection-and-exit'
         assert client.result('shutdown') is None
         client.send('unlaxer/configure', options('local'))
         for method in ('unlaxer/configure', 'initialize', 'shutdown', 'textDocument/hover'):
@@ -105,6 +107,7 @@ def run_configuration(clients, directory):
     for host, previous in hosts:
         for mode in ('early-exit', 'profile-initialize-eof', 'unknown-initialize'):
             client = type(previous)(previous.process.args, native=host == 'rust')
+            client.fixture = mode
             try:
                 if mode == 'early-exit':
                     client.send('exit')
@@ -140,6 +143,7 @@ def document_versions(hosts, directory, fixture):
     for host, client in hosts:
         for kind, method in (('open', 'textDocument/didOpen'), ('change', 'textDocument/didChange')):
             for name, extra in cases + [('dropped-' + str(i), {'version': v}) for i, v in enumerate(versions['dropped'])]:
+                client.fixture = 'document-version-' + kind + '-' + name
                 target = (directory / (kind + '-' + name + '.ubnf')).as_uri()
                 text = {'uri': target, **(extra or {})}
                 if kind == 'open':
@@ -154,6 +158,7 @@ def document_versions(hosts, directory, fixture):
                 assert opened(client, target) == document['hover'], (host, kind, name)
                 client.send('textDocument/didClose', {'textDocument': {'uri': target}})
         # A dropped change leaves an open document unchanged.
+        client.fixture = 'document-version-dropped-change'
         target = (directory / 'kept.ubnf').as_uri()
         client.send('textDocument/didOpen', {'textDocument': {'uri': target, 'version': 1, 'text': document['source']}})
         assert client.diagnostics(target) == document['diagnostics']
@@ -171,6 +176,7 @@ def import_queries(hosts, directory, configuration):
     uri = main.as_uri()
     start = source.index('m.A')
     for host, client in hosts:
+        client.fixture = 'reconfigure-import-buffers-hover-completion-full-json'
         client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'version': 8, 'text': source}})
         assert client.diagnostics(uri) == []
         for name in ('local', 'restricted', 'mixed'):

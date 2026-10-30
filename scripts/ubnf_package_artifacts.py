@@ -117,6 +117,7 @@ def run_package_artifacts(clients, directory, java_command, native_command, root
                       'end': position(source, source.index('@import') + len(declaration))},
             'severity': 1, 'code': 'E-MODULE', 'source': 'ubnf-module', 'message': 'import layout: ' + error}]
         for host, client in zip(['java', 'rust'], clients):
+            client.fixture = case['id']
             client.timeout = 20
             client.send('textDocument/didOpen', {'textDocument': {
                 'uri': uri, 'languageId': 'ubnf', 'version': 1, 'text': source}})

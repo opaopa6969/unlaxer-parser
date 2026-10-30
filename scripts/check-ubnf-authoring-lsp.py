@@ -6,24 +6,77 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
+import signal
 import subprocess
 import tempfile
 import threading
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class Client:
-    def __init__(self, command, native=False):
+    def __init__(self, command, native=False, backend=None):
         env = dict(os.environ)
         if native:
             env.update(PATH='', JAVA_HOME='/nonexistent-java')
-        self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env)
+        self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+        self.backend = backend or ('rust' if native else 'java')
+        self.fixture = 'initialization'
+        self.last_request = 'none'
+        self.stderr_tail = bytearray()
+        self.stderr_lock = threading.Lock()
         self.messages = queue.Queue()
         self.serial = 0
         self.pending = []
         self.timeout = 20
-        threading.Thread(target=self.read, daemon=True).start()
+        self.stderr_reader = threading.Thread(target=self.read_stderr, daemon=True)
+        self.stderr_reader.start()
+        self.reader = threading.Thread(target=self.read, daemon=True)
+        self.reader.start()
+
+    def read_stderr(self):
+        # Drain continuously: a verbose failing server must never fill its pipe.
+        while chunk := self.process.stderr.read1(1024):
+            with self.stderr_lock:
+                self.stderr_tail.extend(chunk)
+                del self.stderr_tail[:-4096]
+
+    def failure(self, reason):
+        code = self.process.poll()
+        if code is None and reason != 'response timeout':
+            try:
+                code = self.process.wait(timeout=0.2)
+            except subprocess.TimeoutExpired:
+                pass
+        if code is not None:
+            self.stderr_reader.join(timeout=1)
+        status = 'running' if code is None else str(code)
+        if code is not None and code < 0:
+            try:
+                status += ' (' + signal.Signals(-code).name + ')'
+            except ValueError:
+                pass
+        with self.stderr_lock:
+            tail = bytes(self.stderr_tail).decode('utf-8', errors='replace')
+        # Stderr may echo grammar bodies or credentials. Report only recognized
+        # resource/transport errors and exception types, never arbitrary payloads.
+        safe = []
+        for line in tail.splitlines():
+            resource = re.search(r'OutOfMemoryError(?:: (?:Java heap space|GC overhead limit exceeded))?|'
+                                 r'Cannot allocate memory|memory allocation of \d+ bytes failed|'
+                                 r'unable to create native thread|Could not reserve enough space|'
+                                 r'Broken pipe|StackOverflowError|panicked at', line)
+            exception = re.match(r'^(?:Exception in thread "[^"\n]{1,40}" )?'
+                                 r'((?:java\.|org\.|com\.)[\w.$]*(?:Exception|Error))\b', line)
+            safe.append(resource.group() if resource else exception.group(1) if exception else '[stderr content omitted]')
+        excerpt = '\n'.join(safe).encode()[-4096:].decode(errors='replace') or '(empty)'
+        if reason == 'response timeout':
+            reason += f' after {self.timeout}s'
+        return RuntimeError(f'authoring server: backend={self.backend} fixture={self.fixture} '
+                            f'last_request={self.last_request} exit={status}: {reason}\n'
+                            f'stderr tail (sanitized, <=4096 bytes):\n{excerpt}')
 
     def read(self):
         try:
@@ -44,23 +97,39 @@ class Client:
             self.messages.put(error)
 
     def send(self, method, params=None, request=False):
+        previous = self.last_request
+        self.last_request = f'{method} (previous: {previous.split(" (previous:")[0]})'
+        if self.process.poll() is not None:
+            raise self.failure('unexpected process exit before send')
         message = {'jsonrpc': '2.0', 'method': method, 'params': params or {}}
         if request:
             self.serial += 1
             message['id'] = self.serial
         data = json.dumps(message, ensure_ascii=False).encode()
-        self.process.stdin.write(f'Content-Length: {len(data)}\r\n\r\n'.encode() + data)
-        self.process.stdin.flush()
+        try:
+            self.process.stdin.write(f'Content-Length: {len(data)}\r\n\r\n'.encode() + data)
+            self.process.stdin.flush()
+        except (BrokenPipeError, OSError) as error:
+            raise self.failure('transport write failed') from error
         return self.serial
 
     def receive(self, predicate):
         for i, item in enumerate(self.pending):
             if predicate(item):
                 return self.pending.pop(i)
+        deadline = time.monotonic() + self.timeout
         while True:
-            item = self.messages.get(timeout=self.timeout)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise self.failure('response timeout')
+            try:
+                item = self.messages.get(timeout=remaining)
+            except queue.Empty as error:
+                raise self.failure('response timeout') from error
             if isinstance(item, Exception):
-                raise item
+                # Parser exceptions can embed an arbitrary header/body in their
+                # message. Keep transport context without echoing that payload.
+                raise self.failure('server closed stdout or invalid protocol frame') from None
             if predicate(item):
                 return item
             self.pending.append(item)
@@ -78,10 +147,19 @@ class Client:
         return self.receive(lambda m: m.get('method') == 'textDocument/publishDiagnostics' and m['params']['uri'] == uri)['params']['diagnostics']
 
     def close(self):
-        self.process.kill()
+        if self.process.poll() is None:
+            self.process.kill()
         self.process.wait(timeout=5)
-        self.process.stdin.close()
+        # Buffered stdin may retry a failed write on close. Preserve the original
+        # diagnostic and always release both servers, including after BrokenPipe.
+        try:
+            self.process.stdin.close()
+        except OSError:
+            pass
+        self.reader.join(timeout=1)
+        self.stderr_reader.join(timeout=1)
         self.process.stdout.close()
+        self.process.stderr.close()
 
 
 def position(source, offset):
@@ -120,6 +198,8 @@ def run(java, native, directory):
     cases = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/cases.json').read_text())
     evidence = []
     for case in cases:
+        for client in clients:
+            client.fixture = case['id']
         folder = directory / case['id']
         folder.mkdir()
         for name, text in case.get('files', {}).items():
@@ -191,6 +271,8 @@ def validator_diagnostics(clients, directory):
     cases += features
     evidence, failures = [], []
     for case in cases:
+        for client in clients:
+            client.fixture = case['id']
         uri = (directory / (case['id'] + ' 😀.ubnf')).as_uri()
         for host, client in zip(('java', 'rust'), clients):
             client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'languageId': 'ubnf', 'version': 8, 'text': case['source']}})
@@ -228,6 +310,7 @@ def import_buffers(clients, directory):
     source = "grammar Main { @import m from 'module space.ubnf' @ubnf: v2 @root @mapping(Value) Start ::= m.A; }"
     params = {'textDocument': {'uri': uri}, 'position': position(source, source.index('m.A') + 2)}
     for client in clients:
+        client.fixture = 'open-import-buffer-change-close-save'
         client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'languageId': 'ubnf', 'version': 1, 'text': source}})
         assert client.diagnostics(uri) == []
         client.send('textDocument/didOpen', {'textDocument': {'uri': module.as_uri(), 'languageId': 'ubnf', 'version': 1, 'text': buffer}})
@@ -272,6 +355,7 @@ def packages(clients, directory):
         params = {'textDocument': {'uri': uri}, 'position': position(source, source.index('layout.GAP') + 9)}
         all_completions, all_hovers, all_diagnostics = [], [], []
         for client in clients:
+            client.fixture = 'package-' + mode
             # An open buffer at a virtual package path must not replace verified bytes.
             spoof = (folder / '.ubnf-cache/sources' / digest / 'layout space.ubnf').as_uri()
             client.send('textDocument/didOpen', {'textDocument': {'uri': spoof, 'languageId': 'ubnf', 'version': 1, 'text': "grammar Fake { @ubnf: v2 token SPOOF ::= 'x'; }"}})
@@ -311,7 +395,10 @@ def main():
     parser.add_argument('--output', required=True)
     parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents', 'package-artifacts', 'package-artifact-utf8', 'package-grammar-paths', 'package-json', 'configuration'], default='baseline')
     args = parser.parse_args()
-    java = Client([args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.lsp.ubnf.UBNFLspLauncherExt'])
+    # The 64 MiB boundary needs more than 4 GiB; bound each test JVM instead of
+    # letting host-wide ergonomics reserve ~22 GiB per concurrently live JVM.
+    java_command = [args.java, '-Xmx8g', '--enable-preview', '-cp', args.classpath]
+    java = Client(java_command + ['org.unlaxer.dsl.lsp.ubnf.UBNFLspLauncherExt'])
     native = Client([args.rust], native=True)
     try:
         with tempfile.TemporaryDirectory(prefix='ubnf-authoring-', dir=os.environ.get('TMPDIR')) as directory:
@@ -338,7 +425,7 @@ def main():
                 from ubnf_package_artifacts import run_package_artifacts
                 initialize(java, native)
                 evidence = run_package_artifacts([java, native], Path(directory),
-                    [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'],
+                    java_command + ['org.unlaxer.dsl.CodegenMain'],
                     [str(Path(args.rust).with_name('unlaxer'))], ROOT, args.suite)
                 for client in [java, native]:
                     assert client.result('shutdown') is None
@@ -348,7 +435,7 @@ def main():
                 from ubnf_package_documents import run_package_documents
                 initialize(java, native)
                 evidence = run_package_documents([java, native], Path(directory),
-                    [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'],
+                    java_command + ['org.unlaxer.dsl.CodegenMain'],
                     [str(Path(args.rust).with_name('unlaxer'))], ROOT)
                 for client in [java, native]:
                     assert client.result('shutdown') is None
@@ -358,12 +445,8 @@ def main():
                 from ubnf_local_imports import run_local_imports
                 initialize(java, native)
                 evidence = run_local_imports([java, native], Path(directory),
-                    [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'],
+                    java_command + ['org.unlaxer.dsl.CodegenMain'],
                     [str(Path(args.rust).with_name('unlaxer'))], ROOT)
-                for client in [java, native]:
-                    assert client.result('shutdown') is None
-                    client.send('exit')
-                    assert client.process.wait(timeout=5) == 0
             elif args.suite == 'navigation':
                 from ubnf_authoring_navigation import run_navigation
                 initialize(java, native)
