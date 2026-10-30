@@ -146,7 +146,7 @@ def observe(command, case, operation, work, native):
             for key in keys}, actual
 
 
-def exercise(cases, directory, commands, evidence, trees=None):
+def exercise(cases, directory, commands, evidence, trees=None, direct_java=None):
     read_permissions = permissions_apply(directory)
     permissions = write_permissions_apply(directory)
     file_permissions = file_write_permissions_apply(directory)
@@ -168,7 +168,8 @@ def exercise(cases, directory, commands, evidence, trees=None):
                 before = snapshot(work)
                 for operation in case['operations']:
                     for host, command in commands:
-                        observed, raw = observe(command, case, operation, work, host == 'rust')
+                        selected = direct_java if host == 'java' and case.get('realCli') else command
+                        observed, raw = observe(selected, case, operation, work, host == 'rust')
                         entry = dict(case=case['id'], ending=ending, operation=operation, host=host,
                                      observed=observed, raw=raw)
                         evidence['observations'].append(entry)
@@ -434,7 +435,8 @@ def main():
                     exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence)
             elif args.suite in ('regex', 'qualified', 'value'):
                 with blank_java_host(args.java, args.classpath, Path(directory)) as host:
-                    exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence, corpus.get('trees'))
+                    exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence, corpus.get('trees'),
+                             [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'])
             else:
                 exercise(cases, Path(directory), [
                     ('java', [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),

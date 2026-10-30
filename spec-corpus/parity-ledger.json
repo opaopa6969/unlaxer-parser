@@ -613,13 +613,13 @@
       "state": "OPEN",
       "title": "parity(cli): playground --profile の profile ファイル入力 I/O で native の終了コードと stderr が Java と違う（#937 レビュー由来）"
     },
-    "971": {
-      "state": "OPEN",
-      "title": "parity(cli): native generate が既存生成物を rename で置き換えるため mode・hard link・読取り専用 directory の扱いが Java と違う（#952 レビュー由来）"
-    },
     "956": {
       "state": "OPEN",
       "title": "credentials 受理後の TLS・HTTP 失敗診断を Java に揃える"
+    },
+    "958": {
+      "state": "OPEN",
+      "title": "HTTPS credentials ファイル場所の Java/Rust 対称性"
     },
     "959": {
       "state": "OPEN",
@@ -633,13 +633,21 @@
       "state": "OPEN",
       "title": "ASCII HTTPS URL の構文受理を Java URI.create に揃える"
     },
-    "958": {
-      "state": "OPEN",
-      "title": "HTTPS credentials ファイル場所の Java/Rust 対称性"
-    },
     "964": {
       "state": "OPEN",
       "title": "passwd home の例外 fallback における JDK17/21 の互換方針"
+    },
+    "966": {
+      "state": "OPEN",
+      "title": "parity(cli): 非 UTF-8 ロケールの JVM パス変換制約と native の成功する操作を区別する"
+    },
+    "971": {
+      "state": "OPEN",
+      "title": "parity(cli): native generate が既存生成物を rename で置き換えるため mode・hard link・読取り専用 directory の扱いが Java と違う（#952 レビュー由来）"
+    },
+    "972": {
+      "state": "OPEN",
+      "title": "HTTP/1.1応答framingとheader上限のJava/native差"
     },
     "974": {
       "state": "OPEN",
@@ -665,21 +673,17 @@
       "state": "OPEN",
       "title": "ruleを含むlocal moduleのnative拒否診断に元ファイルのパスがない"
     },
-    "972": {
+    "994": {
       "state": "OPEN",
-      "title": "HTTP/1.1応答framingとheader上限のJava/native差"
-    },
-    "966": {
-      "state": "OPEN",
-      "title": "parity(cli): 非 UTF-8 ロケールの JVM パス変換制約と native の成功する操作を区別する"
+      "title": "parity(lsp): UBNF authoring の JSON-RPC params 型変換・未知 method・publishDiagnostics version を Java に揃える（#895 後続）"
     },
     "996": {
       "state": "OPEN",
       "title": "parity(frontend): native の規則本体入れ子上限後も構文診断を選択できる安全な走査を設計する"
     },
-    "994": {
+    "999": {
       "state": "OPEN",
-      "title": "parity(lsp): UBNF authoring の JSON-RPC params 型変換・未知 method・publishDiagnostics version を Java に揃える（#895 後続）"
+      "title": "parity(cli): 複数grammar module・network import 拒否で native の E-MODULE に対象表示がない"
     },
     "1001": {
       "state": "OPEN",
@@ -2460,7 +2464,7 @@
       "issues": [
         986
       ],
-      "observation": "Java製品を維持し、(IDENTIFIER dot)*の接頭辞内の空白・改行・行コメントをnativeでも構文エラーにする。a .N / a. b.NはP-SYNTAX/null/UBNF syntax、a. N / a.b. N / 最後の名前の前のコメントはJava同様に構文受理する。旧REGEXより全体構文を優先する#949の順序、importのP-MODULEラップ、#937のhost別構文表示を維持する。18形×入口/local importと正常token import2形、LF/CRLFの608CLI観測・成功後--check16回・frontend36入力を固定期待値に照合し、無出力/入力不変と正常生成物の全hashを検証する。authoringのspaced-namespace-*は既存の編集拒否を維持。正常な未解決参照のE-RULE-UNDEFINED本文は既存#843契約、module拒否のパス表示差は#988、途中値検証は#983で追跡する。公開3.3.0とJava診断は不変。",
+      "observation": "Java製品を維持し、(IDENTIFIER dot)*の接頭辞内の空白・改行・行コメントをnativeでも構文エラーにする。a .N / a. b.NはP-SYNTAX/null/UBNF syntax、a. N / a.b. N / 最後の名前の前のコメントはJava同様に構文受理する。旧REGEXより全体構文を優先する#949の順序、importのP-MODULEラップ、#937のhost別構文表示を維持する。18形×入口/local importと正常token import2形、LF/CRLFの608CLI観測・成功後--check16回・frontend36入力を固定期待値に照合し、無出力/入力不変と正常生成物の全hashを検証する。authoringのspaced-namespace-*は既存の編集拒否を維持。正常な未解決参照のE-RULE-UNDEFINED本文は既存#843契約、module拒否のパスは#988で共通期待値へ統合し、追加4形と合わせて672CLI観測を固定する。途中値検証は#983で追跡する。公開3.3.0とJava診断は不変。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/cli-stderr.json",
@@ -2474,17 +2478,21 @@
     },
     {
       "id": "local-rule-module-error-path",
-      "category": "unresolved",
+      "category": "contract",
       "title": "ruleを含むlocal module拒否の元ファイル表示",
-      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "hosts": "Java CodegenMain / native Rust unlaxer / authoring LSP",
       "issues": [
         988
       ],
-      "observation": "構文として正しいruleを含むlocal moduleは両版とも生成/deps inspectで終了3となるが、Javaのonly declarative token modules can be importedには絶対元パスが付き、nativeには付かない。check/PlaygroundのP-MODULEと無出力は一致。#986の正常構文対照にhost別の固定値を置き、ここでは修正しない。",
+      "observation": "Java製品コードを基準にnativeのruleを含むlocal module拒否へ絶対・字句正規化した元ファイルのパスを付ける（#988、merge待ち）。入口/推移的import、é・😀・空白のパス、LF/CRLFの独立固定期待値を既存qualified suiteへ追加し、実CLIのgenerate/deps inspectのstderr全文・終了3・module種別拒否が未解決importより先・入力不変・出力/staging不在を検証する。check JSON/PlaygroundのP-MODULEを維持し、同じ4形×LF/CRLFの両authoring stdio全診断JSONと復帰を照合する。正常declarative token importと生成bytesは既存成功fixtureで固定。Cロケールの非ASCIIパス変換と非UTF8の生bytes名はcli-locale-path-encoding（#991/#966）と同じJVM制約の恒久差で、nativeを故意に失敗させない。parserホットパス・公開3.3.0・Java既存診断は変更しない。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/cli-stderr.json",
-        "rust/unlaxer-generator/src/packages.rs"
+        "rust/unlaxer-generator/src/modules.rs",
+        "scripts/cli_stderr.py",
+        "scripts/check-ubnf-authoring-lsp.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
+        "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
       ]
     },
     {
@@ -2522,6 +2530,21 @@
         "docs/java-parser-limits.md",
         "rust/unlaxer-ubnf/src/parser.rs"
       ]
+    },
+    {
+      "id": "module-rejection-target-context",
+      "category": "unresolved",
+      "title": "複数grammar module・module feature・network importの拒否対象表示",
+      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "issues": [
+        999
+      ],
+      "observation": "rule-moduleの元パスは#988で共通化するが、import requires exactly one grammarとinvalid module features（@feature不正のdeclarative token module）の絶対元パス、network imports are unsupportedのURLはnativeでは未表示。Java21/Rust1.85のgenerate/deps inspectはどちらも終了3・入力不変・出力/staging不在を確認した。Java製品を基準に共通fixtureと両JDK/両stdioの検証を#999で行い、本修正の範囲へ混ぜない。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "rust/unlaxer-generator/src/modules.rs",
+        "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFModuleLoader.java"
+      ]
     }
   ],
   "corpora": [
@@ -2532,7 +2555,7 @@
         "rust": 11,
         "nativeSyntax": 5,
         "nativeExpected": 3,
-        "nativeByEnding": 234,
+        "nativeByEnding": 228,
         "javaError": 222,
         "native": 234,
         "javaAst": 12
@@ -2582,8 +2605,13 @@
     },
     {
       "path": "spec-corpus/ubnf-authoring-lsp/configuration.json",
-      "fields": {"java": 4, "rust": 4},
-      "entries": ["ubnf-authoring-lsp"]
+      "fields": {
+        "java": 4,
+        "rust": 4
+      },
+      "entries": [
+        "ubnf-authoring-lsp"
+      ]
     },
     {
       "path": "spec-corpus/ubnf-authoring-lsp/cases.json",
