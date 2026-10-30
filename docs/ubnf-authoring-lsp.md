@@ -85,7 +85,7 @@ virtual package path に開いた偽 buffer が検証済み source を置換で�
 server が manifest/lock/cache を書き換えないことも両版で検証する。
 現時点の native file URI は Linux のローカル絶対パスを検証対象とし、UNC/Windows 等は #902（親 #886）に残す。
 
-CI は `ubnf-authoring` 必須契約の12メソッドと、基準127件・navigation39件・local import 17件・package metadata 27件・artifact 39件・artifact UTF-8 29件の実行件数を別々に検査する。
+CI は `ubnf-authoring` 必須契約の12メソッドと、基準127件・navigation39件・local import 17件・package metadata 27件・artifact 39件・artifact UTF-8 29件・JSON-RPC 168件の実行件数を別々に検査する。
 packaged VSIX は従来 Java smoke を保持し、別の隔離 profile で Java executable を不存在に設定して
 Rust の completion/hover/診断と変更後の修復、および両 backend の definition/references・rename・documentSymbol・foldingRange・linkedEditingRange・readonly package source を確認する。最後に拡張の `deactivate` で
 native server の子プロセスが終了し、残らないことを確認する（tinycalc-vscode #874/#880 と同じ後始末の水準）。
@@ -375,7 +375,7 @@ JSON-RPC 入力境界だけを native へ移し、新しい crate・ネットワ
 | 入力 / 観測項目 | Java の固定挙動 | native の選択と理由 |
 |---|---|---|
 | initialize/configure の params 欠落、null、`[null]` | `-32603 Internal error.`。initialize は未初期化、configure は旧設定と文書を保持 | 同じ code/message と状態。Java の NPE は欠陥だが、製品を変更せず失敗境界を保つ方が最小・可逆 |
-| params の `[]`、scalar、`[7]`、capabilities の scalar/array | Gson が `-32700 Message could not be parsed.` | lifecycle dispatch より先に型を検査。失敗で構成を変更しない |
+| params の `[]`、scalar、`[7]`、capabilities の scalar/array | Gson が `-32700 Message could not be parsed.` | lifecycle dispatch より先に型を検査。失敗で構成を変更しない。検査するのは params 自体と `capabilities` の型だけで、他の InitializeParams 欄と入れ子 DTO の型違いは #1001（後述） |
 | `[有効 InitializeParams]` | 単一 positional 引数として受理 | 同じ。失敗後の initialize 再試行をこの形でも確認 |
 | document version | 省略/null/i32 に加え、数値文字列・整数値の小数・指数を Gson `nextInt` で受理。値の大小は無視 | `Integer.parseInt` 相当の BMP 数字、続いて double→i32→double の一致で判定。ASCII前後空白、符号、浮動小数suffix/16進浮動小数文字列も共通 fixture。範囲外・非整数・真偽値/object/array は通知ごと破棄 |
 | publishDiagnostics | Ext は documentVersions を更新せず常に `version: 0`。configure 自体は通知しない | 同じ欄を追加。実 version を推測して送らず、観測契約を維持 |
@@ -402,6 +402,14 @@ self-hosted CI の必須契約へ追加する。Java driver の `-Xmx8g`、runs-
 #901 の codeAction/signatureHelp/semanticTokens full は範囲外で、既存のホスト別 capability oracle を維持する。
 新たに確認した reader のキー順（params より後の id）・positional arity > 1 による無応答、
 capabilities null の無応答は [#1001](https://github.com/opaopa6969/unlaxer-parser/issues/1001) で追跡する。
+PR #1002 のレビューで実測した次の差も #1001 に記録した（いずれもこの PR の変更前からある reader / DTO 層の差で、この PR では変えない）。
+InitializeParams の他の欄と入れ子 DTO の型違い（`processId: "abc"`/`1.5`、`rootUri: {}`、`workspaceFolders: "x"`、
+`clientInfo: "x"`、`trace: {}`、`locale: []`、`capabilities.textDocument: 7`）は、Java が `-32700` を返して未初期化のまま、native は受理して初期化する。
+`workDoneToken: {}` には Java が応答しない。型付き params の request（例: `textDocument/formatting` の `params: 7`）は Java が `-32700`、native が `-32603`。
+`"id": null` の frame は Java が通知として扱って応答せず、native は `id: null` で応答する。
+JSON 数値の f64 overflow（例: version の生の `1e400`）は、Java が Gson で通知を破棄するか request に `-32700` を返す。
+native は frame 全体を JSON 解析エラーとし、`id: null` の `-32700 Parse error` を返す。
+ただし `cargo build --workspace` では unlaxer-dap の serde_json `arbitrary_precision` が統合されるため、native も受理して破棄する（build 単位で挙動が変わる）。
 この168件の成功を全 DTO・全 raw frame の同等性や親 #885/#864/#111 の完了とは扱わない。
 
 追加 suite の直接実行は JDK21 約2.7秒、JDK17 約4.4秒（共有ホスト上の実測）。

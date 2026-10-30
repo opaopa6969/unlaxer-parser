@@ -219,4 +219,6 @@ initialize/configure params の失敗、Gson Integer の version 受理域、診
 両実 stdio に送り、初期化失敗後の再試行と configure 失敗後の設定・既存文書・新入力を検証する。
 JVM/Gson 固有 error.data だけを除外し、code/message/result/id と他のキーは比較する。
 #901 の3機能は残る。reader のキー順・positional arity・capabilities null の無応答は #1001。
+型検査は params 自体と capabilities の型だけで、InitializeParams の他欄・入れ子 DTO の型違い、`id: null`、
+JSON 数値の f64 overflow の差も #1001 に記録した。
 [固定対応表と検証境界](../docs/ubnf-authoring-lsp.md#json-rpc-層の固定契約994) を参照。
