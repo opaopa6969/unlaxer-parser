@@ -15,7 +15,7 @@
 
 **3.3.0 is published** on [Maven Central](https://repo1.maven.org/maven2/org/unlaxer/unlaxer-parser/3.3.0/unlaxer-parser-3.3.0.pom) and [GitHub Releases](https://github.com/opaopa6969/unlaxer-parser/releases/tag/v3.3.0). See the [verified source, signatures, and consumer results](release/3.3.0-verification.json).
 The development UBNF VSIX includes an in-editor [beginner catalog/help](unlaxer-dsl/ubnf-vscode/README.md).
-開発版では JVM 不要の [Rust UBNF authoring server](docs/ubnf-authoring-lsp.md) を VSIX から選択できます。Java を既定に保ち、hover・completion・定義/参照・AST rename・outline/folding・linked editing・検証済み package source 表示を提供します。実 stdio 103件＋navigation/package 39件を照合しています。validator意味解析/classpath は #893、syntax/module は #894、profile は #895、FQN quick fix/signature/semantic tokens は #901、入力域・platform は #902 で継続します（親 #885/#886/#864）。
+開発版では JVM 不要の [Rust UBNF authoring server](docs/ubnf-authoring-lsp.md) を VSIX から選択できます。Java を既定に保ち、hover・completion・定義/参照・AST rename・outline/folding・linked editing・検証済み package source 表示を提供します。実 stdio 127件＋navigation/package 39件、initialize/configure と profile metadata の60件を照合しています（#895）。validator意味解析/classpath は #893、syntax/module は #894、FQN quick fix/signature/semantic tokens は #901、入力域・platform は #902 で継続します（親 #885/#886/#864）。
 
 Generate a self-contained [language playground from UBNF](docs/ubnf-playground-ja.md), including UBNF's own meta-grammar.
 Try UBNF grammar syntax, AST and CST in the [online UBNF playground](https://opaopa6969.github.io/unlaxer-parser/ubnf/).

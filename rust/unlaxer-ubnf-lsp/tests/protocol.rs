@@ -19,7 +19,7 @@ fn rejected_lifecycle_and_changes_leave_the_document_unchanged() {
         request(
             &mut server,
             "initialize",
-            json!({"initializationOptions":{"profile":"missing"}})
+            json!({"initializationOptions":{"languageProfile":null}})
         )["error"]["code"],
         -32602
     );
@@ -33,25 +33,21 @@ fn rejected_lifecycle_and_changes_leave_the_document_unchanged() {
     assert!(request(&mut server, "textDocument/hover", params.clone())["result"].is_null());
     assert_eq!(notify(&mut server, "textDocument/didOpen", open).len(), 1);
     let before = request(&mut server, "textDocument/hover", params.clone());
-    for changes in [
-        json!([]),
-        json!([{"text":"broken","range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}}}]),
-    ] {
-        assert!(notify(
-            &mut server,
-            "textDocument/didChange",
-            json!({"textDocument":{"uri":"file:///test.ubnf","version":2},"contentChanges":changes})
-        )
-        .is_empty());
-        assert_eq!(
-            request(&mut server, "textDocument/hover", params.clone()),
-            before
-        );
-    }
+    let changes = json!([]);
+    assert!(notify(
+        &mut server,
+        "textDocument/didChange",
+        json!({"textDocument":{"uri":"file:///test.ubnf","version":2},"contentChanges":changes})
+    )
+    .is_empty());
+    assert_eq!(
+        request(&mut server, "textDocument/hover", params.clone()),
+        before
+    );
     notify(
         &mut server,
         "textDocument/didChange",
-        json!({"textDocument":{"uri":"file:///test.ubnf","version":1},"contentChanges":[{"text":"broken"}]}),
+        json!({"textDocument":{"uri":"file:///test.ubnf","version":1},"contentChanges":[{"text":"broken","range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}}}]}),
     );
     // The Java authoring server applies Full changes regardless of version order.
     assert_ne!(
@@ -94,6 +90,12 @@ fn transport_recovers_from_invalid_json_and_requires_shutdown_before_exit() {
         let error: Value = serde_json::from_slice(&frame).unwrap();
         assert_eq!(error["error"]["code"], -32700);
     }
+    let mut server = Server::default();
+    notify(&mut server, "exit", json!({}));
+    assert_eq!(
+        request(&mut server, "unlaxer/configure", json!({}))["error"],
+        json!({"code":-32600,"message":"Server has shut down"})
+    );
 }
 #[test]
 fn positions_past_line_or_document_end_clamp_like_java() {

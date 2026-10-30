@@ -1,0 +1,1281 @@
+{
+  "reference": "384fcf3eb1c0ce3e207ac580cec5fcac4b478b34",
+  "profiles": {
+    "restricted": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tPARTIAL\ncapability\tCST\tEXTERNAL\ncapability\tVALIDATE\tUNSUPPORTED\ncapability\tCOMPLETION\tUNSUPPORTED\ncapability\tHOVER\tEXTERNAL\ncapability\tDEFINITION\tUNSUPPORTED\ncapability\tRENAME\tUNSUPPORTED\ncapability\tFORMAT\tUNSUPPORTED\ncapability\tCODE_ACTION\tUNSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n",
+    "mixed": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tPARTIAL\ncapability\tAST\tEXTERNAL\ncapability\tCST\tUNSUPPORTED\ncapability\tVALIDATE\tPARTIAL\ncapability\tCOMPLETION\tPARTIAL\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tEXTERNAL\ncapability\tRENAME\tPARTIAL\ncapability\tFORMAT\tEXTERNAL\ncapability\tCODE_ACTION\tEXTERNAL\ncapability\tEXECUTE\tUNSUPPORTED\n",
+    "local": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+  },
+  "expected": {
+    "default": {
+      "java": {
+        "capabilities": {
+          "textDocumentSync": 1,
+          "hoverProvider": true,
+          "definitionProvider": true,
+          "referencesProvider": true,
+          "renameProvider": true,
+          "documentSymbolProvider": true,
+          "foldingRangeProvider": true,
+          "linkedEditingRangeProvider": true,
+          "completionProvider": {
+            "resolveProvider": false,
+            "triggerCharacters": [
+              "@",
+              "=",
+              "."
+            ]
+          },
+          "codeActionProvider": true,
+          "signatureHelpProvider": {
+            "triggerCharacters": [
+              "(",
+              ","
+            ]
+          },
+          "semanticTokensProvider": {
+            "full": true,
+            "legend": {
+              "tokenTypes": [
+                "keyword",
+                "type",
+                "property",
+                "macro",
+                "string",
+                "number",
+                "operator",
+                "comment",
+                "function",
+                "namespace"
+              ],
+              "tokenModifiers": [
+                "declaration"
+              ]
+            }
+          },
+          "experimental": {
+            "languageQueryConsumer": {
+              "schemaVersion": 1,
+              "operations": {
+                "VALIDATE": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "COMPLETION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "HOVER": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "DEFINITION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "RENAME": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "FORMAT": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "CODE_ACTION": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "rust": {
+        "capabilities": {
+          "textDocumentSync": 1,
+          "hoverProvider": true,
+          "definitionProvider": true,
+          "referencesProvider": true,
+          "renameProvider": true,
+          "documentSymbolProvider": true,
+          "foldingRangeProvider": true,
+          "linkedEditingRangeProvider": true,
+          "completionProvider": {
+            "resolveProvider": false,
+            "triggerCharacters": [
+              "@",
+              "=",
+              "."
+            ]
+          },
+          "experimental": {
+            "languageQueryConsumer": {
+              "schemaVersion": 1,
+              "operations": {
+                "VALIDATE": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "COMPLETION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "HOVER": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "DEFINITION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "RENAME": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "FORMAT": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "CODE_ACTION": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "restricted": {
+      "java": {
+        "capabilities": {
+          "textDocumentSync": 1,
+          "hoverProvider": false,
+          "definitionProvider": false,
+          "referencesProvider": true,
+          "renameProvider": false,
+          "documentSymbolProvider": true,
+          "foldingRangeProvider": true,
+          "linkedEditingRangeProvider": true,
+          "codeActionProvider": false,
+          "signatureHelpProvider": {
+            "triggerCharacters": [
+              "(",
+              ","
+            ]
+          },
+          "semanticTokensProvider": {
+            "full": true,
+            "legend": {
+              "tokenTypes": [
+                "keyword",
+                "type",
+                "property",
+                "macro",
+                "string",
+                "number",
+                "operator",
+                "comment",
+                "function",
+                "namespace"
+              ],
+              "tokenModifiers": [
+                "declaration"
+              ]
+            }
+          },
+          "experimental": {
+            "languageQueryConsumer": {
+              "schemaVersion": 1,
+              "operations": {
+                "VALIDATE": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "COMPLETION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "HOVER": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "DEFINITION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "RENAME": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "FORMAT": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "CODE_ACTION": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                }
+              }
+            },
+            "languageProfile": {
+              "schemaVersion": 1,
+              "tsv": "capability\tAST\tPARTIAL\ncapability\tCODE_ACTION\tUNSUPPORTED\ncapability\tCOMPLETION\tUNSUPPORTED\ncapability\tCST\tEXTERNAL\ncapability\tDEFINITION\tUNSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\ncapability\tFORMAT\tUNSUPPORTED\ncapability\tHOVER\tEXTERNAL\ncapability\tPARSE\tSUPPORTED\ncapability\tRENAME\tUNSUPPORTED\ncapability\tVALIDATE\tUNSUPPORTED\nentry\tUBNFFile\tSUPPORTED\nfixture\tfixture.json\ngrammar\tUBNF\tubnf.ubnf\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\nprofile\t1\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\n",
+              "entry": "UBNFFile",
+              "grammar": "UBNF",
+              "language": "ubnf",
+              "package": "team/ubnf",
+              "version": "1.2.3"
+            }
+          },
+          "documentFormattingProvider": false,
+          "documentRangeFormattingProvider": false
+        }
+      },
+      "rust": {
+        "capabilities": {
+          "textDocumentSync": 1,
+          "hoverProvider": false,
+          "definitionProvider": false,
+          "referencesProvider": true,
+          "renameProvider": false,
+          "documentSymbolProvider": true,
+          "foldingRangeProvider": true,
+          "linkedEditingRangeProvider": true,
+          "experimental": {
+            "languageQueryConsumer": {
+              "schemaVersion": 1,
+              "operations": {
+                "VALIDATE": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "COMPLETION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "HOVER": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "DEFINITION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "RENAME": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "FORMAT": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "CODE_ACTION": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                }
+              }
+            },
+            "languageProfile": {
+              "schemaVersion": 1,
+              "tsv": "capability\tAST\tPARTIAL\ncapability\tCODE_ACTION\tUNSUPPORTED\ncapability\tCOMPLETION\tUNSUPPORTED\ncapability\tCST\tEXTERNAL\ncapability\tDEFINITION\tUNSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\ncapability\tFORMAT\tUNSUPPORTED\ncapability\tHOVER\tEXTERNAL\ncapability\tPARSE\tSUPPORTED\ncapability\tRENAME\tUNSUPPORTED\ncapability\tVALIDATE\tUNSUPPORTED\nentry\tUBNFFile\tSUPPORTED\nfixture\tfixture.json\ngrammar\tUBNF\tubnf.ubnf\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\nprofile\t1\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\n",
+              "entry": "UBNFFile",
+              "grammar": "UBNF",
+              "language": "ubnf",
+              "package": "team/ubnf",
+              "version": "1.2.3"
+            }
+          },
+          "codeActionProvider": false,
+          "documentFormattingProvider": false,
+          "documentRangeFormattingProvider": false
+        }
+      }
+    },
+    "mixed": {
+      "java": {
+        "capabilities": {
+          "textDocumentSync": 1,
+          "hoverProvider": true,
+          "definitionProvider": false,
+          "referencesProvider": true,
+          "renameProvider": true,
+          "documentSymbolProvider": true,
+          "foldingRangeProvider": true,
+          "linkedEditingRangeProvider": true,
+          "completionProvider": {
+            "resolveProvider": false,
+            "triggerCharacters": [
+              "@",
+              "=",
+              "."
+            ]
+          },
+          "codeActionProvider": false,
+          "signatureHelpProvider": {
+            "triggerCharacters": [
+              "(",
+              ","
+            ]
+          },
+          "semanticTokensProvider": {
+            "full": true,
+            "legend": {
+              "tokenTypes": [
+                "keyword",
+                "type",
+                "property",
+                "macro",
+                "string",
+                "number",
+                "operator",
+                "comment",
+                "function",
+                "namespace"
+              ],
+              "tokenModifiers": [
+                "declaration"
+              ]
+            }
+          },
+          "experimental": {
+            "languageQueryConsumer": {
+              "schemaVersion": 1,
+              "operations": {
+                "VALIDATE": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "COMPLETION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "HOVER": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "DEFINITION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "RENAME": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "FORMAT": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "CODE_ACTION": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                }
+              }
+            },
+            "languageProfile": {
+              "schemaVersion": 1,
+              "tsv": "capability\tAST\tEXTERNAL\ncapability\tCODE_ACTION\tEXTERNAL\ncapability\tCOMPLETION\tPARTIAL\ncapability\tCST\tUNSUPPORTED\ncapability\tDEFINITION\tEXTERNAL\ncapability\tEXECUTE\tUNSUPPORTED\ncapability\tFORMAT\tEXTERNAL\ncapability\tHOVER\tSUPPORTED\ncapability\tPARSE\tPARTIAL\ncapability\tRENAME\tPARTIAL\ncapability\tVALIDATE\tPARTIAL\nentry\tUBNFFile\tSUPPORTED\nfixture\tfixture.json\ngrammar\tUBNF\tubnf.ubnf\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\nprofile\t1\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\n",
+              "entry": "UBNFFile",
+              "grammar": "UBNF",
+              "language": "ubnf",
+              "package": "team/ubnf",
+              "version": "1.2.3"
+            }
+          },
+          "documentFormattingProvider": false,
+          "documentRangeFormattingProvider": false
+        }
+      },
+      "rust": {
+        "capabilities": {
+          "textDocumentSync": 1,
+          "hoverProvider": true,
+          "definitionProvider": false,
+          "referencesProvider": true,
+          "renameProvider": true,
+          "documentSymbolProvider": true,
+          "foldingRangeProvider": true,
+          "linkedEditingRangeProvider": true,
+          "completionProvider": {
+            "resolveProvider": false,
+            "triggerCharacters": [
+              "@",
+              "=",
+              "."
+            ]
+          },
+          "experimental": {
+            "languageQueryConsumer": {
+              "schemaVersion": 1,
+              "operations": {
+                "VALIDATE": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "COMPLETION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "HOVER": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "DEFINITION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "RENAME": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "FORMAT": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                },
+                "CODE_ACTION": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": false,
+                  "available": false
+                }
+              }
+            },
+            "languageProfile": {
+              "schemaVersion": 1,
+              "tsv": "capability\tAST\tEXTERNAL\ncapability\tCODE_ACTION\tEXTERNAL\ncapability\tCOMPLETION\tPARTIAL\ncapability\tCST\tUNSUPPORTED\ncapability\tDEFINITION\tEXTERNAL\ncapability\tEXECUTE\tUNSUPPORTED\ncapability\tFORMAT\tEXTERNAL\ncapability\tHOVER\tSUPPORTED\ncapability\tPARSE\tPARTIAL\ncapability\tRENAME\tPARTIAL\ncapability\tVALIDATE\tPARTIAL\nentry\tUBNFFile\tSUPPORTED\nfixture\tfixture.json\ngrammar\tUBNF\tubnf.ubnf\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\nprofile\t1\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\n",
+              "entry": "UBNFFile",
+              "grammar": "UBNF",
+              "language": "ubnf",
+              "package": "team/ubnf",
+              "version": "1.2.3"
+            }
+          },
+          "codeActionProvider": false,
+          "documentFormattingProvider": false,
+          "documentRangeFormattingProvider": false
+        }
+      }
+    },
+    "local": {
+      "java": {
+        "capabilities": {
+          "textDocumentSync": 1,
+          "hoverProvider": true,
+          "definitionProvider": true,
+          "referencesProvider": true,
+          "renameProvider": true,
+          "documentSymbolProvider": true,
+          "foldingRangeProvider": true,
+          "linkedEditingRangeProvider": true,
+          "completionProvider": {
+            "resolveProvider": false,
+            "triggerCharacters": [
+              "@",
+              "=",
+              "."
+            ]
+          },
+          "codeActionProvider": true,
+          "signatureHelpProvider": {
+            "triggerCharacters": [
+              "(",
+              ","
+            ]
+          },
+          "semanticTokensProvider": {
+            "full": true,
+            "legend": {
+              "tokenTypes": [
+                "keyword",
+                "type",
+                "property",
+                "macro",
+                "string",
+                "number",
+                "operator",
+                "comment",
+                "function",
+                "namespace"
+              ],
+              "tokenModifiers": [
+                "declaration"
+              ]
+            }
+          },
+          "experimental": {
+            "languageQueryConsumer": {
+              "schemaVersion": 1,
+              "operations": {
+                "VALIDATE": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "COMPLETION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "HOVER": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "DEFINITION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "RENAME": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "FORMAT": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "CODE_ACTION": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                }
+              }
+            },
+            "languageProfile": {
+              "schemaVersion": 1,
+              "tsv": "capability\tAST\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\nentry\tUBNFFile\tSUPPORTED\nfixture\tfixture.json\ngrammar\tUBNF\tubnf.ubnf\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\nprofile\t1\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\n",
+              "entry": "UBNFFile",
+              "grammar": "UBNF",
+              "language": "ubnf",
+              "package": "team/ubnf",
+              "version": "1.2.3"
+            }
+          }
+        }
+      },
+      "rust": {
+        "capabilities": {
+          "textDocumentSync": 1,
+          "hoverProvider": true,
+          "definitionProvider": true,
+          "referencesProvider": true,
+          "renameProvider": true,
+          "documentSymbolProvider": true,
+          "foldingRangeProvider": true,
+          "linkedEditingRangeProvider": true,
+          "completionProvider": {
+            "resolveProvider": false,
+            "triggerCharacters": [
+              "@",
+              "=",
+              "."
+            ]
+          },
+          "experimental": {
+            "languageQueryConsumer": {
+              "schemaVersion": 1,
+              "operations": {
+                "VALIDATE": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "COMPLETION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "HOVER": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "DEFINITION": {
+                  "transport": true,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "RENAME": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "FORMAT": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                },
+                "CODE_ACTION": {
+                  "transport": false,
+                  "providerRegistered": false,
+                  "profileAllowed": true,
+                  "available": false
+                }
+              }
+            },
+            "languageProfile": {
+              "schemaVersion": 1,
+              "tsv": "capability\tAST\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\nentry\tUBNFFile\tSUPPORTED\nfixture\tfixture.json\ngrammar\tUBNF\tubnf.ubnf\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\nprofile\t1\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\n",
+              "entry": "UBNFFile",
+              "grammar": "UBNF",
+              "language": "ubnf",
+              "package": "team/ubnf",
+              "version": "1.2.3"
+            }
+          }
+        }
+      }
+    }
+  },
+  "invalid": [
+    {
+      "id": "profile-not-object-0",
+      "options": {
+        "languageProfile": null
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile must contain tsv and entry"
+      }
+    },
+    {
+      "id": "profile-not-object-1",
+      "options": {
+        "languageProfile": false
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile must contain tsv and entry"
+      }
+    },
+    {
+      "id": "profile-not-object-2",
+      "options": {
+        "languageProfile": 1
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile must contain tsv and entry"
+      }
+    },
+    {
+      "id": "profile-not-object-3",
+      "options": {
+        "languageProfile": "unknown"
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile must contain tsv and entry"
+      }
+    },
+    {
+      "id": "profile-not-object-4",
+      "options": {
+        "languageProfile": []
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile must contain tsv and entry"
+      }
+    },
+    {
+      "id": "profile-keys-5",
+      "options": {
+        "languageProfile": {}
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile must contain only tsv and entry"
+      }
+    },
+    {
+      "id": "profile-keys-6",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile must contain only tsv and entry"
+      }
+    },
+    {
+      "id": "profile-keys-7",
+      "options": {
+        "languageProfile": {
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile must contain only tsv and entry"
+      }
+    },
+    {
+      "id": "profile-keys-8",
+      "options": {
+        "languageProfile": {
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\n",
+          "entry": "UBNFFile",
+          "unknown": true
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile must contain only tsv and entry"
+      }
+    },
+    {
+      "id": "field-tsv-9",
+      "options": {
+        "languageProfile": {
+          "tsv": null,
+          "entry": "UBNFFile"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "field-tsv-10",
+      "options": {
+        "languageProfile": {
+          "tsv": false,
+          "entry": "UBNFFile"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "field-tsv-11",
+      "options": {
+        "languageProfile": {
+          "tsv": 1,
+          "entry": "UBNFFile"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "field-tsv-12",
+      "options": {
+        "languageProfile": {
+          "tsv": [],
+          "entry": "UBNFFile"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "field-tsv-13",
+      "options": {
+        "languageProfile": {
+          "tsv": {},
+          "entry": "UBNFFile"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "field-entry-14",
+      "options": {
+        "languageProfile": {
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n",
+          "entry": null
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "field-entry-15",
+      "options": {
+        "languageProfile": {
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n",
+          "entry": false
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "field-entry-16",
+      "options": {
+        "languageProfile": {
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n",
+          "entry": 1
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "field-entry-17",
+      "options": {
+        "languageProfile": {
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n",
+          "entry": []
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "field-entry-18",
+      "options": {
+        "languageProfile": {
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n",
+          "entry": {}
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile fields must be strings"
+      }
+    },
+    {
+      "id": "wrong-entry",
+      "options": {
+        "languageProfile": {
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n",
+          "entry": "Start"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "languageProfile entry must match generated root"
+      }
+    },
+    {
+      "id": "empty",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": ""
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "no-lf",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "crlf",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\r\nlanguage\tubnf\r\npackage\tteam/ubnf\t1.2.3\r\ntarget\tjava\trust\r\ntool\tunlaxer\tdevelopment\r\ngrammar\tUBNF\tubnf.ubnf\r\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\r\nfixture\tfixture.json\r\nentry\tUBNFFile\tSUPPORTED\r\ncapability\tPARSE\tSUPPORTED\r\ncapability\tAST\tSUPPORTED\r\ncapability\tCST\tSUPPORTED\r\ncapability\tVALIDATE\tSUPPORTED\r\ncapability\tCOMPLETION\tSUPPORTED\r\ncapability\tHOVER\tSUPPORTED\r\ncapability\tDEFINITION\tSUPPORTED\r\ncapability\tRENAME\tSUPPORTED\r\ncapability\tFORMAT\tSUPPORTED\r\ncapability\tCODE_ACTION\tSUPPORTED\r\ncapability\tEXECUTE\tUNSUPPORTED\r\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "nul",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n\u0000"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "unknown-row",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\nunknown\tx\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "duplicate",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\nprofile\t1\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "missing-capability",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "bad-version",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t01.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "unsupported-entry",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tUNSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "execute",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "no-source-https",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\tfile:///example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "byte-limit",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\ndifference\tNote\t😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "row-limit",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\ndifference\tX0\tnote\ndifference\tX1\tnote\ndifference\tX2\tnote\ndifference\tX3\tnote\ndifference\tX4\tnote\ndifference\tX5\tnote\ndifference\tX6\tnote\ndifference\tX7\tnote\ndifference\tX8\tnote\ndifference\tX9\tnote\ndifference\tX10\tnote\ndifference\tX11\tnote\ndifference\tX12\tnote\ndifference\tX13\tnote\ndifference\tX14\tnote\ndifference\tX15\tnote\ndifference\tX16\tnote\ndifference\tX17\tnote\ndifference\tX18\tnote\ndifference\tX19\tnote\ndifference\tX20\tnote\ndifference\tX21\tnote\ndifference\tX22\tnote\ndifference\tX23\tnote\ndifference\tX24\tnote\ndifference\tX25\tnote\ndifference\tX26\tnote\ndifference\tX27\tnote\ndifference\tX28\tnote\ndifference\tX29\tnote\ndifference\tX30\tnote\ndifference\tX31\tnote\ndifference\tX32\tnote\ndifference\tX33\tnote\ndifference\tX34\tnote\ndifference\tX35\tnote\ndifference\tX36\tnote\ndifference\tX37\tnote\ndifference\tX38\tnote\ndifference\tX39\tnote\ndifference\tX40\tnote\ndifference\tX41\tnote\ndifference\tX42\tnote\ndifference\tX43\tnote\ndifference\tX44\tnote\ndifference\tX45\tnote\ndifference\tX46\tnote\ndifference\tX47\tnote\ndifference\tX48\tnote\ndifference\tX49\tnote\ndifference\tX50\tnote\ndifference\tX51\tnote\ndifference\tX52\tnote\ndifference\tX53\tnote\ndifference\tX54\tnote\ndifference\tX55\tnote\ndifference\tX56\tnote\ndifference\tX57\tnote\ndifference\tX58\tnote\ndifference\tX59\tnote\ndifference\tX60\tnote\ndifference\tX61\tnote\ndifference\tX62\tnote\ndifference\tX63\tnote\ndifference\tX64\tnote\ndifference\tX65\tnote\ndifference\tX66\tnote\ndifference\tX67\tnote\ndifference\tX68\tnote\ndifference\tX69\tnote\ndifference\tX70\tnote\ndifference\tX71\tnote\ndifference\tX72\tnote\ndifference\tX73\tnote\ndifference\tX74\tnote\ndifference\tX75\tnote\ndifference\tX76\tnote\ndifference\tX77\tnote\ndifference\tX78\tnote\ndifference\tX79\tnote\ndifference\tX80\tnote\ndifference\tX81\tnote\ndifference\tX82\tnote\ndifference\tX83\tnote\ndifference\tX84\tnote\ndifference\tX85\tnote\ndifference\tX86\tnote\ndifference\tX87\tnote\ndifference\tX88\tnote\ndifference\tX89\tnote\ndifference\tX90\tnote\ndifference\tX91\tnote\ndifference\tX92\tnote\ndifference\tX93\tnote\ndifference\tX94\tnote\ndifference\tX95\tnote\ndifference\tX96\tnote\ndifference\tX97\tnote\ndifference\tX98\tnote\ndifference\tX99\tnote\ndifference\tX100\tnote\ndifference\tX101\tnote\ndifference\tX102\tnote\ndifference\tX103\tnote\ndifference\tX104\tnote\ndifference\tX105\tnote\ndifference\tX106\tnote\ndifference\tX107\tnote\ndifference\tX108\tnote\ndifference\tX109\tnote\ndifference\tX110\tnote\ndifference\tX111\tnote\ndifference\tX112\tnote\ndifference\tX113\tnote\ndifference\tX114\tnote\ndifference\tX115\tnote\ndifference\tX116\tnote\ndifference\tX117\tnote\ndifference\tX118\tnote\ndifference\tX119\tnote\ndifference\tX120\tnote\ndifference\tX121\tnote\ndifference\tX122\tnote\ndifference\tX123\tnote\ndifference\tX124\tnote\ndifference\tX125\tnote\ndifference\tX126\tnote\ndifference\tX127\tnote\ndifference\tX128\tnote\ndifference\tX129\tnote\ndifference\tX130\tnote\ndifference\tX131\tnote\ndifference\tX132\tnote\ndifference\tX133\tnote\ndifference\tX134\tnote\ndifference\tX135\tnote\ndifference\tX136\tnote\ndifference\tX137\tnote\ndifference\tX138\tnote\ndifference\tX139\tnote\ndifference\tX140\tnote\ndifference\tX141\tnote\ndifference\tX142\tnote\ndifference\tX143\tnote\ndifference\tX144\tnote\ndifference\tX145\tnote\ndifference\tX146\tnote\ndifference\tX147\tnote\ndifference\tX148\tnote\ndifference\tX149\tnote\ndifference\tX150\tnote\ndifference\tX151\tnote\ndifference\tX152\tnote\ndifference\tX153\tnote\ndifference\tX154\tnote\ndifference\tX155\tnote\ndifference\tX156\tnote\ndifference\tX157\tnote\ndifference\tX158\tnote\ndifference\tX159\tnote\ndifference\tX160\tnote\ndifference\tX161\tnote\ndifference\tX162\tnote\ndifference\tX163\tnote\ndifference\tX164\tnote\ndifference\tX165\tnote\ndifference\tX166\tnote\ndifference\tX167\tnote\ndifference\tX168\tnote\ndifference\tX169\tnote\ndifference\tX170\tnote\ndifference\tX171\tnote\ndifference\tX172\tnote\ndifference\tX173\tnote\ndifference\tX174\tnote\ndifference\tX175\tnote\ndifference\tX176\tnote\ndifference\tX177\tnote\ndifference\tX178\tnote\ndifference\tX179\tnote\ndifference\tX180\tnote\ndifference\tX181\tnote\ndifference\tX182\tnote\ndifference\tX183\tnote\ndifference\tX184\tnote\ndifference\tX185\tnote\ndifference\tX186\tnote\ndifference\tX187\tnote\ndifference\tX188\tnote\ndifference\tX189\tnote\ndifference\tX190\tnote\ndifference\tX191\tnote\ndifference\tX192\tnote\ndifference\tX193\tnote\ndifference\tX194\tnote\ndifference\tX195\tnote\ndifference\tX196\tnote\ndifference\tX197\tnote\ndifference\tX198\tnote\ndifference\tX199\tnote\ndifference\tX200\tnote\ndifference\tX201\tnote\ndifference\tX202\tnote\ndifference\tX203\tnote\ndifference\tX204\tnote\ndifference\tX205\tnote\ndifference\tX206\tnote\ndifference\tX207\tnote\ndifference\tX208\tnote\ndifference\tX209\tnote\ndifference\tX210\tnote\ndifference\tX211\tnote\ndifference\tX212\tnote\ndifference\tX213\tnote\ndifference\tX214\tnote\ndifference\tX215\tnote\ndifference\tX216\tnote\ndifference\tX217\tnote\ndifference\tX218\tnote\ndifference\tX219\tnote\ndifference\tX220\tnote\ndifference\tX221\tnote\ndifference\tX222\tnote\ndifference\tX223\tnote\ndifference\tX224\tnote\ndifference\tX225\tnote\ndifference\tX226\tnote\ndifference\tX227\tnote\ndifference\tX228\tnote\ndifference\tX229\tnote\ndifference\tX230\tnote\ndifference\tX231\tnote\ndifference\tX232\tnote\ndifference\tX233\tnote\ndifference\tX234\tnote\ndifference\tX235\tnote\ndifference\tX236\tnote\ndifference\tX237\tnote\ndifference\tX238\tnote\ndifference\tX239\tnote\ndifference\tX240\tnote\ndifference\tX241\tnote\ndifference\tX242\tnote\ndifference\tX243\tnote\ndifference\tX244\tnote\ndifference\tX245\tnote\ndifference\tX246\tnote\ndifference\tX247\tnote\ndifference\tX248\tnote\ndifference\tX249\tnote\ndifference\tX250\tnote\ndifference\tX251\tnote\ndifference\tX252\tnote\ndifference\tX253\tnote\ndifference\tX254\tnote\ndifference\tX255\tnote\ndifference\tX256\tnote\ndifference\tX257\tnote\ndifference\tX258\tnote\ndifference\tX259\tnote\ndifference\tX260\tnote\ndifference\tX261\tnote\ndifference\tX262\tnote\ndifference\tX263\tnote\ndifference\tX264\tnote\ndifference\tX265\tnote\ndifference\tX266\tnote\ndifference\tX267\tnote\ndifference\tX268\tnote\ndifference\tX269\tnote\ndifference\tX270\tnote\ndifference\tX271\tnote\ndifference\tX272\tnote\ndifference\tX273\tnote\ndifference\tX274\tnote\ndifference\tX275\tnote\ndifference\tX276\tnote\ndifference\tX277\tnote\ndifference\tX278\tnote\ndifference\tX279\tnote\ndifference\tX280\tnote\ndifference\tX281\tnote\ndifference\tX282\tnote\ndifference\tX283\tnote\ndifference\tX284\tnote\ndifference\tX285\tnote\ndifference\tX286\tnote\ndifference\tX287\tnote\ndifference\tX288\tnote\ndifference\tX289\tnote\ndifference\tX290\tnote\ndifference\tX291\tnote\ndifference\tX292\tnote\ndifference\tX293\tnote\ndifference\tX294\tnote\ndifference\tX295\tnote\ndifference\tX296\tnote\ndifference\tX297\tnote\ndifference\tX298\tnote\ndifference\tX299\tnote\ndifference\tX300\tnote\ndifference\tX301\tnote\ndifference\tX302\tnote\ndifference\tX303\tnote\ndifference\tX304\tnote\ndifference\tX305\tnote\ndifference\tX306\tnote\ndifference\tX307\tnote\ndifference\tX308\tnote\ndifference\tX309\tnote\ndifference\tX310\tnote\ndifference\tX311\tnote\ndifference\tX312\tnote\ndifference\tX313\tnote\ndifference\tX314\tnote\ndifference\tX315\tnote\ndifference\tX316\tnote\ndifference\tX317\tnote\ndifference\tX318\tnote\ndifference\tX319\tnote\ndifference\tX320\tnote\ndifference\tX321\tnote\ndifference\tX322\tnote\ndifference\tX323\tnote\ndifference\tX324\tnote\ndifference\tX325\tnote\ndifference\tX326\tnote\ndifference\tX327\tnote\ndifference\tX328\tnote\ndifference\tX329\tnote\ndifference\tX330\tnote\ndifference\tX331\tnote\ndifference\tX332\tnote\ndifference\tX333\tnote\ndifference\tX334\tnote\ndifference\tX335\tnote\ndifference\tX336\tnote\ndifference\tX337\tnote\ndifference\tX338\tnote\ndifference\tX339\tnote\ndifference\tX340\tnote\ndifference\tX341\tnote\ndifference\tX342\tnote\ndifference\tX343\tnote\ndifference\tX344\tnote\ndifference\tX345\tnote\ndifference\tX346\tnote\ndifference\tX347\tnote\ndifference\tX348\tnote\ndifference\tX349\tnote\ndifference\tX350\tnote\ndifference\tX351\tnote\ndifference\tX352\tnote\ndifference\tX353\tnote\ndifference\tX354\tnote\ndifference\tX355\tnote\ndifference\tX356\tnote\ndifference\tX357\tnote\ndifference\tX358\tnote\ndifference\tX359\tnote\ndifference\tX360\tnote\ndifference\tX361\tnote\ndifference\tX362\tnote\ndifference\tX363\tnote\ndifference\tX364\tnote\ndifference\tX365\tnote\ndifference\tX366\tnote\ndifference\tX367\tnote\ndifference\tX368\tnote\ndifference\tX369\tnote\ndifference\tX370\tnote\ndifference\tX371\tnote\ndifference\tX372\tnote\ndifference\tX373\tnote\ndifference\tX374\tnote\ndifference\tX375\tnote\ndifference\tX376\tnote\ndifference\tX377\tnote\ndifference\tX378\tnote\ndifference\tX379\tnote\ndifference\tX380\tnote\ndifference\tX381\tnote\ndifference\tX382\tnote\ndifference\tX383\tnote\ndifference\tX384\tnote\ndifference\tX385\tnote\ndifference\tX386\tnote\ndifference\tX387\tnote\ndifference\tX388\tnote\ndifference\tX389\tnote\ndifference\tX390\tnote\ndifference\tX391\tnote\ndifference\tX392\tnote\ndifference\tX393\tnote\ndifference\tX394\tnote\ndifference\tX395\tnote\ndifference\tX396\tnote\ndifference\tX397\tnote\ndifference\tX398\tnote\ndifference\tX399\tnote\ndifference\tX400\tnote\ndifference\tX401\tnote\ndifference\tX402\tnote\ndifference\tX403\tnote\ndifference\tX404\tnote\ndifference\tX405\tnote\ndifference\tX406\tnote\ndifference\tX407\tnote\ndifference\tX408\tnote\ndifference\tX409\tnote\ndifference\tX410\tnote\ndifference\tX411\tnote\ndifference\tX412\tnote\ndifference\tX413\tnote\ndifference\tX414\tnote\ndifference\tX415\tnote\ndifference\tX416\tnote\ndifference\tX417\tnote\ndifference\tX418\tnote\ndifference\tX419\tnote\ndifference\tX420\tnote\ndifference\tX421\tnote\ndifference\tX422\tnote\ndifference\tX423\tnote\ndifference\tX424\tnote\ndifference\tX425\tnote\ndifference\tX426\tnote\ndifference\tX427\tnote\ndifference\tX428\tnote\ndifference\tX429\tnote\ndifference\tX430\tnote\ndifference\tX431\tnote\ndifference\tX432\tnote\ndifference\tX433\tnote\ndifference\tX434\tnote\ndifference\tX435\tnote\ndifference\tX436\tnote\ndifference\tX437\tnote\ndifference\tX438\tnote\ndifference\tX439\tnote\ndifference\tX440\tnote\ndifference\tX441\tnote\ndifference\tX442\tnote\ndifference\tX443\tnote\ndifference\tX444\tnote\ndifference\tX445\tnote\ndifference\tX446\tnote\ndifference\tX447\tnote\ndifference\tX448\tnote\ndifference\tX449\tnote\ndifference\tX450\tnote\ndifference\tX451\tnote\ndifference\tX452\tnote\ndifference\tX453\tnote\ndifference\tX454\tnote\ndifference\tX455\tnote\ndifference\tX456\tnote\ndifference\tX457\tnote\ndifference\tX458\tnote\ndifference\tX459\tnote\ndifference\tX460\tnote\ndifference\tX461\tnote\ndifference\tX462\tnote\ndifference\tX463\tnote\ndifference\tX464\tnote\ndifference\tX465\tnote\ndifference\tX466\tnote\ndifference\tX467\tnote\ndifference\tX468\tnote\ndifference\tX469\tnote\ndifference\tX470\tnote\ndifference\tX471\tnote\ndifference\tX472\tnote\ndifference\tX473\tnote\ndifference\tX474\tnote\ndifference\tX475\tnote\ndifference\tX476\tnote\ndifference\tX477\tnote\ndifference\tX478\tnote\ndifference\tX479\tnote\ndifference\tX480\tnote\ndifference\tX481\tnote\ndifference\tX482\tnote\ndifference\tX483\tnote\ndifference\tX484\tnote\ndifference\tX485\tnote\ndifference\tX486\tnote\ndifference\tX487\tnote\ndifference\tX488\tnote\ndifference\tX489\tnote\ndifference\tX490\tnote\ndifference\tX491\tnote\ndifference\tX492\tnote\ndifference\tX493\tnote\ndifference\tX494\tnote\ndifference\tX495\tnote\ndifference\tX496\tnote\ndifference\tX497\tnote\ndifference\tX498\tnote\ndifference\tX499\tnote\ndifference\tX500\tnote\ndifference\tX501\tnote\ndifference\tX502\tnote\ndifference\tX503\tnote\ndifference\tX504\tnote\ndifference\tX505\tnote\ndifference\tX506\tnote\ndifference\tX507\tnote\ndifference\tX508\tnote\ndifference\tX509\tnote\ndifference\tX510\tnote\ndifference\tX511\tnote\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    },
+    {
+      "id": "grammar",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tOther\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "profile grammar/entry cannot be parsed locally"
+      }
+    },
+    {
+      "id": "external-entry",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tEXTERNAL\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "profile grammar/entry cannot be parsed locally"
+      }
+    },
+    {
+      "id": "external-parse",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tEXTERNAL\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "profile grammar/entry cannot be parsed locally"
+      }
+    },
+    {
+      "id": "unknown-support-capability",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tUNKNOWN\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "No enum constant org.unlaxer.source.LanguageProfile.Support.UNKNOWN"
+      }
+    },
+    {
+      "id": "unknown-support-entry",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tUNKNOWN\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "No enum constant org.unlaxer.source.LanguageProfile.Support.UNKNOWN"
+      }
+    },
+    {
+      "id": "unknown-support-syntax",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "profile\t1\nlanguage\tubnf\npackage\tteam/ubnf\t1.2.3\ntarget\tjava\trust\ntool\tunlaxer\tdevelopment\ngrammar\tUBNF\tubnf.ubnf\nsource\thttps://example.invalid/must-not-fetch\trev\tsha\nfixture\tfixture.json\nentry\tUBNFFile\tSUPPORTED\ncapability\tPARSE\tSUPPORTED\ncapability\tAST\tSUPPORTED\ncapability\tCST\tSUPPORTED\ncapability\tVALIDATE\tSUPPORTED\ncapability\tCOMPLETION\tSUPPORTED\ncapability\tHOVER\tSUPPORTED\ncapability\tDEFINITION\tSUPPORTED\ncapability\tRENAME\tSUPPORTED\ncapability\tFORMAT\tSUPPORTED\ncapability\tCODE_ACTION\tSUPPORTED\ncapability\tEXECUTE\tUNSUPPORTED\nsyntax\tCustom\tUNKNOWN\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "No enum constant org.unlaxer.source.LanguageProfile.Support.UNKNOWN"
+      }
+    },
+    {
+      "id": "shape-before-enum",
+      "options": {
+        "languageProfile": {
+          "entry": "UBNFFile",
+          "tsv": "unknown\tx\ncapability\tAST\tUNKNOWN\n"
+        }
+      },
+      "error": {
+        "code": -32602,
+        "message": "invalid language profile"
+      }
+    }
+  ],
+  "ignoredOptions": [
+    null,
+    {},
+    true,
+    7,
+    "unknown",
+    [],
+    [
+      {
+        "languageProfile": null
+      }
+    ],
+    {
+      "unknown": {
+        "tsv": "not read"
+      }
+    },
+    {
+      "profile": "missing"
+    },
+    {
+      "languageProfilePath": "https://example.invalid/not-fetched",
+      "catalogPath": "/dev/stdin"
+    }
+  ],
+  "document": {
+    "source": "grammar G { @root Start ::= Missing; }",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 18
+          },
+          "end": {
+            "line": 0,
+            "character": 23
+          }
+        },
+        "severity": 1,
+        "code": "E-RULE-UNDEFINED",
+        "source": "ubnf-validator",
+        "message": "rule Start references undefined rule or token 'Missing' — Define a rule or token named 'Missing'."
+      }
+    ],
+    "hover": {
+      "contents": {
+        "kind": "markdown",
+        "value": "Valid UBNF"
+      }
+    }
+  }
+}

@@ -97,7 +97,7 @@ def initialize(java, native):
         assert cap['textDocumentSync'] == 1 and cap['hoverProvider'] is True, cap
         assert cap['completionProvider'] == {'resolveProvider': False, 'triggerCharacters': ['@', '=', '.']}, cap
         if client is native:
-            assert set(cap) == {'textDocumentSync', 'hoverProvider', 'completionProvider', 'definitionProvider', 'referencesProvider', 'renameProvider', 'documentSymbolProvider', 'foldingRangeProvider', 'linkedEditingRangeProvider'}, cap
+            assert set(cap) == {'textDocumentSync', 'hoverProvider', 'completionProvider', 'definitionProvider', 'referencesProvider', 'renameProvider', 'documentSymbolProvider', 'foldingRangeProvider', 'linkedEditingRangeProvider', 'experimental'}, cap
             for key in ['definitionProvider', 'referencesProvider', 'renameProvider', 'documentSymbolProvider', 'foldingRangeProvider', 'linkedEditingRangeProvider']:
                 assert cap[key] is True, cap
         else:
@@ -108,7 +108,7 @@ def initialize(java, native):
             assert set(cap) == {'textDocumentSync', 'hoverProvider', 'completionProvider', 'definitionProvider', 'referencesProvider', 'renameProvider', 'documentSymbolProvider', 'codeActionProvider', 'foldingRangeProvider', 'linkedEditingRangeProvider', 'signatureHelpProvider', 'semanticTokensProvider', 'experimental'}, cap
         assert client.request('initialize')['error']['code'] == -32600
         client.send('initialized')
-    assert native.request('unlaxer/configure')['error']['code'] == -32601
+    assert native.result('unlaxer/configure')['capabilities']['experimental'] == java.result('unlaxer/configure')['capabilities']['experimental']
     assert native.result('ubnf/packageSource', {'uri': 'ubnf-package:/unknown'}) is None
     for method in ['codeAction', 'signatureHelp', 'semanticTokens/full']:
         assert native.request('textDocument/' + method)['error']['code'] == -32601
@@ -309,13 +309,16 @@ def main():
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents', 'package-artifacts', 'package-artifact-utf8', 'package-grammar-paths', 'package-json'], default='baseline')
+    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents', 'package-artifacts', 'package-artifact-utf8', 'package-grammar-paths', 'package-json', 'configuration'], default='baseline')
     args = parser.parse_args()
     java = Client([args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.lsp.ubnf.UBNFLspLauncherExt'])
     native = Client([args.rust], native=True)
     try:
         with tempfile.TemporaryDirectory(prefix='ubnf-authoring-', dir=os.environ.get('TMPDIR')) as directory:
-            if args.suite == 'package-json':
+            if args.suite == 'configuration':
+                from ubnf_authoring_configuration import run_configuration
+                evidence = run_configuration([java, native], Path(directory))
+            elif args.suite == 'package-json':
                 from ubnf_package_json import run_lsp
                 initialize(java, native)
                 evidence = run_lsp([java, native], Path(directory))
