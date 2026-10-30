@@ -13,15 +13,21 @@ impl Backend for Hooks {
             "empty" => Ok(vec![]),
             "bad-span" => Ok(vec![Step {
                 label: "bad".into(),
+                generated_text: None,
+                projected_text: None,
                 span: Span { start: 0, end: 99 },
             }]),
             "A\r\nB" => Ok(vec![Step {
                 label: "bad".into(),
+                generated_text: None,
+                projected_text: None,
                 span: Span { start: 2, end: 3 },
             }]),
             _ => Ok(vec![
                 Step {
                     label: "Parent".into(),
+                    generated_text: None,
+                    projected_text: None,
                     span: Span {
                         start: 0,
                         end: source.len(),
@@ -29,6 +35,8 @@ impl Backend for Hooks {
                 },
                 Step {
                     label: "Child".into(),
+                    generated_text: None,
+                    projected_text: None,
                     span: Span {
                         start: 1,
                         end: source.len(),
@@ -128,6 +136,41 @@ fn real_frames_preserve_sequence_state_and_application_hooks() {
     for (index, message) in emitted.iter().enumerate() {
         assert_eq!(message["seq"], index + 1);
     }
+    // Actual framed output order, including DAP's explicit next-response exception.
+    let order: Vec<_> = emitted
+        .iter()
+        .map(|m| {
+            m[if m["type"] == "response" {
+                "command"
+            } else {
+                "event"
+            }]
+            .as_str()
+            .unwrap()
+        })
+        .collect();
+    assert_eq!(
+        order,
+        [
+            "initialize",
+            "initialized",
+            "launch",
+            "stopped",
+            "configurationDone",
+            "stackTrace",
+            "variables",
+            "next",
+            "stopped",
+            "stackTrace",
+            "output",
+            "terminated",
+            "exited",
+            "continue",
+            "stackTrace",
+            "unknown",
+            "disconnect"
+        ]
+    );
     let response = |id| {
         emitted
             .iter()
@@ -138,10 +181,8 @@ fn real_frames_preserve_sequence_state_and_application_hooks() {
     assert_eq!(response(4)["body"]["stackFrames"][0]["column"], 0);
     assert_eq!(response(7)["body"]["stackFrames"][0]["column"], 2);
     assert_eq!(response(7)["body"]["stackFrames"][0]["endColumn"], 3);
-    assert!(response(9)["body"]["stackFrames"]
-        .as_array()
-        .unwrap()
-        .is_empty());
+    assert_eq!(response(9)["body"], json!({"stackFrames":[]}));
+    assert_eq!(response(4)["body"].as_object().unwrap().len(), 1);
     assert_eq!(response(10)["success"], false);
     assert!(response(5)["body"]["variables"]
         .as_array()
@@ -175,7 +216,7 @@ fn strict_failures_never_substitute_token_or_stale_steps() {
                 4,
                 "launch",
                 json!({"program":path,"steppingMode":"ast","stopOnEntry":true})
-            ))[0]["success"],
+            ))[1]["success"],
             true
         );
         let result = server.handle(request(5, "configurationDone", json!({})));
@@ -225,7 +266,7 @@ fn malformed_frames_and_requests_fail_with_bounded_transport() {
 }
 
 #[test]
-fn token_backend_requires_complete_real_trace_and_rejects_detached_source() {
+fn token_backend_requires_complete_real_trace_and_retains_detached_source() {
     use unlaxer_runtime::{
         token::{TokenKind, TokenSource},
         token_trace::Limits,
@@ -277,10 +318,26 @@ fn token_backend_requires_complete_real_trace_and_rejects_detached_source() {
             },
         )
         .unwrap();
-    assert!(
+    let steps = unlaxer_dap::token_steps(&context.tree(token.index()).unwrap()).unwrap();
+    assert_eq!(steps.len(), 2);
+    assert_eq!(steps[0].generated_text, None);
+    assert_eq!(steps[1].span, Span { start: 1, end: 1 });
+    assert_eq!(steps[1].generated_text.as_deref(), Some("generated"));
+    context
+        .add_token_node(
+            0,
+            TokenKind::VirtualMatchOnly,
+            TokenSource::Generated {
+                anchor: 0,
+                text: "hidden".into(),
+            },
+        )
+        .unwrap();
+    assert_eq!(
         unlaxer_dap::token_steps(&context.tree(token.index()).unwrap())
-            .unwrap_err()
-            .contains("detached generated")
+            .unwrap()
+            .len(),
+        2
     );
 }
 

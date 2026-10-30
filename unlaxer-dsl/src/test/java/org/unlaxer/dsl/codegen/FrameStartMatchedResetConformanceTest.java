@@ -62,6 +62,9 @@ public class FrameStartMatchedResetConformanceTest {
             assertTrue("duplicate difference " + key, seen.add(key));
             String[] expected = rows.get(key);
             assertNotNull(key, expected);
+            // #827 permits host-dependent hit accounting only, never diagnostic differences.
+            assertEquals(key + "/diagnostic parity", diff[5], diff[6]);
+            assertEquals(key + "/follower diagnostic parity", diff[11], diff[12]);
             int[] columns = {9, 10, 11, 16};
             for (int i = 0; i < columns.length; i++) {
                 assertEquals(key + "/Java column " + columns[i], expected[columns[i]], diff[5 + 2 * i]);
@@ -102,6 +105,13 @@ public class FrameStartMatchedResetConformanceTest {
             case "stop-invert" -> new InvertMatchPropagationStopper(parser);
             case "positive" -> new MatchOnly(new WordParser("b"));
             case "negative" -> new Not(new WordParser("b"));
+            // #838 nested frames: rule and non-rule frames, and failures after a successful Not.
+            case "lookahead-longest" -> new MatchOnly(new LongestChoice(parser, new WordParser("fallback")));
+            case "unique-lookahead" -> new UniqueLongestChoice(new MatchOnly(parser), new WordParser("fallback"));
+            case "lookahead-negative" -> new MatchOnly(new Not(new WordParser("b")));
+            case "longest-negative" -> new LongestChoice(new Not(new WordParser("b")), parser);
+            case "negative-then" -> new Chain(new Not(new WordParser("b")), parser);
+            case "choice-negative-seq" -> new Choice(new Chain(new Not(new WordParser("b")), new WordParser("zz")), parser);
             default -> throw new AssertionError(boundary);
         };
     }
@@ -211,6 +221,7 @@ public class FrameStartMatchedResetConformanceTest {
     }
 
     private static void assertObservations(String label, List<String> expected, List<String> actual) {
+        MemoHitAccountingAssertions.assertMemoTransparency(label, actual);
         assertEquals(label + " observation count", expected.size(), actual.size());
         for (int i = 0; i < expected.size(); i++) {
             String key = String.join("/", java.util.Arrays.copyOf(expected.get(i).split("\t"), 5));

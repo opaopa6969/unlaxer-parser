@@ -1,6 +1,6 @@
 //! Read-only capability inventory followed by structural validation when possible.
 //! String API is I/O-free; file API resolves local lexical modules.
-use crate::adapters::{feature_diagnostics, token_contract_diagnostics, AdapterRegistry};
+use crate::adapters::{token_contract_diagnostics, AdapterRegistry};
 use std::fmt::Write;
 use unlaxer_ubnf::*;
 
@@ -135,7 +135,9 @@ fn parameterized_code(message: &str) -> Option<&'static str> {
 }
 
 pub fn check_file(path: &std::path::Path) -> Report {
-    if let Ok(source) = std::fs::read_to_string(path) {
+    if let Ok(source) = crate::modules::normalize(path)
+        .and_then(|path| std::fs::read_to_string(path).map_err(|e| e.to_string()))
+    {
         match parse(&source) {
             Ok(file)
                 if file.grammars.iter().any(|g| {
@@ -249,14 +251,14 @@ impl Inventory {
         });
     }
     fn grammar(&mut self, grammar: &GrammarDecl) {
-        let (adapter_registry, adapter_issues) = AdapterRegistry::from_grammar(grammar);
+        // Java recompiles the lexical tokens for every lookup; the result is the same for one
+        // grammar, so compile at most once here (keeps check linear in @whitespace count).
+        let lexical = Lexical::new();
+        let (_, adapter_issues) = AdapterRegistry::from_grammar(grammar);
         for issue in adapter_issues {
             self.add(issue.code, issue.subject, issue.span);
         }
         for issue in token_contract_diagnostics(grammar) {
-            self.add(issue.code, issue.subject, issue.span);
-        }
-        for issue in feature_diagnostics(grammar) {
             self.add(issue.code, issue.subject, issue.span);
         }
         for issue in crate::lexical_contexts::problems(grammar) {
@@ -280,20 +282,13 @@ impl Inventory {
                     "package" | "memoSafeToken" | "tokenStream" | "embedding",
                     SettingValue::String(_),
                 ) => {}
-                ("ubnf", SettingValue::String(value)) if value == "v1" || value == "v2" => {}
-                ("feature", SettingValue::String(value))
-                    if matches!(
-                        value.as_str(),
-                        "tokenContractsV1"
-                            | "contextAccessorsV1"
-                            | "parseBindingsV1"
-                            | "tokenProgressContractsV1"
-                            | "declarativeTokensV1"
-                    ) => {}
+                // Java scanGrammar leaves ubnf/feature validation to structural lowering.
+                // Block values still receive P-SETTING through the default arm.
+                ("ubnf" | "feature", SettingValue::String(_)) => {}
                 // @comment has its own E-COMMENT-* diagnostics, including the block form check.
                 ("tokenAdapter" | "tokenContract" | "embedded" | "comment", _) => {}
                 ("whitespace", SettingValue::String(value)) => {
-                    if !named_whitespace(grammar, value) {
+                    if !named_whitespace(&lexical, grammar, value) {
                         self.add("P-WHITESPACE", value, setting.value_span);
                     }
                 }
@@ -302,15 +297,10 @@ impl Inventory {
         }
         for token in &grammar.tokens {
             match &token.kind {
-                TokenKind::Declarative { .. } => {}
+                TokenKind::Declarative { .. } | TokenKind::Adapter { .. } => {}
                 TokenKind::Simple { parser_class } => {
                     if crate::lowering::token_expression(&token.kind).is_err() {
                         self.add("P-EXTERNAL-TOKEN", parser_class, token.span);
-                    }
-                }
-                TokenKind::Adapter { id, version } => {
-                    if let Err((code, subject)) = adapter_registry.resolve(id, version) {
-                        self.add(code, subject, token.span);
                     }
                 }
                 TokenKind::Regex { .. } => self.add("P-TOKEN-KIND", "REGEX", token.span),
@@ -333,12 +323,12 @@ impl Inventory {
                 if skip && matches!(annotation.kind, AnnotationKind::Mapping { .. }) {
                     continue;
                 }
-                self.annotation(grammar, annotation);
+                self.annotation(&lexical, grammar, annotation);
             }
             self.body(&rule.body);
         }
     }
-    fn annotation(&mut self, grammar: &GrammarDecl, annotation: &Annotation) {
+    fn annotation(&mut self, lexical: &Lexical, grammar: &GrammarDecl, annotation: &Annotation) {
         let span = annotation.span;
         match &annotation.kind {
             AnnotationKind::Root
@@ -364,10 +354,9 @@ impl Inventory {
                 }
             }
             AnnotationKind::Whitespace { style } => {
-                if let Some(style) = style {
-                    if !named_whitespace(grammar, style) {
-                        self.add("P-WHITESPACE", style, span);
-                    }
+                let style = style.as_deref().unwrap_or("javaStyle");
+                if !named_whitespace(lexical, grammar, style) {
+                    self.add("P-WHITESPACE", style, span);
                 }
             }
             AnnotationKind::Interleave { profile } => {
@@ -438,12 +427,22 @@ fn identifier(value: &str) -> bool {
         && !matches!(value, "Self" | "self" | "super" | "crate")
 }
 
-fn named_whitespace(grammar: &GrammarDecl, value: &str) -> bool {
-    whitespace(value)
-        || crate::lexical::compile_syntax(grammar)
-            .ok()
-            .and_then(|definitions| definitions.get(value.trim()).cloned())
-            .is_some_and(|expression| !expression.nullable())
+/// Lazily compiled declarative tokens of one grammar (`None` when compilation fails).
+type Lexical = std::cell::OnceCell<
+    Option<std::collections::HashMap<String, unlaxer_ubnf::lexical::LexicalExpression>>,
+>;
+
+fn named_whitespace(lexical: &Lexical, grammar: &GrammarDecl, value: &str) -> bool {
+    // Java resolves even built-in styles only after LexicalCompiler.compile succeeds.
+    lexical
+        .get_or_init(|| crate::lexical::compile_syntax(grammar).ok())
+        .as_ref()
+        .is_some_and(|definitions| {
+            whitespace(value)
+                || definitions
+                    .get(value.trim())
+                    .is_some_and(|expression| !expression.nullable())
+        })
 }
 fn whitespace(value: &str) -> bool {
     value.trim().eq_ignore_ascii_case("javaStyle") || value.trim().eq_ignore_ascii_case("none")

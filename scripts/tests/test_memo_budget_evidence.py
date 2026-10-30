@@ -231,7 +231,7 @@ class EvidenceCheckTest(unittest.TestCase):
 class WorkflowTest(unittest.TestCase):
     def setUp(self):
         workflow = yaml.safe_load((ROOT / '.github/workflows/maven.yml').read_text())
-        self.steps = workflow['jobs']['rust']['steps']
+        self.steps = workflow['jobs']['rust-conformance']['steps']
 
     def step(self, name):
         found = [index for index, step in enumerate(self.steps) if step.get('name') == name]
@@ -254,10 +254,11 @@ class WorkflowTest(unittest.TestCase):
         self.assertGreater(upload, self.step('Require bounded success memo conformance evidence'))
         self.assertGreater(upload, self.step('Cross-language fixtures, compile failures, and generated-file drift'))
         step = self.steps[upload]
-        self.assertEqual(step['if'], 'always()')
+        self.assertEqual(step['if'], "always() && matrix.shard == 'core'")
         self.assertNotIn('continue-on-error', step)
         for kind in ('failure', 'success'):
             gate = self.steps[self.step(f'Require bounded {kind} memo conformance evidence')]
+            self.assertEqual(gate['if'], "matrix.shard == 'core'")
             self.assertNotIn('continue-on-error', gate)
         self.assertNotIn('continue-on-error', self.steps[self.step(
             'Cross-language fixtures, compile failures, and generated-file drift')])

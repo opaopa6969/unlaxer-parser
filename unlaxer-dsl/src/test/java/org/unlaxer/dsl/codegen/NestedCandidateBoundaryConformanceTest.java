@@ -62,6 +62,9 @@ public class NestedCandidateBoundaryConformanceTest {
             assertTrue("duplicate difference " + key, seen.add(key));
             String[] expected = rows.get(key);
             assertNotNull(key, expected);
+            // #827 permits host-dependent hit accounting only, never diagnostic differences.
+            assertEquals(key + "/diagnostic parity", diff[5], diff[6]);
+            assertEquals(key + "/follower diagnostic parity", diff[11], diff[12]);
             int[] columns = {9, 10, 11, 16};
             for (int i = 0; i < columns.length; i++) {
                 assertEquals(key + "/Java column " + columns[i], expected[columns[i]], diff[5 + 2 * i]);
@@ -72,6 +75,26 @@ public class NestedCandidateBoundaryConformanceTest {
     }
 
     private void checkJavaInternalCandidates(ClassLoader loader) throws Exception {
+        // #827: exact generated classes, not inherited markers or token name heuristics.
+        for (String name : List.of("Root", "Integer", "IntegerGroup0", "Longest", "Unique",
+                "Mix", "Outer", "__CaptureSite", "RootGroup0", "LongestGroup0", "UniqueGroup0",
+                "Helper", "MixGroup0")) {
+            String type = name.equals("__CaptureSite") ? name : name + "Parser";
+            var interfaces = List.of(loader.loadClass("nestedboundary.NestedBoundaryParsers$" + type)
+                    .getInterfaces());
+            boolean safe = List.of("RootGroup0", "LongestGroup0", "UniqueGroup0", "Helper", "MixGroup0")
+                    .contains(name);
+            assertEquals(name + "/failure marker", safe,
+                    interfaces.contains(org.unlaxer.context.SafeFailureMemoizable.class));
+            assertEquals(name + "/success marker", safe,
+                    interfaces.contains(org.unlaxer.context.SafeSuccessMemoizable.class));
+        }
+        for (String name : List.of("Outer", "Mix", "MixGroup0", "Helper")) {
+            Parser parser = (Parser) loader.loadClass("nestedboundary.NestedBoundaryParsers$" + name + "Parser")
+                    .getConstructor().newInstance();
+            for (Parser child : parser.getChildren())
+                assertNotEquals(name + "/non-nested candidate", "__CaptureSite", child.getClass().getSimpleName());
+        }
         for (String rule : List.of("Root", "Integer")) {
             Parser parser = (Parser) loader.loadClass("nestedboundary.NestedBoundaryParsers$" + rule + "Parser")
                     .getConstructor().newInstance();
@@ -226,6 +249,7 @@ public class NestedCandidateBoundaryConformanceTest {
     }
 
     private static void assertObservations(String label, List<String> expected, List<String> actual) {
+        MemoHitAccountingAssertions.assertMemoTransparency(label, actual);
         assertEquals(label + " observation count", expected.size(), actual.size());
         for (int i = 0; i < expected.size(); i++) assertEquals(label + " row " + i, expected.get(i), actual.get(i));
     }

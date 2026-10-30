@@ -108,10 +108,13 @@ pub fn terminals(
     tokens: &[String],
     literals: &[String],
 ) -> Result<Vec<(String, bool, LexicalExpression)>, String> {
+    // Java LexicalContexts.terminals compiles first and propagates LexicalCompiler's
+    // prefixed message, so a lexical error wins over the terminal limit (#916).
+    let programs =
+        crate::lexical::compile(grammar).map_err(|message| format!("E-LEXICAL: {message}"))?;
     if tokens.len() + literals.len() > 256 {
         return Err("E-LEXICAL-CONTEXT-LIMIT: 256 terminals".into());
     }
-    let programs = crate::lexical::compile(grammar)?;
     let mut result = vec![];
     let mut seen = HashSet::new();
     for literal in literals {

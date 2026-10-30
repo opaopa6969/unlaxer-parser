@@ -26,11 +26,11 @@ clientはinitialize後、`launch` に `program`（旧Java互換の `formulaSourc
 | breakpoint source | source.path と program を絶対化し、`.` / `..` を字句正規化して比較する。同一の対象だけを検証・更新し、別対象や空・欠落・不正 path は unverified を返して既存 breakpoint を保持する。source 自体の省略/null は現在 program の旧互換略記。同じ正規化 path の relaunch は保持し、対象変更時は消去する。symlink の実体比較は行わない（#507） |
 | thread/frame | 単一thread 1、現在nodeのframe 0、variablesReference 1。値そのもののreferenceは0 |
 | 座標 | 内部spanは原文CP。DAPの開始/終了columnはUTF-16、line/columnの基底はclientのlinesStartAt1/columnsStartAt1に従う。省略時は1-based |
-| CR / LF / CRLF | immutable source snapshotで変換する。CRLF途中の境界は表示可能な位置として受理しない |
+| CR / LF / CRLF | immutable source snapshotで変換する。CRLF途中の境界は表示可能な位置として受理しない。token の launch は保持し、位置変換 request の失敗は [#899 の契約](token-trace.md#crlf-内部の位置と-request-の失敗899--900) に従う |
 | traversal | node自身、mapping field宣言順の子node。optional/listを再帰し、mixed値のtextはnode数に含めない |
 | source slice | applicationのsource hookが返す独立textとline offsetを用いる。元program pathを維持する |
 | variables | 現在nodeのlabel/text、runtimeMode、astNodeCount、astCurrentNode、applicationのruntimeVariablesの結果 |
-| failure | failed launch/nextは現在stepを変更しない。mapperエラーをtoken stepへ置き換えず、relaunchで古いASTを再利用しない |
+| failure | [共通 request 一覧](fixtures/dap-failures/README.md)で success / message / body 型・先頭行を比較する（#900）。failed launch/nextは現在stepを変更しない。mapperエラーをtoken stepへ置き換えず、relaunchで古いASTを再利用しない |
 
 [DAP公式schema](https://raw.githubusercontent.com/microsoft/debug-adapter-protocol/main/debugAdapterProtocol.json) はcolumnをUTF-16と定義し、基底をclient初期化へ委ねる。今回JavaのstackTraceも、既存breakpoint helperと同じ `DocumentSnapshot` の変換へ統一した。disconnectではresponse前にprocessを終了せず、stepを解放してclient側のstdio終了を待つ。Rustはdisconnect responseを送ってserver loopを終える。
 

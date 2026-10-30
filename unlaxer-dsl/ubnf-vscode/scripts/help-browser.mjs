@@ -16,7 +16,7 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const url = `http://127.0.0.1:${server.address().port}/`;
 let browser;
 try {
-  browser = await chromium.launch();
+  browser = await chromium.launch({args: ["--password-store=basic"]});
   const context = await browser.newContext({viewport: {width: 1280, height: 1000}});
   const page = await context.newPage();
   const errors = [];

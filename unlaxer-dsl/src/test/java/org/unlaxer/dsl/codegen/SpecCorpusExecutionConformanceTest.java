@@ -100,6 +100,10 @@ public class SpecCorpusExecutionConformanceTest {
             for (boolean root : List.of(false, true)) {
                 String input = root ? source.substring(0, source.length() - 1)
                     + " @root @mapping(Entry) Entry ::= 'z'; }" : source;
+                if (root && fixture.has("rootRule")) {
+                    String declaration = fixture.get("rootRule").getAsString() + " ::=";
+                    input = source.replace(declaration, "@root " + declaration);
+                }
                 var grammar = UBNFMapper.parse(input).grammars().get(0);
                 // Independent expected code, and the actual Java validator's first error.
                 assertEquals(fixture.toString(), code, GrammarValidator.validate(grammar).stream()
@@ -108,6 +112,8 @@ public class SpecCorpusExecutionConformanceTest {
                         assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(grammar)).getMessage(),
                         assertThrows(IllegalArgumentException.class, () -> new RustBackend().generate(grammar)).getMessage())) {
                     assertEquals(fixture + " / root=" + root + ": " + message, code, message.split(":", 2)[0]);
+                    if (fixture.has("detail")) assertEquals(fixture.toString(),
+                        code + ": Rust subset: " + fixture.get("detail").getAsString(), message);
                 }
             }
         }
@@ -116,12 +122,18 @@ public class SpecCorpusExecutionConformanceTest {
             assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(noRoot)).getMessage());
         assertFalse(new RustBackend().generate(UBNFMapper.parse(
             "grammar G { @root @mapping(X) R ::= 'x'; }").grammars().get(0)).isEmpty());
-        // Qualified references keep the existing Rust rejection, as in native lowering.
+        var unmappedRoot = UBNFMapper.parse("grammar G { @root @leftAssoc @precedence(level=1) R ::= 'x' @left { '+' @op 'y' @right }; }").grammars().get(0);
+        assertEquals("E-ASSOC-NO-MAPPING: Rust subset: root must resolve to exactly one AST node",
+            assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(unmappedRoot)).getMessage());
+        var nodeRoot = UBNFMapper.parse("grammar G { @root @leftAssoc @precedence(level=1) R ::= Base @left { '+' @op 'y' @right }; @mapping(Base) Base ::= 'x'; }").grammars().get(0);
+        assertEquals("E-ASSOC-NO-MAPPING: Rust subset: @leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on R",
+            assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(nodeRoot)).getMessage());
+        // Keep qualified-reference explanations, with the Java code first (#843).
         var qualified = UBNFMapper.parse("grammar G { @root @mapping(X) R ::= 'x' ns.Missing; }").grammars().get(0);
-        assertEquals("Rust subset: qualified rule reference",
+        assertEquals("E-RULE-UNDEFINED: Rust subset: qualified rule reference",
             assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(qualified)).getMessage());
         var qualifiedNoRoot = UBNFMapper.parse("grammar G { R ::= ns.Missing; }").grammars().get(0);
-        assertEquals("Rust subset: exactly one @root is required",
+        assertEquals("E-RULE-UNDEFINED: Rust subset: qualified rule reference",
             assertThrows(IllegalArgumentException.class, () -> RustGrammarLowering.lower(qualifiedNoRoot)).getMessage());
     }
 

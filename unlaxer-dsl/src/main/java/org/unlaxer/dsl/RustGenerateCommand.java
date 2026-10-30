@@ -64,9 +64,9 @@ final class RustGenerateCommand {
             return CodegenMain.EXIT_CLI_ERROR;
         }
         try {
-            Path grammarPath = Path.of(options.get("--grammar"));
+            Path grammarPath = Path.of(options.get("--grammar")).toAbsolutePath().normalize();
             var snapshot = UBNFMapper.parseWithSource(Files.readString(grammarPath));
-            var file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(snapshot, grammarPath, Files::readString);
+            var file = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolve(snapshot, grammarPath, org.unlaxer.dsl.bootstrap.UBNFPackageResolver.diskReader());
             org.unlaxer.dsl.codegen.GrammarFileLayout.validate(file, snapshot);
             // Java class-resolution warnings do not define Rust token support: lowering
             // enforces an explicit Rust allowlist. Common grammar errors remain fatal.

@@ -156,7 +156,10 @@ fn declaration_diagnostic_priority() {
         let source = fixture["source"].as_str().unwrap();
         let code = fixture["code"].as_str().unwrap();
         for with_root in [false, true] {
-            let input = if with_root {
+            let input = if with_root && fixture.get("rootRule").is_some() {
+                let declaration = format!("{} ::=", fixture["rootRule"].as_str().unwrap());
+                source.replace(&declaration, &format!("@root {declaration}"))
+            } else if with_root {
                 format!(
                     "{} @root @mapping(Entry) Entry ::= 'z'; }}",
                     source.strip_suffix('}').unwrap()
@@ -175,6 +178,14 @@ fn declaration_diagnostic_priority() {
                     "{} / root={with_root}: {message}",
                     fixture["name"]
                 );
+                if let Some(detail) = fixture.get("detail") {
+                    assert_eq!(
+                        message,
+                        format!("{code}: {}", detail.as_str().unwrap()),
+                        "{}",
+                        fixture["name"]
+                    );
+                }
             }
         }
     }
@@ -184,15 +195,20 @@ fn declaration_diagnostic_priority() {
         "exactly one @root is required"
     );
     assert!(unlaxer_generator::generate("grammar G { @root @mapping(X) R ::= 'x'; }").is_ok());
-    // Qualified references keep the existing Rust rejection, as on Java-host.
+    // The sole validator error is missing mapping; preserve root projection's explanation.
+    assert_eq!(unlaxer_generator::generate("grammar G { @root @leftAssoc @precedence(level=1) R ::= 'x' @left { '+' @op 'y' @right }; }").unwrap_err(),
+        "E-ASSOC-NO-MAPPING: root must resolve to exactly one AST node");
+    assert_eq!(unlaxer_generator::generate("grammar G { @root @leftAssoc @precedence(level=1) R ::= Base @left { '+' @op 'y' @right }; @mapping(Base) Base ::= 'x'; }").unwrap_err(),
+        "E-ASSOC-NO-MAPPING: @leftAssoc requires left { op right } with scalar operands and params=[left, op, right] on R");
+    // Preserve qualified-reference explanations while adding the Java code (#843).
     assert_eq!(
         unlaxer_generator::generate("grammar G { @root @mapping(X) R ::= 'x' ns.Missing; }")
             .unwrap_err(),
-        "unsupported qualified rule reference"
+        "E-RULE-UNDEFINED: unsupported qualified rule reference"
     );
     assert_eq!(
         unlaxer_generator::generate("grammar G { R ::= ns.Missing; }").unwrap_err(),
-        "exactly one @root is required"
+        "E-RULE-UNDEFINED: unsupported qualified rule reference"
     );
 }
 

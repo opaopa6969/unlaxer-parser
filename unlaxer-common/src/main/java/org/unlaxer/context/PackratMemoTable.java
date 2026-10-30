@@ -672,7 +672,13 @@ public final class PackratMemoTable {
   public int successEntryCount() { return successEntryCount; }
   public long successBudgetMisses() { return successBudgetMisses; }
 
+  /**
+   * Failure entries actually replayed in this context. Host-dependent internal accounting: the
+   * Rust runtime caches whole rules instead of exact marker classes, so the count is not
+   * comparable across Java/Rust even for the same grammar, input and options (#827).
+   */
   public int failureHits() { return failureHits; }
+  /** Successful snapshots actually replayed; host-dependent like {@link #failureHits()} (#827). */
   public int successHits() { return successHits; }
   /** Entries currently held; with eviction on this plateaus instead of growing with the input. */
   public int entryCount() { return entryCount; }

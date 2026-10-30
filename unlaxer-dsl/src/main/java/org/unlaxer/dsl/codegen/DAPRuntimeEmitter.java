@@ -441,9 +441,18 @@ class DAPRuntimeEmitter {
         w.line("}");
         w.blankLine();
 
+        w.line("/** Original-source CP range; override with [anchor, anchor] for detached generated tokens.");
+        w.line(" * Token text remains token.source.sourceAsString(); the default preserves legacy source coordinates. */");
+        w.line("protected int[] tokenSourceSpan(Token token) {");
+        w.indent();
+        w.line("int start = token.source.offsetFromRoot().value();");
+        w.line("return new int[]{start, start + token.source.codePointLength().value()};");
+        w.dedent();
+        w.line("}");
+        w.blankLine();
         w.line("private int getLineForToken(Token t) {");
         w.indent();
-        w.line("return getLineForOffset(t.source.offsetFromRoot().value());");
+        w.line("return getLineForOffset(tokenSourceSpan(t)[0]);");
         w.dedent();
         w.line("}");
         w.blankLine();
