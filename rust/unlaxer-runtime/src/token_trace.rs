@@ -158,8 +158,9 @@ pub(crate) struct Trace {
     error: Option<Error>,
     /// While `error` is a Limit: a node-less leaf or an Unsupported was dropped, or the
     /// Limit came from a node-less leaf. Removing node leaves then cannot undo it.
-    /// Set whenever a Limit is raised; a restored Limit keeps it (a stale `true` only
-    /// keeps that Limit), and it means nothing without one.
+    /// Set whenever a Limit is raised. Checkpoints restore it with the error, so a
+    /// discarded Unsupported cannot keep a Limit caused only by later-removed nodes.
+    /// It means nothing without a Limit.
     suppressed: bool,
 }
 impl Trace {
@@ -187,6 +188,7 @@ pub(crate) struct Mark {
     bytes: u32,
     scope: Scope,
     error: Option<Error>,
+    suppressed: bool,
 }
 impl Mark {
     pub(crate) fn of(trace: Option<&Trace>) -> Self {
@@ -196,12 +198,14 @@ impl Mark {
                 bytes: 0,
                 scope: Scope::OPEN,
                 error: None,
+                suppressed: false,
             },
             |t| Self {
                 leaves: t.leaves.len() as u32,
                 bytes: t.bytes,
                 scope: t.scope,
                 error: t.error.clone(),
+                suppressed: t.suppressed,
             },
         )
     }
@@ -230,6 +234,7 @@ impl Mark {
             t.bytes = self.bytes;
             t.scope = self.scope;
             t.error = self.error;
+            t.suppressed = self.suppressed;
         }
     }
 }

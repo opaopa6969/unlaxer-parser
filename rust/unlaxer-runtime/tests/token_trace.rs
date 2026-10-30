@@ -856,6 +856,27 @@ fn classic_collector_budget_counts_only_retained_leaves_of_java_oracle() {
 
 #[test]
 fn custom_callbacks_generated_text_and_reuse_keep_exact_budget_boundaries() {
+    fn undeclared_rollback(context: &mut ParseContext<'_>) -> ParseResult {
+        Ok(ParseMatch::empty(Span {
+            start: context.position(),
+            end: context.position(),
+        }))
+    }
+    fn hidden_with_rolled_back_unsupported(context: &mut ParseContext<'_>) -> ParseResult {
+        assert!(context.declare_complete_token_trace());
+        let mut matched = context.parse_with_token_mode(&word("|"), TokenKind::MatchOnly, false)?;
+        // This candidate's Unsupported is discarded. It must not poison an earlier
+        // Limit belonging only to the value node the enclosing collector removes.
+        let fallback = context.parse(&Expr::Choice(vec![
+            Expr::Sequence(vec![
+                Expr::Custom(undeclared_rollback),
+                Expr::Error("discard candidate"),
+            ]),
+            Expr::Sequence(vec![]),
+        ]))?;
+        matched.nodes.extend(fallback.nodes);
+        Ok(matched)
+    }
     fn foreign(context: &mut ParseContext<'_>) -> ParseResult {
         assert!(context.declare_complete_token_trace());
         context.parse_with_token_mode(&word("|"), TokenKind::MatchOnly, false)
@@ -909,6 +930,15 @@ fn custom_callbacks_generated_text_and_reuse_keep_exact_budget_boundaries() {
     }
     let tail = || Expr::Sequence(vec![word("|"), word("x")]).match_only();
     let exact = [
+        (
+            "discarded Unsupported cannot poison a removed value node",
+            Expr::Sequence(vec![
+                word("a"),
+                Expr::Custom(hidden_with_rolled_back_unsupported).text_value(),
+            ]),
+            "a|",
+            "WordParser,consumed,0,1,a",
+        ),
         (
             "custom mixed result under value node",
             Expr::Sequence(vec![word("a"), Expr::Custom(mixed).text_value()]),
