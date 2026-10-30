@@ -656,6 +656,10 @@
     "972": {
       "state": "OPEN",
       "title": "HTTP/1.1応答framingとheader上限のJava/native差"
+    },
+    "966": {
+      "state": "OPEN",
+      "title": "parity(cli): 非 UTF-8 ロケールの JVM パス変換制約と native の成功する操作を区別する"
     }
   },
   "entries": [
@@ -2406,6 +2410,26 @@
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
         "docs/ubnf-packages.md"
       ]
+    },
+    {
+      "id": "cli-locale-path-encoding",
+      "category": "contract",
+      "title": "JVM のファイル名変換制約と UTF-8 本文 I/O",
+      "hosts": "Oracle JDK17 / JDK21 / native Rust（Linux）",
+      "issues": [
+        966
+      ],
+      "observation": "LC_ALL/LANGの未設定・C・C.UTF-8の全9組合せを子だけへ渡す。JVMのsun.jnu.encodingがUS-ASCIIの非ASCIIパスとUTF-8でも表現不能な生バイト名はJavaの実行環境制約であり、nativeを故意に失敗させない恒久差とする。manifest・grammar・出力先・import・credentials override・passwd homeの12形、本文から読むlocal source/CA証明書と存在しないgrammarの非ASCIIパス3形、12対照を共通fixtureでskipせず972観測/JDK実行。JavaはCのMalformed input/exit3、UTF-8の生バイト名はmissing manifest/exit3、grammar/import親は置換後パス/exit4、credentialsはmissing/exit3、homeは私有CA不在のTLS失敗/exit3。生バイト出力はJavaがU+FFFDの別名を作る成功も全ツリーhexで固定し、nativeは元bytesを使う。ASCII symlink経由の生バイトimportは両者成功。Cの本文由来パスはJavaがcannot read local artifact/CA certificate・exit3、存在しない非ASCII grammarはJavaがMalformed input・exit3でnativeは本来のI/O診断・exit4（C.UTF-8では両者exit4）。非UTF-8ロケールのJavaは本文由来のstdout/stderr文字も?にし、nativeはロケールに依らずUTF-8で出す表示の恒久差（構文エラー文面は#937）。JDK17のfile.encodingがUS-ASCIIでも対象本文reader/writerはUTF-8で、manifest・credentials・artifact・TLS応答は\\u escapeでない生UTF-8 bytesで書き、非ASCII本文・raw cache・生成bytesの一致、不正UTF-8/手書き出力の共通診断・exit・失敗時全入力/lock/cache/出力不変を固定する。実CLIの独立oracleを凍結し、バッチはOS argvの復号と版別stdout/stderr charsetを再現する。passwd/HOMEはchild-only隔離、実credentialsは開かずローカルTLSとダミー値だけを使う。Java製品コード・native製品コード・公開3.3.0・parserホットパスと依存crateは変更不要。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/cli-locale-paths.json",
+        "scripts/cli_locale_paths.py",
+        "scripts/ubnf_credentials_home.py",
+        "scripts/fixtures/credentials-passwd.c",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/CodegenBatchHost.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
+        ".github/optin-test-contracts.json"
+      ]
     }
   ],
   "corpora": [
@@ -3066,6 +3090,17 @@
         "package-unicode-url",
         "package-unicode-url-backtick",
         "package-https-framing"
+      ]
+    },
+    {
+      "path": "spec-corpus/cli-locale-paths.json",
+      "fields": {
+        "javaAscii": 27,
+        "javaUtf8": 27,
+        "native": 27
+      },
+      "entries": [
+        "cli-locale-path-encoding"
       ]
     }
   ],
