@@ -27,7 +27,13 @@ public abstract class AbstractParser implements Parser {
 	
 	Name specifiedName;
 
-	Parser parser;
+	/**
+	 * The delegate that the inherited {@link #parse} runs, created on first use. Library and generated
+	 * parsers override parse and return this from createParser, so only user parsers that inherit parse
+	 * read it on every call. Several contexts may reach the first use of a shared graph at once (#1007):
+	 * see {@link #getParser()}.
+	 */
+	volatile Parser parser;
 
 	Parsers children;
 
@@ -107,20 +113,39 @@ public abstract class AbstractParser implements Parser {
 		}
 	}
 
+	/**
+	 * Returns the delegate, creating it on the first call. Creating it can attach the delegate as a
+	 * child, which changes the graph, so it runs once under this parser's monitor (the one that
+	 * prepares the children) and the field is written only after the delegate has its parent and is a
+	 * child. A thread that reads a non-null field therefore sees the attached delegate, a failed
+	 * creation publishes nothing and the next call retries, and concurrent first uses create one
+	 * delegate. The child list is replaced rather than changed in place, so another thread walking the
+	 * children meanwhile sees the list either before or after the attachment.
+	 */
 	public Parser getParser() {
-		
-		if (parser == null) {
-			parser = createParser();
-			if(this != parser){
-				parser.setParent(this);
+		Parser created = parser;
+		if (created == null) {
+			created = createAttachedParser();
+		}
+		createParserAndThen(created);
+		return created;
+	}
 
-				if(false ==getChildren().contains(parser)){
-					getChildren().add(parser);
-				}
+	private synchronized Parser createAttachedParser() {
+		Parser created = parser;
+		if (created != null) {
+			return created;
+		}
+		created = createParser();
+		if(this != created){
+			created.setParent(this);
+			Parsers attachedTo = getChildren();
+			if(false == attachedTo.contains(created)){
+				attachedTo.appendByCopy(created);
 			}
 		}
-		createParserAndThen(parser);
-		return parser;
+		parser = created;
+		return created;
 	}
 
 	public void createParserAndThen(Parser createdParser){

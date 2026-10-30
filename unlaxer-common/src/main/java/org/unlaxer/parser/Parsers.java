@@ -56,15 +56,32 @@ public class Parsers implements List<Parser>  , Serializable{
 		this(new ArrayList<>());
 	}
 	
-	synchronized void  prepare(){
+	/**
+	 * The backing list, read under this lock (#1007): {@link #appendByCopy} replaces the list under
+	 * the same lock, so a reader on another thread gets either the earlier list, which is no longer
+	 * changed, or the complete new one.
+	 */
+	synchronized List<Parser> prepare(){
 		if(parsers != null) {
-			return;
+			return parsers;
 		}
 		parsers = new ArrayList<Parser>();
 		for (Supplier<? extends Parser> supplier : parserSuppliers) {
 			Parser parser = supplier.get();
 			this.parsers.add(parser);
 		}
+		return parsers;
+	}
+	
+	/**
+	 * Appends a parser to a list that other threads may be reading (#1007): AbstractParser attaches its
+	 * lazily created delegate this way. The other mutators change the list in place and keep the
+	 * single-thread contract of graph mutation.
+	 */
+	synchronized void appendByCopy(Parser parser){
+		List<Parser> appended = new ArrayList<>(prepare());
+		appended.add(parser);
+		parsers = appended;
 	}
 	
 	public static Parsers of(List<Parser> parsers) {
@@ -84,171 +101,142 @@ public class Parsers implements List<Parser>  , Serializable{
 
 	@Override
 	public int size() {
-		prepare();
-		return parsers.size();
+		return prepare().size();
 	}
 
 	@Override
 	public boolean isEmpty() {
-		prepare();
-		return parsers.isEmpty();
+		return prepare().isEmpty();
 	}
 
 	@Override
 	public boolean contains(Object o) {
-		prepare();
-		return parsers.contains(o);
+		return prepare().contains(o);
 	}
 
 	public Iterator<Parser> iterator() {
-		prepare();
-		return parsers.iterator();
+		return prepare().iterator();
 	}
 
 	@Override
 	public Object[] toArray() {
-		prepare();
-		return parsers.toArray();
+		return prepare().toArray();
 	}
 
 	@Override
 	public <T> T[] toArray(T[] a) {
-		prepare();
-		return parsers.toArray(a);
+		return prepare().toArray(a);
 	}
 
 	@Override
 	public boolean add(Parser e) {
-		prepare();
-		return parsers.add(e);
+		return prepare().add(e);
 	}
 	
 	public boolean add(Class<? extends Parser> clazz) {
-		prepare();
-		return parsers.add(Parser.get(clazz));
+		return prepare().add(Parser.get(clazz));
 	}
 
 	@Override
 	public boolean remove(Object o) {
-		prepare();
-		return parsers.remove(o);
+		return prepare().remove(o);
 	}
 
 	@Override
 	public boolean containsAll(Collection<?> c) {
-		prepare();
-		return parsers.containsAll(c);
+		return prepare().containsAll(c);
 	}
 
 	@Override
 	public boolean addAll(Collection<? extends Parser> c) {
-		prepare();
-		return parsers.addAll(c);
+		return prepare().addAll(c);
 	}
 
 	@Override
 	public boolean addAll(int index, Collection<? extends Parser> c) {
-		prepare();
-		return parsers.addAll(index, c);
+		return prepare().addAll(index, c);
 	}
 
 	@Override
 	public boolean removeAll(Collection<?> c) {
-		prepare();
-		return parsers.removeAll(c);
+		return prepare().removeAll(c);
 	}
 
 	@Override
 	public boolean retainAll(Collection<?> c) {
-		prepare();
-		return parsers.retainAll(c);
+		return prepare().retainAll(c);
 	}
 
 	@Override
 	public void clear() {
-		prepare();
-		parsers.clear();
+		prepare().clear();
 	}
 
 	@Override
 	public boolean equals(Object o) {
-		prepare();
-		return parsers.equals(o);
+		return prepare().equals(o);
 	}
 
 	@Override
 	public int hashCode() {
-		prepare();
-		return parsers.hashCode();
+		return prepare().hashCode();
 	}
 
 	@Override
 	public Parser get(int index) {
-		prepare();
-		return parsers.get(index);
+		return prepare().get(index);
 	}
 
 	@Override
 	public Parser set(int index, Parser element) {
-		prepare();
-		return parsers.set(index, element);
+		return prepare().set(index, element);
 	}
 
 	@Override
 	public void add(int index, Parser element) {
-		prepare();
-		parsers.add(index, element);
+		prepare().add(index, element);
 	}
 	
 	public Parser set(int index, Class<? extends Parser> element) {
-		prepare();
-		return parsers.set(index, Parser.get(element));
+		return prepare().set(index, Parser.get(element));
 	}
 
 	public void add(int index, Class<? extends Parser> element) {
-		prepare();
-		parsers.add(index, Parser.get(element));
+		prepare().add(index, Parser.get(element));
 	}
 
 	@Override
 	public Parser remove(int index) {
-		prepare();
-		return parsers.remove(index);
+		return prepare().remove(index);
 	}
 
 
 	@Override
 	public int indexOf(Object o) {
-		prepare();
-		return parsers.indexOf(o);
+		return prepare().indexOf(o);
 	}
 
 	@Override
 	public int lastIndexOf(Object o) {
-		prepare();
-		return parsers.lastIndexOf(o);
+		return prepare().lastIndexOf(o);
 	}
 
 	@Override
 	public ListIterator<Parser> listIterator() {
-		prepare();
-		return parsers.listIterator();
+		return prepare().listIterator();
 	}
 
 	@Override
 	public ListIterator<Parser> listIterator(int index) {
-		prepare();
-		return parsers.listIterator(index);
+		return prepare().listIterator(index);
 	}
 
 	@Override
 	public List<Parser> subList(int fromIndex, int toIndex) {
-		prepare();
-		return parsers.subList(fromIndex, toIndex);
+		return prepare().subList(fromIndex, toIndex);
 	}
 	
 	public List<Parser> list(){
-		prepare();
-		return parsers;
+		return prepare();
 	}
 }

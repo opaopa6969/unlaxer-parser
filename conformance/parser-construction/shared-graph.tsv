@@ -15,7 +15,14 @@
 # first-use-parked: thread A stops inside the first resolution of Elem's reference to List (Java:
 # the ReferenceParser predicate; Rust: a Custom expression delegating to List) on list-nested
 # while thread B parses list-nested on the same graph to the end; then A resumes. Both must match
-# the row. Same-context concurrency and graph mutation during a parse are not part of this table.
+# the row. lazy-delegate first use: List's body Elem* is instead built on first use (Java: a user
+# parser inheriting AbstractParser.parse whose createParser builds it; Rust: a Custom expression and
+# a OnceLock beside the grammar), on graphs nobody used yet and on graphs whose body was built before
+# sharing; each thread parses every row in two contexts and the body is built once.
+# lazy-delegate-parked: thread A stops inside that first build (Java: createParser, and the body's
+# setParent during the attachment) on list-nested; thread B's first use waits for it, then both
+# match the row. Same-context concurrency and graph mutation by users during a parse are not part
+# of this table.
 # failureCP and ruleStack follow cases.tsv (0 / ~ under DETAILED_ON_FAILURE; ruleStack: the
 # farthest failed rule invocation, then more frames, then the earliest). leaves are the retained
 # terminal tokens; an empty List keeps one empty token.
