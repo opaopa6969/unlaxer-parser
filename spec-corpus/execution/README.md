@@ -32,25 +32,36 @@ validate は元入力のまま、syntax 受理後に validator / lowering / gene
 OPEN issue を必須とし、`observation` の backtick で列挙する corpus ID と既知差の集合を完全一致させる。
 解消後に未修正項目だけ残すことも検査で落ちる。
 
-`diagnostic-priority.json` は別途、複数エラーを持つ 19 入力を root なし／独立した有効な root 付きで
+`diagnostic-priority.json` は別途、単一・複数エラーを持つ 42 入力を root なし／root 付きで
 実行する。Java validator の最初の ERROR と独立期待値を照合し、両 Rust host の lowering / generator が
-同じコードを選ぶことを確認する。対象コードの順序は global whitespace（重複→style）、規則の宣言順に
-whitespace（style→重複）→mapping（重複param→欠落→未列挙）→左右の結合性競合→precedence→
-interleave→scopeTree、その後に全規則の precedence 欠如→未定義参照。
+同じコードを選ぶことを確認する。既存入力は独立した有効な root を追加し、#843 の入力は
+`rootRule` で指定した対象規則に root を付ける。`detail` がある入力は両 host の従来説明も
+完全一致で比較する。対象コードの順序は global whitespace（重複→style）、規則の宣言順に
+whitespace（style→重複）→mapping（重複param→欠落→未列挙）→左右の結合性競合→
+結合性の mapping 欠如→params の left/op/right 欠落→repeat 欠如→rightAssoc 非canonical（precedence が1つの場合。
+Java の validateAssoc の最初のエラー）→choice profile→precedence→
+interleave（重複→profile）→scopeTree（重複→mode）、その後に全規則の precedence 欠如→未定義参照。
 Java の root 欠如は `W-GENERAL-NO-ROOT` なのでこれらを遮らない。Rust の root 必須エラーは
 対象診断が無い場合の従来の説明を保つ。
 
-これは #833–#835 の診断群の順序であり、Java validator 全体を Rust lowering に移したものではない。
+これは #833–#835 / #843 の診断群の順序であり、Java validator 全体を Rust lowering に移したものではない。
 例えば元の `annotation/assoc-without-precedence` では Java は mapping 欠如も列挙するが、
 corpus が指定する `E-ASSOC-NO-PRECEDENCE` を引き続き独立期待値とする。
+`annotation/precedence-duplicate` の `E-PRECEDENCE-DUPLICATE` も保持するため、#843 の新しい
+結合性検査は precedence が1つある規則に限る。この差と理由は ledger に記録する。
+無 mapping の場合は選んだコードを保持して既存の root 投影検査まで進め、その検査が失敗した場合の
+説明（`root must resolve to exactly one AST node`）も保つ。別の lowering エラーでコードを上書きしない。
 生成前の bounded/precedence overflow・nested・commonField 等の先行検証は #825 のまま。
 Java generator API は全 validator の代替ではなく、通常 frontend が共通 validator を先に呼ぶ。
 Java-host の既存 `Rust subset: ` は説明内へ残し、対象コードを先頭に置く。
-既存 choice profile の失敗は precedence より先の従来経路へ委ね、説明文を維持する。
-名前述語の capture 検証が mapping 診断に先行する契約も保持する。native はその検証に必要な
-body を構築する間だけ mapping 診断を保留し、検証後は root 欠如より先に返す。保留中に起きた
+`E-LONGEST-CHOICE-SHAPE` は precedence より先に従来説明へコードを付ける。他の choice profile の失敗は従来経路へ委ねる。
+名前述語の検証が mapping 診断・結合性の params 欠落・repeat 欠如・rightAssoc 非canonical に先行する契約も保持する。native は
+その検証に必要な body を構築する間だけ診断を保留し、検証後は root 欠如より先に返す。保留中に起きた
 名前述語以外の lowering エラー（未定義参照など）より保留した診断を優先し、Java-host と同じ順にする。
-修飾参照（`ns.Name`）は両 host とも従来の Rust の拒否（qualified rule reference）を保つ。
+ただし native の lowering 前半（重複注釈・body の lowering）が先に失敗すると名前述語の検証まで届かず、
+重複注釈・longestChoice 形状・修飾参照・profile・未定義参照が名前述語より先に出る差が残る（#858）。
+import なし修飾参照（`ns.Name`）は両 host とも従来の説明（qualified rule reference）を残して
+`E-RULE-UNDEFINED:` を付け、root 欠如より先に返す（#843）。import の解決経路は変更しない。
 check JSON は説明文を公開せず、従来の inventory code / `P-STRUCTURE` と CP span・終了コードを維持する。
 
 Rust は照合後に `SPEC-CORPUS` 実行記録を出力し、Java は native テストを `--exact` で

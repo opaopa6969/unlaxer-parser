@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """#719: real Surefire 3.2.5 reports and workflow obligation regression checks."""
 import importlib.util
+import copy
 import json
 from pathlib import Path
 import re
@@ -20,6 +21,71 @@ FIXTURES = Path(__file__).parent / 'fixtures/surefire'
 SPEC = importlib.util.spec_from_file_location('verifier', SCRIPT)
 VERIFIER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERIFIER)
+
+
+def execution_contracts():
+    expanded = VERIFIER.expand_contracts(json.loads(VERIFIER.CONTRACTS.read_text()))
+    return {name: contract for name, contract in expanded.items() if 'shards' not in contract}
+
+
+def matrix_jobs(job):
+    """Inspect each fixed shard's actual commands with its matrix values expanded."""
+    for row in job.get('strategy', {}).get('matrix', {}).get('include', [{}]):
+        document = json.dumps(job)
+        for key, value in row.items():
+            document = document.replace('${{ matrix.' + key + ' }}', str(value))
+        expanded = json.loads(document)
+        steps = []
+        for step in expanded.get('steps', []):
+            condition = step.get('if', '')
+            match = re.search(r"matrix.shard == '([^']+)'", condition)
+            if match:
+                if match[1] != row['shard']:
+                    continue
+                condition = condition.replace(match[0] + ' && ', '').replace(' && ' + match[0], '')
+                step['if'] = condition
+            steps.append(step)
+        expanded['steps'] = steps
+        yield expanded
+
+
+class ShardContractTest(unittest.TestCase):
+    def setUp(self):
+        self.contracts = json.loads(VERIFIER.CONTRACTS.read_text())
+        self.parent = self.contracts['cross-language']
+
+    def test_union_preserves_every_original_class_method_property_and_report(self):
+        expanded = VERIFIER.expand_contracts(self.contracts)
+        combined = {}
+        for name in self.parent['shards']:
+            shard = expanded[name]
+            self.assertFalse(set(combined) & set(shard['required']))
+            combined.update(shard['required'])
+            self.assertEqual(shard['properties'], self.parent['properties'])
+            self.assertEqual(shard['reports'], self.parent['reports'])
+            self.assertEqual(shard['properties']['rustConformance'], 'true')
+        self.assertEqual(combined, self.parent['required'])
+        # Expanding never changes the canonical, unsplit obligation.
+        self.assertEqual(expanded['cross-language'], self.parent)
+
+    def test_missing_duplicate_unknown_empty_and_colliding_shards_fail_closed(self):
+        names = list(self.parent['shards'])
+        for mutation in ['missing', 'duplicate', 'unknown', 'empty', 'collision']:
+            with self.subTest(mutation=mutation):
+                contracts = copy.deepcopy(self.contracts)
+                shards = contracts['cross-language']['shards']
+                if mutation == 'missing':
+                    shards[names[0]].pop()
+                elif mutation == 'duplicate':
+                    shards[names[1]].append(shards[names[0]][0])
+                elif mutation == 'unknown':
+                    shards[names[0]].append('unknown.Test')
+                elif mutation == 'empty':
+                    shards[names[0]] = []
+                else:
+                    shards['tiny-catalog'] = shards.pop(names[0])
+                with self.assertRaises(ValueError):
+                    VERIFIER.expand_contracts(contracts)
 
 
 class SurefireTest(unittest.TestCase):
@@ -208,10 +274,11 @@ class SurefireTest(unittest.TestCase):
 
 class WorkflowTest(unittest.TestCase):
     def test_all_contracts_are_wired_with_prepare_verification_and_evidence(self):
-        contracts = json.loads(VERIFIER.CONTRACTS.read_text())
+        contracts = execution_contracts()
         verified, prepared, artifacts = set(), set(), []
         for path in (ROOT / '.github/workflows').glob('*.yml'):
-            for job in yaml.safe_load(path.read_text())['jobs'].values():
+            jobs = yaml.safe_load(path.read_text())['jobs'].values()
+            for job in (expanded for job in jobs for expanded in matrix_jobs(job)):
                 for step in job.get('steps', []):
                     run = step.get('run', '')
                     match = re.search(r'verify-optin-tests.py ([\w-]+)', run)
@@ -223,7 +290,9 @@ class WorkflowTest(unittest.TestCase):
                         else:
                             verified.add(name)
                             self.assertEqual(step.get('if'), 'success()', (path, name))
-                            self.assertEqual(step.get('id'), 'verify-' + name)
+                            # Matrix workers share a step ID, with distinct contract/artifact names.
+                            expected_id = 'verify-cross-language' if name.startswith('cross-language-') else 'verify-' + name
+                            self.assertEqual(step.get('id'), expected_id)
                     if 'upload-artifact@' in step.get('uses', '') and 'optin-evidence/' in step.get('with', {}).get('path', ''):
                         artifacts.append(step['with']['path'])
                         self.assertIn(".outcome != 'skipped'", step.get('if', ''))
@@ -236,6 +305,7 @@ class WorkflowTest(unittest.TestCase):
 
     def test_real_tiny_catalog_uses_the_downstream_pin_and_grammar(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/maven.yml').read_text())['jobs']
+        jobs['rust'] = next(matrix_jobs(jobs['rust-conformance']))
         def tiny(job, path):
             return next(s['with'] for s in jobs[job]['steps'] if s.get('with', {}).get('path') == path)
         self.assertEqual(tiny('rust', 'tiny-catalog')['ref'], tiny('downstream', 'tinyexpression')['ref'])
@@ -254,10 +324,11 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn(real, contracts['downstream-portability']['required'][portability])
 
     def test_every_selected_class_and_method_has_a_contract_and_vice_versa(self):
-        contracts = json.loads(VERIFIER.CONTRACTS.read_text())
+        contracts = execution_contracts()
         checked = set()
         for path in (ROOT / '.github/workflows').glob('*.yml'):
-            for job in yaml.safe_load(path.read_text())['jobs'].values():
+            jobs = yaml.safe_load(path.read_text())['jobs'].values()
+            for job in (expanded for job in jobs for expanded in matrix_jobs(job)):
                 steps = job.get('steps', [])
                 for index, step in enumerate(steps):
                     prepare = re.search(r'verify-optin-tests.py ([\w-]+) --prepare', step.get('run', ''))
@@ -281,6 +352,8 @@ class WorkflowTest(unittest.TestCase):
                         selected[cls] = set(methods.split('+')) if sep else None
                     required = {fq.rsplit('.', 1)[1]: set(methods)
                                 for fq, methods in contracts[name]['required'].items()}
+                    for key, value in contracts[name].get('properties', {}).items():
+                        self.assertIn(f'-D{key}=' + (value or ''), run, (path, name))
                     self.assertEqual(set(selected), set(required), (path, name))
                     for cls, methods in selected.items():
                         if methods is not None:
@@ -288,6 +361,38 @@ class WorkflowTest(unittest.TestCase):
                     checked.add(name)
         self.assertEqual(checked, set(contracts) - {'tiny-catalog', 'downstream-p4-smoke', 'downstream-ide-smoke'})
         self.assertTrue(contracts['assertion-contracts']['all_reports'])
+
+    def test_original_check_requires_both_shards_and_preserves_failure_status(self):
+        jobs = yaml.safe_load((ROOT / '.github/workflows/maven.yml').read_text())['jobs']
+        worker, aggregate = jobs['rust-conformance'], jobs['rust']
+        self.assertEqual(worker['strategy']['max-parallel'], 2)
+        self.assertIs(worker['strategy']['fail-fast'], False)
+        self.assertEqual({row['shard'] for row in worker['strategy']['matrix']['include']}, {'core', 'cli'})
+        self.assertLessEqual(worker['timeout-minutes'], 60)
+        self.assertEqual(aggregate['name'], 'Rust backend and Java conformance')
+        self.assertEqual(aggregate['needs'], 'rust-conformance')
+        self.assertEqual(aggregate['if'], 'always()')
+        step, = aggregate['steps']
+        self.assertEqual(step['env']['RESULT'], '${{ needs.rust-conformance.result }}')
+        for status in ['success', 'failure', 'cancelled', 'skipped', '']:
+            result = subprocess.run(['bash', '-eu', '-c', step['run']], env={'RESULT': status})
+            self.assertEqual(result.returncode == 0, status == 'success', status)
+
+    def test_learning_browser_builds_its_site_in_the_same_job(self):
+        # DeclarativeTokenConformanceTest's CLI-side build cannot supply core's files.
+        checked = 0
+        for path in (ROOT / '.github/workflows').glob('*.yml'):
+            jobs = yaml.safe_load(path.read_text())['jobs'].values()
+            for job in (expanded for job in jobs for expanded in matrix_jobs(job)):
+                steps = job.get('steps', [])
+                for index, step in enumerate(steps):
+                    if 'node scripts/learning-browser.mjs' in step.get('run', ''):
+                        builders = [s for s in steps[:index]
+                                    if s.get('run', '').strip() == 'node scripts/build-learning.mjs']
+                        self.assertEqual(len(builders), 1, path)
+                        self.assertNotIn('working-directory', builders[0])
+                        checked += 1
+        self.assertEqual(checked, 2)  # core and the standalone learning-pages workflow
 
 
 if __name__ == '__main__':

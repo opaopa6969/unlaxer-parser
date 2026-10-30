@@ -3,11 +3,13 @@ import { ChildProcess, spawn } from "node:child_process";
 import * as vscode from "vscode";
 import { LanguageClient, LanguageClientOptions, ServerOptions, CloseAction, ErrorAction } from "vscode-languageclient/node";
 
-let client: LanguageClient | undefined;
+let client: OwnedLanguageClient | undefined;
 let pending: Promise<void> = Promise.resolve();
 let stopping = false;
 let ownedProcess: ChildProcess | undefined;
 let cancelStarting: (() => void) | undefined;
+// One bounded budget for the LSP shutdown exchange and natural process exit.
+const shutdownTimeoutMs = 5000;
 class StartupCancelled extends Error {}
 
 class OwnedLanguageClient extends LanguageClient {
@@ -25,9 +27,21 @@ class OwnedLanguageClient extends LanguageClient {
 async function stopClient(): Promise<void> {
   const previous = client;
   client = undefined;
-  try { if (previous) await previous.dispose(1000); }
-  catch { /* A starting/failed client cannot complete LSP shutdown; terminate its owned process. */ }
+  const deadline = Date.now() + shutdownTimeoutMs;
+  let graceful = previous?.ready && previous.isRunning();
+  try { if (previous) await previous.dispose(shutdownTimeoutMs); }
+  catch { graceful = false; }
   const child = ownedProcess;
+  // Protocol completion only means exit was sent, not that the process has exited.
+  // Give a healthy server the remaining budget before falling back to signals.
+  // Failed/interrupted initialization skips this wait and is terminated immediately.
+  if (graceful && child && child.exitCode === null && child.signalCode === null && child.pid !== undefined) {
+    await new Promise<void>(resolve => {
+      const exited = (): void => { clearTimeout(timer); resolve(); };
+      const timer = setTimeout(() => { child.off("exit", exited); resolve(); }, Math.max(0, deadline - Date.now()));
+      child.once("exit", exited);
+    });
+  }
   if (child && child.exitCode === null && child.signalCode === null && child.pid !== undefined) {
     await new Promise<void>((resolve, reject) => {
       const force = setTimeout(() => child.kill("SIGKILL"), 500);

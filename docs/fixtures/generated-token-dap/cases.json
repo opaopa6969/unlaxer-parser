@@ -1,0 +1,8 @@
+[
+  {"name":"empty","input":"","tokens":[{"generated":"","anchor":0}],"steps":[["GeneratedToken","",0,0,1,1,1,1]]},
+  {"name":"ascii-mixed","input":"ab","tokens":[{"input":"a"},{"generated":"R","anchor":1},{"input":"b"}],"steps":[["WordParser","a",0,1,1,1,1,2],["GeneratedToken","R",1,1,1,2,1,2],["WordParser","b",1,2,1,2,1,3]]},
+  {"name":"unicode","input":"😀éZ","tokens":[{"input":"😀é"},{"generated":"✨😀é","anchor":3},{"input":"Z"}],"steps":[["WordParser","😀é",0,3,1,1,1,5],["GeneratedToken","✨😀é",3,3,1,5,1,5],["WordParser","Z",3,4,1,5,1,6]]},
+  {"name":"crlf","input":"A\r\n😀B","tokens":[{"input":"A\r\n"},{"generated":"X\r\nY","anchor":3},{"input":"😀"},{"generated":"\r\n😀","anchor":4},{"input":"B"}],"steps":[["WordParser","A\r\n",0,3,1,1,2,1],["GeneratedToken","X\r\nY",3,3,2,1,2,1],["WordParser","😀",3,4,2,1,2,3],["GeneratedToken","\r\n😀",4,4,2,3,2,3],["WordParser","B",4,5,2,3,2,4]]},
+  {"name":"same-anchor","input":"x","tokens":[{"generated":"","anchor":0},{"generated":"a\"b","anchor":0},{"input":"x"},{"generated":"longer than input","anchor":1},{"generated":" \t😀 \r\n","anchor":1}],"steps":[["GeneratedToken","",0,0,1,1,1,1],["GeneratedToken","a\"b",0,0,1,1,1,1],["WordParser","x",0,1,1,1,1,2],["GeneratedToken","longer than input",1,1,1,2,1,2],["GeneratedToken"," \t😀 \r\n",1,1,1,2,1,2]]},
+  {"name":"trace-order","input":"😀\r\nx","tokens":[{"input":"😀\r\nx"},{"generated":"tail","anchor":4},{"generated":"head","anchor":0}],"steps":[["WordParser","😀\r\nx",0,4,1,1,2,2],["GeneratedToken","tail",4,4,2,2,2,2],["GeneratedToken","head",0,0,1,1,1,1]]}
+]

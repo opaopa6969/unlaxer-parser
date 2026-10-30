@@ -41,6 +41,64 @@ public class RustUbnfFrontendConformanceTest {
      */
     private static final Set<String> POSITIONED_REJECTIONS = Set.of("trailing-input", "trailing-input-no-space");
 
+    /** #949: syntax of the whole file precedes mapping a retired token. */
+    @Test public void regexMigrationWaitsForCompleteSyntax() throws Exception {
+        checkSyntaxCases("regex", 40);
+    }
+
+    /** #986: only the namespace prefix is contiguous; the final name permits trivia. */
+    @Test public void qualifiedReferenceTriviaMatchesJava() throws Exception {
+        checkSyntaxCases("qualified", 36);
+    }
+
+    /** #983: mapper values never hide subsequent syntax, including later grammars. */
+    @Test public void valueValidationWaitsForCompleteSyntax() throws Exception {
+        checkSyntaxCases("value", 158);
+    }
+
+    private void checkSyntaxCases(String scope, int expectedCount) throws Exception {
+        if (!Boolean.getBoolean("rustConformance"))
+            System.out.println("[assumption] frontend syntax priority requires -DrustConformance=true");
+        assumeTrue("enable with -DrustConformance=true (requires rustc)", Boolean.getBoolean("rustConformance"));
+        Path binary = inspectBinary();
+        var cases = JsonParser.parseString(Files.readString(repo.resolve("spec-corpus/cli-stderr.json")))
+            .getAsJsonObject().getAsJsonArray("cases");
+        int checked = 0;
+        for (var item : cases) {
+            var row = item.getAsJsonObject();
+            if (!row.get("scope").getAsString().equals(scope) || !row.has("frontend")) continue;
+            for (String ending : List.of("LF", "CRLF")) {
+                String source = row.getAsJsonObject("files").get("main.ubnf").getAsString()
+                    .replace("\n", ending.equals("LF") ? "\n" : "\r\n");
+                String name = row.get("id").getAsString() + "/" + ending;
+                var expected = row.getAsJsonObject("frontend").getAsJsonObject(ending);
+                Path input = temporary.newFile().toPath();
+                Files.writeString(input, source);
+                assertEquals(name, expected.get("native"), inspect(binary, input));
+                if (expected.has("javaAst")) {
+                    assertEquals(name, expected.get("javaAst"), canonical(UBNFMapper.parse(source)));
+                    assertEquals(name, expected.get("javaAst"), canonical(UBNFMapper.parseWithSource(source).ast()));
+                } else {
+                    var javaError = assertThrows(name, IllegalArgumentException.class, () -> UBNFMapper.parse(source));
+                    assertEquals(name, expected.get("javaError").getAsString(), javaError.getMessage());
+                    var snapshotError = assertThrows(name, IllegalArgumentException.class, () -> UBNFMapper.parseWithSource(source));
+                    assertEquals(name, javaError.getClass(), snapshotError.getClass());
+                    assertEquals(name, javaError.getMessage(), snapshotError.getMessage());
+                    if (javaError instanceof org.unlaxer.dsl.bootstrap.RegexRetirement.MigrationException migration) {
+                        var span = expected.getAsJsonObject("native").getAsJsonArray("span");
+                        assertEquals(name, span.get(2).getAsInt(), migration.start());
+                        assertEquals(name, span.get(3).getAsInt(), migration.end());
+                        // Non-BMP prefixes must use CP, not UTF-16 offsets.
+                        assertEquals(name, span.get(0).getAsInt(), source.substring(0,
+                            source.offsetByCodePoints(0, migration.start())).getBytes(StandardCharsets.UTF_8).length);
+                    }
+                }
+                checked++;
+            }
+        }
+        assertEquals("shared cases must not disappear", expectedCount, checked);
+    }
+
     @Test public void nativeFrontendMatchesJavaSyntax() throws Exception {
         if (false == Boolean.getBoolean("rustConformance")) {
             System.out.println("[assumption] RustUbnfFrontendConformanceTest skipped:"

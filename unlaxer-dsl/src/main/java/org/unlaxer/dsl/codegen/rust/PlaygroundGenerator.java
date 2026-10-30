@@ -43,6 +43,7 @@ public final class PlaygroundGenerator {
     }
 
     public static Map<String, String> generate(Path path) throws IOException {
+        path = path.toAbsolutePath().normalize();
         String source = Files.readString(path);
         var readiness = PortabilityCheck.checkFile(path);
         if (!readiness.portable()) throw new IllegalArgumentException("Playground requires a Rust-portable grammar: " + readiness.diagnostics());

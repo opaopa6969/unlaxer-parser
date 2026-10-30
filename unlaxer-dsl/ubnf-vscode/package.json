@@ -41,6 +41,14 @@
     "configuration": {
       "title": "UBNF LSP",
       "properties": {
+        "ubnfLsp.server.backend": {
+          "type": "string", "enum": ["java", "rust"], "default": "java",
+          "description": "文法編集サーバー。Rust は診断の一部・hover・completion・定義/参照・rename・outline/folding・linked editing・package source に対応。変更後は Reload Window。"
+        },
+        "ubnfLsp.server.rustPath": {
+          "type": "string", "default": "ubnf-language-server",
+          "description": "Rust authoring server の実行ファイル。JVM 不要。自分で build した絶対パスを指定できます。"
+        },
         "ubnfLsp.server.javaPath": {
           "type": "string",
           "default": "java",

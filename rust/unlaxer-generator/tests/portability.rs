@@ -267,6 +267,38 @@ fn structural_diagnostic_priority_matches_shared_oracle() {
             }
             assert_eq!(source, fs::read_to_string(path).unwrap());
             assert_eq!(1, fs::read_dir(&directory.0).unwrap().count());
+            if let Some(code) = case["generation"]["rust"].as_i64() {
+                let output = run(
+                    &directory,
+                    &[
+                        "generate",
+                        "--grammar",
+                        "main.ubnf",
+                        "--output",
+                        "generated",
+                    ],
+                );
+                assert_eq!(
+                    Some(code as i32),
+                    output.status.code(),
+                    "{} / {ending}: {}",
+                    case["name"],
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                let generated = directory.0.join("generated");
+                if code == 0 {
+                    assert_eq!(5, fs::read_dir(generated).unwrap().count());
+                } else {
+                    assert!(
+                        String::from_utf8_lossy(&output.stderr).contains("E-COMMONFIELD-MISMATCH")
+                    );
+                    assert!(!generated.exists());
+                }
+                assert_eq!(
+                    source,
+                    fs::read_to_string(directory.0.join("main.ubnf")).unwrap()
+                );
+            }
         }
     }
 }

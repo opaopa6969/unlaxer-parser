@@ -24,6 +24,7 @@ Ast.Root root = GeneratedMapper.parseWithOptions(text, options);
   [policy切替時のkeyと互換constructor](memo-reset-policy.md)も参照。
 - failure/success hit は最初の rule call が生成した診断を再生するため、OFF/ON で farthest offset と
   expected hints が変わらない。
+- `ParseContext.getPackratMemoTable().failureHits() / successHits()` は公開された host 依存の内部会計値で、同じ文法・入力・設定でも Java/Rust 間の数値の一致を保証しない (#827)。cache 対象の粒度と安全判定が異なる。構文結果・cursor・診断・reset の互換性とは分けて扱う。[実測と契約](../conformance/chain-reset-after-failure/README.md#memo-hit-accounting)。
 - cache は 1 個の `ParseContext` に閉じ、session をまたいで共有しない。
 - parser graph（rule instance、その children、parse 結果へ影響する設定）は session 中 immutable
   であることを前提とする。graph を変更する可能性がある callback/state facility は下記の

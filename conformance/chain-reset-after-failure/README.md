@@ -213,7 +213,7 @@ entry field・cache・allocation は追加しない。
 **結論:** 候補単独の owner reset 差は既知の内部差として残す。今回調べた生成文法の外部経路では、
 その候補に Java 相当の Chain 境界を加えても観測は変わらなかった。PR #828 では runtime / IR / 公開型を変更しなかった。
 ただし、**Java / Rust の診断位置と memo hit がすべて一致したという意味ではない**。
-調査で見つかった別の差は #826 / #827 と差分表で追跡する。
+調査で見つかった診断差は #826 で解消し、残る memo 会計差は #827 で host 依存の内部会計という契約にした（末尾参照）。
 
 ### lowering と frame の根拠
 
@@ -310,15 +310,18 @@ Root / Integer の第1候補、`ab`、先行 `LOOKAHEAD('a')`、初期 reset=tru
 
 ### 別に見つかった診断・memo 差
 
-`nested-boundary-differences.tsv` は456行の**全行キー付きの明示差分**であり、
-Java oracle の該当値も照合してから Rust の4列（最遠診断 CP、failure / success memo hit、後続の最遠診断 CP）だけに適用する。
+`nested-boundary-differences.tsv` は #826 時点で232行（#838 で456→288行、#826 で288→232行、#827 の追加後は268行）の**全行キー付きの明示差分**であり、
+Java oracle の該当値も照合してから Rust の値に適用する。#827 では診断2列の同値を必須にし、host 差を failure / success hit の2列だけに限定した。
 他の列や行を除外しない。
 通常 / mapping、両 host、Chain 対照に同じ値を要求する。PBT の known-differences は変更しない。
 
-- **#826 診断位置:** Root に `azb`、先行 `a`、通常、初期 reset=false の成功直後は Java CP2 / Rust CP0。
-  Integer を NonOrdered 内で `ab`、先行 `a`、初期 false で失敗させると CP1 / CP0 の差もある。
-  また成功後に後続先読みを行うと、最終 matched より前の CP に Rust の診断が残るケースがある。
-  DETAILED_ON_FAILURE の低水準入口は記録を遅延するため双方 CP0。詳細は #826 で追跡する。
+- **#826 診断位置（修正済み）:** #838 後の残り56行はすべて通常呼出の成功時の到達位置で、
+  正の先読みも診断 fallback を開始するようにして解消した。後続診断と失敗時の診断は #838 の値を維持する。
+  `Integer-nonordered-failure` の初期 false の CP1/0 は #838 後には既に一致している。
+  `Ahead-nonordered-failure` / `AheadToken-nonordered-failure` は名前に failure を含むが、初期 false では
+  先行先読みの次の `b` に成功する行（CP0/2）であり、この成功時診断も CP2 に揃えた。
+  全1800行の診断2列は共通の Java oracle と一致し、残る232行は #827 の memo 会計差だけである。
+  DETAILED_ON_FAILURE の低水準入口は双方 CP0 のまま。実装・受け入れ範囲は後述の #826 を参照する。
 - **#827 memo 会計:** Integer などの生成 Java rule/group/__CaptureSite は安全 marker がなく、
   failure hit 0。一方 Rust は rule 全体を cache し、3回呼出で2 hit するケースがある。
   Root の text group は Java でも安全 marker を持つので、多くの経路で2 hit となるが、
@@ -385,13 +388,13 @@ Java で transaction を持たない `Commit` / `Label` / `DoConsumePropagationS
 | 直接の EMPTY | 成功 CP0/1 | 成功 CP0/2 |
 
 全行で成否・cursor・reset・後続の成否を Java oracle へ直接照合する。
-診断 CP と failure / success memo hit は #826 / #827 / #838 の残差があり、606行について
+この時点では診断 CP と failure / success memo hit に #826 / #827 / #838 の残差があり、606行について
 `frame-start-differences.tsv` に Java / Rust の値を行キー付きで記録する。
 Java 側の値も照合してからこの4列だけを差し替え、行全体や設定を除外しない。
 このうち42行は、修正前の Rust が先読みの進めた位置で照合して失敗していたため**たまたま** Java と同じ値だった。
 36行は診断 CP（`positive-eof`、`negative-*` / `Negative-*`、`*-longest` / `*-unique` の通常・初期 true・AUTO/DETAILED）で、
 Java の `startParse` が begin の reset **前**に frame 開始を `max(consumed, matched)` として記録するのに対し、
-Rust は rule を介さない frame の失敗でこの位置を記録しないことによる（#838）。
+Rust は rule を介さない frame の失敗でこの位置を記録しなかったことによる。#838 で以下のとおり解消した。
 残る6行は `PlainTok-ahead` / `PlainTok-unicode` の SAFE_FAILURES の failure hit（Java 0 / Rust 2）で、#827 の型である。
 既存 nested corpus では `Longest-partial` / `Unique-partial` の通常・初期 true・AUTO/DETAILED の8行で、
 開始時の巻き戻しに伴い Rust の診断 CP が1から0へ変わり、この列は Java の CP0と一致する。
@@ -415,3 +418,486 @@ Rust は rule を介さない frame の失敗でこの位置を記録しない�
   出力全行には `PlainSeq-longest` の同設定が失敗 CP0/1から成功 CP0/2になる差もあり、成否の検証にも効く。
 
 Java は変更せず参照実装として再実行し、修正を外した状態を期待値へ取り込まない。
+
+
+## reset 前の frame 開始診断 (#838)
+
+Java の runtime は変更しない。`ParseContext.startParse` は `begin` より先に
+`max(consumed, matched)` を記録する。低水準入口では AUTO は DETAILED に解決され、
+`ParseFrame` の開始値・最大値が `registerFailureCandidate` の候補になる。
+DETAILED_ON_FAILURE（この corpus の診断記録 OFF）は `deferredFrameStarts` に開始値を積むが、
+`endDeferredParse` は明示的な trial recording 以外の診断を作らず、取得値は CP0 のまま。
+この区別は memo OFF / SAFE_FAILURES に共通であり、memo の入出力にも診断記録を含める。
+
+Rust は失敗後に既存 checkpoint を復元した位置を `fail_parser_frame` へ渡す。
+従来の Sequence / Choice / PredictiveChoice / Repeat / JavaRepeat に加えて、
+Java の診断 frame を持つ `java_transaction` の式（MatchOnly / JavaLookahead、
+LongestChoice / UniqueLongestChoice、NonOrdered、capture / name frame など）にも適用する。
+`CatchLabels` は transaction を持つ一方、Java では `startParse` / `endParse` を呼ばないので除外する。
+資源中断、Classic 自身の frame 記録、token stream / expression entry の frontier 契約は維持する。
+
+負の先読みの成功は別扱いである。Java の `Not` は子の失敗を
+`discardDiagnosticSpeculation` で捨てるため、失敗候補がなければ frame 開始を含む
+`maxReachedOffset` が診断値になる。Rust は成功した負の先読みから既存の到達位置 fallback を有効にし、
+それを持つ外側の native frame（候補開始で reset した Choice など）へ開始・終了位置を反映する。
+`MatchOnly(Not(b))` のように Not が MatchOnly の直下にあると、Rust の通常呼出は入口で暗黙に Classic の token mode へ入る。
+このとき `parse_with_token_mode` と同じく入口の `max(consumed, matched)` を到達位置 fallback に記録し、
+Not 自身も token mode のまま fallback を開始する（Java の MatchOnly の `startParse` に当たる）。
+これは失敗候補ではない。後続の本当の失敗が CP0 にあれば、以前の fallback が CP1 / CP2 でも CP0 を返す。
+既存の `classic_max_reached` と memo diagnostic の同フィールドを再利用し、記録のための確保や新規 field は足さない。
+これは #838 時点の範囲であり、正の先読みからの成功時到達位置は後述の #826 で追加する。
+
+#197 に対する成功側の例外は `finish_expression` のこの fallback 記録だけである。
+成功した `java_transaction` の frame でだけ、診断設定と「負の先読み、または native で fallback が有効」かを判定し
+（#872 / #876 で後者は「native」に変わった。[後述](#plain-success-diagnostics)）、
+記録本体（CatchLabels・frontier・token stream の除外と最大値更新）は `#[cold]` / `#[inline(never)]` の
+`note_success_frame_start` に置く。診断 OFF では transaction 以外の成功に追加の判定はなく、
+transaction の成功でも診断設定の比較1つだけで、保存・確保・最大値計算・呼出しは行わない。
+暗黙の Classic 入口の記録は `parse_expression` の既存分岐（token mode へ入る呼出しごとに1回）内の DETAILED だけで行う。
+失敗側の追加は既存の失敗分岐内と cold な `fail_parser_frame` に限定し、
+reset・入力照合・候補選択・memo key / hit 会計を変更しない。性能の再計測は行わない。
+
+`FrameStartMatchedResetConformanceTest` の同じ2メソッドで Java の2,688観測と
+両 Rust host × 通常 / mapping grammar の10,752観測を比較する。
+issue の36行はすべて一致し、`frame-start-differences.tsv` から除いた。
+同じ記録処理により frame-start corpus の診断値は計224行で Java に一致する方向へ変わった。
+156行は全列一致のため除去し、68行は残る診断差または memo 会計差を保持する。
+既存104経路の Java oracle・入力・成否・両 cursor・reset・後続成否・memo hit の各値は変更しない。
+`PlainTok-ahead` / `PlainTok-unicode` の #827 型の6行も維持する。
+
+入れ子の8経路を追加した（各192観測の Java oracle を追記）。`lookahead-longest`（MatchOnly の中の LongestChoice）、
+`unique-lookahead`（UniqueLongestChoice の中の MatchOnly(rule)）、`lookahead-negative`（MatchOnly の中の Not）、
+`longest-negative`（LongestChoice(Not, rule)。Root と Negative）、`negative-then`（Chain(Not, rule)。成功した frame の後の rule frame の失敗）、
+`choice-negative-seq`（Choice(Chain(Not, 'zz'), rule)。成功した Not の後の失敗と rule frame）。
+Java の `Not` は任意の子を取れるが、Rust の生成 IR の Not は語の `JavaLookahead` だけなので、Not の中の Not は比較できない。
+`lookahead-negative` は PR の初版で Java CP1 / Rust CP0 だった（上記の暗黙 Classic 入口で解消）。
+`Root-longest-negative` の SAFE_FAILURES・初期 false の3行は success hit が Java 1 / Rust 0 で、
+外側 Longest の success hit と同じ #827 の型であり、差分表に追加した。差分表は453行となる。
+
+nested corpus の診断修正は #826 に残したが、#838 でも
+同じ記録処理で初期 reset=true の後続診断 CP（3/2 → 3/3 など）と、
+`Integer-nonordered-failure` / `Ahead-nonordered-failure` / `AheadToken-nonordered-failure` の通常呼出の診断 CP が Java に一致した。
+差分表を実測に合わせ、全列一致の168行を除き、44行の Rust 値を更新した（456行 → 288行）。
+テスト側で列を読み替えて差分表を据え置く方式は採らない。差分表の Rust 値が実測と異なるまま残るためである。
+
+mutation は別の隔離 worktree で修正前 runtime と更新後の差分表を組み合わせ、
+`FrameStartMatchedResetConformanceTest` が `Root-no-prefix / 通常 / 初期true / OFF / AUTO` の
+後続診断 CP1 → CP0 で失敗することを確認した。Java oracle のテストは成功する。
+入れ子経路を加えた Java-host の通常 / mapping 合計5,376観測では、修正済みの不一致0、
+修正全体を除去して464、失敗時記録だけ除去して400、成功時 fallback だけ除去して56、
+暗黙 Classic 入口の記録だけ除去して8（`Negative-lookahead-negative`）。
+成功側だけの変異は `Negative-ahead` の同設定で診断 CP1 → CP0 を検出する。
+`NestedCandidateBoundaryConformanceTest` も修正全体・失敗時記録の除去で後続診断 CP3 → CP2 により失敗する。
+
+
+## 正の先読み後の成功診断と投機的候補 (#826)
+
+#844 merge 後の master を基準に、Java の製品コードは変更せず、既存の入力・oracle 行を維持する。
+Java の `startParse` / `endParse` / `trackCursorProgress` は成功した frame の到達位置も保存し、
+失敗候補が1つもなければ `maxReachedOffset` を返す。一方、失敗候補があれば、成功時の到達位置より
+手前でも `farthestFailureOffset` が優先する。候補を rollback しても診断は残るが、成功した
+PEG assertion / Not が明示的に捨てる投機的診断は残らない。
+
+Rust では #838 の `note_success_frame_start` が負の先読みからしか fallback を開始していなかった。
+正の `JavaLookahead` にも同じ cold な記録を適用し、既存の native frame 終了処理・memo diagnostic に
+開始位置と終了時の `max(consumed, matched)` を伝える。cursor や reset は変更しない。
+これにより nested の残る56行（通常 × memo 2設定 × AUTO/DETAILED）が一致する。
+初期 true の行も含み、`Root-partial` / `Predictive-partial` の成功 CP2/2 と、
+`Ahead` / `AheadToken` の直接・NonOrdered 内での成功 CP0/1 または CP0/2 を覆う。
+後続 MatchOnly の診断値と既存の失敗時診断は変わらない。
+
+関連する frame-start corpus は次の2点も検査する。
+
+- 正の先読みの記録により340行の成功時診断が一致する。`empty-unicode` は開始CP2・終了CP1であり、
+  最終 cursor だけから診断を作る案では不足する。開始位置を含む履歴の fallback が必要である。
+- `Root` / `PlainSeq` を `OwnedCapture` / `CaptureScope` で包む初期 true の32行では、
+  Java の `parseCaptureBoundary` が begin 前のCP1を失敗候補にする。Rust は Classic 内のこれらの frame を
+  失敗記録の一覧に含めていなかった。既存の失敗分岐に2型を足し、復元した checkpoint の開始CP1を記録する。
+  通常呼出も owned capture の原文処理のため暗黙の Classic に入るので、通常 / Classic の双方を修正する。
+
+正の先読みの fallback を加えるだけだと、`PlainSeq-until-frame` の通常・初期 true の4行が
+Java CP0 に対して Rust CP2 になる。Java の UNTIL は最初の終端 `b` をCP0で試して失敗してから進む。
+この失敗候補が成功時の最大CP2より優先するが、Rust の native `JavaUntil` は失敗した終端試行を記録していなかった。
+そこで既存の診断用 cold 関数内で `note_until_failures` を呼び、失敗した終端候補の最大位置を再構成する。
+終端成功なら最後の不一致は最終 consumed の1 CP手前、EOFなら最終 consumed 自身である。
+初回の試行位置も含めるため、先行先読みが後で見つかる終端より先へ進んでいた場合を落とさない。
+走査ループ・診断 OFF の経路には処理を追加せず、UTF-8 byte ではなく CP 境界から前の位置を求める。
+後続の本当の失敗を優先する規則を維持し、この4行は修正前と同じCP0を保つ。
+Longest / Unique の成功候補の試行中に記録された実失敗も fallback で上書きしない。
+
+### 受け入れ範囲・差分表
+
+- 既存75入力・Java1800行の nested corpus と、112入力・Java2688行の frame-start corpus を維持する。
+  frame-start に UNTIL の Unicode・終端なしEOF・先読みより手前の終端の3経路72行を追加し、115入力2760行とする。
+  追加 oracle も Java を実行して採取し、既存2688行は byte 単位で変更しない。
+  両 Rust host × 通常 / mapping grammar、通常 / Classic、初期 reset 2設定、memo OFF / SAFE_FAILURES、診断3設定を比較する。
+  nested はさらに18候補の Chain 対照を含め、各 host 7200観測を検査する。
+- nested の差分表から診断差56行を除去（288→232）、frame-start から372行を除去（453→81）。
+  残る行は #827 の memo 会計差だけで、各行は byte 単位で従来どおりである。
+  既存の Java oracle、成否・両cursor・reset・後続成否・failure/success hit は変更しない。
+  診断 OFF の値はすべてCP0のまま、後続診断の値も全行で維持する。
+- テストの読み替え・除外は加えない。差分表のすべての値を実際の Rust 出力と照合する既存テストを維持する。
+  この2 corpus に未解決の診断差は残らない。候補単独の owner reset（#823 の内部差）と #827 の会計差は対象外。
+  任意の手組み IR や、成功履歴全般の全面一致を主張するものではない。
+- #826 時点では UNTIL の集約が先行先読みなどで `classic_max_reached` を記録した後に限られていた。
+  先読みのない `aab` / `bb` の成功診断は #872 / #876 で同じ corpus に追加し、Java CP1 に揃えた。
+  先読みなしの通常呼出の範囲と native PEG との区別は [後述](#plain-success-diagnostics) を参照する。
+
+### #197 と mutation
+
+成功経路の差分は、既存の `java_transaction && Diagnostics::Detailed` ガードの内側から
+`JavaLookahead` の `positive: false` 制限を取り除き、checkpoint の開始位置の最大値計算を cold 関数内へ移すだけである。
+新しい条件分岐・確保・field・cache は足さない。
+正の先読みとその後の native frame は既存の cold 関数を使い、診断 OFF ではその呼出しも増えない。
+capture の追加記録は既存の失敗分岐内、UNTIL の失敗候補の集約は既存の診断用 cold 関数内に置く。
+入力照合・候補選択・memo key / hit 会計は変えず、性能の再計測は行わない。
+
+mutation は同じ生成 parser・support driver・更新後 oracle で、修正全体、正の先読みの記録、
+UNTIL の失敗記録、その初回試行位置、Classic capture の失敗記録を個別に除去して検出する。
+修正全体と正の先読みの除去は nested の `Root-partial` CP2→0、UNTIL の除去は
+`PlainSeq-until-frame` CP0→2、capture の除去は `Root-capture-scope` CP1→0 で失敗する。
+
+初回試行位置だけを外す変異は追加した `PlainSeq-until-earlier` の初期 false で CP2→0 を検出する。
+同じ生成 parser の通常 / mapping（nested は Chain 対照も含む）での不一致観測数は次のとおり。
+
+| 変異 | nested（7200観測） | frame-start（5520観測） |
+| --- | ---: | ---: |
+| 修正済み | 0 | 0 |
+| 修正全体を除去 | 224 | 784 |
+| 正の先読みの記録だけ除去 | 224 | 720 |
+| UNTIL の失敗記録だけ除去 | 0 | 32 |
+| UNTIL の初回試行位置だけ除去 | 0 | 8 |
+| Classic capture の失敗記録だけ除去 | 0 | 64 |
+
+さらに origin/master 起点の隔離 worktree に更新後の corpus を置き、修正前 runtime のまま
+`NestedCandidateBoundaryConformanceTest` / `FrameStartMatchedResetConformanceTest` を実行した。
+Java oracle の2テストは成功し、Rust 照合の2テストはそれぞれ `Root-partial` / `Root-ahead` の
+CP2→0で失敗する。最終版の両 host の照合と同じテストで修正除去を検出する。
+
+<a id="memo-hit-accounting"></a>
+
+## failure / success hit の契約 (#827)
+
+**結論:** hit 数は host 依存の内部会計であり、同じ文法・入力・設定でも Java/Rust 間の
+数値の一致を契約しない。成否・consumed / matched cursor・診断・reset・後続解析の一致は
+引き続き検証する。hit 数を揃えるために cache を追加したり、Java の安全 marker や Rust の
+rule 単位 cache を変更したりしない。これらは安全性・性能の作業であり、#197 の凍結対象になる。
+今回は runtime / generator / memo key / 計数処理を変更せず、性能の再計測もしない。
+
+### 公開される値と利用範囲
+
+- Java: `ParseContext.getPackratMemoTable().failureHits() / successHits()`。
+  memo OFF では table が null の場合がある。
+- Rust: `ParseContext::memoized_failure_hits() / memoized_success_hits()`。
+  通常 / Classic とも context の pass 内の実 hit で、別 context の詳細診断 retry を合算しない。
+- `benchmarks/tiny-classic/consumers/` の Java / Rust consumer が返す結果 JSON の
+  `failure_hits` / `success_hits` も上記 getter の値であり、同じ host 依存の契約になる。
+  Java の `Parsed`、Rust の `ParseMatch` / `ParseDiagnostic` / Classic `TokenInfo` 自体には
+  hit フィールドはない。hit は構文診断の位置や成否ではなく、cache の再利用を調べる統計である。
+- Java の `PackratMemoTable.failureHits()` / `successHits()` と Rust の両 getter の Javadoc / rustdoc にも、
+  host 依存で言語間の比較に使えないことを記す。
+
+公開されているため「利用者には見えない値」とは扱わない。host・生成器・安全判定・診断設定・
+候補除外・cache 予算・trace の条件が変われば hit 数も変わり得る。言語間の互換性判定や性能順位に
+hit の絶対値を使わない。固定 corpus では回帰検知のため、各 host の現在の生の値を厳密に残す。
+
+### marker と cache 対象の対応
+
+`nested-boundary.ubnf` の生成 Java を compile し、次の直接宣言 marker をテストで照合する。
+Java の `PackratMemoTable` は継承した marker ではなく exact class の直接宣言を確認し、
+parser identity と両 cursor 等を key にする。Rust の `rule → memoized_rule → probe_rule_memo` は
+安全性を確認した `Rule` 全体を key にし、inline の Choice / Sequence / 値投影に独立した entry は作らない。
+
+| 生成 Java のクラス | failure / success marker | Rust の対応する cache 単位 |
+| --- | --- | --- |
+| RootParser / IntegerParser / LongestParser / UniqueParser | なし / なし | 各 Rule 全体（Number を含む既知の式として安全） |
+| IntegerGroup0Parser / __CaptureSite | なし / なし | inline Choice / TextValue / ValueBoundary。独立 cache なし |
+| RootGroup0Parser / LongestGroup0Parser / UniqueGroup0Parser | あり / あり | literal だけの inline Choice。独立 cache なし |
+| OuterParser / MixParser | なし / なし | Outer / Mix の各 Rule 全体 |
+| HelperParser | あり / あり | Helper Rule 全体 |
+| MixGroup0Parser | あり / あり | Helper を参照する inline Choice。独立 cache なし |
+
+Java の `ParserGenerator.collectMemoDependencies` は `token N = NumberParser` のような
+`TokenDecl.Simple` を名前だけで安全とみなさない。N に依存する rule は marker を持たず、
+literal のみ、または安全な Helper だけに依存する group は `ParserRuleEmitter.generateHelperCode`
+で両 marker を得る。Rust の lowering は N を既知の `Expr::Number` にし、
+`expression_is_memo_safe` が rule の依存先まで確認する。この安全判定と粒度の違いを
+計数の誤りとして補正する根拠はない。
+
+一時コピーだけに hit の trace を加えた対照でも、`Outer` の Java の内訳は初期 false で
+初回 Helper 1回、2・3回目に MixGroup0 と Helper 各1回の計5回、初期 true は初回0・以後各2の計4回だった。
+Rust は両設定とも2・3回目に Outer 全体を再生して計2回だった。
+Longest / Unique の Java success hit 1回は勝者を再実行するときの Group0 再生であり、
+Rust の inline group には対応する cache probe がない。trace 用コードは製品・テストへ組み込まない。
+
+### 共通 corpus と owner reset の切り分け
+
+既存75経路・Java1800行を維持し、nested を使わない
+`Helper ::= 'a' 'z' | 'h'; Mix ::= (Helper | 'q') | N; Outer ::= Mix | Helper 'x';`
+の4経路96行を追加した。生成 Java の候補に __CaptureSite がないことも検査する。
+両 Rust host の生成物は byte 一致を確認し、それぞれを compile・実行する。
+
+| 入力経路 | SAFE_FAILURES の実 hit（Java / Rust） |
+| --- | --- |
+| Integer-failure（ab、先読み a、3回失敗） | failure 0 / 2 |
+| Longest-text / Unique-text（qb）、同 partial（azb、先読み a） | 成功候補の再実行で success 1 / 0 となる行 |
+| Outer-nonstarter（+b、先読み +、3回失敗） | AUTO / DETAILED は初期 false: 5 / 2、true: 4 / 2。DETAILED_ON_FAILURE は 0 / 2 |
+| Outer-failure（ab、先読み a、3回失敗） | 診断3設定とも初期 false: 5 / 2、true: 4 / 2 |
+| Outer-no-prefix（ab、先読みなし、3回失敗） | 先読みなしの失敗の対照。診断3設定とも初期 false: 5 / 2、true: 4 / 2 |
+| Outer-success（hxb） | 成功の対照。hit は両 host とも 0 / 0 で差分表に行はない |
+| frame-start の Root-longest-negative（ab、先読み a、通常、初期 false） | 診断3設定とも success 1 / 0 |
+
+Outer の遅延診断0 hit は、候補の FIRST 除外で probe 自体を省く入力の値である。
+ab は Helper の開始文字 a を含むため同じ0にはならず、追加した +b で issue コメントの値を再現する。
+これは診断設定による既存の候補除外で、成否・cursor を変える cache 再生ではない。
+
+nested の18候補だけに Sequence([child]) を付ける既存の Chain 対照も継続する。
+候補単独の reset が true→false、後続先読みが失敗→成功になることを正の対照とし、
+rule 全体からの観測は hit を含む全列が元の Rust と一致する。
+さらに Outer には nested 境界がなくても差が出る。したがって #823 の owner reset 内部差を
+正規化すればこの会計差が消える、という説明は成立しない。初期 reset による同一 host 内の
+key の区別は正しい動作であり、異なる cache 対象間の hit 数を揃える理由にはならない。
+
+#827 時点の検査範囲は nested 79経路・Java1896行、両 host × 通常/mapping × Chain 対照の
+15168観測と、frame-start 115経路・Java2760行、両 host × 通常/mapping の11040観測である。
+全経路に通常/Classic、初期 reset 2設定、memo OFF/SAFE_FAILURES、診断3設定を含む。
+差分表は nested 268行（既存232行＋Outer失敗36行）、frame-start 81行で、既存データ行は変更しない。
+hit 列は削除せず Java 側の値・全キー・全行・全列を照合し、診断2列の host 差はテストが拒否する。
+`MemoHitAccountingAssertions` は実測の OFF/SAFE_FAILURES の成否・両 cursor・reset・診断と
+後続解析を直接比較し、OFF の両 hit が0であることも検査する。
+この範囲では cache が結果を変える反例はなく、新しい不具合 issue に分離する項目はない。
+任意文法・任意 IR の全面一致や #823 の候補単独の差の解消は主張しない。
+
+### mutation
+
+隔離した比較用 worktree で、同じ生成 parser・実測照合テストを実行した。変更なしの
+nested 対照は成功し、次の4変異はいずれも失敗した。元の作業 worktree の oracle は変えていない。
+
+- Outer の会計差36行を差分表から除去すると、Rust の実 failure hit 2 が Java の期待5と異なり失敗する。
+- frame-start の Root-longest-negative の Rust success hit を0→1に変えると、実測0との不一致で失敗する。
+- Outer-nonstarter の Rust 診断 CP を差分表で +1すると、診断差を許可しない検査で失敗する。
+- Outer-nonstarter の Java failure hit の期待値を5→6に変えると、生成 Java の実測5との不一致で失敗する。
+
+
+<a id="plain-success-diagnostics"></a>
+
+## 先行先読みのない通常呼出の成功診断 (#872 / #876)
+
+両 issue の原因は同じである。Java の `getParseFailureDiagnostics()` は実失敗があれば
+`farthestFailureOffset` を優先し、なければ `maxReachedOffset` を返す。
+`startParse` / `endParse` / `consume` / `matchOnly` が `trackCursorProgress` を呼ぶため、
+成功した literal / MatchOnly の到達位置も fallback に含む。Java runtime は変更しない。
+
+Rust の `finish_expression` は `classic_max_reached.is_some()` を成功記録の条件にしていた。
+先行先読みがなければ `note_success_frame_start` に入らず、UNTIL の終端失敗の集約も呼ばれない。
+この条件だけを除き、既存の Detailed transaction ガードと cold recorder を使う。
+実失敗は引き続き成功到達位置より優先し、既存の memo diagnostic にも同じ値を保存する。
+
+| 入力経路（通常呼出、AUTO / DETAILED） | Java oracle / 修正後 Rust | 修正前 Rust |
+| --- | ---: | ---: |
+| PlainSeq-until-noprefix、`aab` | CP1（CP0/1 の終端試行の失敗） | CP0 |
+| PlainSeq-until-immediate、`bb` | CP1（失敗なし、終端 MatchOnly の到達） | CP0 |
+| PlainSeq-until-noprefix-unicode、`a😀b` | CP1（byte 位置ではなく CP） | CP0 |
+| PlainSeq-until-noprefix-eof、`a😀` | CP2（EOF の終端試行の失敗） | CP0 |
+| Helper2、`azb`、direct / nonordered | CP2（失敗なし） | CP0 |
+| Outer2、`azx`、direct / nonordered | CP3（失敗なし） | CP0 |
+
+### native PEG の契約との境界
+
+今回の Rust harness は `parse_shared_grammar` の driver 内で生成 rule / wrapper の
+`Expr::parse` を呼ぶので、`grammar_frontier=true` の Java 互換経路である。
+Java-host / native は生成器の違いであり、native 生成器の使用自体を native PEG 診断契約の
+選択とはみなさない。そのため、この corpus の成功到達位置は Java に揃える。
+
+独立した native PEG の `context.parse(&expr)` は、grammar 内から呼ばれた場合も
+`grammar_frontier=false` に切り替える。cold recorder の既存ガードがこの入口と lexing session を除外する。
+`peg-frontier` の Java 成功到達 / Rust `failure()=0` の別列は維持し、期待値を変更しない。
+`CatchLabels` の通知なし transaction も従来どおり除外する。
+[PEG の入口契約](../../docs/peg-assertions.md)と
+[prior matched の契約](../../docs/prior-matched-diagnostics.md)を参照。
+
+### corpus と不変条件
+
+frame-start に5経路120行、nested-boundary に32経路768行を Java の実行値から追記した。
+既存の Java oracle 2760 / 1896行は byte 単位で維持する。
+nested は `Helper2` / `Outer2` のほか `[Helper] 'x' | Helper`、Longest / Unique の Helper、
+`Outer 'y' | Outer | Mix 'x'` を direct / nonordered / lookahead / choice で比較する。
+Unicode・EOF・空入力・先行先読み・候補失敗・optional 欠落の対照も含む。
+
+各入力を通常 / Classic、初期 reset 2設定、memo OFF / SAFE_FAILURES、診断3設定で検査する。
+Java は frame-start 2880行・nested 2664行、両 Rust host × 通常/mapping はそれぞれ
+11520 / 21312観測（nested は既存18候補の Chain 対照込み）。
+生成物の byte 一致だけで済ませず、両 host の生成物を個別に compile・実行する。
+
+差分表の診断2列の差はともに0行。frame-start の81行は不変、nested は268→316行で、
+増分48行は新規経路の #827 型の memo 会計差だけである。既存の差分行は byte 単位で維持する。
+修正前後で成否・両 cursor・reset・後続成否・後続診断・failure/success hit は全観測不変。
+変化するのは成功直後の診断 CP だけ（frame-start 32行、nested 152行／graph）。
+`MemoHitAccountingAssertions` と差分表の診断同値検査を維持し、テスト側の除外や値の読み替えは足さない。
+
+### #197 に対する費用
+
+- 成功経路の既存 `java_transaction && Diagnostics::Detailed` の短絡順は維持する。
+  その後の `classic_max_reached.is_some()` の判定1つを除く。新しい分岐・呼出し箇所・field・cache は0。
+- AUTO / DETAILED では、先行先読みがなくても成功した native transaction frame ごとに
+  既存の `#[cold] #[inline(never)] note_success_frame_start` が呼ばれる。呼出し頻度は増える。
+  最大値計算・memo diagnostic 更新と UNTIL の失敗試行の集約は既存 helper 内に保つ。
+  UNTIL は既存の expected 名の登録も実行するため、未登録なら従来の診断用領域を使う。
+- DETAILED_ON_FAILURE の処理・呼出し数と UNTIL の走査ループは不変。新しい再帰経路はない。
+  入力照合・候補選択・memo key / hit 会計も変えず、性能の再計測は行わない。
+
+#877 時点の記録点は成功した Java transaction frame だけだった。その外の Chain / literal の
+最後の消費（direct の `'a' 'z'` は Java CP2 / Rust CP0）は、後述の #878 で外部入口の成功時に
+記録するようになった。#197 の費用の説明は、この節では #877 の変更だけを述べている。
+任意の手組み IR や成功履歴全般の全面一致、#823 の候補単独 reset 差の解消は主張しない。
+入口が戻る前の custom parser による途中診断の観測は #881 に分離する。
+
+
+### mutation
+
+origin/master `91c691aa` の隔離比較 worktree に更新後の入力・Java oracle・memo 差分表を置き、
+成功記録の条件を変更していない runtime で、同じ2つの conformance test を実行した。
+先に照合する host で失敗が確定するため、比較用 test の host 順だけを逆にした実行も行い、両 host の mutation を確認した。
+Java oracle の2メソッドは成功し、Rust 照合の2メソッドだけが失敗する。
+frame-start は `PlainSeq-until-noprefix / false / false / OFF / AUTO` の CP1→0、
+nested は `Helper2-direct-noprefix` の同設定の CP2→0 を検出した。
+修正前 runtime の全出力と修正済みの対照を比較すると、不一致は診断 CP のみで、
+frame-start は各 host 5760観測中64、nested は各 host 10656観測中608となる。
+修正済みでは両 host とも0。元の作業 worktree の runtime と oracle は mutation で変更していない。
+
+
+## transaction frame の外の成功到達位置 (#878)
+
+Java の `consume` は transaction frame の外でも到達位置を記録する。Rust は外部入口
+`parse_expression` の成功分岐で、AUTO / DETAILED のときだけ cold helper
+`note_success_entry` を呼び、`max(position, matched_position)` を既存の成功 watermark と
+有効な memo diagnostic frame に保存する。実失敗を優先する `failure()` は変えない。
+Java runtime、ノード単位の `expression` / `finish_expression`、走査・照合・transaction は変更しない。
+
+| 入力経路（通常呼出、AUTO / DETAILED） | Java / 修正後 Rust | 修正前 Rust |
+| --- | ---: | ---: |
+| PlainSeq2 direct、`azb` | CP2 | CP0 |
+| PlainSeq2 direct、`azb`、先行先読み `a` | CP2 | CP1 |
+| TailSeq direct、`azb` | CP2 | CP1 |
+| LiteralOnly direct、`azb` | CP2 | CP0 |
+| UnicodeSeq / UnicodeLiteral direct、`a😀b` | CP2 | CP0 |
+| UnicodeTail direct、`a😀b` | CP2 | CP1 |
+
+### 検査範囲と費用
+
+nested-boundary に47経路・1128行を Java の実行値から追加した。既存2664行は byte 単位で
+維持し、計158経路・3792行を通常/Classic、初期 reset 2設定、memo 2設定、診断3設定で比較する。
+両 Rust host × 通常/mapping × 既存 Chain 対照で30336観測を照合する。両生成器の byte 一致を
+確認したうえで、それぞれ compile・実行する。差分表は既存316行のままで診断差は0行。
+
+PR #882 のレビューで、Java 実測の18経路・432行をさらに追加した（計176経路・4224行、
+両 Rust host × 通常/mapping × Chain 対照で33792観測、診断差0行）。`'a'` 単独 rule とその EOF、
+literal の後の rule 呼出し（`'a' SingleZ`）は修正を外すと失敗する。末尾の optional / 反復
+（当たり・外れ・EOF）、末尾の先読み、`@longestChoice` / `@predictiveChoice`、Unicode の反復と
+その空一致、先行先読みが消費より広い `'a'` は対照で、修正の前後で値が変わらない。
+
+`NonOrdered(PlainSeq2)`、`Choice(TailSeq, 'fallback')`、最後が Choice の Chain、UNTIL 単独・
+Choice・後続消費、optional、先行失敗候補、反復、alias と入れ子 rule の後続消費を対照に含める。
+Unicode・EOF・空入力・先行先読みも検査する。成否・両 cursor・reset・後続成否/診断・memo hit を
+修正前後の全行で比較する。Classic と DETAILED_ON_FAILURE の診断値も変えない。
+
+- 外部入口の成功時に**入口ごとに分岐1つ増える**。DETAILED_ON_FAILURE でも比較1つは増える。
+  既存の入口の診断分岐は Classic 切替専用なので、通常呼出には流用できない。
+- 指示役は #197 に対してこの費用を許可した。利用者の呼出しごとの比較で解析の長さに比例せず、
+  凍結が守るノードごとの走査・照合・transaction の費用に入らないためである。
+- 最大値の計算と記録、対象の判定は `#[cold] #[inline(never)]` helper 内に置く。
+  新しい field・cache・割当・再帰経路はない。性能再計測は行わない。
+- Classic、`grammar_frontier=false` の native PEG 式入口、lexing session を helper 内で除外する。
+  通知なしの CatchLabels も除外し、`peg-frontier` の別列は維持する。
+
+### 途中診断の観測時点の契約 (#881)
+
+**結論:** Java 互換 grammar の外部入口から戻る前に custom parser が読む成功診断 CP は、
+Rust では、その時点までに記録済みの transaction frame（および戻った入れ子入口）と実失敗だけを
+反映する下限であり、対応する Java の値以下になる。外部入口から戻った後の診断 CP は Java と
+一致する。これは公開 API の**観測時点の意図した差**であり、途中値を現在の cursor や最終診断と
+同一視しない。実失敗が既に記録されていれば成功時の最大到達位置より失敗が優先され、途中値も
+Java と一致する。成功時の下限は、その後の実失敗を含む最終 CP の下限を意味しない。
+
+Java の `trackCursorProgress` は `consume` / `matchOnly` / `startParse` / `endParse` で
+`max(consumed, matched)` を記録する。Rust の成功記録点は対応する Java の到達履歴の部分集合で、
+未記録の Chain / literal の消費を加えても最大値は減らないため、実失敗のない途中値は
+`Rust ≤ Java` となる。両者とも実失敗を成功 fallback より優先するので、例えば CP0 の実失敗後に
+2 CP 消費しても途中・最終の診断は CP0 になる。この根拠は Java 互換の構文診断についてのもので、
+任意の手組み IR・独自エラー・resource/name/raised failure の優先順位全般の新しい保証ではない。
+
+`ParseContext::failure(&self)` は読み取りだけで、cursor / reset / transaction / memo を更新せず、
+再解析もしない。Java の accessor も解析状態を進めない。途中値を読むだけなら後続の結果は不変だが、
+利用側が異なる途中値を条件に受理や消費を変える custom parser の同値性は保証しない。
+低水準 context の DETAILED_ON_FAILURE は途中・最終とも空診断（CP0）のまま、読み取りで retry しない。
+独立 native PEG の `context.parse(&expr)` と lexing は従来の別契約を維持する。
+
+完全な途中一致には Java と同様の更新を Rust のノード単位の処理へ追加する必要がある。
+[#878 の指示役判断](https://github.com/opaopa6969/unlaxer-parser/issues/878#issuecomment-6442006064) が
+#197 の範囲内で許可したのは外部入口ごとの比較と cold helper だけなので、その追加はしない。
+Java/Rust runtime の実行コード・cache・生成器は変更せず、rustdoc と共通 probe で契約を固定する。
+性能の再計測も行わない。
+
+#### 共通 probe と実測 oracle
+
+`MidParseDiagnosticsConformanceTest` と `rust/unlaxer-runtime/tests/mid_parse_diagnostics.rs` は
+`mid-parse-inputs.tsv` を共有する。Java の `Chain(head, Chain(observerWordZ))` と、Rust の
+`parse_shared_grammar` 内 `Root = Sequence(head, Rule(Inner))`、
+`Inner = Sequence(Custom(observer), Literal("z"))` を対応させる。Java は `getToken` の先頭、
+Rust は空成功の callback 内で、同じ `z` の消費前に診断を2回読む。
+observer の記録は context の外に置き、state epoch / memo key を変えない。
+
+8経路 × ASCII / Unicode × 通常 / Classic × 初期 reset 2設定 × memo OFF / SAFE_FAILURES ×
+診断3設定 = **384行**。各行で観測する実行と観測しない対照を別 context で実行する。
+Java の実測全41列を `mid-parse-java.tsv` に固定し、途中の両言語の値は等しい行も含め
+`mid-parse-observations.tsv` の384行に固定する。差分は次の**途中 CP の48行だけ**である。
+
+| 経路（通常、AUTO / DETAILED） | ASCII 途中 Java / Rust | Unicode 途中 Java / Rust | 最終 CP（両言語、ASCII / Unicode） |
+| --- | --- | --- | --- |
+| plain / EOF | 1 / 0 | 2 / 0 | 2 / 3 |
+| 読み取り後、`z` を消費して後続 `!` が失敗 | 1 / 0 | 2 / 0 | 2 / 3（解析失敗・cursor は0へ rollback） |
+| head を NonOrdered で包む（完了済み frame） | 1 / 1 | 2 / 2 | 2 / 3 |
+| `head + z` の先行 MatchOnly | 2 / 2 | 3 / 3 | 2 / 3 |
+| head 前の失敗候補 | 0 / 0 | 0 / 0 | 0 / 0 |
+| head 後の Optional 内の実失敗 | 1 / 1 | 2 / 2 | 1 / 2 |
+| `head + z` 後の失敗候補から rollback | 2 / 2 | 3 / 3 | 2 / 3 |
+
+Classic の途中値はこの corpus の全行で一致する。DETAILED_ON_FAILURE は全行 CP0。
+実失敗済みの3経路・144行では、途中も必ず完全一致を assert する。
+全行で `Rust ≤ Java` を assert し、途中列だけを差分表で置換して全行を比較する。
+最終 CP・成否・両 cursor・reset は緩和せず完全一致。後続の NonOrdered(MatchOnly("b")) と
+同一の安全な失敗 rule の3回呼出しでも全列を照合する。Java ではその rule の exact class に
+`SafeSuccessMemoizable` を宣言し、Rust は同一 grammar session の rule memo を使う。
+SAFE_FAILURES の failure hit は両言語とも0→1→2（OFF は0）、success hit はこの probe では0。
+読み取り有無でこれらの全列が同じであり、memo OFF / SAFE_FAILURES でも解析結果は変わらない。
+
+この probe は issue の手組み公開 grammar API の契約を扱う。**生成 rule 内の custom adapter の
+lowering は対象に含めない**ため、新 probe に生成 host / mapping の組はない。
+既存の `NestedCandidateBoundaryConformanceTest`（両 Rust host × 通常/mapping × Chain 対照）の
+4224行 oracle と差分表は変更せず、診断差0行を回帰確認する。
+ChainReset / FrameStart / PriorMatchedDiagnostics と Rust workspace、native PEG の対照も実行する。
+調査した範囲では (a) 下限、(b) 読み取り無作用、(c) 実失敗時の一致を破る反例は見つからなかった。
+反例が見つかった場合はこの差分表の許容範囲へ追加せず、受け入れ条件付きの不具合 issue に分離する。
+
+#### #881 の照合 mutation
+
+runtime の修正を外す代わりに、同じ Rust 共通 oracle テストへ次の変異を順に与え、
+両方とも失敗を確認してから fixture を byte 単位で復元する。
+
+- `mid-parse-java.tsv` の先頭行の外部入口直後 CP を2→3に変更: `final oracle` の完全一致で失敗。
+- `mid-parse-observations.tsv` の先頭行の Rust 途中 CP を0→2（Java は1）に変更:
+  `intermediate lower bound` の不等式で失敗。
+
+### #878 の mutation
+
+base `3b8a2bc7` の隔離 worktree に更新後の corpus を置き、修正前 runtime で同じ
+`NestedCandidateBoundaryConformanceTest` を実行した。Java oracle テストは成功し、Rust 照合は
+`PlainSeq2-direct / false / false / OFF / AUTO` の CP2→0 で失敗する。比較用テストの host 順を
+逆にした実行でも native の同じ失敗を確認した。製品 runtime と共通テストには変異を入れない。
+
+各 host の通常/mapping/Chain 対照15168観測を修正前後で比較すると、16経路512行の成功直後の
+診断 CP だけが変化する（128行/graph）。成否・両 cursor・reset・後続の成否/診断・failure/success hit、
+Classic と DETAILED_ON_FAILURE は全行不変。修正済みの診断差は両 host とも0行である。
+レビューで追加した後の corpus（各 host 16896観測）でも修正の呼出しだけを外して照合し、
+両 host とも19経路608行（上記16経路と `SingleA-direct` / `SingleA-eof` / `RuleTail-direct`）の
+成功直後の診断 CP だけが変わることを確認した。

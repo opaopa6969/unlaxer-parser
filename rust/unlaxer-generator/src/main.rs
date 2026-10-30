@@ -1,4 +1,4 @@
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -150,7 +150,9 @@ fn run_check(args: Vec<OsString>) -> Result<(u8, String), (u8, String)> {
         return Err((2, CHECK_HELP.into()));
     }
     let grammar = grammar.ok_or((2, CHECK_HELP.into()))?;
-    let source = fs::read_to_string(&grammar).map_err(io_error)?;
+    let grammar = unlaxer_generator::modules::normalize(&grammar).map_err(|e| (4, e))?;
+    let source = unlaxer_generator::input::read_grammar(&grammar)
+        .map_err(|error| (4, format!("I/O error: {error}")))?;
     let report = if unlaxer_ubnf::parse(&source).is_err() {
         unlaxer_generator::portability::check(&source)
     } else {
@@ -248,14 +250,11 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     if grammar.as_os_str().is_empty() || output.as_os_str().is_empty() {
         return Err((2, "grammar and output paths must not be empty".into()));
     }
+    let grammar = unlaxer_generator::modules::normalize(&grammar).map_err(|e| (4, e))?;
     // Keep I/O exit status separate from grammar/link errors for the entry file.
-    let source = fs::read_to_string(&grammar).map_err(io_error)?;
-    let files = (if lsp || dap {
-        unlaxer_generator::generate_file_with_protocols(&grammar, lsp, dap)
-    } else {
-        unlaxer_generator::generate_file(&grammar)
-    })
-    .map_err(|message| (3, message))?;
+    let source = unlaxer_generator::input::read_grammar(&grammar).map_err(file_error)?;
+    let files =
+        unlaxer_generator::generate_file_with_errors(&grammar, lsp, dap).map_err(file_error)?;
     // Errors come first; under --strict a warning fails before anything is written.
     let warnings = unlaxer_generator::warnings::report(
         &unlaxer_generator::warnings::collect(&source),
@@ -264,6 +263,7 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     if !warnings.is_empty() {
         eprintln!("{warnings}");
     }
+    let output = output_path(&output);
     write_artifacts(&output, &files, check).map_err(io_error)?;
     Ok(format!(
         "{} {} Rust module files in {}",
@@ -273,8 +273,24 @@ fn run(args: Vec<OsString>) -> Result<String, (u8, String)> {
     ))
 }
 
+fn file_error(error: unlaxer_generator::input::FileError) -> (u8, String) {
+    (error.exit_code(), error.to_string())
+}
+
 fn io_error(error: io::Error) -> (u8, String) {
     (4, error.to_string())
+}
+
+// String.isBlank / Character.isWhitespace on JDK17 and JDK21. Rust's Unicode
+// White_Space includes NBSP/NEL and excludes U+001C..U+001F, so do not use it.
+fn java_option_is_blank(value: &OsStr) -> bool {
+    value.to_str().is_some_and(|value| {
+        value.chars().all(|ch| {
+            matches!(ch, '\u{0009}'..='\u{000d}' | '\u{001c}'..='\u{0020}'
+                | '\u{1680}' | '\u{2000}'..='\u{2006}' | '\u{2008}'..='\u{200a}'
+                | '\u{2028}' | '\u{2029}' | '\u{205f}' | '\u{3000}')
+        })
+    })
 }
 
 fn run_playground(args: Vec<OsString>) -> Result<String, (u8, String)> {
@@ -295,7 +311,7 @@ fn run_playground(args: Vec<OsString>) -> Result<String, (u8, String)> {
             option,
             "--grammar" | "--profile" | "--package" | "--manifest" | "--output"
         ) || cursor + 1 == args.len()
-            || args[cursor + 1].is_empty()
+            || java_option_is_blank(&args[cursor + 1])
             || args[cursor + 1].to_string_lossy().starts_with("--")
         {
             return Err((2, PLAYGROUND_HELP.into()));
@@ -331,25 +347,36 @@ fn run_playground(args: Vec<OsString>) -> Result<String, (u8, String)> {
             &manifest.unwrap(),
             package.to_str().ok_or((2, PLAYGROUND_HELP.into()))?,
         )
+        .map_err(|message| (3, message))?
     } else if let Some(profile) = profile {
-        unlaxer_generator::playground::generate_profile(&profile)
+        // Path.of in Java collapses separators for profile paths as for output paths.
+        unlaxer_generator::playground::generate_profile_with_errors(&output_path(&profile))
+            .map_err(file_error)?
     } else {
-        unlaxer_generator::playground::generate_file(&grammar.unwrap())
-    }
-    .map_err(|message| (3, message))?;
+        unlaxer_generator::playground::generate_file_with_errors(&grammar.unwrap())
+            .map_err(file_error)?
+    };
+    let given = output_path(&output);
+    let given = if given.is_absolute() {
+        given
+    } else {
+        std::env::current_dir().map_err(io_error)?.join(given)
+    };
+    // Java checks both spellings: normalization must not hide a symlink in a/../b.
+    reject_symlink_ancestors(&given).map_err(io_error)?;
+    let output = unlaxer_generator::modules::normalize(&given).map_err(|e| (4, e))?;
     write_playground(&output, &files, check).map_err(io_error)?;
     Ok(format!("{} {} playground files in {}\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.",
         if check { "Verified" } else { "Generated" }, files.len(), output.display()))
 }
 
 fn write_playground(output: &Path, files: &[GeneratedFile], check: bool) -> io::Result<()> {
-    let output = std::path::absolute(output)?;
-    reject_symlink_ancestors(&output)?;
+    reject_symlink_ancestors(output)?;
     if check {
         for file in files {
             let destination = output.join(&file.relative_path);
             reject_symlink_ancestors(&destination)?;
-            if fs::read_to_string(&destination)? != file.content {
+            if !destination.is_file() || read_output(&destination)? != file.content {
                 return Err(invalid(format!(
                     "generated file differs: {}",
                     destination.display()
@@ -367,7 +394,7 @@ fn write_playground(output: &Path, files: &[GeneratedFile], check: bool) -> io::
     let parent = output
         .parent()
         .ok_or_else(|| invalid("output needs a parent"))?;
-    fs::create_dir_all(parent)?;
+    create_output_directories(parent)?;
     let mut staging = None;
     for attempt in 0..100 {
         let candidate = parent.join(format!(".ubnf-playground-{}-{attempt}", std::process::id()));
@@ -377,24 +404,27 @@ fn write_playground(output: &Path, files: &[GeneratedFile], check: bool) -> io::
                 break;
             }
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(error),
+            Err(error) => return Err(path_error(&candidate, error)),
         }
     }
     let staging = staging.ok_or_else(|| invalid("cannot allocate playground staging directory"))?;
     let result = (|| {
         for file in files {
             let destination = staging.join(&file.relative_path);
-            fs::create_dir_all(destination.parent().unwrap())?;
+            create_output_directories(destination.parent().unwrap())?;
             let mut handle = OpenOptions::new()
                 .write(true)
                 .create_new(true)
-                .open(destination)?;
-            handle.write_all(file.content.as_bytes())?;
+                .open(&destination)
+                .map_err(|e| path_error(&destination, e))?;
+            handle
+                .write_all(file.content.as_bytes())
+                .map_err(write_error)?;
         }
         if output.exists() {
             return Err(invalid("output was created during generation"));
         }
-        fs::rename(&staging, &output)
+        fs::rename(&staging, output).map_err(|e| path_error(output, e))
     })();
     result.map_err(|error| {
         invalid(format!(
@@ -407,100 +437,329 @@ fn invalid(message: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message.into())
 }
 
-fn reject_symlink_ancestors(path: &Path) -> io::Result<()> {
-    for ancestor in path.ancestors().filter(|p| !p.as_os_str().is_empty()) {
-        // A trailing slash or /. makes stat follow the link on Unix. Remove only
-        // lexical dot/slash decoration; do not resolve '..' through a symlink.
-        let normalized: PathBuf = ancestor.components().collect();
-        match fs::symlink_metadata(&normalized) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err(invalid(format!(
-                    "refusing symbolic link {}",
-                    ancestor.display()
-                )))
+// Unix Path.of collapses separators, but retains dot and parent components.
+// Path::components would also remove dots; canonicalize would follow symlinks.
+fn output_path(path: &Path) -> PathBuf {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+        let mut bytes = Vec::new();
+        for &byte in path.as_os_str().as_bytes() {
+            if byte != b'/' || bytes.last() != Some(&b'/') {
+                bytes.push(byte);
             }
-            Ok(_) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(path_error(&normalized, error)),
         }
+        if bytes.len() > 1 && bytes.last() == Some(&b'/') {
+            bytes.pop();
+        }
+        OsString::from_vec(bytes).into()
+    }
+    #[cfg(not(unix))]
+    path.to_owned()
+}
+
+fn reject_symlink_ancestors(path: &Path) -> io::Result<()> {
+    if let Some(link) = symbolic_link_ancestor(path) {
+        return Err(invalid(format!(
+            "refusing symbolic link {}",
+            link.display()
+        )));
     }
     Ok(())
 }
 
+fn symbolic_link_ancestor(path: &Path) -> Option<PathBuf> {
+    let mut cursor = Some(output_path(path));
+    while let Some(path) = cursor {
+        // Like Files.isSymbolicLink, mask attribute errors; the write reports them.
+        if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Some(path);
+        }
+        cursor = output_parent(&path);
+    }
+    None
+}
+
+// Java getParent retains dots: the parent of link/. is link, unlike Rust Path.
+fn output_parent(path: &Path) -> Option<PathBuf> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+        let bytes = path.as_os_str().as_bytes();
+        if bytes == b"/" {
+            return None;
+        }
+        bytes
+            .iter()
+            .rposition(|&b| b == b'/')
+            .map(|index| OsString::from_vec(bytes[..index.max(1)].to_vec()).into())
+    }
+    #[cfg(not(unix))]
+    path.parent().map(Path::to_owned)
+}
+
+// Java NIO path exceptions for output operations (EISDIR differs from input reads).
 fn path_error(path: &Path, error: io::Error) -> io::Error {
-    io::Error::new(error.kind(), format!("{}: {error}", path.display()))
+    let message = match error.kind() {
+        io::ErrorKind::NotFound
+        | io::ErrorKind::PermissionDenied
+        | io::ErrorKind::AlreadyExists => path.display().to_string(),
+        _ => format!("{}: {}", path.display(), os_reason(&error)),
+    };
+    io::Error::new(error.kind(), message)
+}
+
+fn os_reason(error: &io::Error) -> String {
+    let message = error.to_string();
+    error
+        .raw_os_error()
+        .and_then(|errno| message.strip_suffix(&format!(" (os error {errno})")))
+        .map_or_else(|| message.clone(), str::to_owned)
+}
+
+// A failed write on an open channel (ENOSPC, EFBIG, EIO) is a pathless IOException in Java.
+fn write_error(error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), os_reason(&error))
+}
+
+// Files.readString of an existing output: Java NIO path messages and malformed lengths.
+fn read_output(path: &Path) -> io::Result<String> {
+    unlaxer_generator::input::read_string(path)
+        .map_err(|message| io::Error::new(io::ErrorKind::InvalidData, message))
+}
+
+// Files.createDirectories first tries the supplied path, then walks from an
+// existing absolute parent. Preserve that path spelling in failures (#937).
+fn create_output_directories(path: &Path) -> io::Result<()> {
+    fn create(path: &Path) -> io::Result<()> {
+        // createAndCheckIsDirectory: an existing entry must be a directory, not a link to one.
+        match fs::create_dir(path) {
+            Err(error)
+                if error.kind() == io::ErrorKind::AlreadyExists
+                    && fs::symlink_metadata(path).is_ok_and(|m| m.is_dir()) =>
+            {
+                Ok(())
+            }
+            result => result,
+        }
+    }
+    match create(path) {
+        Ok(()) => return Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            return Err(path_error(path, error))
+        }
+        Err(_) => {}
+    }
+    // toAbsolutePath and getParent retain dot components (std::path::absolute and
+    // Path::parent drop them), so file/./out fails at file/. as in Java (#952).
+    let absolute = if path.is_absolute() {
+        path.to_owned()
+    } else {
+        std::env::current_dir()?.join(path)
+    };
+    let mut parent = output_parent(&absolute);
+    while let Some(candidate) = parent {
+        match fs::metadata(&candidate) {
+            Ok(_) => {
+                parent = Some(candidate);
+                break;
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                parent = output_parent(&candidate)
+            }
+            Err(error) => return Err(path_error(&candidate, error)),
+        }
+    }
+    let parent = parent.ok_or_else(|| invalid("output needs an existing ancestor"))?;
+    let parent = parent.as_path();
+    // Java walks parent.relativize(absolute), which folds dot/parent pairs.
+    // Keep the original destination for the subsequent open and its error: when
+    // out is absent, out/../out2 creates only out2, then opening the file fails.
+    let mut relative = Vec::new();
+    for component in absolute.strip_prefix(parent).unwrap().components() {
+        use std::path::Component;
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir if matches!(relative.last(), Some(Component::Normal(_))) => {
+                relative.pop();
+            }
+            other => relative.push(other),
+        }
+    }
+    let mut directory = parent.to_owned();
+    // An empty relativize result still has one empty name: Java re-checks the parent,
+    // so file/. reports the existing non-directory file rather than a later open.
+    if relative.is_empty() {
+        return create(&directory).map_err(|e| path_error(&directory, e));
+    }
+    for component in relative {
+        directory.push(component);
+        create(&directory).map_err(|e| path_error(&directory, e))?;
+    }
+    Ok(())
+}
+
+fn cannot_write(destination: &Path, error: io::Error) -> io::Error {
+    io::Error::new(
+        error.kind(),
+        format!("cannot write {}: {error}", destination.display()),
+    )
 }
 
 fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::Result<()> {
-    reject_symlink_ancestors(output)?;
+    if fs::symlink_metadata(output).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(invalid(format!(
+            "output directory must not be a symbolic link: {}",
+            output.display()
+        )));
+    }
+    // Intentional native policy: do not write through caller-owned symlink ancestors.
+    if let Some(link) = symbolic_link_ancestor(output) {
+        return Err(invalid(format!(
+            "output directory must not have a symbolic link ancestor: {}",
+            link.display()
+        )));
+    }
     // Preflight every artifact. Unsupported input and handwritten files cause no writes.
     for file in files {
         let destination = output.join(&file.relative_path);
-        reject_symlink_ancestors(&destination)?;
-        for parent in destination.ancestors().skip(1) {
-            if parent.exists() && !parent.is_dir() {
+        // Java validateGeneratedParents: nearest generated parent first, then the file.
+        let mut parent = output_parent(&destination);
+        while let Some(directory) = parent.filter(|p| p.as_os_str() != output.as_os_str()) {
+            if fs::symlink_metadata(&directory).is_ok_and(|m| m.file_type().is_symlink()) {
                 return Err(invalid(format!(
-                    "refusing non-directory {}",
-                    parent.display()
+                    "refusing symbolic link {}",
+                    directory.display()
                 )));
             }
-        }
-        match fs::symlink_metadata(&destination) {
-            Ok(metadata) => {
-                if metadata.file_type().is_symlink() || !metadata.is_file() {
-                    return Err(invalid(format!(
-                        "refusing non-regular file {}",
-                        destination.display()
-                    )));
-                }
-                let previous =
-                    fs::read_to_string(&destination).map_err(|e| path_error(&destination, e))?;
-                if check {
-                    if previous != file.content {
-                        return Err(invalid(format!(
-                            "generated file differs: {}",
-                            destination.display()
-                        )));
-                    }
-                } else if !previous.starts_with(HEADER) {
-                    return Err(invalid(format!(
-                        "refusing to overwrite handwritten file {}",
-                        destination.display()
-                    )));
-                }
+            if directory.exists() && !directory.is_dir() {
+                return Err(invalid(format!(
+                    "refusing non-directory {}",
+                    directory.display()
+                )));
             }
-            Err(error) if error.kind() == io::ErrorKind::NotFound && !check => {}
-            Err(error) => return Err(path_error(&destination, error)),
+            parent = output_parent(&directory);
+        }
+        if fs::symlink_metadata(&destination).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err(invalid(format!(
+                "refusing symbolic link {}",
+                destination.display()
+            )));
+        }
+        // Java Files.exists / isRegularFile mask attribute errors (the write reports them);
+        // --check reports any missing or non-regular file as differing.
+        let metadata = fs::metadata(&destination).ok();
+        let regular = metadata.as_ref().is_some_and(fs::Metadata::is_file);
+        if check {
+            if !regular || read_output(&destination)? != file.content {
+                return Err(invalid(format!(
+                    "generated file differs: {}",
+                    destination.display()
+                )));
+            }
+        } else if metadata.is_some()
+            && (!regular || !read_output(&destination)?.starts_with(HEADER))
+        {
+            return Err(invalid(format!(
+                "refusing to overwrite non-generated file {}",
+                destination.display()
+            )));
         }
     }
     if check {
         return Ok(());
     }
-    fs::create_dir_all(output).map_err(|e| path_error(output, e))?;
-    // Per-file replacement avoids truncation on a failed write and does not follow a
-    // destination symlink introduced after preflight. This is not a directory transaction.
+    // Sibling replacement preserves contents on failure except for Java-compatible
+    // in-place writes to hard links or existing files in unwritable directories.
+    // This is not a directory transaction.
     for (i, file) in files.iter().enumerate() {
         let destination = output.join(&file.relative_path);
-        fs::create_dir_all(destination.parent().unwrap())
-            .map_err(|e| path_error(&destination, e))?;
-        let temporary = output.join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
-        let mut handle = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-            .map_err(|e| path_error(&destination, path_error(&temporary, e)))?;
+        // Java createDirectories(destination.getParent()) keeps out/. spelled as given.
+        let directory = output_parent(&destination).unwrap();
+        create_output_directories(&directory).map_err(|e| cannot_write(&destination, e))?;
+        // Rename alone bypasses a read-only existing artifact. Check the same
+        // write access as Java, without truncating it or following a raced link.
+        let mut access = OpenOptions::new();
+        access.write(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            access.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+        }
+        let existing = match access.open(&destination) {
+            Ok(handle) => Some(handle),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => return Err(cannot_write(&destination, path_error(&destination, error))),
+        };
+        let metadata = existing
+            .as_ref()
+            .map(fs::File::metadata)
+            .transpose()
+            .map_err(|e| cannot_write(&destination, path_error(&destination, e)))?;
+        #[cfg(unix)]
+        if metadata.as_ref().is_some_and(|m| {
+            use std::os::unix::fs::MetadataExt;
+            m.nlink() > 1
+        }) {
+            write_in_place(existing.unwrap(), &file.content)
+                .map_err(|e| cannot_write(&destination, e))?;
+            continue;
+        }
+        // A sibling temporary keeps Java's per-file directory permissions and write order.
+        let temporary = directory.join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
+        let mut create = OpenOptions::new();
+        create.write(true).create_new(true);
+        // Do not expose a private artifact's temporary before its mode is copied.
+        #[cfg(unix)]
+        if existing.is_some() {
+            use std::os::unix::fs::OpenOptionsExt;
+            create.mode(0o600);
+        }
+        let mut handle = match create.open(&temporary) {
+            Ok(handle) => handle,
+            // Only an existing, already opened writable file can use this fallback.
+            // A collision or other I/O failure must retain the replacement contract.
+            Err(error) if error.kind() == io::ErrorKind::PermissionDenied && existing.is_some() => {
+                write_in_place(existing.unwrap(), &file.content)
+                    .map_err(|e| cannot_write(&destination, e))?;
+                continue;
+            }
+            Err(error) => {
+                let failed = if error.kind() == io::ErrorKind::AlreadyExists {
+                    &temporary
+                } else {
+                    &destination
+                };
+                return Err(cannot_write(&destination, path_error(failed, error)));
+            }
+        };
         let result = (|| {
-            handle.write_all(file.content.as_bytes())?;
-            handle.sync_all()?;
+            // Copy the mode before writing: like Java's in-place write, the write then
+            // clears set-user-ID (and set-group-ID with group execute) for non-root users.
+            if let Some(metadata) = &metadata {
+                handle
+                    .set_permissions(metadata.permissions())
+                    .map_err(|e| path_error(&destination, e))?;
+            }
+            handle
+                .write_all(file.content.as_bytes())
+                .map_err(write_error)?;
+            handle.sync_all().map_err(write_error)?;
             drop(handle);
-            fs::rename(&temporary, output.join(&file.relative_path))
+            fs::rename(&temporary, &destination).map_err(|e| path_error(&destination, e))
         })();
         if result.is_err() {
             let _ = fs::remove_file(&temporary);
         }
-        result.map_err(|e| path_error(&destination, e))?;
+        result.map_err(|e| cannot_write(&destination, e))?;
     }
     Ok(())
+}
+
+// Reuse the non-following handle checked above; do not reopen a raced destination.
+fn write_in_place(mut handle: fs::File, content: &str) -> io::Result<()> {
+    handle.set_len(0).map_err(write_error)?;
+    handle.write_all(content.as_bytes()).map_err(write_error)
 }
 
 #[cfg(test)]
@@ -523,7 +782,10 @@ mod artifact_tests {
         let files = unlaxer_generator::generate(source).unwrap();
         assert_eq!(files.last().unwrap().relative_path, "mod.rs");
         // Exclusive temp creation fails at the second artifact, after one child write.
-        let blocked = output.join(format!(".unlaxer-{}-1.tmp", std::process::id()));
+        let blocked = output
+            .join(files[1].relative_path.as_str())
+            .with_file_name(format!(".unlaxer-{}-1.tmp", std::process::id()));
+        fs::create_dir_all(blocked.parent().unwrap()).unwrap();
         fs::write(&blocked, "occupied").unwrap();
         for existing in [false, true] {
             if existing {

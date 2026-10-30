@@ -12,6 +12,136 @@ public final class UBNFPackageResolver {
     public static final String MANIFEST = "ubnf.json";
     public static final String LOCK = "ubnf.lock.json";
     private static final int MAX_BYTES = 8 * 1024 * 1024;
+    // Local source files share the package graph byte budget; individual artifacts stay at 8 MiB.
+    static final int MAX_LOCAL_BYTES = 64 * 1024 * 1024;
+    private static final String NOT_REGULAR = "E-MODULE: local import is not a regular file";
+    private static final String TOO_LARGE = "E-MODULE: local import exceeds 64 MiB";
+
+    /** Disk reader for local imports. Custom SourceReaders may still supply in-memory documents. */
+    public static String readLocalSource(Path path) throws IOException {
+        return readLocalSource(path, UBNFPackageResolver::openSource);
+    }
+
+    @FunctionalInterface interface LocalInput {
+        OpenedSource open(Path path) throws IOException;
+    }
+
+    record OpenedSource(java.io.InputStream stream, boolean seekable, long size) implements AutoCloseable {
+        @Override public void close() throws IOException { stream.close(); }
+    }
+
+    // JDK17 exposes handle size/seekability, but not fstat's file type or O_NONBLOCK.
+    // In particular open itself can still block after a FIFO replacement: see #907.
+    static OpenedSource openSource(Path path) throws IOException {
+        var channel = java.nio.channels.FileChannel.open(path, StandardOpenOption.READ);
+        try {
+            boolean seekable;
+            try { channel.position(); seekable = true; }
+            catch (IOException exception) { seekable = false; }
+            return new OpenedSource(java.nio.channels.Channels.newInputStream(channel),
+                seekable, seekable ? channel.size() : 0);
+        } catch (IOException | RuntimeException exception) {
+            channel.close();
+            throw exception;
+        }
+    }
+
+    // The opener seam lets tests replace/grow the file after stat, without a timing race.
+    static String readLocalSource(Path path, LocalInput input) throws IOException {
+        return readSource(path, MAX_LOCAL_BYTES, NOT_REGULAR, TOO_LARGE, input);
+    }
+
+    private static void checkSource(Path path, int limit, String notRegular, String tooLarge) throws IOException {
+        var attributes = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class);
+        if (!attributes.isRegularFile()) throw new IOException(notRegular);
+        if (attributes.size() > limit) throw new IOException(tooLarge);
+    }
+
+    static String readSource(Path path, int limit, String notRegular, String tooLarge, LocalInput input) throws IOException {
+        byte[] bytes = readSourceBytes(path, limit, notRegular, tooLarge, input);
+        // Preserve Files.readString's strict UTF-8 decoding (no replacement characters).
+        return StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+    }
+
+    // The same bounded reader also supplies raw artifact bytes for SHA-256 verification.
+    private static byte[] readSourceBytes(Path path, int limit, String notRegular, String tooLarge, LocalInput input) throws IOException {
+        checkSource(path, limit, notRegular, tooLarge);
+        OpenedSource source;
+        try { source = input.open(path); }
+        catch (IOException exception) {
+            // Socket opens can fail before returning a channel; normalize a visible replacement.
+            checkSource(path, limit, notRegular, tooLarge);
+            throw exception;
+        }
+        try (var opened = source) {
+            if (!opened.seekable()) throw new IOException(notRegular);
+            if (opened.size() > limit) throw new IOException(tooLarge);
+            byte[] bytes = opened.stream().readNBytes(limit + 1);
+            if (bytes.length > limit) throw new IOException(tooLarge);
+            return bytes;
+        }
+    }
+
+    static byte[] readArtifact(Path path, boolean cached, LocalInput input) throws IOException {
+        String notRegular = cached ? "missing artifact; run unlaxer deps resolve --manifest ubnf.json"
+            : "artifact is not a regular file";
+        try {
+            return readSourceBytes(path, MAX_BYTES, "E-PACKAGE: " + notRegular,
+                "E-PACKAGE: artifact exceeds 8 MiB", input);
+        } catch (IOException exception) {
+            if (cached) throw documentError("artifact", exception);
+            // Explicit local sources keep Rust's existing wording: re-running deps resolve cannot fix them.
+            if (exception instanceof NoSuchFileException) throw error("missing local artifact");
+            if (exception.getMessage() != null && exception.getMessage().startsWith("E-PACKAGE: "))
+                throw new IllegalArgumentException(exception.getMessage(), exception);
+            throw error("cannot read local artifact");
+        }
+    }
+
+    /** Disk callbacks keep package metadata separate from local/unsaved source documents. */
+    public static UBNFModuleLoader.SourceReader diskReader() {
+        return new UBNFModuleLoader.SourceReader() {
+            @Override public String read(Path path) throws IOException { return readLocalSource(path); }
+            @Override public String readPackage(Path path) throws IOException { return readPackageSource(path); }
+        };
+    }
+
+    private static String subject(Path path) {
+        return path.getFileName().toString().equals(LOCK) ? "lock" : "manifest";
+    }
+
+    public static String readPackageSource(Path path) throws IOException {
+        return readPackageSource(path, subject(path));
+    }
+
+    private static String readPackageSource(Path path, String subject) throws IOException {
+        try {
+            return readSource(path, MAX_BYTES, "E-PACKAGE: " + subject + " is not a regular file",
+                "E-PACKAGE: " + subject + " exceeds 8 MiB", UBNFPackageResolver::openSource);
+        } catch (IOException exception) { throw documentError(subject, exception); }
+    }
+
+    private static IllegalArgumentException documentError(String subject, IOException exception) {
+        if (exception instanceof NoSuchFileException)
+            return error("missing " + subject + "; run unlaxer deps resolve --manifest ubnf.json");
+        // Invalid UTF-8 is invalid JSON content, as in Rust's byte parser, not an I/O failure.
+        if (exception instanceof java.nio.charset.CharacterCodingException) return error("invalid JSON");
+        if (exception.getMessage() != null && exception.getMessage().startsWith("E-PACKAGE: "))
+            return new IllegalArgumentException(exception.getMessage(), exception);
+        return error("cannot read " + subject);
+    }
+
+    private String readDocument(Path path) throws IOException {
+        String subject = subject(path);
+        try {
+            // Keep custom SourceReaders (including in-memory package documents) injectable.
+            // Production disk readers enforce the byte bound while reading, too.
+            String source = reader.readPackage(path);
+            if (source.length() > MAX_BYTES || source.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES)
+                throw error(subject + " exceeds 8 MiB");
+            return source;
+        } catch (IOException exception) { throw documentError(subject, exception); }
+    }
     private static final Gson JSON = new GsonBuilder().disableHtmlEscaping().setStrictness(Strictness.STRICT).create();
     private final Path directory;
     private final Path virtualRoot;
@@ -97,7 +227,7 @@ public final class UBNFPackageResolver {
     /** Resolve/update is the only operation that may retrieve dependency artifacts. */
     public static JsonObject resolve(Path manifestPath) throws IOException {
         Path manifest = manifestPath.toAbsolutePath().normalize();
-        JsonObject configuration = parse(Files.readString(manifest));
+        JsonObject configuration = parse(readPackageSource(manifest, "manifest"));
         versioned(configuration);
         JsonObject roots = object(configuration.get("dependencies"), "dependencies");
         dependencies(roots);
@@ -105,7 +235,7 @@ public final class UBNFPackageResolver {
         Map<String, byte[]> blobs = new TreeMap<>();
         for (var root : roots.entrySet()) resolveOne(root.getKey(), root.getValue().getAsJsonObject(),
             manifest.getParent(), packages, blobs, new LinkedHashSet<>(), false);
-        if (packages.size() > 128 || blobs.values().stream().mapToLong(b -> b.length).sum() > 64L * 1024 * 1024)
+        if (packages.size() > 128 || blobs.values().stream().mapToLong(b -> b.length).sum() > MAX_LOCAL_BYTES)
             throw error("package graph exceeds cache limits");
         JsonObject lock = new JsonObject();
         JsonObject packageValues = new JsonObject();
@@ -145,9 +275,10 @@ public final class UBNFPackageResolver {
             }
         } else if (source.startsWith("local:")) {
             if (remote) throw error("remote artifact cannot use local dependencies");
-            Path path = sourceDirectory.resolve(source.substring(6)).normalize();
-            if (Files.size(path) > MAX_BYTES) throw error("artifact exceeds 8 MiB");
-            bytes = Files.readAllBytes(path);
+            Path path;
+            try { path = sourceDirectory.resolve(source.substring(6)).normalize(); }
+            catch (InvalidPathException exception) { throw error("cannot read local artifact"); }
+            bytes = readArtifact(path, false, UBNFPackageResolver::openSource);
             childDirectory = path.toAbsolutePath().getParent();
         } else if (source.startsWith("https:")) {
             bytes = UBNFPackageFetcher.fetch(source);
@@ -168,7 +299,7 @@ public final class UBNFPackageResolver {
         JsonObject previous = packages.putIfAbsent(name, pinned);
         if (previous != null && !previous.equals(pinned)) throw error("conflicting package identity: " + name);
         if (previous == null) {
-            if (blobs.values().stream().mapToLong(blob -> blob.length).sum() + bytes.length > 64L * 1024 * 1024)
+            if (blobs.values().stream().mapToLong(blob -> blob.length).sum() + bytes.length > MAX_LOCAL_BYTES)
                 throw error("package graph exceeds cache limits");
             blobs.put(hash, bytes);
             for (var entry : nested.entrySet()) resolveOne(entry.getKey(), entry.getValue().getAsJsonObject(),
@@ -180,12 +311,12 @@ public final class UBNFPackageResolver {
     private JsonObject lock() throws IOException {
         if (lock != null) return lock;
         Path lockPath = directory.resolve(LOCK);
-        if (!Files.isRegularFile(lockPath)) throw error("missing lock; run unlaxer deps resolve --manifest ubnf.json");
-        JsonObject configuration = parse(reader.read(directory.resolve(MANIFEST)));
+        String lockSource = readDocument(lockPath);
+        JsonObject configuration = parse(readDocument(directory.resolve(MANIFEST)));
         versioned(configuration);
         JsonObject dependencies = object(configuration.get("dependencies"), "dependencies");
         dependencies(dependencies);
-        JsonObject value = parse(reader.read(lockPath));
+        JsonObject value = parse(lockSource);
         versioned(value);
         JsonObject roots = object(value.get("roots"), "roots");
         JsonObject expected = new JsonObject();
@@ -236,11 +367,9 @@ public final class UBNFPackageResolver {
         if (artifacts.containsKey(name)) return artifacts.get(name);
         JsonObject pinned = pinned(name);
         Path cache = directory.resolve(".ubnf-cache/packages/" + string(pinned, "sha256") + ".json");
-        if (!Files.isRegularFile(cache)) throw error("missing artifact; run unlaxer deps resolve --manifest ubnf.json");
-        if (Files.size(cache) > MAX_BYTES) throw error("artifact exceeds 8 MiB");
-        byte[] bytes = Files.readAllBytes(cache);
+        byte[] bytes = readArtifact(cache, true, UBNFPackageResolver::openSource);
         loadedBytes += bytes.length;
-        if (loadedBytes > 64L * 1024 * 1024) throw error("package graph exceeds cache limits");
+        if (loadedBytes > MAX_LOCAL_BYTES) throw error("package graph exceeds cache limits");
         if (!sha256(bytes).equals(string(pinned, "sha256"))) throw error("artifact hash mismatch: " + name);
         JsonObject value = artifact(bytes);
         if (!name.equals(string(value, "id")) || !string(value, "version").equals(string(pinned, "version")))

@@ -287,7 +287,7 @@ fn source_contract(
             }
             source_children(&item.element, &mut pending);
         }
-        let (semantic, cardinality) =
+        let (semantic, mut cardinality) =
             crate::preferred_plan::capture_contract(grammar, rule, field, recursive)?
                 .unwrap_or((false, unlaxer_codegen::Cardinality::One));
         let types: HashSet<_> = sites
@@ -311,10 +311,16 @@ fn source_contract(
             nominal = "Object".into();
         }
         if crate::nested_captures::enabled(rule) {
+            // Nested inference normalizes containers and transparent groups. Its
+            // leaf kind (including numeric/enum) and mapped nominal are the Java
+            // contract; the ordinary source spelling is not part of that type.
             nominal = format!(
-                "{:?}:{nominal}",
-                crate::nested_captures::field(grammar, rule, field)?
+                "{:?}:{:?}",
+                crate::nested_captures::field(grammar, rule, field)?,
+                crate::nested_captures::nominal_leaf(grammar, sites[0])
             );
+            // All container cardinalities are already present in the shape.
+            cardinality = unlaxer_codegen::Cardinality::One;
         }
         if let Some((previous, count)) = &mut contract {
             if *count != cardinality {
@@ -642,27 +648,10 @@ pub(crate) fn emit(grammar: &GrammarDecl, ir: &GrammarIr) -> Result<String, Stri
                         ));
                     }
                     nominal = Some(actual);
-                } else if !matches!(actual.kind, Kind::Enum(_) | Kind::Value)
-                    && !matches!(&actual.kind, Kind::Nested { leaf, .. } if **leaf == Kind::Value)
-                {
-                    for rule in grammar
-                        .rules
-                        .iter()
-                        .filter(|r| mapping(r).is_some_and(|(n, _)| n == variant))
-                    {
-                        let mut actual = HashSet::new();
-                        capture_types(grammar, &rule.body, name, &mut actual);
-                        if actual.len() != 1
-                            || nominal.as_ref().is_some_and(|previous| previous != &actual)
-                        {
-                            return Err(invalid(
-                                &family.rule,
-                                &format!("incompatible field {name} on {variant}"),
-                            ));
-                        }
-                        nominal = Some(actual);
-                    }
                 }
+                // families() already compared source field types. Comparing the
+                // descendants again would reject ordinary group captures whose
+                // Java type is Object and whose Rust representation is Text.
                 if contract.is_some_and(|previous| previous != actual) {
                     return Err(invalid(
                         &family.rule,

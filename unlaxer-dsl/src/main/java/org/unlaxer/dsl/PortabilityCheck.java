@@ -44,6 +44,7 @@ public final class PortabilityCheck {
 
     /** File API opts into local module loading; the String API remains I/O-free. */
     public static Result checkFile(java.nio.file.Path path) throws java.io.IOException {
+        path = path.toAbsolutePath().normalize();
         UBNFSourceSnapshot snapshot;
         try {
             snapshot = UBNFMapper.parseWithSource(java.nio.file.Files.readString(path));
@@ -63,7 +64,7 @@ public final class PortabilityCheck {
             return check(snapshot, snapshot.ast());
         try {
             var linked = org.unlaxer.dsl.bootstrap.UBNFModuleLoader.resolveWithSource(
-                snapshot, path, java.nio.file.Files::readString);
+                snapshot, path, org.unlaxer.dsl.bootstrap.UBNFPackageResolver.diskReader());
             // Only root identities (including rebuilt nodes) have positions in this snapshot.
             return check(linked, linked.ast());
         } catch (IllegalArgumentException | java.io.IOException error) {

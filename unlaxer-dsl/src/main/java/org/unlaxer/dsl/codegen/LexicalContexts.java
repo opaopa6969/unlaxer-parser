@@ -21,6 +21,9 @@ public final class LexicalContexts {
         try { requireValid(grammar); return List.of(); }
         catch (IllegalArgumentException error) {
             String message=error.getMessage();
+            // The portability inventory owns only context diagnostics. Let its
+            // structural phase report lexical compile errors as P-STRUCTURE.
+            if (message != null && message.startsWith("E-LEXICAL:")) return List.of();
             if (message == null || !message.startsWith("E-LEXICAL-CONTEXT-")) throw error;
             int separator=message.indexOf(": ");
             String code=message.substring(0,separator),subject=message.substring(separator+2);

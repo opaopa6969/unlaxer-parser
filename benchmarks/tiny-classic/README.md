@@ -66,6 +66,7 @@ python3 scripts/run-tiny-classic-benchmark.py \
 
 各 operation は fresh `ParseContext` を使い、実際に選んだ entry 名、両 cursor、完全入力、canonical typed AST と
 全 node CP span、semantic diagnostics、native syntax diagnostic、memo 実 hit を記録する。
+結果 JSON の `failure_hits` / `success_hits` は host 依存の内部会計で、Java/Rust 間の一致を契約しない (#827)。cache 粒度の差を含むため、意味の一致や性能順位の根拠にしない。[契約と実測](../../conformance/chain-reset-after-failure/README.md#memo-hit-accounting)。
 OFF/ON と同 host の各 trial では native syntax も完全比較し、異なる backend 間では
 expected の表示名/引用符を残したまま失敗 CP と hint の有無を比較する。成功時の
 reached/expected は生データへ保持するが、そのまま構文エラーとは扱わない。

@@ -1,6 +1,7 @@
 //! File-based lexical modules. Import aliases are namespaces, not host package names.
+use crate::input::FileError;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use unlaxer_ubnf::lexical::{LexicalExpression, Op};
 use unlaxer_ubnf::*;
 
@@ -14,9 +15,19 @@ pub(crate) const NON_ROOT_SPAN: Span = Span {
 };
 
 pub fn load(path: &Path) -> Result<UbnfFile, String> {
+    load_with_errors(path).map_err(|error| error.to_string())
+}
+
+pub(crate) fn load_with_errors(path: &Path) -> Result<UbnfFile, FileError> {
     let path = normalize(path)?;
-    let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    resolve(&source, &path, &mut crate::packages::Resolver::new(&path))
+    let source = crate::input::read_grammar(&path)?;
+    resolve_root(
+        &source,
+        &path,
+        &mut crate::packages::Resolver::new(&path),
+        false,
+        true,
+    )
 }
 
 pub(crate) fn load_for_check(path: &Path) -> Result<UbnfFile, String> {
@@ -27,7 +38,9 @@ pub(crate) fn load_for_check(path: &Path) -> Result<UbnfFile, String> {
         &path,
         &mut crate::packages::Resolver::new(&path),
         true,
+        true,
     )
+    .map_err(|error| error.to_string())
 }
 
 pub fn resolve(
@@ -35,7 +48,17 @@ pub fn resolve(
     path: &Path,
     packages: &mut crate::packages::Resolver,
 ) -> Result<UbnfFile, String> {
-    resolve_root(source, path, packages, false)
+    resolve_root(source, path, packages, false, true).map_err(|error| error.to_string())
+}
+
+/// Java's vocabulary inspection resolves an AST without a source snapshot, so
+/// even multi-grammar I/O failures have no grammar-location wrapper.
+pub(crate) fn resolve_for_inspect(
+    source: &str,
+    path: &Path,
+    packages: &mut crate::packages::Resolver,
+) -> Result<UbnfFile, String> {
+    resolve_root(source, path, packages, false, false).map_err(|error| error.to_string())
 }
 
 fn resolve_root(
@@ -43,7 +66,8 @@ fn resolve_root(
     path: &Path,
     packages: &mut crate::packages::Resolver,
     root_spans_only: bool,
-) -> Result<UbnfFile, String> {
+    include_location: bool,
+) -> Result<UbnfFile, FileError> {
     let path = normalize(path)?;
     let mut file = parse(source).map_err(|e| e.to_string())?;
     let mut loader = Loader {
@@ -55,11 +79,11 @@ fn resolve_root(
     for grammar in &mut file.grammars {
         let root_tokens = grammar.tokens.len();
         loader.link(grammar, &path).map_err(|error| {
-            if multiple {
-                format!(
-                    "grammar {} [{},{}): {error}",
+            if multiple && include_location {
+                error.context(&format!(
+                    "grammar {} [{},{})",
                     grammar.name, grammar.span.codepoint_start, grammar.span.codepoint_end
-                )
+                ))
             } else {
                 error
             }
@@ -76,7 +100,9 @@ fn resolve_root(
     Ok(file)
 }
 
-fn normalize(path: &Path) -> Result<PathBuf, String> {
+/// Absolute lexical file identity, shared by CLI readers and module/package loading.
+/// Does not resolve symlinks or require removed components to exist.
+pub fn normalize(path: &Path) -> Result<PathBuf, String> {
     let absolute = if path.is_absolute() {
         path.to_owned()
     } else {
@@ -84,17 +110,7 @@ fn normalize(path: &Path) -> Result<PathBuf, String> {
             .map_err(|e| e.to_string())?
             .join(path)
     };
-    let mut result = PathBuf::new();
-    for component in absolute.components() {
-        match component {
-            Component::ParentDir => {
-                result.pop();
-            }
-            Component::CurDir => {}
-            value => result.push(value),
-        }
-    }
-    Ok(result)
+    Ok(crate::packages::normalize(&absolute))
 }
 fn error(message: impl std::fmt::Display) -> String {
     format!("E-MODULE: {message}")
@@ -106,23 +122,27 @@ struct Loader<'a> {
     stack: BTreeSet<PathBuf>,
 }
 impl Loader<'_> {
-    fn module(&mut self, path: &Path) -> Result<Exports, String> {
+    fn module(&mut self, path: &Path) -> Result<Exports, FileError> {
         let path = normalize(path)?;
         if self.stack.contains(&path) {
-            return Err(error(format!("cyclic import: {}", path.display())));
+            return Err(error(format!("cyclic import: {}", path.display())).into());
         }
         if let Some(exports) = self.cache.get(&path) {
             return Ok(exports.clone());
         }
         if self.stack.len() >= 64 {
-            return Err(error("import depth exceeds 64"));
+            return Err(error("import depth exceeds 64").into());
         }
         self.stack.insert(path.clone());
         let result = (|| {
-            let source = self.packages.read(&path)?;
+            let source = self.packages.read_with_errors(&path)?;
             let mut file = parse(&source).map_err(|e| e.to_string())?;
             if file.grammars.len() != 1 {
-                return Err(error("import requires exactly one grammar"));
+                return Err(error(format!(
+                    "import requires exactly one grammar: {}",
+                    path.display()
+                ))
+                .into());
             }
             let grammar = &mut file.grammars[0];
             if !grammar.rules.is_empty()
@@ -131,13 +151,18 @@ impl Loader<'_> {
                     .iter()
                     .any(|t| !matches!(t.kind, TokenKind::Declarative { .. }))
             {
-                return Err(error("only declarative token modules can be imported"));
+                return Err(error(format!(
+                    "only declarative token modules can be imported: {}",
+                    path.display()
+                ))
+                .into());
             }
             if !crate::adapters::feature_diagnostics(grammar).is_empty() {
-                return Err(error("invalid module features"));
+                return Err(error(format!("invalid module features: {}", path.display())).into());
             }
             self.link(grammar, &path)?;
-            let exports: Exports = crate::lexical::compile_syntax(grammar)?
+            let exports: Exports = crate::lexical::compile_syntax(grammar)
+                .map_err(|message| format!("E-LEXICAL: {message}"))?
                 .into_iter()
                 .collect();
             self.cache.insert(path.clone(), exports.clone());
@@ -146,7 +171,7 @@ impl Loader<'_> {
         self.stack.remove(&path);
         result
     }
-    fn link(&mut self, grammar: &mut GrammarDecl, path: &Path) -> Result<(), String> {
+    fn link(&mut self, grammar: &mut GrammarDecl, path: &Path) -> Result<(), FileError> {
         if grammar.imports.is_empty() {
             return Ok(());
         }
@@ -154,13 +179,14 @@ impl Loader<'_> {
         let mut imported = Exports::new();
         for declaration in &grammar.imports {
             if !aliases.insert(&declaration.alias) {
-                return Err(error(format!(
-                    "duplicate import alias: {}",
-                    declaration.alias
-                )));
+                return Err(error(format!("duplicate import alias: {}", declaration.alias)).into());
             }
             if declaration.path.contains("://") {
-                return Err(error("network imports are unsupported"));
+                return Err(error(format!(
+                    "network imports are unsupported: {}",
+                    declaration.path
+                ))
+                .into());
             }
             let target = self.packages.import_path(path, &declaration.path)?;
             for (name, expression) in self.module(&target)? {

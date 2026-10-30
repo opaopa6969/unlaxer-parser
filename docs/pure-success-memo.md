@@ -54,6 +54,7 @@ traceをcache hitで欠落させることはありません。failure memoはそ
 `ParseContext::memoized_success_hits()` は実際に成功entryを再生した数を返します。
 Javaの `getPackratMemoTable().successHits()` と同様、別contextでの診断retryは含めません。
 候補除外で再試行そのものが省かれた場合は、成功hitと数えません。
+これらの公開値は host 依存の内部会計です。同じ文法・入力・設定でも、Java/Rust の failure/success hit 数の一致は契約しません (#827)。Java の生成 helper と Rust の rule 全体では cache 粒度が異なります。[marker 一覧・実測・検証](../conformance/chain-reset-after-failure/README.md#memo-hit-accounting)。
 
 [共有fixtureと実行手順](../conformance/pure-success-memo/README.md)を参照してください。
 EOF/zero-width、Unicode/family emoji、typed AST、3診断mode、相対edge、ID/metadataのrollback、

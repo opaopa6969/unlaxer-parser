@@ -89,10 +89,15 @@ final class UbnfEditorIndex {
             Path file = Path.of(URI.create(uri)).toAbsolutePath().normalize();
             var sources = new LinkedHashMap<Path, String>();
             sources.put(file, source);
-            UBNFModuleLoader.SourceReader stable = path -> {
-                path = path.toAbsolutePath().normalize();
-                if (!sources.containsKey(path)) sources.put(path, reader.read(path));
-                return sources.get(path);
+            UBNFModuleLoader.SourceReader stable = new UBNFModuleLoader.SourceReader() {
+                @Override public String read(Path path) throws java.io.IOException {
+                    path = path.toAbsolutePath().normalize();
+                    if (!sources.containsKey(path)) sources.put(path, reader.read(path));
+                    return sources.get(path);
+                }
+                @Override public String readPackage(Path path) throws java.io.IOException {
+                    return reader.readPackage(path);
+                }
             };
             var packages = new UBNFPackageResolver(file, stable);
             for (Scope scope : scopes) {
@@ -209,12 +214,16 @@ final class UbnfEditorIndex {
 
     private void atomUses(Scope scope, AtomicElement atom) {
         if (atom instanceof RuleRefElement ref) {
+            // A rewritten reference without a source origin cannot be edited safely.
+            if (snapshot.spanOf(ref).isEmpty()) { safe = false; return; }
             var b = bounds(snapshot, ref);
             var matcher = WORD.matcher(code).region(b[0], b[1]);
             String name = ref.namespace().map(value -> value + ".").orElse("") + ref.name();
             if (matcher.find() && matcher.group().replaceAll("\\s", "").equals(name)) uses.add(new Use(name, matcher.start(), matcher.end(), false, scope));
             else safe = false;
-        } else if (atom instanceof GroupElement group) bodyUses(scope, group.body());
+        // COMMIT/LABEL/CATCH/CAPTURE/CAPTURE_SCOPE (and @autoCommit's inserted COMMIT) are
+        // transparent like a group. Skipping them made rename leave stale references (#886).
+        } else if (atom instanceof TransparentElement transparent) bodyUses(scope, transparent.body());
         else if (atom instanceof OptionalElement optional) bodyUses(scope, optional.body());
         else if (atom instanceof RepeatElement repeat) bodyUses(scope, repeat.body());
         else if (atom instanceof OneOrMoreElement repeat) atomUses(scope, repeat.body());
