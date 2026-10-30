@@ -1277,5 +1277,23 @@
         "value": "Valid UBNF"
       }
     }
+  },
+  "documentVersions": {
+    "omittedAccepted": true,
+    "accepted": [
+      null,
+      0,
+      -1,
+      2147483647,
+      -2147483648
+    ],
+    "dropped": [
+      2147483648,
+      -2147483649,
+      1.5,
+      true,
+      "x",
+      {}
+    ]
   }
 }

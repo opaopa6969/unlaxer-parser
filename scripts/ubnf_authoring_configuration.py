@@ -88,6 +88,8 @@ def run_configuration(clients, directory):
             client.send('textDocument/didClose', {'textDocument': {'uri': target}})
             assert client.result('textDocument/hover', {'textDocument': {'uri': target}, 'position': {'line': 0, 'character': 0}}) is None
     evidence.append({'case': 'multiple-documents-range-full-change-same-decreasing-version'})
+    document_versions(hosts, directory, fixture)
+    evidence.extend([{'case': 'document-version-wire-types'}, {'case': 'change-opens-unopened-document'}])
     evidence.extend(import_queries(hosts, directory, configuration))
     evidence.extend(package_snapshots(hosts, directory, configuration))
     for host, client in hosts:
@@ -119,6 +121,45 @@ def run_configuration(clients, directory):
                 client.close()
     evidence.extend([{'case': 'early-exit'}, {'case': 'profile-initialize-eof'}])
     return evidence
+
+
+def document_versions(hosts, directory, fixture):
+    """Ext ignores version values; only lsp4j's Integer field type gates the notification."""
+    document, versions = fixture['document'], fixture['documentVersions']
+    hover = {'textDocument': {}, 'position': {'line': 0, 'character': len(document['source'])}}
+
+    def opened(client, target):
+        hover['textDocument']['uri'] = target
+        actual = client.result('textDocument/hover', hover)
+        # The hover response is a barrier: no latent publish may remain.
+        assert not client.pending and client.messages.empty(), (target, 'unexpected publish')
+        return actual
+
+    cases = [('omitted', None)] if versions['omittedAccepted'] else []
+    cases += [('accepted-' + str(i), {'version': v}) for i, v in enumerate(versions['accepted'])]
+    for host, client in hosts:
+        for kind, method in (('open', 'textDocument/didOpen'), ('change', 'textDocument/didChange')):
+            for name, extra in cases + [('dropped-' + str(i), {'version': v}) for i, v in enumerate(versions['dropped'])]:
+                target = (directory / (kind + '-' + name + '.ubnf')).as_uri()
+                text = {'uri': target, **(extra or {})}
+                if kind == 'open':
+                    params = {'textDocument': {**text, 'text': document['source']}}
+                else:  # A Full change to a never-opened URI opens it, as Ext parseDocument does.
+                    params = {'textDocument': text, 'contentChanges': [{'text': document['source']}]}
+                client.send(method, params)
+                if name.startswith('dropped'):
+                    assert opened(client, target) is None, (host, kind, name)
+                    continue
+                assert client.diagnostics(target) == document['diagnostics'], (host, kind, name)
+                assert opened(client, target) == document['hover'], (host, kind, name)
+                client.send('textDocument/didClose', {'textDocument': {'uri': target}})
+        # A dropped change leaves an open document unchanged.
+        target = (directory / 'kept.ubnf').as_uri()
+        client.send('textDocument/didOpen', {'textDocument': {'uri': target, 'version': 1, 'text': document['source']}})
+        assert client.diagnostics(target) == document['diagnostics']
+        client.send('textDocument/didChange', {'textDocument': {'uri': target, 'version': versions['dropped'][0]}, 'contentChanges': [{'text': 'grammar Kept {'}]})
+        assert opened(client, target) == document['hover'], (host, 'dropped change applied')
+        client.send('textDocument/didClose', {'textDocument': {'uri': target}})
 
 
 def import_queries(hosts, directory, configuration):

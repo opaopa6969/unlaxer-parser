@@ -29,7 +29,7 @@ Java の既存経路は維持し、Rust は対応した capability だけを広�
 | `signatureHelpProvider`: `textDocument/signatureHelp` | trigger `(`, `,`、annotation signature | 未対応 #901 |
 | `semanticTokensProvider`: `textDocument/semanticTokens/full` | full=true、10 token types、modifier declaration。不完全入力でも動く | 未対応 #901（range/delta は Java も広告しない） |
 | `ubnf/packageSource` | 検証済み index にある package source だけを返す | #886 第一単位、元位置/hash/cache寿命/任意URI拒否と packaged VSIX |
-| `unlaxer/configure`（継承） | profile / client capability を再設定し cache 無効化 | #895：同じ options と experimental metadata、成功/失敗・全置換・文書保持を共通60件で検証 |
+| `unlaxer/configure`（継承） | profile / client capability を再設定し cache 無効化 | #895：同じ options と experimental metadata、成功/失敗・全置換・文書保持を共通62件で検証 |
 
 将来機能の formatting、workspace 全体索引、completion resolve、semantic delta は今回の parity 条件に混ぜない。
 未対応 request は `-32601`。全診断/profile は [#885](https://github.com/opaopa6969/unlaxer-parser/issues/885)、
@@ -186,7 +186,8 @@ range 付きの `didChange` は両版とも先頭の text を全文として適�
 
 - [#893](https://github.com/opaopa6969/unlaxer-parser/issues/893): 上表の未接続意味解析・Java classpath・表現境界を含む validator 全診断。
 - [#894](https://github.com/opaopa6969/unlaxer-parser/issues/894): `ULX-PARSE-001` の expected/stack/data/relatedInformation、consumedLength hover、module全文/複数失敗/URI位置。
-- [#895](https://github.com/opaopa6969/unlaxer-parser/issues/895): initialize options と `unlaxer/configure`、experimental profile / languageQueryConsumer、cache/lifecycle を共通60件で接続・検証。
+- [#895](https://github.com/opaopa6969/unlaxer-parser/issues/895): initialize options と `unlaxer/configure`、experimental profile / languageQueryConsumer、cache/lifecycle を共通62件で接続・検証。
+- [#994](https://github.com/opaopa6969/unlaxer-parser/issues/994): #895 レビューで見つけた JSON-RPC 層の残差。params 自体の欠落・型違い、document version の gson 型変換、publishDiagnostics の `version` 欄、未知/未実装 method の応答。
 
 既存の型解析に依存する全診断と、parser failure provenance、session profile は別の契約である。
 一つの巨大な移植で Java の機能を省く代わりに、今回の診断接続を独立して revert できる単位とし、
@@ -343,6 +344,7 @@ Java 参照は `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34`（origin/master、2026
 | initialize/configure/shutdown の通知 | 実行せず無視。通知専用 method の request は -32600 `Notification method requires a notification` | 同じ lifecycle 境界 |
 | exit | shutdown 後0、それ以外1で process 終了。以降 wire request は送れない | 同じ終了境界。handle 層も終了後拒否 |
 | 同一/減少 version、range 付き Full change | Ext は version/range を見ず先頭 text を全文適用。空 change は文書不変 | native も適用。複数文書・再設定後の query/診断で検証 |
+| 未オープン URI への didChange、document version の型 | Ext の parseDocument が未オープン URI も開いて診断する。version は lsp4j の Integer として読むだけで値は使わない（省略/null/32bit 整数は受理、範囲外・小数・真偽値・object は通知ごと破棄） | 同じ。lsp4j/gson が数値文字列や整数値の小数を整数へ寄せる型変換、params 自体の欠落・型違い、publishDiagnostics の version 欄、未知 method の応答は #994 |
 
 Java の semanticTokens/codeAction/signatureHelp の実装と広告は維持する。
 これらの native 移植は #901 のままとし、共通 fixture はホスト別の既存 capability も独立全 JSON 期待値で固定する。
@@ -351,7 +353,7 @@ Java の semanticTokens/codeAction/signatureHelp の実装と広告は維持す�
 [既存 stdio checker の configuration suite](../scripts/ubnf_authoring_configuration.py) で行う。
 入力40種の失敗 initialize と同じ40種の再設定、未知 options 10種、既定/制限/混合/ローカル profile、
 複数文書の診断・同一/減少 version・range/空/複数 change、import buffer の変更後の全 hover/completion JSON、
-package snapshot の保持と次の query の再検証、初期化前/重複/通知誤用/終了境界を含む60ケースである。
+package snapshot の保持と次の query の再検証、未オープン URI の Full change と document version の型、初期化前/重複/通知誤用/終了境界を含む62ケースである。
 profile の source URL や未知の catalogPath を読み込まず、providerRegistered/available は false を維持する。
 両ホストの InitializeResult は既存未実装 capability の差も含めて別々の独立期待値を持ち、
 実測応答から期待値を生成しない。既存 UbnfAuthoringProtocolConformanceTest の必須メソッドに登録している。

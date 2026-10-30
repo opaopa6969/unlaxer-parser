@@ -77,7 +77,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=240000) public void nativeAndJavaServersShareConfigurationFixtures() throws Exception {
-        runProtocol("configuration", 60);
+        runProtocol("configuration", 62);
     }
 
     private void runProtocol(String suite, int count) throws Exception {

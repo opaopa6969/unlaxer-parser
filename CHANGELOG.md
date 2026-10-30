@@ -83,7 +83,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - JVM 不要の Rust UBNF authoring server と VSIX の明示選択を追加。Java 基準の capability/request 表、実 stdio 共通 fixture、import/package 境界を固定し、第一段は診断の一部・hover・completion を提供する (#864)。残る診断/profile は #885、navigation・編集支援・packageSource・native 配布は #886。[対応範囲](docs/ubnf-authoring-lsp.md)。
 - Rust UBNF authoring server に root・mapping・参照・左再帰などの validator 診断を接続し、同一/減少 version の Full change を Java と一致させた。76文法の全診断 JSON・VSIX 表示を照合する（#885、意味解析/classpath #893・syntax/module #894・profile #895 は継続）。
 - Rust UBNF authoring に Java の AST binding に基づく定義/参照・rename・outline/folding・linked editing と検証済み package source 表示を追加。共通実 stdio 39件と両 backend の packaged VSIX で位置・拒否・readonly 境界を検証する（#886 第一単位、残る編集支援 #901・入力域/platform #902）。
-- Rust UBNF authoring の initialize options・`unlaxer/configure`・experimental profile / languageQueryConsumer metadata を Java 基準へ揃えた。失敗時の設定保持、診断 gate、文書保持、同一/減少 version・range 付き Full change、package snapshot の寿命を実 stdio 共通60件で検証する (#895)。
+- Rust UBNF authoring の initialize options・`unlaxer/configure`・experimental profile / languageQueryConsumer metadata を Java 基準へ揃えた。失敗時の設定保持、診断 gate、文書保持、同一/減少 version・range 付き Full change、未オープン URI への Full change、document version の型、package snapshot の寿命を実 stdio 共通62件で検証する (#895)。
 - Java / Rust（native・Java-host）の既知差・未対応・条件付き skip を issue へ結ぶ [台帳](docs/parity-ledger.md) と JSON、host 別 corpus（JSON・JSON Lines・TSV・CSV・YAML、host 列の行）とテスト内の無条件 skip・差分表・除外集合の登録漏れ、文書の不一致を検出する既存 CI の検査を追加 (#771)。
 
 ### Fixed

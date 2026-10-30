@@ -10,9 +10,9 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::io::{self, BufRead, Write};
 
+// Java Ext ignores LSP document versions; only their wire type is checked.
 struct Document {
     source: String,
-    version: i64,
 }
 #[derive(Default)]
 pub struct Server {
@@ -28,6 +28,16 @@ pub struct Server {
 type Error = (i64, String);
 fn invalid(message: &str) -> Error {
     (-32602, message.into())
+}
+// lsp4j reads the version as Integer: absent/null and 32-bit integers are
+// accepted, other JSON numbers drop the notification (#895).
+fn notified_version(document: &Value) -> Result<(), Error> {
+    let version = &document["version"];
+    if version.is_null() || version.as_i64().is_some_and(|v| i32::try_from(v).is_ok()) {
+        Ok(())
+    } else {
+        Err(invalid("document version must be a 32-bit integer"))
+    }
 }
 impl Server {
     fn configure(&mut self, params: &Value) -> Result<Value, Error> {
@@ -137,11 +147,8 @@ impl Server {
                                 .as_str()
                                 .ok_or_else(|| invalid("document text required"))?
                                 .to_owned();
-                            let version = doc["version"]
-                                .as_i64()
-                                .ok_or_else(|| invalid("document version required"))?;
-                            self.documents
-                                .insert(uri.into(), Document { source, version });
+                            notified_version(doc)?;
+                            self.documents.insert(uri.into(), Document { source });
                             self.publish(uri, &mut out);
                         }
                         "textDocument/didChange" => {
@@ -154,15 +161,9 @@ impl Server {
                                 .as_str()
                                 .ok_or_else(|| invalid("change text required"))?
                                 .to_owned();
-                            let version = doc["version"]
-                                .as_i64()
-                                .ok_or_else(|| invalid("document version required"))?;
-                            let state = self
-                                .documents
-                                .get_mut(uri)
-                                .ok_or_else(|| invalid("document not open"))?;
-                            state.source = source;
-                            state.version = version;
+                            notified_version(doc)?;
+                            // Java Ext parseDocument also opens a URI that was never opened.
+                            self.documents.insert(uri.into(), Document { source });
                             self.publish(uri, &mut out);
                         }
                         "textDocument/didClose" => {
