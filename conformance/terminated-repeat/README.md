@@ -1,6 +1,7 @@
 # 任意 terminator 付き反復の移植契約 (#846)
 
-基準は master `6bc349c1cf60fc31a7c62fb0bc72a25f5e2f6236`（#855 merge）。
+基準は master `6bc349c1cf60fc31a7c62fb0bc72a25f5e2f6236`（#855 merge）。master `dce213e9`（#1003 merge）へ統合した後も、
+既存の期待値は変えずに両言語で通る。
 Java の製品コードは変更しない。Rust には `Expr::repeat_java_until(terminator, min, max)`
 （`Expr::JavaTerminatedRepeat`）を足し、既存 `Expr::JavaUntil` の Classic CST を Java に揃えた。
 UBNF 構文は追加しない（生成器・frontend は不変）。
@@ -58,11 +59,36 @@ terminator 位置でも同じく1段深い。この差は #846 固有ではな�
 構文がないので、生成 parser からこの位置には到達しない。比較では Rust の root rule node（Java の root は
 反復そのもの）を外し、その子から比べる。
 
-Rust に専用の式がない Java の CollectingParser（ParserWrapper・ParserHolder・MappedSingleCharacterParserHolder・
-PredicateAnyMatchForParsedParser・OldMatchedTokenParser・TagWrapper 系）は、terminator にすると Java では
-二重収集される。Rust の対応経路は custom parser（`Expr::Custom` / `parse_classic`）か未移植で、custom parser の
-terminator は Classic node で包まない。共通 fixture はなく、対応表の `graph-utilities`（ParserWrapper/Holder）と
-`legacy-not`（任意 child の Not）は未検証のまま、TagWrapper 系は reduced CST の #851 に残す。
+ParserWrapper / ParserHolder / MappedSingleCharacterParserHolder（`holders.tsv`）: 既定形は自分の CST node を
+挟まない CollectingParser で、Java では terminator にすると二重収集される。Rust では新しい式も custom parser も
+使わず、既存の公開 API に写す。どの位置（terminator・body・Chain の要素）でも、memo 2 × 診断 3 モードの全列が
+Java と一致する。
+
+| Java | Rust |
+|---|---|
+| `ParserWrapper(p)`・`ParserWrapper(name, p)`・`ParserWrapper(p, p.getTokenKind(), false)`・`ParserHolder(p)`・`ParserHolder(name, p)`・`MappedSingleCharacterParserHolder([name,] c)` | `p.stop_consume().stop_invert()`（p が Chain なら素の `p` も一致） |
+| `ParserWrapper(p, matchOnly, false)`・`ParserWrapper(name, p, matchOnly, false)`・`ParserWrapper(MatchOnly(p))` | `p.match_only()`（Word なら `Expr::JavaLookahead { positive: true, .. }` も一致） |
+| `ParserWrapper(p, matchOnly, true)` | `p.invert_match().match_only()` |
+| `ParserHolder(MatchOnly(p))` | `p.match_only().stop_consume().stop_invert()` |
+
+素の Word `p` は CST が1段浅く、`Expr::sequence([p])` は1段深いので、どちらも既定形の写しにならない
+（terminator で 120/600 行が不一致）。`ParserHolder(MatchOnly(p))` を `p.match_only()` に写すと、原 token・CST・葉が
+違う。次の4つは Java21 の probe（`eb8ecc61`）で測った境界で、#846 では完了扱いにせず、fixture にも入れていない。
+
+- `ParserWrapper(p, consumed, true)`: Rust の `p.invert_match()` は NotPropagatableSource と同じく自分の node を持つ。
+  そのため CST だけ1段深い（terminator 174/600、body 168/600、Chain の要素 90/600）。terminator 以外でも
+  同じ差があり、#853 の境界。
+- virtual kind を固定する `ParserWrapper(p, virtualTokenConsumed | virtualTokenMatchOnly, false)`: Rust には kind を
+  virtual に固定する式がない。`stop_consume().stop_invert()` で写すと、受理と cursor まで違う行がある（194/600）。
+  `match_only()` で写すと、原 token の kind が違う（162/600）。これも #853 の境界。
+- `createMetaToken=false`（`CreateMetaTokenSpecifier.createMetaOff`）: Occurs 自身を含む MetaFunctionParser の
+  収集を止める、context 全体の設定。Rust には対応する option がない。反復の root から CST が変わる
+  （ParserHolder・ParserWrapper・Chain・body の全 scenario で 600/600）。terminator 固有の差ではなく、対応表の
+  meta-function 行の境界。
+- custom parser（`Expr::Custom` から `parse_with_token_mode` で kind・invert を固定する経路）は検証していない。
+
+PredicateAnyMatchForParsedParser と OldMatchedTokenParser は Rust に経路がなく、未検証のまま。TagWrapper 系は
+reduced CST の #851 に残す。`legacy-not`（任意 child の Not）も未検証のまま。
 
 ## fixture
 
@@ -84,6 +110,9 @@ terminator は Classic node で包まない。共通 fixture はなく、対応�
   Chain 内の Commit / Label（cut 後の失敗）・body 内の Commit・Choice 越しと MatchOnly 越しの raise・
   NamedCapture・MatchOnly(Chain)・WildCardStringTerminatorParser・ZeroOrMore・生成形 rule（Chain / Choice）・
   Not・MatchOnly(Word)・PegLookahead（正/負）・NameResolutionScope。
+- `holders.tsv`（900行、9 scenario）: ParserWrapper / ParserHolder / MappedSingleCharacterParserHolder を terminator
+  （Word・Chain・MatchOnly・matchOnly 固定・matchOnly+invert 固定）、body、Chain 内の terminator 要素に置いた反復。
+  入力と列は `wrappers.tsv` と同じ。Java は上の表の全 constructor を同じ行で実行し、Rust は表の各 recipe を同じ行で実行する。
 - `raised-state.tsv`（112行）: `state.tsv` と同じ capture 付き state 書換え terminator を、Commit(Chain)・
   Chain 内 Commit / Label・Choice 越しの raise・CatchLabels による捕捉と代替の再解析・MatchOnly 越し・外側失敗に
   置き、4 token kind で成否・両 cursor・state・capture・呼出し回数・失敗 CP・raised failure を比べる。
@@ -95,6 +124,8 @@ until は terminator の begin が matched を consumed へ戻すので `;` を�
 Optional の begin で同じ位置を2回読む）。Rust 実装はこの表を参照せずに書き、表と突き合わせた。
 reduced CST（tag による AST 射影）は #851 の範囲で、ここの構成は tag を付けないので Java の
 `filteredChildren` は原 CST と同じであることを Java 側で検査する。
+`holders.tsv` は統合後の `eb8ecc61` で、同じ probe を使って Java21 で生成した。生成し直した旧 probe の 1300 行は、
+`e3b7eda4` で測った行と byte 単位で一致した。
 `wrappers.tsv` / `raised-state.tsv` は Java21 の probe（memo OFF・DETAILED）で生成し、Occurs の規則と照らして
 見直した（例: matchOnly の呼出しでは terminator の begin が matched を consumed へ戻すので、cut の後ろに届かず
 raise しない）。Rust の出力からは作っていない。
@@ -104,7 +135,7 @@ DETAILED と同じ診断を保つ（両言語）。`wrappers.tsv` の1行（`rai
 reset=true）は、Java だけ DETAILED_ON_FAILURE で失敗する。これは #861（Choice の FIRST 除外が reset 前の
 cursor を読む。修正は PR #862）で、terminator がない `Choice(Chain(a, !), "a;y")` でも再現する。Java の
 テストはこの1行・このモードだけ #861 の実測値を期待し（使用回数も検査）、#862 と一緒に外す。Rust と Java の
-他のモードは共通の期待値で比べる。
+他のモードは共通の期待値で比べる。この例外（`ISSUE_861_DETAILED_ON_FAILURE`）は、#862 が merge されるまで残す（依存待ち）。
 
 ## 実行
 
@@ -112,7 +143,7 @@ cursor を読む。修正は PR #862）で、terminator がない `Choice(Chain(
   同じ行で実行し、Memoization 全値 × Diagnostics 全値で比較する。
 - Rust: `rust/unlaxer-runtime/tests/terminated_repeat.rs`。memo 2 × 診断 3 モード、通常入口と共有 grammar 入口、
   FIRST 除外の Off / On / Audit 同値性、memo・snapshot cache を承認しないこと、1500 段の入れ子が
-  2 MiB stack で資源失敗になることを検査する。`wrappers.tsv` は token trace（既定の上限）を有効にして葉を比べる。
+  2 MiB stack で資源失敗になることを検査する。`wrappers.tsv` / `holders.tsv` は token trace（既定の上限）を有効にして葉を比べる。
 - 資源失敗: Java `ResourcePublicationTest` と Rust `tests/resource_publication.rs` が `resource-abort/cases.tsv` を実行する。
 
 trace 上限の扱い（Classic の collect が後で除外する葉も上限に数える）は terminator がない `seq + match_only` でも

@@ -223,9 +223,9 @@ class Hidden { public static class Leaked {} }
         with tempfile.TemporaryDirectory(prefix='java-api-') as temporary:
             root = self.overlay(temporary, {self.RUNTIME: renamed})
             errors = '\n'.join(self.runtime_errors(root, self.data))
-            self.assertIn('lib.rs#L410（anchor が見つからない', errors)
+            self.assertIn('lib.rs#L420（anchor が見つからない', errors)
             _, _, failures = api.remap(root, self.data)
-            self.assertTrue(any('lib.rs#L410（anchor が見つからない' in failure for failure in failures))
+            self.assertTrue(any('lib.rs#L420（anchor が見つからない' in failure for failure in failures))
 
     def test_ambiguous_anchor_fails_and_remap_does_not_pick_the_first(self):
         source = (api.ROOT / self.RUNTIME).read_text()
@@ -233,9 +233,9 @@ class Hidden { public static class Leaked {} }
         with tempfile.TemporaryDirectory(prefix='java-api-') as temporary:
             root = self.overlay(temporary, {self.RUNTIME: duplicate})
             errors = '\n'.join(self.runtime_errors(root, self.data))
-            self.assertRegex(errors, r'lib\.rs#L410（anchor が一意でない: L410, L\d+')
+            self.assertRegex(errors, r'lib\.rs#L420（anchor が一意でない: L420, L\d+')
             _, _, failures = api.remap(root, self.data)
-            self.assertTrue(any('lib.rs#L410（anchor が一意でない' in failure for failure in failures))
+            self.assertTrue(any('lib.rs#L420（anchor が一意でない' in failure for failure in failures))
 
     def test_scoped_anchor_does_not_escape_its_declaration(self):
         # Expr::Number を消しても、後続の Predictor::Number へ付け替えない。
@@ -258,17 +258,17 @@ class Hidden { public static class Leaked {} }
             command = [sys.executable, str(SCRIPT), '--root', str(root)]
             result = subprocess.run(command, capture_output=True, text=True, timeout=90)
             self.assertNotEqual(0, result.returncode)
-            self.assertIn('根拠行が anchor とずれた: rust/unlaxer-runtime/src/lib.rs#L410 → L411', result.stderr)
+            self.assertIn('根拠行が anchor とずれた: rust/unlaxer-runtime/src/lib.rs#L420 → L421', result.stderr)
             result = subprocess.run(command + ['--remap', '--write-doc'], capture_output=True, text=True, timeout=90)
             self.assertEqual(0, result.returncode, result.stderr)
-            self.assertIn('根拠行を付け替え: rust/unlaxer-runtime/src/lib.rs#L410 → L411', result.stderr)
+            self.assertIn('根拠行を付け替え: rust/unlaxer-runtime/src/lib.rs#L420 → L421', result.stderr)
             rewritten = json.loads((root / api.DATA).read_text())
             self.assertEqual(api.dump(rewritten), (root / api.DATA).read_text())
             expected, _, _ = api.remap(root, self.data)
             self.assertEqual(expected, rewritten)
             document = (root / api.DOCUMENT).read_text()
-            self.assertIn('](../rust/unlaxer-runtime/src/lib.rs#L411)', document)
-            self.assertNotIn('](../rust/unlaxer-runtime/src/lib.rs#L410)', document)
+            self.assertIn('](../rust/unlaxer-runtime/src/lib.rs#L421)', document)
+            self.assertNotIn('](../rust/unlaxer-runtime/src/lib.rs#L420)', document)
             self.assertEqual(0, subprocess.run(command, capture_output=True, timeout=90).returncode)
 
     def test_cli_remap_refuses_without_writing_when_any_anchor_is_unresolved(self):

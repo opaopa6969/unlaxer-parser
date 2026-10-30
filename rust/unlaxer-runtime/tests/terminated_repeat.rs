@@ -16,6 +16,7 @@ use unlaxer_runtime::{
 const CASES: &str = include_str!("../../../conformance/terminated-repeat/cases.tsv");
 const STATE: &str = include_str!("../../../conformance/terminated-repeat/state.tsv");
 const WRAPPERS: &str = include_str!("../../../conformance/terminated-repeat/wrappers.tsv");
+const HOLDERS: &str = include_str!("../../../conformance/terminated-repeat/holders.tsv");
 const RAISED_STATE: &str = include_str!("../../../conformance/terminated-repeat/raised-state.tsv");
 
 fn rows(corpus: &str) -> Vec<Vec<&str>> {
@@ -706,6 +707,83 @@ fn shared_wrapper_rule_and_lookahead_terminator_oracle_in_every_mode() {
         failures.join("\n")
     );
     assert_eq!(parsers.len(), 23);
+}
+
+/// The Rust recipes of the Java ParserWrapper / ParserHolder / MappedSingleCharacterParserHolder
+/// constructions of `holders.tsv` (see README). Every recipe must reproduce every row.
+fn holder_parsers(scenario: &str) -> Vec<Expr> {
+    let until = |terminator: Expr| w("a").repeat_java_until(terminator, 0, None);
+    let body = |inner: Expr| inner.repeat_java_until(w(";"), 0, None);
+    let semi_x = || Expr::sequence([w(";"), w("x")]);
+    let holder = |child: Expr| child.stop_consume().stop_invert();
+    match scenario {
+        "holder-word" => vec![
+            until(holder(w(";"))),
+            until(holder(Expr::CharRange(';', ';'))),
+        ],
+        "holder-chain" => vec![until(holder(semi_x())), until(semi_x())],
+        "holder-body" => vec![
+            body(holder(w("a"))),
+            body(holder(Expr::CharRange('a', 'a'))),
+        ],
+        "holder-in-chain-term" => vec![
+            until(Expr::sequence([holder(w(";")), w("x")])),
+            until(semi_x()),
+        ],
+        "wrapper-matchonly" => vec![
+            until(w(";").match_only()),
+            until(Expr::JavaLookahead {
+                pattern: ";",
+                positive: true,
+            }),
+        ],
+        "wrapper-matchonly-chain" => vec![until(semi_x().match_only())],
+        "wrapper-matchonly-invert" => vec![until(w(";").invert_match().match_only())],
+        "holder-of-matchonly" => vec![until(holder(w(";").match_only()))],
+        "holder-of-matchonly-body" => vec![body(holder(w("a").match_only()))],
+        _ => panic!("{scenario}"),
+    }
+}
+
+#[test]
+fn shared_parser_wrapper_and_holder_terminator_oracle_in_every_mode() {
+    let rows = rows(HOLDERS);
+    assert_eq!(rows.len(), 900);
+    let mut parsers = std::collections::HashMap::new();
+    let mut failures = Vec::new();
+    for (memo, diagnostics) in MODES {
+        for row in &rows {
+            assert_eq!(row.len(), 17);
+            let options = ParseOptions::with_memoization(memo).with_diagnostics(diagnostics);
+            let mut expected = row[6..].iter().map(|v| v.to_string()).collect::<Vec<_>>();
+            if diagnostics == Diagnostics::DetailedOnFailure && row[11] == "~" {
+                expected[3] = "0".into();
+                expected[4] = "false".into();
+            }
+            let recipes = parsers.entry(row[0]).or_insert_with(|| {
+                holder_parsers(row[0])
+                    .into_iter()
+                    .map(Wrapper::Expression)
+                    .collect::<Vec<_>>()
+            });
+            for (index, parser) in recipes.iter().enumerate() {
+                let actual = observe_wrapper(parser, row, options);
+                if actual != expected {
+                    failures.push(format!(
+                        "{:?}#{index}/{memo:?}/{diagnostics:?}\n expected {expected:?}\n actual   {actual:?}",
+                        &row[..6]
+                    ));
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} failures\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+    assert_eq!(parsers.len(), 9);
 }
 
 fn raised_state_parser(scenario: &str) -> Expr {

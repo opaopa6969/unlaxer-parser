@@ -25,6 +25,7 @@ public class TerminatedRepeatParityTest {
     private static final Path STATE = Path.of("../conformance/terminated-repeat/state.tsv");
     private static final Path WRAPPERS = Path.of("../conformance/terminated-repeat/wrappers.tsv");
     private static final Path RAISED_STATE = Path.of("../conformance/terminated-repeat/raised-state.tsv");
+    private static final Path HOLDERS = Path.of("../conformance/terminated-repeat/holders.tsv");
 
     public static class A extends WordParser { private static final long serialVersionUID = 1L; public A() { super("a"); } }
     public static class Semi extends WordParser { private static final long serialVersionUID = 1L; public Semi() { super(";"); } }
@@ -314,6 +315,41 @@ public class TerminatedRepeatParityTest {
         } else for (Token child : token.filteredChildren) leaves(child, out);
     }
 
+    /** The expected columns of a wrappers.tsv / holders.tsv row from {@code success} in the given mode. */
+    private static List<String> expectedWrapperRow(String[] row, ParseOptions.Diagnostics mode) {
+        assertEquals(17, row.length);
+        List<String> expected = new ArrayList<>(Arrays.asList(row).subList(6, 17));
+        // A raised failure (#700) keeps its diagnostics when DETAILED_ON_FAILURE records lazily.
+        if (mode == ParseOptions.Diagnostics.DETAILED_ON_FAILURE && row[11].equals("~")) {
+            expected.set(3, "0");
+            expected.set(4, "false");
+        }
+        return expected;
+    }
+
+    /** One parse of a wrappers.tsv / holders.tsv row; the column order from {@code success}. */
+    private static List<String> observeWrapperRow(Parser parser, String[] row, Memoization memo, ParseOptions.Diagnostics mode) {
+        try (var context = ParseContext.withOptions(StringSource.createRootSource(decode(row[1])),
+                ParseOptions.withMemoization(memo).withDiagnostics(mode))) {
+            context.getCurrent().setResetMatchedWithConsumed(false);
+            if (!row[4].equals("~")) assertTrue(w(decode(row[4])).parse(context, TokenKind.matchOnly, false).isSucceeded());
+            context.getCurrent().setResetMatchedWithConsumed(Boolean.parseBoolean(row[5]));
+            Parsed parsed = parser.parse(context, TokenKind.valueOf(row[2]), Boolean.parseBoolean(row[3]));
+            var diagnostic = context.getParseFailureDiagnostics();
+            List<String> leaves = new ArrayList<>();
+            for (Token token : context.getCurrent().getTokens()) leaves(token, leaves);
+            return List.of(String.valueOf(parsed.isSucceeded()),
+                    String.valueOf(context.getConsumedPosition().value()),
+                    String.valueOf(context.getMatchedPosition().value()),
+                    String.valueOf(diagnostic.getFarthestOffset()),
+                    String.valueOf(!diagnostic.getExpectedTokens().isEmpty()), raised(context),
+                    parsed.isSucceeded() ? joined(parsed.getOriginalTokens().stream().map(TerminatedRepeatParityTest::signature).toList()) : "~",
+                    joined(context.getCurrent().getTokens().stream().map(TerminatedRepeatParityTest::tree).toList()),
+                    joined(leaves), String.valueOf(context.getTokenStack().size()),
+                    String.valueOf(context.getCurrent().isResetMatchedWithConsumed()));
+        }
+    }
+
     /**
      * #861 (fix PR #862, not in this base): Java DETAILED_ON_FAILURE excludes Choice candidates by the
      * matched cursor before the reset, so this one row fails only in that mode. It is not a terminator
@@ -332,47 +368,82 @@ public class TerminatedRepeatParityTest {
         int issue861 = 0;
         for (Memoization memo : Memoization.values()) for (ParseOptions.Diagnostics mode : ParseOptions.Diagnostics.values()) {
             for (String[] row : rows) {
-                assertEquals(17, row.length);
-                List<String> expected = new ArrayList<>(Arrays.asList(row).subList(6, 17));
-                // A raised failure (#700) keeps its diagnostics when DETAILED_ON_FAILURE records lazily.
-                if (mode == ParseOptions.Diagnostics.DETAILED_ON_FAILURE && row[11].equals("~")) {
-                    expected.set(3, "0");
-                    expected.set(4, "false");
-                }
+                List<String> expected = expectedWrapperRow(row, mode);
                 List<String> known = ISSUE_861_DETAILED_ON_FAILURE.get(String.join("\t", Arrays.copyOf(row, 6)));
                 if (mode == ParseOptions.Diagnostics.DETAILED_ON_FAILURE && known != null) {
                     expected = known;
                     issue861++;
                 }
                 Parser parser = parsers.computeIfAbsent(row[0], TerminatedRepeatParityTest::wrapperParser);
-                try (var context = ParseContext.withOptions(StringSource.createRootSource(decode(row[1])),
-                        ParseOptions.withMemoization(memo).withDiagnostics(mode))) {
-                    context.getCurrent().setResetMatchedWithConsumed(false);
-                    if (!row[4].equals("~")) assertTrue(w(decode(row[4])).parse(context, TokenKind.matchOnly, false).isSucceeded());
-                    context.getCurrent().setResetMatchedWithConsumed(Boolean.parseBoolean(row[5]));
-                    Parsed parsed = parser.parse(context, TokenKind.valueOf(row[2]), Boolean.parseBoolean(row[3]));
-                    var diagnostic = context.getParseFailureDiagnostics();
-                    List<String> leaves = new ArrayList<>();
-                    for (Token token : context.getCurrent().getTokens()) leaves(token, leaves);
-                    List<String> actual = List.of(String.valueOf(parsed.isSucceeded()),
-                            String.valueOf(context.getConsumedPosition().value()),
-                            String.valueOf(context.getMatchedPosition().value()),
-                            String.valueOf(diagnostic.getFarthestOffset()),
-                            String.valueOf(!diagnostic.getExpectedTokens().isEmpty()), raised(context),
-                            parsed.isSucceeded() ? joined(parsed.getOriginalTokens().stream().map(TerminatedRepeatParityTest::signature).toList()) : "~",
-                            joined(context.getCurrent().getTokens().stream().map(TerminatedRepeatParityTest::tree).toList()),
-                            joined(leaves), String.valueOf(context.getTokenStack().size()),
-                            String.valueOf(context.getCurrent().isResetMatchedWithConsumed()));
-                    if (false == actual.equals(expected)) {
-                        failures.add(Arrays.toString(Arrays.copyOf(row, 6)) + "/" + memo + "/" + mode
-                                + "\n expected " + expected + "\n actual   " + actual);
-                    }
+                List<String> actual = observeWrapperRow(parser, row, memo, mode);
+                if (false == actual.equals(expected)) {
+                    failures.add(Arrays.toString(Arrays.copyOf(row, 6)) + "/" + memo + "/" + mode
+                            + "\n expected " + expected + "\n actual   " + actual);
                 }
             }
         }
         assertTrue(String.join("\n", failures), failures.isEmpty());
         assertEquals(23, parsers.size());
         assertEquals(Memoization.values().length, issue861);
+    }
+
+    private static Parser semiX() { return new Chain(w(";"), w("x")); }
+
+    /**
+     * Every public construction of ParserWrapper / ParserHolder / MappedSingleCharacterParserHolder that
+     * ports to the scenario's Rust recipe in README.md. The default wrapper forms are CollectingParsers
+     * without a CST node of their own between their parent and their child.
+     */
+    static List<Parser> holderParsers(String scenario) {
+        return switch (scenario) {
+            case "holder-word" -> {
+                Parser semi = w(";");
+                yield List.of(new ZeroOrMore(w("a"), new ParserWrapper(semi)),
+                        new ZeroOrMore(w("a"), new ParserWrapper(n(), w(";"))),
+                        new ZeroOrMore(w("a"), new ParserWrapper(semi, semi.getTokenKind(), false)),
+                        new ZeroOrMore(w("a"), new ParserHolder(w(";"))),
+                        new ZeroOrMore(w("a"), new ParserHolder(n(), w(";"))),
+                        new ZeroOrMore(w("a"), new MappedSingleCharacterParserHolder(new MappedSingleCharacterParser(';'))),
+                        new ZeroOrMore(w("a"), new MappedSingleCharacterParserHolder(n(), new MappedSingleCharacterParser(';'))));
+            }
+            case "holder-chain" -> List.of(new ZeroOrMore(w("a"), new ParserWrapper(semiX())),
+                    new ZeroOrMore(w("a"), new ParserHolder(semiX())));
+            case "holder-body" -> List.of(new ZeroOrMore(new ParserWrapper(w("a")), w(";")),
+                    new ZeroOrMore(new ParserHolder(w("a")), w(";")),
+                    new ZeroOrMore(new MappedSingleCharacterParserHolder(new MappedSingleCharacterParser('a')), w(";")));
+            case "holder-in-chain-term" -> List.of(new ZeroOrMore(w("a"), new Chain(new ParserWrapper(w(";")), w("x"))),
+                    new ZeroOrMore(w("a"), new Chain(new ParserHolder(w(";")), w("x"))));
+            case "wrapper-matchonly" -> List.of(new ZeroOrMore(w("a"), new ParserWrapper(w(";"), TokenKind.matchOnly, false)),
+                    new ZeroOrMore(w("a"), new ParserWrapper(n(), w(";"), TokenKind.matchOnly, false)),
+                    new ZeroOrMore(w("a"), new ParserWrapper(new MatchOnly(w(";")))));
+            case "wrapper-matchonly-chain" -> List.of(new ZeroOrMore(w("a"), new ParserWrapper(semiX(), TokenKind.matchOnly, false)));
+            case "wrapper-matchonly-invert" -> List.of(new ZeroOrMore(w("a"), new ParserWrapper(w(";"), TokenKind.matchOnly, true)));
+            case "holder-of-matchonly" -> List.of(new ZeroOrMore(w("a"), new ParserHolder(new MatchOnly(w(";")))));
+            case "holder-of-matchonly-body" -> List.of(new ZeroOrMore(new ParserHolder(new MatchOnly(w("a"))), w(";")));
+            default -> throw new AssertionError(scenario);
+        };
+    }
+
+    @Test public void sharedParserWrapperAndHolderTerminatorOracleInEveryMode() throws Exception {
+        List<String[]> rows = rows(HOLDERS);
+        assertEquals(900, rows.size());
+        Map<String, List<Parser>> parsers = new HashMap<>();
+        var failures = new ArrayList<String>();
+        for (Memoization memo : Memoization.values()) for (ParseOptions.Diagnostics mode : ParseOptions.Diagnostics.values()) {
+            for (String[] row : rows) {
+                List<String> expected = expectedWrapperRow(row, mode);
+                List<Parser> constructions = parsers.computeIfAbsent(row[0], TerminatedRepeatParityTest::holderParsers);
+                for (int index = 0; index < constructions.size(); index++) {
+                    List<String> actual = observeWrapperRow(constructions.get(index), row, memo, mode);
+                    if (false == actual.equals(expected)) {
+                        failures.add(Arrays.toString(Arrays.copyOf(row, 6)) + "#" + index + "/" + memo + "/" + mode
+                                + "\n expected " + expected + "\n actual   " + actual);
+                    }
+                }
+            }
+        }
+        assertTrue(String.join("\n", failures), failures.isEmpty());
+        assertEquals(9, parsers.size());
     }
 
     @Test public void sharedRaisedTerminatorStateAndRollbackOracle() throws Exception {

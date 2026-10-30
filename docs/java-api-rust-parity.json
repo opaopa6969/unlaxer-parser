@@ -87,7 +87,7 @@
     },
     "terminated-repeat": {
       "status": "verified",
-      "reason": "ChildOccursWithTerminator / Occurs と Lazy* / Optional / ZeroOrOne / Repeat の terminator は body より前に、親の kind・invert に関係なく parse(context)（consumed・非反転）で独自 transaction 内に試す。成功は consumed 系の親でだけ commit され CollectingParser（Chain/Choice/Occurs 系と Commit・Label・stopper・NotPropagatableSource・Not・PegLookahead など ConstructedSingleChildParser 全部）は二重に収集され、matchOnly 系の親では rollback して停止する。min/max・max 到達後の未試行・nullable body/terminator の停止・Transaction.begin の matched reset・raised failure を含め、Rust `Expr::repeat_java_until`（`Expr::JavaTerminatedRepeat`）で実装した。独立した terminated-repeat corpus 732 行で4 token kind・invert・prior matched・reset 方針・両 cursor・原 token と kind 別 CST・失敗 CP・token stack を、所有状態 24 行で capture / user state / 終端呼出し回数 / 外側失敗後の再試行と同一 parser 再利用を、memo 2×診断3モードで比較する。Java 側は各型の全公開 constructor・newWithTerminator・Lazy 形を同じ行で実行する。wrappers 2342 行（23 scenario）で Commit/Label・3つの伝播 wrapper・cut/label 後の失敗と Choice/MatchOnly 越しの raise・生成形 rule（LazyChain/LazyChoice）・Not/MatchOnly/PegLookahead・NameResolutionScope の terminator を raised failure と token trace の葉まで、raised-state 112 行で cut/label/CatchLabels 下の capture・user state の rollback を、resource-abort の terminator/body 4 行で資源失敗の復元を比較する。手書きの非 collecting rule class が1段深いのは既存の #845 境界、ParserWrapper/ParserHolder など Rust に専用式がない CollectingParser は graph-utilities で未検証。Java DETAILED_ON_FAILURE の1行は #861 の既知差として Java テストに明示する。新 variant は memo 不安全・snapshot cache 非承認で、FIRST は Java と同じく body と terminator の和。",
+      "reason": "ChildOccursWithTerminator / Occurs と Lazy* / Optional / ZeroOrOne / Repeat の terminator は body より前に、親の kind・invert に関係なく parse(context)（consumed・非反転）で独自 transaction 内に試す。成功は consumed 系の親でだけ commit され CollectingParser（Chain/Choice/Occurs 系と Commit・Label・stopper・NotPropagatableSource・Not・PegLookahead など ConstructedSingleChildParser 全部）は二重に収集され、matchOnly 系の親では rollback して停止する。min/max・max 到達後の未試行・nullable body/terminator の停止・Transaction.begin の matched reset・raised failure を含め、Rust `Expr::repeat_java_until`（`Expr::JavaTerminatedRepeat`）で実装した。独立した terminated-repeat corpus 732 行で4 token kind・invert・prior matched・reset 方針・両 cursor・原 token と kind 別 CST・失敗 CP・token stack を、所有状態 24 行で capture / user state / 終端呼出し回数 / 外側失敗後の再試行と同一 parser 再利用を、memo 2×診断3モードで比較する。Java 側は各型の全公開 constructor・newWithTerminator・Lazy 形を同じ行で実行する。wrappers 2342 行（23 scenario）で Commit/Label・3つの伝播 wrapper・cut/label 後の失敗と Choice/MatchOnly 越しの raise・生成形 rule（LazyChain/LazyChoice）・Not/MatchOnly/PegLookahead・NameResolutionScope の terminator を raised failure と token trace の葉まで、raised-state 112 行で cut/label/CatchLabels 下の capture・user state の rollback を、resource-abort の terminator/body 4 行で資源失敗の復元を比較する。手書きの非 collecting rule class が1段深いのは既存の #845 境界、ParserWrapper/ParserHolder/MappedSingleCharacterParserHolder は holders 900 行（9 scenario）で、Java の全 constructor と Rust の既存公開 API recipe（既定形は `p.stop_consume().stop_invert()`）を terminator・body・Chain 要素の位置で比較する。consumed+invert 固定・virtual kind 固定・createMetaToken=false・custom parser 経路は graph-utilities / meta-function / #853 の境界として未検証。Java DETAILED_ON_FAILURE の1行は #861 の既知差として Java テストに明示し、#862 の merge 後に外す。新 variant は memo 不安全・snapshot cache 非承認で、FIRST は Java と同じく body と terminator の和。",
       "route": "`Expr::literal(\"a\").repeat_java_until(Expr::literal(\";\"), 0, None)`（ZeroOrMore(inner, terminator)）。min/max は OneOrMore=(1, None)、Optional/ZeroOrOne=(0, Some(1))、Repeat#newWithTerminator=(min, Some(max))。Java の Class/Supplier/Lazy 指定・Name・ASTNodeKind は Rust の Expr 値と Rule 名へ移し（#845 の構築境界）、反射 identity は持ち込まない。UBNF 構文は追加しない。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChildOccursWithTerminator.java#L12", "anchor": "public abstract class ChildOccursWithTerminator extends ConstructedOccurs"},
@@ -109,6 +109,7 @@
         "conformance/terminated-repeat/cases.tsv",
         "conformance/terminated-repeat/state.tsv",
         "conformance/terminated-repeat/wrappers.tsv",
+        "conformance/terminated-repeat/holders.tsv",
         "conformance/terminated-repeat/raised-state.tsv",
         "conformance/resource-abort/cases.tsv",
         "conformance/terminated-repeat/README.md"
@@ -607,8 +608,8 @@
     },
     "graph-utilities": {
       "status": "uncorroborated",
-      "reason": "Flatten は child.getChildren を Chain化し、Reverse は一部 constructor だけ元の Parsers を反転する。ParserHolder/MappedSingleCharacterParserHolder は引数を捨て child.parse(context)、ParserWrapper は保存した kind/invert で呼ぶ。Rust の sequence/Vec操作/parse_classic で表現できるが、各 overload の副作用と位置は未検証。ParserWrapper/ParserHolder は CollectingParser なので Occurs terminator の commit で二重収集されるが、Rust の custom parser terminator は包まない（#846 の README）。",
-      "route": "`Expr::sequence(children)`、明示 `Vec::reverse`、custom Parser から `parse_classic`。Reverse の varargs は Java でも反転しないので、名前から全constructorを逆順扱いしない。",
+      "reason": "Flatten は child.getChildren を Chain化し、Reverse は一部 constructor だけ元の Parsers を反転する。ParserHolder/MappedSingleCharacterParserHolder は引数を捨て child.parse(context)、ParserWrapper は保存した kind/invert で呼ぶ。ParserWrapper/ParserHolder/MappedSingleCharacterParserHolder の既定形・matchOnly 固定・matchOnly+invert 固定・ParserHolder(MatchOnly) は、#846 の holders.tsv（900行・9 scenario、Java21 実測）で terminator・body・Chain 要素の位置を Java は全 constructor、Rust は既存公開 API の recipe で全列比較済み。残る未検証: Flatten/Reverse の各 overload、ParserWrapper(p, consumed, true)（Rust invert_match は自分の node を持ち CST が1段深い）、virtual kind 固定の ParserWrapper（Rust に kind を virtual に固定する式がない）、createMetaToken=false（meta-function の境界）、custom parser 経路。",
+      "route": "`ParserWrapper(p)` / `ParserHolder(p)` / `MappedSingleCharacterParserHolder(c)` ⇔ `p.stop_consume().stop_invert()`（Chain なら素の `p` も可）、`ParserWrapper(p, matchOnly, false)` / `ParserWrapper(MatchOnly(p))` ⇔ `p.match_only()`、`ParserWrapper(p, matchOnly, true)` ⇔ `p.invert_match().match_only()`、`ParserHolder(MatchOnly(p))` ⇔ `p.match_only().stop_consume().stop_invert()`。素の `p` と `Expr::sequence([p])` は CST の段数がずれるので写しにならない。Flatten は `Expr::sequence(children)`、Reverse は明示 `Vec::reverse`。Reverse の varargs は Java でも反転しないので、名前から全constructorを逆順扱いしない。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Reverse.java#L10", "anchor": "public class Reverse extends Chain"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Flatten.java#L13", "anchor": "public class Flatten extends Chain implements List<Parser>"},
@@ -616,9 +617,16 @@
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ParserWrapper.java#L10", "anchor": "public class ParserWrapper extends ConstructedSingleChildParser"},
         {"location": "rust/unlaxer-runtime/src/token.rs#L1", "anchor": "//! Explicit Classic token parsing and owned portable metadata."}
       ],
-      "tests": [],
-      "fixtures": [],
+      "tests": [
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/TerminatedRepeatParityTest.java",
+        "rust/unlaxer-runtime/tests/terminated_repeat.rs"
+      ],
+      "fixtures": [
+        "conformance/terminated-repeat/holders.tsv",
+        "conformance/terminated-repeat/README.md"
+      ],
       "issues": [
+        846,
         853
       ],
       "followup_group": "combinator"
