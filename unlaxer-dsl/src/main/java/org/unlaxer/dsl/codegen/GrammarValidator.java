@@ -159,6 +159,12 @@ public final class GrammarValidator {
             String code = error.getMessage().startsWith("E-LEXICAL-CONTEXT-") ? error.getMessage().split(":",2)[0] : "E-LEXICAL-CONTEXT";
             errors.add(new ValidationIssue(code, error.getMessage(), "Select non-nullable declarative tokens and nonempty unique literals."));
         }
+        try { SemanticPredicates.requireValid(grammar); }
+        catch (IllegalArgumentException error) {
+            String message = error.getMessage();
+            errors.add(new ValidationIssue(message.split(":", 2)[0], message,
+                "Use one @predicate('registeredName') per rule and at most 64 distinct names."));
+        }
         try { NamePredicates.requireValid(grammar); }
         catch (IllegalArgumentException error) {
             String message=error.getMessage();
