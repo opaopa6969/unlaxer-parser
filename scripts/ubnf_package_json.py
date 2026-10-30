@@ -320,6 +320,7 @@ def _run_lsp(clients, directory, origin, connections):
         params = {'textDocument': {'uri': uri}, 'position': {'line': 3, 'character': 1}}
         record = {'case': case['id'], 'gap': case.get('gap', False), 'servers': []}
         for host, client in zip(['java', 'rust'], clients):
+            client.fixture = case['id']
             error = case.get('rustLspError', expected(case, host, 'load')) if host == 'rust' else case.get('lspError', case.get('loadError'))
             prefix = case.get('rustLoadPrefix', case.get('loadPrefix', 'E-PACKAGE: ')) if host == 'rust' else case.get('loadPrefix', 'E-PACKAGE: ')
             oracle = [] if error is None else [{

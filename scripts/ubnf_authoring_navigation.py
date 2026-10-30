@@ -57,6 +57,7 @@ def run_navigation(clients, directory):
         uri = (directory / (case['id'] + ' space 😀.ubnf')).as_uri()
         for host, client in zip(('java', 'rust'), clients):
             label = (case['id'], host)
+            client.fixture = label[0]
             open_document(client, uri, case['source'])
             base = {'textDocument': {'uri': uri}}
             result(client, 'documentSymbol', base, [symbol(s) for s in case['symbols']], label)
@@ -130,6 +131,7 @@ def import_navigation(clients, directory):
     refs = [at(source, v) for v in ['a.NUMBER', 'b. NUMBER', 'c.NUMBER']]
     for host, client in zip(('java', 'rust'), clients):
         label = ('imports-aliases-scopes-buffers', host)
+        client.fixture = label[0]
         diagnostics = open_document(client, uri, source)
         assert diagnostics == [], (label, diagnostics)
         for marker in ('a.NUMBER', 'b. NUMBER', 'c.NUMBER'):
@@ -183,6 +185,7 @@ def import_navigation(clients, directory):
         uri = (folder / 'main.ubnf').as_uri()
         for host, client in zip(('java', 'rust'), clients):
             label = (mode, host)
+            client.fixture = label[0]
             diagnostics = open_document(client, uri, source)
             assert any(d['code'] == 'E-MODULE' for d in diagnostics), (label, diagnostics)
             params = {'textDocument': {'uri': uri}, 'position': point(at(source, 'bad.' + use)[:2]), 'newName': 'Other'}
@@ -225,6 +228,7 @@ def package_navigation(clients, directory):
         refs = [at(source, 'layout.GAP')]
         for host, client in zip(('java', 'rust'), clients):
             label = (mode, host)
+            client.fixture = label[0]
             # Neither a known-looking hash nor arbitrary file/http URIs authorize I/O.
             invalid = [None, artifact.as_uri(), 'file:///dev/stdin', 'https://127.0.0.1:1/private',
                        'ubnf-package:/unknown/source.ubnf', package_uri + '/../ubnf.lock.json',

@@ -147,6 +147,7 @@ def run_lsp(clients, directory):
         before = snapshot(work)
         pair = []
         for client in clients:
+            client.fixture = case['id']
             client.send('textDocument/didOpen', {'textDocument': {
                 'uri': uri, 'languageId': 'ubnf', 'version': 1, 'text': SOURCE}})
             diagnostics = client.diagnostics(uri)

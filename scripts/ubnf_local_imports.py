@@ -42,6 +42,8 @@ def run_local_imports(clients, directory, java_command, native_command, root):
         (folder / 'socket').symlink_to(directory / 's')
         for case in cases:
             name = case['id']
+            for client in clients:
+                client.fixture = name
             print('local import fixture:', name, flush=True)
             declaration = f"@import x from '{case['path']}'"
             source = f"grammar Main {{ // 😀\r\n {declaration}\r\n @ubnf: v2\r\n @root @mapping(Value) Start ::= 'a';\r\n}}"
@@ -77,6 +79,14 @@ def run_local_imports(clients, directory, java_command, native_command, root):
                     assert ('x.Item' in labels) == (error is None), (name, host, labels)
                 client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
                 assert client.result('textDocument/hover', params) is None
+            if case is cases[-1]:
+                # All stdio assertions (including followups) are complete. Release
+                # the large Java parser heap before starting the boundary CLIs;
+                # keeping the idle server alive overlaps two multi-GiB JVMs.
+                for client in clients:
+                    assert client.result('shutdown') is None
+                    client.send('exit')
+                    assert client.process.wait(timeout=5) == 0
             generated = []
             for host, command in [('java', java_command), ('rust', native_command)]:
                 output = folder / f'{name}-{host}'
