@@ -12,6 +12,9 @@ const BODY_LIMIT: usize = 8 * 1024 * 1024;
 // JDK21's default budget is 384 KiB, but it accounts for parsed fields rather
 // than wire bytes. Keep this finite wire cap; the exact boundary is host-specific.
 const RESPONSE_HEADER_LIMIT: usize = 384 * 1024;
+// Java: `HttpRequest.timeout(20 s)` and `future.get(20, SECONDS)` bound the whole exchange.
+const DEADLINE: Duration = Duration::from_secs(20);
+const TRANSPORT: &str = "HTTPS artifact retrieval failed (TLS, timeout or size limit)";
 
 fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
@@ -47,6 +50,33 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
     if let Some(token) = token {
         request = request.header("Authorization", format!("Bearer {token}"));
     }
+    // ureq re-arms its remaining global budget for every socket write inside one TLS
+    // transmit, so a peer that stops reading a large request target could hold the call
+    // for several multiples of 20 s. Like Java's `future.get(20 s)` + cancel, bound the
+    // whole exchange; an abandoned worker only holds its own connection until exit.
+    within(DEADLINE, move || exchange(request))
+}
+
+/// Runs `work` on a worker and gives up after `deadline` with the transport diagnostic.
+fn within(
+    deadline: Duration,
+    work: impl FnOnce() -> Result<Vec<u8>, String> + Send + 'static,
+) -> Result<Vec<u8>, String> {
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    std::thread::Builder::new()
+        .name("ubnf-https-fetch".into())
+        .spawn(move || {
+            let _ = sender.send(work());
+        })
+        .map_err(|_| error(TRANSPORT))?;
+    receiver
+        .recv_timeout(deadline)
+        .unwrap_or_else(|_| Err(error(TRANSPORT)))
+}
+
+fn exchange(
+    request: ureq::RequestBuilder<ureq::typestate::WithoutBody>,
+) -> Result<Vec<u8>, String> {
     let mut response = request
         .call()
         .map_err(|_| error("HTTPS artifact retrieval failed (TLS, timeout or size limit)"))?;
@@ -195,7 +225,7 @@ fn client(origin: &str, target: Option<&str>) -> Result<(ureq::Agent, Option<Str
         .input_buffer_size(RESPONSE_HEADER_LIMIT + 1)
         .proxy(None)
         .timeout_connect(Some(Duration::from_secs(5)))
-        .timeout_global(Some(Duration::from_secs(20)));
+        .timeout_global(Some(DEADLINE));
     if let Some(path) = credentials.get("caCertificate") {
         let path = path
             .as_deref()
@@ -312,7 +342,30 @@ fn default_home() -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::{java_route, Route};
+    use super::{java_route, within, Route};
+
+    #[test]
+    fn whole_exchange_is_bounded_like_java_future_get() {
+        let started = std::time::Instant::now();
+        let (_keep, blocked) = std::sync::mpsc::channel::<()>();
+        let result = within(std::time::Duration::from_millis(200), move || {
+            let _ = blocked.recv(); // Never answers, like a peer that stops reading.
+            Ok(b"late".to_vec())
+        });
+        assert_eq!(
+            result,
+            Err("E-PACKAGE: HTTPS artifact retrieval failed (TLS, timeout or size limit)".into())
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+        let fast = within(std::time::Duration::from_secs(5), || {
+            Ok(b"artifact".to_vec())
+        });
+        assert_eq!(fast, Ok(b"artifact".to_vec()));
+        let failed = within(std::time::Duration::from_secs(5), || {
+            Err("E-PACKAGE: x".into())
+        });
+        assert_eq!(failed, Err("E-PACKAGE: x".into()));
+    }
 
     fn literal(url: &str, host: &str) -> Route {
         Route::Literal {

@@ -1628,5 +1628,13 @@
     "error": null,
     "hostHeader": "localhost:{port}",
     "backendIssue": 977
+  },
+  {
+    "id": "request-stall",
+    "kind": "request-stall",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 7000000,
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "backendIssue": 977
   }
 ]

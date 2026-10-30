@@ -127,6 +127,11 @@ Host・認証を含む後続 header bytes は移動するだけで、再構築�
 
 送信 buffer は既定128 KiBに target の長さを足し、既存8 MiBの入力文書上限と encoding の伸びの範囲で確保する。
 置換に使った経過時間を元の timeout から引き、1回の underlying transmit に渡す。期限切れでは書き込まず、分割ごとに期限を延長しない。
+ただし ureq は1回の TLS transmit の中でも socket write ごとに残り期限を設定し直すため、受信を止めた peer に
+socket buffer を超える target を送ると、全体20秒を数倍超えて待ち得る（6 MB の target で約62秒を実測）。
+Java は `future.get(20秒)` で交換全体を打ち切るので、native も取得全体を worker で実行し、20秒で同じ取得失敗を返す。
+打ち切った worker は自身の接続だけを保持し、process 終了で消える。共通 fixture の `request-stall` 形
+（7000000 bytes、server は先頭256 KiBだけ読んで止まる）で両版とも19.5秒以上30秒未満を要求する。
 agent は1回の fetch 専用で接続を pool に保持せず、redirect は0回のまま。
 この公開 API は ureq の `unversioned` 名前空間にあり、依存更新時は共通 transport fixture を再実行する。
 TLS 未確立、想定外の prelude、buffer 不足、ASCII origin-form 外の target は書込み前に拒否する。
@@ -360,10 +365,11 @@ ureq の `limit` は指定量を読み切るとエラーになるため、上限
 `101` と本文を宣言した `204` は、java.net.http が status 判定より前に exchange を失敗させる
 （`Exchange` の "Unexpected 101 response"、`MultiExchange.bodyIsPresent`）。Rust も応答 header の時点で同じ規則を適用する。
 期限の fixture は製品の値をそのまま測る。接続 timeout は accept しない listen socket（backlog を先に埋める）への接続で
-5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満を要求し、期限を外すと落ちる。
-待つだけの2形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
+5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満、
+送信途中で受信を止める `request-stall` は19.5秒以上30秒未満を要求し、期限を外すと落ちる。
+待つだけの3形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
 
-共通 `spec-corpus/package-https-transport.json` の transport42形と URL150形を `HttpsPackageConformanceTest` から実行する。
+共通 `spec-corpus/package-https-transport.json` の transport43形と URL150形を `HttpsPackageConformanceTest` から実行する。
 JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を snapshot 有無の両方で照合する。
 待たない形の Java `deps resolve` は、テスト専用の `CodegenBatchHost` が1つの JVM で `CodegenMain.run` を順に呼ぶ
 （JVM 起動を1回にするため。呼出しごとに credentials override を読み直す）。両 JDK で、1呼出し1 JVM の実 CLI と
@@ -372,7 +378,7 @@ JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を 
 （成功・302・Unicode path・Unicode と不正 percent）で snapshot 有無の両方を照合する。
 失敗時の lock/cache 不変、成功時の raw bytes、認証の exact origin、TLS境界、redirect 先の接続0、
 生成時の接続0と固定cache使用を検査する。空bodyの診断は transport ではなく後続 JSON 検査である。
-42形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
+43形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
 HTTP/1.1 の境界・不正 framing は追加38形を同じメソッドで実行し、host 別期待値も skip しない（#972）。
 Java 製品コード・診断は維持し、native は以下の安全側の契約を使う。
 表の「取得失敗」は `HTTPS artifact retrieval failed (TLS, timeout or size limit)`（exit 3）、

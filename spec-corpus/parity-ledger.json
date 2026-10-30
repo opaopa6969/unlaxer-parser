@@ -732,7 +732,7 @@
       "issues": [
         956
       ],
-      "observation": "Java製品コードを変えず、TLS/接続/本文読取り失敗を共通のretrieval failed (TLS, timeout or size limit)へ写す。本文完了後だけstatus 200を要求し、302/404/500でも過大・途中切断が先行する。ureqの排他的limitは上限+1バイトで8MiBちょうどを受理。要求していない101と本文を宣言した204はJavaのexchange失敗に揃える。42形を両deps resolve・snapshot有無で、3生成CLIを代表2形で照合し、JDK17/21独立oracle、秘密値非記録、exact origin/TLS/redirect禁止、失敗時snapshot不変・生成時接続0を検証する。接続5秒・全体20秒は実測し、待つ形は並行、他のJava呼出しは1 JVMで実行する。不正framingとheader境界はpackage-https-framing（#972）の恒久契約で検証する。#956はPR #970でmerge済み。",
+      "observation": "Java製品コードを変えず、TLS/接続/本文読取り失敗を共通のretrieval failed (TLS, timeout or size limit)へ写す。本文完了後だけstatus 200を要求し、302/404/500でも過大・途中切断が先行する。ureqの排他的limitは上限+1バイトで8MiBちょうどを受理。要求していない101と本文を宣言した204はJavaのexchange失敗に揃える。43形を両deps resolve・snapshot有無で、3生成CLIを代表2形で照合し、JDK17/21独立oracle、秘密値非記録、exact origin/TLS/redirect禁止、失敗時snapshot不変・生成時接続0を検証する。接続5秒・全体20秒は実測し、待つ形は並行、他のJava呼出しは1 JVMで実行する。不正framingとheader境界はpackage-https-framing（#972）の恒久契約で検証する。#956はPR #970でmerge済み。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials.json",
@@ -834,7 +834,7 @@
         977,
         979
       ],
-      "observation": "Uri parseは全長65534 bytesまで、from_parts/builderは成分上限を残し、backtickは全constructorが拒否する。ureq-protoのtargetはUriから作られる。公開Agent::with_parts/DefaultConnector::chainのTLS外側でureqのGET / HTTP/1.1の/だけをJavaの検証済みNFC/percent targetへ置換し、Host・認証header bytes、TCP/TLS・期限・応答parserと#972のframing/header上限はureqのまま。bufferは既定128KiB+target長（入力8MiB上限）、置換の経過時間を引いたtimeoutの1回writeで期限を延長せずfetch専用agentのpool保持を無効化。独自HTTP client/新crate/unsafeは追加しない。全長65534/65535/65536/100000/200000 bytes、Unicode encoding後の長さ、U+1FEF単独/BMP/非BMP/percent混在とU+037E対照を直接/推移的依存・snapshot有無・両JDKで共通期待値にする。target/Host/raw lock-cacheと失敗時接続0/snapshot不変を検証。不正credentials→CA→tokenの優先順、raw backtick構文拒否・非scalar送信禁止・#976接続先を維持し、切詰めや追加escapeはしない。",
+      "observation": "Uri parseは全長65534 bytesまで、from_parts/builderは成分上限を残し、backtickは全constructorが拒否する。ureq-protoのtargetはUriから作られる。公開Agent::with_parts/DefaultConnector::chainのTLS外側でureqのGET / HTTP/1.1の/だけをJavaの検証済みNFC/percent targetへ置換し、Host・認証header bytes、TCP/TLS・期限・応答parserと#972のframing/header上限はureqのまま。bufferは既定128KiB+target長（入力8MiB上限）、置換の経過時間を引いたtimeoutの1回writeで期限を延長せずfetch専用agentのpool保持を無効化。ureqはTLS内の各socket writeで残り期限を再設定するため、受信を止めたpeerへの数MBのtargetでも全体20秒で終わるよう、Javaのfuture.get(20秒)と同じく交換全体をworker外の期限で打ち切る（7000000 bytesのrequest-stall形）。独自HTTP client/新crate/unsafeは追加しない。全長65534/65535/65536/100000/200000 bytes、Unicode encoding後の長さ、U+1FEF単独/BMP/非BMP/percent混在とU+037E対照を直接/推移的依存・snapshot有無・両JDKで共通期待値にする。target/Host/raw lock-cacheと失敗時接続0/snapshot不変を検証。不正credentials→CA→tokenの優先順、raw backtick構文拒否・非scalar送信禁止・#976接続先を維持し、切詰めや追加escapeはしない。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-https-transport.json",

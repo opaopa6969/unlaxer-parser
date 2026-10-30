@@ -19,7 +19,7 @@ from ubnf_package_credentials import ROOT, local_tls_context, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
 LIMIT = 8 * 1024 * 1024
-COUNT = 230
+COUNT = 231
 URI_COUNT = 150
 UNICODE_COUNT = 88
 TOKEN = 'transport-fixture-only-token'
@@ -31,7 +31,9 @@ STATUS = 'HTTPS artifact requires status 200; redirects are forbidden'
 MISSING = 'E-PACKAGE: missing lock; run unlaxer deps resolve --manifest ubnf.json'
 # Product deadlines (connect 5 s, whole call 20 s) are measured unchanged. These
 # shapes only wait, so all of their invocations run concurrently in their own folders.
-SLOW = {'stall': (19.5, 45), 'connect-stall': (4.5, 19)}
+# A peer that stops reading a request larger than the socket buffers must still end at
+# 20 s (Java future.get); ureq re-arms its budget per write, so bound it tightly (#977).
+SLOW = {'stall': (19.5, 45), 'connect-stall': (4.5, 19), 'request-stall': (19.5, 30)}
 NO_BODY = [101, 204, 304]
 
 
@@ -51,6 +53,7 @@ def fixtures():
     generated = [c for c in cases if c.get('generate')]
     assert len(generated) == 4 and {c['error'] is None for c in generated} == {True, False}
     assert {c['kind'] for c in cases} >= set(SLOW), 'deadline fixtures missing'
+    assert [c['urlBytes'] for c in cases if c['kind'] == 'request-stall'] == [7000000], 'request stall missing'
     return cases
 
 
@@ -139,6 +142,11 @@ def transport_server(directory, artifact):
                         if 'hostHeader' in cases[case_id]:
                             received['host'] = [line.split(b':', 1)[1].strip().decode('ascii') for line in lines[1:]
                                                 if line.lower().startswith(b'host:')]
+                    if case_id in cases and cases[case_id]['kind'] == 'request-stall':
+                        # Read only the first 256 KiB: the rest of the multi-MB target exceeds
+                        # the socket buffers, so the client blocks while writing the request.
+                        stop.wait(90)
+                        return
                     receipts.append(received)
                     # A followed redirect is a test failure, including same-origin redirects.
                     if path == '/redirect-target':
@@ -370,8 +378,8 @@ def expected_receipt(case, host='java', port=None, java17=False):
         if 'hostHeader' in case:  # Java sends getHost() as written, plus a non-default port.
             wanted['host'] = [case['hostHeader'].format(port=port)]
         return wanted
-    if not case.get('trust', True) or 'hostname' in case or case['kind'] in ['refused', 'connect-stall']:
-        return None  # The request must not pass the TCP/TLS boundary.
+    if not case.get('trust', True) or 'hostname' in case or case['kind'] in ['refused', 'connect-stall', 'request-stall']:
+        return None  # No complete request passes the TCP/TLS boundary (request-stall: never fully read).
     return {'case': case['id'], 'authorization': 'bearer' if case.get('token', True) else 'absent'}
 
 
@@ -427,7 +435,7 @@ def check(directory, args, records):
                     seconds=elapsed, snapshot=receipt(after))
 
     with transport_server(directory, artifact) as (port, refused, blackhole, ca, received, connections), \
-            java_host(args, host_env, directory) as batch, ThreadPoolExecutor(max_workers=8) as pool:
+            java_host(args, host_env, directory) as batch, ThreadPoolExecutor(max_workers=12) as pool:
         ports = (port, refused, blackhole)
 
         def slow_run(case, host, existing):
