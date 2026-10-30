@@ -652,6 +652,14 @@
     "983": {
       "title": "parity(frontend): 途中の値検証が後続構文エラーを隠す診断選択差",
       "state": "OPEN"
+    },
+    "986": {
+      "state": "OPEN",
+      "title": "名前空間参照の接頭辞の連続性をJavaへ揃える"
+    },
+    "988": {
+      "state": "OPEN",
+      "title": "ruleを含むlocal moduleのnative拒否診断に元ファイルのパスがない"
     }
   },
   "entries": [
@@ -2383,19 +2391,55 @@
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
         "docs/ubnf-packages.md"
       ]
+    },
+    {
+      "id": "qualified-reference-prefix-trivia",
+      "category": "contract",
+      "title": "名前空間参照の接頭辞だけの連続性と最後の名前のtrivia",
+      "hosts": "Java UBNFMapper / native Rust frontend / authoring LSP",
+      "issues": [
+        986
+      ],
+      "observation": "Java製品を維持し、(IDENTIFIER dot)*の接頭辞内の空白・改行・行コメントをnativeでも構文エラーにする。a .N / a. b.NはP-SYNTAX/null/UBNF syntax、a. N / a.b. N / 最後の名前の前のコメントはJava同様に構文受理する。旧REGEXより全体構文を優先する#949の順序、importのP-MODULEラップ、#937のhost別構文表示を維持する。18形×入口/local importと正常token import2形、LF/CRLFの608CLI観測・成功後--check16回・frontend36入力を固定期待値に照合し、無出力/入力不変と正常生成物の全hashを検証する。authoringのspaced-namespace-*は既存の編集拒否を維持。正常な未解決参照のE-RULE-UNDEFINED本文は既存#843契約、module拒否のパス表示差は#988、途中値検証は#983で追跡する。公開3.3.0とJava診断は不変。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/cli-stderr.json",
+        "scripts/cli_stderr.py",
+        "rust/unlaxer-ubnf/src/parser.rs",
+        "rust/unlaxer-ubnf-lsp/src/index.rs",
+        "spec-corpus/ubnf-authoring-lsp/navigation.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustUbnfFrontendConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java"
+      ]
+    },
+    {
+      "id": "local-rule-module-error-path",
+      "category": "unresolved",
+      "title": "ruleを含むlocal module拒否の元ファイル表示",
+      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "issues": [
+        988
+      ],
+      "observation": "構文として正しいruleを含むlocal moduleは両版とも生成/deps inspectで終了3となるが、Javaのonly declarative token modules can be importedには絶対元パスが付き、nativeには付かない。check/PlaygroundのP-MODULEと無出力は一致。#986の正常構文対照にhost別の固定値を置き、ここでは修正しない。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/cli-stderr.json",
+        "rust/unlaxer-generator/src/packages.rs"
+      ]
     }
   ],
   "corpora": [
     {
       "path": "spec-corpus/cli-stderr.json",
       "fields": {
-        "java": 7,
-        "nativeExpected": 3,
+        "java": 11,
+        "rust": 11,
         "nativeSyntax": 5,
-        "rust": 7,
-        "javaError": 40,
-        "native": 40,
-        "nativeByEnding": 40
+        "nativeExpected": 3,
+        "nativeByEnding": 76,
+        "javaError": 64,
+        "native": 76,
+        "javaAst": 12
       },
       "entries": [
         "cli-stderr-presentation",
@@ -2403,7 +2447,9 @@
         "playground-profile-input-io",
         "playground-option-blank-values",
         "cli-output-replacement-metadata",
-        "readiness-regex-syntax-priority"
+        "readiness-regex-syntax-priority",
+        "qualified-reference-prefix-trivia",
+        "local-rule-module-error-path"
       ]
     },
     {

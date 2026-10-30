@@ -131,7 +131,7 @@ def remove_created(work, case, before):
 
 def observe(command, case, operation, work, native):
     args = [arg.replace('${WORK}', str(work)) for arg in options(case, operation)]
-    if callable(command) and case['scope'] == 'regex':
+    if callable(command) and case['scope'] in ('regex', 'qualified'):
         # One batch JVM for this suite; resolve each case's inputs/output explicitly.
         for option in ('--grammar', '--output'):
             if option in args:
@@ -141,7 +141,7 @@ def observe(command, case, operation, work, native):
     if 'args' in case or callable(command):
         # Unicode separators in a nonblank path are part of the diagnostic, not LF.
         actual['lastError'] = actual['stderr'].removesuffix('\n').rsplit('\n', 1)[-1]
-    keys = ('exit', 'stdout', 'lastError', 'stderr') if case['scope'] == 'regex' else ('exit', 'stdout', 'lastError')
+    keys = ('exit', 'stdout', 'lastError', 'stderr') if case['scope'] in ('regex', 'qualified') else ('exit', 'stdout', 'lastError')
     return {key: normalize(actual[key], work) if isinstance(actual[key], str) else actual[key]
             for key in keys}, actual
 
@@ -189,7 +189,7 @@ def exercise(cases, directory, commands, evidence, trees=None):
                             entry['before'] = before
                             entry['after'] = after
                             assert after == {**before, **expected_tree(case, operation, host, ending, trees)}, (entry, 'tree')
-                            if observed['exit'] == 0:
+                            if observed['exit'] == 0 and operation in ('generate', 'playground'):
                                 checked, _ = observe(command, {**case, 'flags': ['--check']},
                                                      operation, work, host == 'rust')
                                 evidence['checks'].append(dict(case=case['id'], ending=ending,
@@ -403,7 +403,7 @@ def main():
     parser.add_argument('--java', required=True)
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
-    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax', 'profile', 'blank', 'regex', 'replacement'], required=True)
+    parser.add_argument('--suite', choices=['output', 'paths', 'utf8', 'readiness', 'syntax', 'profile', 'blank', 'regex', 'qualified', 'replacement'], required=True)
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
     corpus = json.loads((ROOT / 'spec-corpus/cli-stderr.json').read_text())
@@ -432,9 +432,9 @@ def main():
                 work.mkdir()
                 with blank_java_host(args.java, args.classpath, work) as host:
                     exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence)
-            elif args.suite == 'regex':
+            elif args.suite in ('regex', 'qualified'):
                 with blank_java_host(args.java, args.classpath, Path(directory)) as host:
-                    exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence)
+                    exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence, corpus.get('trees'))
             else:
                 exercise(cases, Path(directory), [
                     ('java', [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),

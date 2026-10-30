@@ -1034,6 +1034,38 @@ CLI から到達する readiness の50 code は本変更の48入力で固定す�
 手組みASTだけの `P-GRAMMAR-COUNT` / `P-GRAMMAR-NAME` / `P-TOKEN-KIND` も同じ分岐のない描画を使うが、
 実 CLI の corpus 件数には含めない。
 
+### 名前空間参照の空白（#986）
+
+Java `RuleRefElementParser` を基準に、native frontend も `(IDENTIFIER '.')*` の
+**接頭辞だけ**を連続した字句として読む。設定・import・adapter 等の別の dotted name 構文は変えない。
+
+| 参照 | 構文認識 |
+| --- | --- |
+| `a.N` / `a.b.N` | 受理 |
+| `a .N` / `a.b .N` / `a. b.N` | `P-SYNTAX` |
+| `a// comment` 改行 `.N` / `a.// comment` 改行 `b.N` | `P-SYNTAX` |
+| `a. N` / `a.b. N` / `a.// comment` 改行 `N` | 受理（最後の名前の前には grammar trivia を許す） |
+
+最後の名前の前まで禁止すると Java の既存の受理から退行するため、この境界を維持する。
+構文不正の入口 check は `P-SYNTAX` / span=null / subject=`UBNF syntax`、
+local import の入口 check / Playground は既存の `P-MODULE` ラップを保つ。
+旧 REGEX 宣言が先行しても、全体の構文不正を移行診断より優先する（#949）。
+generate / deps inspect は出力の作成前に終了3となり、エラー本文は上記 #937 の host 別表示を保つ。
+
+`spec-corpus/cli-stderr.json` の `qualified` suite は18形×入口/local import と
+正常な token import 2形の38ケースを固定する。LF/CRLF・非BMPを含む両実CLIの608観測と
+成功後の `--check` 16回で、check JSON全文・全stderr・失敗段階・出力/staging不在、
+成功時の全生成物の名前/type/mode/SHA-256 を比較する。生成物の固定値は変更前 Java の出力を
+変更前/後 native とも比較して確定し、試験中に他方の host から期待値を作らない。
+同じ表の frontend 36入力は Java の通常/snapshot API と native の AST または全位置付きエラーに照合する。
+既存の authoring LSP `spaced-namespace-*` の編集拒否は維持する。
+
+構文として正しい未解決参照の generate は、既存の Java validator の詳細と native の
+`E-RULE-UNDEFINED: unsupported qualified rule reference` という説明を維持する（#843）。
+rule を含む module の拒否で native の `E-MODULE` に元ファイルのパスがない既存差は
+[#988](https://github.com/opaopa6969/unlaxer-parser/issues/988) へ分離した。
+途中値検証と構文認識の一般的な分離（#983）、Java の製品コード・診断文、公開3.3.0 は変更しない。
+
 ## CLI の出力先パス（#952）
 
 参照は Java `CodegenMain`。Java 製品コード、上記 #932/#934 の入力 I/O 表、#937 の出力 I/O 表、

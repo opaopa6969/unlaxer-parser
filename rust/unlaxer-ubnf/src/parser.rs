@@ -160,6 +160,23 @@ impl Parser<'_> {
         }
         Ok(value)
     }
+    // Java's RuleRefElement has a contiguous (identifier '.')* prefix;
+    // grammar trivia is allowed only before its final identifier. Other dotted
+    // names (settings/imports/adapters) have their own grammar and keep dotted().
+    fn rule_reference(&mut self) -> Result<String> {
+        let mut value = self.identifier()?;
+        let mut contiguous = true;
+        while self.is('.') {
+            if !contiguous || self.previous().byte_end != self.current().span.byte_start {
+                return Err(self.error("namespace prefix must be contiguous"));
+            }
+            self.pos += 1;
+            contiguous = self.previous().byte_end == self.current().span.byte_start;
+            value.push('.');
+            value.push_str(&self.identifier()?);
+        }
+        Ok(value)
+    }
     fn annotation_is(&self, name: &str) -> bool {
         self.is('@')
             && self
@@ -1248,7 +1265,7 @@ impl Parser<'_> {
             self.expect(')')?;
             ElementKind::Error(message)
         } else {
-            let value = self.dotted()?;
+            let value = self.rule_reference()?;
             let (namespace, name) = match value.rsplit_once('.') {
                 Some((ns, name)) => (Some(ns.to_owned()), name.to_owned()),
                 None => (None, value),

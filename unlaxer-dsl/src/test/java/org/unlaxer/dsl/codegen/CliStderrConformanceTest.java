@@ -35,6 +35,8 @@ public class CliStderrConformanceTest {
     @Test(timeout=120000) public void playgroundBlankOptionsMatchJavaWhitespace() throws Exception { check("blank"); }
     @Test(timeout=120000) public void regexSyntaxPriorityMatchesJavaBeforeOutput() throws Exception { check("regex"); }
 
+    @Test(timeout=120000) public void qualifiedReferenceSyntaxMatchesJavaBeforeOutput() throws Exception { check("qualified"); }
+
     private static void check(String suite) throws Exception {
         String classpath = Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
             .map(path -> Path.of(path).toAbsolutePath().toString()).collect(Collectors.joining(File.pathSeparator));
@@ -53,6 +55,7 @@ public class CliStderrConformanceTest {
         int observations = switch (suite) {
             case "replacement" -> 60;
             case "regex" -> 640;
+            case "qualified" -> 608;
             case "blank" -> 350;
             case "output" -> 112;
             case "paths" -> 244;
@@ -64,6 +67,7 @@ public class CliStderrConformanceTest {
         int skipped = 0;
         for (var entry : excluded) skipped += entry.getAsJsonObject().get("observations").getAsInt();
         assertEquals(observations - skipped, evidence.getAsJsonArray("observations").size());
+        if (suite.equals("qualified")) assertEquals(16, evidence.getAsJsonArray("checks").size());
         if (suite.equals("paths")) assertEquals(114, evidence.getAsJsonArray("checks").size());
         if (suite.equals("profile")) assertEquals(4, evidence.getAsJsonArray("checks").size());
         if (suite.equals("replacement") && excluded.size() == 0) assertEquals(44, evidence.getAsJsonArray("checks").size());

@@ -358,9 +358,9 @@ impl Index {
             .find(|s| s.start <= offset && offset <= s.end)
     }
 }
-/// Java's namespace prefix is a plain LazyChain (no inter-token trivia); only
-/// the final identifier may have leading whitespace. The native frontend accepts
-/// more spacing. Recover those documents instead of granting AST edit authority.
+/// Java's namespace prefix is contiguous; only the final identifier permits
+/// leading trivia. Check the source spelling of AST references (including those
+/// produced by expansion) before granting AST edit authority.
 fn authoring_parse(source: &str) -> Result<UbnfFile, Diagnostic> {
     fn body(source: &str, value: &RuleBody) -> Option<Span> {
         value
