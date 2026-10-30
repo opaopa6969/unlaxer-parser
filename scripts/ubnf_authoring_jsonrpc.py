@@ -1,5 +1,7 @@
-"""#994: 手書きの wire 入力と独立全 JSON oracle。実測結果を期待値にしない。"""
+"""#994/#1001: 手書きの wire 入力と独立全 JSON oracle。実測結果を期待値にしない。"""
 import json
+import queue
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -9,11 +11,11 @@ def run_jsonrpc(clients, directory, omit_params):
     fixture = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/jsonrpc.json').read_text())
     configuration = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/configuration.json').read_text())
     assert (len(fixture['invalidParams']), len(fixture['versions']), len(fixture['methods'])) == (12, 47, 47)
+    started = time.monotonic()
     evidence = []
     hosts = list(zip(('java', 'rust'), clients))
 
-    def response(client, method, params, expected):
-        actual = client.request(method, params)
+    def check(client, actual, expected, serial):
         # Only JVM/Gson implementation details are excluded. All other fields,
         # code/message, result, id and key presence remain exact comparisons.
         if client.backend == 'java' and 'error' in expected and expected['error']['code'] in (-32603, -32700):
@@ -21,8 +23,79 @@ def run_jsonrpc(clients, directory, omit_params):
             actual = {**actual, 'error': dict(actual['error'])}
             detail = actual['error'].pop('data')
             assert isinstance(detail, str if expected['error']['code'] == -32603 else dict), (client.fixture, detail)
-        oracle = {'jsonrpc': '2.0', 'id': client.serial, **expected}
-        assert actual == oracle, (client.backend, client.fixture, method, oracle, actual)
+        oracle = {'jsonrpc': '2.0', 'id': serial, **expected}
+        assert actual == oracle, (client.backend, client.fixture, oracle, actual)
+
+    def response(client, method, params, expected):
+        actual = client.request(method, params)
+        check(client, actual, expected, client.serial)
+
+    reader = fixture['reader']
+    assert reader['javaRevision'] == '384fcf3eb1c0ce3e207ac580cec5fcac4b478b34'
+
+    def quiet(client):
+        # The preceding barrier proves the reader has processed the bad frame.
+        # A bounded interval then rejects late responses as well as queued ones.
+        assert not client.pending, (client.fixture, client.pending)
+        try:
+            item = client.messages.get(timeout=reader['silenceSeconds'])
+        except queue.Empty:
+            assert client.process.poll() is None, client.failure('unexpected process exit')
+            return
+        raise AssertionError((client.backend, client.fixture, 'unexpected frame', item))
+
+    def raw(client, frame, expected, response_id=None):
+        client.serial += 1
+        serial = client.serial
+        client.send_raw(frame.replace('$ID', str(serial)))
+        if expected is not None:
+            response_id = serial if response_id is None else response_id
+            check(client, client.receive(lambda m: m.get('id') == response_id), expected, response_id)
+
+    def order_frame(order, method, case, profile):
+        options = {'initializationOptions': {}}
+        if profile != 'default':
+            options['initializationOptions']['languageProfile'] = {'entry': 'UBNFFile', 'tsv': configuration['profiles'][profile]}
+        params = case['raw'].replace('$OPTIONS', json.dumps(options)[1:-1])
+        return order.replace('$METHOD', method).replace('$PARAMS', params)
+
+    def raw_dto(client, method, params, expected):
+        raw(client, '{"jsonrpc":"2.0","id":$ID,"method":' + json.dumps(method) + ',"params":' + params + '}', expected)
+
+    # Isolated lifecycle sessions allow every raw key order and positional arity
+    # to prove initialize retry (including Java reader failures and native success).
+    for case in reader['orderParams']:
+        for index, order in enumerate(reader['orders']):
+            for _, original in hosts:
+                outcome = case[original.backend][index]
+                # Failed attempts share the still-uninitialized real server.
+                # Only accepted initialization needs a fresh session. This keeps
+                # JVM startup and all silent-input deadlines below one minute.
+                client = type(original)(original.command, native=original.backend == 'rust') if outcome == 'success' else original
+                client.timeout = 4
+                client.fixture = f"jsonrpc/reader/initialize/{case['id']}/{index}"
+                try:
+                    outcome = case[client.backend][index]
+                    expected = configuration['expected']['default'][client.backend]
+                    raw(client, order_frame(order, 'initialize', case, 'default'),
+                        {'result': expected} if outcome == 'success' else None if outcome == 'silent' else reader['oracles'][outcome])
+                    if outcome != 'success':
+                        response(client, 'textDocument/hover', {}, reader['oracles']['early'])
+                    else:
+                        response(client, 'initialize', {'capabilities': {}}, reader['oracles']['already'])
+                    if outcome == 'success':
+                        response(client, '$/reader-barrier', {}, {'result': None})
+                        assert not client.pending and client.messages.empty(), client.fixture
+                        response(client, 'shutdown', {}, {'result': None})
+                        client.send('exit')
+                        assert client.process.wait(timeout=4) == 0
+                finally:
+                    if client is not original:
+                        client.close()
+            evidence.append({'case': f"reader-initialize-{case['id']}-{index}"})
+
+    for _, client in hosts:
+        quiet(client)
 
     def hover(client, uri, document):
         response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': len(document['source'])}}, {'result': document['hover']})
@@ -50,6 +123,12 @@ def run_jsonrpc(clients, directory, omit_params):
             response(client, 'textDocument/hover', {}, early)
             client.send('textDocument/didOpen', {'textDocument': {'uri': (directory / ('early-' + case['id'] + '.ubnf')).as_uri(), 'version': 1, 'text': fixture['freshDocument']['source']}})
         evidence.append({'case': 'initialize-' + case['id']})
+    for index, params in enumerate(reader['dtoInvalid']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/reader/initialize/dto-{index}'
+            raw_dto(client, 'initialize', params, reader['oracles']['parse'])
+            response(client, 'textDocument/hover', {}, reader['oracles']['early'])
+        evidence.append({'case': f'reader-initialize-dto-{index}'})
     for _, client in hosts:
         client.fixture = 'jsonrpc/retry-initialize'
         configure(client, 'restricted', 'initialize')
@@ -78,6 +157,46 @@ def run_jsonrpc(clients, directory, omit_params):
             hover(client, uri, fresh)
             client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
         evidence.append({'case': 'configure-' + case['id']})
+    def retained(client, suffix):
+        # Check the complete old document and newly submitted text under the old
+        # restricted VALIDATE gate, not merely liveness or cached diagnostics.
+        uri = (directory / 'kept.ubnf').as_uri()
+        hover(client, uri, kept)
+        response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': fixture['keptSymbols']})
+        uri = (directory / ('reader-fresh-' + suffix + '.ubnf')).as_uri()
+        fresh = fixture['freshDocument']
+        client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'version': 1, 'text': fresh['source']}})
+        diagnostic(client, uri, [])
+        hover(client, uri, fresh)
+        client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
+
+    for index, params in enumerate(reader['dtoInvalid']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/reader/configure/dto-{index}'
+            raw_dto(client, 'unlaxer/configure', params, reader['oracles']['parse'])
+            retained(client, f'dto-{index}')
+        evidence.append({'case': f'reader-configure-dto-{index}'})
+    for case in reader['orderParams']:
+        for index, order in enumerate(reader['orders']):
+            for _, client in hosts:
+                client.fixture = f"jsonrpc/reader/configure/{case['id']}/{index}"
+                outcome = case[client.backend][index]
+                raw(client, order_frame(order, 'unlaxer/configure', case, 'restricted'),
+                    {'result': configuration['expected']['restricted'][client.backend]} if outcome == 'success'
+                    else None if outcome == 'silent' else reader['oracles'][outcome])
+                retained(client, case['id'] + str(index))
+            evidence.append({'case': f"reader-configure-{case['id']}-{index}"})
+    for index, case in enumerate(reader['duplicates']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/reader/duplicate-{index}'
+            raw(client, case['raw'], reader['oracles'][case['oracle']] if 'oracle' in case else case['expected'], case.get('responseId'))
+            retained(client, f'duplicate-{index}')
+        evidence.append({'case': f'reader-duplicate-{index}'})
+    # All silent configure inputs share one short deadline. A barrier/request
+    # after each input and the final drain detect missing, spurious and late ids.
+    for _, client in hosts:
+        quiet(client)
+
     # A later successful configure restores validation without replacing buffers.
     for _, client in hosts:
         client.fixture = 'jsonrpc/recover-configure'
@@ -119,6 +238,43 @@ def run_jsonrpc(clients, directory, omit_params):
                     assert not client.pending and client.messages.empty(), (client.fixture, 'dropped notification published')
                 client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
             evidence.append({'case': kind + '-' + case['id']})
+    for index, params in enumerate(reader['dtoAccepted']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/reader/accepted-dto-{index}'
+            raw_dto(client, 'unlaxer/configure', params, {'result': configuration['expected']['default'][client.backend]})
+        evidence.append({'case': f'reader-accepted-dto-{index}'})
+    for method in reader['typedMethods']:
+        for index, params in enumerate(reader['typedInvalid']):
+            for _, client in hosts:
+                client.fixture = f'jsonrpc/reader/typed/{method}/{index}'
+                raw_dto(client, method, params, reader['oracles']['parse'])
+                response(client, '$/reader-barrier', {}, {'result': None})
+            evidence.append({'case': f'reader-typed-{method}-{index}'})
+    for case in reader['typedPositional']:
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/reader/typed-positional/' + case['method']
+            raw_dto(client, case['method'], '[{"textDocument":{"uri":"file:///none"}}]', case['expected'])
+        evidence.append({'case': 'reader-typed-positional-' + case['method']})
+    for index, params in enumerate(reader['typedNested']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/reader/nested-{index}'
+            raw_dto(client, 'textDocument/hover', params, reader['oracles']['parse'])
+        evidence.append({'case': f'reader-nested-{index}'})
+    for method in reader['nullIdMethods']:
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/reader/null-id/' + method
+            client.send_raw('{"jsonrpc":"2.0","id":null,"method":' + json.dumps(method) + ',"params":{}}')
+            response(client, '$/reader-barrier', {}, {'result': None})
+        evidence.append({'case': 'reader-null-id-' + method})
+    for _, client in hosts:
+        client.fixture = 'jsonrpc/reader/overflow-notification'
+        uri = (directory / 'overflow.ubnf').as_uri()
+        client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'version': 1, 'text': fixture['oldDocument']['source']}})
+        diagnostic(client, uri, [])
+        client.send_raw(reader['overflowNotification'].replace('$URI', json.dumps(uri)).replace('$SOURCE', json.dumps(kept['source'])))
+        response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': fixture['oldDocument']['symbols']})
+        quiet(client)
+    evidence.append({'case': 'reader-overflow-notification'})
     for case in fixture['methods']:
         for _, client in hosts:
             client.fixture = 'jsonrpc/method/' + case['method']
@@ -131,5 +287,5 @@ def run_jsonrpc(clients, directory, omit_params):
         client.send('exit')
         assert client.process.wait(timeout=5) == 0
         assert not client.pending
-    evidence.append({'case': 'shutdown-exit'})
+    evidence.append({'case': 'shutdown-exit', 'elapsedSeconds': round(time.monotonic() - started, 3)})
     return evidence

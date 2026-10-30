@@ -72,8 +72,12 @@ impl Server {
         out.push(json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"version":0,"diagnostics":diagnostics}}));
     }
     pub fn handle(&mut self, message: Value) -> Vec<Value> {
+        self.handle_checked(message, None)
+    }
+    fn handle_checked(&mut self, message: Value, reader_error: Option<Error>) -> Vec<Value> {
         let mut out = Vec::new();
-        let request = message.get("id").is_some();
+        // lsp4j treats an explicit null id exactly like an absent id.
+        let request = message.get("id").is_some_and(|id| !id.is_null());
         let id = message.get("id").cloned().unwrap_or(Value::Null);
         let method = message["method"].as_str().unwrap_or("");
         if message["jsonrpc"] != "2.0"
@@ -86,11 +90,12 @@ impl Server {
         }
         let params = &message["params"];
         let result = (|| -> Result<Value, Error> {
-            // Gson deserializes typed params before the lifecycle endpoint runs.
-            if matches!(method, "initialize" | "unlaxer/configure") {
-                rpc::initialize_shape(params)?;
+            if let Some(error) = reader_error {
+                return Err(error);
             }
-            let params = if matches!(method, "initialize" | "unlaxer/configure") {
+            // Gson deserializes typed params before the lifecycle endpoint runs.
+            rpc::params_shape(method, params)?;
+            let params = if rpc::typed_request(method) {
                 rpc::initialize_params(params)
             } else {
                 params
@@ -293,8 +298,8 @@ impl Server {
             let Some(bytes) = unlaxer_lsp::read_frame(input)? else {
                 break;
             };
-            let messages = match serde_json::from_slice(&bytes) {
-                Ok(value) => self.handle(value),
+            let messages = match rpc::read_message(&bytes) {
+                Ok((value, error)) => self.handle_checked(value, error),
                 Err(_) => vec![
                     json!({"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}),
                 ],
