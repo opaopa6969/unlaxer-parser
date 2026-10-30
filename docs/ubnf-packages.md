@@ -431,6 +431,8 @@ Java 製品コード・診断・公開済み3.3.0・parser ホットパスは変
 | 同じ生バイト名の passwd home | 置換後の home に既定 credentials がなく、fixture の私有 CA を得られない。exit 3、`E-PACKAGE: HTTPS artifact retrieval failed (TLS, timeout or size limit)` | exit 0、元の home の credentials を使用 | 同上。Java の診断は TLS fixture の条件下の値 |
 | 生バイト名、有効ロケール `C` または未設定（ASCII 名の symlink を経る import を除く） | exit 3、`Malformed input ...` | exit 0 | JVM のパス変換による恒久差 |
 | ASCII 名の import symlink の target に生バイト名がある | 両ロケールで exit 0。target の bytes は OS が辿る | exit 0 | 同じ生成 bytes |
+| ASCII の manifest 本文の `local:` source、ASCII の credentials 本文の `caCertificate` が非 ASCII のパス、有効ロケール `C` または未設定 | exit 3、`E-PACKAGE: cannot read local artifact` / `E-PACKAGE: cannot read artifact CA certificate` | exit 0、指定したファイルを使用 | 本文から読んだパスも JVM の変換による恒久差。`C.UTF-8` では両 host が同じ lock/cache で成功 |
+| 存在しない非 ASCII の grammar、有効ロケール `C` または未設定 | exit 3、`Malformed input ...` | exit 4、そのパス | 両方失敗するが、Java は I/O の前にパス変換で失敗する恒久差。native はロケールに依らず本来の I/O 診断を返し、`C.UTF-8` では両 host とも exit 4 で一致 |
 
 UTF-8 の grammar 本文には FF のファイル名を直接書けない。共通 fixture は任意の
 置換文字をその名前の代用にせず、ASCII import → 生バイト target の symlink と、
@@ -439,10 +441,15 @@ UTF-16 の単独 surrogate を文法に通す #959 は扱わない。
 argv は OS bytes から復号するため、`é😀` は C で6個の置換文字になる。
 UTF-8 本文から読む import の `é😀` は2コードポイントのままで、最終 stderr は
 ASCII encoder により `??` と表示する。この区別も独立した実 CLI の期待値で固定する。
+非 UTF-8 ロケールの Java は本文由来の文字を含む stdout/stderr も同じ encoder で `?` にする
+（例: 構文エラーの `UBNF パース失敗: ... é😀` は `UBNF ?????: ... ??`、exit 3 は一致）。
+native は端末の文字コードを推測せず、ロケールに依らず UTF-8 で出力する。これも JVM の
+コンソール文字コードによる表示の恒久差で、構文エラー文面自体の差は #937 の意図した差である。
 
 **本文 bytes はファイル名と別の契約**とする。JDK17 の `file.encoding` は C で
 US-ASCII、JDK21 は UTF-8 だが、対象 CLI の grammar / manifest / credentials reader と
-生成 writer は UTF-8 を使う。ASCII パス上の非 ASCII grammar・manifest・credentials・
+生成 writer は UTF-8 を使う。fixture の grammar・manifest・credentials・artifact の本文は
+`\u` escape ではなく生の UTF-8 bytes で書き、その性質も setup で検査する。ASCII パス上の非 ASCII grammar・manifest・credentials・
 取得 cache・生成物・Playground/profile の bytes は両 JDK/native とも一致する。
 不正 UTF-8 grammar/import は `Input length = 1` / exit 4、manifest は
 `E-PACKAGE: invalid JSON` / exit 3、credentials は
@@ -451,9 +458,9 @@ US-ASCII、JDK21 は UTF-8 だが、対象 CLI の grammar / manifest / credenti
 これらの両方失敗する形は診断・exit・全入力/lock/cache/出力不変を一致させる。
 今回の実測では本文 I/O や共通失敗条件に実装修正を要する差はなかった。
 
-共通 `spec-corpus/cli-locale-paths.json` の23形を既存
+共通 `spec-corpus/cli-locale-paths.json` の27形を既存
 `CliStderrConformanceTest#localePathsRetainHostLimitsAndUtf8FileBytes` で実行する。
-9環境 × 両 host × 既存 lock/cache 有無の828観測を、host 別の固定期待値と照合する。
+9環境 × 両 host × 既存 lock/cache 有無の972観測を、host 別の固定期待値と照合する。
 生バイト名は証跡のツリーで hex にして lossless に記録し、生成ファイルは全内容の
 SHA-256 を固定する。成功時も意図しない別名・追加ファイルを検出する。
 Java は同じ環境内を `CodegenBatchHost --locale-paths` の1 JVMにまとめ、OS argv の

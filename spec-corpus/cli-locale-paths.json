@@ -186,13 +186,13 @@
       },
       "javaUtf8": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       },
       "native": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       }
@@ -213,7 +213,7 @@
       },
       "native": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       }
@@ -229,13 +229,13 @@
       },
       "javaUtf8": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       },
       "native": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       }
@@ -256,9 +256,73 @@
       },
       "native": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
+      }
+    },
+    {
+      "id": "local-source-unicode",
+      "scope": "local-source",
+      "kind": "unicode",
+      "javaAscii": {
+        "exit": 3,
+        "stdout": "",
+        "lastError": "E-PACKAGE: cannot read local artifact"
+      },
+      "javaUtf8": {
+        "exit": 0,
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "lastError": "",
+        "tree": "credentials-unicode-javaUtf8"
+      },
+      "native": {
+        "exit": 0,
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "lastError": "",
+        "tree": "credentials-unicode-javaUtf8"
+      }
+    },
+    {
+      "id": "ca-certificate-unicode",
+      "scope": "ca-certificate",
+      "kind": "unicode",
+      "javaAscii": {
+        "exit": 3,
+        "stdout": "",
+        "lastError": "E-PACKAGE: cannot read artifact CA certificate"
+      },
+      "javaUtf8": {
+        "exit": 0,
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "lastError": "",
+        "tree": "credentials-unicode-javaUtf8"
+      },
+      "native": {
+        "exit": 0,
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "lastError": "",
+        "tree": "credentials-unicode-javaUtf8"
+      }
+    },
+    {
+      "id": "grammar-missing-unicode",
+      "scope": "grammar-missing",
+      "kind": "unicode",
+      "javaAscii": {
+        "exit": 3,
+        "stdout": "",
+        "lastError": "Malformed input or input contains unmappable characters: ${WORK}/??????.ubnf"
+      },
+      "javaUtf8": {
+        "exit": 4,
+        "stdout": "",
+        "lastError": "${WORK}/é😀.ubnf"
+      },
+      "native": {
+        "exit": 4,
+        "stdout": "",
+        "lastError": "${WORK}/é😀.ubnf"
       }
     },
     {
@@ -311,19 +375,19 @@
       "kind": "control",
       "javaAscii": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       },
       "javaUtf8": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       },
       "native": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       }
@@ -334,19 +398,19 @@
       "kind": "control",
       "javaAscii": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       },
       "javaUtf8": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       },
       "native": {
         "exit": 0,
-        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
+        "stdout": "{\"packages\":{\"std/layout\":{\"dependencies\":{},\"id\":\"std/layout\",\"sha256\":\"5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf\",\"version\":\"1.0.0\"}},\"roots\":{\"std/layout\":\"1.0.0\"},\"schemaVersion\":1}\n",
         "lastError": "",
         "tree": "credentials-unicode-javaUtf8"
       }
@@ -496,6 +560,26 @@
         "stdout": "",
         "lastError": "refusing to overwrite non-generated file ${WORK}/out/mod.rs"
       }
+    },
+    {
+      "id": "stderr-body",
+      "scope": "stderr-body",
+      "kind": "control",
+      "javaAscii": {
+        "exit": 3,
+        "stdout": "",
+        "lastError": "UBNF ?????: grammar Main { ?? }"
+      },
+      "javaUtf8": {
+        "exit": 3,
+        "stdout": "",
+        "lastError": "UBNF パース失敗: grammar Main { é😀 }"
+      },
+      "native": {
+        "exit": 3,
+        "stdout": "",
+        "lastError": "1:16: unexpected character 'é'"
+      }
     }
   ],
   "trees": {
@@ -547,8 +631,8 @@
     "credentials-unicode-javaUtf8": {
       "2e75626e662d6361636865": "directory",
       "2e75626e662d63616368652f7061636b61676573": "directory",
-      "2e75626e662d63616368652f7061636b616765732f656636386331616231323961366533373866373532313432663437323831666536656339336664323064373137656465613734313330633734353237653332642e6a736f6e": "ef68c1ab129a6e378f752142f47281fe6ec93fd20d717edea74130c74527e32d",
-      "75626e662e6c6f636b2e6a736f6e": "4fa2e7166a307e9c6152528e625bf4f3bb6b8bd30f118d122882aa94ef12749a"
+      "2e75626e662d63616368652f7061636b616765732f353438396335366132653862663166643866646230303432626336656363363337616139643032326636626632623534393063366137366632663833326364662e6a736f6e": "5489c56a2e8bf1fd8fdb0042bc6ecc637aa9d022f6bf2b5490c6a76f2f832cdf",
+      "75626e662e6c6f636b2e6a736f6e": "2952c8035599d81d0653d271222f705dbea81b58536ee489797b1ac12db7f150"
     },
     "grammar-body-javaAscii": {
       "6f7574": "directory",

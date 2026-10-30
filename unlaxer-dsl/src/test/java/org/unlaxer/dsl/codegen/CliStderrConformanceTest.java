@@ -45,7 +45,7 @@ public class CliStderrConformanceTest {
             "--output", output.toString()), EVIDENCE.resolve("cli-stderr-locale.log"), 210);
         var evidence = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
         assertEquals("all LC_ALL/LANG combinations", 9, evidence.getAsJsonArray("environments").size());
-        assertEquals("all paths/controls, both hosts and snapshots", 828,
+        assertEquals("all paths/controls, both hosts and snapshots", 972,
             evidence.getAsJsonArray("observations").size());
         assertEquals("locale fixtures must never be excluded", 0, evidence.getAsJsonArray("excluded").size());
     }

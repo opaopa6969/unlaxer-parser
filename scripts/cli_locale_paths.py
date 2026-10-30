@@ -25,9 +25,21 @@ def fixtures():
     cases = document['cases']
     wanted = {(scope, kind) for scope in ('manifest', 'grammar', 'output', 'import', 'credentials', 'home')
               for kind in ('unicode', 'bytes')}
+    # Paths read from UTF-8 file bodies (local source, CA) cannot spell raw bytes.
+    wanted |= {(scope, 'unicode') for scope in ('local-source', 'ca-certificate', 'grammar-missing')}
     assert {(c['scope'], c['kind']) for c in cases if c['kind'] in ('unicode', 'bytes')} == wanted
-    assert len(cases) == len({c['id'] for c in cases}) == 23, 'locale fixture missing'
+    assert len(cases) == len({c['id'] for c in cases}) == 27, 'locale fixture missing'
     return cases, document['trees']
+
+
+def utf8_json(value):
+    """Raw UTF-8 JSON bytes: JDK17's US-ASCII file.encoding must not reach these readers."""
+    return json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+
+
+ARTIFACT = utf8_json(dict(schemaVersion=1, id='std/layout', version='1.0.0', entry='layout.ubnf',
+                          files={'layout.ubnf': "grammar Layout { @ubnf: v2 token T ::= 'a'; } // é😀\n"},
+                          dependencies={}))
 
 
 def tree(folder):
@@ -77,12 +89,12 @@ def setup(folder, case, origin, ca, env):
     manifest = folder / (name + '.json' if scope == 'manifest' else 'ubnf.json')
     output = folder / (name if scope == 'output' else 'out')
     source = "grammar Main { @ubnf: v2 @root @mapping(Value) Start ::= 'a'; }\n"
-    artifact = encode(dict(schemaVersion=1, id='std/layout', version='1.0.0', entry='layout.ubnf',
-                          files={'layout.ubnf': "grammar Layout { @ubnf: v2 token T ::= 'a'; } // é😀\n"},
-                          dependencies={}))
-    (folder / 'artifact.json').write_bytes(artifact)
-    dependency = {'std/layout': dict(version='1.0.0', source='local:artifact.json')}
-    if scope in ('credentials', 'home', 'credentials-body', 'credentials-invalid'):
+    (folder / (name + '.json' if scope == 'local-source' else 'artifact.json')).write_bytes(ARTIFACT)
+    dependency = {'std/layout': dict(version='1.0.0', source='local:' + (
+        name + '.json' if scope == 'local-source' else 'artifact.json'))}
+    if scope == 'grammar-missing':
+        grammar = folder / (name + '.ubnf')
+    if scope in ('credentials', 'home', 'credentials-body', 'credentials-invalid', 'ca-certificate'):
         dependency['std/layout']['source'] = origin + '/artifact'
         credentials = folder / (name + '.json' if scope == 'credentials' else 'credentials.json')
         if scope == 'home':
@@ -92,8 +104,13 @@ def setup(folder, case, origin, ca, env):
         else:
             env['UBNF_CREDENTIALS_FILE'] = str(credentials)
         credentials.parent.mkdir(parents=True, exist_ok=True)
-        credentials.write_bytes(b'\xff' if scope == 'credentials-invalid' else encode(
-            {origin: dict(caCertificate=str(ca), bearerToken=TOKEN, note='é😀')}))
+        authority = str(ca)
+        if scope == 'ca-certificate':
+            authority = str(folder / (name + '.pem'))
+            shutil.copyfile(ca, authority)
+        body = {origin: dict(caCertificate=authority, bearerToken=TOKEN, note='é😀')}
+        credentials.write_bytes(b'\xff' if scope == 'credentials-invalid' else
+                                utf8_json(body) if scope == 'credentials-body' else encode(body))
     if scope in ('import', 'import-parent', 'import-invalid'):
         lib = folder / (name if scope == 'import' else 'lib')
         lib.mkdir()
@@ -113,10 +130,20 @@ def setup(folder, case, origin, ca, env):
             grammar = raw / 'main.ubnf'
     if scope in ('grammar-body', 'playground-body', 'profile-body'):
         source = source.replace("'a'", "'é😀'")
-    grammar.write_bytes(b'\xff' if scope == 'grammar-invalid' else source.encode('utf-8'))
-    manifest.write_bytes(b'\xff' if scope == 'manifest-invalid' else encode(
-        dict(schemaVersion=1, dependencies=dependency if scope in (
-            'credentials', 'home', 'manifest-body', 'credentials-body', 'credentials-invalid') else {}, note='é😀')))
+    if scope == 'stderr-body':
+        # Both CLIs reject it with exit 3; only the console encoding of the echoed body differs.
+        source = "grammar Main { é😀 }\n"
+    if scope != 'grammar-missing':
+        grammar.write_bytes(b'\xff' if scope == 'grammar-invalid' else source.encode('utf-8'))
+    document = dict(schemaVersion=1, dependencies=dependency if scope in (
+        'credentials', 'home', 'manifest-body', 'credentials-body', 'credentials-invalid',
+        'local-source', 'ca-certificate') else {}, note='é😀')
+    manifest.write_bytes(b'\xff' if scope == 'manifest-invalid' else
+                         utf8_json(document) if scope in ('manifest-body', 'local-source') else encode(document))
+    raw_bodies = [ARTIFACT] + [path.read_bytes() for path, wanted in (
+        (manifest, ('manifest-body', 'local-source')),
+        (Path(env.get('UBNF_CREDENTIALS_FILE', '')), ('credentials-body',))) if scope in wanted]
+    assert all(max(body) >= 0x80 for body in raw_bodies), 'body control lost its raw UTF-8 bytes'
     if scope == 'output-failure':
         output.mkdir()
         (output / 'mod.rs').write_bytes('caller-owned é\n'.encode())
@@ -126,7 +153,7 @@ def setup(folder, case, origin, ca, env):
         profile = next(c for c in json.loads(template)['cases'] if c['id'] == 'profile-readable')
         (folder / 'profile.tsv').write_bytes(profile['fixedFiles']['p.tsv'].encode())
     if scope in ('manifest', 'credentials', 'home', 'manifest-body', 'manifest-invalid',
-                 'credentials-body', 'credentials-invalid'):
+                 'credentials-body', 'credentials-invalid', 'local-source', 'ca-certificate'):
         options = ['deps', 'resolve', '--manifest', str(manifest)]
     elif scope in ('playground-body', 'profile-body'):
         options = ['playground', '--output', str(output)] + (
@@ -147,12 +174,9 @@ def batch(stack, java, env, cwd, unbatched):
 def check(directory, args, evidence):
     shim = compile_passwd_shim(directory)
     cases, trees = fixtures()
-    # The TLS response contains non-ASCII text too: raw cache must remain UTF-8.
-    remote = encode(dict(schemaVersion=1, id='std/layout', version='1.0.0', entry='layout.ubnf',
-                         files={'layout.ubnf': "grammar Layout { @ubnf: v2 token T ::= 'a'; } // é😀\n"},
-                         dependencies={}))
     java = [args.java, '-Djava.io.tmpdir=' + str(directory), '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']
-    with local_tls(directory, remote) as (origin, ca, received):
+    # The TLS response is raw UTF-8 text too: the raw cache must keep its bytes.
+    with local_tls(directory, ARTIFACT) as (origin, ca, received):
         for lc_all in LOCALES:
             for lang in LOCALES:
                 label = str(lc_all) + '-' + str(lang)
