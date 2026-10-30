@@ -24,10 +24,16 @@ function dead(pid) {
 const run = async () => {
   const settings = JSON.parse(process.env.TINYCALC_SETTINGS);
   let ownedLsp;
+  const unresponsiveChildren = [];
   // Capture the actual owned wrapper. A fast Rust child can answer initialize
   // before its wrapper has recorded the spawn in the PID journal.
   childProcess.spawn = function(command, args) {
     const child = originalSpawn.apply(this, arguments);
+    if (command === process.env.TINYCALC_UNRESPONSIVE) {
+      unresponsiveChildren.push(child);
+      child.once('spawn', () => trace('unresponsive-spawn', {pid: child.pid}));
+      child.once('exit', (code, signal) => trace('unresponsive-exit', {pid: child.pid, code, signal}));
+    }
     if (command === settings['server.rustLspPath'] ||
         (command === settings['server.javaPath'] && args?.includes('-jar'))) ownedLsp = child;
     return child;
@@ -224,21 +230,44 @@ const run = async () => {
     await config.update('server.rustLspPath', settings['server.rustLspPath'] ?? '', vscode.ConfigurationTarget.Global);
     await config.update('server.backend', settings['server.backend'], vscode.ConfigurationTarget.Global);
   };
-  const hang = async timeout => {
+  const configureHang = async timeout => {
     const offset = (await journal()).length;
     await config.update('server.startupTimeoutMs', timeout, vscode.ConfigurationTarget.Global);
     await config.update(settings['server.backend'] === 'java' ? 'server.javaPath' : 'server.rustLspPath', unresponsive, vscode.ConfigurationTarget.Global);
     await config.update('server.backend', settings['server.backend'], vscode.ConfigurationTarget.Global);
-    return until(async () => (await journal()).slice(offset).find(row => row.fixture === 'unresponsive' && row.event === 'initialize' && !dead(row.pid)), 'unresponsive server actually receives initialize');
+    return offset;
+  };
+  // Receipt is durable history: startup timeout/cleanup may finish before the
+  // configuration updates return or before the journal is first read.
+  const receivedInitialize = (offset, pid) => until(async () => (await journal()).slice(offset).find(row =>
+    row.fixture === 'unresponsive' && row.event === 'initialize' && (pid === undefined || row.pid === pid)),
+  'unresponsive server actually receives initialize');
+  const hang = async timeout => {
+    const offset = await configureHang(timeout);
+    // Only interruption tests need a live pending start. Configuration updates
+    // may cancel earlier starts, so wait for a live initialized replacement.
+    return until(async () => (await journal()).slice(offset).find(row =>
+      row.fixture === 'unresponsive' && row.event === 'initialize' && !dead(row.pid)),
+    'unresponsive startup is still pending before interruption');
   };
   const stoppedHangs = async () => until(async () => (await journal()).filter(row => row.fixture === 'unresponsive').every(({pid}) => dead(pid)), 'all unresponsive children terminate', 10000);
   // No initialize response: explicit startup fails with the configured timeout, not an unrelated error.
   trace('timeout-test-start');
-  await hang(1000);
+  const timeoutOffset = await configureHang(1000);
+  await receivedInitialize(timeoutOffset);
+  const previousHangs = unresponsiveChildren.length;
   await assert.rejects(bounded(restart(), 'unresponsive startup timeout'), /Server initialization exceeded 1000 ms\./);
   trace('timeout-test-rejected');
+  assert.ok(unresponsiveChildren.length > previousHangs, 'explicit restart spawned an unresponsive child');
+  const timedOut = unresponsiveChildren.at(-1);
+  assert.equal(timedOut.signalCode, 'SIGKILL', 'timed-out child ignores TERM and requires bounded force cleanup');
+  // Always observe receipt AFTER the explicit restart has joined its child. This
+  // exercises a late journal read on every run without adding sleeps or budgets.
+  const initialized = await receivedInitialize(timeoutOffset, timedOut.pid);
+  assert.ok(dead(initialized.pid), 'initialize receipt remains observable after child termination');
+  trace('unresponsive-initialize-observed-after-exit', {pid: initialized.pid, initializedAt: initialized.at});
   await stoppedHangs();
-  assert.ok((await journal()).some(row => row.fixture === 'unresponsive' && row.event === 'sigterm'), 'fixture ignores TERM and exercises bounded force cleanup');
+  assert.ok((await journal()).some(row => row.pid === timedOut.pid && row.fixture === 'unresponsive' && row.event === 'sigterm'), 'the same initialized child received and ignored TERM');
   // A healthy start may take longer than the timeout deliberately used above. Hold
   // completion of the real LanguageClient start past 1000 ms on both backends so
   // forgetting to restore the normal budget fails deterministically, even on fast CI.
