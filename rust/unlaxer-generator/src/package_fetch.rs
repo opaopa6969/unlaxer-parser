@@ -6,6 +6,8 @@ use std::time::Duration;
 #[cfg(unix)]
 mod passwd_home;
 
+mod request_target;
+
 const BODY_LIMIT: usize = 8 * 1024 * 1024;
 // JDK21's default budget is 384 KiB, but it accounts for parsed fields rather
 // than wire bytes. Keep this finite wire cap; the exact boundary is host-specific.
@@ -26,12 +28,15 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
         }
         Https::Origin(origin) => origin,
     };
-    let (agent, token) = client(&origin)?;
-    // Only the transport URL is NFC/percent encoded; callers keep the raw source.
+    // Encoding has no I/O or diagnostics; credentials -> CA -> token still precede
+    // routing, TLS and sending. Only the transport copy is normalized.
     let encoded = ascii_url(source);
+    let (agent, token) = client(&origin, Some(request_target::path(&encoded)))?;
     let mut request = match java_route(&encoded, &origin) {
-        Route::Direct => agent.get(encoded.as_ref()),
-        Route::Literal { url, host } => agent.get(&url).header("Host", host),
+        Route::Direct => agent.get(request_target::placeholder(&encoded)),
+        Route::Literal { url, host } => agent
+            .get(request_target::placeholder(&url))
+            .header("Host", host),
         // Java fails after the credentials, CA and token checks, before connecting.
         Route::Unreachable => {
             return Err(error(
@@ -172,14 +177,14 @@ fn ambiguous_framing(response: &ureq::http::Response<ureq::Body>) -> bool {
 /// HTTP request encoder fails after the credentials, CA and token checks. Run the
 /// same checks for the Java-derived origin and never send any substituted URL.
 pub(crate) fn reject_unencodable(origin: &str) -> Result<Vec<u8>, String> {
-    client(origin)?;
+    client(origin, None)?;
     Err(error(
         "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
     ))
 }
 
 /// Exact-origin credentials: CA before token, as UBNFPackageFetcher does.
-fn client(origin: &str) -> Result<(ureq::Agent, Option<String>), String> {
+fn client(origin: &str, target: Option<&str>) -> Result<(ureq::Agent, Option<String>), String> {
     let credentials = credentials(origin)?;
     let mut configuration = ureq::Agent::config_builder()
         .max_redirects(0)
@@ -220,7 +225,16 @@ fn client(origin: &str) -> Result<(ureq::Agent, Option<String>), String> {
                 .build(),
         );
     }
-    let agent = ureq::Agent::new_with_config(configuration.build());
+    // Keep enough room for the original ureq headers plus the expanded target.
+    // Source documents are already bounded to 8 MiB before this encoder runs.
+    let agent = if let Some(target) = target {
+        let configuration = configuration
+            .output_buffer_size(128 * 1024 + target.len())
+            .max_idle_connections(0);
+        request_target::agent(configuration.build(), target)
+    } else {
+        ureq::Agent::new_with_config(configuration.build())
+    };
     let token = match credentials.get("bearerToken") {
         None => None,
         Some(token) => Some(

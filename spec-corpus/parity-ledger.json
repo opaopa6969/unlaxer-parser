@@ -645,6 +645,10 @@
       "state": "OPEN",
       "title": "parity(cli): playground の空白だけの option 値を Java の isBlank と同じく usage 誤りにする（#953 レビュー由来）"
     },
+    "977": {
+      "state": "OPEN",
+      "title": "長いHTTPS request targetのhttp::Uri上限"
+    },
     "979": {
       "state": "OPEN",
       "title": "NFCでbacktickになるU+1FEFのrequest targetのbackend拒否"
@@ -806,7 +810,7 @@
       "issues": [
         960
       ],
-      "observation": "Unicode scalarもASCIIと同じUTF-16 URI parserで全体構文→scheme/getHost/userinfo/query/fragment/portの順に検査し、IDNはomit、不正percentと非ASCII空白はinvalid。送信用だけNFC後の非ASCII UTF-8 bytesを大文字percent encodeし、既存escape・Host・raw manifest/cacheは保持する（lockにsource fieldはない）。Unicode80形を直接/推移的依存・snapshot有無で両resolveに送り、target/Host/raw bytes・拒否時接続0を照合する。nativeはJDK21/Unicode15を参照し、JDK17の50結合文字の版差2形はjavaJdk17TargetSuffixで固定してJDK17 jobでも実行する。U+1FEFのbackend拒否2形は#979。#960はPRのレビュー待ち。",
+      "observation": "Unicode scalarもASCIIと同じUTF-16 URI parserで全体構文→scheme/getHost/userinfo/query/fragment/portの順に検査し、IDNはomit、不正percentと非ASCII空白はinvalid。送信用だけNFC後の非ASCII UTF-8 bytesを大文字percent encodeし、既存escape・Host・raw manifest/cacheは保持する（lockにsource fieldはない）。Unicode88形を直接/推移的依存・snapshot有無で両resolveに送り、target/Host/raw bytes・拒否時接続0を照合する。nativeはJDK21/Unicode15を参照し、JDK17の50結合文字の版差2形はjavaJdk17TargetSuffixで固定してJDK17 jobでも実行する。U+1FEFのbackend拒否は#977/#979の公開transport adapterで解消し、共通期待値で送信する。#960はPR #980でmerge済み。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",
@@ -822,20 +826,23 @@
       ]
     },
     {
-      "id": "package-unicode-url-backtick",
-      "category": "unresolved",
-      "title": "NFCでASCII backtickになるUnicode pathのbackend拒否",
-      "hosts": "Java HttpClient / Rust ureq（両 deps resolve）",
+      "id": "package-https-request-target",
+      "category": "contract",
+      "title": "長いHTTPS targetとNFC由来backtickの同一bytes送信",
+      "hosts": "JDK17/21 HttpClient / native Rust ureq 公開transport API",
       "issues": [
+        977,
         979
       ],
-      "observation": "U+1FEFは両JDKのURI.createが受理し、NFCでU+0060へ変換してそのbyteを送る。nativeのNFC/percent encodingは同じ文字列を返すが、ureq http::Uriの公開constructorがbacktickを拒否する。Java製品コードを狭めず、nativeはcredentials/CA/token後に接続0のretrieval failedを返す。単独とBMP/非BMP/percent混在の2形を直接/推移的依存・snapshot有無・両JDKで実行し、Javaのwire/lock/cacheとRustの接続0/snapshot不変を固定する。%60を送って一致扱いにせず、解決/恒久契約の判断は#979で追跡する。raw ASCII backtickの構文拒否は不変。",
+      "observation": "Uri parseは全長65534 bytesまで、from_parts/builderは成分上限を残し、backtickは全constructorが拒否する。ureq-protoのtargetはUriから作られる。公開Agent::with_parts/DefaultConnector::chainのTLS外側でureqのGET / HTTP/1.1の/だけをJavaの検証済みNFC/percent targetへ置換し、Host・認証header bytes、TCP/TLS・期限・応答parserと#972のframing/header上限はureqのまま。bufferは既定128KiB+target長（入力8MiB上限）、置換の経過時間を引いたtimeoutの1回writeで期限を延長せずfetch専用agentのpool保持を無効化。独自HTTP client/新crate/unsafeは追加しない。全長65534/65535/65536/100000/200000 bytes、Unicode encoding後の長さ、U+1FEF単独/BMP/非BMP/percent混在とU+037E対照を直接/推移的依存・snapshot有無・両JDKで共通期待値にする。target/Host/raw lock-cacheと失敗時接続0/snapshot不変を検証。不正credentials→CA→tokenの優先順、raw backtick構文拒否・非scalar送信禁止・#976接続先を維持し、切詰めや追加escapeはしない。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-https-transport.json",
         "scripts/ubnf_package_transport.py",
         "rust/unlaxer-generator/src/packages/java_uri.rs",
-        "rust/unlaxer-generator/src/package_fetch.rs"
+        "rust/unlaxer-generator/src/package_fetch.rs",
+        "rust/unlaxer-generator/src/package_fetch/request_target.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java"
       ]
     },
     {
@@ -846,7 +853,7 @@
       "issues": [
         962
       ],
-      "observation": "Java製品コードを変えず、ASCII scalar URLをjava_uri.rsの既存UTF-16 parserで構文検査し、scheme/host/userinfo/query/fragment/portを同順で検査してから元URLをureqへ渡す。接続先もJavaに揃え、15文字までの先頭0のIPv4 octetは10進literalへ接続してJavaと同じHost headerを送り、それより長い数字host（InetAddressの曖昧表記拒否）と末尾dot・63文字超label（SNIHostName例外）は接続前に取得失敗とする。ASCII53形とUnicode対照7形（#960で共通期待値へ統合）を直接/推移的依存・snapshot有無の両方で実行し、拒否時request/接続0、成功時raw lock/cache bytes、失敗時snapshot不変を検証する。#960のUnicode診断/encoding契約、#939の非scalar送信禁止、credentials/CA/token・#956/#958を維持する。全長65535 bytes以上はJava/移植parserが受理してもureq http::Uriの65534 bytes上限で追加拒否される。65534/65535/65536のparser境界実測をdocs/PRへ記録し、backend制限として残す。Javaは65,624/100,024 bytesの取得に成功し、この差は#977で追跡する。#962はPR #976でmerge済み。",
+      "observation": "Java製品コードを変えず、ASCII scalar URLをjava_uri.rsの既存UTF-16 parserで構文検査し、scheme/host/userinfo/query/fragment/portを同順で検査してからrequest targetを変えず取得へ進める。接続先もJavaに揃え、15文字までの先頭0のIPv4 octetは10進literalへ接続してJavaと同じHost headerを送り、それより長い数字host（InetAddressの曖昧表記拒否）と末尾dot・63文字超label（SNIHostName例外）は接続前に取得失敗とする。ASCII53形とUnicode対照7形（#960で共通期待値へ統合）を直接/推移的依存・snapshot有無の両方で実行し、拒否時request/接続0、成功時raw lock/cache bytes、失敗時snapshot不変を検証する。#960のUnicode診断/encoding契約、#939の非scalar送信禁止、credentials/CA/token・#956/#958を維持する。全長65535 bytes以上は#977/#979の公開transport adapterでJavaと同じtargetを送る。構文・接続先とbackend制約の回避は別の境界に保つ。#962はPR #976でmerge済み。",
       "evidence": [
         "docs/ubnf-packages.md",
         "rust/unlaxer-generator/src/package_fetch.rs",
@@ -3083,12 +3090,12 @@
       "fields": {
         "javaJdk17Error": 8,
         "javaJdk17TargetSuffix": 2,
-        "rustError": 20
+        "rustError": 18
       },
       "entries": [
         "package-ascii-url",
         "package-unicode-url",
-        "package-unicode-url-backtick",
+        "package-https-request-target",
         "package-https-framing"
       ]
     },
