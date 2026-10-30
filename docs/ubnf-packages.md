@@ -1393,7 +1393,8 @@ native の UTF-8 表示や利用可能なパスの読取りを故意に失敗さ
 （推移的 import の記述は `./?? space/part.ubnf`）で終了3となる。
 native は同じ終了3で UTF-8 の絶対元パス付き `E-MODULE` を返す。
 
-隣接する拒否のうち、`import requires exactly one grammar` の絶対元パスと
-`network imports are unsupported` の URL が native に付かない表示差は #999 で追跡する。
-両方とも generate / deps inspect の終了3と無出力は一致する。#988 は rule を含む module の
-拒否だけを扱い、この2つの既存診断は変更しない。
+隣接する拒否のうち、`import requires exactly one grammar` と `invalid module features`
+（`@feature` が不正な declarative token module）の絶対元パス、`network imports are unsupported` の
+URL が native に付かない表示差は #999 で追跡する。
+いずれも generate / deps inspect の終了3と無出力は一致する。#988 は rule を含む module の
+拒否だけを扱い、この3つの既存診断は変更しない。
