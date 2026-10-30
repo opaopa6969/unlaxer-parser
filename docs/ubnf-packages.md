@@ -1213,7 +1213,7 @@ generate / deps inspect は出力の作成前に終了3となり、エラー本�
 構文として正しい未解決参照の generate は、既存の Java validator の詳細と native の
 `E-RULE-UNDEFINED: unsupported qualified rule reference` という説明を維持する（#843）。
 rule を含む module の拒否の元パスは [#988](https://github.com/opaopa6969/unlaxer-parser/issues/988) で
-共通期待値へ統合し、下記の4形を加えた42ケース・672観測に拡張する。
+共通期待値へ統合し、下記の4形を加えた42ケース・672観測、さらに #999 の20形を加えた62ケース・992観測に拡張する。
 この名前空間参照の修正では値検証の順序を変えない（別途 #983）。Java の製品コード・診断文、公開3.3.0 は変更しない。
 
 ## CLI の出力先パス（#952）

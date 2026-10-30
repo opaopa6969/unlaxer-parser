@@ -35,7 +35,7 @@ public class CliStderrConformanceTest {
     @Test(timeout=120000) public void playgroundBlankOptionsMatchJavaWhitespace() throws Exception { check("blank"); }
     @Test(timeout=120000) public void regexSyntaxPriorityMatchesJavaBeforeOutput() throws Exception { check("regex"); }
 
-    @Test(timeout=120000) public void qualifiedReferenceSyntaxMatchesJavaBeforeOutput() throws Exception { check("qualified"); }
+    @Test(timeout=240000) public void qualifiedReferenceSyntaxMatchesJavaBeforeOutput() throws Exception { check("qualified"); }
 
     @Test(timeout=120000) public void valueSyntaxPriorityMatchesJavaBeforeOutput() throws Exception { check("value"); }
 
@@ -86,6 +86,8 @@ public class CliStderrConformanceTest {
         for (var entry : excluded) skipped += entry.getAsJsonObject().get("observations").getAsInt();
         assertEquals(observations - skipped, evidence.getAsJsonArray("observations").size());
         if (suite.equals("qualified")) assertEquals(16, evidence.getAsJsonArray("checks").size());
+        // #999: every network fixture must prove the loopback listener was never contacted.
+        if (suite.equals("qualified")) assertEquals(8, evidence.getAsJsonArray("networkProbes").size());
         if (suite.equals("paths")) assertEquals(114, evidence.getAsJsonArray("checks").size());
         if (suite.equals("profile")) assertEquals(4, evidence.getAsJsonArray("checks").size());
         if (suite.equals("replacement") && excluded.size() == 0) assertEquals(44, evidence.getAsJsonArray("checks").size());

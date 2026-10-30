@@ -91,7 +91,6 @@ def module_fixture(case, work):
                 case['id'], 'network import connected before rejection')
 
 
-
 def prepare(work, case, separator):
     setup(work, case, separator)
     for name, encoded in case.get('bytes', {}).items():
@@ -228,7 +227,7 @@ def exercise(cases, directory, commands, evidence, trees=None, direct_java=None)
                                 entry['after'] = after
                                 assert after == {**before, **expected_tree(case, operation, host, ending, trees)}, (entry, 'tree')
                                 if observed['exit'] == 0 and operation in ('generate', 'playground'):
-                                    checked, _ = observe(command, {**case, 'flags': ['--check']},
+                                    checked, _ = observe(command, {**prepared, 'flags': ['--check']},
                                                          operation, work, host == 'rust')
                                     evidence['checks'].append(dict(case=case['id'], ending=ending,
                                                                   operation=operation, host=host, observed=checked))

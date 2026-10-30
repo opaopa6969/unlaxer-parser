@@ -2451,7 +2451,7 @@
       "issues": [
         986
       ],
-      "observation": "Java製品を維持し、(IDENTIFIER dot)*の接頭辞内の空白・改行・行コメントをnativeでも構文エラーにする。a .N / a. b.NはP-SYNTAX/null/UBNF syntax、a. N / a.b. N / 最後の名前の前のコメントはJava同様に構文受理する。旧REGEXより全体構文を優先する#949の順序、importのP-MODULEラップ、#937のhost別構文表示を維持する。18形×入口/local importと正常token import2形、LF/CRLFの608CLI観測・成功後--check16回・frontend36入力を固定期待値に照合し、無出力/入力不変と正常生成物の全hashを検証する。authoringのspaced-namespace-*は既存の編集拒否を維持。正常な未解決参照のE-RULE-UNDEFINED本文は既存#843契約、module拒否のパスは#988で共通期待値へ統合し、追加4形と合わせて672CLI観測を固定する。途中値検証は#983で追跡する。公開3.3.0とJava診断は不変。",
+      "observation": "Java製品を維持し、(IDENTIFIER dot)*の接頭辞内の空白・改行・行コメントをnativeでも構文エラーにする。a .N / a. b.NはP-SYNTAX/null/UBNF syntax、a. N / a.b. N / 最後の名前の前のコメントはJava同様に構文受理する。旧REGEXより全体構文を優先する#949の順序、importのP-MODULEラップ、#937のhost別構文表示を維持する。18形×入口/local importと正常token import2形、LF/CRLFの608CLI観測・成功後--check16回・frontend36入力を固定期待値に照合し、無出力/入力不変と正常生成物の全hashを検証する。authoringのspaced-namespace-*は既存の編集拒否を維持。正常な未解決参照のE-RULE-UNDEFINED本文は既存#843契約、module拒否のパスは#988で共通期待値へ統合し、追加4形と合わせて672CLI観測、#999の20形と合わせて992CLI観測を固定する。途中値検証は#983で追跡する。公開3.3.0とJava診断は不変。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/cli-stderr.json",
