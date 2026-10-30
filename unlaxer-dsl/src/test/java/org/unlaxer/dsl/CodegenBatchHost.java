@@ -13,8 +13,23 @@ import java.nio.charset.StandardCharsets;
 public final class CodegenBatchHost {
     private CodegenBatchHost() {}
 
-    public static void main(String[] ignored) throws IOException {
+    public static void main(String[] options) throws IOException {
         PrintStream protocol = new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8);
+        // Updated JDK17 releases backport the JDK21 header budget. Inspect the
+        // parser's field without opening the module or changing the product.
+        if (options.length == 1 && options[0].equals("--http-header-limit")) {
+            boolean limited;
+            try {
+                Class.forName("jdk.internal.net.http.Http1HeaderParser").getDeclaredField("MAX_HTTP_HEADER_SIZE");
+                limited = true;
+            } catch (NoSuchFieldException absent) {
+                limited = false;
+            } catch (ClassNotFoundException absent) {
+                throw new IOException("HTTP header parser unavailable", absent);
+            }
+            protocol.println(limited ? "limited" : "unlimited");
+            return;
+        }
         PrintStream originalOut = System.out, originalErr = System.err;
         BufferedReader input = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         for (String line; (line = input.readLine()) != null; ) {

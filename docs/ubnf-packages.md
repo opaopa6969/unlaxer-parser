@@ -330,8 +330,42 @@ JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を 
 失敗時の lock/cache 不変、成功時の raw bytes、認証の exact origin、TLS境界、redirect 先の接続0、
 生成時の接続0と固定cache使用を検査する。空bodyの診断は transport ではなく後続 JSON 検査である。
 42形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
-形の崩れた応答（Content-Length と chunked の併記、header の大きさ・行数、重複・負の Content-Length 等）の
-framing 解釈の差は [#972](https://github.com/opaopa6969/unlaxer-parser/issues/972) で追跡する。
+HTTP/1.1 の境界・不正 framing は追加33形を同じメソッドで実行し、host 別期待値も skip しない（#972）。
+Java 製品コード・診断は維持し、native は以下の安全側の契約を使う。
+表の「取得失敗」は `HTTPS artifact retrieval failed (TLS, timeout or size limit)`（exit 3）、
+「status」は `HTTPS artifact requires status 200; redirects are forbidden`（exit 3）を指す。
+
+| 応答の形 | Java 17.0.12 / 21.0.9 | native（ureq 3.4.2）と判断理由 |
+| --- | --- | --- |
+| header 70 / 200 KiB | 両方成功 | 揃える。`max_response_header_size` を64から384 KiBへ変更し、入力 buffer も上限＋1 bytes にする。既定128 KiB buffer のままでは200 KiBを受け取れない |
+| header 500 KiB / 2 MiB | 17成功、21取得失敗 | 公称384 KiBの厳しい21を参照し、native は取得失敗。17の parser はこの上限を持たず、2 MiBまで成功を実測（有限の上限が2 MiBという意味ではない） |
+| header 上限の直前・直後 | この fixture の wire 393074 bytesまで21成功、393075以上は取得失敗。17は全境界成功 | native は status 行から空行までの wire 393216 bytesを包含的に受理、393217以上で取得失敗。会計方式の狭い差は恒久契約 |
+| header 127 / 128 / 129 / 200行 | 両方成功 | 128行まで成功、129行以上は取得失敗。ureq-protoの固定 `MAX_RESPONSE_HEADERS = 128` に公開設定がなく、恒久差 |
+| Content-Length と Transfer-Encoding の併記 | CLで読み、このfixtureは `invalid JSON` | 取得失敗。ureqがchunkedとして読むことを確認後、自前検査で拒否。RFC 9112 §6.3(3) の曖昧なframingをcacheへ入れない |
+| `gzip, chunked` / `chunked, gzip` / TEの複数行 | close-delimited等で読み、このfixtureは `invalid JSON` | 取得失敗。ureqはgzipを復号せずchunkedと解釈するので、単独のchunked以外を拒否。RFC 9112 §6.1・§6.3(4)。gzip転送のラベルだけを除去してartifactにしない |
+| 同値の重複 Content-Length | 両方成功 | 成功を維持。RFC 9112 §6.3(5) が同値のリストを許容 |
+| 異値の重複 Content-Length | 最初のCLで成功 | 取得失敗を維持。RFC 9112 §6.3(5) の回復不能なframingエラー |
+| Content-Length の負数 / 正符号 | `-1`はclose-delimited、正符号は数値として成功 | 取得失敗を維持。RFC 9112 §6.2 の `1*DIGIT` を満たさない |
+| `:` のない行 | 無視して成功 | 取得失敗を維持。RFC 9112 §5 のfield構文に反する行を独自に補修しない |
+| obs-fold | 展開して成功 | 取得失敗を維持するbackend制約。RFC 9112 §5.2は送信を禁止するが、user agentには受信時の空白への展開を要求しており、nativeの拒否をRFC必須とは扱わない。独自parserでureqを緩めない |
+| 204 + Content-Length: +0 | 両方status診断 | nativeは取得失敗という恒久差。ureq-protoはbody mode決定中にCLを拒否し、`.call()`のエラーにはstatus/headerが残らない。取得後の検査だけで安全にstatus診断へ写せない |
+
+JDK21の `jdk.http.maxHeaderSize` の既定値は384 KiBだが、status長＋32、各fieldの名前長＋値長＋32と、
+解析途中の行長でも検査する。ureqの上限はwire bytesなので完全な同一境界ではない。
+fixtureの4 headerの場合はJDK21の会計がwireより140 bytes大きく、最後の行の途中検査がさらに2 bytesを要する。
+reason phraseや生の空白はureqの公開Responseに保持されず、受信後に厳密なJDK会計を復元できない。
+公称384 KiBの有限上限を設定し、この差を `error`（上限のあるJDK）・`javaJdk17Error`（旧17）・`rustError` に固定する。
+更新版JDK17にも上限がbackportされる。CIで使用可能なTemurin 17.0.20-101にも同じfieldがあるため、
+既存のテスト専用 `CodegenBatchHost --http-header-limit` でparserの `MAX_HTTP_HEADER_SIZE` fieldの有無だけを調べる
+（値の読取り・module opensは不要）。`javaJdk17Error` はこのfieldがない17だけに適用し、更新版17は上限のある期待値を使う。
+NFCのJDK17/21別期待値は従来どおりmajor versionで選び、このheader判定と混同しない。
+証跡の `javaHeaderAccounting` は `limited` / `unlimited` だけを記録する。
+JDKのsystem propertyによる上限変更の模倣はしない。
+CL+TEと`gzip, chunked`は、修正前nativeがserverのchunk内のartifactと同じlock/cache raw bytesを保存することも確認する。
+成功扱いで曖昧な応答をcacheに入れる経路を残さず、Java側の寛容さを変更しない。
+仕様根拠: [RFC 9112 §5](https://www.rfc-editor.org/rfc/rfc9112.html#section-5)、
+[§5.2](https://www.rfc-editor.org/rfc/rfc9112.html#section-5.2)、
+[§6.1–6.3](https://www.rfc-editor.org/rfc/rfc9112.html#section-6.1)。
 証跡 `target/rust-package-transport.json` には既知の診断・exit・件数・hash・所要時間だけを記録し、
 資格情報・header値・server body・任意の例外文を残さない。
 

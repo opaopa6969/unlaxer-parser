@@ -7,6 +7,9 @@ use std::time::Duration;
 mod passwd_home;
 
 const BODY_LIMIT: usize = 8 * 1024 * 1024;
+// JDK21's default budget is 384 KiB, but it accounts for parsed fields rather
+// than wire bytes. Keep this finite wire cap; the exact boundary is host-specific.
+const RESPONSE_HEADER_LIMIT: usize = 384 * 1024;
 
 fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
@@ -42,7 +45,7 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
     let mut response = request
         .call()
         .map_err(|_| error("HTTPS artifact retrieval failed (TLS, timeout or size limit)"))?;
-    if rejected_by_java_exchange(&response) {
+    if rejected_by_java_exchange(&response) || ambiguous_framing(&response) {
         return Err(error(
             "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
         ));
@@ -145,6 +148,22 @@ fn rejected_by_java_exchange(response: &ureq::http::Response<ureq::Body>) -> boo
     }
 }
 
+/// Reject ambiguous framing and transfer codings we cannot decode. ureq accepts
+/// CL+TE and treats any coding list containing chunked as chunked (RFC 9112 6.1/6.3).
+/// Inspect every field occurrence without exposing its value in diagnostics.
+fn ambiguous_framing(response: &ureq::http::Response<ureq::Body>) -> bool {
+    use ureq::http::header;
+    let headers = response.headers();
+    if !headers.contains_key(header::TRANSFER_ENCODING) {
+        return false;
+    }
+    headers.contains_key(header::CONTENT_LENGTH)
+        || headers.get_all(header::TRANSFER_ENCODING).iter().count() != 1
+        || !headers[header::TRANSFER_ENCODING]
+            .as_bytes()
+            .eq_ignore_ascii_case(b"chunked")
+}
+
 /// A source with an unpaired UTF-16 unit: Java's `URI.create` accepts it, then its
 /// HTTP request encoder fails after the credentials, CA and token checks. Run the
 /// same checks for the Java-derived origin and never send any substituted URL.
@@ -161,6 +180,10 @@ fn client(origin: &str) -> Result<(ureq::Agent, Option<String>), String> {
     let mut configuration = ureq::Agent::config_builder()
         .max_redirects(0)
         .http_status_as_error(false)
+        .max_response_header_size(RESPONSE_HEADER_LIMIT)
+        // ureq's fixed input buffer must also hold a complete header. One probe
+        // byte lets it reject an oversized, still-incomplete header at the cap.
+        .input_buffer_size(RESPONSE_HEADER_LIMIT + 1)
         .proxy(None)
         .timeout_connect(Some(Duration::from_secs(5)))
         .timeout_global(Some(Duration::from_secs(20)));

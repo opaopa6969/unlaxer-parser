@@ -19,7 +19,7 @@ from ubnf_package_credentials import ROOT, local_tls_context, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
 LIMIT = 8 * 1024 * 1024
-COUNT = 175
+COUNT = 208
 URI_COUNT = 133
 UNICODE_COUNT = 80
 TOKEN = 'transport-fixture-only-token'
@@ -38,6 +38,8 @@ NO_BODY = [101, 204, 304]
 def fixtures():
     cases = json.loads((ROOT / 'spec-corpus/package-https-transport.json').read_text())
     assert len(cases) == len({c['id'] for c in cases}) == COUNT, 'transport fixture missing'
+    framing = [c for c in cases if c['kind'] == 'framing']
+    assert len(framing) == 33, 'HTTP framing fixtures missing'
     uri = [c for c in cases if c['kind'] == 'uri']
     assert len(uri) == URI_COUNT and sum(c.get('unicode960', False) for c in uri) == UNICODE_COUNT
     # Only the separately tracked NFC -> backtick backend boundary has host errors.
@@ -49,6 +51,48 @@ def fixtures():
     assert len(generated) == 4 and {c['error'] is None for c in generated} == {True, False}
     assert {c['kind'] for c in cases} >= set(SLOW), 'deadline fixtures missing'
     return cases
+
+
+def framing_response(case, artifact):
+    """Fixture bytes stay private; only shape IDs, lengths and digests reach evidence."""
+    status = case.get('status', 200)
+    headers = [f'HTTP/1.1 {status} Fixture', 'Connection: close', 'X-Fixture: ' + HEADER]
+    shape = case.get('shape', 'length')
+    data = artifact
+    if shape in ['cl-te', 'gzip-chunked', 'chunked-gzip', 'repeated-te']:
+        data = f'{len(artifact):x}\r\n'.encode() + artifact + b'\r\n0\r\n\r\n'
+        if shape == 'cl-te':
+            headers += ['Content-Length: ' + str(len(data)), 'Transfer-Encoding: chunked']
+        elif shape == 'repeated-te':
+            headers += ['Transfer-Encoding: gzip', 'Transfer-Encoding: chunked']
+        else:
+            headers += ['Transfer-Encoding: ' + ('gzip, chunked' if shape == 'gzip-chunked' else 'chunked, gzip')]
+    elif shape == 'duplicate-cl':
+        headers += ['Content-Length: ' + str(len(artifact)),
+                    'Content-Length: ' + str(len(artifact) + case.get('delta', 0))]
+    elif shape == 'negative-cl':
+        headers += ['Content-Length: -1']
+    elif shape == 'plus-cl':
+        headers += ['Content-Length: +0' if status == 204 else 'Content-Length: +' + str(len(artifact))]
+        if status == 204:
+            data = b''
+    else:
+        headers += ['Content-Length: ' + str(len(artifact))]
+    if shape == 'colonless':
+        headers += [HEADER]
+    elif shape == 'obs-fold':
+        headers += ['X-Fold: ' + HEADER, '\t' + HEADER]
+    if 'headerLines' in case:
+        headers += ['X-Pad: x'] * (case['headerLines'] - (len(headers) - 1))
+    if 'headerBytes' in case:
+        prefix = '\r\n'.join(headers) + '\r\nX-Pad: '
+        padding = case['headerBytes'] - len(prefix.encode()) - 4
+        assert padding >= 0
+        wire = (prefix + 'x' * padding + '\r\n\r\n').encode()
+        assert len(wire) == case['headerBytes']
+    else:
+        wire = ('\r\n'.join(headers) + '\r\n\r\n').encode()
+    return wire + data
 
 
 @contextmanager
@@ -99,6 +143,9 @@ def transport_server(directory, artifact):
                         return
                     case = cases[case_id]
                     kind = case['kind']
+                    if kind == 'framing':
+                        stream.sendall(framing_response(case, artifact))
+                        return
                     if kind == 'disconnect':
                         return
                     status = case.get('status', 401 if kind == 'auth' and not authorized else 200)
@@ -318,6 +365,15 @@ def check(directory, args, records):
             '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']
     version = subprocess.check_output([args.java, '--version'], timeout=10).decode('ascii')
     java17 = re.search(r'\b17\.', version) is not None
+    # The header budget was backported after Oracle 17.0.12. Keep NFC's major
+    # version oracle separate from the actual HTTP parser's header accounting.
+    header_limit = subprocess.check_output(
+        [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenBatchHost',
+         '--http-header-limit'], timeout=10).decode('ascii').strip()
+    assert header_limit in ['limited', 'unlimited'], 'unknown Java HTTP header accounting'
+    args.header_accounting = header_limit
+    legacy_headers = java17 and header_limit == 'unlimited'
+
 
     def resolved(case, existing, transitive, folder):
         if transitive:
@@ -335,7 +391,8 @@ def check(directory, args, records):
         return pinned(artifact)
 
     def verify(case, host, existing, folder, actual, elapsed, transitive=False):
-        error = case.get('rustError', case['error']) if host == 'rust' else case['error']
+        error = (case.get('rustError', case['error']) if host == 'rust' else
+                 case.get('javaJdk17Error', case['error']) if legacy_headers else case['error'])
         expected = {'exit': 3 if error else 0, 'lastError': 'E-PACKAGE: ' + error if error else ''}
         if not args.oracle:
             assert actual == expected, (case['id'], host, 'diagnostic/exit differs', actual)
@@ -480,7 +537,7 @@ def main():
                 prefix='package-transport-', dir=os.environ.get('TMPDIR')) as temporary:
             elapsed = check(Path(temporary), args, records)
     finally:
-        args.output.write_text(json.dumps({'seconds': elapsed, 'cases': records}, indent=2) + '\n')
+        args.output.write_text(json.dumps({'seconds': elapsed, 'javaHeaderAccounting': getattr(args, 'header_accounting', None), 'cases': records}, indent=2) + '\n')
 
 
 if __name__ == '__main__':
