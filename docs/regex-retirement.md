@@ -35,7 +35,7 @@ native も Java と同じく、ファイル全体・後続 grammar・末尾入�
 
 入れ子上限は再帰的 AST の構築・破棄と debug CLI の2 MiB stack 保証も制限しています。仮の scalar/string を置ける値失敗と異なり、上限でさらに再帰すること自体が危険なので引き上げません。#996 は明示 stack 等による安全な構文継続と Java/Rust 双方の境界検証を受け入れ条件にしています。`REGEX → 128〜168段 group → S ::= ;` の既存差が残るため、#983 全体は完了扱いにしません。
 
-共通 fixture `spec-corpus/cli-stderr.json` の `value` suite は79形×入口/local importを LF/CRLF で処理し、両実 CLI の2,528観測（check JSON全文・Playground stderr・generate / deps inspect の exit・原因・位置、出力/staging不在・入力不変）を host 別の固定期待値と比較します。同じ fixture の158入力を Java 通常/snapshot API と native inspect の byte/CP span・行・列へ照合します。字句 repeat と recovery は構文失敗の対照、v2 の複数不正は mapper 順の対照です。既存 `regex` / `qualified` suite も維持します。
+共通 fixture `spec-corpus/cli-stderr.json` の `value` suite は79形×入口/local importを LF/CRLF で処理し、両実 CLI の2,528観測（check JSON全文・Playground stderr・generate / deps inspect の exit・原因・位置、出力/staging不在・入力不変）を host 別の固定期待値と比較します。同じ fixture の158入力を Java 通常/snapshot API と native inspect の byte/CP span・行・列へ照合します。字句 repeat と recovery は構文失敗の対照、v2 の複数不正は mapper 順の対照です。既存 `regex` / `qualified` suite も維持します。 native の期待値（value 158・regex 40・qualified 24 入力）は `rust/unlaxer-ubnf/tests/diagnostic_priority.rs` でも照合し、Rust 単体の `cargo test` でも診断順の退行を検出します。
 
 次は同等の正規表現へ自動変換する規則ではなく、目的を明示して選び直す例です。
 

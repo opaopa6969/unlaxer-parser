@@ -2352,6 +2352,7 @@
       "evidence": [
         "docs/regex-retirement.md",
         "rust/unlaxer-ubnf/src/parser.rs",
+        "rust/unlaxer-ubnf/tests/diagnostic_priority.rs",
         "spec-corpus/cli-stderr.json",
         "scripts/cli_stderr.py",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustUbnfFrontendConformanceTest.java",
