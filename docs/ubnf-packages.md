@@ -232,18 +232,40 @@ Unix 以外（Windows 等）の Rust は従来の `HOME` と override の挙動�
 
 passwd lookup の不在・エラー・2 バイト未満の home（空、systemd DynamicUser の `/` など）は JDK 間で規則が異なる。
 JDK21 は非空の `HOME`、なければ `?` を使う。JDK17 は不在・エラー時に `?`、見つかった home は短くてもそのまま使う。
-native はリポジトリの既定 JDK21 を参照し、残る JDK17 差と互換方針を
-[#964](https://github.com/opaopa6969/unlaxer-parser/issues/964) に分離する。
+native の互換対象をリポジトリの既定 JDK21 に固定する（#964）。Java の製品コードを
+変えずに native が JDK17 と JDK21 の異なる場所を同時に選ぶことはできない。
+既定 JDK・CI の主 job と一致し、非空 HOME があるとき cwd や `?` 配下を誤って読む危険を
+小さくするため JDK21 を選ぶ。HOME もない場合の `?` は JDK21 の既存規則として維持する。
 この条件では同じ `UBNF_CREDENTIALS_FILE` の明示で差を避けられる。
 
-共通 `spec-corpus/package-credentials-location.json` の26形を既存の `HttpsPackageConformanceTest` から実行する。
-各形で両 `deps resolve`、Java-host Rust / native Rust / Java flag CLI と lock/cache の有無を検査する（260起動）。
-Java の独立 home probe と実 CLI の診断・exit・ローカル TLS server の Authorization 受信から選択ファイルを固定し、
-失敗時の snapshot 不変、生成時の無通信・固定 cache のみの利用を確認する。
+| passwd lookup / pw_dir | HOME | JDK17 の基点 | JDK21 / native の基点 |
+| --- | --- | --- | --- |
+| 不在 | 未設定 / 空 | `?` | `?` |
+| 不在 | 非空 | `?` | HOME |
+| エラー | 未設定 / 空 | `?` | `?` |
+| エラー | 非空 | `?` | HOME |
+| 空 pw_dir | 未設定 / 空 | 空文字列（cwd） | `?` |
+| 空 pw_dir | 非空 | 空文字列（cwd） | HOME |
+| 1バイトの pw_dir（`/`・`s`） | 未設定 / 空 | pw_dir | `?` |
+| 1バイトの pw_dir（`/`・`s`） | 非空 | pw_dir | HOME |
+| 2バイト以上の pw_dir | 任意 | pw_dir | pw_dir |
+
+各基点から `.config/unlaxer/credentials.json` を選ぶ。空 home はこの相対パスを cwd で解決する。
+共通 `spec-corpus/package-credentials-location.json` の41形を既存の `HttpsPackageConformanceTest` から実行する。
+不在・エラー・空 pw_dir × HOME 未設定・空・非空の9組合せは、正常なファイルと不正 JSON の
+両方を検証する。各形で両 `deps resolve`、Java-host Rust / native Rust / Java flag CLI と
+lock/cache の有無を検査する（410呼出し）。成功時は Authorization のラベルで選択ファイルを確認し、
+raw lock/cache と生成 bytes を照合する。不正 JSON の形は選ばれるべきファイルだけを壊し、
+他の候補は正常なままにする（別の場所を選ぶと成功して検出される）。両 resolve が
+`E-PACKAGE: cannot read artifact credentials` / exit 3、lock/cache は既存の有無とも不変で、
+同じ不正 credentials があっても固定 cache からの3 CLI生成は成功し通信しない。
+Java の独立 home probe と実 CLI の診断・exit を使い、同じ子環境内の呼出しは
+既存 `CodegenBatchHost` の1 JVM にまとめる（`--unbatched` で実 CLI と照合可能）。
 `-Duser.home` の2形は native の明示ファイル指定へ対応付けた検査であり、同じ環境だけで一致したとは扱わない。
-JDK17 の fallback 差3形は host 別期待値で実行し、skip しない。TLS の最終診断は #956 で共通化した。
-CI の cross-language job は JDK21 で実行する。JDK17 の期待値は現在の jdk17-parity job に含まれず、手元の JDK17 実行で確認している（CI 化は [#967](https://github.com/opaopa6969/unlaxer-parser/issues/967)）。
-非 UTF-8 ロケールで Java が非 ASCII のパスを扱えない差は [#966](https://github.com/opaopa6969/unlaxer-parser/issues/966) で追跡する。
+JDK17 の差は `javaSelected17` として記録し、skip しない。TLS の最終診断は #956 で共通化した。
+CI の cross-language job（cli shard）は JDK21、JDK17 も既存の jdk17-parity step の
+`credentialsLocationsMatchJavaHomeAndPaths` で全形を実行する（#967 / #975）。
+非 UTF-8 ロケールと生バイト名の恒久差は、下記「CLI のロケールとファイル名」（#966）の契約に従う。
 Linux のテスト専用 `LD_PRELOAD` shim は子プロセスだけへ仮の passwd home を返し、実 passwd lookup へ fallback しない。
 実 credentials は開かず、前後の存在・inode・size・mtime/ctime（symlink とリンク先）で不変を検査する。
 結果は `target/rust-package-credentials-location.json` に、値を含めず選択ファイルのラベルと所要時間で記録する。
@@ -330,8 +352,43 @@ JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を 
 失敗時の lock/cache 不変、成功時の raw bytes、認証の exact origin、TLS境界、redirect 先の接続0、
 生成時の接続0と固定cache使用を検査する。空bodyの診断は transport ではなく後続 JSON 検査である。
 42形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
-形の崩れた応答（Content-Length と chunked の併記、header の大きさ・行数、重複・負の Content-Length 等）の
-framing 解釈の差は [#972](https://github.com/opaopa6969/unlaxer-parser/issues/972) で追跡する。
+HTTP/1.1 の境界・不正 framing は追加38形を同じメソッドで実行し、host 別期待値も skip しない（#972）。
+Java 製品コード・診断は維持し、native は以下の安全側の契約を使う。
+表の「取得失敗」は `HTTPS artifact retrieval failed (TLS, timeout or size limit)`（exit 3）、
+「status」は `HTTPS artifact requires status 200; redirects are forbidden`（exit 3）を指す。
+
+| 応答の形 | Java 17.0.12 / 21.0.9 | native（ureq 3.4.2）と判断理由 |
+| --- | --- | --- |
+| header 70 / 200 KiB | 両方成功 | 揃える。`max_response_header_size` を64から384 KiBへ変更し、入力 buffer も上限＋1 bytes にする。既定128 KiB buffer のままでは200 KiBを受け取れない |
+| header 500 KiB / 2 MiB | 17成功、21取得失敗 | 公称384 KiBの厳しい21を参照し、native は取得失敗。17の parser はこの上限を持たず、2 MiBまで成功を実測（有限の上限が2 MiBという意味ではない） |
+| header 上限の直前・直後 | この fixture の wire 393074 bytesまで21成功、393075以上は取得失敗。17は全境界成功 | native は status 行から空行までの wire 393216 bytesを包含的に受理、393217以上で取得失敗。会計方式の狭い差は恒久契約 |
+| header 127 / 128 / 129 / 200行 | 両方成功 | 128行まで成功、129行以上は取得失敗。ureq-protoの固定 `MAX_RESPONSE_HEADERS = 128` に公開設定がなく、恒久差 |
+| Content-Length と Transfer-Encoding の併記 | CLで読み、このfixtureは `invalid JSON` | 取得失敗。ureqがchunkedとして読むことを確認後、自前検査で拒否。RFC 9112 §6.3(3) の曖昧なframingをcacheへ入れない。拒否はstatus 200だけで、404/500等は本文を読み捨ててJavaと同じstatus診断 |
+| `gzip, chunked` / `chunked, gzip` / TEの複数行 | close-delimited等で読み、このfixtureは `invalid JSON` | 取得失敗。ureqはgzipを復号せずchunkedと解釈するので、単独のchunked以外を拒否。RFC 9112 §6.1・§6.3(4)。gzip転送のラベルだけを除去してartifactにしない。大文字小文字違い・前後の空白付きの単独 `chunked` は成功。非200は上と同じくstatus診断 |
+| 同値の重複 Content-Length | 両方成功 | 成功を維持。RFC 9112 §6.3(5) が同値のリストを許容 |
+| 異値の重複 Content-Length | 最初のCLで成功 | 取得失敗を維持。RFC 9112 §6.3(5) の回復不能なframingエラー |
+| Content-Length の負数 / 正符号 | `-1`はclose-delimited、正符号は数値として成功 | 取得失敗を維持。RFC 9112 §6.2 の `1*DIGIT` を満たさない |
+| `:` のない行 | 無視して成功 | 取得失敗を維持。RFC 9112 §5 のfield構文に反する行を独自に補修しない |
+| obs-fold | 展開して成功 | 取得失敗を維持するbackend制約。RFC 9112 §5.2は送信を禁止するが、user agentには受信時の空白への展開を要求しており、nativeの拒否をRFC必須とは扱わない。独自parserでureqを緩めない |
+| 404 等 + ureq が `.call()` で拒否する形（負のCL等） | status診断 | 取得失敗の恒久差。理由は次の行と同じで、`.call()` のエラーにはstatusが残らない |
+| 204 + Content-Length: +0 | 両方status診断 | nativeは取得失敗という恒久差。ureq-protoはbody mode決定中にCLを拒否し、`.call()`のエラーにはstatus/headerが残らない。取得後の検査だけで安全にstatus診断へ写せない |
+
+JDK21の `jdk.http.maxHeaderSize` の既定値は384 KiBだが、status長＋32、各fieldの名前長＋値長＋32と、
+解析途中の行長でも検査する。ureqの上限はwire bytesなので完全な同一境界ではない。
+fixtureの4 headerの場合はJDK21の会計がwireより140 bytes大きく、最後の行の途中検査がさらに2 bytesを要する。
+reason phraseや生の空白はureqの公開Responseに保持されず、受信後に厳密なJDK会計を復元できない。
+公称384 KiBの有限上限を設定し、この差を `error`（上限のあるJDK）・`javaJdk17Error`（旧17）・`rustError` に固定する。
+更新版JDK17にも上限がbackportされる。CIで使用可能なTemurin 17.0.20-101にも同じfieldがあるため、
+既存のテスト専用 `CodegenBatchHost --http-header-limit` でparserの `MAX_HTTP_HEADER_SIZE` fieldの有無だけを調べる
+（値の読取り・module opensは不要）。`javaJdk17Error` はこのfieldがない17だけに適用し、更新版17は上限のある期待値を使う。
+NFCのJDK17/21別期待値は従来どおりmajor versionで選び、このheader判定と混同しない。
+証跡の `javaHeaderAccounting` は `limited` / `unlimited` だけを記録する。
+JDKのsystem propertyによる上限変更の模倣はしない。
+CL+TEと`gzip, chunked`は、修正前nativeがserverのchunk内のartifactと同じlock/cache raw bytesを保存することも確認する。
+成功扱いで曖昧な応答をcacheに入れる経路を残さず、Java側の寛容さを変更しない。
+仕様根拠: [RFC 9112 §5](https://www.rfc-editor.org/rfc/rfc9112.html#section-5)、
+[§5.2](https://www.rfc-editor.org/rfc/rfc9112.html#section-5.2)、
+[§6.1–6.3](https://www.rfc-editor.org/rfc/rfc9112.html#section-6.1)。
 証跡 `target/rust-package-transport.json` には既知の診断・exit・件数・hash・所要時間だけを記録し、
 資格情報・header値・server body・任意の例外文を残さない。
 
@@ -349,6 +406,70 @@ stdio の authoring も同じ読取り専用経路を使い、明示 resolve を
 未信頼 TLS/hostname、別 origin、redirect、容量、本文 timeout、remote→local 拒否、
 server 停止後のオフライン生成を両 CLI で照合する。CI は `rust-package-https.tsv` と
 `rust-package-credentials.json`（件数・所要時間・値を含まない比較結果）を保存する。
+
+## CLI のロケールとファイル名（#966）
+
+Linux の Java CLI は OS の argv・環境変数・passwd home を JVM の
+`sun.jnu.encoding` で復号し、`Path.of` は同じ文字コードへ再変換する。
+Oracle JDK17.0.12 / 21.0.9 では `LC_ALL` が未設定なら `LANG`、両方未設定または
+有効値が `C` なら US-ASCII、`C.UTF-8` なら UTF-8 になる。`LC_ALL` は `LANG` に優先する。
+CI 自身のロケールは変更せず、子だけで全9組合せを検証する。
+
+この制約による Java の失敗を native に移植しない。native は OS のパス bytes を保持し、
+利用可能なファイルを読み書きできる契約を維持する。利用者の成功する操作を意図的に
+失敗させる利益がなく、言語仕様・parser の機能差でもないための恒久差である。
+Java 製品コード・診断・公開済み3.3.0・parser ホットパスは変更しない。
+
+| パスの形 | Java（JDK17 / 21） | native Rust | 判断 |
+| --- | --- | --- | --- |
+| UTF-8 の非 ASCII manifest / grammar / 出力先 / import / credentials override / passwd home、有効ロケール `C` または未設定 | exit 3、最終行 `Malformed input or input contains unmappable characters: ...`。lock/cache・出力は不変 | exit 0、指定したファイルを使用 | JVM のパス変換による恒久差 |
+| 同じ6形、有効ロケール `C.UTF-8` | exit 0 | exit 0、同じ lock/cache・生成 bytes | 一致を固定 |
+| 非 UTF-8 の `raw-FF`（FF は単一 byte）の manifest、`C.UTF-8` | exit 3、`E-PACKAGE: missing manifest; run unlaxer deps resolve --manifest ubnf.json` | exit 0、生 bytes の名前を使用 | JVM が FF を U+FFFD に復号する恒久差 |
+| 同じ生バイト名の grammar / import を含む親ディレクトリ | exit 4、置換後の絶対パス（`raw-�`） | exit 0、生 bytes の名前を使用 | 同上 |
+| 同じ生バイト名の出力先 | exit 0、`raw-�` という **別の名前** を作る | exit 0、元の FF を含む名前を作る | ファイル名は恒久差。両方の生成内容 bytes は一致 |
+| 同じ生バイト名の credentials override | exit 3、`E-PACKAGE: artifact credentials file is missing` | exit 0、指定ファイルでローカル TLS 取得 | JVM の復号による恒久差 |
+| 同じ生バイト名の passwd home | 置換後の home に既定 credentials がなく、fixture の私有 CA を得られない。exit 3、`E-PACKAGE: HTTPS artifact retrieval failed (TLS, timeout or size limit)` | exit 0、元の home の credentials を使用 | 同上。Java の診断は TLS fixture の条件下の値 |
+| 生バイト名、有効ロケール `C` または未設定（ASCII 名の symlink を経る import を除く） | exit 3、`Malformed input ...` | exit 0 | JVM のパス変換による恒久差 |
+| ASCII 名の import symlink の target に生バイト名がある | 両ロケールで exit 0。target の bytes は OS が辿る | exit 0 | 同じ生成 bytes |
+| ASCII の manifest 本文の `local:` source、ASCII の credentials 本文の `caCertificate` が非 ASCII のパス、有効ロケール `C` または未設定 | exit 3、`E-PACKAGE: cannot read local artifact` / `E-PACKAGE: cannot read artifact CA certificate` | exit 0、指定したファイルを使用 | 本文から読んだパスも JVM の変換による恒久差。`C.UTF-8` では両 host が同じ lock/cache で成功 |
+| 存在しない非 ASCII の grammar、有効ロケール `C` または未設定 | exit 3、`Malformed input ...` | exit 4、そのパス | 両方失敗するが、Java は I/O の前にパス変換で失敗する恒久差。native はロケールに依らず本来の I/O 診断を返し、`C.UTF-8` では両 host とも exit 4 で一致 |
+
+UTF-8 の grammar 本文には FF のファイル名を直接書けない。共通 fixture は任意の
+置換文字をその名前の代用にせず、ASCII import → 生バイト target の symlink と、
+生バイト親ディレクトリ → ASCII の相対 import の両境界を測る。
+UTF-16 の単独 surrogate を文法に通す #959 は扱わない。
+argv は OS bytes から復号するため、`é😀` は C で6個の置換文字になる。
+UTF-8 本文から読む import の `é😀` は2コードポイントのままで、最終 stderr は
+ASCII encoder により `??` と表示する。この区別も独立した実 CLI の期待値で固定する。
+非 UTF-8 ロケールの Java は本文由来の文字を含む stdout/stderr も同じ encoder で `?` にする
+（例: 構文エラーの `UBNF パース失敗: ... é😀` は `UBNF ?????: ... ??`、exit 3 は一致）。
+native は端末の文字コードを推測せず、ロケールに依らず UTF-8 で出力する。これも JVM の
+コンソール文字コードによる表示の恒久差で、構文エラー文面自体の差は #937 の意図した差である。
+
+**本文 bytes はファイル名と別の契約**とする。JDK17 の `file.encoding` は C で
+US-ASCII、JDK21 は UTF-8 だが、対象 CLI の grammar / manifest / credentials reader と
+生成 writer は UTF-8 を使う。fixture の grammar・manifest・credentials・artifact の本文は
+`\u` escape ではなく生の UTF-8 bytes で書き、その性質も setup で検査する。ASCII パス上の非 ASCII grammar・manifest・credentials・
+取得 cache・生成物・Playground/profile の bytes は両 JDK/native とも一致する。
+不正 UTF-8 grammar/import は `Input length = 1` / exit 4、manifest は
+`E-PACKAGE: invalid JSON` / exit 3、credentials は
+`E-PACKAGE: cannot read artifact credentials` / exit 3。
+既存の手書き出力は `refusing to overwrite non-generated file ...` / exit 4。
+これらの両方失敗する形は診断・exit・全入力/lock/cache/出力不変を一致させる。
+今回の実測では本文 I/O や共通失敗条件に実装修正を要する差はなかった。
+
+共通 `spec-corpus/cli-locale-paths.json` の27形を既存
+`CliStderrConformanceTest#localePathsRetainHostLimitsAndUtf8FileBytes` で実行する。
+9環境 × 両 host × 既存 lock/cache 有無の972観測を、host 別の固定期待値と照合する。
+生バイト名は証跡のツリーで hex にして lossless に記録し、生成ファイルは全内容の
+SHA-256 を固定する。成功時も意図しない別名・追加ファイルを検出する。
+Java は同じ環境内を `CodegenBatchHost --locale-paths` の1 JVMにまとめ、OS argv の
+復号と実 CLI の stdout/stderr encoder を再現する。`--unbatched` は実 CLI の独立照合用。
+JVM の起動と `sun.jnu.encoding` / default charset を毎環境で確認し、fixture を skip しない。
+credentials は child-only の passwd/HOME shim、ローカル TLS、ダミー値だけを使う。
+実ユーザーの credentials は開かず、前後の metadata 不変も検査する。
+結果と runner のロケールは `target/cli-stderr-locale.json` に記録する。
+既存 cli shard と jdk17-parity の必須メソッド登録で両 JDK が実行する。
 
 ## 定義の出典を確認する
 

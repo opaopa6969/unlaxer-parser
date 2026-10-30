@@ -110,7 +110,7 @@ public class HttpsPackageConformanceTest {
             "--output", output.toString()), null, 240);
         assertEquals(result.output(), 0, result.code());
         var report = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
-        assertEquals("all location fixtures executed", 26, report.getAsJsonArray("cases").size());
+        assertEquals("all location fixtures executed", 41, report.getAsJsonArray("cases").size());
         for (var entry : report.getAsJsonArray("cases"))
             assertEquals("both snapshots and all five CLI paths", 10,
                 entry.getAsJsonObject().getAsJsonArray("runs").size());
@@ -131,7 +131,7 @@ public class HttpsPackageConformanceTest {
             "--output", output.toString()), null, 240);
         assertEquals(result.output(), 0, result.code());
         var report = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
-        assertEquals("all transport fixtures executed", 175, report.getAsJsonArray("cases").size());
+        assertEquals("all transport fixtures executed", 213, report.getAsJsonArray("cases").size());
         int generated = 0;
         for (var entry : report.getAsJsonArray("cases")) {
             // URI cases also resolve the same source through a transitive dependency.

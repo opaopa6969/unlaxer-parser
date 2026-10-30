@@ -660,6 +660,14 @@
     "988": {
       "state": "OPEN",
       "title": "ruleを含むlocal moduleのnative拒否診断に元ファイルのパスがない"
+    },
+    "972": {
+      "state": "OPEN",
+      "title": "HTTP/1.1応答framingとheader上限のJava/native差"
+    },
+    "966": {
+      "state": "OPEN",
+      "title": "parity(cli): 非 UTF-8 ロケールの JVM パス変換制約と native の成功する操作を区別する"
     }
   },
   "entries": [
@@ -689,7 +697,7 @@
       "issues": [
         958
       ],
-      "observation": "通常のpasswd homeはHOME未設定・空・差替えより優先する。空overrideはcwd、末尾の/は除去、空白・相対・tildeはそのまま、symlinkを追跡し、欠落/親非directoryとdirectoryの診断をJavaに揃える。getpwuid_rのunsafeは専用関数のみ、外部crate追加なし。26形260呼出しをsnapshot有無で検証する（CIはJDK21、JDK17は手元）。JVM -Duser.homeはnativeの明示UBNF_CREDENTIALS_FILEへ対応付ける。非Unixは既存のHOME/overrideを維持する。子プロセスのpasswdとHOMEだけを隔離し実credentialsは開かずstatで不変検査。JDK別fallbackはpackage-credentials-home-fallbackに分離。",
+      "observation": "通常のpasswd homeはHOME未設定・空・差替えより優先する。空overrideはcwd、末尾の/は除去、空白・相対・tildeはそのまま、symlinkを追跡し、欠落/親非directoryとdirectoryの診断をJavaに揃える。getpwuid_rのunsafeは専用関数のみ、外部crate追加なし。41形410呼出しをsnapshot有無で検証する（CIのcli shardはJDK21、jdk17-parityも同じ全形を実行）。JVM -Duser.homeはnativeの明示UBNF_CREDENTIALS_FILEへ対応付ける。非Unixは既存のHOME/overrideを維持する。子プロセスのpasswdとHOMEだけを隔離し実credentialsは開かずstatで不変検査。JDK別fallbackはpackage-credentials-home-fallbackに分離。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials-location.json",
@@ -702,13 +710,13 @@
     },
     {
       "id": "package-credentials-home-fallback",
-      "category": "unresolved",
-      "title": "passwd entry 不在・空 home における JDK17/21 の差",
+      "category": "contract",
+      "title": "JDK21 を互換対象とする Unix credentials home fallback",
       "hosts": "JDK17 / JDK21 / native Rust",
       "issues": [
         964
       ],
-      "observation": "通常のpasswd entryは一致するが、JDK21は不在/lookup失敗/2バイト未満のhome（空・/など）なら非空HOME→?へfallbackする。JDK17は不在/失敗で?、見つかったhomeは短くても維持する。nativeは既定JDK21を参照し、passwd-missing・passwd-empty・passwd-shortをJDK17別期待値でskipせず実行する。共通の明示overrideで回避可能。互換対象/選択方法の確定を#964で追跡する。",
+      "observation": "nativeの互換対象を既定JDK・CI主jobのJDK21に確定する。Java製品コードを変えず異なる2場所を同時に選べず、非空HOMEへのfallbackはcwdや?配下の誤読を減らすため。不在/lookupエラー/2バイト未満のpw_dirは非空HOME→?、JDK17は不在/エラーで?、見つかったhomeは空/短くても維持する。不在・エラー・空pw_dir×HOME未設定・空・非空の9組合せを正常/不正JSON両方で実行し、両resolveの選択ファイル・最終診断/exit・snapshot有無で失敗時不変を固定する。不正JSONはcannot read artifact credentials/exit3、3生成CLIはcredentialsも通信も使わず固定cacheから生成する。JDK17との差はjavaSelected17のhost別期待値でCIでもskipせず実行し、1バイトhomeの既存対照も維持する。明示overrideで回避可能。子環境だけを隔離し実credentialsを開かない。既存native選択・Java製品コード・非Unix挙動は変更しない。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials-location.json",
@@ -716,7 +724,8 @@
         "scripts/ubnf_credentials_home.py",
         "scripts/fixtures/credentials-passwd.c",
         "rust/unlaxer-generator/src/package_fetch/passwd_home.rs",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/CodegenBatchHost.java"
       ]
     },
     {
@@ -727,7 +736,7 @@
       "issues": [
         956
       ],
-      "observation": "Java製品コードを変えず、TLS/接続/本文読取り失敗を共通のretrieval failed (TLS, timeout or size limit)へ写す。本文完了後だけstatus 200を要求し、302/404/500でも過大・途中切断が先行する。ureqの排他的limitは上限+1バイトで8MiBちょうどを受理。要求していない101と本文を宣言した204はJavaのexchange失敗に揃える。42形を両deps resolve・snapshot有無で、3生成CLIを代表2形で照合し、JDK17/21独立oracle、秘密値非記録、exact origin/TLS/redirect禁止、失敗時snapshot不変・生成時接続0を検証する。接続5秒・全体20秒は実測し、待つ形は並行、他のJava呼出しは1 JVMで実行する。形の崩れた応答のframing差は#972。#956はPRのmerge待ち。",
+      "observation": "Java製品コードを変えず、TLS/接続/本文読取り失敗を共通のretrieval failed (TLS, timeout or size limit)へ写す。本文完了後だけstatus 200を要求し、302/404/500でも過大・途中切断が先行する。ureqの排他的limitは上限+1バイトで8MiBちょうどを受理。要求していない101と本文を宣言した204はJavaのexchange失敗に揃える。42形を両deps resolve・snapshot有無で、3生成CLIを代表2形で照合し、JDK17/21独立oracle、秘密値非記録、exact origin/TLS/redirect禁止、失敗時snapshot不変・生成時接続0を検証する。接続5秒・全体20秒は実測し、待つ形は並行、他のJava呼出しは1 JVMで実行する。不正framingとheader境界はpackage-https-framing（#972）の恒久契約で検証する。#956はPR #970でmerge済み。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials.json",
@@ -736,6 +745,24 @@
         "unlaxer-dsl/src/main/java/org/unlaxer/dsl/bootstrap/UBNFPackageFetcher.java",
         "spec-corpus/package-https-transport.json",
         "scripts/ubnf_package_transport.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/CodegenBatchHost.java"
+      ]
+    },
+    {
+      "id": "package-https-framing",
+      "category": "contract",
+      "title": "HTTP/1.1応答のheader上限と安全側framing拒否",
+      "hosts": "Java JDK17/21 HttpClient / native Rust ureq 3.4.2",
+      "issues": [
+        972
+      ],
+      "observation": "Java製品コードは不変。nativeはheader wire上限384 KiBと入力buffer上限+1を設定する。JDK21はstatus長+32と各field長+32で数え、このfixtureはwire393074まで成功、393075で取得失敗。nativeは393216まで成功、393217で失敗。Oracle17.0.12には同じ上限がなく2 MiBまで成功を実測し、javaJdk17Errorで固定する。更新版17のbackport（Temurin17.0.20-101）も実測し、テスト専用hostのfield存在検査で上限有無を選ぶ。NFCのmajor版判定は別に維持する。ureq固定128 header行の追加拒否、異値重複CL・負数/正符号CL・colonless・obs-foldは恒久差。CL+TEと単独chunked以外のTEはstatus 200の受信後に取得失敗として拒否し（RFC9112 6.1/6.3）、非200は本文を読み捨ててJavaと同じstatus診断。大文字・空白付きの単独chunkedは成功。修正前のCL+TE/gzip,chunkedはchunk内artifactとraw lock/cache一致を検証。204+CL:+0と404+負数CLはJavaがstatus診断、nativeはureq内部でstatusが失われるため取得失敗。obs-foldの拒否は5.2のuser agent展開要件より厳しいbackend制約。追加38形を両resolve・snapshot有無・JDK17/21でskipせず実行し、診断/exit/raw bytes/失敗時不変と秘密値非記録を検査する。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-https-transport.json",
+        "scripts/ubnf_package_transport.py",
+        "rust/unlaxer-generator/src/package_fetch.rs",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/CodegenBatchHost.java"
       ]
@@ -2426,6 +2453,26 @@
         "spec-corpus/cli-stderr.json",
         "rust/unlaxer-generator/src/packages.rs"
       ]
+    },
+    {
+      "id": "cli-locale-path-encoding",
+      "category": "contract",
+      "title": "JVM のファイル名変換制約と UTF-8 本文 I/O",
+      "hosts": "Oracle JDK17 / JDK21 / native Rust（Linux）",
+      "issues": [
+        966
+      ],
+      "observation": "LC_ALL/LANGの未設定・C・C.UTF-8の全9組合せを子だけへ渡す。JVMのsun.jnu.encodingがUS-ASCIIの非ASCIIパスとUTF-8でも表現不能な生バイト名はJavaの実行環境制約であり、nativeを故意に失敗させない恒久差とする。manifest・grammar・出力先・import・credentials override・passwd homeの12形、本文から読むlocal source/CA証明書と存在しないgrammarの非ASCIIパス3形、12対照を共通fixtureでskipせず972観測/JDK実行。JavaはCのMalformed input/exit3、UTF-8の生バイト名はmissing manifest/exit3、grammar/import親は置換後パス/exit4、credentialsはmissing/exit3、homeは私有CA不在のTLS失敗/exit3。生バイト出力はJavaがU+FFFDの別名を作る成功も全ツリーhexで固定し、nativeは元bytesを使う。ASCII symlink経由の生バイトimportは両者成功。Cの本文由来パスはJavaがcannot read local artifact/CA certificate・exit3、存在しない非ASCII grammarはJavaがMalformed input・exit3でnativeは本来のI/O診断・exit4（C.UTF-8では両者exit4）。非UTF-8ロケールのJavaは本文由来のstdout/stderr文字も?にし、nativeはロケールに依らずUTF-8で出す表示の恒久差（構文エラー文面は#937）。JDK17のfile.encodingがUS-ASCIIでも対象本文reader/writerはUTF-8で、manifest・credentials・artifact・TLS応答は\\u escapeでない生UTF-8 bytesで書き、非ASCII本文・raw cache・生成bytesの一致、不正UTF-8/手書き出力の共通診断・exit・失敗時全入力/lock/cache/出力不変を固定する。実CLIの独立oracleを凍結し、バッチはOS argvの復号と版別stdout/stderr charsetを再現する。passwd/HOMEはchild-only隔離、実credentialsは開かずローカルTLSとダミー値だけを使う。Java製品コード・native製品コード・公開3.3.0・parserホットパスと依存crateは変更不要。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/cli-locale-paths.json",
+        "scripts/cli_locale_paths.py",
+        "scripts/ubnf_credentials_home.py",
+        "scripts/fixtures/credentials-passwd.c",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/CodegenBatchHost.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
+        ".github/optin-test-contracts.json"
+      ]
     }
   ],
   "corpora": [
@@ -3070,7 +3117,7 @@
     {
       "path": "spec-corpus/package-credentials-location.json",
       "fields": {
-        "javaSelected17": 3
+        "javaSelected17": 11
       },
       "entries": [
         "package-credentials-location",
@@ -3080,13 +3127,26 @@
     {
       "path": "spec-corpus/package-https-transport.json",
       "fields": {
+        "javaJdk17Error": 8,
         "javaJdk17TargetSuffix": 2,
-        "rustError": 2
+        "rustError": 20
       },
       "entries": [
         "package-ascii-url",
         "package-unicode-url",
-        "package-unicode-url-backtick"
+        "package-unicode-url-backtick",
+        "package-https-framing"
+      ]
+    },
+    {
+      "path": "spec-corpus/cli-locale-paths.json",
+      "fields": {
+        "javaAscii": 27,
+        "javaUtf8": 27,
+        "native": 27
+      },
+      "entries": [
+        "cli-locale-path-encoding"
       ]
     }
   ],

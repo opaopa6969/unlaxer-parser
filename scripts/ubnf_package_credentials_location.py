@@ -1,5 +1,6 @@
 """Java-oracle credentials locations through two resolvers and three generation CLIs."""
 import argparse
+from contextlib import ExitStack
 import json
 import os
 from pathlib import Path
@@ -7,11 +8,11 @@ import subprocess
 import tempfile
 import time
 
-from ubnf_credentials_home import compile_passwd_shim, isolated_env, protect_real_credentials
+from ubnf_credentials_home import batch_cli, compile_passwd_shim, isolated_env, protect_real_credentials
 from ubnf_package_credentials import ROOT, TLS_ERROR, local_tls, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
-COUNT = 26
+COUNT = 41
 # Only dummy values; never include these in errors, receipts or logs.
 TOKENS = {label: 'location-fixture-only-' + label for label in
           ['passwd', 'environment', 'property', 'explicit', 'spaces', 'tilde', 'cwd', 'fallback', 'short']}
@@ -20,18 +21,38 @@ TOKENS = {label: 'location-fixture-only-' + label for label in
 def fixtures():
     cases = json.loads((ROOT / 'spec-corpus/package-credentials-location.json').read_text())
     assert len(cases) == len({case['id'] for case in cases}) == COUNT, 'location fixture missing'
+    # Both successful selection and a poisoned selected file cover the full 3 x 3 matrix.
+    assert all(case.get('selected') for case in cases if case.get('invalidCredentials')), \
+        'invalid credentials case without the selected file to poison'
+    for invalid in [False, True]:
+        matrix = [(c.get('passwd'), c['home']) for c in cases
+                  if c.get('passwd') in ['missing', 'error', 'empty']
+                  and bool(c.get('invalidCredentials')) == invalid]
+        assert len(matrix) == 9 and set(matrix) == {
+            (passwd, home) for passwd in ['missing', 'error', 'empty']
+            for home in ['unset', 'empty', 'other']}, 'fallback matrix missing'
     return cases
 
 
+def diagnostic(stdout, stderr, code):
+    assert all(token.encode() not in stdout + stderr for token in TOKENS.values()), \
+        'credential leaked into process output'
+    last = (stderr.decode('utf-8').strip().splitlines() or [''])[-1]
+    missing = 'E-PACKAGE: missing lock; run unlaxer deps resolve --manifest ubnf.json'
+    allowed = ['', missing, 'Generation failed: ' + missing] + ['E-PACKAGE: ' + error for error in
+        ['cannot read artifact credentials', 'artifact credentials file is missing', *TLS_ERROR.values()]]
+    assert last in allowed, 'unexpected diagnostic (withheld to protect private values)'
+    return {'exit': code, 'lastError': last}
+
+
 def invoke(command, options, env, cwd):
+    if callable(command):
+        return command(options)
     try:
         result = subprocess.run(command + options, env=env, cwd=cwd, capture_output=True, timeout=30)
     except subprocess.TimeoutExpired:
         raise AssertionError('credentials location process timed out') from None
-    assert all(token.encode() not in result.stdout + result.stderr for token in TOKENS.values()), \
-        'credential leaked into process output'
-    return {'exit': result.returncode,
-            'lastError': (result.stderr.decode('utf-8').strip().splitlines() or [''])[-1]}
+    return diagnostic(result.stdout, result.stderr, result.returncode)
 
 
 def check(directory, args, records):
@@ -100,6 +121,15 @@ def check(directory, args, records):
                 passwd if found and (jdk == '17' or len(passwd) >= 2) else
                 '?' if jdk == '17' or home in [None, ''] else str(home))
             assert actual_home == expected_home, (case['id'], 'unexpected Java home oracle')
+            if case.get('invalidCredentials'):
+                # Poison only the expected file(s); every other candidate stays valid, so
+                # selecting a different location would succeed and fail the exit check.
+                # A JDK17 run poisons both hosts' files; the JDK21 run pins native alone.
+                poisoned = {case['selected']}
+                if jdk == '17':
+                    poisoned.add(case.get('javaSelected17', case['selected']))
+                for label in poisoned:
+                    paths[label].write_bytes(b'{')
             manifest = project / 'ubnf.json'
             manifest.write_bytes(encode({'schemaVersion': 1, 'dependencies': {
                 'std/layout': {'version': '1.0.0', 'source': origin + '/artifact'}}}))
@@ -117,57 +147,67 @@ def check(directory, args, records):
                     native_env['UBNF_CREDENTIALS_FILE'] = str(paths['cwd'] if property_path == '' else paths['property'])
                 commands.append(('rust', [args.rust], native_env))
             record = {'case': case['id'], 'jdk': jdk, 'homeOracle': 'pass',
+                      'homeLabel': ('property' if property_value is not None else
+                                    'cwd' if actual_home == '' else
+                                    'fallback' if actual_home == '?' else
+                                    'short' if actual_home == 's' else
+                                    'environment' if actual_home == str(homes['environment']) else 'passwd'),
                       'nativePropertyEquivalent': property_value is not None, 'runs': []}
             records.append(record)
-            for existing in [False, True]:
-                initial = baseline if existing else {}
-                for host, command, process_env in commands:
-                    reset(project, initial)
-                    before = len(received)
-                    actual = invoke(command, ['deps', 'resolve', '--manifest', str(manifest)], process_env, folder)
-                    error = case.get('error')
-                    if error == 'tls':
-                        error = TLS_ERROR[host]  # Java transport classification (#956).
-                    expected = {'exit': 3 if error else 0, 'lastError': 'E-PACKAGE: ' + error if error else ''}
-                    assert actual == expected, (case['id'], host, 'resolve diagnostic/exit differs')
-                    after = snapshot(project)
-                    assert after == (initial if error else baseline), (case['id'], host, 'resolve snapshot differs')
-                    selected = case.get('selected')
-                    if host == 'java' and jdk == '17':
-                        selected = case.get('javaSelected17', selected)
-                    wanted = [] if error else [{'authorization': selected, 'extraHeader': False, 'path': '/artifact'}]
-                    assert received[before:] == wanted, (case['id'], host, 'selected credential file differs')
-                    record['runs'].append(dict(host=host, operation='resolve', existingSnapshot=existing,
-                                               **actual, selectedFile=selected, snapshot=receipt(after)))
-                # All location shapes also reach every generation CLI. No credentials
-                # lookup, request or lock/cache mutation is permitted, even on failures.
-                reset(project, initial)
-                generated = []
-                for host, command, process_env in commands:
-                    for flags in ([False, True] if host == 'java' else [False]):
-                        output = folder / (host + ('-flags' if flags else '-rust') + str(existing))
-                        options = ['--grammar', str(grammar), '--output', str(output), '--generators', 'Parser'] if flags else [
-                            'generate', '--target', 'rust', '--grammar', str(grammar), '--output', str(output)]
+            with ExitStack() as stack:
+                if not args.unbatched:
+                    batch = stack.enter_context(batch_cli(java[:-1] + ['org.unlaxer.dsl.CodegenBatchHost'],
+                                                          env, folder, diagnostic))
+                    commands[0] = ('java', batch, env)
+                for existing in [False, True]:
+                    initial = baseline if existing else {}
+                    for host, command, process_env in commands:
+                        reset(project, initial)
                         before = len(received)
-                        actual = invoke(command, options, process_env, folder)
-                        missing = 'E-PACKAGE: missing lock; run unlaxer deps resolve --manifest ubnf.json'
-                        expected = {'exit': 0 if existing else 4 if flags else 3,
-                                    'lastError': '' if existing else ('Generation failed: ' if flags else '') + missing}
-                        assert actual == expected, (case['id'], host, 'generation diagnostic/exit differs')
-                        assert snapshot(project) == initial, 'generation changed snapshot'
-                        assert len(received) == before, 'generation used network'
-                        if existing:
-                            files = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob('*') if p.is_file()}
-                            assert files and all(token.encode() not in data for data in files.values()
-                                                 for token in TOKENS.values()), 'credential leaked into generation'
-                            if not flags:
-                                generated.append(files)
-                        else:
-                            assert not output.exists(), 'failed generation published files'
-                        record['runs'].append(dict(host=host, operation='flags' if flags else 'generate',
-                                                   existingSnapshot=existing, **actual))
-                if len(generated) == 2:
-                    assert generated[0] == generated[1], 'generated bytes differ'
+                        actual = invoke(command, ['deps', 'resolve', '--manifest', str(manifest)], process_env, folder)
+                        error = case.get('error')
+                        if error == 'tls':
+                            error = TLS_ERROR[host]  # Java transport classification (#956).
+                        expected = {'exit': 3 if error else 0, 'lastError': 'E-PACKAGE: ' + error if error else ''}
+                        assert actual == expected, (case['id'], host, 'resolve diagnostic/exit differs')
+                        after = snapshot(project)
+                        assert after == (initial if error else baseline), (case['id'], host, 'resolve snapshot differs')
+                        selected = case.get('selected')
+                        if host == 'java' and jdk == '17':
+                            selected = case.get('javaSelected17', selected)
+                        wanted = [] if error else [{'authorization': selected, 'extraHeader': False, 'path': '/artifact'}]
+                        assert received[before:] == wanted, (case['id'], host, 'selected credential file differs')
+                        record['runs'].append(dict(host=host, operation='resolve', existingSnapshot=existing,
+                                                   **actual, selectedFile=selected, snapshot=receipt(after)))
+                    # All location shapes also reach every generation CLI. No credentials
+                    # lookup, request or lock/cache mutation is permitted, even on failures.
+                    reset(project, initial)
+                    generated = []
+                    for host, command, process_env in commands:
+                        for flags in ([False, True] if host == 'java' else [False]):
+                            output = folder / (host + ('-flags' if flags else '-rust') + str(existing))
+                            options = ['--grammar', str(grammar), '--output', str(output), '--generators', 'Parser'] if flags else [
+                                'generate', '--target', 'rust', '--grammar', str(grammar), '--output', str(output)]
+                            before = len(received)
+                            actual = invoke(command, options, process_env, folder)
+                            missing = 'E-PACKAGE: missing lock; run unlaxer deps resolve --manifest ubnf.json'
+                            expected = {'exit': 0 if existing else 4 if flags else 3,
+                                        'lastError': '' if existing else ('Generation failed: ' if flags else '') + missing}
+                            assert actual == expected, (case['id'], host, 'generation diagnostic/exit differs')
+                            assert snapshot(project) == initial, 'generation changed snapshot'
+                            assert len(received) == before, 'generation used network'
+                            if existing:
+                                files = {str(p.relative_to(output)): p.read_bytes() for p in output.rglob('*') if p.is_file()}
+                                assert files and all(token.encode() not in data for data in files.values()
+                                                     for token in TOKENS.values()), 'credential leaked into generation'
+                                if not flags:
+                                    generated.append(files)
+                            else:
+                                assert not output.exists(), 'failed generation published files'
+                            record['runs'].append(dict(host=host, operation='flags' if flags else 'generate',
+                                                       existingSnapshot=existing, **actual))
+                    if len(generated) == 2:
+                        assert generated[0] == generated[1], 'generated bytes differ'
             record['seconds'] = round(time.monotonic() - tick, 3)
     return time.monotonic() - started
 
@@ -179,6 +219,7 @@ def main():
     parser.add_argument('--rust')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--case', action='append')
+    parser.add_argument('--unbatched', action='store_true', help='independent real CLI oracle')
     args = parser.parse_args()
     records = []
     elapsed = None

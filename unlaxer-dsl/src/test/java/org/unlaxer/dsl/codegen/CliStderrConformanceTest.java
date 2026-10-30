@@ -37,6 +37,21 @@ public class CliStderrConformanceTest {
 
     @Test(timeout=120000) public void qualifiedReferenceSyntaxMatchesJavaBeforeOutput() throws Exception { check("qualified"); }
 
+    @Test(timeout=240000) public void localePathsRetainHostLimitsAndUtf8FileBytes() throws Exception {
+        String classpath = Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
+            .map(path -> Path.of(path).toAbsolutePath().toString()).collect(Collectors.joining(File.pathSeparator));
+        Path output = EVIDENCE.resolve("cli-stderr-locale.json").toAbsolutePath();
+        run(List.of("python3", ROOT.resolve("scripts/cli_locale_paths.py").toString(),
+            "--java", Path.of(System.getProperty("java.home"), "bin/java").toString(), "--classpath", classpath,
+            "--rust", ROOT.resolve("rust/target/debug/unlaxer").toString(),
+            "--output", output.toString()), EVIDENCE.resolve("cli-stderr-locale.log"), 210);
+        var evidence = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
+        assertEquals("all LC_ALL/LANG combinations", 9, evidence.getAsJsonArray("environments").size());
+        assertEquals("all paths/controls, both hosts and snapshots", 972,
+            evidence.getAsJsonArray("observations").size());
+        assertEquals("locale fixtures must never be excluded", 0, evidence.getAsJsonArray("excluded").size());
+    }
+
     private static void check(String suite) throws Exception {
         String classpath = Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
             .map(path -> Path.of(path).toAbsolutePath().toString()).collect(Collectors.joining(File.pathSeparator));
