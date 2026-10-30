@@ -1991,10 +1991,8 @@ fn parse_detailed_owned(
     options: ParseOptions,
     bindings: BTreeMap<String, Vec<String>>,
 ) -> Result<Tree, ParseDiagnostic> {
-    parse_detailed_stacked(
-        rules, root, whitespace, input, options, bindings, None, false,
-    )
-    .map_err(|failure| failure.diagnostic)
+    parse_detailed_stacked(rules, root, whitespace, input, options, bindings, (), false)
+        .map_err(|failure| failure.diagnostic)
 }
 
 /// Full-input parsing with a caller-owned immutable registry of pure named predicates.
@@ -2016,7 +2014,7 @@ pub fn parse_detailed_shared_with_semantic_predicates(
         input,
         options,
         BTreeMap::new(),
-        Some(predicates),
+        predicates,
         false,
     )
     .map_err(|failure| failure.diagnostic)
@@ -2043,20 +2041,20 @@ pub fn parse_detailed_shared_with_rule_stack(
         input,
         options,
         BTreeMap::new(),
-        None,
+        (),
         true,
     )
 }
 
 #[allow(clippy::too_many_arguments)]
-fn parse_detailed_stacked(
+fn parse_detailed_stacked<P: semantic_predicates::Entry>(
     rules: SharedGrammar,
     root: usize,
     whitespace: bool,
     input: &str,
     options: ParseOptions,
     bindings: BTreeMap<String, Vec<String>>,
-    predicates: Option<&semantic_predicates::Bindings>,
+    predicates: P,
     stacked: bool,
 ) -> Result<Tree, RuleStackDiagnostic> {
     let unstacked = |diagnostic| RuleStackDiagnostic {
@@ -2073,11 +2071,7 @@ fn parse_detailed_stacked(
         options
     };
     let mut parser = ParseContext::with_bindings(input, bindings, options);
-    if let Some(predicates) = predicates {
-        predicates
-            .install(&mut parser)
-            .expect("a new context has no active predicate scope");
-    }
+    predicates.prepare(&mut parser);
     parser.track_owned_source = shared_grammar_needs_owned_source(&rules);
     parser.rules = rules;
     parser.whitespace = whitespace;
@@ -2114,12 +2108,7 @@ fn parse_detailed_stacked(
             farthest: error,
         }));
     }
-    if let Some(failure) = parser.semantic_predicate_failure().or_else(|| {
-        predicates
-            .is_none()
-            .then(|| semantic_predicates::unregistered(&parser.rules, root))
-            .flatten()
-    }) {
+    if let Some(failure) = predicates.failure(&parser, root) {
         return Err(unstacked(ParseDiagnostic {
             kind: failure.kind,
             offset: failure.span.start,

@@ -138,6 +138,37 @@ pub fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Full-input entry policy, specialized at compile time. The ordinary entry carries
+/// only `()`: no registry pointer, setup branch, state lookup or allocation is added
+/// to successful parsing without predicates. Diagnostic inspection remains on failure.
+pub(crate) trait Entry: Copy {
+    fn prepare(self, context: &mut ParseContext<'_>);
+    fn failure(self, context: &ParseContext<'_>, root: usize) -> Option<Failure>;
+}
+
+impl Entry for () {
+    #[inline(always)]
+    fn prepare(self, _context: &mut ParseContext<'_>) {}
+
+    fn failure(self, context: &ParseContext<'_>, root: usize) -> Option<Failure> {
+        context
+            .semantic_predicate_failure()
+            .or_else(|| unregistered(&context.rules, root))
+    }
+}
+
+impl Entry for &Bindings {
+    #[inline(always)]
+    fn prepare(self, context: &mut ParseContext<'_>) {
+        self.install(context)
+            .expect("a new context has no active predicate scope");
+    }
+
+    fn failure(self, context: &ParseContext<'_>, _root: usize) -> Option<Failure> {
+        context.semantic_predicate_failure()
+    }
+}
+
 /// Sticky entry failure: `predicate_missing`, `predicate_error`, `predicate_source`,
 /// `predicate_limit` or `predicate_scope_missing`.
 #[derive(Debug, Clone, PartialEq, Eq)]
