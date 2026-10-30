@@ -1,12 +1,62 @@
 """Child-only Linux passwd isolation for HTTPS credentials fixtures (#958)."""
 from contextlib import contextmanager
+import json
 import os
 from pathlib import Path
 import pwd
+import queue
 import subprocess
 import sys
+import threading
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@contextmanager
+def batch_cli(command, env, cwd, diagnostic):
+    """Use CodegenBatchHost only within one isolated passwd/HOME/cwd environment."""
+    process = subprocess.Popen(command, env=env, cwd=cwd, stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    lines = queue.Queue()
+
+    def read_lines():
+        for line in process.stdout:
+            lines.put(line)
+        lines.put(None)
+
+    reader = threading.Thread(target=read_lines, daemon=True)
+    stray = []
+    drain = threading.Thread(target=lambda: stray.append(process.stderr.read()), daemon=True)
+    reader.start()
+    drain.start()
+
+    def call(options):
+        process.stdin.write((json.dumps(options) + '\n').encode())
+        process.stdin.flush()
+        try:
+            line = lines.get(timeout=30)
+        except queue.Empty:
+            raise AssertionError('credentials batch call timed out') from None
+        assert line is not None, 'credentials batch host stopped'
+        answer = json.loads(line)
+        return diagnostic(answer['stdout'].encode(), answer['stderr'].encode(), answer['exit'])
+
+    try:
+        yield call
+    finally:
+        process.stdin.close()
+        try:
+            code = process.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+            raise AssertionError('credentials batch host did not stop') from None
+        reader.join(timeout=5)
+        drain.join(timeout=5)
+        diagnostic(b'', b''.join(stray), code)
+        assert code == 0 and not b''.join(stray), 'credentials batch host failed'
+        process.stdout.close()
+        process.stderr.close()
 
 
 def compile_passwd_shim(directory):

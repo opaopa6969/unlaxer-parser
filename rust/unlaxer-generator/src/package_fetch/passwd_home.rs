@@ -1,4 +1,4 @@
-//! Unix user.home for explicit HTTPS resolution only (JDK 17/21, #958).
+//! Unix user.home for explicit HTTPS resolution only (JDK 21 compatibility, #964).
 use std::ffi::CStr;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
@@ -44,7 +44,7 @@ pub(super) fn get() -> PathBuf {
             }
         }
         // JDK 21 falls back to nonempty HOME, then "?". JDK 17 differs on
-        // missing/short passwd entries; keep that measured limit explicit (#964).
+        // missing/short passwd entries; this is the intentional host contract (#964).
         return std::env::var_os("HOME")
             .filter(|home| !home.is_empty())
             .map_or_else(|| PathBuf::from("?"), PathBuf::from);
