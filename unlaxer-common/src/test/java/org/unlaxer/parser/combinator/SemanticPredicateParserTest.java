@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.function.Predicate;
 import org.junit.Test;
 import org.unlaxer.StringSource;
+import org.unlaxer.Token;
+import org.unlaxer.TokenKind;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.context.ParseOptions;
 import org.unlaxer.context.SemanticPredicateBindings;
@@ -79,5 +81,42 @@ public class SemanticPredicateParserTest {
         }
         for (String invalid : List.of("", "1bad", "a b", "é", "x".repeat(129)))
             assertThrows(IllegalArgumentException.class, () -> SemanticPredicateBindings.requireName(invalid));
+    }
+
+    @Test public void matchOnlyAndVirtualKindsStillExposeTheMatchedText() {
+        for (var kind : TokenKind.values()) for (boolean invert : List.of(false, true)) {
+            String text = invert ? "b" : "a";
+            try (var context = new ParseContext(StringSource.createRootSource(text))) {
+                SemanticPredicateBindings.install(context, Map.of("valid", candidate -> {
+                    assertEquals(new Candidate(text, 0, 1), candidate);
+                    return true;
+                }));
+                assertTrue(kind + "/" + invert, gate(new WordParser("a")).parse(context, kind, invert).isSucceeded());
+            }
+        }
+    }
+
+    @Test public void rejectionRestoresRegisteredChildState() {
+        for (var memo : org.unlaxer.context.Memoization.values()) {
+            try (var context = ParseContext.withOptions(StringSource.createRootSource("x"), ParseOptions.withMemoization(memo))) {
+                int[] state = {0};
+                context.registerTransactionalState(() -> {
+                    int previous = state[0];
+                    return () -> state[0] = previous;
+                });
+                Parser child = new WordParser("x") {
+                    @Override public Token getToken(ParseContext parseContext, TokenKind kind, boolean invert) {
+                        state[0]++;
+                        return super.getToken(parseContext, kind, invert);
+                    }
+                };
+                Parser parser = new SemanticPredicateScope(new Choice(new SemanticPredicateParser(child, "valid"),
+                    new WordParser("x")), List.of("valid"));
+                SemanticPredicateBindings.install(context, Map.of("valid", candidate -> false));
+                assertTrue(parser.parse(context).isSucceeded());
+                assertEquals(0, state[0]);
+                assertEquals(1, context.getConsumedPosition().value());
+            }
+        }
     }
 }

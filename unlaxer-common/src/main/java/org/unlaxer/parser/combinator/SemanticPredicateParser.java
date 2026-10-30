@@ -33,7 +33,7 @@ public class SemanticPredicateParser extends ConstructedAbstractParser implement
             Parsed parsed = getChild().parse(context, kind, invert);
             boolean accepted = parsed.isSucceeded();
             if (accepted) {
-                var source = parsed.getConsumed().source;
+                var source = parsed.getRootToken(false).source;
                 String text = source.sourceAsString();
                 int start = source.offsetFromRoot().value();
                 accepted = SemanticPredicateBindings.test(context, predicate,
