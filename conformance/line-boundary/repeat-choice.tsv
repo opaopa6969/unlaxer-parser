@@ -1,0 +1,3 @@
+# parser	input-hex	javaAccepted	javaConsumed	javaMatched	rustAccepted	rustConsumed	rustMatched
+wild	0a0a78	true	0	1	true	0	3
+empty	0a0a78	true	0	1	false	0	0

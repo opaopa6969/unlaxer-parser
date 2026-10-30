@@ -14,6 +14,98 @@ use unlaxer_ubnf::{ast::TokenKind, parse_with_source};
 
 static NEXT_TEMP: AtomicUsize = AtomicUsize::new(0);
 
+#[test]
+fn shared_diagnostic_oracle_covers_lowering_portability_and_authoring() {
+    use serde_json::{json, Value};
+    let cases: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../spec-corpus/token-adapters/diagnostics.json"
+    ))
+    .unwrap();
+    assert_eq!(46, cases.len());
+    for case in cases {
+        for ending in ["\n", "\r\n"] {
+            let source = case["source"].as_str().unwrap().replace('\n', ending);
+            let snapshot = parse_with_source(&source).unwrap();
+            let grammar = &snapshot.ast().grammars[0];
+            let (_, adapters) = AdapterRegistry::from_grammar(grammar);
+            let contracts = unlaxer_generator::adapters::token_contract_diagnostics(grammar);
+            let mut expected_messages = Vec::new();
+            let mut expected_check = Vec::new();
+            for (kind, actual) in [("adapters", adapters), ("contracts", contracts)] {
+                let expected = case[kind].as_array().unwrap();
+                assert_eq!(expected.len(), actual.len(), "{} {kind}", case["name"]);
+                for (d, a) in expected.iter().zip(actual) {
+                    assert_eq!(d["code"], a.code, "{}", case["name"]);
+                    assert_eq!(d["subject"], a.subject, "{}", case["name"]);
+                    let line = d["line"].as_u64().unwrap() as usize;
+                    let offset: usize = source.split_inclusive('\n').take(line).map(str::len).sum();
+                    let end = offset
+                        + source[offset..]
+                            .split('\n')
+                            .next()
+                            .unwrap()
+                            .trim_end_matches('\r')
+                            .len();
+                    assert_eq!((offset, end), (a.span.byte_start, a.span.byte_end));
+                    expected_messages.push((a.code.to_owned(), a.subject.clone()));
+                    expected_check.push(json!({"code": d["code"], "severity": "error", "subject": d["subject"],
+                        "span": {"start": source[..offset].chars().count(), "end": source[..end].chars().count()}}));
+                }
+            }
+            let authoring: Vec<_> = unlaxer_generator::validation::collect(grammar)
+                .into_iter()
+                .map(|d| (d.code, d.message))
+                .collect();
+            let expected_authoring: Vec<_> = expected_messages
+                .iter()
+                .map(|(code, subject)| (code.clone(), format!("{code}: {subject}")))
+                .collect();
+            assert_eq!(expected_authoring, authoring, "{}", case["name"]);
+            expected_check.sort_by_key(|d| d["span"]["start"].as_u64().unwrap());
+            let expected = json!({"schemaVersion": 1, "target": "rust", "portable": expected_check.is_empty(),
+                "structure": if expected_check.is_empty() { "passed" } else { "blocked" }, "diagnostics": expected_check});
+            assert_eq!(
+                expected,
+                serde_json::from_str::<Value>(&check(&source).to_json()).unwrap(),
+                "{}",
+                case["name"]
+            );
+            if let Some((code, subject)) = expected_messages.first() {
+                assert_eq!(
+                    format!("{code}: {subject}"),
+                    generate(&source).unwrap_err(),
+                    "{}",
+                    case["name"]
+                );
+            } else {
+                assert_eq!(5, generate(&source).unwrap().len(), "{}", case["name"]);
+            }
+        }
+    }
+}
+
+#[test]
+fn adapter_references_precede_later_generator_diagnostics() {
+    // Java-host validateOrThrow reports TokenAdapterRegistry (including references)
+    // before contracts, features, comments, whitespace, mappings and references.
+    let cases: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+        "../../../spec-corpus/token-adapters/generate-order.json"
+    ))
+    .unwrap();
+    assert_eq!(5, cases.len());
+    for case in cases {
+        for ending in ["\n", "\r\n"] {
+            let source = case["source"].as_str().unwrap().replace('\n', ending);
+            assert_eq!(
+                case["first"].as_str().unwrap(),
+                generate(&source).unwrap_err(),
+                "{}",
+                case["name"]
+            );
+        }
+    }
+}
+
 struct Temp(PathBuf);
 
 impl Temp {

@@ -65,12 +65,13 @@ public final class RustGrammarLowering {
         org.unlaxer.dsl.bootstrap.RegexRetirement.requireValid(grammar);
         org.unlaxer.dsl.codegen.NestedCaptures.requireValid(grammar);
         org.unlaxer.dsl.codegen.RaisingOperators.requireValid(grammar);
-        CommonFieldSchema.build(grammar);
+        var commonFields = CommonFieldEmitter.families(grammar);
         EnumSchema.validate(grammar);
         org.unlaxer.dsl.codegen.TypeofConstraints.validate(grammar);
         org.unlaxer.dsl.codegen.EvalSchema.specifications(grammar);
         org.unlaxer.dsl.codegen.EmbeddedGrammarEmitter.declarations(grammar);
         var ir = new RustGrammarLowering(grammar).run();
+        CommonFieldEmitter.validate(commonFields, ir);
         RustEvalEmitter.apply(grammar, ir, "");
         return ir;
     }

@@ -192,8 +192,8 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
                 response.setStackFrames(new StackFrame[0]);
                 return CompletableFuture.completedFuture(response);
             }
-            int charOffset = current.source.offsetFromRoot().value();
-            int endOffset = charOffset + current.source.codePointLength().value();
+            int[] tokenSpan = tokenSourceSpan(current);
+            int charOffset = tokenSpan[0], endOffset = tokenSpan[1];
             if (isAstRuntimeMode()) {
                 int[] span = currentAstSpan();
                 if (span != null) {
@@ -603,8 +603,15 @@ public abstract class SnapshotDebugAdapter implements IDebugProtocolServer {
         return sourceContent.offsetByCodePoints(0, safeCodePointOffset);
     }
 
+    /** Original-source CP range; override with [anchor, anchor] for detached generated tokens.
+     * Token text remains token.source.sourceAsString(); the default preserves legacy source coordinates. */
+    protected int[] tokenSourceSpan(Token token) {
+        int start = token.source.offsetFromRoot().value();
+        return new int[]{start, start + token.source.codePointLength().value()};
+    }
+
     private int getLineForToken(Token t) {
-        return getLineForOffset(t.source.offsetFromRoot().value());
+        return getLineForOffset(tokenSourceSpan(t)[0]);
     }
 
     private int findBreakpointIndex(int fromIndex) {

@@ -21,12 +21,36 @@ env:
   CARGO_INCREMENTAL: '0'
 
 jobs:
+  # Preserve the existing check name, including failures/cancellation in either shard.
   rust:
     name: Rust backend and Java conformance
+    needs: rust-conformance
+    if: always()
+    runs-on: [unlaxer-parser-ci, Linux, X64]
+    timeout-minutes: 5
+    steps:
+    - name: Require both Rust conformance shards
+      env:
+        RESULT: ${{ needs.rust-conformance.result }}
+      run: test "$RESULT" = success
+
+  rust-conformance:
+    name: Rust conformance (${{ matrix.shard }})
     runs-on: [unlaxer-parser-ci, Linux, X64]
     env:
       RUSTUP_TOOLCHAIN: '1.85.0'
-    timeout-minutes: 60
+    # #954: measured class groups, two workers at most on the shared host.
+    # Each shard builds locally; do not cancel its evidence when its peer fails.
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+        - shard: core
+          tests: RustBackendTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,${PORTABILITY_TESTS},MultiGrammarConformanceTest,TokenAdapterConformanceTest,JavaTokenBindingConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,SpecCorpusExecutionConformanceTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,ClassicSemanticTokensConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,GeneratedTokenDapProtocolConformanceTest,ProjectedTokenDapProtocolConformanceTest,TokenTraceConformanceTest,NonOrderedParityTest,NonOrderedStateTest,ClassicLspLifecycleConformanceTest,ClassicLspDiagnosticsConformanceTest,PegLookaheadTest,PegLookaheadStateTest,ClassicLspKeywordConformanceTest,DapLauncherLifecycleConformanceTest,IncrementalCacheConformanceTest,CommonFieldConformanceTest,NumericCaptureConformanceTest,GeneralTokenPropagationTest,GeneralLexicalPropagationTest,GeneralTokenPropagationStateTest,ApiImpactOverloadTest,ObserverFailureTest,ObserverScopeStateTest,PreferredAstConformanceTest,FamilyProjectionConformanceTest,LeftRecursionConformanceTest,OwnedCaptureTest,AssociativeProjectionConformanceTest,AssociativeDelimiterConformanceTest,AssociativeNullableDelimiterConformanceTest,AtomicTriviaConformanceTest,ZeroRepeatBoundaryTest,ZeroRepeatGenerationTest,RegexRetirementConformanceTest,CaptureBoundaryTest,NullableRepeatStateTest,NullableRepeatConformanceTest,NullableSeparationStateTest,NullableSeparationConformanceTest,MemoResetPolicyTest,MemoEvictionTest,MemoResourceDepthTest,TypedNestedSchemaTest,TypedNestedCaptureConformanceTest,PureSuccessRollbackTest,PureSuccessMemoizationConformanceTest,VersionedFailureMemoizationConformanceTest,SafeSuccessMemoizationTest,ResourcePublicationTest,NestedMappedCaptureConformanceTest,ClassicMemoizationConformanceTest,OwnedCaptureConformanceTest,OwnedCaptureSyntaxTest,NestedSharedFieldConformanceTest,MappingGuardTest,PublicMapperCstConformanceTest,OrdinaryParserExceptionTest,OrdinaryExceptionOracleTest,PriorMatchedDiagnosticsTest,OrdinaryParserExceptionConformanceTest,NestedSeparatedBoundaryTest,NestedMixedValueConformanceTest,FailureMemoBudgetTest,FailureMemoBudgetConformanceTest,SuccessMemoBudgetTest,SuccessMemoBudgetConformanceTest,ParserScalingSmokeTest,MemoScalingConformanceTest,OwnedNestedCaptureConformanceTest,NestedTypeofConformanceTest,NestedAliasCaptureConformanceTest,FailureMemoConfigurationTest,ParameterizedRuleConformanceTest,CallByValueConformanceTest,CutLabeledFailureTest,RuleStackTest,RuleStackLspConformanceTest,RaisingOperatorConformanceTest,AutoCommitConformanceTest,AutoCommitWhitespaceFuzzTest,NumberTokenOracleTest,NumberTokenConformanceTest,GenerationWarningsConformanceTest,SimpleAnnotationConformanceTest,CodegenRunnerTest,BoundedOverflowConformanceTest,LookaheadGroupFrameConformanceTest,PrecedenceOverflowConformanceTest,ChainResetAfterFailureConformanceTest,NameScopeTokenModeResetConformanceTest,ValueBoundaryResetConformanceTest,NestedCandidateBoundaryConformanceTest,FrameStartMatchedResetConformanceTest,MidParseDiagnosticsConformanceTest,LineBoundaryConformanceTest
+        - shard: cli
+          tests: RustConformanceTest,DeclarativeTokenConformanceTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,LocalImportReaderTest,PackageDocumentReaderTest,PackageArtifactReaderTest,PackageArtifactUtf8Test,PackageLocalPathConformanceTest,PackageJsonAcceptanceConformanceTest,PackageGrammarBaseConformanceTest,CliInputIoConformanceTest,CliStderrConformanceTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,EnumConformanceTest,MixedEnumConformanceTest,EvaluationConformanceTest,TypeofConformanceTest,RecursiveHelperConformanceTest,NestedSeparatedCaptureConformanceTest,NestedSeparatedMappedCaptureConformanceTest,NestedAutoEvalConformanceTest,PropertyBasedParityTest,EmptyLiteralConformanceTest,GlobalCommentConformanceTest
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
@@ -36,6 +60,7 @@ jobs:
         overwrite-settings: false
     - uses: ./.github/actions/maven-job-repository
     - name: Check public Java parser API inventory (#716)
+      if: matrix.shard == 'core'
       run: |
         python3 scripts/check-java-api-parity.py
         python3 scripts/run-required-unittests.py scripts.tests.test_java_api_parity
@@ -46,6 +71,7 @@ jobs:
         bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update --component rustfmt --component clippy
         bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup target add --toolchain "$RUSTUP_TOOLCHAIN" wasm32-unknown-unknown
     - name: Rust standalone checks
+      if: matrix.shard == 'core'
       run: |
         cargo fmt --all --manifest-path rust/Cargo.toml --check
         cargo test --locked --manifest-path rust/Cargo.toml
@@ -57,13 +83,16 @@ jobs:
       with:
         node-version: '20'
     - name: Check pinned Unicode XID, grapheme, and case tables
+      if: matrix.shard == 'core'
       run: |
         python3 scripts/generate-xid-tables.py --check
         python3 scripts/generate-grapheme-tables.py --check
         python3 scripts/generate-case-tables.py --check
+        python3 scripts/generate-package-nfc.py --java-home "$JAVA_HOME" --check
         (cd spec-corpus/case-insensitive/unicode-17.0.0 && sha256sum --check SHA256SUMS)
         (cd spec-corpus/grapheme/unicode-17.0.0 && sha256sum --check SHA256SUMS)
     - name: Check memo budget evidence gate (#789)
+      if: matrix.shard == 'core'
       run: python3 scripts/run-required-unittests.py scripts.tests.test_memo_budget_evidence
     # Same fixed grammar as downstream; both real Tiny opt-ins must execute here.
     - name: Checkout the pinned Tiny Catalog grammar
@@ -76,30 +105,39 @@ jobs:
       run: |
         mkdir -p unlaxer-dsl/target
         git -C tiny-catalog rev-parse HEAD > unlaxer-dsl/target/rust-catalog-tiny-revision.txt
-    - name: Prepare required tests (cross-language)
+    - name: Build the CLI shard's native generator
+      if: matrix.shard == 'cli'
+      run: cargo build --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
+    - name: Compile Java sources and tests for this shard
+      run: mvn -B -pl unlaxer-common,unlaxer-dsl -am test-compile
+    - name: Prepare required tests (cross-language-${{ matrix.shard }})
       run: |
-        python3 scripts/verify-optin-tests.py cross-language --prepare
-        rm -f unlaxer-dsl/target/spec-corpus-validate.json unlaxer-dsl/target/spec-corpus-runtime.json
-        python3 scripts/check-spec-corpus-execution.py
-        python3 scripts/run-required-unittests.py scripts.tests.test_spec_corpus_execution
+        python3 scripts/verify-optin-tests.py cross-language-${{ matrix.shard }} --prepare
+        if [ '${{ matrix.shard }}' = core ]; then
+          rm -f unlaxer-dsl/target/spec-corpus-validate.json unlaxer-dsl/target/spec-corpus-runtime.json
+          python3 scripts/check-spec-corpus-execution.py
+          python3 scripts/run-required-unittests.py scripts.tests.test_spec_corpus_execution
+        fi
     - name: Cross-language fixtures, compile failures, and generated-file drift
       env:
         # 実 Tiny grammar の Portability は downstream だけで実行する。
-        PORTABILITY_TESTS: RustPortabilityConformanceTest#inventoriesAndCliExitCodesAgreeWithoutWritingGeneratedFiles+tokenAdapterRegistryDiagnosticsAgreeWithSourcePositions+importedDiagnosticsRetainOnlyRootPositionsAndDistinctOccurrences+structuralDiagnosticPriorityMatchesJavaForEveryLineEnding
+        PORTABILITY_TESTS: RustPortabilityConformanceTest#featureAndLexicalDiagnosticsMatchIndependentOracleAcrossConsumers+adapterAndContractDiagnosticsMatchIndependentOracleAcrossConsumers+inventoriesAndCliExitCodesAgreeWithoutWritingGeneratedFiles+tokenAdapterRegistryDiagnosticsAgreeWithSourcePositions+importedDiagnosticsRetainOnlyRootPositionsAndDistinctOccurrences+structuralDiagnosticPriorityMatchesJavaForEveryLineEnding
       run: >
         mvn -B -pl unlaxer-common,unlaxer-dsl -am test
-        -Dtest=RustBackendTest,RustConformanceTest,RustUbnfFrontendConformanceTest,RustUbnfSourceConformanceTest,${PORTABILITY_TESTS},MultiGrammarConformanceTest,TokenAdapterConformanceTest,JavaTokenBindingConformanceTest,UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,GraphemeTest,GraphemeConformanceTest,ParseBindingsConformanceTest,DeclarativeTokenConformanceTest,ApiImpactConformanceTest,UbnfSpecCorpusTest,SpecCorpusExecutionConformanceTest,NumericCaptureRuntimeTest,RustNativeEmitterTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,ScopeStoreConformanceTest,ScopeAnnotationConformanceTest,NestedCaptureConformanceTest,RustCatalogConformanceTest,SkipMappingConformanceTest,CaptureEqualityConformanceTest,ErrorElementConformanceTest,RecoveryConformanceTest,SemanticModelConformanceTest,ProjectSymbolIndexConformanceTest,EditorParseResultConformanceTest,EditorPipelineConformanceTest,EditorCstTest,SemanticModelUbnfTest,TokenStreamConformanceTest,TypeSystemConformanceTest,CallInferenceConformanceTest,SemanticQueriesConformanceTest,SemanticQueryEditsTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,SemanticRulesConformanceTest,SemanticDiagnosticConformanceTest,ClassicLspProtocolConformanceTest,ClassicSemanticTokensConformanceTest,LSPQueryConsumerTest,LSPNonBmpOffsetTest,LSPProfileInitializationTest,PreprocessingConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,ContextualLexingConformanceTest,CodePointEscapeConformanceTest,ClassicDapProtocolConformanceTest,ClassicTokenDapProtocolConformanceTest,TokenTraceConformanceTest,NonOrderedParityTest,NonOrderedStateTest,ClassicLspLifecycleConformanceTest,ClassicLspDiagnosticsConformanceTest,EnumConformanceTest,PegLookaheadTest,PegLookaheadStateTest,ClassicLspKeywordConformanceTest,DapLauncherLifecycleConformanceTest,MixedEnumConformanceTest,IncrementalCacheConformanceTest,CommonFieldConformanceTest,NumericCaptureConformanceTest,GeneralTokenPropagationTest,GeneralLexicalPropagationTest,GeneralTokenPropagationStateTest,EvaluationConformanceTest,ApiImpactOverloadTest,TypeofConformanceTest,ObserverFailureTest,ObserverScopeStateTest,RecursiveHelperConformanceTest,PreferredAstConformanceTest,FamilyProjectionConformanceTest,LeftRecursionConformanceTest,OwnedCaptureTest,AssociativeProjectionConformanceTest,AssociativeDelimiterConformanceTest,AssociativeNullableDelimiterConformanceTest,AtomicTriviaConformanceTest,ZeroRepeatBoundaryTest,ZeroRepeatGenerationTest,RegexRetirementConformanceTest,CaptureBoundaryTest,NullableRepeatStateTest,NullableRepeatConformanceTest,NullableSeparationStateTest,NullableSeparationConformanceTest,MemoResetPolicyTest,MemoEvictionTest,MemoResourceDepthTest,TypedNestedSchemaTest,TypedNestedCaptureConformanceTest,PureSuccessRollbackTest,PureSuccessMemoizationConformanceTest,VersionedFailureMemoizationConformanceTest,SafeSuccessMemoizationTest,ResourcePublicationTest,NestedMappedCaptureConformanceTest,ClassicMemoizationConformanceTest,OwnedCaptureConformanceTest,OwnedCaptureSyntaxTest,NestedSharedFieldConformanceTest,MappingGuardTest,PublicMapperCstConformanceTest,OrdinaryParserExceptionTest,OrdinaryExceptionOracleTest,PriorMatchedDiagnosticsTest,OrdinaryParserExceptionConformanceTest,NestedSeparatedBoundaryTest,NestedSeparatedCaptureConformanceTest,NestedMixedValueConformanceTest,NestedSeparatedMappedCaptureConformanceTest,FailureMemoBudgetTest,FailureMemoBudgetConformanceTest,SuccessMemoBudgetTest,SuccessMemoBudgetConformanceTest,ParserScalingSmokeTest,MemoScalingConformanceTest,OwnedNestedCaptureConformanceTest,NestedTypeofConformanceTest,NestedAutoEvalConformanceTest,NestedAliasCaptureConformanceTest,FailureMemoConfigurationTest,ParameterizedRuleConformanceTest,CallByValueConformanceTest,PropertyBasedParityTest,CutLabeledFailureTest,RuleStackTest,RuleStackLspConformanceTest,RaisingOperatorConformanceTest,AutoCommitConformanceTest,AutoCommitWhitespaceFuzzTest,EmptyLiteralConformanceTest,GlobalCommentConformanceTest,NumberTokenOracleTest,NumberTokenConformanceTest,GenerationWarningsConformanceTest,SimpleAnnotationConformanceTest,CodegenRunnerTest,BoundedOverflowConformanceTest,LookaheadGroupFrameConformanceTest,PrecedenceOverflowConformanceTest,ChainResetAfterFailureConformanceTest,NameScopeTokenModeResetConformanceTest,ValueBoundaryResetConformanceTest,NestedCandidateBoundaryConformanceTest,FrameStartMatchedResetConformanceTest -DrustConformance=true -DtokenStreamBench=true
+        -Dtest=${{ matrix.tests }} -DrustConformance=true -DtokenStreamBench=true
         -Dsurefire.failIfNoSpecifiedTests=false
         -Dtinyexpression.grammar=${{ github.workspace }}/tiny-catalog/tools/tinyexpression-p4-lsp-vscode/grammar/tinyexpression-p4.ubnf
-    - name: Verify required tests (cross-language)
+    - name: Verify required tests (cross-language-${{ matrix.shard }})
       id: verify-cross-language
       if: success()
       run: |
-        python3 scripts/verify-optin-tests.py cross-language
-        python3 scripts/check-spec-corpus-execution.py --receipts unlaxer-dsl/target/spec-corpus-validate.json unlaxer-dsl/target/spec-corpus-runtime.json
+        python3 scripts/verify-optin-tests.py cross-language-${{ matrix.shard }}
+        if [ '${{ matrix.shard }}' = core ]; then
+          python3 scripts/check-spec-corpus-execution.py --receipts unlaxer-dsl/target/spec-corpus-validate.json unlaxer-dsl/target/spec-corpus-runtime.json
+        fi
     - name: Verify required tests (tiny-catalog)
       id: verify-tiny-catalog
-      if: success()
+      if: success() && matrix.shard == 'core'
       run: |
         python3 scripts/verify-optin-tests.py tiny-catalog
         test -s unlaxer-dsl/target/rust-catalog-tiny-frontier.txt
@@ -107,14 +145,14 @@ jobs:
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() && steps.verify-cross-language.outcome != 'skipped' }}
       with:
-        name: optin-cross-language
+        name: optin-cross-language-${{ matrix.shard }}
         path: |
-          target/optin-evidence/cross-language/
+          target/optin-evidence/cross-language-${{ matrix.shard }}/
           unlaxer-dsl/target/spec-corpus-validate.json
           unlaxer-dsl/target/spec-corpus-runtime.json
         if-no-files-found: error
     - uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() && steps.verify-tiny-catalog.outcome != 'skipped' }}
+      if: ${{ matrix.shard == 'core' && !cancelled() && steps.verify-tiny-catalog.outcome != 'skipped' }}
       with:
         name: tiny-catalog-conformance
         path: |
@@ -125,7 +163,7 @@ jobs:
     # PropertyBasedParityTest (#705): fixed seeds 1..24 plus spec-corpus/property-based/regressions.json.
     # Uploaded even when the test fails: -raw.json holds findings before shrinking.
     - name: Upload property-based parity results
-      if: always()
+      if: always() && matrix.shard == 'cli'
       uses: actions/upload-artifact@v4
       with:
         name: property-based-parity
@@ -136,23 +174,27 @@ jobs:
           unlaxer-dsl/target/property-based-parity-observations.jsonl
         if-no-files-found: ignore
     - name: Require property-based parity evidence
+      if: matrix.shard == 'cli'
       run: |
         test -s unlaxer-dsl/target/property-based-parity-stats.txt
         test -s unlaxer-dsl/target/property-based-parity-observations.jsonl
         grep -qx '\[\]' unlaxer-dsl/target/property-based-parity.json
     - name: Require nested typeof conformance evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/nested-typeof-java.tsv
         test -s unlaxer-dsl/target/nested-typeof-conformance.tsv
         awk 'END {exit NR != 307}' unlaxer-dsl/target/nested-typeof-java.tsv
         awk 'END {exit NR != 613}' unlaxer-dsl/target/nested-typeof-conformance.tsv
     - name: Require bounded failure memo conformance evidence
+      if: matrix.shard == 'core'
       run: |
         python3 scripts/check-memo-budget-evidence.py \
           --cases conformance/failure-memo-budget/cases.tsv --rows 600 \
           unlaxer-dsl/target/failure-memo-budget-java.tsv \
           unlaxer-dsl/target/failure-memo-budget-rust.tsv
     - name: Require bounded success memo conformance evidence
+      if: matrix.shard == 'core'
       run: |
         python3 scripts/check-memo-budget-evidence.py \
           --cases conformance/success-memo-budget/cases.tsv --rows 600 \
@@ -162,7 +204,7 @@ jobs:
     # stdout, kept only for diagnosis (progress lines interleave with test output there).
     # Uploaded even when a test or a gate fails.
     - name: Upload memo budget evidence
-      if: always()
+      if: always() && matrix.shard == 'core'
       uses: actions/upload-artifact@v4
       with:
         name: memo-budget-evidence
@@ -175,86 +217,126 @@ jobs:
           unlaxer-dsl/target/success-memo-budget-rust.log
         if-no-files-found: ignore
     - name: Require nested leaf evaluator evidence
+      if: matrix.shard == 'cli'
       run: |
         test -s unlaxer-dsl/target/nested-auto-eval-java.tsv
         test -s unlaxer-dsl/target/nested-auto-eval-rust.tsv
         awk 'END {exit NR != 265}' unlaxer-dsl/target/nested-auto-eval-java.tsv
         awk 'END {exit NR != 529}' unlaxer-dsl/target/nested-auto-eval-rust.tsv
     - name: Require finite memo scaling evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/memo-scaling-java.tsv
         test -s unlaxer-dsl/target/memo-scaling-rust.tsv
         awk 'END {exit NR != 9}' unlaxer-dsl/target/memo-scaling-java.tsv
         awk 'END {exit NR != 65}' unlaxer-dsl/target/memo-scaling-rust.tsv
     - name: Require pure success memo conformance evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/pure-success-memo-java.tsv
         test -s unlaxer-dsl/target/pure-success-memo-conformance.tsv
     - name: Require generated case-insensitive token conformance evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
         test -s unlaxer-dsl/target/case-insensitive-java.tsv
     - name: Require snapshot cache conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/incremental-cache.tsv
     - name: Require real Java and Rust lifecycle evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/classic-lsp-lifecycle.tsv
     - name: Require real Java and Rust semantic-token protocol evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/classic-semantic-tokens.tsv
     - name: Require real Java and Rust syntax diagnostic evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/classic-lsp-diagnostics.tsv
     - name: Require Java and both Rust hosts empty-literal evidence
+      if: matrix.shard == 'cli'
       run: |
         rows=$(python3 -c "import json; print(1 + sum(len(g['cases']) for p in ('spec-corpus/empty-literal/corpus.json', 'spec-corpus/root-choice-cst/corpus.json') for g in json.load(open(p, encoding='utf-8'))))")
         test "$rows" -gt 1
         awk -v rows="$rows" 'END {exit NR != rows}' unlaxer-dsl/target/empty-literal-java.tsv
         awk -v rows="$rows" 'END {exit NR != rows}' unlaxer-dsl/target/rust-empty-literal.tsv
     - name: Require real Java and Rust rule-stack diagnostic evidence
+      if: matrix.shard == 'core'
       run: grep -qxP 'Rust\t14\tPASS' unlaxer-dsl/target/rule-stack-lsp.tsv
     - name: Require Java and native Rust literal enum evidence
+      if: matrix.shard == 'cli'
       run: |
         test -s unlaxer-dsl/target/enum-java.tsv
         test -s unlaxer-dsl/target/enum-conformance.tsv
         test -s unlaxer-dsl/target/mixed-enum-java.tsv
         test -s unlaxer-dsl/target/mixed-enum-rust.tsv
     - name: Require recursive helper oracle evidence
+      if: matrix.shard == 'cli'
       run: |
         test -s unlaxer-dsl/target/recursive-helpers-java.tsv
         test -s unlaxer-dsl/target/recursive-helpers-conformance.tsv
     - name: Require mapping-time typeof oracle evidence
+      if: matrix.shard == 'cli'
       run: |
         test -s unlaxer-dsl/target/typeof-java.tsv
         test -s unlaxer-dsl/target/typeof-conformance.tsv
     - name: Require automatic evaluator oracle evidence
+      if: matrix.shard == 'cli'
       run: |
         test -s unlaxer-dsl/target/evaluation-AutoEval-java.tsv
         test -s unlaxer-dsl/target/evaluation-AutoEval-rust.tsv
         test -s unlaxer-dsl/target/evaluation-ValueEval-java.tsv
         test -s unlaxer-dsl/target/evaluation-ValueEval-rust.tsv
     - name: Require real Java and Rust semantic-token protocol evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/classic-semantic-tokens.tsv
     - name: Require real Java and Rust syntax diagnostic evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/classic-lsp-diagnostics.tsv
     - name: Require REGEX retirement and lexical migration evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/regex-retirement-runtime.tsv
         test -s unlaxer-dsl/target/regex-retirement-rejections.tsv
     - name: Require real Java and Rust DAP protocol evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/classic-dap-protocol.tsv
         test -s unlaxer-dsl/target/classic-token-dap-protocol.tsv
+        test -s unlaxer-dsl/target/generated-token-dap-protocol.tsv
+        test -s unlaxer-dsl/target/projected-token-dap-protocol.tsv
+        test -s unlaxer-dsl/target/projected-token-dap-overflow.tsv
+        test -s unlaxer-dsl/target/token-dap-crlf.tsv
+        for route in classic-ast classic-token generated projected; do
+          for backend in java rust; do
+            test -s "unlaxer-dsl/target/dap-failures-${route}-${backend}.tsv"
+            test -s "unlaxer-dsl/target/dap-arguments-${route}-${backend}.tsv"
+            test -s "unlaxer-dsl/target/dap-launch-state-${route}-${backend}.tsv"
+            test -s "unlaxer-dsl/target/dap-wire-${route}-${backend}.tsv"
+          done
+        done
+        test -s unlaxer-dsl/target/dap-failures-classic-token-rust-native.tsv
+        test -s unlaxer-dsl/target/dap-arguments-classic-token-rust-native.tsv
+        test -s unlaxer-dsl/target/dap-launch-state-classic-token-rust-native.tsv
+        test -s unlaxer-dsl/target/dap-wire-classic-token-rust-native.tsv
         test -s unlaxer-dsl/target/token-trace.tsv
         # #866: every budget.tsv row ran on Java and was matched by Rust's trace.
         rows=$(grep -vc '^#' conformance/token-trace/budget.tsv)
         test "$(grep -c '^java-budget' unlaxer-dsl/target/token-trace.tsv)" -eq "$rows"
         test "$(grep -c '^rust-budget' unlaxer-dsl/target/token-trace.tsv)" -eq "$rows"
     - name: Resolver tutorial (Java and Rust)
+      if: matrix.shard == 'core'
       run: |
         python3 examples/resolver-tutorial/run.py build
         python3 examples/resolver-tutorial/run.py check
         cargo clippy --locked --manifest-path examples/resolver-tutorial/rust/Cargo.toml --all-targets -- -D warnings
         rustfmt --edition 2021 --config skip_children=true --check examples/resolver-tutorial/rust/src/main.rs examples/resolver-tutorial/rust/src/resolvers.rs
         test -s examples/resolver-tutorial/target/conformance.tsv
+    # DeclarativeTokenConformanceTest builds this too, but it now runs in the CLI shard.
+    - name: Build the learning site for core browser checks
+      if: matrix.shard == 'core'
+      run: node scripts/build-learning.mjs
     - name: Generated WASM playground in Chromium
+      if: matrix.shard == 'core'
       working-directory: unlaxer-dsl/ubnf-vscode
       run: |
         bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" npm ci
@@ -266,6 +348,7 @@ jobs:
         node --test scripts/completion.test.mjs
         node scripts/learning-browser.mjs
     - name: Require selectable lexing conformance and measurement evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/rust-token-stream.tsv
         awk -F '\t' 'NR > 1 {n[$5]++} END {exit NR != 1105 || n["generated"] != 552 || n["java-generated"] != 552}' unlaxer-dsl/target/rust-token-stream.tsv
@@ -276,11 +359,13 @@ jobs:
         test -s unlaxer-dsl/ubnf-vscode/target/contextual-lexing-reference.tsv
         test -s unlaxer-dsl/ubnf-vscode/target/contextual-lexing-wasm.tsv
     - name: Require memo reset policy conformance evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-common/target/memo-reset-policy-java-failure.tsv
         test -s unlaxer-common/target/memo-reset-policy-java-success.tsv
         test -s unlaxer-common/target/memo-reset-policy-rust.log
     - name: Require semantic model and generated UBNF evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/rust-semantic-model.tsv
         test -s unlaxer-dsl/target/rust-semantic-rules.tsv
@@ -297,8 +382,10 @@ jobs:
         test -s unlaxer-dsl/target/rust-editor-pipeline.tsv
         test -s unlaxer-dsl/ubnf-vscode/target/editor-playground.tsv
     - name: Require UBNF source position conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/rust-ubnf-source.tsv
     - name: Require portability check conformance evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/rust-portability.tsv
         cases=$(python3 -c "import json; print(len(json.load(open('rust/unlaxer-generator/tests/fixtures/portability/imports.json'))))")
@@ -308,6 +395,7 @@ jobs:
         test "$cases" -gt 0
         awk -v rows="$((1 + 2 * cases))" 'END {exit NR != rows}' unlaxer-dsl/target/rust-portability-structure-priority.tsv
     - name: Require multiple grammar consumers and rejection evidence
+      if: matrix.shard == 'core'
       run: |
         cases=$(python3 -c "import json; c=json.load(open('spec-corpus/multiple-grammars/corpus.json')); print(sum(len(f['cases']) for f in c['valid']))")
         rejected=$(python3 -c "import json; print(len(json.load(open('spec-corpus/multiple-grammars/corpus.json'))['invalid']))")
@@ -317,17 +405,26 @@ jobs:
         awk -v rows="$((1 + 8 * cases))" 'END {exit NR != rows}' unlaxer-dsl/target/multiple-grammars-rust.tsv
         awk -v rows="$((1 + 2 * rejected))" 'END {exit NR != rows}' unlaxer-dsl/target/multiple-grammars-rejections.tsv
     - name: Require token adapter diagnostics and runtime evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/rust-token-adapter-diagnostics.tsv
+        cases=$(python3 -c "import json; print(len(json.load(open('spec-corpus/token-adapters/diagnostics.json'))))")
+        test "$cases" -gt 0
+        awk -v rows="$((1 + 2 * cases))" 'END {exit NR != rows}' unlaxer-dsl/target/rust-adapter-contract-diagnostics.tsv
+        test -s unlaxer-dsl/target/rust-feature-lexical-diagnostics.tsv
+        awk 'END {exit NR != 653}' unlaxer-dsl/target/rust-feature-lexical-diagnostics.tsv
         test -s unlaxer-dsl/target/rust-token-adapter-runtime.tsv
         test -s unlaxer-dsl/target/rust-parse-bindings.tsv
     - name: Require declarative token codegen and runtime evidence
+      if: matrix.shard == 'cli'
       run: test -s unlaxer-dsl/target/rust-declarative-token-runtime.tsv
     - name: Require API evolution reports and real compiler evidence
+      if: matrix.shard == 'core'
       run: |
         test -s unlaxer-dsl/target/api-impact-conformance.tsv
         test -s unlaxer-dsl/target/api-impact-compile.tsv
     - name: Require rule trivia conformance evidence
+      if: matrix.shard == 'cli'
       run: |
         test -s unlaxer-dsl/target/rust-rule-trivia.tsv
         test -s unlaxer-dsl/target/rust-global-comment.tsv
@@ -336,43 +433,58 @@ jobs:
         test -s unlaxer-dsl/target/rust-name-snapshots.tsv
         test -s unlaxer-dsl/target/rust-name-predicate.tsv
     - name: Require pinned package conformance evidence
+      if: matrix.shard == 'cli'
       run: |
         test -s unlaxer-dsl/target/rust-packages.tsv
         test -s unlaxer-dsl/target/rust-package-https.tsv
+        test -s unlaxer-dsl/target/rust-package-credentials.json
+        test -s unlaxer-dsl/target/rust-package-transport.json
         test -s unlaxer-dsl/target/rust-vocabulary-origins.tsv
     - name: Require transactional scope conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/rust-scope-store.tsv
     - name: Require generated scope annotation conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/rust-scope-annotations.tsv
     - name: Require typed nested capture conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/typed-nested-captures.tsv
     - name: Require nested separated capture conformance evidence
+      if: matrix.shard == 'cli'
       run: |
         test -s unlaxer-dsl/target/nested-separated-captures.tsv
         test -s unlaxer-dsl/target/nested-separated-mapped.tsv
     - name: Require nested capture conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/rust-nested-captures.tsv
     - name: Require catalog metadata conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/rust-catalog-metadata.tsv
     - name: Require skip projection conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/rust-skip-mapping.tsv
     - name: Require capture equality conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/rust-capture-equality.tsv
     - name: Require ERROR element conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/rust-error-elements.tsv
     - name: Require recovery conformance evidence
+      if: matrix.shard == 'core'
       run: test -s unlaxer-dsl/target/rust-recovery.tsv
     - name: Require parameterized rule conformance evidence
+      if: matrix.shard == 'core'
       run: |
         awk 'END {exit NR != 157}' unlaxer-dsl/target/parameterized-rules-java.tsv
         awk 'END {exit NR != 46}' unlaxer-dsl/target/parameterized-rules-rust.tsv
     - name: Require call-by-value conformance evidence
+      if: matrix.shard == 'core'
       run: |
         awk 'END {exit NR != 433}' unlaxer-dsl/target/call-by-value-java.tsv
         awk 'END {exit NR != 50}' unlaxer-dsl/target/call-by-value-rust.tsv
     - uses: actions/upload-artifact@v4
       with:
-        name: rust-conformance
+        name: rust-conformance-${{ matrix.shard }}
         path: |
           unlaxer-dsl/target/parameterized-rules-java.tsv
           unlaxer-dsl/target/parameterized-rules-rust.tsv
@@ -392,6 +504,14 @@ jobs:
           unlaxer-dsl/target/incremental-cache.tsv
           unlaxer-dsl/target/classic-semantic-tokens.tsv
           unlaxer-dsl/target/classic-lsp-diagnostics.tsv
+          unlaxer-dsl/target/generated-token-dap-protocol.tsv
+          unlaxer-dsl/target/projected-token-dap-protocol.tsv
+          unlaxer-dsl/target/projected-token-dap-overflow.tsv
+          unlaxer-dsl/target/token-dap-crlf.tsv
+          unlaxer-dsl/target/dap-failures-*.tsv
+          unlaxer-dsl/target/dap-arguments-*.tsv
+          unlaxer-dsl/target/dap-launch-state-*.tsv
+          unlaxer-dsl/target/dap-wire-*.tsv
           unlaxer-dsl/target/rule-stack-lsp.tsv
           unlaxer-dsl/target/case-insensitive-conformance.tsv
           unlaxer-dsl/target/case-insensitive-java.tsv
@@ -443,6 +563,8 @@ jobs:
           unlaxer-dsl/target/multiple-grammars-rust.tsv
           unlaxer-dsl/target/multiple-grammars-rejections.tsv
           unlaxer-dsl/target/rust-token-adapter-diagnostics.tsv
+          unlaxer-dsl/target/rust-adapter-contract-diagnostics.tsv
+          unlaxer-dsl/target/rust-feature-lexical-diagnostics.tsv
           unlaxer-dsl/target/rust-token-adapter-runtime.tsv
           unlaxer-dsl/target/rust-parse-bindings.tsv
           examples/resolver-tutorial/target/conformance.tsv
@@ -468,6 +590,8 @@ jobs:
           unlaxer-dsl/target/rust-name-predicate.tsv
           unlaxer-dsl/target/rust-packages.tsv
           unlaxer-dsl/target/rust-package-https.tsv
+          unlaxer-dsl/target/rust-package-credentials.json
+          unlaxer-dsl/target/rust-package-transport.json
           unlaxer-dsl/target/rust-vocabulary-origins.tsv
           unlaxer-dsl/target/rust-scope-store.tsv
           unlaxer-dsl/target/rust-scope-annotations.tsv
@@ -483,12 +607,14 @@ jobs:
           unlaxer-dsl/target/rust-recovery.tsv
         if-no-files-found: error
     - name: Build and smoke-test the native subset example
+      if: matrix.shard == 'core'
       run: |
         cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-evolution-example
         printf '%s\n' 'if(0,neg(2*3),4+5)' | rust/target/release/unlaxer-evolution-example | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["ok"] and r["value"] == 9'
         cp spec-corpus/xid-identifier/UNICODE-LICENSE.txt rust/target/release/UNICODE-LICENSE.txt
         tar -czf rust/target/unlaxer-evolution-linux-x86_64.tar.gz -C rust/target/release unlaxer-evolution-example UNICODE-LICENSE.txt
     - name: Build and smoke-test the JVM-free generator
+      if: matrix.shard == 'core'
       run: |
         cargo build --release --locked --manifest-path rust/Cargo.toml -p unlaxer-generator
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer generate --grammar unlaxer-dsl/src/test/resources/evolution/3/Evolution.ubnf --output rust/examples/evolution/src/generated --check
@@ -504,11 +630,13 @@ jobs:
         PATH='' JAVA_HOME=/nonexistent-java rust/target/release/unlaxer impact --target rust --before spec-corpus/api-impact/node-add/before.ubnf --after spec-corpus/api-impact/node-add/after.ubnf | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["ok"] and [(c["kind"], c["subject"]) for c in r["changes"]] == [("METHOD_ADDED", "eval_extra"), ("NODE_ADDED", "Extra")]'
         tar -czf rust/target/unlaxer-generator-linux-x86_64.tar.gz -C rust/target/release unlaxer UNICODE-LICENSE.txt
     - uses: actions/upload-artifact@v4
+      if: matrix.shard == 'core'
       with:
         name: unlaxer-generator-linux-x86_64
         path: rust/target/unlaxer-generator-linux-x86_64.tar.gz
         if-no-files-found: error
     - uses: actions/upload-artifact@v4
+      if: matrix.shard == 'core'
       with:
         name: unlaxer-evolution-linux-x86_64
         path: rust/target/unlaxer-evolution-linux-x86_64.tar.gz
@@ -618,10 +746,10 @@ jobs:
 
     - name: Prepare required tests (jdk17-parity)
       run: python3 scripts/verify-optin-tests.py jdk17-parity --prepare
-    - name: Require Unicode-pinned CI parity on the Java 17 JVM
+    - name: Require Unicode-pinned, credentials, and HTTPS transport CI parity on the Java 17 JVM
       run: |
         mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am test \
-          -Dtest=UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,RustUbnfFrontendConformanceTest \
+          -Dtest=UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,RustUbnfFrontendConformanceTest,CliStderrConformanceTest,HttpsPackageConformanceTest#credentialsLocationsMatchJavaHomeAndPaths+credentialsJsonMatchesAcrossClis+transportDiagnosticsMatchJavaAcrossClis \
           -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
         test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
         test -s unlaxer-dsl/target/case-insensitive-java.tsv
@@ -643,6 +771,7 @@ jobs:
           unlaxer-dsl/target/classic-lsp-lifecycle.tsv
           unlaxer-dsl/target/classic-semantic-tokens.tsv
           unlaxer-dsl/target/classic-lsp-diagnostics.tsv
+          unlaxer-dsl/target/generated-token-dap-protocol.tsv
           unlaxer-dsl/target/case-insensitive-conformance.tsv
           unlaxer-dsl/target/case-insensitive-java.tsv
           unlaxer-dsl/target/enum-java.tsv
@@ -682,6 +811,27 @@ jobs:
     - name: Install unlaxer to local repo
       run: mvn -B -pl .,unlaxer-common,unlaxer-dsl install -DskipTests -Dgpg.skip=true
 
+    - name: Set up Rust for UBNF authoring
+      run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
+
+    - name: Test authoring transport failure diagnostics (#995)
+      run: python3 scripts/run-required-unittests.py scripts.tests.test_ubnf_authoring_lsp
+
+    - name: Prepare required tests (ubnf-authoring)
+      run: python3 scripts/verify-optin-tests.py ubnf-authoring --prepare
+
+    - name: Verify native and Java UBNF authoring servers
+      run: |
+        export PATH="$HOME/.cargo/bin:$PATH"
+        mvn -B -pl unlaxer-dsl/ubnf-vscode test -Dtest=UbnfAuthoringProtocolConformanceTest -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
+
+    - name: Verify required tests (ubnf-authoring)
+      id: verify-ubnf-authoring
+      if: success()
+      run: python3 scripts/verify-optin-tests.py ubnf-authoring
+
     - name: Build ubnf-vscode VSIX
       run: mvn -B -pl unlaxer-dsl/ubnf-vscode verify -Dgpg.skip=true
 
@@ -697,6 +847,23 @@ jobs:
         export PATH="$HOME/.cargo/bin:$PATH"
         bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update --target wasm32-unknown-unknown
         xvfb-run -a npm run test:vsix
+
+    - name: Activate the packaged VSIX with the native UBNF server
+      working-directory: unlaxer-dsl/ubnf-vscode
+      env:
+        UBNF_TEST_BACKEND: rust
+        UBNF_TEST_RUST_PATH: ${{ github.workspace }}/rust/target/debug/ubnf-language-server
+      run: xvfb-run -a npm run test:vsix
+
+    - name: Upload UBNF authoring protocol evidence
+      if: ${{ !cancelled() && steps.verify-ubnf-authoring.outcome != 'skipped' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ubnf-authoring-protocol
+        path: |
+          target/optin-evidence/ubnf-authoring/
+          unlaxer-dsl/ubnf-vscode/target/ubnf-authoring-*-protocol.json
+          unlaxer-dsl/ubnf-vscode/target/ubnf-authoring-*-wire.log
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4

@@ -75,7 +75,7 @@ Rust transportのparse中interruptは未実装。rename/format/code-action trans
 | Rust Classic LSP（`unlaxer-lsp`、`--lsp`） | `positionEncoding=utf-16`、`textDocumentSync=1`（Full）、`completionProvider`、`hoverProvider`。`definitionProvider` は provider を登録した場合だけ。experimental は Java と同じ | RL:178-218、`rust/unlaxer-lsp/tests/protocol.rs`、`ClassicLspProtocolConformanceTest#generatedServersShareIndependentPositionsAndVersionTransactions` |
 | UBNF 言語サーバ（ubnf-vscode） | 上の Java 生成分に加えて、completion の trigger 文字、definition、references、rename、documentSymbol、codeAction、foldingRange、linkedEditingRange、signatureHelp、semanticTokens（10 種類）。独自 request `ubnf/packageSource` | UBX:298-328、`UBNFLanguageServerExtTest#initializeAdvertisesRichCapabilities` |
 | Java 生成 DAP（`DAPGenerator`） | `supportsConfigurationDoneRequest` だけ。request は launch / configurationDone / setBreakpoints / next / continue / threads / stackTrace / scopes / variables / disconnect | DPE:47-56、DAPGenerator.java:62-90、`DAPGeneratorTest`、`ClassicDapProtocolConformanceTest#generatedJavaAndRustShareStrictTypedAstInspection` |
-| Rust Classic DAP（`unlaxer-dap`、`--dap`） | `supportsConfigurationDoneRequest` だけ。request は Java と同じ集合。それ以外は `unsupported command` | RD:177、RD:183-351、`rust/unlaxer-dap/tests/protocol.rs`、`ClassicTokenDapProtocolConformanceTest#generatedTokenDapUsesRealBoundedTerminalTrace` |
+| Rust Classic DAP（`unlaxer-dap`、`--dap`） | `supportsConfigurationDoneRequest` だけ。request は Java と同じ集合。`IDebugProtocolServer` の既定31 request は Java と同じ `Internal error.` / `java.lang.UnsupportedOperationException`、未知 command は `Unsupported request method: <command>`（#900） | RD:177、RD:183-351、`rust/unlaxer-dap/tests/protocol.rs`、`ClassicTokenDapProtocolConformanceTest#generatedTokenDapUsesRealBoundedTerminalTrace` |
 
 注意点:
 
@@ -165,7 +165,7 @@ Rust transportのparse中interruptは未実装。rename/format/code-action trans
 
 ## 6. 対応表: DAP（デバッグ）
 
-生成 DAP はどちらも `initialize` で `supportsConfigurationDoneRequest` しか返さない（DPE:52、RD:177）。以下で「なし」と書いた request は、Java では `IDebugProtocolServer` の既定実装、Rust では `unsupported command`（RD:351）になる。
+生成 DAP はどちらも `initialize` で `supportsConfigurationDoneRequest` しか返さない（DPE:52、RD:177）。以下で「なし」と書いた request は、Java では `IDebugProtocolServer` の既定実装、Rust では同じ失敗形（`Internal error.` と文字列 body `java.lang.UnsupportedOperationException`、#900）になる。
 
 | # | IDE 機能 | IntelliJ / Eclipse での名前 | DAP の対応 | unlaxer Java の現状 | unlaxer Rust の現状 | 文法から自動生成 | 優先度 | 区分 |
 |---|---|---|---|---|---|---|---|---|

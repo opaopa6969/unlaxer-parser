@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{self, BufRead, Write};
 use unlaxer_runtime::incremental::{Revisions, SnapshotParseCache, Stats};
-use unlaxer_runtime::language_profile::{LanguageProfile, Selection};
+pub use unlaxer_runtime::language_profile::{LanguageProfile, Selection};
 use unlaxer_runtime::language_queries::{LanguageQueries, QueryView};
 use unlaxer_runtime::source::{Operation, State};
 use unlaxer_runtime::source::{Position, Snapshot};

@@ -1,0 +1,27 @@
+[
+  {
+    "name": "reference-before-undefined-rule",
+    "source": "grammar G {\ntoken Z = ADAPTER('zzz.word', version=1)\n@root @mapping(Root, params=[value]) Start ::= Missing @value;\n}\n",
+    "first": "P-ADAPTER-UNKNOWN: zzz.word"
+  },
+  {
+    "name": "reference-before-mapping",
+    "source": "grammar G {\ntoken Z = ADAPTER('zzz.word', version=1)\n@root @mapping(Root, params=[value, other]) Start ::= 'x' @value;\n}\n",
+    "first": "P-ADAPTER-UNKNOWN: zzz.word"
+  },
+  {
+    "name": "reference-before-whitespace-style",
+    "source": "grammar G {\n@whitespace: nope\ntoken Z = ADAPTER('zzz.word', version=1)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "first": "P-ADAPTER-UNKNOWN: zzz.word"
+  },
+  {
+    "name": "reference-before-comment-setting",
+    "source": "grammar G {\n@comment: bad\ntoken Z = ADAPTER('zzz.word', version=1)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "first": "P-ADAPTER-UNKNOWN: zzz.word"
+  },
+  {
+    "name": "reference-before-contract-and-feature",
+    "source": "grammar G {\n@ubnf: v2\n@feature: nope\n@tokenContract: { token: 'T' accepts: 'x' failure: 'no-consume' consumes: 'always' context: 'bad' }\ntoken T = ADAPTER('missing.word', version=1)\n@root @mapping(Root, params=[value]) Start ::= 'x' @value;\n}\n",
+    "first": "P-ADAPTER-UNKNOWN: missing.word"
+  }
+]

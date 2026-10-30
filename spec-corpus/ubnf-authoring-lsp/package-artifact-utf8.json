@@ -1,0 +1,214 @@
+[
+  {
+    "id": "cache-invalid-start",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "ff",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-hash-invalid-start",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "ff",
+    "hashMismatch": true,
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "local-invalid-start",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "ff",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-truncated",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "e282",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-hash-truncated",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "e282",
+    "hashMismatch": true,
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "local-truncated",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "e282",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-json-string",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "7b2278223a22ff227d",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-hash-json-string",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "7b2278223a22ff227d",
+    "hashMismatch": true,
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "local-json-string",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "7b2278223a22ff227d",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-overlong",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "c0af",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-hash-overlong",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "c0af",
+    "hashMismatch": true,
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "local-overlong",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "c0af",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-surrogate",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "eda080",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-hash-surrogate",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "eda080",
+    "hashMismatch": true,
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "local-surrogate",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "eda080",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-above-unicode",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "f4908080",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-hash-above-unicode",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "f4908080",
+    "hashMismatch": true,
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "local-above-unicode",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "f4908080",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-invalid-json",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "7b",
+    "hashMismatch": false,
+    "loadError": "invalid JSON"
+  },
+  {
+    "id": "cache-invalid-json-hash",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "7b",
+    "hashMismatch": true,
+    "loadError": "artifact hash mismatch: std/layout"
+  },
+  {
+    "id": "cache-utf8-before-json",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "5dff",
+    "hashMismatch": false,
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-overlong-three-byte",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "e08080",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "local-overlong-three-byte",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "e08080",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-above-f4",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "f5808080",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "local-above-f4",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "f5808080",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-bom-then-invalid",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "efbbbfff",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "local-bom-then-invalid",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "efbbbfff",
+    "resolveError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "cache-json-then-truncated",
+    "mode": "cache",
+    "kind": "raw",
+    "bytesHex": "7b7de282",
+    "loadError": "invalid UTF-8 artifact"
+  },
+  {
+    "id": "local-json-then-truncated",
+    "mode": "local",
+    "kind": "raw",
+    "bytesHex": "7b7de282",
+    "resolveError": "invalid UTF-8 artifact"
+  }
+]

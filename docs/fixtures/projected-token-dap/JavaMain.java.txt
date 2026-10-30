@@ -1,0 +1,106 @@
+package wire.projected;
+
+import com.google.gson.*;
+import java.nio.file.*;
+import java.util.*;
+import org.unlaxer.*;
+import org.unlaxer.context.*;
+import org.unlaxer.parser.Parser;
+import org.unlaxer.parser.combinator.NoneChildParser;
+import org.unlaxer.parser.elementary.WordParser;
+
+public final class JavaMain {
+    static JsonObject row;
+    static final IdentityHashMap<Token, PortableTokenMetadata.Info> anchors = new IdentityHashMap<>();
+    public static void main(String[] args) throws Exception {
+        var fixtures = JsonParser.parseString(Files.readString(Path.of(args[0]))).getAsJsonArray();
+        var server = new ProjectedInspectionDebugAdapter() {
+            String wireFailure = "";
+            @Override protected Object parseDebugAst(String source) {
+                if (wireFailure.equals("ast-empty")) return null;
+                if (wireFailure.equals("ast-span")) return new Object();
+                if (wireFailure.equals("ast-throw")) throw new IllegalStateException("fixture mapper failure");
+                return super.parseDebugAst(source);
+            }
+            @Override protected DebugSource resolveDebugSource(String program, String original, Map<String,Object> arguments) {
+                wireFailure = String.valueOf(arguments.getOrDefault("wireFailure", ""));
+                if (wireFailure.equals("source-throw")) throw new IllegalArgumentException("fixture source failure");
+                if (wireFailure.equals("source-null")) return null;
+                row = null;
+                for (var item : fixtures) if (item.getAsJsonObject().get("name").getAsString().equals(arguments.get("fixture"))) row = item.getAsJsonObject();
+                if (row == null) throw new IllegalArgumentException("unknown fixture");
+                return debugSource(String.valueOf(arguments.getOrDefault("sourceText", row.get("input").getAsString())), ((Number)arguments.getOrDefault("lineOffset", 0)).intValue());
+            }
+            @Override protected int[] tokenSourceSpan(Token token) {
+                var info = anchors.get(token);
+                return info == null ? super.tokenSourceSpan(token) : new int[]{info.offset(), info.end()};
+            }
+        };
+        var launcher = org.eclipse.lsp4j.debug.launch.DSPLauncher.createServerLauncher(server, System.in, System.out);
+        server.connect(launcher.getRemoteProxy());
+        launcher.startListening().get();
+    }
+    static final class GeneratedToken extends NoneChildParser {
+        private static final long serialVersionUID = 1L;
+        @Override public Parser createParser() { return this; }
+        @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) { throw new UnsupportedOperationException(); }
+    }
+    static final class ProjectedToken extends NoneChildParser {
+        private static final long serialVersionUID = 1L;
+        @Override public Parser createParser() { return this; }
+        @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) { throw new UnsupportedOperationException(); }
+    }
+    static final class Collector extends NoneChildParser {
+        private static final long serialVersionUID = 1L;
+        @Override public Parser createParser() { return this; }
+        @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+            anchors.clear();
+            var metadata = new PortableTokenMetadata(context);
+            var leaves = new TokenList();
+            for (var element : row.getAsJsonArray("tokens")) {
+                var item = element.getAsJsonObject();
+                if (item.has("input")) {
+                    var parsed = new WordParser(item.get("input").getAsString()).parse(context);
+                    if (!parsed.isSucceeded()) return parsed;
+                    leaves.add(parsed.getConsumed());
+                } else if (item.has("parts")) {
+                    var pieces = new TokenList();
+                    for (var part : item.getAsJsonArray("parts")) {
+                        var range = part.getAsJsonArray();
+                        var source = context.getSource().subSource(new org.unlaxer.CodePointIndex(range.get(0).getAsInt()), new org.unlaxer.CodePointIndex(range.get(1).getAsInt()));
+                        pieces.add(new Token(TokenKind.consumed, source, this));
+                    }
+                    // Publish the real concatenated source as one terminal, without its pieces as children.
+                    var token = new Token(TokenKind.consumed, pieces.toSource(org.unlaxer.Source.SourceKind.subSource), new ProjectedToken());
+                    context.getCurrent().addToken(token, token.tokenKind);
+                    leaves.add(token);
+                } else {
+                    var token = new Token(TokenKind.virtualTokenConsumed, StringSource.createDetachedSource(item.get("generated").getAsString()), new GeneratedToken());
+                    context.getCurrent().addToken(token, token.tokenKind);
+                    var id = metadata.registerGenerated(token, item.get("anchor").getAsInt());
+                    anchors.put(token, metadata.info(id).orElseThrow());
+                    leaves.add(token);
+                }
+            }
+            for (int i = 0; i < leaves.size(); i++) {
+                var token = leaves.get(i);
+                var expected = row.getAsJsonArray("steps").get(i).getAsJsonArray();
+                var info = anchors.get(token);
+                int start = info == null ? token.source.offsetFromRoot().value() : info.offset();
+                int end = info == null ? start + token.source.codePointLength().value() : info.end();
+                if (start != expected.get(2).getAsInt() || end != expected.get(3).getAsInt()
+                        || !token.source.sourceAsString().equals(expected.get(1).getAsString()))
+                    throw new AssertionError("source differs from independent oracle: " + row.get("name"));
+            }
+            // A custom collector retains the real input extent independently of generated child text.
+            return new Parsed(new Token(TokenKind.consumed, context.getSource(), this, leaves));
+        }
+    }
+}
+final class ProjectedInspectionParsers {
+    static Parser getRootParser() { return new JavaMain.Collector(); }
+}
+final class ProjectedInspectionMapper {
+    static Object parse(String source) { throw new UnsupportedOperationException("token fixture"); }
+}
+interface ProjectedInspectionAST {}

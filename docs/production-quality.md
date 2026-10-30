@@ -26,8 +26,8 @@ CI の check が緑、または `-Dtest` にクラスがあるだけでは実行
 
 | job / 契約 | 必須条件・証跡 |
 |---|---|
-| `maven.yml:rust` / `cross-language` | Java21 / Rust1.85、`rustConformance=true`、`tokenStreamBench=true`、固定 Tiny 文法。共通適合性、frontend、意味 oracle、位置、LSP/DAP の全対象を検査 |
-| 同 job / `tiny-catalog` | `RustCatalogConformanceTest.realTinyGrammarAdvancesPastCatalogToTheSameGenerationFrontier` を含む全件。下流と同じ Tiny `7d7bd1cbfab1bd9548ba53c73cc50502f0437c67` の実 grammar を指定し、XML・frontier・revision を `tiny-catalog-conformance` artifact に保存 |
+| `maven.yml:rust-conformance` / `cross-language-core`, `cross-language-cli` | Java21 / Rust1.85、`rustConformance=true`、`tokenStreamBench=true`、固定 Tiny 文法。元の `cross-language` 契約を重複・欠落なしで2分割し、各 shard で必須メソッドと skip 0 を検査 |
+| core shard / `tiny-catalog` | `RustCatalogConformanceTest.realTinyGrammarAdvancesPastCatalogToTheSameGenerationFrontier` を含む全件。下流と同じ Tiny `7d7bd1cbfab1bd9548ba53c73cc50502f0437c67` の実 grammar を指定し、XML・frontier・revision を `tiny-catalog-conformance` artifact に保存 |
 | `maven.yml:downstream` | `downstream-p4-smoke`（意味 oracle）、`downstream-node-alias`（原文保存）、`downstream-tokens`（実 Tiny クラスと両 Rust generator の意味・位置）、`downstream-portability`（実 grammar）、`downstream-ide-smoke`（LSP）の各実行を直後に検査 |
 | `maven.yml:build-jdk17` / `jdk17-parity` | 明示的な Unicode / frontend の 3 クラスだけを検査。通常 package の opt-in skip は対象外 |
 | `assertion-contracts`, `shared-language-calls`, `embedded-grammars`, `language-profiles`, `language-queries`, `external-language-providers`, `analysis-pipeline` | 各 workflow の必須クラスと `rustConformance=true` を検査 |
@@ -44,6 +44,17 @@ verifier が失敗しても証跡はアップロードし、Maven 未実行・�
 別の Maven 実行が XML を上書きする前に検査・保存する。
 対象の追加・削除・改名時には契約も更新する。workflow の長い `-Dtest` 一覧とは別ファイルなので、
 他の機能 PR による一覧の追加と競合しにくい。`WorkflowTest` は `-Dtest` と契約を双方向に照合する。
+
+#954 の分割では `cross-language.required` を共通の正本として保持する。
+クラス追加時は正本、`shards` のどちらか一方、workflow の同じ shard の `matrix.tests` を更新する。
+メソッド・property・report path は正本から継承し、クラスの重複・欠落・未登録は prepare 時点でも失敗する。
+XML は `optin-cross-language-core` / `optin-cross-language-cli`、生成証跡は
+`rust-conformance-core` / `rust-conformance-cli` artifact の和で確認する。
+両 shard は独立した Maven repository と Cargo build を使用し、ハーネスの並列度は増やさない。
+matrix は `max-parallel: 2` / `fail-fast: false`、各 job の timeout は50分。
+集約 job `rust` は元の check 名 `Rust backend and Java conformance` を保ち、
+どちらかが失敗・cancel・skip なら成功にしない。branch protection の設定は変更しない。
+
 `assertion-contracts` では契約外も含め全 XML を検査し、従来の全 skip 禁止範囲を維持する。
 実 Tiny Portability のメソッドは downstream だけで実行し、共通 job は同クラスの残り2メソッドを選ぶ。
 

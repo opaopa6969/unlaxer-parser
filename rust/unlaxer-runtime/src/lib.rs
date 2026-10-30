@@ -276,7 +276,7 @@ pub enum Expr {
         alternative: Box<Expr>,
         labels: Vec<&'static str>,
     },
-    /// Undeclared custom parser: [`Diagnostics::Auto`] conservatively uses `Detailed`.
+    /// Undeclared custom parser: Auto uses Detailed. For intermediate reads see [`ParseContext::failure`].
     Custom(fn(&mut ParseContext<'_>) -> ParseResult),
     /// Custom parser with a caller-supplied contract for automatic diagnostics.
     /// Deferred diagnostics require `reads_diagnostics: false` and `replayable: true`.
@@ -889,6 +889,8 @@ const _: () = {
 
 /// Shared entry point for handwritten and generated parsers. Use context.parse(parser)
 /// when calling a custom implementation so failed calls roll back transactional state.
+/// Inside a grammar callback, success diagnostics can lag Java until the enclosing entry
+/// returns; see [`ParseContext::failure`]. Reading diagnostics itself has no parse effects.
 pub trait Parser {
     fn parse(&self, context: &mut ParseContext<'_>) -> ParseResult;
     /// Classic entry. Existing custom parsers retain transactional failure cleanup;
@@ -2291,7 +2293,7 @@ impl<'a> ParseContext<'a> {
         metrics
     }
 
-    /// Hits in this context's pass only; excludes any separate detailed retry.
+    /// Hits in this context's pass only, excluding a separate detailed retry. Host-dependent (#827).
     pub fn memoized_failure_hits(&self) -> usize {
         self.memoized_failure_hits
     }
@@ -2320,8 +2322,8 @@ impl<'a> ParseContext<'a> {
         self.success_memo.budget_misses
     }
 
-    /// Actual successful rule replays in this context's pass. Tracing, unsafe
-    /// rules and snapshots exceeding the memo budgets are misses.
+    /// Actual successful rule replays in this context's pass (host-dependent, not comparable with
+    /// Java, #827). Tracing, unsafe rules and snapshots exceeding the memo budgets are misses.
     pub fn memoized_success_hits(&self) -> usize {
         self.memoized_success_hits
     }
@@ -2526,6 +2528,23 @@ impl<'a> ParseContext<'a> {
         self.raised
     }
 
+    /// Returns a snapshot of the current syntax diagnostic in code-point offsets.
+    /// Reading it does not advance cursors, reset state, replay parsing or change memo hits.
+    /// Actual syntax failures take precedence over the successful-reach fallback; resource,
+    /// name and raised failures retain their own precedence.
+    ///
+    /// In the Java-compatible grammar path, a custom parser reading this **before the
+    /// enclosing public entry returns** sees only reach already recorded by completed
+    /// transaction frames / nested entries and actual failures. Unlike Java's per-consume
+    /// tracking, unrecorded successful consumption is absent: the intermediate success
+    /// offset is a lower bound (Rust <= Java), not a live cursor or a final diagnostic.
+    /// Once an actual syntax failure has been recorded, its offset agrees with Java even
+    /// during parsing. After the public grammar entry returns, the final offset agrees.
+    /// This intentional observation-time difference (#881) avoids per-node work under #197.
+    /// It does not extend the grammar contract to the native PEG [`Self::parse`] entry,
+    /// lexing sessions, or arbitrary custom code that changes acceptance based on the value.
+    /// [`Diagnostics::DetailedOnFailure`] on a low-level context keeps empty diagnostics
+    /// (offset zero) and this accessor never triggers a detailed retry.
     pub fn failure(&self) -> ParseError {
         if let Some(error) = &self.resource_failure {
             return error.clone();
@@ -2614,6 +2633,8 @@ impl<'a> ParseContext<'a> {
     /// Temporarily installs grammar rules/trivia policy; user state and input are shared.
     /// This accepts a prefix. Use an EOF parser or parse_detailed for full-input acceptance.
     /// Node rule IDs are local to this grammar; map each returned root with its own mapper.
+    /// Custom callbacks observe intermediate success diagnostics until this entry returns;
+    /// see [`Self::failure`] for the Java/Rust observation-time contract.
     pub fn parse_grammar(
         &mut self,
         rules: Vec<Rule>,
@@ -2730,24 +2751,36 @@ impl<'a> ParseContext<'a> {
         let previous = self.token_mode;
         if previous.is_none() && requires_classic_mode(expression, &self.rules) {
             self.token_mode = Some(token::ParseMode::default());
+            // Like parse_with_token_mode: Java's startParse of the outer frame (e.g.
+            // MatchOnly around a successful Not) records its reach before begin (#838).
+            if self.options.diagnostics == Diagnostics::Detailed {
+                self.note_classic_entry();
+            }
         }
         let start = self.position();
         let result = match self.expression(expression, self.call_depth) {
-            Some(fragment) => Ok(ParseMatch {
-                span: fragment
-                    .source
-                    .as_deref()
-                    .filter(|source| source.classic)
-                    .map_or(
-                        Span {
-                            start,
-                            end: self.position(),
-                        },
-                        |source| source.span,
-                    ),
-                nodes: fragment.nodes,
-                captures: fragment.captures,
-            }),
+            Some(fragment) => {
+                // Once per caller entry, never per expression node (#878). The successful
+                // tail can consume beyond the last Java transaction frame.
+                if self.options.diagnostics == Diagnostics::Detailed {
+                    self.note_success_entry(expression);
+                }
+                Ok(ParseMatch {
+                    span: fragment
+                        .source
+                        .as_deref()
+                        .filter(|source| source.classic)
+                        .map_or(
+                            Span {
+                                start,
+                                end: self.position(),
+                            },
+                            |source| source.span,
+                        ),
+                    nodes: fragment.nodes,
+                    captures: fragment.captures,
+                })
+            }
             None => Err(self.failure()),
         };
         self.token_mode = previous;
@@ -3101,6 +3134,95 @@ impl<'a> ParseContext<'a> {
         {
             self.fail_without_expected();
         }
+    }
+
+    /// The successful Classic watermark at an implicit Classic entry (#838).
+    #[cold]
+    #[inline(never)]
+    fn note_classic_entry(&mut self) {
+        let reached = self.position.max(self.matched_position);
+        self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+    }
+
+    /// Java also tracks consumption outside transaction frames. Record the final reach
+    /// at the public expression/grammar entry, preserving Classic and native PEG contracts.
+    /// Actual failures still take precedence over this fallback in failure().
+    #[cold]
+    #[inline(never)]
+    fn note_success_entry(&mut self, expression: &Expr) {
+        if self.token_mode.is_some()
+            || !self.grammar_frontier
+            || self.lexing.is_some()
+            || matches!(expression, Expr::CatchLabels { .. })
+        {
+            return;
+        }
+        let reached = self.position.max(self.matched_position);
+        self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.classic_max_reached = Some(frame.classic_max_reached.unwrap_or(0).max(reached));
+        }
+    }
+
+    /// Java's fallback reach after a successful parser frame (#826, #838, #872, #876): startParse
+    /// max(consumed, matched), recorded before begin reset matched, and that of every
+    /// enclosing frame (e.g. a Choice that reset before the Not or a MatchOnly around it).
+    /// This is not a failure: a later real failure behind it still wins. The successful
+    /// Classic watermark and memo diagnostics carry this reach in existing fields. A Not
+    /// directly under MatchOnly runs in token mode and starts the fallback there. Native
+    /// transaction frames also start it without a prior lookahead; token streams keep
+    /// the consumed frontier, and explicit native PEG expression entries keep their contract.
+    #[cold]
+    #[inline(never)]
+    fn note_success_frame_start(&mut self, expression: &Expr, checkpoint: &Checkpoint) {
+        if matches!(expression, Expr::CatchLabels { .. })
+            || !self.grammar_frontier
+            || self.lexing.is_some()
+        {
+            return;
+        }
+        if let Expr::JavaUntil(terminator) = expression {
+            self.note_until_failures(terminator, checkpoint);
+        }
+        let reached = checkpoint
+            .position
+            .max(checkpoint.matched_position)
+            .max(self.position)
+            .max(self.matched_position);
+        self.classic_max_reached = Some(self.classic_max_reached.unwrap_or(0).max(reached));
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.classic_max_reached = Some(frame.classic_max_reached.unwrap_or(0).max(reached));
+        }
+    }
+
+    /// Summarize native UNTIL's rejected MatchOnly probes in the existing Detailed
+    /// recorder, without adding work to its scan loop or diagnostics-off path (#826).
+    /// After consuming, the last rejection precedes a matched terminator by one CP;
+    /// without a terminator the EOF probe itself failed. An immediate match rejects
+    /// nothing. Record the historical offset directly, not the current matched frontier.
+    #[cold]
+    #[inline(never)]
+    fn note_until_failures(&mut self, terminator: &str, checkpoint: &Checkpoint) {
+        let failed_at = if self.matched_position == self.position {
+            self.position
+        } else if self.position > checkpoint.position {
+            self.byte_offsets[self.position() - 1]
+        } else {
+            return;
+        };
+        // The first rejected probe can be ahead of every later one when owner reset
+        // is false and a preceding lookahead passed the eventual terminator.
+        let first = if checkpoint.match_cursor_policy.reset {
+            checkpoint.position
+        } else {
+            checkpoint.position.max(checkpoint.matched_position)
+        };
+        self.classic_failure_seen = true;
+        if let Some(frame) = self.diagnostic_frames.last_mut() {
+            frame.classic_failure_seen = true;
+        }
+        let expected = self.expected_names.intern(terminator);
+        self.record_failure(failed_at.max(first), expected);
     }
 
     // A no-cache recursive rule must not retain the large memo snapshot/key
@@ -3745,20 +3867,13 @@ impl<'a> ParseContext<'a> {
             let failed_reset = self.match_cursor_policy.reset;
             self.restore(checkpoint);
             if self.resource_failure.is_none() {
-                // Group/choice parsers have frames even without a rule invocation (#793).
-                // A bounded repeat (`'x'{2}`) is a Java Repeat frame that fails after its
-                // earlier iterations consumed. Reuse the restored cursors; successful
-                // expressions and the deferred pass need no frame bookkeeping. Classic
-                // records its frames below.
+                // Java startParse precedes begin's matched reset (#793, #838).
+                // CatchLabels has a transaction but no startParse/endParse notification.
+                // Reuse the restored entry cursors only on failure; Classic records its
+                // failed frames below and deferred diagnostics need no bookkeeping.
                 if self.options.diagnostics == Diagnostics::Detailed
-                    && matches!(
-                        expression,
-                        Expr::Sequence(_)
-                            | Expr::Choice(_)
-                            | Expr::PredictiveChoice { .. }
-                            | Expr::Repeat { .. }
-                            | Expr::JavaRepeat { .. }
-                    )
+                    && ((java_transaction && !matches!(expression, Expr::CatchLabels { .. }))
+                        || matches!(expression, Expr::Sequence(_) | Expr::Repeat { .. }))
                 {
                     self.fail_parser_frame();
                 }
@@ -3785,6 +3900,8 @@ impl<'a> ParseContext<'a> {
                             expression,
                             Expr::CaptureBoundary(_, _)
                                 | Expr::InputCaptureBoundary(_, _)
+                                | Expr::OwnedCapture(_, _)
+                                | Expr::CaptureScope(_)
                                 | Expr::Rule(_)
                                 | Expr::MatchOnly(_)
                                 | Expr::InvertMatch(_)
@@ -3802,6 +3919,16 @@ impl<'a> ParseContext<'a> {
                 }
             }
         } else {
+            // Java records successful frames even without a preceding lookahead (#872, #876).
+            // Reuse the Detailed transaction gate and cold recorder; requiring an existing
+            // watermark would drop both plain success and UNTIL's rejected probes.
+            // Native PEG expression entries and lexing are excluded inside the recorder.
+            if java_transaction
+                && self.options.diagnostics == Diagnostics::Detailed
+                && (matches!(expression, Expr::JavaLookahead { .. }) || self.token_mode.is_none())
+            {
+                self.note_success_frame_start(expression, &checkpoint);
+            }
             if self.token_mode.is_some()
                 && (classic_collector_label(expression).is_some()
                     || matches!(

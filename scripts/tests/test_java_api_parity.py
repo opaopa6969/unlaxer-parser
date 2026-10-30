@@ -137,13 +137,31 @@ class Hidden { public static class Leaked {} }
         # 名前の不一致で未対応と断定しない: UBNF/Rust の BOL・BOF は両 host の共通 corpus を持つ。
         for name, op in (('start-of-line', 'Op::BOL'), ('start-of-source', 'Op::BOF')):
             entry = self.data['assessments'][name]
-            self.assertEqual('uncorroborated', entry['status'])
+            self.assertEqual('verified', entry['status'])
             self.assertIn('spec-corpus/declarative-tokens/runtime.json', entry['fixtures'])
+            self.assertIn('conformance/line-boundary/cases.tsv', entry['fixtures'])
+            self.assertIn('unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java', entry['tests'])
             evidence = next(c for c in entry['code'] if type(c) is dict
                             and c['location'].startswith('rust/unlaxer-runtime/src/lexical.rs#L'))
             self.assertTrue(evidence['anchor'].startswith(op))
             line = int(evidence['location'].rpartition('#L')[2])
             self.assertIn(op, (api.ROOT / 'rust/unlaxer-runtime/src/lexical.rs').read_text().splitlines()[line - 1])
+
+    def test_line_composition_does_not_claim_terminated_repeat_completion(self):
+        rows = {row['id']: row for row in self.data['apis']}
+        for name in ('EmptyLineParser', 'WildCardLineParser'):
+            entry = self.data['assessments'][rows['org.unlaxer.parser.elementary.' + name]['assessment']]
+            self.assertEqual('uncorroborated', entry['status'])
+            self.assertTrue({846, 848}.issubset(entry['issues']))
+            self.assertIn('conformance/line-boundary/repeat-choice.tsv', entry['fixtures'])
+            self.assertIn('conformance/line-boundary/char-class.tsv', entry['fixtures'])
+        for name in ('LineTerminatorParser', 'EndOfLineParser'):
+            entry = self.data['assessments'][rows['org.unlaxer.parser.elementary.' + name]['assessment']]
+            self.assertEqual('verified', entry['status'])
+            self.assertIn('conformance/line-boundary/cases.tsv', entry['fixtures'])
+            # Java の DETAILED_ON_FAILURE 限定の FIRST 除外欠陥は別 issue で追跡する。
+            self.assertIn(861, entry['issues'])
+
 
     RUNTIME = 'rust/unlaxer-runtime/src/lib.rs'
 
