@@ -1,8 +1,35 @@
 //! `java.net.URI.create` (JDK 17/21 RFC 2396 parser) over UTF-16 units, for HTTPS
 //! sources, including those that a Rust string cannot hold. It only classifies the
 //! URL as `UBNFPackageFetcher.fetch` does before credentials; it never builds a request.
-//! ASCII scalar URLs share this classifier; Unicode scalar URLs retain their
-//! existing transport path until #960.
+//! All scalar URLs share this classifier. Only accepted scalar URLs can be encoded
+//! for transport; the non-scalar entry point still never builds a request.
+
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "java_uri/nfc.rs"]
+mod nfc;
+
+/// `URI.toASCIIString` / HttpClient `Utils.encode`: NFC, then escape non-ASCII
+/// UTF-8 bytes with uppercase hex. Existing ASCII (including `%xx`) stays verbatim.
+/// Call only after classification; no URI syntax is repaired by this encoder.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn ascii_url(source: &str) -> std::borrow::Cow<'_, str> {
+    if source.is_ascii() {
+        return std::borrow::Cow::Borrowed(source);
+    }
+    let normalized = nfc::normalize(source);
+    let mut encoded = String::with_capacity(normalized.len());
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    for b in normalized.bytes() {
+        if b.is_ascii() {
+            encoded.push(char::from(b));
+        } else {
+            encoded.push('%');
+            encoded.push(char::from(HEX[(b >> 4) as usize]));
+            encoded.push(char::from(HEX[(b & 15) as usize]));
+        }
+    }
+    std::borrow::Cow::Owned(encoded)
+}
 
 const L_DIGIT: u64 = 0x3FF000000000000;
 const H_ALPHA: u64 = 0x7FFFFFE | 0x7FFFFFE00000000;
@@ -546,6 +573,40 @@ impl Parser<'_> {
 #[cfg(test)]
 mod tests {
     use super::{classify, Https};
+
+    #[test]
+    fn transport_urls_follow_java_utils_encode() {
+        // Expected: Oracle JDK 21.0.9 `URI.create(source).toASCIIString()`, the
+        // same NFC + uppercase UTF-8 escapes as HttpClient's request target.
+        let base = "https://localhost:8443/";
+        assert!(matches!(
+            super::ascii_url("https://localhost:8443/%c3%a9"),
+            std::borrow::Cow::Borrowed(_)
+        ));
+        for (path, expected) in [
+            ("e\u{301}", "%C3%A9"),
+            ("%c3%a9\u{e9}", "%c3%a9%C3%A9"),
+            ("%4a\u{301}", "%4%C3%A1"),
+            ("=\u{338}", "%E2%89%A0"),
+            ("a\u{1ac1}\u{323}", "%E1%BA%A1%E1%AB%81"),
+            ("a\u{305}\u{301}", "a%CC%85%CC%81"),
+            ("\u{301}e", "%CC%81e"),
+            ("\u{344}", "%CC%88%CC%81"),
+            ("\u{212b}", "%C3%85"),
+            ("\u{1d15e}", "%F0%9D%85%97%F0%9D%85%A5"),
+            ("\u{1100}\u{1161}\u{11a8}", "%EA%B0%81"),
+            ("\u{1100}\u{1161}\u{11a7}", "%EA%B0%80%E1%86%A7"),
+            ("\u{ac00}\u{11a8}\u{11a8}", "%EA%B0%81%E1%86%A8"),
+            ("\u{37e}\u{1fef}", ";`"),
+        ] {
+            let source = format!("{base}{path}");
+            assert_eq!(
+                super::ascii_url(&source),
+                format!("{base}{expected}"),
+                "{path:?}"
+            );
+        }
+    }
 
     fn run(source: &str) -> Https {
         // `\u{e000}` stands for an unpaired high surrogate in these literals.

@@ -644,6 +644,10 @@
     "974": {
       "state": "OPEN",
       "title": "parity(cli): playground の空白だけの option 値を Java の isBlank と同じく usage 誤りにする（#953 レビュー由来）"
+    },
+    "979": {
+      "state": "OPEN",
+      "title": "NFCでbacktickになるU+1FEFのrequest targetのbackend拒否"
     }
   },
   "entries": [
@@ -735,7 +739,7 @@
         959,
         960
       ],
-      "observation": "#939 は package 入力に通常 UTF-8 / 非 scalar UTF-16 units の Text を導入し、entry・files key/未使用本文・HTTPS source を復元する。Java の経路・受理集合・診断と raw bytes は不変。schema/ID/path の順序、entry照合、Linux Path拒否、URI→credentials→HTTP encoding の境界をJavaへ揃える。正常URLのtransportは変えず、非scalarURLはJDK17/21のURI.createをUTF-16 unitsへ移植した判定でoriginだけを求め、置換URLを作らず送信しない。既存13 gapの10件と全13件のresolveは一致。実読取り3 commentのloadと追加15件は#959、正常対URLの4診断差とrequest targetは#960へ分離し、完了扱いにしない。共通481件で両stdio/両resolve、既存400＋代表追加13形で3 CLI生成を比較。raw hash→UTF-8→JSON、8MiB reader、深さ255、記述順、数値表記、32byte Value、parserホットパスを維持する。",
+      "observation": "#939 は package 入力に通常 UTF-8 / 非 scalar UTF-16 units の Text を導入し、entry・files key/未使用本文・HTTPS source を復元する。Java の経路・受理集合・診断と raw bytes は不変。schema/ID/path の順序、entry照合、Linux Path拒否、URI→credentials→HTTP encoding の境界をJavaへ揃える。非scalarURLはJDK17/21のURI.createをUTF-16 unitsへ移植した判定でoriginだけを求め、置換URLを作らず送信しない。既存13 gapの10件と全13件のresolveは一致。実読取り3 commentのloadと追加15件は#959、正常対URLの4診断差とrequest targetは#960で共通期待値へ揃える。共通481件で両stdio/両resolve、既存400＋代表追加13形で3 CLI生成を比較。raw hash→UTF-8→JSON、8MiB reader、深さ255、記述順、数値表記、32byte Value、parserホットパスを維持する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",
@@ -765,17 +769,42 @@
     },
     {
       "id": "package-unicode-url",
-      "category": "unresolved",
+      "category": "contract",
       "title": "正常 Unicode HTTPS URL の診断と request target",
-      "hosts": "Java / Rust native",
+      "hosts": "Java URI.create / HttpClient（JDK17/21）・native Rust（Unicode15 NFC）",
       "issues": [
         960
       ],
-      "observation": "正常対のhost/userinfoはJavaのomit診断とRustのinvalid URLが異なる。正常pathはJavaがpercent encode、Rustが生UTF-8のrequest targetを送る。#939は通常URL経路を変えず、共通4診断差と直接/推移的pathのwireをlocal TLSで記録する。不正percentの受理も#960で追跡する。",
+      "observation": "Unicode scalarもASCIIと同じUTF-16 URI parserで全体構文→scheme/getHost/userinfo/query/fragment/portの順に検査し、IDNはomit、不正percentと非ASCII空白はinvalid。送信用だけNFC後の非ASCII UTF-8 bytesを大文字percent encodeし、既存escape・Host・raw manifest/cacheは保持する（lockにsource fieldはない）。Unicode80形を直接/推移的依存・snapshot有無で両resolveに送り、target/Host/raw bytes・拒否時接続0を照合する。nativeはJDK21/Unicode15を参照し、JDK17の50結合文字の版差2形はjavaJdk17TargetSuffixで固定してJDK17 jobでも実行する。U+1FEFのbackend拒否2形は#979。#960はPRのレビュー待ち。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-json-acceptance.json",
-        "scripts/ubnf_package_json.py"
+        "scripts/ubnf_package_json.py",
+        "spec-corpus/package-https-transport.json",
+        "scripts/ubnf_package_transport.py",
+        "rust/unlaxer-generator/src/packages/java_uri.rs",
+        "rust/unlaxer-generator/src/packages/java_uri/nfc.rs",
+        "rust/unlaxer-generator/src/packages/java_uri/nfc_data.rs",
+        "scripts/generate-package-nfc.py",
+        "rust/unlaxer-generator/src/package_fetch.rs",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java"
+      ]
+    },
+    {
+      "id": "package-unicode-url-backtick",
+      "category": "unresolved",
+      "title": "NFCでASCII backtickになるUnicode pathのbackend拒否",
+      "hosts": "Java HttpClient / Rust ureq（両 deps resolve）",
+      "issues": [
+        979
+      ],
+      "observation": "U+1FEFは両JDKのURI.createが受理し、NFCでU+0060へ変換してそのbyteを送る。nativeのNFC/percent encodingは同じ文字列を返すが、ureq http::Uriの公開constructorがbacktickを拒否する。Java製品コードを狭めず、nativeはcredentials/CA/token後に接続0のretrieval failedを返す。単独とBMP/非BMP/percent混在の2形を直接/推移的依存・snapshot有無・両JDKで実行し、Javaのwire/lock/cacheとRustの接続0/snapshot不変を固定する。%60を送って一致扱いにせず、解決/恒久契約の判断は#979で追跡する。raw ASCII backtickの構文拒否は不変。",
+      "evidence": [
+        "docs/ubnf-packages.md",
+        "spec-corpus/package-https-transport.json",
+        "scripts/ubnf_package_transport.py",
+        "rust/unlaxer-generator/src/packages/java_uri.rs",
+        "rust/unlaxer-generator/src/package_fetch.rs"
       ]
     },
     {
@@ -786,7 +815,7 @@
       "issues": [
         962
       ],
-      "observation": "Java製品コードを変えず、ASCII scalar URLをjava_uri.rsの既存UTF-16 parserで構文検査し、scheme/host/userinfo/query/fragment/portを同順で検査してから元URLをureqへ渡す。接続先もJavaに揃え、15文字までの先頭0のIPv4 octetは10進literalへ接続してJavaと同じHost headerを送り、それより長い数字host（InetAddressの曖昧表記拒否）と末尾dot・63文字超label（SNIHostName例外）は接続前に取得失敗とする。ASCII53形とUnicode対照7形を直接/推移的依存・snapshot有無の両方で実行し、拒否時request/接続0、成功時raw lock/cache bytes、失敗時snapshot不変を検証する。Unicode scalar経路と#960のhost別期待値、#939の非scalar送信禁止、credentials/CA/token・#956/#958を維持する。全長65535 bytes以上はJava/移植parserが受理してもureq http::Uriの65534 bytes上限で追加拒否される。65534/65535/65536のparser境界実測をdocs/PRへ記録し、backend制限として残す。Javaは65,624/100,024 bytesの取得に成功し、この差は#977で追跡する。#962はPRのmerge待ち。",
+      "observation": "Java製品コードを変えず、ASCII scalar URLをjava_uri.rsの既存UTF-16 parserで構文検査し、scheme/host/userinfo/query/fragment/portを同順で検査してから元URLをureqへ渡す。接続先もJavaに揃え、15文字までの先頭0のIPv4 octetは10進literalへ接続してJavaと同じHost headerを送り、それより長い数字host（InetAddressの曖昧表記拒否）と末尾dot・63文字超label（SNIHostName例外）は接続前に取得失敗とする。ASCII53形とUnicode対照7形（#960で共通期待値へ統合）を直接/推移的依存・snapshot有無の両方で実行し、拒否時request/接続0、成功時raw lock/cache bytes、失敗時snapshot不変を検証する。#960のUnicode診断/encoding契約、#939の非scalar送信禁止、credentials/CA/token・#956/#958を維持する。全長65535 bytes以上はJava/移植parserが受理してもureq http::Uriの65534 bytes上限で追加拒否される。65534/65535/65536のparser境界実測をdocs/PRへ記録し、backend制限として残す。Javaは65,624/100,024 bytesの取得に成功し、この差は#977で追跡する。#962はPR #976でmerge済み。",
       "evidence": [
         "docs/ubnf-packages.md",
         "rust/unlaxer-generator/src/package_fetch.rs",
@@ -2349,12 +2378,9 @@
     {
       "path": "spec-corpus/package-json-acceptance.json",
       "fields": {
-        "java": 2,
-        "rust": 2,
         "rustLoadError": 18,
         "rustLoadExit": 3,
-        "rustLoadPrefix": 12,
-        "rustResolveError": 4
+        "rustLoadPrefix": 12
       },
       "entries": [
         "package-json-surrogate-text",
@@ -2977,12 +3003,13 @@
     {
       "path": "spec-corpus/package-https-transport.json",
       "fields": {
-        "rustError": 7,
-        "rustTargetSuffix": 3
+        "javaJdk17TargetSuffix": 2,
+        "rustError": 2
       },
       "entries": [
         "package-ascii-url",
-        "package-unicode-url"
+        "package-unicode-url",
+        "package-unicode-url-backtick"
       ]
     }
   ],

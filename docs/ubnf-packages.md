@@ -94,11 +94,11 @@ userinfo、query、fragment と redirect は拒否する。TLS の証明書と h
 リモート artifact の推移的依存に `local:` を指定できない。取得後は同じ ID/版/hash
 検証を行い、生成時は固定 cache を使う。生成/check/Playground が取得や認証を行うことはない。
 
-ASCII の HTTPS source は Java の `URI.create`（JDK17/21）を構文の参照にする（#962）。
-Rust は `packages/java_uri.rs` の UTF-16 parser に `classify_str(&str)` の入口を追加し、
-ASCII URL に限って同じ parser と origin 判定を使う。URL 全体の構文検査後、scheme →
+HTTPS source は ASCII・Unicode scalar とも Java の `URI.create`（JDK17/21）を構文の参照にする（#962・#960）。
+Rust は `packages/java_uri.rs` の `classify_str(&str)` から同じ UTF-16 parser と origin 判定を使う。URL 全体の構文検査後、scheme →
 `getHost()`（null・ASCII DNS/IPv4 文字種）→ userinfo → query → fragment → port の順で検査し、
-受理した元の URL だけを ureq に渡す。Java の製品コード・診断と parser のホットパスは変更しない。
+受理後だけ HTTP 用 URL を組み立てる（ASCII は元の綴り、Unicode は下記の NFC/percent encoding）。
+Java の製品コード・診断と parser のホットパスは変更しない。
 ただし接続先は java.net.http の扱いに合わせる（レビューで追加）。4つの数字 octet の host は
 `InetAddress` が10進で読む literal なので、先頭0を含む `127.0.0.010` は 127.0.0.10 へ接続する
 （getaddrinfo は8進で 127.0.0.8 と読む）。Rust はこの場合だけ 10進正規形の literal を接続・TLS（IP 照合、SNI なし）に使い、
@@ -115,7 +115,8 @@ ASCII URL を独立に測ると、Java と移植 parser はすべて受理し、
 65535 bytes 以上を拒否した（内部上限65534 bytes）。これは取得 backend の追加制約として残す。
 長い URL の切詰めや独自 HTTP transport は追加せず、credentials / CA / token の検査後に
 既存の取得失敗診断へ進む。レビューでローカル TLS へ実際に送ると、全長65,624 / 100,024 bytes の URL を
-Java は取得に成功し Rust は取得失敗となった。この差は [#977](https://github.com/opaopa6969/unlaxer-parser/issues/977) で追跡する。
+Java は取得に成功し Rust は取得失敗となった。Unicode URL も送信用の encoding 後に同じ backend 上限を受ける。
+この長さ境界は [#977](https://github.com/opaopa6969/unlaxer-parser/issues/977) で追跡する。
 
 | ASCII source の形 | credentials より前の結果 |
 | --- | --- |
@@ -129,12 +130,14 @@ Java は取得に成功し Rust は取得失敗となった。この差は [#977
 
 構文の拒否は host / query 等の拒否より先になる。たとえば不正 hostname と path の `[` を
 同時に含む URL は invalid になる。既存の credentials → CA → token と transport の順は維持する。
-Unicode を含む scalar URL は従来の ureq 経路に残す。正常 Unicode の診断・不正 percent と
-request target の percent-encoding は [#960](https://github.com/opaopa6969/unlaxer-parser/issues/960) の対象で、
-今回の7対照形でも host 別の既存診断と request target bytes を固定する。
+Unicode を含む scalar URL も同じ順で検査する（#960）。Unicode host / IDN は punycode に変換せず、
+Java と同じ registry authority（`getHost() == null`）として omit 診断にする。
+Unicode userinfo / query / fragment は URI が構文受理しても omit、不正 percent escape と Unicode の
+混在や非 ASCII の空白（NBSP・U+1680・U+2009・U+2028・U+3000 等）は先に invalid になる。
+全角 `／？＃＠：％` は ASCII の区切りへ変換しない。
 非 scalar URL は従来どおり origin の検査だけに parser を使い、HTTP request を作らず送信しない（#939）。
 
-共通 `spec-corpus/package-https-transport.json` に ASCII53形・Unicode対照7形を追加し、
+共通 `spec-corpus/package-https-transport.json` の ASCII53形・Unicode80形を、
 既存 `HttpsPackageConformanceTest#transportDiagnosticsMatchJavaAcrossClis` で実行する。
 各形は直接依存とローカル親 artifact 経由の推移的依存を両 `deps resolve` に与え、
 snapshot 有無の両方で診断・exit・成功時 lock/cache raw bytes・失敗時 snapshot 不変を照合する。
@@ -143,8 +146,55 @@ snapshot 有無の両方で診断・exit・成功時 lock/cache raw bytes・失�
 末尾 dot の localhost は正しい token と CA で送り、両方とも接続0の取得失敗になることを確かめる。
 先頭0の IPv4 は 127.0.0.10 にも同じ port の listener（証明書に IP SAN）を置き、受信先・`Host`・request target を照合し、16文字以上の数字 host は接続0の取得失敗を確かめる。
 成功する localhost URL はローカル TLS で認証・request target bytes も照合する。
-3生成 CLI・両 stdio の固定 cache 読取りは既存の共通試験で通信しないことを検証する。
+3生成 CLI・両 stdio の固定 cache 読取りは既存の共通試験で通信しないことを検証し、
+Unicode の成功 path と不正 percent source でも3生成 CLIの接続0・snapshot不変を検査する。
 Java の順次呼出しは既存 `CodegenBatchHost` の1 JVM方式を使い、CIの新クラス・メソッド・shardは増やさない。
+
+Unicode の送信表現は Oracle JDK17.0.12 / 21.0.9 のローカル TLS 実測を参照する。
+HttpClient の `Http1Request.getPathAndQuery` → `Utils.encode` は raw path を **NFC** に正規化し、
+非 ASCII の UTF-8 bytes だけを大文字 `%XX` にする（`URI.toASCIIString()` と同じ方式）。
+既存の percent escape は復号せず、小文字 hex も保持する。dot segment / 重複 slash も畳まない。
+`Host` は元の ASCII `getHost()` の大文字小文字を保ち、既定以外の port を数値化して付ける。
+IPv4 の10進接続先・末尾 dot 等の接続前失敗は #962 の規則をそのまま使う。
+
+| raw path の一部 | 送信する request target の対応部分（JDK17/21・native） |
+| --- | --- |
+| `é` / `e` + U+0301 | `%C3%A9`（NFC/NFD で同じ wire） |
+| `😀`（正常な UTF-16 pair） | `%F0%9F%98%80` |
+| `é%2f😀%41%25%ff` | `%C3%A9%2f%F0%9F%98%80%41%25%ff` |
+| `e%CC%81` | `e%CC%81`（escape 越しの合成はしない） |
+| `%65` + U+0301 | `%65%CC%81`（ASCII escape の末尾 `5` は合成されない） |
+| `%4a` + U+0301 | `%4%C3%A1`（末尾の hex 文字 `a` は合成され、送信する escape が崩れる。Java と同じ） |
+| U+212B / `A` + U+030A | `%C3%85` |
+| Hangul U+1100 U+1161 U+11A8 | `%EA%B0%81` |
+| U+1D15E（非 BMP・合成除外） | `%F0%9D%85%97%F0%9D%85%A5` |
+
+native の取得専用 NFC は JDK21 / Unicode15.0 の canonical decomposition・結合クラス・合成対と
+algorithmic Hangul を使う。`scripts/generate-package-nfc.py --java-home <JDK21> --check` で
+JDK から offline 再生成・hash 照合でき（CI の core shard が実行）、新しい依存 crate や外部プロセスは製品に追加しない。
+結合文字列は安定ソートで並べ、長い結合 run に二乗の処理を持ち込まない。
+この表と処理は native の明示取得だけで、WASM / parser / package 本文には適用しない。
+
+**JDK 自身の版差**: JDK17（Unicode13）と21（Unicode15）は canonical decomposition / 合成対が同じだが、
+JDK21 では50文字に新しい結合クラスが付く。たとえば `a` U+1AC1 U+0323 は21/nativeでは
+`%E1%BA%A1%E1%AB%81`、17では `a%E1%AB%81%CC%A3` となる。
+U+1E4EC を含む非 BMP の対照も共通 fixture の `javaJdk17TargetSuffix` に固定し、CI の JDK17 job も同じ transport メソッドを実行する。
+native は主 CI の JDK21 を参照する。入力だけでは実行する JDK の版を選べないための契約であり、
+JDK17 の URI 受理・診断を変更したり、この2形を skip したりしない。
+
+**取得 backend の残差**: U+1FEF（GREEK VARIA）は NFC で ASCII backtick（U+0060）になり、
+Java はその byte `60` を送って成功するが、ureq の `http::Uri` は backtick を拒否する。
+native は credentials / CA / token の後に取得失敗（接続0）となる。
+`%60` への追加 escape では Java と同じ bytes にならないため、その置換や unsafe / 独自 transport は追加しない。
+この差は [#979](https://github.com/opaopa6969/unlaxer-parser/issues/979) に受け入れ条件付きで分離し、
+単独と BMP/非BMP/percent 混在の2形を host 別期待値で実行する（skip しない）。
+raw ASCII backtick は従来どおり URI 構文エラーであり、この残差とは区別する。
+
+共通 fixture は JSON の raw UTF-8 と BMP escape / 正常な surrogate pair escape の両方を与える。
+encoding は送信専用。manifest は書き換えず、取得した cache の raw bytes も変えない。
+lock の現行 schema は source URL を記録せず ID/版/hash/dependencies を記録する。
+推移的依存を含む親 artifact の cache は元の Unicode/JSON escape の綴りをそのまま保持する。
+NFC と NFD の source は同じ wire でも別の raw source であり、この差を親 artifact の hash まで照合する。
 
 HTTPS client と TLS は native target のみに含める。ブラウザー向け WASM での依存取得は
 明示エラーとし、native `deps resolve` で準備した package の明示ロードを利用する。
@@ -270,13 +320,13 @@ ureq の `limit` は指定量を読み切るとエラーになるため、上限
 5秒以上19秒未満（全体20秒と区別）、本文 read timeout は header 後に止まる応答で19.5秒以上45秒未満を要求し、期限を外すと落ちる。
 待つだけの2形の呼出し（両 resolve × snapshot 有無）は別 folder で並行に実行し、Java も実 CLI を起動する。
 
-共通 `spec-corpus/package-https-transport.json` の transport42形と URL60形を `HttpsPackageConformanceTest` から実行する。
+共通 `spec-corpus/package-https-transport.json` の transport42形と URL133形を `HttpsPackageConformanceTest` から実行する。
 JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を snapshot 有無の両方で照合する。
 待たない形の Java `deps resolve` は、テスト専用の `CodegenBatchHost` が1つの JVM で `CodegenMain.run` を順に呼ぶ
 （JVM 起動を1回にするため。呼出しごとに credentials override を読み直す）。両 JDK で、1呼出し1 JVM の実 CLI と
 診断・exit・snapshot が全76呼出しで一致することを確認した。
-生成は fetch しないため、3生成 CLI（Java-host Rust / native Rust / Java flag CLI）は `generate: true` の代表2形
-（成功・302）で snapshot 有無の両方を照合する。
+生成は fetch しないため、3生成 CLI（Java-host Rust / native Rust / Java flag CLI）は `generate: true` の代表4形
+（成功・302・Unicode path・Unicode と不正 percent）で snapshot 有無の両方を照合する。
 失敗時の lock/cache 不変、成功時の raw bytes、認証の exact origin、TLS境界、redirect 先の接続0、
 生成時の接続0と固定cache使用を検査する。空bodyの診断は transport ではなく後続 JSON 検査である。
 42形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
@@ -614,9 +664,10 @@ Java の Gson / SourceReader / FileSystemPort と受理集合は変更しない�
 UTF-16 units 上にそのまま移植した判定で分類し、credentials の origin（小文字 host、443 以外の port）だけを得る。
 置換した URL や percent escape した URL は作らず、HTTP request も組み立てない。credentials → CA → token の検査後、必ず transport の前で拒否する。
 移植した判定は JDK17/21 の `URI.create` と、単独サロゲートを含む fuzz 8万件・ユニットテスト58形で一致を確認した。
-ASCII scalar URL も #962 で同じ parser を使う。Unicode を含む scalar URL の既存経路と #960 の差は維持する。
+ASCII scalar URL は #962、Unicode scalar URL は #960 で同じ parser を使う。
+Unicode scalar の送信だけは上記の NFC/percent encoding を行う。非 scalar URL には適用しない。
 未使用 credential の型、CA と token の優先順位、既存の exact origin・TLS・redirect・timeout・上限は維持する。
-#956 の transport 文言差と #958 の credentials 場所選択も変更しない。
+#956 の transport 診断契約と #958 の credentials 場所選択も変更しない。
 この単位の path 診断は self-hosted Linux / JDK17・21 の境界で検証する。
 
 本文を実際に UBNF として読む場合は、package 型だけでは Rust の `&str` frontend、String の AST、
@@ -629,9 +680,8 @@ Java の `ubnf/packageSource` も、内部 UTF-16 String と stdio encoder が `
 元の13 gap のうち10件は一致し、3 comment の resolve も一致する。残る3件の load と追加した実読取りの
 計18件は #959 の host 別期待値で実行し、完了扱いにしない。
 
-正常な対の HTTPS host / userinfo の既存診断差と path の request target encoding は #960 に分離する。
-Java は正常な非 ASCII path を percent encode し、既存 Rust は生 UTF-8 を送る。
-この対照4件の診断差と2件の request target 差も記録し、#939 の修正で通常 URL の挙動を変えない。
+正常な対の HTTPS host / userinfo の診断と path の request target は #960 で上記の共通契約へ揃えた。
+package JSON corpus にあった4診断差と2 request target差の host 別期待値は削除し、共通期待値で実行する。
 
 共通 `spec-corpus/package-json-acceptance.json` は481件（既存400＋#939 の81）。両実 stdio では全件を実行し、
 本文の代表では definition の UTF-16 range・packageSource・後続 request も照合する。
@@ -683,7 +733,7 @@ lock の出力には検証済みの文字列参照だけを既存の辞書順 JS
 raw bytes の reader・hash・UTF-8 の順序は変えない。この表現は package 入力だけに限定し、
 DAP / LSP の一般 JSON、UBNF parser のホットパスには適用しない。credentials は #943 で
 この reader を共用するが、JsonElement の受理と固定 field の検査を別経路で行う。
-#939 は上記 Text により file/entry/HTTPS を復元する。実読取りの未修正差は #959、通常 Unicode URL は #960 が追跡する。
+#939 は上記 Text により file/entry/HTTPS を復元する。実読取りの未修正差は #959、通常 Unicode URL は #960 の上記契約で検査する。
 
 #941 の再測定（Linux x86_64、Rust 1.85.0、`deps resolve`、各3回の中央値、時間 s / peak RSS MiB）。
 基点は #946 merge 後の `a40c7513`。比較には同じ入力と固定した standalone binary を使う。

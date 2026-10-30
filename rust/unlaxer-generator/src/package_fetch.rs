@@ -12,54 +12,22 @@ fn error(message: &str) -> String {
     format!("E-PACKAGE: {message}")
 }
 pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
-    let (origin, route) = if source.is_ascii() {
-        use crate::packages::java_uri::{classify_str, Https};
-        // Match URI.create and the Java fetcher's checks before credentials or I/O.
-        match classify_str(source) {
-            Https::Invalid => return Err(error("invalid HTTPS artifact URL")),
-            Https::Omit => {
-                return Err(error(
-                    "HTTPS artifact URL must omit credentials, query and fragment",
-                ));
-            }
-            Https::Origin(origin) => {
-                let route = java_route(source, &origin);
-                (origin, route)
-            }
-        }
-    } else {
-        // Unicode acceptance and request-target encoding are tracked in #960.
-        let uri: ureq::http::Uri = source
-            .parse()
-            .map_err(|_| error("invalid HTTPS artifact URL"))?;
-        let host = uri
-            .host()
-            .ok_or_else(|| error("invalid HTTPS artifact URL"))?;
-        if uri.scheme_str() != Some("https")
-            || source.contains(['?', '#'])
-            || uri.authority().is_some_and(|v| v.as_str().contains('@'))
-            || host.is_empty()
-            || !host
-                .bytes()
-                .all(|c| c.is_ascii_alphanumeric() || b".-".contains(&c))
-            || uri.port_u16() == Some(0)
-        {
+    use crate::packages::java_uri::{ascii_url, classify_str, Https};
+    // URI.create checks the entire raw source before origin checks or credentials.
+    let origin = match classify_str(source) {
+        Https::Invalid => return Err(error("invalid HTTPS artifact URL")),
+        Https::Omit => {
             return Err(error(
                 "HTTPS artifact URL must omit credentials, query and fragment",
             ));
         }
-        let origin = format!(
-            "https://{}{}",
-            host.to_ascii_lowercase(),
-            uri.port_u16()
-                .filter(|p| *p != 443)
-                .map_or(String::new(), |p| format!(":{p}"))
-        );
-        (origin, Route::Direct)
+        Https::Origin(origin) => origin,
     };
     let (agent, token) = client(&origin)?;
-    let mut request = match route {
-        Route::Direct => agent.get(source),
+    // Only the transport URL is NFC/percent encoded; callers keep the raw source.
+    let encoded = ascii_url(source);
+    let mut request = match java_route(&encoded, &origin) {
+        Route::Direct => agent.get(encoded.as_ref()),
         Route::Literal { url, host } => agent.get(&url).header("Host", host),
         // Java fails after the credentials, CA and token checks, before connecting.
         Route::Unreachable => {

@@ -88,6 +88,7 @@ jobs:
         python3 scripts/generate-xid-tables.py --check
         python3 scripts/generate-grapheme-tables.py --check
         python3 scripts/generate-case-tables.py --check
+        python3 scripts/generate-package-nfc.py --java-home "$JAVA_HOME" --check
         (cd spec-corpus/case-insensitive/unicode-17.0.0 && sha256sum --check SHA256SUMS)
         (cd spec-corpus/grapheme/unicode-17.0.0 && sha256sum --check SHA256SUMS)
     - name: Check memo budget evidence gate (#789)
@@ -741,10 +742,10 @@ jobs:
 
     - name: Prepare required tests (jdk17-parity)
       run: python3 scripts/verify-optin-tests.py jdk17-parity --prepare
-    - name: Require Unicode-pinned and credentials CI parity on the Java 17 JVM
+    - name: Require Unicode-pinned, credentials, and HTTPS transport CI parity on the Java 17 JVM
       run: |
         mvn -B -pl unlaxer-common-jdk17,unlaxer-dsl-jdk17 -am test \
-          -Dtest=UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,RustUbnfFrontendConformanceTest,CliStderrConformanceTest,HttpsPackageConformanceTest#credentialsLocationsMatchJavaHomeAndPaths+credentialsJsonMatchesAcrossClis \
+          -Dtest=UnicodeIgnoreCaseWordParserTest,CaseInsensitiveConformanceTest,RustUbnfFrontendConformanceTest,CliStderrConformanceTest,HttpsPackageConformanceTest#credentialsLocationsMatchJavaHomeAndPaths+credentialsJsonMatchesAcrossClis+transportDiagnosticsMatchJavaAcrossClis \
           -DrustConformance=true -Dsurefire.failIfNoSpecifiedTests=false
         test -s unlaxer-dsl/target/case-insensitive-conformance.tsv
         test -s unlaxer-dsl/target/case-insensitive-java.tsv
