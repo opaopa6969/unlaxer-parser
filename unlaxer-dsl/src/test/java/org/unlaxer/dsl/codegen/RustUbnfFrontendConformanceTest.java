@@ -51,6 +51,11 @@ public class RustUbnfFrontendConformanceTest {
         checkSyntaxCases("qualified", 36);
     }
 
+    /** #983: mapper values never hide subsequent syntax, including later grammars. */
+    @Test public void valueValidationWaitsForCompleteSyntax() throws Exception {
+        checkSyntaxCases("value", 158);
+    }
+
     private void checkSyntaxCases(String scope, int expectedCount) throws Exception {
         if (!Boolean.getBoolean("rustConformance"))
             System.out.println("[assumption] frontend syntax priority requires -DrustConformance=true");
@@ -84,7 +89,8 @@ public class RustUbnfFrontendConformanceTest {
                         assertEquals(name, span.get(2).getAsInt(), migration.start());
                         assertEquals(name, span.get(3).getAsInt(), migration.end());
                         // Non-BMP prefixes must use CP, not UTF-16 offsets.
-                        assertEquals(name, source.indexOf("REGEX"), source.offsetByCodePoints(0, migration.start()));
+                        assertEquals(name, span.get(0).getAsInt(), source.substring(0,
+                            source.offsetByCodePoints(0, migration.start())).getBytes(StandardCharsets.UTF_8).length);
                     }
                 }
                 checked++;

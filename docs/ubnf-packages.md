@@ -1176,8 +1176,10 @@ check がともに `P-SYNTAX`（span=null、subject=`UBNF syntax`）を選ぶ。
 セミコロンのない旧宣言は `E-REGEX-RETIRED` のまま拒否する。ファイル全体の構文認識を
 移行診断より優先し、Playground の record 表示にも同じ選択を反映する。
 両版・LF/CRLF・import・非BMP・独立期待値・mutation の詳細は
-[REGEX 移行診断](regex-retirement.md)を参照。途中の値検証がさらに後ろの構文エラーを隠す
-既存の残差は #983 で追跡する。
+[REGEX 移行診断](regex-retirement.md)を参照。#983 では CHAR_RANGE・escape・字句 range・
+重複 annotation 引数も保留し、後続の構文不正を優先する。規則本体の native 入れ子上限で
+先を読めなくなる残差は #996 で追跡する。共通 `value` suite の79形・2,528観測は、
+既存 `regex` / `qualified` suite と同じ1 JVMバッチ・出力先/staging不在の検査を使う。
 CLI から到達する readiness の50 code は本変更の48入力で固定する。
 手組みASTだけの `P-GRAMMAR-COUNT` / `P-GRAMMAR-NAME` / `P-TOKEN-KIND` も同じ分岐のない描画を使うが、
 実 CLI の corpus 件数には含めない。
@@ -1212,7 +1214,7 @@ generate / deps inspect は出力の作成前に終了3となり、エラー本�
 `E-RULE-UNDEFINED: unsupported qualified rule reference` という説明を維持する（#843）。
 rule を含む module の拒否で native の `E-MODULE` に元ファイルのパスがない既存差は
 [#988](https://github.com/opaopa6969/unlaxer-parser/issues/988) へ分離した。
-途中値検証と構文認識の一般的な分離（#983）、Java の製品コード・診断文、公開3.3.0 は変更しない。
+この名前空間参照の修正では値検証の順序を変えない（別途 #983）。Java の製品コード・診断文、公開3.3.0 は変更しない。
 
 ## CLI の出力先パス（#952）
 

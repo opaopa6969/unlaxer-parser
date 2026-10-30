@@ -672,6 +672,10 @@
     "966": {
       "state": "OPEN",
       "title": "parity(cli): 非 UTF-8 ロケールの JVM パス変換制約と native の成功する操作を区別する"
+    },
+    "996": {
+      "state": "OPEN",
+      "title": "parity(frontend): native の規則本体入れ子上限後も構文診断を選択できる安全な走査を設計する"
     }
   },
   "entries": [
@@ -2337,16 +2341,21 @@
     },
     {
       "id": "frontend-value-validation-before-syntax",
-      "category": "unresolved",
-      "title": "途中の値検証が後続構文エラーを隠す",
+      "category": "contract",
+      "title": "途中の値検証を全体構文認識後へ保留する",
       "hosts": "Java CodegenMain / native Rust unlaxer",
       "issues": [
-        983
+        983,
+        996
       ],
-      "observation": "旧REGEX→CHAR_RANGE('z','a')→不正な空のrule bodyの順で並べるとJava17/21のcheckはP-SYNTAX/null/UBNF syntax、nativeはE-REGEX-RETIRED/[25,30)となる。origin/master a2f83ccbと#949修正で同じ差を実測。nativeの値検証が途中で構文走査を止める一般の境界を#983で追跡し、構文の整ったREGEX→後続の値エラーでは最初の移行診断を維持する。",
+      "observation": "Java参照でCHAR_RANGEのv1 BMP境界/順序・v2 escape/scalar境界/range・宣言的字句range・@eval重複引数を最初の値診断として保留する。全体構文（後続grammarと末尾を含む）が成功してからJava mapper順で報告し、旧REGEX/旧adapterとの順序を保つ。宣言的字句repeatのoverflow/逆転/入れ子上限はJavaでも構文検証なので維持し、不正recovery modeも構文に分類する。正常入力に追加走査/診断用確保を増やさず、仮ASTは外へ返さない。79形×入口/local import×LF/CRLFで両実CLI2528観測とfrontend158入力を固定期待値へ照合。check JSON全文、Playground stderr、generate/deps inspectの失敗段階/位置/終了3、出力/staging不在と入力不変を検証。Java製品・公開3.3.0は不変。native固有の規則本体入れ子上限後の構文走査は#996に分離し、#983全体は未完了。",
       "evidence": [
         "docs/regex-retirement.md",
-        "rust/unlaxer-ubnf/src/parser.rs"
+        "rust/unlaxer-ubnf/src/parser.rs",
+        "spec-corpus/cli-stderr.json",
+        "scripts/cli_stderr.py",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustUbnfFrontendConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java"
       ]
     },
     {
@@ -2480,6 +2489,22 @@
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
         ".github/optin-test-contracts.json"
       ]
+    },
+    {
+      "id": "frontend-nesting-stops-syntax",
+      "category": "unresolved",
+      "title": "native の規則本体入れ子上限が後続構文不正を隠す",
+      "hosts": "Java CodegenMain / native Rust unlaxer",
+      "issues": [
+        983,
+        996
+      ],
+      "observation": "旧REGEX→group128〜168段→S ::= ;はJavaのP-SYNTAXに対しnativeが上限で停止し先行移行診断を返す。構文正常時の#985の診断優先と2MiB stack/再帰AST破棄の保証を維持する必要があり、単純に上限を増やさず#996で安全な継続を設計する。",
+      "evidence": [
+        "docs/regex-retirement.md",
+        "docs/java-parser-limits.md",
+        "rust/unlaxer-ubnf/src/parser.rs"
+      ]
     }
   ],
   "corpora": [
@@ -2490,9 +2515,9 @@
         "rust": 11,
         "nativeSyntax": 5,
         "nativeExpected": 3,
-        "nativeByEnding": 76,
-        "javaError": 64,
-        "native": 76,
+        "nativeByEnding": 234,
+        "javaError": 222,
+        "native": 234,
         "javaAst": 12
       },
       "entries": [
@@ -2503,7 +2528,8 @@
         "cli-output-replacement-metadata",
         "readiness-regex-syntax-priority",
         "qualified-reference-prefix-trivia",
-        "local-rule-module-error-path"
+        "local-rule-module-error-path",
+        "frontend-value-validation-before-syntax"
       ]
     },
     {
