@@ -232,17 +232,38 @@ Unix 以外（Windows 等）の Rust は従来の `HOME` と override の挙動�
 
 passwd lookup の不在・エラー・2 バイト未満の home（空、systemd DynamicUser の `/` など）は JDK 間で規則が異なる。
 JDK21 は非空の `HOME`、なければ `?` を使う。JDK17 は不在・エラー時に `?`、見つかった home は短くてもそのまま使う。
-native はリポジトリの既定 JDK21 を参照し、残る JDK17 差と互換方針を
-[#964](https://github.com/opaopa6969/unlaxer-parser/issues/964) に分離する。
+native の互換対象をリポジトリの既定 JDK21 に固定する（#964）。Java の製品コードを
+変えずに native が JDK17 と JDK21 の異なる場所を同時に選ぶことはできない。
+既定 JDK・CI の主 job と一致し、非空 HOME があるとき cwd や `?` 配下を誤って読む危険を
+小さくするため JDK21 を選ぶ。HOME もない場合の `?` は JDK21 の既存規則として維持する。
 この条件では同じ `UBNF_CREDENTIALS_FILE` の明示で差を避けられる。
 
-共通 `spec-corpus/package-credentials-location.json` の26形を既存の `HttpsPackageConformanceTest` から実行する。
-各形で両 `deps resolve`、Java-host Rust / native Rust / Java flag CLI と lock/cache の有無を検査する（260起動）。
-Java の独立 home probe と実 CLI の診断・exit・ローカル TLS server の Authorization 受信から選択ファイルを固定し、
-失敗時の snapshot 不変、生成時の無通信・固定 cache のみの利用を確認する。
+| passwd lookup / pw_dir | HOME | JDK17 の基点 | JDK21 / native の基点 |
+| --- | --- | --- | --- |
+| 不在 | 未設定 / 空 | `?` | `?` |
+| 不在 | 非空 | `?` | HOME |
+| エラー | 未設定 / 空 | `?` | `?` |
+| エラー | 非空 | `?` | HOME |
+| 空 pw_dir | 未設定 / 空 | 空文字列（cwd） | `?` |
+| 空 pw_dir | 非空 | 空文字列（cwd） | HOME |
+| 1バイトの pw_dir（`/`・`s`） | 未設定 / 空 | pw_dir | `?` |
+| 1バイトの pw_dir（`/`・`s`） | 非空 | pw_dir | HOME |
+| 2バイト以上の pw_dir | 任意 | pw_dir | pw_dir |
+
+各基点から `.config/unlaxer/credentials.json` を選ぶ。空 home はこの相対パスを cwd で解決する。
+共通 `spec-corpus/package-credentials-location.json` の41形を既存の `HttpsPackageConformanceTest` から実行する。
+不在・エラー・空 pw_dir × HOME 未設定・空・非空の9組合せは、正常なファイルと不正 JSON の
+両方を検証する。各形で両 `deps resolve`、Java-host Rust / native Rust / Java flag CLI と
+lock/cache の有無を検査する（410呼出し）。成功時は Authorization のラベルで選択ファイルを確認し、
+raw lock/cache と生成 bytes を照合する。不正 JSON は両 resolve が
+`E-PACKAGE: cannot read artifact credentials` / exit 3、lock/cache は既存の有無とも不変で、
+同じ不正 credentials があっても固定 cache からの3 CLI生成は成功し通信しない。
+Java の独立 home probe と実 CLI の診断・exit を使い、同じ子環境内の呼出しは
+既存 `CodegenBatchHost` の1 JVM にまとめる（`--unbatched` で実 CLI と照合可能）。
 `-Duser.home` の2形は native の明示ファイル指定へ対応付けた検査であり、同じ環境だけで一致したとは扱わない。
-JDK17 の fallback 差3形は host 別期待値で実行し、skip しない。TLS の最終診断は #956 で共通化した。
-CI の cross-language job は JDK21 で実行する。JDK17 の期待値は現在の jdk17-parity job に含まれず、手元の JDK17 実行で確認している（CI 化は [#967](https://github.com/opaopa6969/unlaxer-parser/issues/967)）。
+JDK17 の差は `javaSelected17` として記録し、skip しない。TLS の最終診断は #956 で共通化した。
+CI の cross-language job（cli shard）は JDK21、JDK17 も既存の jdk17-parity step の
+`credentialsLocationsMatchJavaHomeAndPaths` で全形を実行する（#967 / #975）。
 非 UTF-8 ロケールで Java が非 ASCII のパスを扱えない差は [#966](https://github.com/opaopa6969/unlaxer-parser/issues/966) で追跡する。
 Linux のテスト専用 `LD_PRELOAD` shim は子プロセスだけへ仮の passwd home を返し、実 passwd lookup へ fallback しない。
 実 credentials は開かず、前後の存在・inode・size・mtime/ctime（symlink とリンク先）で不変を検査する。

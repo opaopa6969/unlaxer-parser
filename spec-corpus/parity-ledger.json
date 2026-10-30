@@ -685,7 +685,7 @@
       "issues": [
         958
       ],
-      "observation": "通常のpasswd homeはHOME未設定・空・差替えより優先する。空overrideはcwd、末尾の/は除去、空白・相対・tildeはそのまま、symlinkを追跡し、欠落/親非directoryとdirectoryの診断をJavaに揃える。getpwuid_rのunsafeは専用関数のみ、外部crate追加なし。26形260呼出しをsnapshot有無で検証する（CIはJDK21、JDK17は手元）。JVM -Duser.homeはnativeの明示UBNF_CREDENTIALS_FILEへ対応付ける。非Unixは既存のHOME/overrideを維持する。子プロセスのpasswdとHOMEだけを隔離し実credentialsは開かずstatで不変検査。JDK別fallbackはpackage-credentials-home-fallbackに分離。",
+      "observation": "通常のpasswd homeはHOME未設定・空・差替えより優先する。空overrideはcwd、末尾の/は除去、空白・相対・tildeはそのまま、symlinkを追跡し、欠落/親非directoryとdirectoryの診断をJavaに揃える。getpwuid_rのunsafeは専用関数のみ、外部crate追加なし。41形410呼出しをsnapshot有無で検証する（CIのcli shardはJDK21、jdk17-parityも同じ全形を実行）。JVM -Duser.homeはnativeの明示UBNF_CREDENTIALS_FILEへ対応付ける。非Unixは既存のHOME/overrideを維持する。子プロセスのpasswdとHOMEだけを隔離し実credentialsは開かずstatで不変検査。JDK別fallbackはpackage-credentials-home-fallbackに分離。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials-location.json",
@@ -698,13 +698,13 @@
     },
     {
       "id": "package-credentials-home-fallback",
-      "category": "unresolved",
-      "title": "passwd entry 不在・空 home における JDK17/21 の差",
+      "category": "contract",
+      "title": "JDK21 を互換対象とする Unix credentials home fallback",
       "hosts": "JDK17 / JDK21 / native Rust",
       "issues": [
         964
       ],
-      "observation": "通常のpasswd entryは一致するが、JDK21は不在/lookup失敗/2バイト未満のhome（空・/など）なら非空HOME→?へfallbackする。JDK17は不在/失敗で?、見つかったhomeは短くても維持する。nativeは既定JDK21を参照し、passwd-missing・passwd-empty・passwd-shortをJDK17別期待値でskipせず実行する。共通の明示overrideで回避可能。互換対象/選択方法の確定を#964で追跡する。",
+      "observation": "nativeの互換対象を既定JDK・CI主jobのJDK21に確定する。Java製品コードを変えず異なる2場所を同時に選べず、非空HOMEへのfallbackはcwdや?配下の誤読を減らすため。不在/lookupエラー/2バイト未満のpw_dirは非空HOME→?、JDK17は不在/エラーで?、見つかったhomeは空/短くても維持する。不在・エラー・空pw_dir×HOME未設定・空・非空の9組合せを正常/不正JSON両方で実行し、両resolveの選択ファイル・最終診断/exit・snapshot有無で失敗時不変を固定する。不正JSONはcannot read artifact credentials/exit3、3生成CLIはcredentialsも通信も使わず固定cacheから生成する。JDK17との差はjavaSelected17のhost別期待値でCIでもskipせず実行し、1バイトhomeの既存対照も維持する。明示overrideで回避可能。子環境だけを隔離し実credentialsを開かない。既存native選択・Java製品コード・非Unix挙動は変更しない。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-credentials-location.json",
@@ -712,7 +712,8 @@
         "scripts/ubnf_credentials_home.py",
         "scripts/fixtures/credentials-passwd.c",
         "rust/unlaxer-generator/src/package_fetch/passwd_home.rs",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java"
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/HttpsPackageConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/CodegenBatchHost.java"
       ]
     },
     {
@@ -3046,7 +3047,7 @@
     {
       "path": "spec-corpus/package-credentials-location.json",
       "fields": {
-        "javaSelected17": 3
+        "javaSelected17": 11
       },
       "entries": [
         "package-credentials-location",
