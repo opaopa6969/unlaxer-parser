@@ -93,7 +93,7 @@ fn transport_recovers_from_invalid_json_and_requires_shutdown_before_exit() {
         (vec![json!({"jsonrpc":"2.0","method":"exit"})], 1),
         (
             vec![
-                json!({"jsonrpc":"2.0","id":1,"method":"initialize"}),
+                json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
                 json!({"jsonrpc":"2.0","id":2,"method":"shutdown"}),
                 json!({"jsonrpc":"2.0","method":"exit"}),
             ],

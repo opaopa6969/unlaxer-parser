@@ -9,6 +9,9 @@ pub(crate) struct Configuration {
 }
 impl Configuration {
     pub(crate) fn read(params: &Value) -> Result<Self, Error> {
+        if params.is_null() {
+            return Err(crate::rpc::internal());
+        }
         let Some(value) = params["initializationOptions"].get("languageProfile") else {
             return Ok(Self::default());
         };

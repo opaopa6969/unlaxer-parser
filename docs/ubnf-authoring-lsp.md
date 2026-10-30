@@ -32,7 +32,7 @@ Java の既存経路は維持し、Rust は対応した capability だけを広�
 | `unlaxer/configure`（継承） | profile / client capability を再設定し cache 無効化 | #895：同じ options と experimental metadata、成功/失敗・全置換・文書保持を共通62件で検証 |
 
 将来機能の formatting、workspace 全体索引、completion resolve、semantic delta は今回の parity 条件に混ぜない。
-未対応 request は `-32601`。全診断/profile は [#885](https://github.com/opaopa6969/unlaxer-parser/issues/885)、
+未知 request は `-32601 Unsupported request method: <method>`、lsp4j 宣言済み未実装 request は `-32603 Internal error.`（#994）。全診断/profile は [#885](https://github.com/opaopa6969/unlaxer-parser/issues/885)、
 navigation/編集支援/packageSource/native 配布の親は [#886](https://github.com/opaopa6969/unlaxer-parser/issues/886)。
 AST navigation の第一単位を追加し、残る編集支援は [#901](https://github.com/opaopa6969/unlaxer-parser/issues/901)、
 入力域/platform/起動失敗は [#902](https://github.com/opaopa6969/unlaxer-parser/issues/902) で継続する。
@@ -85,7 +85,7 @@ virtual package path に開いた偽 buffer が検証済み source を置換で�
 server が manifest/lock/cache を書き換えないことも両版で検証する。
 現時点の native file URI は Linux のローカル絶対パスを検証対象とし、UNC/Windows 等は #902（親 #886）に残す。
 
-CI は `ubnf-authoring` 必須契約の8メソッドと、基準127件・navigation39件・local import 17件・package metadata 27件・artifact 39件・artifact UTF-8 29件の実行件数を別々に検査する。
+CI は `ubnf-authoring` 必須契約の12メソッドと、基準127件・navigation39件・local import 17件・package metadata 27件・artifact 39件・artifact UTF-8 29件の実行件数を別々に検査する。
 packaged VSIX は従来 Java smoke を保持し、別の隔離 profile で Java executable を不存在に設定して
 Rust の completion/hover/診断と変更後の修復、および両 backend の definition/references・rename・documentSymbol・foldingRange・linkedEditingRange・readonly package source を確認する。最後に拡張の `deactivate` で
 native server の子プロセスが終了し、残らないことを確認する（tinycalc-vscode #874/#880 と同じ後始末の水準）。
@@ -187,7 +187,7 @@ range 付きの `didChange` は両版とも先頭の text を全文として適�
 - [#893](https://github.com/opaopa6969/unlaxer-parser/issues/893): 上表の未接続意味解析・Java classpath・表現境界を含む validator 全診断。
 - [#894](https://github.com/opaopa6969/unlaxer-parser/issues/894): `ULX-PARSE-001` の expected/stack/data/relatedInformation、consumedLength hover、module全文/複数失敗/URI位置。
 - [#895](https://github.com/opaopa6969/unlaxer-parser/issues/895): initialize options と `unlaxer/configure`、experimental profile / languageQueryConsumer、cache/lifecycle を共通62件で接続・検証。
-- [#994](https://github.com/opaopa6969/unlaxer-parser/issues/994): #895 レビューで見つけた JSON-RPC 層の残差。params 自体の欠落・型違い、document version の gson 型変換、publishDiagnostics の `version` 欄、未知/未実装 method の応答。
+- [#994](https://github.com/opaopa6969/unlaxer-parser/issues/994): JSON-RPC 層を共通168ケースで検証。params 自体の欠落・型違い、document version の Gson 型変換、publishDiagnostics の `version: 0`、未知/未実装 method の応答（後述）。
 
 既存の型解析に依存する全診断と、parser failure provenance、session profile は別の契約である。
 一つの巨大な移植で Java の機能を省く代わりに、今回の診断接続を独立して revert できる単位とし、
@@ -344,7 +344,7 @@ Java 参照は `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34`（origin/master、2026
 | initialize/configure/shutdown の通知 | 実行せず無視。通知専用 method の request は -32600 `Notification method requires a notification` | 同じ lifecycle 境界 |
 | exit | shutdown 後0、それ以外1で process 終了。以降 wire request は送れない | 同じ終了境界。handle 層も終了後拒否 |
 | 同一/減少 version、range 付き Full change | Ext は version/range を見ず先頭 text を全文適用。空 change は文書不変 | native も適用。複数文書・再設定後の query/診断で検証 |
-| 未オープン URI への didChange、document version の型 | Ext の parseDocument が未オープン URI も開いて診断する。version は lsp4j の Integer として読むだけで値は使わない（省略/null/32bit 整数は受理、範囲外・小数・真偽値・object は通知ごと破棄） | 同じ。lsp4j/gson が数値文字列や整数値の小数を整数へ寄せる型変換、params 自体の欠落・型違い、publishDiagnostics の version 欄、未知 method の応答は #994 |
+| 未オープン URI への didChange、document version の型 | Ext の parseDocument が未オープン URI も開いて診断する。version は lsp4j の Integer として読むだけで値は使わない（省略/null/32bit 整数は受理、範囲外・非整数の小数・真偽値・object は通知ごと破棄） | 同じ。#994 で Gson の数値文字列・整数値の小数の型変換と診断 version を追加（後述） |
 
 Java の semanticTokens/codeAction/signatureHelp の実装と広告は維持する。
 これらの native 移植は #901 のままとし、共通 fixture はホスト別の既存 capability も独立全 JSON 期待値で固定する。
@@ -363,3 +363,49 @@ Java の基底 snapshot parse cache は設定成功時に無効化されるが�
 そのため configure では既に検証した package source snapshot を消さず、次の query で import を再検証する。
 client の semantic-token multiline/overlap flags は Java の設定に含まれるが、native の token 提供は #901 の範囲であり、
 この PR はその機能を広告せず、flags が付いた initialize/configure の受理を検証する。
+
+## JSON-RPC 層の固定契約（#994）
+
+参照は #895 と同じ `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34`。
+生成 `UBNFLanguageServer` / `lifecycleEndpoint` と `UBNFLanguageServerExt`、
+`UBNFLspLauncherExt`、LSP4J 0.23.1 / Gson 2.13.2 を固定した。
+Java 製品コード・既存 capability・公開済み3.3.0・通常 parser のホットパスは変更しない。
+JSON-RPC 入力境界だけを native へ移し、新しい crate・ネットワーク・lock更新・コード実行は追加しない。
+
+| 入力 / 観測項目 | Java の固定挙動 | native の選択と理由 |
+|---|---|---|
+| initialize/configure の params 欠落、null、`[null]` | `-32603 Internal error.`。initialize は未初期化、configure は旧設定と文書を保持 | 同じ code/message と状態。Java の NPE は欠陥だが、製品を変更せず失敗境界を保つ方が最小・可逆 |
+| params の `[]`、scalar、`[7]`、capabilities の scalar/array | Gson が `-32700 Message could not be parsed.` | lifecycle dispatch より先に型を検査。失敗で構成を変更しない |
+| `[有効 InitializeParams]` | 単一 positional 引数として受理 | 同じ。失敗後の initialize 再試行をこの形でも確認 |
+| document version | 省略/null/i32 に加え、数値文字列・整数値の小数・指数を Gson `nextInt` で受理。値の大小は無視 | `Integer.parseInt` 相当の BMP 数字、続いて double→i32→double の一致で判定。ASCII前後空白、符号、浮動小数suffix/16進浮動小数文字列も共通 fixture。範囲外・非整数・真偽値/object/array は通知ごと破棄 |
+| publishDiagnostics | Ext は documentVersions を更新せず常に `version: 0`。configure 自体は通知しない | 同じ欄を追加。実 version を推測して送らず、観測契約を維持 |
+| 未知 request | `-32601 Unsupported request method: <method>` | 全 message を一致させる |
+| 未知 `$/` request（cancelRequest/progress/foo 等） | `result: null`。宣言済み通知 `$/setTrace` の request は従来の `-32600` | 同じ。lifecycle の前後では従来の未初期化/終了エラーを維持 |
+| lsp4j 宣言済み未実装 request | `-32603 Internal error.` | 38 method を固定リストで扱う。willSaveWaitUntil/formatting/codeLens/documentHighlight/prepareRename/workspace symbol/executeCommand/willCreateFiles 等を含む。機能を実装したり広告したりせず default method の失敗を維持 |
+| error.data | Internal error は JVM stack trace、parse error は Gson/JsonReader の説明 object | この2エラーの Java `data` のみ比較から除外。JVM の呼出履歴や Gson のクラス名・reader位置を native に捏造せず、実装詳細を安定契約にしないため。存在と型を検査し、code/message/id/result と他のキーは独立全 JSON と厳密比較 |
+
+手書き fixture は `spec-corpus/ubnf-authoring-lsp/jsonrpc.json`。
+`configuration.json` の既存の手書き InitializeResult/profile/診断 oracle も再利用する。
+実測値を oracle に書き戻さず、12不正 params × initialize/configure、47 version × didOpen/didChange、
+47 method、再試行/回復/終了の3件、計168ケースを両実 stdio に送る。
+失敗 initialize 後の新 request は未初期化エラー、再試行は成功する。
+失敗 configure 後は既存文書の全 hover、毎回新しいURIへの didOpen と診断抑制を確認し、
+成功 configure 後の全診断 JSON により旧 VALIDATE gate の保持と回復を検証する。
+不正 version の change は既存の異なる文書を保持し、全 documentSymbol JSON と通知不在を確認する。
+
+共通 checker は、従来 suite の `diagnostics()` でも uri/version/diagnostics 以外のキーを拒否し、
+新 suite は params 全体を独立 oracle に比較する。request の id を params より先に送信し、
+null/省略/空配列/false/0/空文字を勝手に `{}` へ変換しない。
+`UbnfAuthoringProtocolConformanceTest.nativeAndJavaServersShareJsonRpcFixtures` を既存
+self-hosted CI の必須契約へ追加する。Java driver の `-Xmx8g`、runs-on、重い local-imports suite は維持する。
+
+#901 の codeAction/signatureHelp/semanticTokens full は範囲外で、既存のホスト別 capability oracle を維持する。
+新たに確認した reader のキー順（params より後の id）・positional arity > 1 による無応答、
+capabilities null の無応答は [#1001](https://github.com/opaopa6969/unlaxer-parser/issues/1001) で追跡する。
+この168件の成功を全 DTO・全 raw frame の同等性や親 #885/#864/#111 の完了とは扱わない。
+
+追加 suite の直接実行は JDK21 約2.7秒、JDK17 約4.4秒（共有ホスト上の実測）。
+CI に新しい job や既存 local-imports の重複実行を足さず、追加時間の目標1分未満を満たす。
+診断 version の削除、数値文字列 version の拒否、未知 method 文面の巻戻しの3変異を、
+隔離コピーの実 native stdio に適用すると新 suite が全て失敗することを確認した。
+変異はレビュー用 worktree に加えず、元コードで両 JDK の検証を行う。

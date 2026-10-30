@@ -80,6 +80,10 @@ public class UbnfAuthoringProtocolConformanceTest {
         runProtocol("configuration", 62);
     }
 
+    @Test(timeout=120000) public void nativeAndJavaServersShareJsonRpcFixtures() throws Exception {
+        runProtocol("jsonrpc", 168);
+    }
+
     private void runProtocol(String suite, int count) throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] rustConformance=true is required for native authoring stdio");
         Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
