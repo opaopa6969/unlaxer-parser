@@ -219,10 +219,11 @@ initialize/configure params の失敗、Gson Integer の version 受理域、診
 両実 stdio に送り、初期化失敗後の再試行と configure 失敗後の設定・既存文書・新入力を検証する。
 JVM/Gson 固有 error.data だけを除外し、code/message/result/id と他のキーは比較する。
 #1001で同じsuiteを558件（既存168＋raw reader/DTO390件）へ拡張した。InitializeParamsの他欄と
-実測した入れ子DTO、50型付きrequestの不正params、hover positionのInteger変換をJavaへ揃える。
+実測した入れ子DTO、50型付きrequestの不正params、hover positionの型違い拒否、didChange contentChangesの不正DTOによる通知破棄をJavaへ揃える。
 null idは通知とし、生1e400はserde_json arbitrary_precisionをcrate自身で有効にしてbuild方法に依存せず
 requestの元id付きparse error / 通知破棄へ揃える。Javaのid読取り前失敗・arity>1・capabilities null・
 不正workDoneTokenによる無応答はreaderの欠陥として恒久差にし、clientを固める動作を移植せずnativeの
 決定的応答を維持する。全6キー順・重複・失敗後の設定/文書保持と再試行を両実stdioで確認する。
 #901のJava3機能を維持し、全ClientCapabilities schemaや全DTO parityの完了とは扱わない。
+Integer外・非scalarのidはJava無応答・nativeは同じ値を返す恒久差。position受理域と他methodのDTOは #1005。
 [固定対応表と検証境界](../docs/ubnf-authoring-lsp.md#json-rpc-層の固定契約994) を参照。

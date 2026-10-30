@@ -71,8 +71,10 @@ def run_jsonrpc(clients, directory, omit_params):
                 # Failed attempts share the still-uninitialized real server.
                 # Only accepted initialization needs a fresh session. This keeps
                 # JVM startup and all silent-input deadlines below one minute.
+                # Keep the suite-wide response timeout. Lowering it here would
+                # also lower it for every later shared-session request and
+                # make loaded self-hosted runners fail on slow JVM start/GC.
                 client = type(original)(original.command, native=original.backend == 'rust') if outcome == 'success' else original
-                client.timeout = 4
                 client.fixture = f"jsonrpc/reader/initialize/{case['id']}/{index}"
                 try:
                     outcome = case[client.backend][index]
@@ -88,7 +90,7 @@ def run_jsonrpc(clients, directory, omit_params):
                         assert not client.pending and client.messages.empty(), client.fixture
                         response(client, 'shutdown', {}, {'result': None})
                         client.send('exit')
-                        assert client.process.wait(timeout=4) == 0
+                        assert client.process.wait(timeout=client.timeout) == 0
                 finally:
                     if client is not original:
                         client.close()
@@ -273,6 +275,23 @@ def run_jsonrpc(clients, directory, omit_params):
         diagnostic(client, uri, [])
         client.send_raw(reader['overflowNotification'].replace('$URI', json.dumps(uri)).replace('$SOURCE', json.dumps(kept['source'])))
         response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': fixture['oldDocument']['symbols']})
+
+        def change(changes, source):
+            client.send_raw('{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":' + json.dumps(uri)
+                            + ',"version":2},"contentChanges":' + changes.replace('$SOURCE', json.dumps(source)) + '}}')
+        # Any ill-typed change DTO drops the whole notification: no diagnostics
+        # (checked by the barrier and the final quiet) and the old document stays.
+        for changes in reader['droppedChanges']:
+            change(changes, kept['source'])
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': fixture['oldDocument']['symbols']})
+            assert not client.pending, (client.fixture, changes, client.pending)
+        # Gson-coercible and null fields are accepted and apply the first text.
+        for changes in reader['acceptedChanges']:
+            change(changes, kept['source'])
+            diagnostic(client, uri, kept['diagnostics'])
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': fixture['keptSymbols']})
+            change('[{"text":$SOURCE}]', fixture['oldDocument']['source'])
+            diagnostic(client, uri, [])
         quiet(client)
     evidence.append({'case': 'reader-overflow-notification'})
     for case in fixture['methods']:

@@ -32,6 +32,10 @@ fn boolean(value: &Value) -> bool {
     value.is_null() || value.is_boolean() || value.is_string()
 }
 
+fn position(value: &Value) -> bool {
+    object(value) && integer(&value["line"]) && integer(&value["character"])
+}
+
 fn strings(value: &Value, fields: &[&str]) -> bool {
     fields.iter().all(|key| string(&value[key]))
 }
@@ -100,9 +104,7 @@ pub(crate) fn params_shape(method: &str, params: &Value) -> Result<(), Error> {
             // Bounded nested request DTO coverage observed on the Java server.
             object(&params["textDocument"])
                 && string(&params["textDocument"]["uri"])
-                && object(&params["position"])
-                && integer(&params["position"]["line"])
-                && integer(&params["position"]["character"])
+                && position(&params["position"])
         } else {
             true
         };
@@ -211,6 +213,28 @@ pub(crate) fn initialize_params(params: &Value) -> &Value {
     match params.as_array() {
         Some(values) if values.len() == 1 => &values[0],
         _ => params,
+    }
+}
+
+// Gson reads every TextDocumentContentChangeEvent before Java Ext ignores the
+// range and applies the first text. An ill-typed range/rangeLength/text in any
+// change, including a raw 1e400, drops the whole notification (#1001).
+pub(crate) fn change_shape(params: &Value) -> Result<(), Error> {
+    let valid = params["contentChanges"].as_array().is_none_or(|changes| {
+        changes.iter().all(|change| {
+            let range = &change["range"];
+            object(change)
+                && object(range)
+                && position(&range["start"])
+                && position(&range["end"])
+                && integer(&change["rangeLength"])
+                && string(&change["text"])
+        })
+    });
+    if valid {
+        Ok(())
+    } else {
+        Err(parse_error())
     }
 }
 

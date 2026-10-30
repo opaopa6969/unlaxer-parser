@@ -421,10 +421,12 @@ id はその時点まで読めた値だけが Java の error 回復に使われ�
 | `workDoneToken:{}` / `[]` / `true` | Either adapter が reader を失敗させ、応答なし | **恒久差**: native は従来どおり未使用 token を無視して成功を返す。Java reader 欠陥の移植は client を停止させるため安全でない。JSON-RPC request への決定的応答を維持する。数値 `1.5` は両版 `-32700`、文字列/null は受理 |
 | InitializeParams の他欄・入れ子の型違い | id 付き `-32700 Message could not be parsed.`、initialize 未初期化 / configure 旧状態保持 | 同じ。対象の正確な範囲は下記。成功値の coercion と未知キー・untyped options は削らない |
 | 型付き request の params `7` / `[]` / `"x"` / `false` | 宣言済み50 methodで id 付き `-32700`（実装/default method の dispatch より先） | 同じ。hover/formatting/documentSymbol/packageSource の単一 positional 正常形も比較。#901 の既存 Java 3機能を削らず、不正DTOのparse errorだけをnativeへ追加する |
-| hover の `textDocument:7`、`position.line:[]` / 生 `1e400` | id 付き `-32700` | 同じ。position の Integer 検査は hover の実測範囲。他methodの全DTO schemaを移植したとは扱わない |
+| hover の `textDocument:7`、`position.line:[]` / 生 `1e400` | id 付き `-32700` | 同じ。position の Integer 検査は hover の実測範囲。他methodの全DTO schemaを移植したとは扱わない。position の Gson 受理域（`"0"`・`1.0`・`1e-400` 等を Java は受理、native は `-32602`）、hover 以外の入れ子 DTO、hover の `workDoneToken`、ClientCapabilities の他の入れ子欄は [#1005](https://github.com/opaopa6969/unlaxer-parser/issues/1005) で追跡する |
 | 重複 id / method / params | 既知methodの params は出現ごとに検査。正常な重複 id/method は最後の値。不正paramsを後の正常paramsで上書きしても先のparse errorを返す | 同じ入力で比較する。nativeはstream失敗時点の既読idを回復し（未読の場合は最終id付き応答を維持）、先の不正DTOで生じたerrorを後のparamsで消さない。未知methodで保留したparamsは最終methodで変換する。InitializeParamsのtop-level欄も出現ごとに検査する。全ての異種method切替や不正idのreader回復を同等と主張しない |
 | `"id":null`（未知 / `$/foo` / formatting） | 通知として扱い、結果/errorを返さない | 同じ。無いidと同じ通知判定にする。readerの故障ではないため、通知をrequestに変える理由はない |
-| didChange version の生 `1e400` | 通知を黙って破棄し、元文書を保持 | 同じ。`unlaxer-ubnf-lsp` 自身が serde_json `arbitrary_precision` を要求する。`-p` / `--workspace` の feature 統合に依存しない。新しい crate は追加しない。JSON を全体で受理した後 DTO Integer 変換で拒否し、request は元id付き `-32700`、通知は応答なし |
+| Integer に収まらない数値 id（`0.5`、`2147483648`、`10000000000`、生 `1e400` / `-1e400`）、bool / array / object の id | reader が id を読めず、応答なし | **恒久差**: native は数値 id をそのまま返す（bool / array / object は `id:null` の `-32600 Invalid Request`）。JSON-RPC は応答の id を request と同じ値にすることを求める。Java reader の無応答を移植すると client を固めるため、他の無応答と同じ理由で移植しない |
+| 整数値の小数・指数表記の id（`1.0`、`1E0`、`1e-400`） | Integer に変換し、`1` / `0` を返す | **恒久差**: native は request の数値をそのまま返す。JSON-RPC の「同じ値」に沿い、JSON の数値として等しいため client の対応付けは変わらない |
+| didChange version の生 `1e400`、contentChanges の不正 DTO（`range` / `range.start` / `rangeLength` の型違い・生 `±1e400`、2件目以降の不正な change） | 通知を黙って破棄し、元文書を保持。Gson が全 change を読んでから Ext が先頭 text だけを使う | 同じ。native も全 change の `range`・`rangeLength`・`text` を検査してから先頭 text を適用する。null や Gson が変換できる値（`"0"`、`1e-400`、`"1"`）は両版とも受理する。`unlaxer-ubnf-lsp` 自身が serde_json `arbitrary_precision` を要求する。`-p` / `--workspace` の feature 統合に依存しない。新しい crate は追加しない。JSON を全体で受理した後 DTO Integer 変換で拒否し、request は元id付き `-32700`、通知は応答なし |
 | error.data / stderr | -32603 の data は JVM stack trace、-32700 の data は Gson の説明 object。無応答時の stderr に NPE 等 | data の**内容だけ**を比較から外し、存在と型は検査する（#994 と同じ）。VM呼出履歴・Gson内部位置を移植する契約がないため。stderr の stack trace はwire応答ではなく比較対象外。id/code/message/result/他のキーの有無は全JSON比較 |
 
 DTO の検査範囲は `processId`（Gson Integer）、`rootPath/rootUri/locale/trace`（Gson String）、
@@ -440,7 +442,7 @@ ClientCapabilities 全体や全methodの内部DTOは移植しない。広大な�
 fixture の `reader.orders` / `reader.orderParams` / `reader.duplicates` は手書きraw frameで、
 serializeし直さず両実serverへ同じ文字列を送る。生の数値 `1e400`・重複キー・escaped key・順序を保持する。
 oracleは実測結果から作らず、fixture内の明示されたcode/messageとホスト別の成功/無応答表を使う。
-無応答は後続requestが有限4秒内に処理された後、共有の**1秒deadline**で余分なframeがないことを確認する。
+無応答は後続requestが有限の応答 timeout（suite 共通の既定20秒。共有 runner の負荷で JVM 起動や GC が遅れても誤検知しない）内に処理された後、共有の**1秒deadline**で余分なframeがないことを確認する。
 失敗initializeを同じ未初期化serverへ順次送り、最後の正常initializeが成功することを確認する。
 成功するinitializeだけ別sessionで検証して既初期化エラー・後続request・正常終了も調べ、JVM起動回数を抑える。
 configureの失敗後は、旧文書の全hover/documentSymbolと新規URIの診断抑制で旧設定・文書を検証し、

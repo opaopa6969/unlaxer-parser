@@ -1307,6 +1307,21 @@
       "{\"textDocument\":{\"uri\":\"file:///none\"},\"position\":{\"line\":1e400,\"character\":0}}"
     ],
     "overflowNotification": "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":{\"textDocument\":{\"uri\":$URI,\"version\":1e400},\"contentChanges\":[{\"text\":$SOURCE}]}}",
+    "droppedChanges": [
+      "[{\"range\":{\"start\":{\"line\":1e400,\"character\":0},\"end\":{\"line\":0,\"character\":0}},\"text\":$SOURCE}]",
+      "[{\"range\":{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":0,\"character\":-1e400}},\"text\":$SOURCE}]",
+      "[{\"rangeLength\":1e400,\"text\":$SOURCE}]",
+      "[{\"range\":7,\"text\":$SOURCE}]",
+      "[{\"range\":{\"start\":\"x\",\"end\":null},\"text\":$SOURCE}]",
+      "[{\"rangeLength\":\"x\",\"text\":$SOURCE}]",
+      "[{\"text\":$SOURCE},{\"text\":[]}]",
+      "[{\"text\":$SOURCE},{\"range\":{\"start\":{\"line\":1.5}}}]"
+    ],
+    "acceptedChanges": [
+      "[{\"range\":{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":\"0\",\"character\":1e-400}},\"rangeLength\":\"1\",\"text\":$SOURCE}]",
+      "[{\"range\":null,\"rangeLength\":null,\"text\":$SOURCE}]",
+      "[{\"range\":{\"start\":null,\"end\":{}},\"text\":$SOURCE}]"
+    ],
     "typedPositional": [
       {
         "method": "textDocument/hover",

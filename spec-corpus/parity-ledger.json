@@ -2554,7 +2554,7 @@
       "issues": [
         1001
       ],
-      "observation": "固定Java revision 384fcf3eb1c0ce3e207ac580cec5fcac4b478b34。method→params→idでの空配列、stream positional arity>1、capabilities null、不正Either workDoneTokenはJava readerが失敗して応答しない。clientを固める欠陥を互換のために移植せず、nativeはid付きparse errorまたは既存の成功応答でJSON-RPCを完結する恒久差とする。他のキー順でJavaが決定的エラーを返す場合は揃える。全6キー順・重複・arity・null・overflowの独立raw oracleを両実stdioへ送り、1秒deadlineの無応答・後続request・initialize再試行・configure旧設定/文書保持を558件の既存必須suiteで確認する。host別fieldはこの恒久差のoracleと固定revision metadataであり無条件skipではない。JVM/Gson固有error.dataは存在/型を確認して内容を除外し、id/code/messageと他のキーは比較する。ClientCapabilitiesの全schemaは対象外で実測代表を対応表に列挙する。",
+      "observation": "固定Java revision 384fcf3eb1c0ce3e207ac580cec5fcac4b478b34。method→params→idでの空配列、stream positional arity>1、capabilities null、不正Either workDoneToken、Integer外・非scalarのidはJava readerが失敗して応答しない（数値idはnativeが同じ値を返す）。clientを固める欠陥を互換のために移植せず、nativeはid付きparse errorまたは既存の成功応答でJSON-RPCを完結する恒久差とする。他のキー順でJavaが決定的エラーを返す場合は揃える。全6キー順・重複・arity・null・overflowの独立raw oracleを両実stdioへ送り、1秒deadlineの無応答・後続request・initialize再試行・configure旧設定/文書保持を558件の既存必須suiteで確認する。host別fieldはこの恒久差のoracleと固定revision metadataであり無条件skipではない。JVM/Gson固有error.dataは存在/型を確認して内容を除外し、id/code/messageと他のキーは比較する。ClientCapabilitiesの全schemaは対象外で実測代表を対応表に列挙する。position受理域とhover以外のDTOは #1005。",
       "evidence": [
         "docs/ubnf-authoring-lsp.md",
         "spec-corpus/ubnf-authoring-lsp/jsonrpc.json",

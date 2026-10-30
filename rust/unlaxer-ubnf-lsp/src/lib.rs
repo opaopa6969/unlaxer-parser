@@ -157,6 +157,7 @@ impl Server {
                             self.publish(uri, &mut out);
                         }
                         "textDocument/didChange" => {
+                            rpc::change_shape(params)?;
                             let changes = params["contentChanges"]
                                 .as_array()
                                 .ok_or_else(|| invalid("contentChanges required"))?;
