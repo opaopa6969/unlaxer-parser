@@ -383,6 +383,22 @@ impl ParseContext<'_> {
     ) -> Option<NodeId> {
         self.add_token_node_inner(rule, kind, source, true)
     }
+    /// Publishes one custom terminal with an explicit trace label, without moving
+    /// either cursor. Call instead of `add_token_node` when the terminal's source
+    /// is projected or input-backed. Generated sources are recorded exactly once.
+    /// Trace limits and transaction rollback apply; custom callbacks must still
+    /// declare their complete trace contract. Existing parser paths do not call this API.
+    pub fn add_traced_token_node(
+        &mut self,
+        rule: usize,
+        label: &'static str,
+        kind: TokenKind,
+        source: TokenSource,
+    ) -> Option<NodeId> {
+        let id = self.add_token_node_inner(rule, kind, source.clone(), false)?;
+        self.record_trace_node(label, kind, &source, id.index);
+        Some(id)
+    }
     fn add_token_node_inner(
         &mut self,
         rule: usize,

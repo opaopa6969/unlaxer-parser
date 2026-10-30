@@ -4,25 +4,36 @@ use unlaxer_codegen::GeneratedFile;
 use unlaxer_ubnf::ast::TokenKind;
 
 pub fn generate_profile(path: &Path) -> Result<Vec<GeneratedFile>, String> {
-    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    generate_profile_with_errors(path).map_err(|error| error.to_string())
+}
+
+/// Profile Playground entry point preserving profile and module I/O categories.
+pub fn generate_profile_with_errors(
+    path: &Path,
+) -> Result<Vec<GeneratedFile>, crate::input::FileError> {
+    let text = crate::input::read_string(path).map_err(crate::input::FileError::Io)?;
     let profile = unlaxer_runtime::language_profile::LanguageProfile::parse(&text)?;
     let grammar_path = path
         .parent()
         .unwrap_or(Path::new("."))
         .join(profile.grammar_file());
-    let ast = crate::modules::load(&grammar_path)?;
+    let ast = crate::modules::load_with_errors(&grammar_path)?;
     if ast.grammars.len() != 1 {
-        return Err("profile requires exactly one grammar".into());
+        return Err(crate::input::FileError::Grammar(
+            "profile requires exactly one grammar".into(),
+        ));
     }
     let grammar = &ast.grammars[0];
     for entry in profile.entries.keys() {
         if profile.identity(entry)?.grammar != grammar.name
             || !grammar.rules.iter().any(|rule| rule.name == *entry)
         {
-            return Err("profile grammar/entry mismatch".into());
+            return Err(crate::input::FileError::Grammar(
+                "profile grammar/entry mismatch".into(),
+            ));
         }
     }
-    let mut files = generate_file(&grammar_path)?;
+    let mut files = generate_file_with_errors(&grammar_path)?;
     files.push(GeneratedFile {
         relative_path: "public/profile.tsv".into(),
         content: profile.canonical_tsv(),
@@ -43,7 +54,7 @@ pub fn generate_package(manifest: &Path, package_id: &str) -> Result<Vec<Generat
     if !readiness.portable {
         return Err(format!(
             "Playground requires a Rust-portable grammar: {}",
-            readiness.to_json()
+            readiness_diagnostics(&readiness)
         ));
     }
     let mut files = generate_resolved(selected.source, &selected.ast, &selected.vocabulary)?;
@@ -69,16 +80,23 @@ pub fn generate_package(manifest: &Path, package_id: &str) -> Result<Vec<Generat
 }
 
 pub fn generate_file(path: &Path) -> Result<Vec<GeneratedFile>, String> {
-    let source = std::fs::read_to_string(path).map_err(|error| error.to_string())?;
+    generate_file_with_errors(path).map_err(|error| error.to_string())
+}
+
+/// Grammar Playground entry point preserving the entry-file I/O exit category.
+pub fn generate_file_with_errors(
+    path: &Path,
+) -> Result<Vec<GeneratedFile>, crate::input::FileError> {
+    let normalized = crate::modules::normalize(path)?;
+    let path = normalized.as_path();
+    let source = crate::input::read_grammar(path)?;
     let readiness = crate::portability::check_file(path);
     if !readiness.portable {
-        return Err(format!(
-            "Playground requires a Rust-portable grammar: {}",
-            readiness.to_json()
-        ));
+        let diagnostic = readiness_diagnostics(&readiness);
+        return Err(format!("Playground requires a Rust-portable grammar: {diagnostic}").into());
     }
     let file = crate::modules::load(path)?;
-    generate_resolved(source, &file, &crate::vocabulary_origins::inspect(path)?)
+    generate_resolved(source, &file, &crate::vocabulary_origins::inspect(path)?).map_err(Into::into)
 }
 
 fn generate_resolved(
@@ -212,4 +230,30 @@ fn generate_resolved(
         content: format!("{}\n", crate::vocabulary_origins::to_json(vocabulary)),
     });
     Ok(files)
+}
+
+// Java List<Diagnostic>#toString, including record spans and unescaped subjects.
+// Keep this presentation separate from the public check JSON contract.
+fn readiness_diagnostics(report: &crate::portability::Report) -> String {
+    let diagnostics = report
+        .diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let span = diagnostic.span.map_or_else(
+                || "null".into(),
+                |span| {
+                    format!(
+                        "Span[start={}, end={}]",
+                        span.codepoint_start, span.codepoint_end
+                    )
+                },
+            );
+            format!(
+                "Diagnostic[code={}, span={span}, subject={}]",
+                diagnostic.code, diagnostic.subject
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("[{diagnostics}]")
 }

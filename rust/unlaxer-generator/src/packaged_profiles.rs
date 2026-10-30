@@ -11,7 +11,7 @@ pub struct PackagedProfile {
 }
 
 pub fn load(manifest: &Path, package_id: &str) -> Result<PackagedProfile, String> {
-    let manifest = std::path::absolute(manifest).map_err(|e| e.to_string())?;
+    let manifest = crate::modules::normalize(manifest)?;
     if manifest.file_name().and_then(|name| name.to_str()) != Some("ubnf.json") {
         return Err("expected ubnf.json manifest".into());
     }

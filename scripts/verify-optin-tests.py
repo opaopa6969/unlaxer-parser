@@ -17,6 +17,34 @@ BAD_RESULTS = ('skipped', 'failure', 'error', 'flakyFailure', 'flakyError',
                'rerunFailure', 'rerunError')
 
 
+def expand_contracts(contracts):
+    """Keep the unsplit obligation and derive disjoint execution contracts (#954).
+
+    Shards select classes only. Methods, properties and report locations always
+    come from the original contract, so a shard cannot weaken the opt-in gate.
+    Validate before preparing reports too: an omitted/duplicated class is fatal.
+    """
+    expanded = dict(contracts)
+    for parent, contract in contracts.items():
+        if 'shards' not in contract:
+            continue
+        seen = set()
+        for name, classes in contract['shards'].items():
+            if name in expanded or not classes:
+                raise ValueError(f'{parent}: duplicate contract or empty shard: {name}')
+            for cls in classes:
+                if cls not in contract['required'] or cls in seen:
+                    raise ValueError(f'{parent}: unknown or duplicate shard class: {cls}')
+                seen.add(cls)
+            expanded[name] = {key: value for key, value in contract.items()
+                              if key not in ('shards', 'required')}
+            expanded[name]['required'] = {cls: contract['required'][cls] for cls in classes}
+        missing = set(contract['required']) - seen
+        if missing:
+            raise ValueError(f'{parent}: unassigned classes: {sorted(missing)}')
+    return expanded
+
+
 def report_paths(root, contract, name):
     return [root / directory / f'TEST-{name}.xml' for directory in contract['reports']]
 
@@ -120,7 +148,7 @@ def main():
     parser.add_argument('--prepare', action='store_true', help='実行前に対象の古い XML を消す')
     args = parser.parse_args()
     try:
-        contract = json.loads(args.contracts.read_text())[args.contract]
+        contract = expand_contracts(json.loads(args.contracts.read_text()))[args.contract]
         output = args.root / 'target/optin-evidence' / args.contract
         if args.prepare:
             prepare(args.root, contract, output)

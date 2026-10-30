@@ -1,0 +1,6 @@
+[
+  {"name":"ascii-overflow","input":"abc","tokens":[{"input":"a"},{"parts":[[2,3],[2,3]]},{"input":"bc"},{"generated":"G","anchor":3}],"steps":[["WordParser","a",0,1,1,1,1,2],["ProjectedToken","cc",2,4,null,null,null,null],["WordParser","bc",1,3,1,2,1,4],["GeneratedToken","G",3,3,1,4,1,4]]},
+  {"name":"unicode-overflow","input":"a😀Z","tokens":[{"input":"a😀Z"},{"parts":[[1,3],[1,3]]},{"parts":[[0,1]]}],"steps":[["WordParser","a😀Z",0,3,1,1,1,5],["ProjectedToken","😀Z😀Z",1,5,null,null,null,null],["ProjectedToken","a",0,1,1,1,1,2]]},
+  {"name":"entry-overflow","input":"abc","tokens":[{"parts":[[3,3],[2,3],[2,3]]},{"input":"abc"}],"steps":[["ProjectedToken","cc",2,4,null,null,null,null],["WordParser","abc",0,3,1,1,1,4]]},
+  {"name":"last-crlf-overflow","input":"A\r\n😀B","tokens":[{"input":"A\r\n😀B"},{"parts":[[3,5],[3,5]]}],"steps":[["WordParser","A\r\n😀B",0,5,1,1,2,4],["ProjectedToken","😀B😀B",3,7,null,null,null,null]]}
+]

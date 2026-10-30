@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdtemp, readdir, readFile, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, readdir, readFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -18,12 +18,21 @@ try {
   assert.equal(manifest.name, 'ubnf-lsp');
   // The historical .vscodeignore excluded all runtime dependencies. Loading the
   // extracted VSIX (not this checkout's node_modules) makes that failure visible.
+  const rust = process.env.UBNF_TEST_BACKEND === 'rust';
+  if (rust) {
+    assert.ok(path.isAbsolute(process.env.UBNF_TEST_RUST_PATH ?? ''), 'absolute native server path required');
+    await mkdir(path.join(scratch, 'user/User'), {recursive: true});
+    await writeFile(path.join(scratch, 'user/User/settings.json'), JSON.stringify({
+      'ubnfLsp.server.backend': 'rust', 'ubnfLsp.server.rustPath': process.env.UBNF_TEST_RUST_PATH,
+      'ubnfLsp.server.javaPath': '/nonexistent-java'
+    }));
+  }
   await runTests({
     extensionDevelopmentPath: packaged,
-    extensionTestsPath: path.join(root, 'scripts/vsix-suite.cjs'),
+    extensionTestsPath: path.join(root, rust ? 'scripts/vsix-rust-suite.cjs' : 'scripts/vsix-suite.cjs'),
     extensionTestsEnv: {UBNF_PACKAGED_ROOT: packaged},
     launchArgs: ['--disable-extensions', '--disable-workspace-trust', '--skip-welcome', '--skip-release-notes',
-      '--no-sandbox', '--user-data-dir', path.join(scratch, 'user'), '--extensions-dir', path.join(scratch, 'extensions')]
+      '--no-sandbox', '--password-store=basic', '--user-data-dir', path.join(scratch, 'user'), '--extensions-dir', path.join(scratch, 'extensions')]
   });
 } finally {
   // Only the directory created above: never touches a user's editor profile.

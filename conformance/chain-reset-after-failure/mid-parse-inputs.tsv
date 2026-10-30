@@ -1,0 +1,17 @@
+# case	head	input	shape
+ascii-plain	a	azb	plain
+ascii-frame	a	azb	frame
+ascii-ahead	a	azb	ahead
+ascii-failure-before	a	azb	failure-before
+ascii-failure-at-head	a	azb	failure-at-head
+ascii-failure-ahead	a	azb	failure-ahead
+ascii-suffix-failure	a	azxb	suffix-failure
+ascii-eof	a	az	eof
+unicode-plain	a😀	a😀zb	plain
+unicode-frame	a😀	a😀zb	frame
+unicode-ahead	a😀	a😀zb	ahead
+unicode-failure-before	a😀	a😀zb	failure-before
+unicode-failure-at-head	a😀	a😀zb	failure-at-head
+unicode-failure-ahead	a😀	a😀zb	failure-ahead
+unicode-suffix-failure	a😀	a😀zxb	suffix-failure
+unicode-eof	a😀	a😀z	eof

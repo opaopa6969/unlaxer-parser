@@ -3,6 +3,7 @@ grammar NestedBoundary {
     @whitespace: none
     token N = NumberParser
     token B = LOOKAHEAD('b')
+    token U = UNTIL('b')
     @root @nestedCaptures @mapping(TextNode)
     Root ::= ('a' 'z' | 'q') | N;
     @nestedCaptures @mapping(IntegerNode)
@@ -27,4 +28,43 @@ grammar NestedBoundary {
     Unique ::= ('a' 'z' | 'q') | N;
     @nestedCaptures @mapping(PredictiveNode) @predictiveChoice
     Predictive ::= ('a' 'z' | 'q') | N;
+    Helper ::= 'a' 'z' | 'h';
+    Mix ::= (Helper | 'q') | N;
+    Outer ::= Mix | Helper 'x';
+    Helper2 ::= 'a' 'z' | 'h';
+    Outer2 ::= Helper2 'x' | Helper2 'y' | Helper2;
+    OptHelper ::= [Helper] 'x' | Helper;
+    @longestChoice
+    LongestHelper ::= Helper 'x' | Helper | 'a';
+    @uniqueLongestChoice
+    UniqueHelper ::= Helper 'x' | Helper;
+    OuterOuter ::= Outer 'y' | Outer | Mix 'x';
+    PlainSeq2 ::= 'a' 'z';
+    TailSeq ::= ('a' | 'h') 'z';
+    LiteralOnly ::= 'az';
+    UnicodeSeq ::= 'a' '😀';
+    UnicodeTail ::= ('a' | 'h') '😀';
+    UnicodeLiteral ::= 'a😀';
+    LastChoice ::= 'a' ('z' | 'q');
+    UntilOnly ::= U;
+    UntilChoice ::= U | 'q';
+    UntilTail ::= U 'b';
+    OptionalTail ::= ['q'] 'a' 'z';
+    FailedFirst ::= 'a' 'b' | 'a' 'z' 'z';
+    RepeatedA ::= { 'a' };
+    PlainAlias ::= PlainSeq2;
+    NestedTail ::= LiteralOnly 'z';
+    OptTail ::= 'a' ['z'];
+    RepTail ::= 'a' {'z'};
+    AheadTail ::= 'a' 'z' B;
+    @longestChoice
+    LongestSeq ::= 'a' 'z' | 'a';
+    @longestChoice
+    LongestShort ::= 'a' | 'h';
+    @predictiveChoice
+    PredictiveSeq ::= 'a' 'z' | 'h';
+    SingleA ::= 'a';
+    SingleZ ::= 'z';
+    RuleTail ::= 'a' SingleZ;
+    UnicodeRep ::= {'😀'};
 }

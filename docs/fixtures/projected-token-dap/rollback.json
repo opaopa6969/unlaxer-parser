@@ -1,0 +1,7 @@
+[
+  {"name":"committed","input":"a","accepted":true,"projected":1,"text":"aa","span":[0,2]},
+  {"name":"choice-loser","input":"a","accepted":true,"projected":0,"text":"aa","span":[0,2]},
+  {"name":"lookahead","input":"a","accepted":true,"projected":0,"text":"aa","span":[0,2]},
+  {"name":"negative-lookahead","input":"a","accepted":true,"projected":0,"text":"aa","span":[0,2]},
+  {"name":"outer-failure","input":"a","accepted":false,"projected":0,"text":"aa","span":[0,2]}
+]

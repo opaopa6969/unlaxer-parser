@@ -19,7 +19,11 @@ import org.unlaxer.dsl.runtime.LexicalExpression.Op;
  * The old parseWithImports API remains separate.
  */
 public final class UBNFModuleLoader {
-    @FunctionalInterface public interface SourceReader { String read(Path path) throws IOException; }
+    @FunctionalInterface public interface SourceReader {
+        String read(Path path) throws IOException;
+        /** Trusted injection stays compatible; disk implementations override with a bounded reader. */
+        default String readPackage(Path path) throws IOException { return read(path); }
+    }
     private final SourceReader reader;
     private final UBNFPackageResolver packages;
     private final Map<Path, Map<String, LexicalExpression>> modules = new LinkedHashMap<>();
@@ -37,7 +41,8 @@ public final class UBNFModuleLoader {
     }
 
     public static UBNFFile load(Path path) throws IOException {
-        return resolve(UBNFMapper.parse(Files.readString(path)), path, Files::readString);
+        path = path.toAbsolutePath().normalize();
+        return resolve(UBNFMapper.parse(Files.readString(path)), path, UBNFPackageResolver.diskReader());
     }
 
     public static UBNFFile resolve(UBNFFile file, Path path, SourceReader reader) throws IOException {

@@ -4,10 +4,51 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, BufRead, Write};
 use unlaxer_runtime::{source::Snapshot, Span};
 
+mod arguments;
+
 #[derive(Clone, Debug)]
 pub struct Step {
     pub label: String,
+    /// CP range in the original snapshot (logical extent for projected tokens).
+    /// Generated tokens have a zero-width anchor.
     pub span: Span,
+    /// Some (including an empty string) owns generated text at a zero-width anchor.
+    pub generated_text: Option<String>,
+    /// Projected terminal text, independent of the input slice at its logical CP span.
+    /// Both text fields are None for input/AST steps and cannot both be Some.
+    pub projected_text: Option<String>,
+}
+
+enum RequestError {
+    Message(String),
+    Internal(String),
+    Parse(String),
+}
+impl RequestError {
+    fn unavailable() -> Self {
+        Self::failed_future(
+            "IllegalArgumentException",
+            "invalid or unavailable debug request",
+        )
+    }
+    fn failed_future(kind: &str, message: &str) -> Self {
+        Self::Internal(format!(
+            "java.util.concurrent.CompletionException: java.lang.{kind}: {message}"
+        ))
+    }
+    fn position(message: &str) -> Self {
+        Self::Internal(format!("java.lang.IllegalArgumentException: {message}"))
+    }
+}
+impl From<String> for RequestError {
+    fn from(message: String) -> Self {
+        Self::Message(message)
+    }
+}
+impl From<&str> for RequestError {
+    fn from(message: &str) -> Self {
+        Self::Message(message.into())
+    }
 }
 #[derive(Clone, Debug)]
 pub struct DebugSource {
@@ -19,7 +60,9 @@ pub trait Backend {
     fn supports_token_trace(&self) -> bool {
         false
     }
-    /// Return strict, mapped AST nodes in field declaration order. Partial ASTs are not steps.
+    /// Return strict mapped AST nodes, or a complete committed token trace when
+    /// supports_token_trace() is true and token mode is requested. No partial results.
+    /// Use parse_error() for syntax failures; other errors describe unavailable stepping.
     fn steps(&mut self, snapshot: &Snapshot, arguments: &Value) -> Result<Vec<Step>, String>;
     fn resolve_source(
         &mut self,
@@ -84,8 +127,8 @@ pub fn stepping_mode(arguments: &Value) -> &str {
         }
     })
 }
-/// Converts only input-backed committed leaves. Detached generated text has no
-/// corresponding source slice and is explicitly rejected by this source DAP.
+/// Converts a complete committed trace, retaining generated/projected text independently of
+/// its anchor or logical CP range. No input slice is substituted for owned text.
 pub fn token_steps(tree: &unlaxer_runtime::Tree) -> Result<Vec<Step>, String> {
     let trace = tree
         .token_trace()
@@ -93,34 +136,63 @@ pub fn token_steps(tree: &unlaxer_runtime::Tree) -> Result<Vec<Step>, String> {
         .map_err(|error| error.to_string())?;
     let mut steps = Vec::new();
     for leaf in trace.iter().filter(|leaf| leaf.kind.is_consumed()) {
-        if !matches!(leaf.source, unlaxer_runtime::token::TokenSource::Input(_)) {
-            return Err("detached generated token source is not supported by source DAP".into());
-        }
+        let (generated_text, projected_text) = match &leaf.source {
+            unlaxer_runtime::token::TokenSource::Input(_) => (None, None),
+            unlaxer_runtime::token::TokenSource::Generated { text, .. } => {
+                (Some(text.clone()), None)
+            }
+            unlaxer_runtime::token::TokenSource::Projected { text, .. } => {
+                (None, Some(text.to_string()))
+            }
+        };
         steps.push(Step {
             label: leaf.label.into(),
             span: leaf.span(),
+            generated_text,
+            projected_text,
         });
     }
     Ok(steps)
 }
+/// Format the generated Java DAP's parse failure for Backend::steps.
+/// A rejected root reports zero; a successful prefix reports its UTF-16 length.
+/// Pass the structured diagnostic (not its farthest failure, which loses trailing_input).
+pub fn parse_error(source: &str, diagnostic: &unlaxer_runtime::ParseDiagnostic) -> String {
+    if diagnostic.kind == "resource_limit" {
+        return format!("{:?}", diagnostic.farthest);
+    }
+    let offset = if diagnostic.kind == "trailing_input" {
+        source
+            .chars()
+            .take(diagnostic.offset)
+            .map(char::len_utf16)
+            .sum()
+    } else {
+        0
+    };
+    format!("Parse error at offset {offset}")
+}
+
 pub struct Server<B> {
     backend: B,
     seq: i64,
-    initialized: bool,
     configuration_pending: bool,
     terminated: bool,
     disconnected: bool,
     program: String,
     arguments: Value,
     runtime_mode: String,
+    stepping_mode: String,
     ast_mode: bool,
     stop_on_entry: bool,
     snapshot: Option<Snapshot>,
     line_offset: usize,
     steps: Vec<Step>,
     index: usize,
-    breakpoints: BTreeSet<usize>,
-    variables: BTreeMap<String, String>,
+    // Signed like Java's Set<Integer>: an unmatched line still makes the set non-empty.
+    breakpoints: BTreeSet<i64>,
+    // Java keeps these insertion-ordered probes until the next successful preparation.
+    variables: Vec<(String, String)>,
     line_base: usize,
     column_base: usize,
 }
@@ -129,13 +201,13 @@ impl<B: Backend> Server<B> {
         Self {
             backend,
             seq: 0,
-            initialized: false,
             configuration_pending: false,
             terminated: false,
             disconnected: false,
             program: String::new(),
             arguments: Value::Null,
             runtime_mode: "token".into(),
+            stepping_mode: "token".into(),
             ast_mode: false,
             stop_on_entry: false,
             snapshot: None,
@@ -143,55 +215,64 @@ impl<B: Backend> Server<B> {
             steps: vec![],
             index: 0,
             breakpoints: BTreeSet::new(),
-            variables: BTreeMap::new(),
+            variables: vec![],
             line_base: 1,
             column_base: 1,
         }
     }
     /// Process one DAP request, with strictly increasing adapter seq on every output message.
     pub fn handle(&mut self, message: Value) -> Vec<Value> {
+        let raw = message.to_string();
+        self.handle_frame(message, &raw)
+    }
+
+    fn handle_frame(&mut self, message: Value, raw: &str) -> Vec<Value> {
         let request_seq = message["seq"]
             .as_i64()
             .filter(|seq| *seq > 0 && *seq <= i32::MAX as i64)
             .unwrap_or(0);
         let command = message["command"].as_str().unwrap_or("").to_owned();
-        let arguments = message
-            .get("arguments")
-            .cloned()
-            .unwrap_or_else(|| json!({}));
+        let arguments = message.get("arguments").cloned().unwrap_or(Value::Null);
         let mut events = vec![];
-        let result: Result<Value, String> = (|| {
+        let result: Result<Value, RequestError> = (|| {
             if request_seq == 0 || message["type"] != "request" || command.is_empty() {
                 return Err("invalid request".into());
             }
-            if !arguments.is_object() && !arguments.is_null() {
-                return Err("invalid arguments".into());
-            }
+            // LSP4J converts the entire argument DTO before invoking the adapter.
+            // In particular, a rejected conversion must not mutate session state.
+            let arguments::Converted {
+                value: arguments,
+                launch: strings,
+            } = arguments::read(&command, arguments, raw)?;
             if self.disconnected {
                 return Err("disconnected".into());
             }
             if command == "initialize" {
-                self.initialized = true;
                 self.line_base = usize::from(arguments["linesStartAt1"] != false);
                 self.column_base = usize::from(arguments["columnsStartAt1"] != false);
                 return Ok(json!({"supportsConfigurationDoneRequest":true}));
             }
-            // Cancellation may arrive before initialize completes. Disconnect still
-            // acknowledges and closes this transport, matching generated Java launchers.
-            if !self.initialized && command != "disconnect" {
-                return Err("not initialized".into());
-            }
+            // Generated Java adapters accept requests before initialize; each request
+            // validates its own arguments and lifecycle state.
             match command.as_str() {
                 "launch" => {
                     let program = ["program", "formulaSource"]
                         .into_iter()
-                        .filter_map(|key| arguments[key].as_str())
+                        .filter_map(|key| strings[key].as_str())
                         .find(|s| !s.trim().is_empty())
-                        .ok_or("no program specified")?;
-                    let runtime = arguments["runtimeMode"].as_str().unwrap_or("token");
-                    let mode = stepping_mode(&arguments);
+                        .ok_or_else(|| {
+                            RequestError::failed_future(
+                                "IllegalArgumentException",
+                                "invalid program or stepping mode",
+                            )
+                        })?;
+                    let runtime = strings["runtimeMode"].as_str().unwrap_or("token");
+                    let mode = stepping_mode(&strings);
                     if !mode.eq_ignore_ascii_case("ast") && !mode.eq_ignore_ascii_case("token") {
-                        return Err("unsupported stepping mode".into());
+                        return Err(RequestError::failed_future(
+                            "IllegalArgumentException",
+                            "invalid program or stepping mode",
+                        ));
                     }
                     if mode.eq_ignore_ascii_case("token") && !self.backend.supports_token_trace() {
                         return Err("backend does not provide parser token tracing".into());
@@ -200,6 +281,7 @@ impl<B: Backend> Server<B> {
                         self.breakpoints.clear();
                     }
                     self.ast_mode = mode.eq_ignore_ascii_case("ast");
+                    self.stepping_mode = mode.into();
                     self.program = program.into();
                     self.runtime_mode = runtime.into();
                     self.stop_on_entry = arguments["stopOnEntry"] == true;
@@ -208,12 +290,18 @@ impl<B: Backend> Server<B> {
                     self.terminated = false;
                     self.snapshot = None;
                     self.steps.clear();
-                    self.variables.clear();
+                    // launch resets steps, but Java retains the last prepared probes/offset.
                     self.index = 0;
                     events.push(("initialized", Value::Null));
                     Ok(Value::Null)
                 }
                 "setBreakpoints" => {
+                    if arguments.is_null() {
+                        return Err(RequestError::Internal(
+                            "java.lang.NullPointerException: missing setBreakpoints arguments"
+                                .into(),
+                        ));
+                    }
                     let target = normalized_debug_path(&self.program);
                     let requested_path = match arguments.get("source") {
                         None | Some(Value::Null) => target.clone(),
@@ -229,11 +317,21 @@ impl<B: Backend> Server<B> {
                     let mut lines = BTreeSet::new();
                     let mut results = vec![];
                     for breakpoint in requested {
-                        let line = breakpoint["line"]
-                            .as_u64()
-                            .and_then(|line| usize::try_from(line).ok())
-                            .filter(|line| *line >= self.line_base)
-                            .ok_or("invalid breakpoint line")?;
+                        if breakpoint.is_null() {
+                            return Err(RequestError::Internal(
+                                "java.lang.NullPointerException: null breakpoint".into(),
+                            ));
+                        }
+                        // LSP4J accepts signed lines and defaults a missing primitive to 0.
+                        // Negative lines never match a position, but still enable the breakpoint
+                        // search in configurationDone, as in Java.
+                        let line = match breakpoint.get("line") {
+                            None | Some(Value::Null) => 0,
+                            Some(line) => line
+                                .as_i64()
+                                .filter(|line| i32::try_from(*line).is_ok())
+                                .ok_or("invalid breakpoint line")?,
+                        };
                         lines.insert(line);
                         let mut result = json!({"verified":same_source,"line":line});
                         if !same_source {
@@ -248,7 +346,10 @@ impl<B: Backend> Server<B> {
                 }
                 "configurationDone" => {
                     if !self.configuration_pending {
-                        return Err("configurationDone requires a new launch".into());
+                        return Err(RequestError::failed_future(
+                            "IllegalStateException",
+                            "configurationDone requires a new launch",
+                        ));
                     }
                     self.configuration_pending = false;
                     match self.prepare() {
@@ -256,7 +357,11 @@ impl<B: Backend> Server<B> {
                             if self.stop_on_entry {
                                 self.index = 0;
                                 events.push(stopped("entry"));
-                            } else if let Some(index) = self.breakpoint_after(None) {
+                            } else if let Some(index) = if self.breakpoints.is_empty() {
+                                None
+                            } else {
+                                self.breakpoint_after(None)?
+                            } {
                                 self.index = index;
                                 events.push(stopped("breakpoint"));
                             } else {
@@ -264,7 +369,7 @@ impl<B: Backend> Server<B> {
                             }
                         }
                         Err(error) => {
-                            events.push(("output",json!({"category":"stderr","output":format!("{} stepping unavailable: {error}\n",if self.ast_mode {"AST"}else{"Token"})})));
+                            events.push(("output", json!({"category":"stderr","output":error})));
                             self.finish_events(&mut events);
                         }
                     }
@@ -276,19 +381,32 @@ impl<B: Backend> Server<B> {
                     let frames = if self.current().is_some() {
                         let step = self.current().unwrap();
                         let snapshot = self.snapshot.as_ref().unwrap();
-                        let position = snapshot.lsp(step.span.start).map_err(str::to_owned)?;
-                        let end = snapshot.lsp(step.span.end).map_err(str::to_owned)?;
+                        let position = snapshot
+                            .lsp(step.span.start)
+                            .map_err(RequestError::position)?;
+                        let end = snapshot
+                            .lsp(step.span.end)
+                            .map_err(RequestError::position)?;
                         vec![
                             json!({"id":0,"name":format!("{} ({}/{})",step.label,self.index+1,self.steps.len()),"line":position.line+self.line_offset+self.line_base,"column":position.character+self.column_base,"endLine":end.line+self.line_offset+self.line_base,"endColumn":end.character+self.column_base,"source":{"path":self.program,"name":std::path::Path::new(&self.program).file_name().unwrap_or_default().to_string_lossy()}}),
+                        ]
+                    } else if !self.ast_mode && !self.terminated && !self.program.is_empty() {
+                        vec![
+                            json!({"id":0,"name":"<program>","source":{"path":self.program},
+                            "line":self.line_offset+self.line_base,"column":self.column_base}),
                         ]
                     } else {
                         vec![]
                     };
-                    Ok(json!({"stackFrames":frames,"totalFrames":frames.len()}))
+                    Ok(json!({"stackFrames":frames}))
                 }
                 "scopes" => {
-                    if arguments["frameId"] != 0 {
-                        return Err("invalid frame".into());
+                    if !arguments.is_object()
+                        || arguments
+                            .get("frameId")
+                            .is_some_and(|id| id != 0 && !id.is_null())
+                    {
+                        return Err(RequestError::unavailable());
                     }
                     Ok(
                         json!({"scopes":if self.current().is_some(){vec![json!({"name":if self.ast_mode {"Current AST Node"}else{"Current Token"},"variablesReference":1,"expensive":false})]}else{vec![]}}),
@@ -296,14 +414,20 @@ impl<B: Backend> Server<B> {
                 }
                 "variables" => {
                     if arguments["variablesReference"] != 1 {
-                        return Err("invalid variables reference".into());
+                        return Err(RequestError::unavailable());
                     }
                     let mut variables = vec![];
                     if let Some(step) = self.current() {
                         let snapshot = self.snapshot.as_ref().unwrap();
-                        let text = unlaxer_runtime::strip_capture(
-                            snapshot.slice(step.span).map_err(str::to_owned)?,
-                        );
+                        let source_text = match step
+                            .generated_text
+                            .as_ref()
+                            .or(step.projected_text.as_ref())
+                        {
+                            Some(text) => text.as_str(),
+                            None => snapshot.slice(step.span).map_err(str::to_owned)?,
+                        };
+                        let text = unlaxer_runtime::strip_capture(source_text);
                         variables.push(variable(
                             &step.label,
                             &format!("\"{}\"", text.replace('"', "\\\"")),
@@ -322,7 +446,7 @@ impl<B: Backend> Server<B> {
                         ));
                     }
                     for (name, value) in &self.variables {
-                        if name != "runtimeMode" {
+                        if name != "runtimeMode" || self.current().is_none() {
                             variables.push(variable(name, value, "String"));
                         }
                     }
@@ -330,7 +454,11 @@ impl<B: Backend> Server<B> {
                 }
                 "next" => {
                     self.check_thread(&arguments)?;
-                    let label = self.current().ok_or("notStopped")?.label.clone();
+                    let label = self
+                        .current()
+                        .ok_or_else(RequestError::unavailable)?
+                        .label
+                        .clone();
                     self.backend.before_step(self.index + 1, &label);
                     self.index += 1;
                     let label = self
@@ -348,9 +476,9 @@ impl<B: Backend> Server<B> {
                 "continue" => {
                     self.check_thread(&arguments)?;
                     if self.current().is_none() {
-                        return Err("notStopped".into());
+                        return Err(RequestError::unavailable());
                     }
-                    if let Some(index) = self.breakpoint_after(Some(self.index)) {
+                    if let Some(index) = self.breakpoint_after(Some(self.index))? {
                         self.index = index;
                         events.push(stopped("breakpoint"));
                     } else {
@@ -367,11 +495,52 @@ impl<B: Backend> Server<B> {
                     self.variables.clear();
                     Ok(Value::Null)
                 }
-                _ => Err("unsupported command".into()),
+                // Default IDebugProtocolServer methods throw synchronously in LSP4J 0.23.1.
+                "cancel"
+                | "attach"
+                | "restart"
+                | "terminate"
+                | "breakpointLocations"
+                | "setFunctionBreakpoints"
+                | "setExceptionBreakpoints"
+                | "dataBreakpointInfo"
+                | "setDataBreakpoints"
+                | "setInstructionBreakpoints"
+                | "stepIn"
+                | "stepOut"
+                | "stepBack"
+                | "reverseContinue"
+                | "restartFrame"
+                | "goto"
+                | "pause"
+                | "setVariable"
+                | "source"
+                | "terminateThreads"
+                | "modules"
+                | "loadedSources"
+                | "evaluate"
+                | "setExpression"
+                | "stepInTargets"
+                | "gotoTargets"
+                | "completions"
+                | "exceptionInfo"
+                | "readMemory"
+                | "writeMemory"
+                | "disassemble" => Err(RequestError::Internal(
+                    "java.lang.UnsupportedOperationException".into(),
+                )),
+                _ => Err(format!("Unsupported request method: {command}").into()),
             }
         })();
         let mut output = vec![];
-        // Complete the request before sending resulting events (initialized is never pre-initialize).
+        // LSP4J emits notifications inside the adapter method, before its future
+        // completes. DAP NextRequest explicitly requires response-before-stopped,
+        // so keep that exception (including the terminating next) on Rust.
+        // Allocate seq only in wire order; request_seq always identifies the request.
+        let response_first = command == "next";
+        if !response_first {
+            self.append_events(&mut output, &mut events);
+        }
         let mut response = json!({"seq":self.next_seq(),"type":"response","request_seq":request_seq,"command":command,"success":result.is_ok()});
         match result {
             Ok(body) => {
@@ -379,29 +548,42 @@ impl<B: Backend> Server<B> {
                     response["body"] = body;
                 }
             }
-            Err(message) => {
+            Err(RequestError::Message(message)) => {
                 response["message"] = json!(message);
+            }
+            Err(RequestError::Internal(diagnostic)) => {
+                // LSP4J's generated Java adapter returns a string body, not an ErrorResponse.
+                // Preserve its diagnostic without fabricating JVM-specific stack frames.
+                response["message"] = json!("Internal error.");
+                response["body"] = json!(format!("{diagnostic}\n"));
+            }
+            Err(RequestError::Parse(diagnostic)) => {
+                response["message"] = json!("Message could not be parsed.");
+                response["body"] = json!({"message":diagnostic});
             }
         }
         output.push(response);
-        for (event, body) in events {
+        self.append_events(&mut output, &mut events);
+        output
+    }
+    fn append_events(&mut self, output: &mut Vec<Value>, events: &mut Vec<(&str, Value)>) {
+        for (event, body) in events.drain(..) {
             let mut value = json!({"seq":self.next_seq(),"type":"event","event":event});
             if !body.is_null() {
                 value["body"] = body;
             }
             output.push(value);
         }
-        output
     }
     fn next_seq(&mut self) -> i64 {
         self.seq += 1;
         self.seq
     }
-    fn check_thread(&self, arguments: &Value) -> Result<(), String> {
+    fn check_thread(&self, arguments: &Value) -> Result<(), RequestError> {
         if arguments["threadId"] == 1 {
             Ok(())
         } else {
-            Err("invalid thread".into())
+            Err(RequestError::unavailable())
         }
     }
     fn current(&self) -> Option<&Step> {
@@ -411,26 +593,93 @@ impl<B: Backend> Server<B> {
             self.steps.get(self.index)
         }
     }
-    fn breakpoint_after(&self, from: Option<usize>) -> Option<usize> {
-        let snapshot = self.snapshot.as_ref()?;
-        ((from.map_or(0, |i| i + 1))..self.steps.len()).find(|&index| {
-            snapshot
+    fn breakpoint_after(&self, from: Option<usize>) -> Result<Option<usize>, RequestError> {
+        let Some(snapshot) = self.snapshot.as_ref() else {
+            return Ok(None);
+        };
+        // Java evaluates each start position even when continue has no breakpoints.
+        // Do not skip invalid positions: the failed request must leave index intact.
+        for index in from.map_or(0, |i| i + 1)..self.steps.len() {
+            let position = snapshot
                 .lsp(self.steps[index].span.start)
-                .is_ok_and(|position| {
-                    self.breakpoints
-                        .contains(&(position.line + self.line_offset + self.line_base))
-                })
-        })
+                .map_err(RequestError::position)?;
+            if i64::try_from(position.line + self.line_offset + self.line_base)
+                .is_ok_and(|line| self.breakpoints.contains(&line))
+            {
+                return Ok(Some(index));
+            }
+        }
+        Ok(None)
     }
     fn prepare(&mut self) -> Result<(), String> {
-        let metadata = std::fs::metadata(&self.program).map_err(|e| e.to_string())?;
+        let original = self
+            .read_source()
+            .map_err(|detail| self.source_error(&detail))?;
+        let source = self
+            .backend
+            .resolve_source(&self.program, &original, &self.arguments)
+            .map_err(|detail| self.source_error(&detail))?;
+        self.prepare_steps(source).map_err(|detail| {
+            // The String-returning Backend API is retained. Generated backends use
+            // parse_error() for this exact diagnostic, rather than leaking parser Debug text.
+            if detail
+                .strip_prefix("Parse error at offset ")
+                .is_some_and(|offset| {
+                    !offset.is_empty() && offset.bytes().all(|b| b.is_ascii_digit())
+                })
+            {
+                format!("{detail}\n")
+            } else {
+                format!(
+                    "{} stepping unavailable: {detail}\n",
+                    if self.ast_mode { "AST" } else { "Token" }
+                )
+            }
+        })
+    }
+    fn source_error(&self, detail: &str) -> String {
+        format!("Cannot prepare debug source: {} ({detail})\n", self.program)
+    }
+    fn read_source(&self) -> Result<String, String> {
+        if self.program.contains('\0') {
+            return Err(format!(
+                "InvalidPathException: Nul character not allowed: {}",
+                self.program
+            ));
+        }
+        // Path.of on Unix collapses repeated '/' and drops a trailing '/', so Java opens
+        // (and names in its exception) "dir/file" for "dir//file/" (#945).
+        let path = java_path(&self.program);
+        let mut file = std::fs::File::open(&path).map_err(|error| open_error(&path, &error))?;
+        let metadata = file.metadata().map_err(|error| read_error(&error))?;
         if metadata.len() > 4 * 1024 * 1024 {
             return Err("source limit exceeded".into());
         }
-        let original = std::fs::read_to_string(&self.program).map_err(|e| e.to_string())?;
-        let source = self
-            .backend
-            .resolve_source(&self.program, &original, &self.arguments)?;
+        let mut bytes = vec![];
+        io::Read::read_to_end(&mut file, &mut bytes).map_err(|error| read_error(&error))?;
+        String::from_utf8(bytes).map_err(|error| {
+            // Files.readString uses String's non-replacing UTF-8 path, whose
+            // malformed length differs from std::str::Utf8Error::error_len().
+            let invalid = &error.as_bytes()[error.utf8_error().valid_up_to()..];
+            let length = match invalid[0] {
+                0xe0..=0xef if invalid.len() >= 3 => 3,
+                0xe0..=0xef
+                    if invalid.len() == 2
+                        && (invalid[1] & 0xc0 != 0x80
+                            || invalid[0] == 0xe0 && invalid[1] < 0xa0) =>
+                {
+                    2
+                }
+                0xf0..=0xf7 if invalid.len() >= 4 => 4,
+                _ => 1,
+            };
+            format!("MalformedInputException: Input length = {length}")
+        })
+    }
+    fn prepare_steps(&mut self, source: DebugSource) -> Result<(), String> {
+        // Java stores sourceLineOffset as soon as the source resolves, before parsing or
+        // collecting steps; a later failure still moves the next pending frame (#938).
+        self.line_offset = source.line_offset;
         let snapshot =
             Snapshot::new(self.program.clone(), 0, source.text).map_err(str::to_owned)?;
         let steps = self.backend.steps(&snapshot, &self.arguments)?;
@@ -443,9 +692,35 @@ impl<B: Backend> Server<B> {
             .into());
         }
         for step in &steps {
-            snapshot.check(step.span).map_err(str::to_owned)?;
-            snapshot.lsp(step.span.start).map_err(str::to_owned)?;
-            snapshot.lsp(step.span.end).map_err(str::to_owned)?;
+            if step.projected_text.is_some() && (self.ast_mode || step.generated_text.is_some()) {
+                return Err("projected text requires an unambiguous token source".into());
+            }
+            if step.generated_text.is_some() && (self.ast_mode || step.span.start != step.span.end)
+            {
+                return Err("generated text requires a zero-width token anchor".into());
+            }
+            // Java retains concatenated terminals whose logical end exceeds the input.
+            // The end fails in stackTrace; a CRLF-interior start also fails breakpoint search.
+            // Keep rejecting malformed hand-built spans and every other source kind.
+            let projected_overflow = step.projected_text.as_ref().is_some_and(|text| {
+                step.span.end > snapshot.len()
+                    && step.span.end.checked_sub(step.span.start) == Some(text.chars().count())
+            });
+            if !projected_overflow {
+                snapshot.check(step.span).map_err(str::to_owned)?;
+            }
+            // CP ranges may straddle CRLF. Java defers line/column conversion to
+            // stackTrace and breakpoint search; keep the token text and range intact.
+            snapshot
+                .check(unlaxer_runtime::Span {
+                    start: step.span.start,
+                    end: step.span.start,
+                })
+                .map_err(str::to_owned)?;
+            if self.ast_mode {
+                snapshot.lsp(step.span.start).map_err(str::to_owned)?;
+                snapshot.lsp(step.span.end).map_err(str::to_owned)?;
+            }
             if step.label.is_empty() {
                 return Err(if self.ast_mode {
                     "empty AST label"
@@ -455,16 +730,21 @@ impl<B: Backend> Server<B> {
                 .into());
             }
         }
-        let mut variables = self
+        let probes = self
             .backend
             .runtime_variables(&snapshot, &self.runtime_mode, &self.arguments)
             .unwrap_or_else(|error| BTreeMap::from([("debugRuntimeError".into(), error)]));
-        variables.insert("runtimeMode".into(), self.runtime_mode.clone());
-        variables.insert(
-            "steppingMode".into(),
-            if self.ast_mode { "ast" } else { "token" }.into(),
-        );
-        self.line_offset = source.line_offset;
+        let mut variables = vec![
+            ("runtimeMode".into(), self.runtime_mode.clone()),
+            ("steppingMode".into(), self.stepping_mode.clone()),
+        ];
+        for (name, value) in probes {
+            if let Some((_, previous)) = variables.iter_mut().find(|(key, _)| key == &name) {
+                *previous = value;
+            } else {
+                variables.push((name, value));
+            }
+        }
         self.snapshot = Some(snapshot);
         self.steps = steps;
         self.variables = variables;
@@ -490,7 +770,8 @@ impl<B: Backend> Server<B> {
             };
             let message: Value = serde_json::from_slice(&bytes)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-            for message in self.handle(message) {
+            let raw = std::str::from_utf8(&bytes).map_err(io::Error::other)?;
+            for message in self.handle_frame(message, raw) {
                 let body = serde_json::to_vec(&message).map_err(io::Error::other)?;
                 unlaxer_protocol::write_frame(output, &body)?;
             }
@@ -507,6 +788,63 @@ fn stopped(reason: &str) -> (&'static str, Value) {
         json!({"reason":reason,"threadId":1,"allThreadsStopped":true}),
     )
 }
+/// The path string of Java's Path.of(program) on Unix (UnixPath.normalizeAndCheck).
+fn java_path(program: &str) -> String {
+    if !cfg!(unix) {
+        return program.into();
+    }
+    let mut path = String::with_capacity(program.len());
+    for c in program.chars() {
+        if !(c == '/' && path.ends_with('/')) {
+            path.push(c);
+        }
+    }
+    if path.len() > 1 && path.ends_with('/') {
+        path.pop();
+    }
+    path
+}
+/// strerror(3), which both JDK UnixException and Rust's io::Error Display use.
+fn os_reason(error: &io::Error) -> String {
+    let text = error.to_string();
+    match error.raw_os_error() {
+        Some(code) => text
+            .strip_suffix(&format!(" (os error {code})"))
+            .unwrap_or(&text)
+            .to_owned(),
+        None => text,
+    }
+}
+/// Files.readString open failures: UnixException.translateToIOException(file).
+fn open_error(path: &str, error: &io::Error) -> String {
+    // ENOENT / EACCES are 2 / 13 on every Unix; EPERM is not AccessDenied in Java.
+    match (cfg!(unix), error.raw_os_error()) {
+        (true, Some(2)) => format!("NoSuchFileException: {path}"),
+        (true, Some(13)) => format!("AccessDeniedException: {path}"),
+        (true, Some(code)) => format!(
+            "FileSystemException: {path}: {}{}",
+            os_reason(error),
+            if code == ELOOP {
+                " or unable to access attributes of symbolic link"
+            } else {
+                ""
+            }
+        ),
+        _ => match error.kind() {
+            io::ErrorKind::NotFound => format!("NoSuchFileException: {path}"),
+            io::ErrorKind::PermissionDenied => format!("AccessDeniedException: {path}"),
+            _ => read_error(error),
+        },
+    }
+}
+/// Failures after open (for example EISDIR from read) carry only the OS message in Java.
+fn read_error(error: &io::Error) -> String {
+    format!("IOException: {}", os_reason(error))
+}
+#[cfg(any(target_os = "linux", target_os = "android"))]
+const ELOOP: i32 = 40;
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
+const ELOOP: i32 = 62;
 fn normalized_debug_path(path: &str) -> Option<std::path::PathBuf> {
     use std::path::{Component, Path, PathBuf};
     if path.trim().is_empty() || path.contains('\0') {

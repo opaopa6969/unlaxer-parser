@@ -29,15 +29,23 @@ public class ClassicDapProtocolConformanceTest {
             public final class Main {
                 public static void main(String[] args) throws Exception {
                     var server = new InspectionDebugAdapter() {
+                        String wireFailure = "";
                         @Override protected Object parseDebugAst(String source) {
+                            if (wireFailure.equals("ast-empty")) return null;
+                            if (wireFailure.equals("ast-span")) return new Object();
+                            if (wireFailure.equals("ast-throw")) throw new IllegalStateException("fixture mapper failure");
                             if (source.equals("p<m><b>[]x!")) throw new IllegalStateException("application mapper rejected input");
                             return super.parseDebugAst(source);
                         }
                         @Override protected DebugSource resolveDebugSource(String program,String original,java.util.Map<String,Object> arguments) {
+                            wireFailure = String.valueOf(arguments.getOrDefault("wireFailure", ""));
+                            if (wireFailure.equals("source-throw")) throw new IllegalArgumentException("fixture source failure");
+                            if (wireFailure.equals("source-null")) return null;
                             return debugSource(arguments.getOrDefault("sourceText",original).toString(),((Number)arguments.getOrDefault("lineOffset",0)).intValue());
                         }
                         @Override protected java.util.Map<String,String> runtimeVariables(String source,String mode,java.util.Map<String,Object> arguments) {
-                            return java.util.Map.of("sourceLength",String.valueOf(source.codePointCount(0,source.length())),"runtimeLabel",mode);
+                            var values = new java.util.LinkedHashMap<String,String>();
+                            values.put("runtimeLabel", mode); values.put("sourceLength", String.valueOf(source.codePointCount(0,source.length()))); return values;
                         }
                     };
                     var launcher=org.eclipse.lsp4j.debug.launch.DSPLauncher.createServerLauncher(server,System.in,System.out);
@@ -71,8 +79,21 @@ public class ClassicDapProtocolConformanceTest {
             use unlaxer_runtime::source::Snapshot;
             struct Backend;
             impl unlaxer_dap::Backend for Backend {
-                fn steps(&mut self,snapshot:&Snapshot,_:&Value)->Result<Vec<unlaxer_dap::Step>,String> {if snapshot.text=="p<m><b>[]x!" {Err("application mapper rejected input".into())} else {generated::dap::steps(&snapshot.text)}}
-                fn resolve_source(&mut self,_:&str,original:&str,args:&Value)->Result<unlaxer_dap::DebugSource,String> {Ok(unlaxer_dap::DebugSource{text:args["sourceText"].as_str().unwrap_or(original).into(),line_offset:args["lineOffset"].as_u64().unwrap_or(0) as usize})}
+                fn steps(&mut self,snapshot:&Snapshot,args:&Value)->Result<Vec<unlaxer_dap::Step>,String> {
+                    match args["wireFailure"].as_str().unwrap_or("") {
+                        "ast-empty" => return Ok(vec![]),
+                        "ast-span" => return Err("AST source span unavailable".into()),
+                        "ast-throw" => return Err("fixture mapper failure".into()),
+                        _ => {}
+                    }
+                    if snapshot.text=="p<m><b>[]x!" {Err("application mapper rejected input".into())} else {generated::dap::steps(&snapshot.text)}}
+                fn resolve_source(&mut self,_:&str,original:&str,args:&Value)->Result<unlaxer_dap::DebugSource,String> {
+                    match args["wireFailure"].as_str().unwrap_or("") {
+                        "source-throw" => return Err("fixture source failure".into()),
+                        "source-null" => return Err("resolveDebugSource returned no content".into()),
+                        _ => {}
+                    }
+                    Ok(unlaxer_dap::DebugSource{text:args["sourceText"].as_str().unwrap_or(original).into(),line_offset:args["lineOffset"].as_u64().unwrap_or(0) as usize})}
                 fn runtime_variables(&mut self,snapshot:&Snapshot,mode:&str,_:&Value)->Result<BTreeMap<String,String>,String> {Ok(BTreeMap::from([("sourceLength".into(),snapshot.len().to_string()),("runtimeLabel".into(),mode.into())]))}
             }
             fn main(){unlaxer_dap::Server::new(Backend).serve_stdio().unwrap();}
@@ -81,6 +102,10 @@ public class ClassicDapProtocolConformanceTest {
         try(var wire=new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/classic-dap-fixture").toString()).redirectError(temporary.newFile("rust-stderr.log")).start())) {exercise(wire,"rust"); Files.createDirectories(Path.of("target"));Files.write(Path.of("target/classic-dap-protocol.tsv"),evidence);}
     }
     private void exercise(Wire wire,String backend)throws Exception {
+        wire.failures = new DapFailureConformance("classic-ast", backend);
+        wire.probeFailures("fresh");
+        DapLaunchStateConformance.check(wire, "classic-ast", backend, temporary.getRoot().toPath());
+        DapWireConformance.check(wire, "classic-ast", backend, temporary.getRoot().toPath());
         exerciseConfigurationLifecycle(wire, backend);
         exerciseBreakpointSources(wire, backend);
         var rows=JsonParser.parseString(Files.readString(ROOT.resolve("docs/fixtures/classic-dap/ast.json"))).getAsJsonArray();assertEquals(9,rows.size());
@@ -100,8 +125,8 @@ public class ClassicDapProtocolConformanceTest {
                 for(int index=0;index<steps.size();index++) {
                     var expected=steps.get(index).getAsJsonObject();var frame=wire.request("stackTrace",Map.of("threadId",1)).getAsJsonArray("stackFrames").get(0).getAsJsonObject();
                     if(index==0) {
-                        assertFalse(wire.response("launch",Map.of("program","unused","steppingMode","unsupported")).get("success").getAsBoolean());
-                        assertFalse(wire.response("next",Map.of("threadId",99)).get("success").getAsBoolean());
+                        DapFailureConformance.assertError(wire.response("launch",Map.of("program","unused","steppingMode","unsupported")), "java.util.concurrent.CompletionException: java.lang.IllegalArgumentException: invalid program or stepping mode");
+                        DapFailureConformance.invalidRequest(wire.response("next",Map.of("threadId",99)));
                         assertEquals("failed requests preserve current step",frame,wire.request("stackTrace",Map.of("threadId",1)).getAsJsonArray("stackFrames").get(0));
                     }
                     assertEquals(name,expected.get("line").getAsInt()+offset-(startAt1?0:1),frame.get("line").getAsInt());assertEquals(name,expected.get("column").getAsInt()-(startAt1?0:1),frame.get("column").getAsInt());
@@ -129,8 +154,10 @@ public class ClassicDapProtocolConformanceTest {
         wire.request("setBreakpoints",Map.of("source",Map.of("path",noEntry.toString()),"breakpoints",List.of(Map.of("line",0))));
         wire.request("configurationDone",Map.of());assertEquals("breakpoint",wire.event("stopped").get("reason").getAsString());
         while(true){wire.request("continue",Map.of("threadId",1));var event=wire.oneOf("stopped","output");if(event.get("event").getAsString().equals("output")){wire.event("terminated");wire.event("exited");break;}}
-        for(var invalid:List.of(Map.entry("stackTrace",Map.of("threadId",99)),Map.entry("scopes",Map.of("frameId",99)),Map.entry("variables",Map.of("variablesReference",99)),Map.entry("next",Map.of("threadId",1)),Map.entry("launch",Map.of("program","missing","steppingMode","unsupported")))) assertFalse(wire.response(invalid.getKey(),invalid.getValue()).get("success").getAsBoolean());
-        assertFalse(wire.response("unknown-fixture-command",Map.of()).get("success").getAsBoolean());wire.request("disconnect",Map.of());
+        for(var invalid:List.of(Map.entry("stackTrace",Map.of("threadId",99)),Map.entry("scopes",Map.of("frameId",99)),Map.entry("variables",Map.of("variablesReference",99)),Map.entry("next",Map.of("threadId",1)),Map.entry("launch",Map.of("program","missing","steppingMode","unsupported")))) DapFailureConformance.assertError(wire.response(invalid.getKey(),invalid.getValue()), "java.util.concurrent.CompletionException: java.lang.IllegalArgumentException: "+(invalid.getKey().equals("launch") ? "invalid program or stepping mode" : "invalid or unavailable debug request"));
+        var unknown = wire.response("unknown-fixture-command",Map.of()); assertFalse(unknown.get("success").getAsBoolean()); assertEquals("Unsupported request method: unknown-fixture-command", unknown.get("message").getAsString()); assertFalse(unknown.has("body"));wire.failures.complete(); wire.failures = null;
+        DapArgumentConformance.check(wire, "classic-ast", backend, temporary.getRoot().toPath());
+        wire.request("disconnect",Map.of());
     }
     private void exerciseBreakpointSources(Wire wire, String backend) throws Exception {
         wire.request("initialize", Map.of("adapterID", "breakpoint-source", "linesStartAt1", true));
@@ -191,7 +218,7 @@ public class ClassicDapProtocolConformanceTest {
         wire.request("configurationDone", Map.of()); wire.event("stopped");
         wire.request("next", Map.of("threadId", 1)); wire.event("stopped");
         assertConfigurationRejectedWithoutChanges(wire, backend + " while stopped after next");
-        assertFalse(wire.response("launch", Map.of("program", program.toString(), "steppingMode", "unsupported")).get("success").getAsBoolean());
+        DapFailureConformance.assertError(wire.response("launch", Map.of("program", program.toString(), "steppingMode", "unsupported")), "java.util.concurrent.CompletionException: java.lang.IllegalArgumentException: invalid program or stepping mode");
         assertConfigurationRejectedWithoutChanges(wire, backend + " after rejected launch");
         wire.request("continue", Map.of("threadId", 1));
         wire.event("output"); wire.event("terminated"); wire.event("exited");
@@ -214,7 +241,7 @@ public class ClassicDapProtocolConformanceTest {
         var scopes = wire.request("scopes", Map.of("frameId", 0));
         var variables = wire.request("variables", Map.of("variablesReference", 1));
         assertTrue(context + ": no pre-existing events", wire.pending.isEmpty());
-        assertFalse(context, wire.response("configurationDone", Map.of()).get("success").getAsBoolean());
+        DapFailureConformance.assertError(wire.response("configurationDone", Map.of()), "java.util.concurrent.CompletionException: java.lang.IllegalStateException: configurationDone requires a new launch");
         // These requests also drain events emitted after the rejected response.
         assertEquals(context, stack, wire.request("stackTrace", Map.of("threadId", 1)));
         assertEquals(context, scopes, wire.request("scopes", Map.of("frameId", 0)));
@@ -225,12 +252,39 @@ public class ClassicDapProtocolConformanceTest {
     private static JavaFileObject source(String name,String body){return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignore){return body;}};}
     static final class Wire implements AutoCloseable {
         final Process process;final InputStream input;final OutputStream output;final ExecutorService reader=Executors.newSingleThreadExecutor();final List<JsonObject> pending=new ArrayList<>();int next,lastSeq;
+        DapFailureConformance failures;
+        String lastPayload;
+        Future<JsonObject> incoming;
+        void probeFailures(String stage) throws Exception { if (failures != null) failures.check(this, stage); }
         Wire(Process process){this.process=process;input=new BufferedInputStream(process.getInputStream());output=process.getOutputStream();}
-        JsonObject read()throws Exception{return reader.submit(()->{int length=-1;var line=new StringBuilder();while(true){int b=input.read();if(b<0)throw new EOFException();line.append((char)b);if(b=='\n'){String h=line.toString();line.setLength(0);if(h.equals("\r\n"))break;if(h.startsWith("Content-Length:"))length=Integer.parseInt(h.substring(15).trim());}}if(length<0||length>4*1024*1024)throw new IOException("frame limit");byte[] body=input.readNBytes(length);if(body.length!=length)throw new EOFException();var message=JsonParser.parseString(new String(body,StandardCharsets.UTF_8)).getAsJsonObject();assertTrue(message.toString(),message.get("seq").getAsInt()>lastSeq);lastSeq=message.get("seq").getAsInt();return message;}).get(20,TimeUnit.SECONDS);}
-        JsonObject response(String command,Object arguments)throws Exception {int seq=++next;var message=JSON.toJsonTree(Map.of("seq",seq,"type","request","command",command,"arguments",arguments));byte[] body=JSON.toJson(message).getBytes(StandardCharsets.UTF_8);output.write(("Content-Length: "+body.length+"\r\n\r\n").getBytes(StandardCharsets.US_ASCII));output.write(body);output.flush();while(true){var result=read();if(result.get("type").getAsString().equals("response")&&result.get("request_seq").getAsInt()==seq){assertEquals(command,result.get("command").getAsString());return result;}pending.add(result);}}
-        JsonObject request(String command,Object arguments)throws Exception{var response=response(command,arguments);assertTrue(response.toString(),response.get("success").getAsBoolean());return response.has("body")?response.getAsJsonObject("body"):new JsonObject();}
+        JsonObject read() throws Exception {
+            var message = readWithin(20000);
+            if (message == null) throw new TimeoutException("DAP response timeout");
+            return message;
+        }
+        JsonObject readWithin(long millis) throws Exception {
+            if (incoming == null) incoming = reader.submit(()->{int length=-1;var line=new StringBuilder();while(true){int b=input.read();if(b<0)throw new EOFException();line.append((char)b);if(b=='\n'){String h=line.toString();line.setLength(0);if(h.equals("\r\n"))break;if(h.startsWith("Content-Length:"))length=Integer.parseInt(h.substring(15).trim());}}if(length<0||length>4*1024*1024)throw new IOException("frame limit");byte[] body=input.readNBytes(length);if(body.length!=length)throw new EOFException();var message=JsonParser.parseString(new String(body,StandardCharsets.UTF_8)).getAsJsonObject();assertTrue(message.toString(),message.get("seq").getAsInt()>lastSeq);lastSeq=message.get("seq").getAsInt();return message;});
+            try { var message = incoming.get(millis, TimeUnit.MILLISECONDS); incoming = null; return message; }
+            catch (TimeoutException timeout) { return null; }
+        }
+        JsonObject response(String command,Object arguments)throws Exception { return response(command, arguments, true); }
+        JsonObject response(String command,Object arguments,boolean includeArguments)throws Exception { return responseOrdered(command, arguments, includeArguments, true); }
+        int sendOrdered(String command, Object arguments, boolean includeArguments, boolean argumentsFirst) throws Exception {int seq=++next;var message=new JsonObject();message.addProperty("seq",seq);message.addProperty("type","request");if(!argumentsFirst)message.addProperty("command",command);if(includeArguments)message.add("arguments",JSON.toJsonTree(arguments));if(argumentsFirst)message.addProperty("command",command);byte[] body=JSON.toJson(message).getBytes(StandardCharsets.UTF_8);lastPayload=new String(body,StandardCharsets.UTF_8);output.write(("Content-Length: "+body.length+"\r\n\r\n").getBytes(StandardCharsets.US_ASCII));output.write(body);output.flush();return seq;}
+        JsonObject responseOrdered(String command,Object arguments,boolean includeArguments,boolean argumentsFirst)throws Exception {
+            int seq = sendOrdered(command, arguments, includeArguments, argumentsFirst);
+            while(true){var result=read();if(result.get("type").getAsString().equals("response")&&result.get("request_seq").getAsInt()==seq){assertEquals(command,result.get("command").getAsString());return result;}pending.add(result);}
+        }
+        JsonObject responseLiteral(String payload)throws Exception {
+            var request=JsonParser.parseString(payload).getAsJsonObject();
+            int seq=request.get("seq").getAsInt(); String command=request.get("command").getAsString();
+            lastPayload=payload; byte[] body=payload.getBytes(StandardCharsets.UTF_8);
+            output.write(("Content-Length: "+body.length+"\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            output.write(body); output.flush();
+            while(true){var response=read();if(response.get("type").getAsString().equals("response")&&response.get("request_seq").getAsInt()==seq){assertEquals(command,response.get("command").getAsString());return response;}pending.add(response);}
+        }
+        JsonObject request(String command,Object arguments)throws Exception{if(command.equals("disconnect") && failures != null) failures.complete();var response=response(command,arguments);assertTrue(response.toString(),response.get("success").getAsBoolean());return response.has("body")?response.getAsJsonObject("body"):new JsonObject();}
         JsonObject oneOf(String... events)throws Exception{var names=Set.of(events);for(var iterator=pending.iterator();iterator.hasNext();){var candidate=iterator.next();if(candidate.has("event")&&names.contains(candidate.get("event").getAsString())){iterator.remove();return candidate;}}while(true){var candidate=read();if(candidate.has("event")&&names.contains(candidate.get("event").getAsString()))return candidate;pending.add(candidate);}}
-        JsonObject event(String name)throws Exception{var event=oneOf(name);return event.has("body")?event.getAsJsonObject("body"):new JsonObject();}
+        JsonObject event(String name)throws Exception{var event=oneOf(name);if (name.equals("initialized")) probeFailures("pending"); else if (name.equals("stopped")) probeFailures("stopped"); else if (name.equals("exited")) probeFailures("terminated");return event.has("body")?event.getAsJsonObject("body"):new JsonObject();}
         @Override public void close()throws Exception{output.close();process.destroyForcibly();reader.shutdownNow();process.waitFor(5,TimeUnit.SECONDS);}
     }
 }

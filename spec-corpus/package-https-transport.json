@@ -1,0 +1,1640 @@
+[
+  {
+    "id": "authenticated",
+    "kind": "artifact",
+    "error": null,
+    "generate": true
+  },
+  {
+    "id": "untrusted",
+    "kind": "artifact",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "trust": false
+  },
+  {
+    "id": "hostname",
+    "kind": "artifact",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "hostname": "127.0.0.1"
+  },
+  {
+    "id": "connection-refused",
+    "kind": "refused",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "connect-timeout",
+    "kind": "connect-stall",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "exact-origin",
+    "kind": "auth",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "token": false
+  },
+  {
+    "id": "limit-exact",
+    "kind": "limit",
+    "error": null
+  },
+  {
+    "id": "chunked-limit-exact",
+    "kind": "chunked-limit",
+    "error": null
+  },
+  {
+    "id": "close-delimited-limit-exact",
+    "kind": "close-limit",
+    "error": null
+  },
+  {
+    "id": "status-404-limit-exact",
+    "kind": "limit",
+    "status": 404,
+    "error": "HTTPS artifact requires status 200; redirects are forbidden"
+  },
+  {
+    "id": "body-over-limit",
+    "kind": "oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "chunked-over-limit",
+    "kind": "chunked-oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "close-delimited-over-limit",
+    "kind": "close-oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "content-length-too-large",
+    "kind": "truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "content-length-too-small",
+    "kind": "extra",
+    "error": null
+  },
+  {
+    "id": "empty-body",
+    "kind": "empty",
+    "error": "expected object: document"
+  },
+  {
+    "id": "disconnect-before-headers",
+    "kind": "disconnect",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "chunked-truncated",
+    "kind": "chunked-truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "read-timeout",
+    "kind": "stall",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "status-101",
+    "kind": "status",
+    "status": 101,
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "status-201",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 201
+  },
+  {
+    "id": "status-204",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 204
+  },
+  {
+    "id": "status-204-content-length",
+    "kind": "status",
+    "status": 204,
+    "framing": "length",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "status-204-transfer-encoding",
+    "kind": "status",
+    "status": 204,
+    "framing": "chunked",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "status-206",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 206
+  },
+  {
+    "id": "status-300",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 300
+  },
+  {
+    "id": "status-301",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 301
+  },
+  {
+    "id": "status-302",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 302,
+    "generate": true
+  },
+  {
+    "id": "status-303",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 303
+  },
+  {
+    "id": "status-304",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 304
+  },
+  {
+    "id": "status-307",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 307
+  },
+  {
+    "id": "status-308",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 308
+  },
+  {
+    "id": "status-401",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 401
+  },
+  {
+    "id": "status-403",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 403
+  },
+  {
+    "id": "status-404",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 404
+  },
+  {
+    "id": "status-500",
+    "kind": "status",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "status": 500
+  },
+  {
+    "id": "status-302-oversize",
+    "kind": "oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 302
+  },
+  {
+    "id": "status-302-truncated",
+    "kind": "truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 302
+  },
+  {
+    "id": "status-404-oversize",
+    "kind": "oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 404
+  },
+  {
+    "id": "status-404-truncated",
+    "kind": "truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 404
+  },
+  {
+    "id": "status-500-oversize",
+    "kind": "oversize",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 500
+  },
+  {
+    "id": "status-500-truncated",
+    "kind": "truncated",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "status": 500
+  },
+  {
+    "id": "uri-path-left",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a[x",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-query-left",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?a[x",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-fragment-left",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#a[x",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-path-right",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a]x",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-query-right",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?a]x",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-fragment-right",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#a]x",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-path-escaped",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/%5B%5D",
+    "error": null,
+    "targetSuffix": "/%5B%5D"
+  },
+  {
+    "id": "uri-path-reserved",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/:@;!$&'()*+,=-._~",
+    "error": null,
+    "targetSuffix": "/:@;!$&'()*+,=-._~"
+  },
+  {
+    "id": "uri-plain",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}",
+    "error": null,
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-padded-port",
+    "kind": "uri",
+    "url": "https://LOCALHOST:{port:06d}/{id}",
+    "error": null,
+    "hostHeader": "LOCALHOST:{port}"
+  },
+  {
+    "id": "uri-port-0",
+    "kind": "uri",
+    "url": "https://localhost:0/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-65535",
+    "kind": "uri",
+    "url": "https://localhost:65535/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://localhost:65535",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-port-65536",
+    "kind": "uri",
+    "url": "https://localhost:65536/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-70000",
+    "kind": "uri",
+    "url": "https://localhost:70000/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-2147483647",
+    "kind": "uri",
+    "url": "https://localhost:2147483647/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-2147483648",
+    "kind": "uri",
+    "url": "https://localhost:2147483648/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-empty",
+    "kind": "uri",
+    "url": "https://localhost:/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://localhost",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-port-1a",
+    "kind": "uri",
+    "url": "https://localhost:1a/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-plus1",
+    "kind": "uri",
+    "url": "https://localhost:+1/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-1-x",
+    "kind": "uri",
+    "url": "https://localhost:1;x/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-port-minus1",
+    "kind": "uri",
+    "url": "https://localhost:-1/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-leading-hyphen",
+    "kind": "uri",
+    "url": "https://-a:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-trailing-hyphen",
+    "kind": "uri",
+    "url": "https://a-:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-empty-label",
+    "kind": "uri",
+    "url": "https://localhost..:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-numeric-last",
+    "kind": "uri",
+    "url": "https://a.1:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-underscore",
+    "kind": "uri",
+    "url": "https://a_b:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-trailing-dot",
+    "kind": "uri",
+    "url": "https://localhost.:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://localhost.:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-trailing-dot-fetch",
+    "kind": "uri",
+    "url": "https://localhost.:{port}/{id}",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "credentialOrigin": "https://localhost.:{port}"
+  },
+  {
+    "id": "uri-host-hyphen",
+    "kind": "uri",
+    "url": "https://a-b:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://a-b:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-digit-first",
+    "kind": "uri",
+    "url": "https://1a.b:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://1a.b:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-label-63",
+    "kind": "uri",
+    "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-label-64",
+    "kind": "uri",
+    "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.b:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-ipv4",
+    "kind": "uri",
+    "url": "https://127.0.0.1:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://127.0.0.1:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-ipv4-max",
+    "kind": "uri",
+    "url": "https://255.255.255.255:{port}/{id}",
+    "error": "invalid artifact credentials",
+    "credentialOrigin": "https://255.255.255.255:{port}",
+    "invalidToken": true
+  },
+  {
+    "id": "uri-host-ipv4-over",
+    "kind": "uri",
+    "url": "https://256.0.0.1:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv4-short",
+    "kind": "uri",
+    "url": "https://127.1:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv4-leading-zero",
+    "kind": "uri",
+    "url": "https://127.0.0.010:{port}/{id}",
+    "error": null,
+    "credentialOrigin": "https://127.0.0.010:{port}",
+    "hostHeader": "127.0.0.010:{port}"
+  },
+  {
+    "id": "uri-host-ipv4-padded",
+    "kind": "uri",
+    "url": "https://0127.0.000.010:{port}/{id}",
+    "error": null,
+    "credentialOrigin": "https://0127.0.000.010:{port}",
+    "hostHeader": "0127.0.000.010:{port}"
+  },
+  {
+    "id": "uri-host-ipv4-long",
+    "kind": "uri",
+    "url": "https://00127.000.000.010:{port}/{id}",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "credentialOrigin": "https://00127.000.000.010:{port}"
+  },
+  {
+    "id": "uri-host-ipv6",
+    "kind": "uri",
+    "url": "https://[::1]:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv6-v4",
+    "kind": "uri",
+    "url": "https://[::ffff:127.0.0.1]:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv6-scope",
+    "kind": "uri",
+    "url": "https://[fe80::1%25lo]:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-host-ipv6-broken",
+    "kind": "uri",
+    "url": "https://[:::1]:{port}/{id}",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-percent-host",
+    "kind": "uri",
+    "url": "https://%6Cocalhost/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-percent-dot",
+    "kind": "uri",
+    "url": "https://local%2ehost/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-percent-bad",
+    "kind": "uri",
+    "url": "https://local%zzhost/{id}",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-percent-short",
+    "kind": "uri",
+    "url": "https://localhost%/{id}",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-percent-user",
+    "kind": "uri",
+    "url": "https://%41@localhost/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-percent-port",
+    "kind": "uri",
+    "url": "https://localhost:%31/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-syntax-before-host",
+    "kind": "uri",
+    "url": "https://-a:{port}/{id}/a[",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-syntax-before-query",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?a%zz",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-syntax-before-fragment",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#a#b",
+    "error": "invalid HTTPS artifact URL"
+  },
+  {
+    "id": "uri-userinfo",
+    "kind": "uri",
+    "url": "https://user@localhost:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment"
+  },
+  {
+    "id": "uri-unicode-host",
+    "kind": "uri",
+    "url": "https://local\ud83d\ude00host:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-user",
+    "kind": "uri",
+    "url": "https://\ud83d\ude00@localhost:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-path",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a\ud83d\ude00",
+    "error": null,
+    "targetSuffix": "/a%F0%9F%98%80",
+    "unicode960": true,
+    "hostHeader": "localhost:{port}",
+    "generate": true
+  },
+  {
+    "id": "uri-unicode-bmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a\u00e9",
+    "error": null,
+    "targetSuffix": "/a%C3%A9",
+    "unicode960": true,
+    "hostHeader": "localhost:{port}",
+    "rawUnicode": true
+  },
+  {
+    "id": "uri-unicode-percent",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a%\ud83d\ude00",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true,
+    "generate": true
+  },
+  {
+    "id": "uri-unicode-query",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?\ud83d\ude00",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-fragment",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#\ud83d\ude00",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-nfd",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/e\u0301",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%C3%A9",
+    "hostHeader": "localhost:{port}",
+    "rawUnicode": true
+  },
+  {
+    "id": "uri-unicode-singleton",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u212b",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%C3%85",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-reorder",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a\u0315\u0300",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%C3%A0%CC%95",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-blocked",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a\u0305\u0301",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/a%CC%85%CC%81",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-exclusion",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u0344",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%CC%88%CC%81",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-hangul-lv",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1100\u1161",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%EA%B0%80",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-hangul-lvt",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1100\u1161\u11a8",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%EA%B0%81",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-musical",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\ud834\udd5e",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%F0%9D%85%97%F0%9D%85%A5",
+    "hostHeader": "localhost:{port}",
+    "rawUnicode": true
+  },
+  {
+    "id": "uri-unicode-fullwidth",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\uff0f\uff1f\uff03\uff20\uff1a\uff05",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%EF%BC%8F%EF%BC%9F%EF%BC%83%EF%BC%A0%EF%BC%9A%EF%BC%85",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-zero-width",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u200b",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%E2%80%8B",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-percent-valid",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9%2f\ud83d\ude00%41%25%ff",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%C3%A9%2f%F0%9F%98%80%41%25%ff",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-percent-encoded",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/e%CC%81\u00e9",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/e%CC%81%C3%A9",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-percent-blocks-nfc",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/%65\u0301",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%65%CC%81",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-percent-hex-compose",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/%4a\u0301",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%4%C3%A1",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-percent-encoded-space",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9%20%00%C2%A0",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%C3%A9%20%00%C2%A0",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-segments",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9/../e\u0301//\ud83d\ude00",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%C3%A9/../%C3%A9//%F0%9F%98%80",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-jdk-version-bmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a\u1ac1\u0323",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%E1%BA%A1%E1%AB%81",
+    "javaJdk17TargetSuffix": "/a%E1%AB%81%CC%A3",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-jdk-version-nonbmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/a\ud839\udcec\u0323",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%E1%BA%A1%F0%9E%93%AC",
+    "javaJdk17TargetSuffix": "/a%F0%9E%93%AC%CC%A3",
+    "hostHeader": "localhost:{port}"
+  },
+  {
+    "id": "uri-unicode-percent-short-bmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9%",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-percent-short-pair",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\ud83d\ude00%4",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-percent-bad",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9%zz",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-percent-mixed-first",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/%\u00e9",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-percent-mixed-second",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/%4\ud83d\ude00",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-path-bracket",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9[",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-path-backslash",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9\\",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-space",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9 ",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-nbsp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9\u00a0",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-ogham-space",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9\u1680",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-thin-space",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\ud83d\ude00\u2009",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-line-separator",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9\u2028",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-ideographic-space",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9\u3000",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-c1",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u00e9\u0085",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-bmp",
+    "kind": "uri",
+    "url": "https://loc\u00e9host:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-idn",
+    "kind": "uri",
+    "url": "https://\u4f8b\u3048.\u30c6\u30b9\u30c8:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-nfd",
+    "kind": "uri",
+    "url": "https://e\u0301.test:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-fullwidth",
+    "kind": "uri",
+    "url": "https://\uff4c\uff4f\uff43\uff41\uff4c\uff48\uff4f\uff53\uff54:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-fullwidth-dot",
+    "kind": "uri",
+    "url": "https://localhost\uff0e:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-percent-valid",
+    "kind": "uri",
+    "url": "https://\u00e9%41:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-pair-percent",
+    "kind": "uri",
+    "url": "https://\ud83d\ude00%41:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-percent-bad",
+    "kind": "uri",
+    "url": "https://\u00e9%zz:{port}/{id}",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-percent-mixed",
+    "kind": "uri",
+    "url": "https://\u00e9%\ud83d\ude00:{port}/{id}",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-host-space",
+    "kind": "uri",
+    "url": "https://\u00e9\u00a0:{port}/{id}",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-user-bmp",
+    "kind": "uri",
+    "url": "https://\u00e9@localhost:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-user-nfd",
+    "kind": "uri",
+    "url": "https://e\u0301@localhost:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-user-percent",
+    "kind": "uri",
+    "url": "https://\u00e9%41@localhost:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-user-fullwidth-at",
+    "kind": "uri",
+    "url": "https://\u00e9\uff20@localhost:{port}/{id}",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-user-percent-bad",
+    "kind": "uri",
+    "url": "https://\u00e9%\ud83d\ude00@localhost:{port}/{id}",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-query-bmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?\u00e9",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-query-nfd",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?e\u0301",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-query-percent",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?\u00e9%41\ud83d\ude00",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-query-percent-bad",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?\u00e9%\ud83d\ude00",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-query-space",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?\u00e9\u3000",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-fragment-bmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#\u00e9",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-fragment-nfd",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#e\u0301",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-fragment-percent",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#\u00e9%41\ud83d\ude00",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-fragment-percent-bad",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#\u00e9%\ud83d\ude00",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-fragment-space",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#\u00e9\u3000",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-port-zero",
+    "kind": "uri",
+    "url": "https://localhost:0/{id}/\u00e9",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-port-range",
+    "kind": "uri",
+    "url": "https://localhost:65536/{id}/\u00e9",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-port-overflow",
+    "kind": "uri",
+    "url": "https://localhost:2147483648/{id}/\u00e9",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-port-unicode",
+    "kind": "uri",
+    "url": "https://localhost:\uff11\uff12/{id}/\u00e9",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-port-fullwidth-colon",
+    "kind": "uri",
+    "url": "https://localhost:\uff1a1/{id}/\u00e9",
+    "error": "HTTPS artifact URL must omit credentials, query and fragment",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-port-padded",
+    "kind": "uri",
+    "url": "https://LOCALHOST:000{port}/{id}/e\u0301",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%C3%A9",
+    "hostHeader": "LOCALHOST:{port}"
+  },
+  {
+    "id": "uri-unicode-ipv4",
+    "kind": "uri",
+    "url": "https://127.0.0.010:{port}/{id}/\u00e9",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/%C3%A9",
+    "hostHeader": "127.0.0.010:{port}",
+    "credentialOrigin": "https://127.0.0.010:{port}"
+  },
+  {
+    "id": "uri-unicode-trailing-dot",
+    "kind": "uri",
+    "url": "https://localhost.:{port}/{id}/\u00e9",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "unicode960": true,
+    "credentialOrigin": "https://localhost.:{port}"
+  },
+  {
+    "id": "uri-unicode-long-ipv4",
+    "kind": "uri",
+    "url": "https://00127.000.000.010:{port}/{id}/\u00e9",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "unicode960": true,
+    "credentialOrigin": "https://00127.000.000.010:{port}"
+  },
+  {
+    "id": "uri-unicode-syntax-before-host",
+    "kind": "uri",
+    "url": "https://\u00e9:{port}/{id}/\ud83d\ude00%",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-syntax-before-user",
+    "kind": "uri",
+    "url": "https://\u00e9@localhost:{port}/{id}/\ud83d\ude00[",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-syntax-before-port",
+    "kind": "uri",
+    "url": "https://localhost:65536/{id}/\u00e9%",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-syntax-before-query",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}?\u00e9%",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-syntax-before-fragment",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}#\u00e9#\ud83d\ude00",
+    "error": "invalid HTTPS artifact URL",
+    "unicode960": true
+  },
+  {
+    "id": "uri-unicode-grave",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/`",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-unicode-grave-mixed",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef\u00e9%2f\ud83d\ude00",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/`%C3%A9%2f%F0%9F%98%80",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "framing-header-bytes-71680",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 71680
+  },
+  {
+    "id": "framing-header-bytes-204800",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 204800
+  },
+  {
+    "id": "framing-header-bytes-512000",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 512000,
+    "javaJdk17Error": null
+  },
+  {
+    "id": "framing-header-bytes-2097152",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 2097152,
+    "javaJdk17Error": null
+  },
+  {
+    "id": "framing-header-bytes-393215",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393215,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-header-bytes-393216",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393216,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-header-bytes-393217",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393217,
+    "javaJdk17Error": null
+  },
+  {
+    "id": "framing-header-bytes-393064",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393064
+  },
+  {
+    "id": "framing-header-bytes-393065",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393065
+  },
+  {
+    "id": "framing-header-bytes-393066",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393066
+  },
+  {
+    "id": "framing-header-lines-127",
+    "kind": "framing",
+    "error": null,
+    "headerLines": 127
+  },
+  {
+    "id": "framing-header-lines-128",
+    "kind": "framing",
+    "error": null,
+    "headerLines": 128
+  },
+  {
+    "id": "framing-header-lines-129",
+    "kind": "framing",
+    "error": null,
+    "headerLines": 129,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-header-lines-200",
+    "kind": "framing",
+    "error": null,
+    "headerLines": 200,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-cl-te",
+    "kind": "framing",
+    "error": "invalid JSON",
+    "shape": "cl-te",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-gzip-chunked",
+    "kind": "framing",
+    "error": "invalid JSON",
+    "shape": "gzip-chunked",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-chunked-gzip",
+    "kind": "framing",
+    "error": "invalid JSON",
+    "shape": "chunked-gzip",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-repeated-te",
+    "kind": "framing",
+    "error": "invalid JSON",
+    "shape": "repeated-te",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-duplicate-cl",
+    "kind": "framing",
+    "error": null,
+    "shape": "duplicate-cl"
+  },
+  {
+    "id": "framing-duplicate-cl-different",
+    "kind": "framing",
+    "error": null,
+    "shape": "duplicate-cl",
+    "delta": 1,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-negative-cl",
+    "kind": "framing",
+    "error": null,
+    "shape": "negative-cl",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-colonless",
+    "kind": "framing",
+    "error": null,
+    "shape": "colonless",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-obs-fold",
+    "kind": "framing",
+    "error": null,
+    "shape": "obs-fold",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-plus-cl",
+    "kind": "framing",
+    "error": null,
+    "shape": "plus-cl",
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-204-plus-cl",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "plus-cl",
+    "status": 204,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-header-bytes-393070",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393070
+  },
+  {
+    "id": "framing-header-bytes-393071",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393071
+  },
+  {
+    "id": "framing-header-bytes-393072",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393072
+  },
+  {
+    "id": "framing-header-bytes-393073",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393073
+  },
+  {
+    "id": "framing-header-bytes-393074",
+    "kind": "framing",
+    "error": null,
+    "headerBytes": 393074
+  },
+  {
+    "id": "framing-header-bytes-393075",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393075,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-header-bytes-393076",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393076,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-header-bytes-393077",
+    "kind": "framing",
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "headerBytes": 393077,
+    "javaJdk17Error": null,
+    "rustError": null
+  },
+  {
+    "id": "framing-404-cl-te",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "cl-te",
+    "status": 404
+  },
+  {
+    "id": "framing-500-gzip-chunked",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "gzip-chunked",
+    "status": 500
+  },
+  {
+    "id": "framing-404-negative-cl",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "negative-cl",
+    "status": 404,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-te-mixed-case",
+    "kind": "framing",
+    "error": null,
+    "shape": "te-mixed-case"
+  },
+  {
+    "id": "framing-te-ows",
+    "kind": "framing",
+    "error": null,
+    "shape": "te-ows"
+  },
+  {
+    "id": "uri-length-65534",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 65534,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-length-65535",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 65535,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-length-65536",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 65536,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-length-100000",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 100000,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-unicode-backend-bmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef\u00e9",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/`%C3%A9",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-unicode-backend-nonbmp",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef\ud83d\ude00",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/`%F0%9F%98%80",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-unicode-backend-percent",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef%60%2f%41%ff",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/`%60%2f%41%ff",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-unicode-backend-semicolon",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u037e",
+    "error": null,
+    "unicode960": true,
+    "targetSuffix": "/;",
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-raw-backtick",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/`",
+    "error": "invalid HTTPS artifact URL",
+    "backendIssue": 979
+  },
+  {
+    "id": "uri-unicode-expanded-length",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 65534,
+    "urlSuffix": "\u00e9%2f\ud83d\ude00",
+    "targetSuffix": "%C3%A9%2f%F0%9F%98%80",
+    "error": null,
+    "unicode960": true,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "uri-backend-length-credentials",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "error": "cannot read artifact credentials",
+    "backendIssue": 977,
+    "invalidToken": true,
+    "urlBytes": 100000,
+    "invalidCA": true,
+    "invalidCredentials": true
+  },
+  {
+    "id": "uri-backend-length-ca",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "error": "cannot read artifact CA certificate",
+    "backendIssue": 977,
+    "invalidToken": true,
+    "urlBytes": 100000,
+    "invalidCA": true
+  },
+  {
+    "id": "uri-backend-length-token",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "error": "invalid artifact credentials",
+    "backendIssue": 977,
+    "invalidToken": true,
+    "urlBytes": 100000
+  },
+  {
+    "id": "uri-backend-grave-credentials",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef",
+    "error": "cannot read artifact credentials",
+    "backendIssue": 979,
+    "invalidToken": true,
+    "unicode960": true,
+    "invalidCA": true,
+    "invalidCredentials": true
+  },
+  {
+    "id": "uri-backend-grave-ca",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef",
+    "error": "cannot read artifact CA certificate",
+    "backendIssue": 979,
+    "invalidToken": true,
+    "unicode960": true,
+    "invalidCA": true
+  },
+  {
+    "id": "uri-backend-grave-token",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/\u1fef",
+    "error": "invalid artifact credentials",
+    "backendIssue": 979,
+    "invalidToken": true,
+    "unicode960": true
+  },
+  {
+    "id": "uri-length-200000",
+    "kind": "uri",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 200000,
+    "error": null,
+    "hostHeader": "localhost:{port}",
+    "backendIssue": 977
+  },
+  {
+    "id": "request-stall",
+    "kind": "request-stall",
+    "url": "https://localhost:{port}/{id}/",
+    "urlBytes": 7000000,
+    "error": "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
+    "backendIssue": 977
+  }
+]

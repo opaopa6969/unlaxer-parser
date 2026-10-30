@@ -1,0 +1,72 @@
+[
+  {
+    "id": "plain",
+    "grammar": "g.ubnf",
+    "manifest": "ubnf.json"
+  },
+  {
+    "id": "symlink-parent",
+    "grammar": "a/link/../../g.ubnf",
+    "manifest": "a/link/../../ubnf.json"
+  },
+  {
+    "id": "missing-parent",
+    "grammar": "absent/../g.ubnf",
+    "manifest": "absent/../ubnf.json"
+  },
+  {
+    "id": "trailing-slash",
+    "grammar": "g.ubnf/",
+    "manifest": "ubnf.json/"
+  },
+  {
+    "id": "trailing-dot",
+    "grammar": "g.ubnf/.",
+    "manifest": "ubnf.json/."
+  },
+  {
+    "id": "dot-prefix",
+    "grammar": "./g.ubnf",
+    "manifest": "./ubnf.json"
+  },
+  {
+    "id": "middle-dot",
+    "grammar": "a/./../g.ubnf",
+    "manifest": "a/./../ubnf.json"
+  },
+  {
+    "id": "file-parent",
+    "grammar": "g.ubnf/../g.ubnf",
+    "manifest": "ubnf.json/../ubnf.json"
+  },
+  {
+    "id": "double-slash",
+    "grammar": "a//../g.ubnf",
+    "manifest": "a//../ubnf.json"
+  },
+  {
+    "id": "absolute-symlink-parent",
+    "grammar": "${WORK}/a/link/../../g.ubnf",
+    "manifest": "${WORK}/a/link/../../ubnf.json"
+  },
+  {
+    "id": "absolute-missing-parent",
+    "grammar": "${WORK}/absent/../g.ubnf",
+    "manifest": "${WORK}/absent/../ubnf.json"
+  },
+  {
+    "id": "parent-relative",
+    "grammar": "../work/g.ubnf",
+    "manifest": "../work/ubnf.json"
+  },
+  {
+    "id": "trailing-parent",
+    "grammar": "g.ubnf/child/..",
+    "manifest": "ubnf.json/child/.."
+  },
+  {
+    "id": "symlink-file",
+    "grammar": "alias/g.ubnf",
+    "manifest": "alias/ubnf.json"
+  }
+]

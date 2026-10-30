@@ -1,0 +1,152 @@
+[
+  {
+    "id": "missing-parent-segment",
+    "source": "local:nodir/../artifact.json"
+  },
+  {
+    "id": "trailing-slash",
+    "source": "local:artifact.json/"
+  },
+  {
+    "id": "dot-and-separators",
+    "source": "local:./nodir//../artifact.json//"
+  },
+  {
+    "id": "absolute-local",
+    "source": "local:${ROOT}/nodir/../artifact.json/"
+  },
+  {
+    "id": "symlink-parent",
+    "source": "local:a/link/../x.json",
+    "expectedArtifact": "a/x.json"
+  },
+  {
+    "id": "symlink-retained",
+    "source": "local:file-link.json",
+    "expectedArtifact": "physical/standard.json"
+  },
+  {
+    "id": "transitive-parent",
+    "source": "local:nested/nodir/../parent.json",
+    "childSource": "local:../nodir/../artifact.json"
+  },
+  {
+    "id": "transitive-trailing",
+    "source": "local:nested/parent.json/",
+    "childSource": "local:../artifact.json/"
+  },
+  {
+    "id": "transitive-symlink-parent",
+    "source": "local:nested/parent.json",
+    "childSource": "local:../a/link/../x.json",
+    "expectedArtifact": "a/x.json"
+  },
+  {
+    "id": "transitive-symlink-base",
+    "source": "local:nested/alias.json",
+    "childSource": "local:child.json",
+    "expectedArtifact": "nested/child.json",
+    "expectedParent": "physical/parent.json"
+  },
+  {
+    "id": "relative-manifest-parent",
+    "source": "local:artifact.json",
+    "manifest": "nested/../ubnf.json"
+  },
+  {
+    "id": "absent-manifest-parent",
+    "source": "local:artifact.json",
+    "manifest": "nodir/../ubnf.json"
+  },
+  {
+    "id": "absolute-manifest",
+    "source": "local:artifact.json",
+    "manifest": "${ROOT}/ubnf.json"
+  },
+  {
+    "id": "absolute-manifest-parent",
+    "source": "local:artifact.json",
+    "manifest": "${ROOT}/nodir/../ubnf.json"
+  },
+  {
+    "id": "symlink-manifest-parent",
+    "source": "local:artifact.json",
+    "manifest": "a/link/../../ubnf.json"
+  },
+  {
+    "id": "parent-relative-manifest",
+    "source": "local:artifact.json",
+    "manifest": "../ubnf.json",
+    "workingDirectory": "nested"
+  },
+  {
+    "id": "unicode-path",
+    "source": "local:space \ud83d\ude00/nodir/../artifact.json/",
+    "expectedArtifact": "space \ud83d\ude00/artifact.json"
+  },
+  {
+    "id": "trailing-dot",
+    "source": "local:artifact.json/."
+  },
+  {
+    "id": "beyond-filesystem-root",
+    "source": "local:../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../${ROOT}/artifact.json"
+  },
+  {
+    "id": "file-parent-is-directory",
+    "source": "local:artifact.json/..",
+    "error": "artifact is not a regular file"
+  },
+  {
+    "id": "empty-local",
+    "source": "local:",
+    "error": "artifact is not a regular file"
+  },
+  {
+    "id": "nul",
+    "source": "local:art\u0000ifact.json",
+    "error": "cannot read local artifact"
+  },
+  {
+    "id": "nul-removed-component",
+    "source": "local:bad\u0000/../artifact.json",
+    "error": "cannot read local artifact"
+  },
+  {
+    "id": "transitive-nul",
+    "source": "local:nested/parent.json",
+    "childSource": "local:bad\u0000/../../artifact.json",
+    "error": "cannot read local artifact"
+  },
+  {
+    "id": "transitive-directory",
+    "source": "local:nested/parent.json",
+    "childSource": "local:../artifact.json/..",
+    "error": "artifact is not a regular file"
+  },
+  {
+    "id": "missing-local",
+    "source": "local:nodir/../absent.json",
+    "error": "missing local artifact"
+  },
+  {
+    "id": "not-directory",
+    "source": "local:artifact.json/child.json",
+    "error": "cannot read local artifact"
+  },
+  {
+    "id": "filesystem-root",
+    "source": "local:/",
+    "error": "artifact is not a regular file"
+  },
+  {
+    "id": "symlink-directory-trailing-dot",
+    "source": "local:a/link/.",
+    "error": "artifact is not a regular file"
+  },
+  {
+    "id": "backslash-is-not-separator",
+    "source": "local:nodir\\..\\artifact.json",
+    "error": "missing local artifact"
+  }
+]

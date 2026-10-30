@@ -3,15 +3,13 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 pub fn inspect(path: &Path) -> Result<Value, String> {
-    let path = if path.is_absolute() {
-        path.to_owned()
-    } else {
-        std::env::current_dir()
-            .map_err(|e| e.to_string())?
-            .join(path)
-    };
-    let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    crate::modules::load(&path)?;
+    let path = crate::modules::normalize(path)?;
+    let source = crate::packages::read_local_source(&path)?;
+    crate::modules::resolve_for_inspect(
+        &source,
+        &path,
+        &mut crate::packages::Resolver::new(&path),
+    )?;
     inspect_resolved(&path, &source, &mut crate::packages::Resolver::new(&path))
 }
 

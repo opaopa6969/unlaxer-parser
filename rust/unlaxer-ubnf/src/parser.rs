@@ -15,13 +15,27 @@ pub(crate) fn parse(source: &str, tokens: Vec<Token>) -> Result<UbnfFile> {
         depth: 0,
         calls: Vec::new(),
         rule_params: Vec::new(),
+        pending_value: None,
     };
     let mut grammars = Vec::new();
     while parser.current().kind != Kind::Eof {
-        grammars.push(parser.grammar()?);
+        grammars.push(parser.grammar().map_err(|error| {
+            // A native resource limit is not Java syntax (Java parses deeper).
+            // Preserve the first mapper error at that existing boundary.
+            if error.kind == DiagnosticKind::NestingLimit {
+                parser.pending_value.clone().unwrap_or(error)
+            } else {
+                error
+            }
+        })?);
     }
     if grammars.is_empty() {
         return Err(parser.error("expected at least one grammar"));
+    }
+    // Java maps values in declaration order, only after the entire syntax
+    // (including trailing input and subsequent grammars) has been recognized.
+    if let Some(error) = parser.pending_value {
+        return Err(error);
     }
     let span = Span::default().through(parser.current().span);
     // Expansion follows the complete syntax parse, as in the Java frontend.
@@ -44,6 +58,7 @@ struct Parser<'a> {
     parameterized: std::collections::HashSet<String>,
     calls: Vec<crate::params::Call>,
     rule_params: Vec<Vec<Option<Vec<crate::params::Param>>>>,
+    pending_value: Option<Diagnostic>,
 }
 
 impl Parser<'_> {
@@ -66,6 +81,19 @@ impl Parser<'_> {
     }
     fn invalid(&self, span: Span, message: impl Into<String>) -> Diagnostic {
         diagnostic(self.source, span, DiagnosticKind::InvalidValue, message)
+    }
+    // Only invalid inputs allocate a diagnostic. Private placeholder values never
+    // leave parse(): syntax (including later grammars) must succeed first.
+    fn value<T: Default>(&mut self, span: Span, result: std::result::Result<T, &str>) -> T {
+        match result {
+            Ok(value) => value,
+            Err(message) => {
+                if self.pending_value.is_none() {
+                    self.pending_value = Some(self.invalid(span, message));
+                }
+                T::default()
+            }
+        }
     }
     fn is(&self, symbol: char) -> bool {
         self.current().kind == Kind::Symbol(symbol)
@@ -117,8 +145,8 @@ impl Parser<'_> {
     fn class_quoted(&mut self) -> Result<String> {
         let span = self.current().span;
         self.quoted()?;
-        crate::codepoint_escapes::decode(&self.source[span.byte_start..span.byte_end])
-            .map_err(|error| self.invalid(span, error))
+        let result = crate::codepoint_escapes::decode(&self.source[span.byte_start..span.byte_end]);
+        Ok(self.value(span, result))
     }
     // Syntax accepts every ASCII digit run; validation owns the signed-32-bit limit.
     fn repeat_bound(&mut self) -> Result<u32> {
@@ -136,6 +164,23 @@ impl Parser<'_> {
     fn dotted(&mut self) -> Result<String> {
         let mut value = self.identifier()?;
         while self.eat('.') {
+            value.push('.');
+            value.push_str(&self.identifier()?);
+        }
+        Ok(value)
+    }
+    // Java's RuleRefElement has a contiguous (identifier '.')* prefix;
+    // grammar trivia is allowed only before its final identifier. Other dotted
+    // names (settings/imports/adapters) have their own grammar and keep dotted().
+    fn rule_reference(&mut self) -> Result<String> {
+        let mut value = self.identifier()?;
+        let mut contiguous = true;
+        while self.is('.') {
+            if !contiguous || self.previous().byte_end != self.current().span.byte_start {
+                return Err(self.error("namespace prefix must be contiguous"));
+            }
+            self.pos += 1;
+            contiguous = self.previous().byte_end == self.current().span.byte_start;
             value.push('.');
             value.push_str(&self.identifier()?);
         }
@@ -265,8 +310,21 @@ impl Parser<'_> {
             || value == "RegexTokenParser"
             || value == "org.unlaxer.dsl.runtime.RegexTokenParser"
         {
-            return Err(self.invalid(value_start.through(self.previous()),
-                "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)"));
+            let error = self.invalid(value_start.through(self.previous()),
+                "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)");
+            if value == "REGEX" {
+                self.expect('(')?;
+                self.quoted()?;
+                self.expect(')')?;
+            }
+            self.pending_value.get_or_insert(error);
+            // A private placeholder lets syntax recognition finish. No removed
+            // token can escape parse(), reach expansion, or execute a pattern.
+            return Ok(TokenDecl {
+                name,
+                kind: TokenKind::Empty,
+                span: self.span_from(start),
+            });
         }
         let kind = match value.as_str() {
             "ANY" => TokenKind::Any,
@@ -305,6 +363,11 @@ impl Parser<'_> {
                 } else {
                     self.quoted()?
                 };
+                let min = if format_two {
+                    self.value(a, crate::codepoint_escapes::boundary(&min))
+                } else {
+                    self.bmp(&min, a)
+                };
                 self.expect(',')?;
                 let b = self.current().span;
                 let max = if format_two {
@@ -313,23 +376,15 @@ impl Parser<'_> {
                     self.quoted()?
                 };
                 self.expect(')')?;
-                let min = if format_two {
-                    crate::codepoint_escapes::boundary(&min)
-                        .map_err(|error| self.invalid(a, error))?
-                } else {
-                    self.bmp(&min, a)?
-                };
                 let max = if format_two {
-                    crate::codepoint_escapes::boundary(&max)
-                        .map_err(|error| self.invalid(b, error))?
+                    self.value(b, crate::codepoint_escapes::boundary(&max))
                 } else {
-                    self.bmp(&max, b)?
+                    self.bmp(&max, b)
                 };
                 if format_two {
-                    crate::codepoint_escapes::validate_range(min, max)
-                        .map_err(|error| self.invalid(a, error))?;
+                    self.value(a, crate::codepoint_escapes::validate_range(min, max));
                 } else if min > max {
-                    return Err(self.invalid(value_start, "CHAR_RANGE minimum exceeds maximum"));
+                    self.value::<()>(value_start, Err("CHAR_RANGE minimum exceeds maximum"));
                 }
                 if min as u32 > 0xffff || max as u32 > 0xffff {
                     TokenKind::Declarative {
@@ -498,15 +553,12 @@ impl Parser<'_> {
                 "CHAR_RANGE" => {
                     let span = self.current().span;
                     let a = self.class_quoted()?;
-                    let min = crate::codepoint_escapes::boundary(&a)
-                        .map_err(|error| self.invalid(span, error))?;
+                    let min = self.value(span, crate::codepoint_escapes::boundary(&a));
                     self.expect(',')?;
                     let max_span = self.current().span;
                     let b = self.class_quoted()?;
-                    let max = crate::codepoint_escapes::boundary(&b)
-                        .map_err(|error| self.invalid(max_span, error))?;
-                    crate::codepoint_escapes::validate_range(min, max)
-                        .map_err(|error| self.invalid(span, error))?;
+                    let max = self.value(max_span, crate::codepoint_escapes::boundary(&b));
+                    self.value(span, crate::codepoint_escapes::validate_range(min, max));
                     Lex {
                         min: min as i32,
                         max: max as i32,
@@ -536,15 +588,15 @@ impl Parser<'_> {
         }
         Ok(Lex::leaf(Op::REF, name))
     }
-    fn bmp(&self, value: &str, span: Span) -> Result<char> {
+    fn bmp(&mut self, value: &str, span: Span) -> char {
         let mut chars = value.chars();
-        match (chars.next(), chars.next()) {
-            (Some(c), None) if c as u32 <= 0xffff => Ok(c),
-            _ => Err(self.invalid(
-                span,
-                "CHAR_RANGE boundary requires exactly one non-surrogate BMP character",
-            )),
-        }
+        self.value(
+            span,
+            match (chars.next(), chars.next()) {
+                (Some(c), None) if c as u32 <= 0xffff => Ok(c),
+                _ => Err("CHAR_RANGE boundary requires exactly one non-surrogate BMP character"),
+            },
+        )
     }
     /// True when the current token is '(' immediately after the previous token.
     fn adjacent_open(&self) -> bool {
@@ -687,12 +739,13 @@ impl Parser<'_> {
                     let key = self.identifier()?;
                     self.expect('=')?;
                     let value = self.quoted()?;
-                    if key == "kind"
+                    if (key == "kind"
                         || params.iter().any(|p| p.key == key)
-                        || key == "strategy" && strategy.is_some()
+                        || key == "strategy" && strategy.is_some())
+                        && self.pending_value.is_none()
                     {
-                        return Err(
-                            self.invalid(arg_start, format!("duplicate @eval argument {key}"))
+                        self.pending_value = Some(
+                            self.invalid(arg_start, format!("duplicate @eval argument {key}")),
                         );
                     }
                     if key == "strategy" {
@@ -808,9 +861,12 @@ impl Parser<'_> {
                         (RecoveryMode::Sync, tokens)
                     }
                     _ => {
-                        return Err(
-                            self.invalid(mode_start, "expected recovery mode auto, skip or sync")
-                        )
+                        return Err(diagnostic(
+                            self.source,
+                            mode_start,
+                            DiagnosticKind::Syntax,
+                            "expected recovery mode auto, skip or sync",
+                        ))
                     }
                 };
                 self.expect(')')?;
@@ -1216,7 +1272,7 @@ impl Parser<'_> {
             self.expect(')')?;
             ElementKind::Error(message)
         } else {
-            let value = self.dotted()?;
+            let value = self.rule_reference()?;
             let (namespace, name) = match value.rsplit_once('.') {
                 Some((ns, name)) => (Some(ns.to_owned()), name.to_owned()),
                 None => (None, value),

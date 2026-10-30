@@ -1,0 +1,11 @@
+# parser	input-hex	accepted	consumed	matched	javaBodyFrames	rustBodyFrames
+empty	~	true	0	0	0	0
+empty	0a	true	1	1	0	0
+empty	0d0a	true	2	2	0	0
+empty	20090d0a78	true	4	4	0	2
+empty	2009	true	2	2	0	2
+empty	78	false	0	0	0	0
+wild	~	true	0	0	0	0
+wild	0d0a	true	2	2	0	0
+wild	f09f9880780d0a3f	true	4	4	0	2
+wild	7461696c	true	4	4	0	4
