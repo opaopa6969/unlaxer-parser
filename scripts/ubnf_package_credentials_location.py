@@ -22,6 +22,8 @@ def fixtures():
     cases = json.loads((ROOT / 'spec-corpus/package-credentials-location.json').read_text())
     assert len(cases) == len({case['id'] for case in cases}) == COUNT, 'location fixture missing'
     # Both successful selection and a poisoned selected file cover the full 3 x 3 matrix.
+    assert all(case.get('selected') for case in cases if case.get('invalidCredentials')), \
+        'invalid credentials case without the selected file to poison'
     for invalid in [False, True]:
         matrix = [(c.get('passwd'), c['home']) for c in cases
                   if c.get('passwd') in ['missing', 'error', 'empty']
@@ -86,8 +88,7 @@ def check(directory, args, records):
                          short=folder / 's/.config/unlaxer/credentials.json')
             for label, path in paths.items():
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(b'{' if case.get('invalidCredentials') else
-                                 encode({origin: {'caCertificate': str(ca), 'bearerToken': TOKENS[label]}}))
+                path.write_bytes(encode({origin: {'caCertificate': str(ca), 'bearerToken': TOKENS[label]}}))
             (folder / 'directory').mkdir()
             (folder / 'parent-file').write_text('not a directory')
             (folder / 'link').symlink_to('explicit.json')
@@ -120,6 +121,15 @@ def check(directory, args, records):
                 passwd if found and (jdk == '17' or len(passwd) >= 2) else
                 '?' if jdk == '17' or home in [None, ''] else str(home))
             assert actual_home == expected_home, (case['id'], 'unexpected Java home oracle')
+            if case.get('invalidCredentials'):
+                # Poison only the expected file(s); every other candidate stays valid, so
+                # selecting a different location would succeed and fail the exit check.
+                # A JDK17 run poisons both hosts' files; the JDK21 run pins native alone.
+                poisoned = {case['selected']}
+                if jdk == '17':
+                    poisoned.add(case.get('javaSelected17', case['selected']))
+                for label in poisoned:
+                    paths[label].write_bytes(b'{')
             manifest = project / 'ubnf.json'
             manifest.write_bytes(encode({'schemaVersion': 1, 'dependencies': {
                 'std/layout': {'version': '1.0.0', 'source': origin + '/artifact'}}}))

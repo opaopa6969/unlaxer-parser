@@ -255,7 +255,8 @@ native の互換対象をリポジトリの既定 JDK21 に固定する（#964�
 不在・エラー・空 pw_dir × HOME 未設定・空・非空の9組合せは、正常なファイルと不正 JSON の
 両方を検証する。各形で両 `deps resolve`、Java-host Rust / native Rust / Java flag CLI と
 lock/cache の有無を検査する（410呼出し）。成功時は Authorization のラベルで選択ファイルを確認し、
-raw lock/cache と生成 bytes を照合する。不正 JSON は両 resolve が
+raw lock/cache と生成 bytes を照合する。不正 JSON の形は選ばれるべきファイルだけを壊し、
+他の候補は正常なままにする（別の場所を選ぶと成功して検出される）。両 resolve が
 `E-PACKAGE: cannot read artifact credentials` / exit 3、lock/cache は既存の有無とも不変で、
 同じ不正 credentials があっても固定 cache からの3 CLI生成は成功し通信しない。
 Java の独立 home probe と実 CLI の診断・exit を使い、同じ子環境内の呼出しは
