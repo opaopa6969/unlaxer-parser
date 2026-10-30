@@ -2352,7 +2352,7 @@
       "issues": [
         971
       ],
-      "observation": "Java Files.writeStringが参照。nativeは既存の書込み権限をtruncateせず確認し、通常のsibling一時ファイルへ既存permission bitsを写してrenameする。mode 600/640を保存、新規ファイルはumask 022/002/077で644/664/600となりJavaと一致。hard link (nlink>1)と一時ファイル作成のPermissionDenied時の既存ファイルだけは、同じ書込み用handleでその場書込みへ退避する。この2経路のみ#937の書込み失敗時に切り詰めない保証がJavaと同じ水準へ下がり、truncate後の失敗で部分内容が全hard linkへ残る。通常renameは既存bytesを保護する。mode444の非root拒否は#952のまま。所有者・ACL・xattrはrename経路で保存しない意図した差（inode置換と#937のbytes保護を維持し、新依存・特権を加えない最小の選択）。その場書込みの経路は同じinodeでJavaと同じ属性を保持する。rootで444の成功とmode保持はrunnerがsudo不可のため未実測の推定として残す。共通14形をLF/CRLFで両CLIへ送り56観測とcheck40回を独立期待値へ照合し、mode/nlink/全内容を比較。chmod555/444を迂回できるユーザーでは非rootの権限ケースを理由付き除外しCIは除外0。Java製品コード・#937/#952/#953/#974の既存表・check JSON・正常生成bytesは不変。",
+      "observation": "Java Files.writeStringが参照。nativeは既存の書込み権限をtruncateせず確認し、通常のsibling一時ファイル（既存があればmode 600で作成）へ書込み前に既存permission bitsを写してrenameする。mode 600/640を保存し、set-user-IDとgroup execute付きset-group-IDはJavaのその場書込みと同じく非rootの書込みで解除される。新規ファイルはumask 022/002/077で644/664/600となりJavaと一致。hard link (nlink>1)と一時ファイル作成のPermissionDenied時の既存ファイルだけは、同じ書込み用handleでその場書込みへ退避する。この2経路のみ#937の書込み失敗時に切り詰めない保証がJavaと同じ水準へ下がり、truncate後の失敗で部分内容が全hard linkへ残る。通常renameは既存bytesを保護する。mode444の非root拒否は#952のまま。所有者・ACL・xattrはrename経路で保存しない意図した差（inode置換と#937のbytes保護を維持し、新依存・特権を加えない最小の選択）。その場書込みの経路は同じinodeでJavaと同じ属性を保持する。rootで444の成功とmode保持はrunnerがsudo不可のため未実測の推定として残す。共通15形をLF/CRLFで両CLIへ送り60観測とcheck44回を独立期待値へ照合し、mode/nlink/全内容を比較。chmod555/444を迂回できるユーザーでは非rootの権限ケースを理由付き除外しCIは除外0。Java製品コード・#937/#952/#953/#974の既存表・check JSON・正常生成bytesは不変。",
       "evidence": [
         "rust/unlaxer-generator/src/main.rs",
         "unlaxer-dsl/src/main/java/org/unlaxer/dsl/RustGenerateCommand.java",

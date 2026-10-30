@@ -44,13 +44,13 @@ public class CliStderrConformanceTest {
             "--output", output.toString()), EVIDENCE.resolve("cli-stderr-" + suite + ".log"), 840);
         var evidence = JsonParser.parseString(Files.readString(output)).getAsJsonObject();
         var excluded = evidence.getAsJsonArray("excluded");
-        int permissionCases = suite.equals("replacement") ? 3 : suite.equals("output") ? 4 : suite.equals("paths") || suite.equals("profile") ? 3 : 0;
+        int permissionCases = suite.equals("replacement") ? 4 : suite.equals("output") ? 4 : suite.equals("paths") || suite.equals("profile") ? 3 : 0;
         assertTrue("only chmod(000/555/444) may be inapplicable", excluded.size() <= permissionCases);
         for (var entry : excluded) System.out.println("[fixture exclusion] " + entry);
         if (System.getenv("GITHUB_ACTIONS") != null)
             assertEquals("CI must exercise chmod(000/555/444): " + excluded, 0, excluded.size());
         int observations = switch (suite) {
-            case "replacement" -> 56;
+            case "replacement" -> 60;
             case "blank" -> 350;
             case "output" -> 112;
             case "paths" -> 244;
@@ -64,6 +64,7 @@ public class CliStderrConformanceTest {
         assertEquals(observations - skipped, evidence.getAsJsonArray("observations").size());
         if (suite.equals("paths")) assertEquals(114, evidence.getAsJsonArray("checks").size());
         if (suite.equals("profile")) assertEquals(4, evidence.getAsJsonArray("checks").size());
+        if (suite.equals("replacement") && excluded.size() == 0) assertEquals(44, evidence.getAsJsonArray("checks").size());
     }
 
     private static void run(List<String> command, Path log, int seconds) throws Exception {

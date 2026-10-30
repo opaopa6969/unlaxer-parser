@@ -216,7 +216,9 @@ def replacement_expected(work, case, ending, trees, before, host):
     result = dict(before)
     for name, (mode, content) in spec.items():
         if stat.S_ISREG(mode):
-            mode = stat.S_IFREG | case.get('modes', {}).get(name, 0o666 & ~case.get('umask', 0o022))
+            # A non-root write clears set-user-ID, and set-group-ID with group execute.
+            mode = stat.S_IFREG | case.get('writtenModes', {}).get(name, case.get('modes', {}).get(
+                name, 0o666 & ~case.get('umask', 0o022)))
         elif name in case.get('readOnly', []):
             mode = stat.S_IFDIR | 0o555
         elif stat.S_ISDIR(mode) and not (operation == 'playground' and name == 'out' and host == 'java'):
@@ -250,6 +252,10 @@ def replacement_cases(cases, directory, commands, evidence, trees):
                 or (case.get('readOnlyFiles') and not file_permissions)):
             evidence['excluded'].append(dict(case=case['id'], observations=4,
                 reason='Execution user bypasses chmod(555/444); non-root permission behavior cannot be exercised.'))
+            continue
+        if case.get('writtenModes') and os.geteuid() == 0:
+            evidence['excluded'].append(dict(case=case['id'], observations=4,
+                reason='CAP_FSETID keeps set-ID bits on write; the non-root clearing cannot be exercised.'))
             continue
         for ending, separator in [('LF', '\n'), ('CRLF', '\r\n')]:
             for host, command in commands:

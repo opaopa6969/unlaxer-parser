@@ -1082,13 +1082,15 @@ chmod(444) の file と chmod(555) の directory は実行ユーザーで別々�
 Java `CodegenMain` の `Files.writeString` が参照実装で、Java 製品コードは変更しない。
 native の `generate` は通常、既存ファイルを truncate せず書込み用に open して権限を確認し、
 同じ directory の一時ファイルへ書き、既存の permission bits を写してから rename する。
-permission bits は内容を書き始める前に写して一時ファイルの読取り権限も保ち、
-書込み後にも設定して書込みで落ちる set-ID bits を復元する。
+既存ファイルがあるとき一時ファイルは mode 600 で作り、内容を書き始める前に既存の permission bits を写す。
+書込み後には写し直さないので、Java のその場書込みと同じく非 root の書込みで set-user-ID と
+group execute 付きの set-group-ID が OS により解除される。
 新規ファイルには既存 mode を写さず、`0666 & ~umask` を用いる。
 
 | 形 | Java / native の結果 |
 | --- | --- |
 | 既存生成物が mode 600 / 640 | 成功し、既存の mode を保つ。native は rename 前に mode を写す。 |
+| 既存生成物が mode 4755 / 2755 / 2645、hard link 付き 4755 | 成功し、非 root では 755 / 755 / 2645 / 755 になる（書込みによる解除）。 |
 | 既存生成物の nlink > 1 | 成功し、全 hard link の内容と nlink を保つ。native は既に開いた同じ handle へのその場書込みに切り替える。 |
 | 出力 directory が555、既存生成物は書込み可能 | 成功し、mode・nlink を保つ。一時ファイル作成が PermissionDenied になったときだけ、既存の書込み用 handle へその場書込みする。 |
 | 既存生成物が444、非 root | 両方とも終了4。既存内容は変えず、後続ファイルを書かない（#952 のまま）。 |
@@ -1112,13 +1114,13 @@ truncate 後の write に失敗すると空または部分内容を残し、hard
 その場書込みの2経路では、同じ inode を保つため所有者・ACL・xattr も Java と同じく保たれる
 （OS が書込みで更新・解除する属性は OS の規則による）。台帳 `cli-output-replacement-metadata` に記録する。
 
-共通 `replacement` suite は14形、LF/CRLF・両 CLI の56観測と成功後 check 40回。
+共通 `replacement` suite は15形、LF/CRLF・両 CLI の60観測と成功後 check 44回。
 exit・stdout 全文・stderr 最終行と全ツリーの mode・nlink・内容ハッシュを独立期待値に照合する。
 各 host の前に古い生成物を作り直し、一方の成功を他方の入力にしない。
 通常成功ケースは既存 `CodegenBatchHost` から実 `CodegenMain.run` を1 JVMで呼び、
 umask と RLIMIT_FSIZE を変えるケースは実 CLI process を起動する。
 hard link / 555 directory の途中書込み失敗と通常 rename の既存 bytes 保護も対照検証する。
-chmod(555/444) を迂回できる実行ユーザーでは該当の非 root ケースだけを理由付き除外し、
+chmod(555/444) を迂回できる実行ユーザーと、set-ID を解除しない root では該当の非 root ケースだけを理由付き除外し、
 root 専用の行は推定として残す。CI は非 root で除外0・JUnit skip0を必須とする。
 cli shard と JDK17 の既存クラス登録を使い、両契約に新メソッドを必須登録する。
 

@@ -707,11 +707,15 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
         }
         // A sibling temporary keeps Java's per-file directory permissions and write order.
         let temporary = directory.join(format!(".unlaxer-{}-{i}.tmp", std::process::id()));
-        let mut handle = match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-        {
+        let mut create = OpenOptions::new();
+        create.write(true).create_new(true);
+        // Do not expose a private artifact's temporary before its mode is copied.
+        #[cfg(unix)]
+        if existing.is_some() {
+            use std::os::unix::fs::OpenOptionsExt;
+            create.mode(0o600);
+        }
+        let mut handle = match create.open(&temporary) {
             Ok(handle) => handle,
             // Only an existing, already opened writable file can use this fallback.
             // A collision or other I/O failure must retain the replacement contract.
@@ -730,7 +734,8 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
             }
         };
         let result = (|| {
-            // Keep private existing contents private in the sibling temporary too.
+            // Copy the mode before writing: like Java's in-place write, the write then
+            // clears set-user-ID (and set-group-ID with group execute) for non-root users.
             if let Some(metadata) = &metadata {
                 handle
                     .set_permissions(metadata.permissions())
@@ -739,12 +744,6 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
             handle
                 .write_all(file.content.as_bytes())
                 .map_err(write_error)?;
-            // Restore special mode bits that writing can clear.
-            if let Some(metadata) = &metadata {
-                handle
-                    .set_permissions(metadata.permissions())
-                    .map_err(|e| path_error(&destination, e))?;
-            }
             handle.sync_all().map_err(write_error)?;
             drop(handle);
             fs::rename(&temporary, &destination).map_err(|e| path_error(&destination, e))
