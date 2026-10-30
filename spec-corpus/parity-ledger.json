@@ -22,7 +22,8 @@
     "2026-10-27 #827: failure/success hit は公開 context API と Classic harness に現れる host 依存の内部会計であり、Java/Rust 間の数値一致を契約しないと決定。marker・rule/inline group の cache 粒度と Chain 対照を確認し、非nested Outer を追加。runtime/生成器を変えず、実測全行と memo OFF/SAFE_FAILURES の結果不変を検証する。個別の契約判断であり台帳全体の監査日・revision は更新しない。",
     "2026-10-27 #872/#876: 先行先読みのない通常呼出の成功診断をJava実測に揃える。両issueは成功記録の既存watermark必須条件が共通原因。生成grammarのJava互換経路と独立native PEG式入口を区別し、後者の別診断列を維持する。個別修正であり台帳全体の監査日・revisionは更新しない。",
     "2026-10-27 #878: 外部入口の成功時に transaction frame 外の最終消費を記録し、Java 実測の nested-boundary 47経路1128行を追加。#197 は入口ごとの比較1つを指示役が許可し、ノードごとの処理は不変。入口が戻る前の custom parser の途中診断は #881 に分離する。#826/#872/#876 の CLOSED を確認。個別修正であり台帳全体の監査日・revision は更新しない。",
-    "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。"
+    "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。",
+    "2026-10-27 #861: Choice/PredictiveChoiceのFIRST判定を候補beginによるmatched reset後と同じ位置へ揃え、Java専用deferred例外30行を削除。公開runtimeの共通cursor/capture回帰を追加。機能や全体の対応宣言は増やさず、CI/mergeまでissueはOPENのまま維持する。"
   ],
   "issues": {
     "111": {
@@ -2249,16 +2250,19 @@
     },
     {
       "id": "java-first-exclusion-reset",
-      "category": "unresolved",
-      "title": "Java Choice の FIRST 除外が reset 前の cursor を読む",
-      "hosts": "Java Classic（DETAILED_ON_FAILURE） / Rust Classic",
+      "category": "contract",
+      "title": "Choice候補のFIRST判定とbegin後cursorの一致",
+      "hosts": "Java / Rust Classic",
       "issues": [
         861,
         848
       ],
-      "observation": "Java ChoiceInterfaceは候補のbegin前のcursorでlookaheadを取り、親のresetMatchedWithConsumed=trueでbeginがmatchedをconsumedへ戻すと、実際に読む位置と除外判定の位置がずれる。DETAILED_ON_FAILUREだけで成功する候補が除かれ受理が変わる（x LF、C=1/M=2/reset=true/matchOnlyの行終端はDETAILEDで成功、DETAILED_ON_FAILUREで失敗。除外を無効にすると成功）。Rust Classicはtoken modeで除外せずJava DETAILEDと同じ結果。line-boundaryのcases.tsvのjava-deferred-defect列30行がJavaの現状値をJava側だけの期待値として固定し、Rustは主の期待値へ照合する。#861の修正時に列を除く。",
+      "observation": "ChoiceとPredictiveChoiceの候補判定は、親reset=trueならconsumed、それ以外は指定kindのcursorを読む。実parserのkindは保持し、除外だけのtransactionは追加しない。全診断policyで受理・両cursor・選択・原CSTが一致する。line-boundaryの旧Java専用deferred例外30行を削除し、1088行を両版の主の期待値で照合する。後続nullable候補への誤選択はchoice-cursorのASCII/非BMP/複数CP共通corpusで固定する。issue861はCI/mergeまで継続。",
       "evidence": [
-        "conformance/line-boundary/README.md",
+        "conformance/choice-cursor/README.md",
+        "conformance/choice-cursor/predictive.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/ChoiceCursorExclusionTest.java",
+        "rust/unlaxer-runtime/tests/choice_cursor.rs",
         "conformance/line-boundary/cases.tsv",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
         "conformance/line-boundary/probe.rs"
@@ -2272,7 +2276,7 @@
       "issues": [
         848
       ],
-      "observation": "StartOfLine/StartOfSourceはtokenを作らず4kindの参照cursorを検査するCustom adapterで語彙BOL/BOFと接続する。LineTerminator/EndOfLineはChoice/Literal/Eofをそのまま使い、診断モードで分岐するadapterは置かない。DETAILED_ON_FAILUREだけに出るJavaのFIRST除外の欠陥（#861）はRustへ移植しない。既存runtimeへ処理を追加せず、全ケースを独立oracleへ照合。",
+      "observation": "StartOfLine/StartOfSourceはtokenを作らず4kindの参照cursorを検査するCustom adapterで語彙BOL/BOFと接続する。LineTerminator/EndOfLineはChoice/Literal/Eofをそのまま使い、診断モードで分岐するadapterは置かない。JavaのFIRST除外は#861で候補begin後と同じ位置へ修正し、診断modeで分岐しない主oracleを両版で照合する。既存runtimeへ処理を追加せず、全ケースを独立oracleへ照合。",
       "evidence": [
         "conformance/line-boundary/README.md",
         "conformance/line-boundary/cases.tsv",
@@ -3186,15 +3190,6 @@
       },
       "entries": [
         "line-boundary-composition"
-      ]
-    },
-    {
-      "path": "conformance/line-boundary/cases.tsv",
-      "fields": {
-        "java-deferred-defect": 1
-      },
-      "entries": [
-        "java-first-exclusion-reset"
       ]
     },
     {

@@ -131,11 +131,9 @@ reduced CST（tag による AST 射影）は #851 の範囲で、ここの構成
 raise しない）。Rust の出力からは作っていない。
 
 DETAILED_ON_FAILURE では、成功または通常失敗の行は失敗 CP=0・expected なしになるが、raised failure の行は
-DETAILED と同じ診断を保つ（両言語）。`wrappers.tsv` の1行（`raise-choice`・`a;y`・matchOnly・prior `a`・
-reset=true）は、Java だけ DETAILED_ON_FAILURE で失敗する。これは #861（Choice の FIRST 除外が reset 前の
-cursor を読む。修正は PR #862）で、terminator がない `Choice(Chain(a, !), "a;y")` でも再現する。Java の
-テストはこの1行・このモードだけ #861 の実測値を期待し（使用回数も検査）、#862 と一緒に外す。Rust と Java の
-他のモードは共通の期待値で比べる。この例外（`ISSUE_861_DETAILED_ON_FAILURE`）は、#862 が merge されるまで残す（依存待ち）。
+DETAILED と同じ診断を保つ（両言語）。Choice の FIRST 除外が reset 前の cursor を読む #861 は
+依存 PR #862 の修正で解消する。`raise-choice`・`a;y`・matchOnly・prior `a`・reset=true の行も
+Java / Rust の全診断モードで共通期待値へ比較し、Java 専用の例外値は使わない。
 
 ## 実行
 

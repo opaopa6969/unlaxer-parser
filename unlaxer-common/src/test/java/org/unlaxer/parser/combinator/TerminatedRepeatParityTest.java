@@ -350,30 +350,14 @@ public class TerminatedRepeatParityTest {
         }
     }
 
-    /**
-     * #861 (fix PR #862, not in this base): Java DETAILED_ON_FAILURE excludes Choice candidates by the
-     * matched cursor before the reset, so this one row fails only in that mode. It is not a terminator
-     * difference (it reproduces with Choice(Chain(a, !), "a;y")); the Rust row and every other Java mode
-     * follow the shared expectation. Remove this entry together with the #862 fix.
-     */
-    private static final Map<String, List<String>> ISSUE_861_DETAILED_ON_FAILURE = Map.of(
-            "raise-choice\t613b79\tmatchOnly\tfalse\t61\ttrue",
-            List.of("false", "0", "1", "0", "false", "~", "~", "matchOnly@0:1:61", "matchOnly,0,1,61", "1", "true"));
-
     @Test public void sharedWrapperRuleAndLookaheadTerminatorOracleInEveryMode() throws Exception {
         List<String[]> rows = rows(WRAPPERS);
         assertEquals(2342, rows.size());
         Map<String, Parser> parsers = new HashMap<>();
         var failures = new ArrayList<String>();
-        int issue861 = 0;
         for (Memoization memo : Memoization.values()) for (ParseOptions.Diagnostics mode : ParseOptions.Diagnostics.values()) {
             for (String[] row : rows) {
                 List<String> expected = expectedWrapperRow(row, mode);
-                List<String> known = ISSUE_861_DETAILED_ON_FAILURE.get(String.join("\t", Arrays.copyOf(row, 6)));
-                if (mode == ParseOptions.Diagnostics.DETAILED_ON_FAILURE && known != null) {
-                    expected = known;
-                    issue861++;
-                }
                 Parser parser = parsers.computeIfAbsent(row[0], TerminatedRepeatParityTest::wrapperParser);
                 List<String> actual = observeWrapperRow(parser, row, memo, mode);
                 if (false == actual.equals(expected)) {
@@ -384,7 +368,6 @@ public class TerminatedRepeatParityTest {
         }
         assertTrue(String.join("\n", failures), failures.isEmpty());
         assertEquals(23, parsers.size());
-        assertEquals(Memoization.values().length, issue861);
     }
 
     private static Parser semiX() { return new Chain(w(";"), w("x")); }
