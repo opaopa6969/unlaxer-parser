@@ -1432,5 +1432,39 @@
     "headerBytes": 393077,
     "javaJdk17Error": null,
     "rustError": null
+  },
+  {
+    "id": "framing-404-cl-te",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "cl-te",
+    "status": 404
+  },
+  {
+    "id": "framing-500-gzip-chunked",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "gzip-chunked",
+    "status": 500
+  },
+  {
+    "id": "framing-404-negative-cl",
+    "kind": "framing",
+    "error": "HTTPS artifact requires status 200; redirects are forbidden",
+    "shape": "negative-cl",
+    "status": 404,
+    "rustError": "HTTPS artifact retrieval failed (TLS, timeout or size limit)"
+  },
+  {
+    "id": "framing-te-mixed-case",
+    "kind": "framing",
+    "error": null,
+    "shape": "te-mixed-case"
+  },
+  {
+    "id": "framing-te-ows",
+    "kind": "framing",
+    "error": null,
+    "shape": "te-ows"
   }
 ]

@@ -19,7 +19,7 @@ from ubnf_package_credentials import ROOT, local_tls_context, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
 LIMIT = 8 * 1024 * 1024
-COUNT = 208
+COUNT = 213
 URI_COUNT = 133
 UNICODE_COUNT = 80
 TOKEN = 'transport-fixture-only-token'
@@ -39,7 +39,7 @@ def fixtures():
     cases = json.loads((ROOT / 'spec-corpus/package-https-transport.json').read_text())
     assert len(cases) == len({c['id'] for c in cases}) == COUNT, 'transport fixture missing'
     framing = [c for c in cases if c['kind'] == 'framing']
-    assert len(framing) == 33, 'HTTP framing fixtures missing'
+    assert len(framing) == 38, 'HTTP framing fixtures missing'
     uri = [c for c in cases if c['kind'] == 'uri']
     assert len(uri) == URI_COUNT and sum(c.get('unicode960', False) for c in uri) == UNICODE_COUNT
     # Only the separately tracked NFC -> backtick backend boundary has host errors.
@@ -59,12 +59,14 @@ def framing_response(case, artifact):
     headers = [f'HTTP/1.1 {status} Fixture', 'Connection: close', 'X-Fixture: ' + HEADER]
     shape = case.get('shape', 'length')
     data = artifact
-    if shape in ['cl-te', 'gzip-chunked', 'chunked-gzip', 'repeated-te']:
+    if shape in ['cl-te', 'gzip-chunked', 'chunked-gzip', 'repeated-te', 'te-mixed-case', 'te-ows']:
         data = f'{len(artifact):x}\r\n'.encode() + artifact + b'\r\n0\r\n\r\n'
         if shape == 'cl-te':
             headers += ['Content-Length: ' + str(len(data)), 'Transfer-Encoding: chunked']
         elif shape == 'repeated-te':
             headers += ['Transfer-Encoding: gzip', 'Transfer-Encoding: chunked']
+        elif shape in ['te-mixed-case', 'te-ows']:  # Valid sole chunked: must not be rejected.
+            headers += ['Transfer-Encoding: Chunked' if shape == 'te-mixed-case' else 'Transfer-Encoding: \tchunked \t']
         else:
             headers += ['Transfer-Encoding: ' + ('gzip, chunked' if shape == 'gzip-chunked' else 'chunked, gzip')]
     elif shape == 'duplicate-cl':

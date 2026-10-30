@@ -45,7 +45,11 @@ pub fn fetch(source: &str) -> Result<Vec<u8>, String> {
     let mut response = request
         .call()
         .map_err(|_| error("HTTPS artifact retrieval failed (TLS, timeout or size limit)"))?;
-    if rejected_by_java_exchange(&response) || ambiguous_framing(&response) {
+    // Only a 200 body becomes the artifact. For any other status Java completes the
+    // body and reports the status, so ureq's framing is read and discarded as before.
+    if rejected_by_java_exchange(&response)
+        || (response.status() == ureq::http::StatusCode::OK && ambiguous_framing(&response))
+    {
         return Err(error(
             "HTTPS artifact retrieval failed (TLS, timeout or size limit)",
         ));

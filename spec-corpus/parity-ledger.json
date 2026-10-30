@@ -744,7 +744,7 @@
       "issues": [
         972
       ],
-      "observation": "Java製品コードは不変。nativeはheader wire上限384 KiBと入力buffer上限+1を設定する。JDK21はstatus長+32と各field長+32で数え、このfixtureはwire393074まで成功、393075で取得失敗。nativeは393216まで成功、393217で失敗。Oracle17.0.12には同じ上限がなく2 MiBまで成功を実測し、javaJdk17Errorで固定する。更新版17のbackport（Temurin17.0.20-101）も実測し、テスト専用hostのfield存在検査で上限有無を選ぶ。NFCのmajor版判定は別に維持する。ureq固定128 header行の追加拒否、異値重複CL・負数/正符号CL・colonless・obs-foldは恒久差。CL+TEと単独chunked以外のTEは受信後に取得失敗として拒否（RFC9112 6.1/6.3）。修正前のCL+TE/gzip,chunkedはchunk内artifactとraw lock/cache一致を検証。204+CL:+0はJavaがstatus診断、nativeはureq内部でstatusが失われるため取得失敗。obs-foldの拒否は5.2のuser agent展開要件より厳しいbackend制約。追加33形を両resolve・snapshot有無・JDK17/21でskipせず実行し、診断/exit/raw bytes/失敗時不変と秘密値非記録を検査する。",
+      "observation": "Java製品コードは不変。nativeはheader wire上限384 KiBと入力buffer上限+1を設定する。JDK21はstatus長+32と各field長+32で数え、このfixtureはwire393074まで成功、393075で取得失敗。nativeは393216まで成功、393217で失敗。Oracle17.0.12には同じ上限がなく2 MiBまで成功を実測し、javaJdk17Errorで固定する。更新版17のbackport（Temurin17.0.20-101）も実測し、テスト専用hostのfield存在検査で上限有無を選ぶ。NFCのmajor版判定は別に維持する。ureq固定128 header行の追加拒否、異値重複CL・負数/正符号CL・colonless・obs-foldは恒久差。CL+TEと単独chunked以外のTEはstatus 200の受信後に取得失敗として拒否し（RFC9112 6.1/6.3）、非200は本文を読み捨ててJavaと同じstatus診断。大文字・空白付きの単独chunkedは成功。修正前のCL+TE/gzip,chunkedはchunk内artifactとraw lock/cache一致を検証。204+CL:+0と404+負数CLはJavaがstatus診断、nativeはureq内部でstatusが失われるため取得失敗。obs-foldの拒否は5.2のuser agent展開要件より厳しいbackend制約。追加38形を両resolve・snapshot有無・JDK17/21でskipせず実行し、診断/exit/raw bytes/失敗時不変と秘密値非記録を検査する。",
       "evidence": [
         "docs/ubnf-packages.md",
         "spec-corpus/package-https-transport.json",
@@ -3053,7 +3053,7 @@
       "fields": {
         "javaJdk17Error": 8,
         "javaJdk17TargetSuffix": 2,
-        "rustError": 19
+        "rustError": 20
       },
       "entries": [
         "package-ascii-url",

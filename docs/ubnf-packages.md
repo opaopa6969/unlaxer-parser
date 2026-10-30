@@ -330,7 +330,7 @@ JDK17/21 の独立した Java 実測を期待値とし、両 `deps resolve` を 
 失敗時の lock/cache 不変、成功時の raw bytes、認証の exact origin、TLS境界、redirect 先の接続0、
 生成時の接続0と固定cache使用を検査する。空bodyの診断は transport ではなく後続 JSON 検査である。
 42形はすべてローカル TLS/socket fixture の実測で、JDK17/21の診断に差はない。
-HTTP/1.1 の境界・不正 framing は追加33形を同じメソッドで実行し、host 別期待値も skip しない（#972）。
+HTTP/1.1 の境界・不正 framing は追加38形を同じメソッドで実行し、host 別期待値も skip しない（#972）。
 Java 製品コード・診断は維持し、native は以下の安全側の契約を使う。
 表の「取得失敗」は `HTTPS artifact retrieval failed (TLS, timeout or size limit)`（exit 3）、
 「status」は `HTTPS artifact requires status 200; redirects are forbidden`（exit 3）を指す。
@@ -341,13 +341,14 @@ Java 製品コード・診断は維持し、native は以下の安全側の契�
 | header 500 KiB / 2 MiB | 17成功、21取得失敗 | 公称384 KiBの厳しい21を参照し、native は取得失敗。17の parser はこの上限を持たず、2 MiBまで成功を実測（有限の上限が2 MiBという意味ではない） |
 | header 上限の直前・直後 | この fixture の wire 393074 bytesまで21成功、393075以上は取得失敗。17は全境界成功 | native は status 行から空行までの wire 393216 bytesを包含的に受理、393217以上で取得失敗。会計方式の狭い差は恒久契約 |
 | header 127 / 128 / 129 / 200行 | 両方成功 | 128行まで成功、129行以上は取得失敗。ureq-protoの固定 `MAX_RESPONSE_HEADERS = 128` に公開設定がなく、恒久差 |
-| Content-Length と Transfer-Encoding の併記 | CLで読み、このfixtureは `invalid JSON` | 取得失敗。ureqがchunkedとして読むことを確認後、自前検査で拒否。RFC 9112 §6.3(3) の曖昧なframingをcacheへ入れない |
-| `gzip, chunked` / `chunked, gzip` / TEの複数行 | close-delimited等で読み、このfixtureは `invalid JSON` | 取得失敗。ureqはgzipを復号せずchunkedと解釈するので、単独のchunked以外を拒否。RFC 9112 §6.1・§6.3(4)。gzip転送のラベルだけを除去してartifactにしない |
+| Content-Length と Transfer-Encoding の併記 | CLで読み、このfixtureは `invalid JSON` | 取得失敗。ureqがchunkedとして読むことを確認後、自前検査で拒否。RFC 9112 §6.3(3) の曖昧なframingをcacheへ入れない。拒否はstatus 200だけで、404/500等は本文を読み捨ててJavaと同じstatus診断 |
+| `gzip, chunked` / `chunked, gzip` / TEの複数行 | close-delimited等で読み、このfixtureは `invalid JSON` | 取得失敗。ureqはgzipを復号せずchunkedと解釈するので、単独のchunked以外を拒否。RFC 9112 §6.1・§6.3(4)。gzip転送のラベルだけを除去してartifactにしない。大文字小文字違い・前後の空白付きの単独 `chunked` は成功。非200は上と同じくstatus診断 |
 | 同値の重複 Content-Length | 両方成功 | 成功を維持。RFC 9112 §6.3(5) が同値のリストを許容 |
 | 異値の重複 Content-Length | 最初のCLで成功 | 取得失敗を維持。RFC 9112 §6.3(5) の回復不能なframingエラー |
 | Content-Length の負数 / 正符号 | `-1`はclose-delimited、正符号は数値として成功 | 取得失敗を維持。RFC 9112 §6.2 の `1*DIGIT` を満たさない |
 | `:` のない行 | 無視して成功 | 取得失敗を維持。RFC 9112 §5 のfield構文に反する行を独自に補修しない |
 | obs-fold | 展開して成功 | 取得失敗を維持するbackend制約。RFC 9112 §5.2は送信を禁止するが、user agentには受信時の空白への展開を要求しており、nativeの拒否をRFC必須とは扱わない。独自parserでureqを緩めない |
+| 404 等 + ureq が `.call()` で拒否する形（負のCL等） | status診断 | 取得失敗の恒久差。理由は次の行と同じで、`.call()` のエラーにはstatusが残らない |
 | 204 + Content-Length: +0 | 両方status診断 | nativeは取得失敗という恒久差。ureq-protoはbody mode決定中にCLを拒否し、`.call()`のエラーにはstatus/headerが残らない。取得後の検査だけで安全にstatus診断へ写せない |
 
 JDK21の `jdk.http.maxHeaderSize` の既定値は384 KiBだが、status長＋32、各fieldの名前長＋値長＋32と、
