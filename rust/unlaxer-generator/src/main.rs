@@ -730,10 +730,16 @@ fn write_artifacts(output: &Path, files: &[GeneratedFile], check: bool) -> io::R
             }
         };
         let result = (|| {
+            // Keep private existing contents private in the sibling temporary too.
+            if let Some(metadata) = &metadata {
+                handle
+                    .set_permissions(metadata.permissions())
+                    .map_err(|e| path_error(&destination, e))?;
+            }
             handle
                 .write_all(file.content.as_bytes())
                 .map_err(write_error)?;
-            // Apply the existing mode after writing (writes can clear set-ID bits).
+            // Restore special mode bits that writing can clear.
             if let Some(metadata) = &metadata {
                 handle
                     .set_permissions(metadata.permissions())

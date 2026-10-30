@@ -1082,7 +1082,8 @@ chmod(444) の file と chmod(555) の directory は実行ユーザーで別々�
 Java `CodegenMain` の `Files.writeString` が参照実装で、Java 製品コードは変更しない。
 native の `generate` は通常、既存ファイルを truncate せず書込み用に open して権限を確認し、
 同じ directory の一時ファイルへ書き、既存の permission bits を写してから rename する。
-permission bits は書込み後に設定し、書込みで set-ID bits が落ちることを避ける。
+permission bits は内容を書き始める前に写して一時ファイルの読取り権限も保ち、
+書込み後にも設定して書込みで落ちる set-ID bits を復元する。
 新規ファイルには既存 mode を写さず、`0666 & ~umask` を用いる。
 
 | 形 | Java / native の結果 |
