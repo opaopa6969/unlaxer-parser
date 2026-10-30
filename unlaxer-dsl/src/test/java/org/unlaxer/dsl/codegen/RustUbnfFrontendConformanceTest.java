@@ -76,7 +76,7 @@ public class RustUbnfFrontendConformanceTest {
                 checked++;
             }
         }
-        assertEquals("shared cases must not disappear", 38, checked);
+        assertEquals("shared cases must not disappear", 40, checked);
     }
 
     @Test public void nativeFrontendMatchesJavaSyntax() throws Exception {

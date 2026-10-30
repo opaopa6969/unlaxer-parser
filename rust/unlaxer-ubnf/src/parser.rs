@@ -22,7 +22,11 @@ pub(crate) fn parse(source: &str, tokens: Vec<Token>) -> Result<UbnfFile> {
         grammars.push(parser.grammar().map_err(|error| {
             // Keep the first mapping error when a later value validation fails.
             // Syntax errors, unlike value errors, take precedence over migration.
-            if error.kind == DiagnosticKind::InvalidValue {
+            // The native body nesting limit is not Java syntax (Java parses deeper).
+            if matches!(
+                error.kind,
+                DiagnosticKind::InvalidValue | DiagnosticKind::NestingLimit
+            ) {
                 parser.retired_regex.clone().unwrap_or(error)
             } else {
                 error

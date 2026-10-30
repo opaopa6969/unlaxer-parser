@@ -10,9 +10,10 @@
 1-based line/CP-column を固定します。家族 emoji と CRLF を前置した例を含みます。
 
 `../cli-stderr.json` の `scope=regex` は診断選択の共通 oracle (#949) です。
-19形 × 入口/local import × LF/CRLF × 4操作 × 両 CLI の608観測を固定します。
+20形 × 入口/local import × LF/CRLF × 4操作 × 両 CLI の640観測を固定します。
 セミコロンの有無・複数・前後の空白/行コメント、前後の構文エラー、引数不正、
-末尾入力・後続 grammar・旧 adapter・最初の移行診断・非 BMP の CP位置を含みます。
+末尾入力・後続 grammar・旧 adapter・最初の移行診断・非 BMP の CP位置、
+native だけの入れ子上限（128段）を含みます。
 check JSON 全文と stderr、Playground stderr、generate/deps inspect の終了3・原因・位置、
 入力不変と出力先/staging不在を照合します。import 入口は `@ubnf: v2` を指定して
 実際に import を解決します。`frontend` 期待値は既存 `RustUbnfFrontendConformanceTest`

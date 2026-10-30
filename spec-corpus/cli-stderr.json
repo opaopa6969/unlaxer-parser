@@ -7,7 +7,7 @@
     "paths": 33,
     "profile": 74,
     "blank": 175,
-    "regex": 38
+    "regex": 40
   },
   "cases": [
     {
@@ -13782,6 +13782,231 @@
       "files": {
         "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
         "part.ubnf": "grammar Main { token X = REGEX('x') token Y = CHAR_RANGE('z','a') @root Start ::= X; }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"blocked\",\"diagnostics\":[{\"code\":\"P-MODULE\",\"severity\":\"error\",\"span\":null,\"subject\":\"UBNF module resolution\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=P-MODULE, span=null, subject=UBNF module resolution]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-native-nesting-limit-entry",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((X)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))); }"
+      },
+      "expected": {
+        "LF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":25,\"end\":30},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        },
+        "CRLF": {
+          "check": {
+            "exit": 3,
+            "stdout": "{\"schemaVersion\":1,\"target\":\"rust\",\"portable\":false,\"structure\":\"unavailable\",\"diagnostics\":[{\"code\":\"E-REGEX-RETIRED\",\"severity\":\"error\",\"span\":{\"start\":25,\"end\":30},\"subject\":\"E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\"}]}\n",
+            "lastError": "",
+            "stderr": ""
+          },
+          "playground": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]",
+            "stderr": "Playground requires a Rust-portable grammar: [Diagnostic[code=E-REGEX-RETIRED, span=Span[start=25, end=30], subject=E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)]]\n"
+          },
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+            "stderr": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26\n"
+          }
+        }
+      },
+      "nativeByEnding": {
+        "LF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        },
+        "CRLF": {
+          "generate": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          },
+          "inspect": {
+            "exit": 3,
+            "stdout": "",
+            "lastError": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "stderr": "1:26: E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)\n"
+          }
+        }
+      },
+      "frontend": {
+        "LF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              25,
+              30,
+              25,
+              30
+            ],
+            "line": 1,
+            "column": 26
+          }
+        },
+        "CRLF": {
+          "javaError": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md) at code points [25,30), line 1, column 26",
+          "native": {
+            "error": "E-REGEX-RETIRED: REGEX execution was removed; use token NAME ::= expression; (see docs/regex-retirement.md)",
+            "span": [
+              25,
+              30,
+              25,
+              30
+            ],
+            "line": 1,
+            "column": 26
+          }
+        }
+      }
+    },
+    {
+      "id": "regex-native-nesting-limit-import",
+      "scope": "regex",
+      "operations": [
+        "check",
+        "playground",
+        "generate",
+        "inspect"
+      ],
+      "files": {
+        "main.ubnf": "grammar Entry { @import m from 'part.ubnf' @ubnf: v2 @root Start ::= m.Start; }",
+        "part.ubnf": "grammar Main { token X = REGEX('x') @root Start ::= ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((X)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))); }"
       },
       "expected": {
         "LF": {

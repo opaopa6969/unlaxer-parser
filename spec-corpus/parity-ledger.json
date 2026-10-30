@@ -2281,7 +2281,7 @@
       "issues": [
         949
       ],
-      "observation": "Java参照でファイル全体の構文解析・末尾チェックを移行診断より優先する (#949)。旧REGEXと旧adapterの移行診断をnative frontend内で保留し、余分なセミコロン・引数不正・前後の構文エラー・後続grammar不正は入口checkのP-SYNTAX/null/UBNF syntaxへ揃える。構文が整った旧宣言は最初のE-REGEX-RETIRED/CP位置を維持し、展開・生成・実行へ渡さない。Java製品/runtime parserホットパスは不変。共通19形×入口/local import×LF/CRLF×4操作×両CLIの608観測でcheck JSON全文・stderr・readiness・終了3・出力/staging不在を固定し、frontendの通常/snapshot入口とnative全spanも比較する。import入口はv2として解決し、check/Playgroundは既存P-MODULEラップを保持。generate/deps inspectの本文は既存#937契約どおりJavaの先頭80 UTF-16単位/未消費入力表示とnativeの行/CP列/原因表示に分け、nativeByEndingに独立期待値を固定する。公開3.3.0は変更しない。 途中の値検証がさらに後ろの構文エラーを隠す既存差は#983に分離し、ここで一般の値検証経路を変更しない。",
+      "observation": "Java参照でファイル全体の構文解析・末尾チェックを移行診断より優先する (#949)。旧REGEXと旧adapterの移行診断をnative frontend内で保留し、余分なセミコロン・引数不正・前後の構文エラー・後続grammar不正は入口checkのP-SYNTAX/null/UBNF syntaxへ揃える。構文が整った旧宣言は最初のE-REGEX-RETIRED/CP位置を維持し、展開・生成・実行へ渡さない。native固有の規則本体の入れ子上限(128段)はJavaの構文エラーではないため、保留中の移行診断を優先する。Java製品/runtime parserホットパスは不変。共通20形×入口/local import×LF/CRLF×4操作×両CLIの640観測でcheck JSON全文・stderr・readiness・終了3・出力/staging不在を固定し、frontendの通常/snapshot入口とnative全spanも比較する。import入口はv2として解決し、check/Playgroundは既存P-MODULEラップを保持。generate/deps inspectの本文は既存#937契約どおりJavaの先頭80 UTF-16単位/未消費入力表示とnativeの行/CP列/原因表示に分け、nativeByEndingに独立期待値を固定する。公開3.3.0は変更しない。 途中の値検証がさらに後ろの構文エラーを隠す既存差は#983に分離し、ここで一般の値検証経路を変更しない。",
       "evidence": [
         "docs/regex-retirement.md",
         "spec-corpus/regex-retirement/README.md",
@@ -2389,9 +2389,9 @@
         "nativeExpected": 3,
         "nativeSyntax": 5,
         "rust": 7,
-        "javaError": 38,
-        "native": 38,
-        "nativeByEnding": 38
+        "javaError": 40,
+        "native": 40,
+        "nativeByEnding": 40
       },
       "entries": [
         "cli-stderr-presentation",

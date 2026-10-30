@@ -50,7 +50,7 @@ public class CliStderrConformanceTest {
         if (System.getenv("GITHUB_ACTIONS") != null)
             assertEquals("CI must exercise chmod(000/555/444): " + excluded, 0, excluded.size());
         int observations = switch (suite) {
-            case "regex" -> 608;
+            case "regex" -> 640;
             case "blank" -> 350;
             case "output" -> 112;
             case "paths" -> 244;
