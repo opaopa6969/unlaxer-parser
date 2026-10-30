@@ -1021,12 +1021,14 @@ Java の文は複数行のソースを含むため、stderr 最終行がソー�
 この差は parity ledger の `cli-stderr-presentation` / #937 に記録する。
 
 
-調査中に見つけた別の既存差は #949 へ分離した。旧 token 宣言に余分なセミコロンを付けた
-`grammar Main { token X = REGEX('x'); @root Start ::= X; }` は、Java 17/21 が
-`P-SYNTAX`、native が `E-REGEX-RETIRED` を選ぶ。変更前の master 21dac030 でも再現する。
-Playground の record 表示自体は一致させるが、ここでは check の code/span/subject が異なる。
-#937 の「check JSON を変えない」という制約を守り、parser のエラー選択順の変更を別の意味単位にした。
-#949 は両版・LF/CRLF・import・独立期待値・mutation を受け入れ条件に持つ。
+#937 の調査で見つけた旧 token 宣言の余分なセミコロンの診断選択差は #949 で修正した。
+`grammar Main { token X = REGEX('x'); @root Start ::= X; }` は、Java 17/21 と native の
+check がともに `P-SYNTAX`（span=null、subject=`UBNF syntax`）を選ぶ。
+セミコロンのない旧宣言は `E-REGEX-RETIRED` のまま拒否する。ファイル全体の構文認識を
+移行診断より優先し、Playground の record 表示にも同じ選択を反映する。
+両版・LF/CRLF・import・非BMP・独立期待値・mutation の詳細は
+[REGEX 移行診断](regex-retirement.md)を参照。途中の値検証がさらに後ろの構文エラーを隠す
+既存の残差は #983 で追跡する。
 CLI から到達する readiness の50 code は本変更の48入力で固定する。
 手組みASTだけの `P-GRAMMAR-COUNT` / `P-GRAMMAR-NAME` / `P-TOKEN-KIND` も同じ分岐のない描画を使うが、
 実 CLI の corpus 件数には含めない。
