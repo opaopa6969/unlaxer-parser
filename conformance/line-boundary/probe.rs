@@ -169,7 +169,7 @@ pub fn verify() -> usize {
     let mut failures = Vec::new();
     for row in rows {
         let c: Vec<_> = row.split('\t').collect();
-        assert_eq!(c.len(), 17);
+        assert_eq!(c.len(), 16);
         assert_eq!(c[8], "direct");
         let input = decode(c[1]);
         for memo in [Memoization::Off, Memoization::SafeFailures] {

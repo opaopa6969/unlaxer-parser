@@ -159,11 +159,37 @@ class Hidden { public static class Leaked {} }
             entry = self.data['assessments'][rows['org.unlaxer.parser.elementary.' + name]['assessment']]
             self.assertEqual('verified', entry['status'])
             self.assertIn('conformance/line-boundary/cases.tsv', entry['fixtures'])
-            # Java の DETAILED_ON_FAILURE 限定の FIRST 除外欠陥は別 issue で追跡する。
+            # FIRST 除外の修正は #861 で両版の共通期待値に照合する。
             self.assertIn(861, entry['issues'])
 
 
     RUNTIME = 'rust/unlaxer-runtime/src/lib.rs'
+    REPEAT_JAVA = 'pub fn repeat_java(self, min: usize, max: Option<usize>) -> Self'
+
+    def declaration_line(self, prefix, scope=None):
+        """対応表を介さず実ソースから宣言の 1 始まり行番号を一意に導く（固定行に依存しない）。"""
+        lines = (api.ROOT / self.RUNTIME).read_text().splitlines()
+        start = 0
+        if scope is not None:
+            scopes = [index for index, text in enumerate(lines) if text.strip().startswith(scope)]
+            self.assertEqual(1, len(scopes), scope)
+            start = scopes[0]
+            depth = lines[start].count('{') - lines[start].count('}')
+            end = start + 1
+            while depth > 0:
+                depth += lines[end].count('{') - lines[end].count('}')
+                end += 1
+            lines = lines[:end]
+        found = [index + 1 for index, text in enumerate(lines) if index >= start and text.strip().startswith(prefix)]
+        self.assertEqual(1, len(found), prefix)
+        return found[0]
+
+    def repeat_java_line(self):
+        line = self.declaration_line(self.REPEAT_JAVA)
+        # 変異の検査が空振りしないよう、導いた行を対応表が実際に根拠として指すことも確かめる。
+        self.assertIn({'location': f'{self.RUNTIME}#L{line}', 'anchor': self.REPEAT_JAVA},
+                      self.runtime_evidence(self.data))
+        return line
 
     def overlay(self, temporary, replacements):
         """ROOT を symlink で写し、replacements のファイルだけ実体へ置き換えた検査用 root。"""
@@ -190,21 +216,6 @@ class Hidden { public static class Leaked {} }
 
     def runtime_errors(self, root, data):
         return [error for error in api.validate(root, data, self.actual) if self.RUNTIME in error]
-
-    def runtime_line(self, declaration, within=None):
-        """宣言の行番号を JSON や検査器を使わずソースから求める（mod 行の追加で位置が動く）。"""
-        lines = (api.ROOT / self.RUNTIME).read_text().splitlines()
-        start = 0
-        if within is not None:
-            heads = [index for index, text in enumerate(lines) if text.startswith(within + ' ')]
-            self.assertEqual(1, len(heads), within)
-            start = heads[0] + 1
-            end = next(index for index in range(start, len(lines)) if lines[index] == '}')
-        else:
-            end = len(lines)
-        hits = [index + 1 for index in range(start, end) if lines[index].strip().startswith(declaration)]
-        self.assertEqual(1, len(hits), declaration)
-        return hits[0]
 
     def test_inserted_or_deleted_lines_fail_until_remapped(self):
         lines = (api.ROOT / self.RUNTIME).read_text().splitlines(keepends=True)
@@ -235,7 +246,7 @@ class Hidden { public static class Leaked {} }
         source = (api.ROOT / self.RUNTIME).read_text()
         # 改名後の名前が旧名を前方に含んでも、識別子の途中では一致しない。
         renamed = source.replace('pub fn repeat_java(', 'pub fn repeat_java_classic(', 1)
-        line = self.runtime_line('pub fn repeat_java(')
+        line = self.repeat_java_line()
         with tempfile.TemporaryDirectory(prefix='java-api-') as temporary:
             root = self.overlay(temporary, {self.RUNTIME: renamed})
             errors = '\n'.join(self.runtime_errors(root, self.data))
@@ -246,7 +257,7 @@ class Hidden { public static class Leaked {} }
     def test_ambiguous_anchor_fails_and_remap_does_not_pick_the_first(self):
         source = (api.ROOT / self.RUNTIME).read_text()
         duplicate = source + '\nmod duplicate {\n    pub fn repeat_java(self, min: usize, max: Option<usize>) -> Self {\n    }\n}\n'
-        line = self.runtime_line('pub fn repeat_java(')
+        line = self.repeat_java_line()
         with tempfile.TemporaryDirectory(prefix='java-api-') as temporary:
             root = self.overlay(temporary, {self.RUNTIME: duplicate})
             errors = '\n'.join(self.runtime_errors(root, self.data))
@@ -257,8 +268,9 @@ class Hidden { public static class Leaked {} }
     def test_scoped_anchor_does_not_escape_its_declaration(self):
         # Expr::Number を消しても、後続の Predictor::Number へ付け替えない。
         lines = (api.ROOT / self.RUNTIME).read_text().splitlines(keepends=True)
-        line = self.runtime_line('Number,', within='pub enum Expr')
-        self.assertEqual('Number,', lines[line - 1].strip())
+        line = self.declaration_line('Number,', scope='pub enum Expr')
+        # scope の外にも同じ行があるので、scope なしの一意検索とは区別される。
+        self.assertGreater(sum(text.strip() == 'Number,' for text in lines), 1)
         self.assertIn({'location': f'{self.RUNTIME}#L{line}', 'anchor': 'Number,', 'scope': 'pub enum Expr'},
                       self.data['assessments']['lexical-composites']['code'])
         with tempfile.TemporaryDirectory(prefix='java-api-') as temporary:
@@ -270,24 +282,24 @@ class Hidden { public static class Leaked {} }
     def test_cli_remap_rewrites_only_line_numbers_and_regenerates_links(self):
         lines = (api.ROOT / self.RUNTIME).read_text().splitlines(keepends=True)
         documents = {api.DATA: (api.ROOT / api.DATA).read_text(), api.DOCUMENT: (api.ROOT / api.DOCUMENT).read_text()}
-        line = self.runtime_line('pub fn repeat_java(')
+        line = self.repeat_java_line()
         with tempfile.TemporaryDirectory(prefix='java-api-') as temporary:
             root = self.overlay(temporary, {self.RUNTIME: ''.join(lines[:1] + ['// inserted\n'] + lines[1:]),
                                             **documents})
             command = [sys.executable, str(SCRIPT), '--root', str(root)]
             result = subprocess.run(command, capture_output=True, text=True, timeout=90)
             self.assertNotEqual(0, result.returncode)
-            self.assertIn(f'根拠行が anchor とずれた: rust/unlaxer-runtime/src/lib.rs#L{line} → L{line + 1}', result.stderr)
+            self.assertIn(f'根拠行が anchor とずれた: {self.RUNTIME}#L{line} → L{line + 1}', result.stderr)
             result = subprocess.run(command + ['--remap', '--write-doc'], capture_output=True, text=True, timeout=90)
             self.assertEqual(0, result.returncode, result.stderr)
-            self.assertIn(f'根拠行を付け替え: rust/unlaxer-runtime/src/lib.rs#L{line} → L{line + 1}', result.stderr)
+            self.assertIn(f'根拠行を付け替え: {self.RUNTIME}#L{line} → L{line + 1}', result.stderr)
             rewritten = json.loads((root / api.DATA).read_text())
             self.assertEqual(api.dump(rewritten), (root / api.DATA).read_text())
             expected, _, _ = api.remap(root, self.data)
             self.assertEqual(expected, rewritten)
             document = (root / api.DOCUMENT).read_text()
-            self.assertIn(f'](../rust/unlaxer-runtime/src/lib.rs#L{line + 1})', document)
-            self.assertNotIn(f'](../rust/unlaxer-runtime/src/lib.rs#L{line})', document)
+            self.assertIn(f'](../{self.RUNTIME}#L{line + 1})', document)
+            self.assertNotIn(f'](../{self.RUNTIME}#L{line})', document)
             self.assertEqual(0, subprocess.run(command, capture_output=True, timeout=90).returncode)
 
     def test_cli_remap_refuses_without_writing_when_any_anchor_is_unresolved(self):
