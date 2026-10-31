@@ -21,8 +21,13 @@
 # sharing; each thread parses every row in two contexts and the body is built once.
 # lazy-delegate-parked: thread A stops inside that first build (Java: createParser, and the body's
 # setParent during the attachment) on list-nested; thread B's first use waits for it, then both
-# match the row. Same-context concurrency and graph mutation by users during a parse are not part
-# of this table.
+# match the row. lazy-children first use (#1014): Elem's alternatives are instead supplied on first
+# use into one list that a lazy parser keeps (Java: a LazyChoice returning one retained Parsers of
+# suppliers; Rust: a Custom expression and a OnceLock built from the suppliers into a local Vec), on
+# a graph nobody used yet; the second supplier fails on its first call. Exactly one parse gets that
+# failure, every other parse matches its row, and afterwards the list holds all three alternatives
+# (supplier calls 2/2/1). Same-context concurrency and graph mutation by users during a parse are
+# not part of this table.
 # failureCP and ruleStack follow cases.tsv (0 / ~ under DETAILED_ON_FAILURE; ruleStack: the
 # farthest failed rule invocation, then more frames, then the earliest). leaves are the retained
 # terminal tokens; an empty List keeps one empty token.
