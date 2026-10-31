@@ -18,10 +18,17 @@
 //! the same fixed point into a snapshot owned by the caller. The parser never reads it, so a
 //! query cannot change a later parse, and nothing is computed unless it is called. Unlike the
 //! parser's table, a query is bounded in depth, nodes and rounds and answers `unknown` beyond.
+//! The structural walk never nests deeper than the parser may nest from the same position
+//! ([`EXPRESSION_NESTING`] minus the active expression depth, #1027). A deeper child is
+//! `unknown`: the candidate is evaluated, so the parser's own resource guard reports it,
+//! exactly as with exclusion off, instead of this walk overflowing the stack first.
 use std::fmt;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use crate::{Expr, Rule};
+
+/// Active expression nesting the parser evaluates below (`ParseContext::expression`).
+pub(crate) const EXPRESSION_NESTING: usize = 1024;
 
 /// Whether a sequence at the start of an expression may consume trivia first.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -295,7 +302,7 @@ impl FirstSets {
     /// [`FirstSet::UNKNOWN`] when `expression` exceeds the depth or node bound of [`of`](Self::of).
     pub fn expression(&self, expression: &Expr) -> FirstSet {
         if within_query_budget([expression]) {
-            of(expression, &self.rules)
+            of(expression, &self.rules, MAX_QUERY_DEPTH)
         } else {
             FirstSet::UNKNOWN
         }
@@ -438,7 +445,7 @@ fn bounded_compute(rules: &[Rule]) -> Option<Vec<FirstSet>> {
     for _ in 0..=MAX_QUERY_ROUNDS {
         let mut changed = false;
         for (id, rule) in rules.iter().enumerate() {
-            let set = of(&rule.expression, &table).join(table[id]);
+            let set = of(&rule.expression, &table, MAX_QUERY_DEPTH).join(table[id]);
             if set != table[id] {
                 table[id] = set;
                 changed = true;
@@ -452,7 +459,12 @@ fn bounded_compute(rules: &[Rule]) -> Option<Vec<FirstSet>> {
 }
 
 /// The FIRST set of an expression; `Rule(id)` is looked up in `rules` (the fixed-point table).
-pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
+/// `budget` is how many nested expression levels the parser may still evaluate here; a
+/// subtree reaching past it is `unknown` (it propagates, so the whole set is `UNKNOWN`).
+pub(crate) fn of(expression: &Expr, rules: &[FirstSet], budget: usize) -> FirstSet {
+    let Some(budget) = budget.checked_sub(1) else {
+        return FirstSet::UNKNOWN;
+    };
     match expression {
         Expr::Repeat {
             min,
@@ -503,7 +515,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
                 ..FirstSet::EMPTY
             };
             for element in elements {
-                let element = of(element, rules);
+                let element = of(element, rules, budget);
                 if element.unknown {
                     return FirstSet::UNKNOWN;
                 }
@@ -515,18 +527,18 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             }
             set
         }
+        // A loop, not a fold: a closure frame per level would make this walk's debug stack
+        // deeper than the parse it is bounded by (#1027).
         Expr::Choice(alternatives)
         | Expr::LongestChoice(alternatives)
-        | Expr::UniqueLongestChoice(alternatives) => alternatives
-            .iter()
-            .fold(FirstSet::EMPTY, |set, alternative| {
-                set.join(of(alternative, rules))
-            }),
-        Expr::PredictiveChoice { alternatives, .. } => alternatives
-            .iter()
-            .fold(FirstSet::EMPTY, |set, alternative| {
-                set.join(of(alternative, rules))
-            }),
+        | Expr::UniqueLongestChoice(alternatives)
+        | Expr::PredictiveChoice { alternatives, .. } => {
+            let mut set = FirstSet::EMPTY;
+            for alternative in alternatives {
+                set = set.join(of(alternative, rules, budget));
+            }
+            set
+        }
         Expr::OwnedCapture(_, child)
         | Expr::CaptureScope(child)
         | Expr::Capture(_, child)
@@ -536,7 +548,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::InputCaptureBoundary(_, child)
         | Expr::ValueBoundary(child)
         | Expr::RuleEffects { child, .. }
-        | Expr::CaptureEquality { child, .. } => of(child, rules),
+        | Expr::CaptureEquality { child, .. } => of(child, rules, budget),
         Expr::LexicalTriviaScope { .. } | Expr::LexicalContextScope { .. } => FirstSet::UNKNOWN,
         // Comment-only trivia may start with `/`; never exclude a candidate under it.
         Expr::TriviaScope {
@@ -546,7 +558,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         Expr::TriviaScope {
             child, whitespace, ..
         } => {
-            let mut set = of(child, rules);
+            let mut set = of(child, rules, budget);
             set.trivia = match (set.trivia, whitespace) {
                 (Trivia::Dynamic, true) => Trivia::Always,
                 (Trivia::Dynamic, false) => Trivia::None,
@@ -556,10 +568,10 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         }
         Expr::Optional(child) | Expr::JavaOptional(child) => FirstSet {
             nullable: true,
-            ..of(child, rules)
+            ..of(child, rules, budget)
         },
         Expr::Repeat { child, min, .. } | Expr::JavaRepeat { child, min, .. } => {
-            let mut set = of(child, rules);
+            let mut set = of(child, rules, budget);
             set.nullable |= *min == 0;
             set
         }
@@ -570,13 +582,13 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             min,
             ..
         } => {
-            let mut set = of(child, rules).join(of(terminator, rules));
+            let mut set = of(child, rules, budget).join(of(terminator, rules, budget));
             set.nullable |= *min == 0;
             set
         }
         // A lookahead consumes nothing, but its child still runs at this position.
         Expr::Lookahead { child, .. } => {
-            if of(child, rules).unknown {
+            if of(child, rules, budget).unknown {
                 FirstSet::UNKNOWN
             } else {
                 FirstSet::EPSILON
@@ -633,13 +645,14 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
 
 /// Least fixed point of the rule FIRST sets. Convergence compares whole sets, not
 /// `may_start` answers: a nullable set accepts every code point, yet its start set still
-/// flows into enclosing sequences (the Java case 37 fixed-point bug).
-pub(crate) fn compute(rules: &[Rule]) -> Vec<FirstSet> {
+/// flows into enclosing sequences (the Java case 37 fixed-point bug). A rule body nesting
+/// past `budget` is `UNKNOWN`, which is a fixed point of the union.
+pub(crate) fn compute(rules: &[Rule], budget: usize) -> Vec<FirstSet> {
     let mut table = vec![FirstSet::EMPTY; rules.len()];
     loop {
         let mut changed = false;
         for (id, rule) in rules.iter().enumerate() {
-            let set = of(&rule.expression, &table).join(table[id]);
+            let set = of(&rule.expression, &table, budget).join(table[id]);
             if set != table[id] {
                 table[id] = set;
                 changed = true;
@@ -651,7 +664,8 @@ pub(crate) fn compute(rules: &[Rule]) -> Vec<FirstSet> {
     }
 }
 
-type CacheEntry = (Weak<[Rule]>, Arc<[FirstSet]>);
+/// The grammar, its table and the walk budget the table was computed with.
+type CacheEntry = (Weak<[Rule]>, Arc<[FirstSet]>, usize);
 
 /// FIRST tables of long-lived shared grammars, keyed by allocation. A `Weak` keeps the
 /// allocation (not the rules) alive, so another grammar cannot reuse a cached address.
@@ -662,23 +676,30 @@ fn cache() -> &'static Mutex<Vec<CacheEntry>> {
 
 /// The FIRST table for `grammar`. Grammars shared beyond this parse (for example a generated
 /// parser's `OnceLock<SharedGrammar>`) are analysed once; a grammar owned only by this parse
-/// is analysed without being cached.
-pub(crate) fn table(grammar: &Arc<[Rule]>) -> Arc<[FirstSet]> {
+/// is analysed without being cached. `budget` bounds the walk on the caller's stack: a cached
+/// table computed with at least this budget is reused, a smaller one is recomputed once.
+pub(crate) fn table(grammar: &Arc<[Rule]>, budget: usize) -> Arc<[FirstSet]> {
     if Arc::strong_count(grammar) <= 1 {
-        return Arc::from(compute(grammar));
+        return Arc::from(compute(grammar, budget));
     }
     let mut entries = cache()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if let Some((_, table)) = entries
+    let cached = entries
         .iter()
-        .find(|(weak, _)| std::ptr::eq(weak.as_ptr(), Arc::as_ptr(grammar)))
-    {
-        return Arc::clone(table);
+        .position(|(weak, _, _)| std::ptr::eq(weak.as_ptr(), Arc::as_ptr(grammar)));
+    if let Some((_, table, computed)) = cached.map(|index| &entries[index]) {
+        if *computed >= budget {
+            return Arc::clone(table);
+        }
     }
-    entries.retain(|(weak, _)| weak.strong_count() > 0);
-    let table: Arc<[FirstSet]> = Arc::from(compute(grammar));
-    entries.push((Arc::downgrade(grammar), Arc::clone(&table)));
+    let table: Arc<[FirstSet]> = Arc::from(compute(grammar, budget));
+    if let Some(index) = cached {
+        entries[index] = (Arc::downgrade(grammar), Arc::clone(&table), budget);
+        return table;
+    }
+    entries.retain(|(weak, _, _)| weak.strong_count() > 0);
+    entries.push((Arc::downgrade(grammar), Arc::clone(&table), budget));
     table
 }
 
@@ -743,7 +764,7 @@ mod tests {
             ),
             rule("name", Expr::Identifier),
         ];
-        let table = compute(&rules);
+        let table = compute(&rules, EXPRESSION_NESTING);
         assert!(table[0].may_start("@root x", false));
         assert!(table[0].may_start("x", false));
         assert!(!table[0].may_start("1", false));
@@ -760,7 +781,7 @@ mod tests {
                 Expr::literal("x").optional(),
             ]),
         )];
-        let table = compute(&rules);
+        let table = compute(&rules, EXPRESSION_NESTING);
         assert!(table[0].nullable);
         assert_eq!(table[0].ascii, (1 << b'x') | (1 << b','));
     }
@@ -790,7 +811,10 @@ mod tests {
             vec![],
         ];
         for rules in grammars {
-            assert_eq!(bounded_compute(&rules), Some(compute(&rules)));
+            assert_eq!(
+                bounded_compute(&rules),
+                Some(compute(&rules, MAX_QUERY_DEPTH))
+            );
         }
         // Rule i refers to rule i + 1: n rules take n + 1 rounds, the last one unchanged.
         let chain = |count: usize| -> Vec<Rule> {
@@ -802,25 +826,32 @@ mod tests {
                 .collect()
         };
         let longest = chain(MAX_QUERY_ROUNDS);
-        assert_eq!(bounded_compute(&longest), Some(compute(&longest)));
+        assert_eq!(
+            bounded_compute(&longest),
+            Some(compute(&longest, MAX_QUERY_DEPTH))
+        );
         assert_eq!(bounded_compute(&chain(MAX_QUERY_ROUNDS + 1)), None);
     }
 
     #[test]
     fn sequence_trivia_follows_the_caller_policy_unless_a_scope_fixes_it() {
         let sequence = Expr::sequence([Expr::literal("a")]);
-        let set = of(&sequence, &[]);
+        let set = of(&sequence, &[], EXPRESSION_NESTING);
         assert!(set.may_start(" a", true));
         assert!(set.may_start("/* c */a", true));
         assert!(set.may_start("// c\na", true));
         assert!(!set.may_start(" a", false));
         assert!(!set.may_start("/a", true));
-        let fixed = of(&sequence.clone().trivia_scope(true), &[]);
+        let fixed = of(
+            &sequence.clone().trivia_scope(true),
+            &[],
+            EXPRESSION_NESTING,
+        );
         assert!(fixed.may_start(" a", false));
-        let off = of(&sequence.trivia_scope(false), &[]);
+        let off = of(&sequence.trivia_scope(false), &[], EXPRESSION_NESTING);
         assert!(!off.may_start(" a", true));
         // An atom never skips trivia.
-        assert!(!of(&Expr::literal("a"), &[]).may_start(" a", true));
+        assert!(!of(&Expr::literal("a"), &[], EXPRESSION_NESTING).may_start(" a", true));
     }
 
     #[test]
@@ -838,7 +869,7 @@ mod tests {
             Expr::choice([Expr::literal("a"), Expr::Backreference("name")]),
             Expr::Rule(7),
         ] {
-            let set = of(&expression, &[]);
+            let set = of(&expression, &[], EXPRESSION_NESTING);
             assert!(set.unknown, "{expression:?}");
             assert!(set.may_start("", false), "{expression:?}");
         }
@@ -846,28 +877,76 @@ mod tests {
         let set = of(
             &Expr::sequence([Expr::literal("a"), Expr::Custom(custom)]),
             &[],
+            EXPRESSION_NESTING,
         );
         assert!(!set.unknown);
         assert!(!set.may_start("b", false));
     }
 
+    fn nested(depth: usize) -> Expr {
+        let mut expression = Expr::literal("a");
+        for _ in 1..depth {
+            expression = expression.optional();
+        }
+        expression
+    }
+
+    #[test]
+    fn the_walk_stops_where_the_parser_reports_expression_nesting() {
+        // `budget` levels are walked exactly; one more is the parser's resource failure (#1027).
+        let exact = of(&nested(8), &[], 8);
+        assert!(!exact.unknown && exact.nullable);
+        assert!(exact.may_start("a", false) && exact.ascii == 1 << b'a');
+        assert_eq!(of(&nested(8), &[], 7), FirstSet::UNKNOWN);
+        assert_eq!(of(&Expr::literal("a"), &[], 0), FirstSet::UNKNOWN);
+        // Only the nesting the walk visits counts: elements after a consuming one are skipped.
+        let late = Expr::sequence([Expr::literal("b"), nested(8)]);
+        assert_eq!(of(&late, &[], 2), of(&late, &[], EXPRESSION_NESTING));
+        assert!(!of(&late, &[], 2).may_start("a", false));
+        assert_eq!(of(&late, &[], 1), FirstSet::UNKNOWN);
+        // A too-deep alternative is not dropped from the union: the choice becomes unknown.
+        let choice = Expr::choice([Expr::literal("b"), nested(3)]);
+        assert!(!of(&choice, &[], 4).unknown);
+        assert_eq!(of(&choice, &[], 3), FirstSet::UNKNOWN);
+    }
+
+    #[test]
+    fn cached_tables_are_recomputed_for_a_larger_walk_budget() {
+        let grammar: Arc<[Rule]> = Arc::from(vec![
+            rule("deep", nested(4)),
+            rule("flat", Expr::literal("b")),
+        ]);
+        let shared = Arc::clone(&grammar); // Shared beyond one parse: the table is cached.
+        let small = table(&grammar, 3);
+        assert_eq!(small[0], FirstSet::UNKNOWN);
+        assert_eq!(small[1], FirstSet::of_char('b'));
+        let full = table(&grammar, EXPRESSION_NESTING);
+        assert!(!Arc::ptr_eq(&small, &full));
+        assert_eq!(&full[..], &compute(&grammar, EXPRESSION_NESTING)[..]);
+        assert!(!full[0].unknown);
+        // A table computed with a larger budget serves a deeper (smaller budget) entry.
+        assert!(Arc::ptr_eq(&table(&grammar, 3), &full));
+        assert!(Arc::ptr_eq(&table(&grammar, EXPRESSION_NESTING), &full));
+        drop(shared);
+    }
+
     #[test]
     fn lexical_atoms_have_exact_ascii_sets() {
-        let digit = of(&Expr::Number, &[]);
+        let digit = of(&Expr::Number, &[], EXPRESSION_NESTING);
         for start in ["1", "+", "-", "."] {
             assert!(digit.may_start(start, false), "{start}");
         }
         assert!(!digit.may_start("x", false));
-        let range = of(&Expr::CharRange('a', 'c'), &[]);
+        let range = of(&Expr::CharRange('a', 'c'), &[], EXPRESSION_NESTING);
         assert!(range.may_start("b", false) && !range.may_start("d", false));
         assert!(!range.may_start("é", false));
-        let wide = of(&Expr::CharRange('x', 'é'), &[]);
+        let wide = of(&Expr::CharRange('x', 'é'), &[], EXPRESSION_NESTING);
         assert!(wide.may_start("é", false) && wide.may_start("z", false));
-        let except = of(&Expr::Except("ab"), &[]);
+        let except = of(&Expr::Except("ab"), &[], EXPRESSION_NESTING);
         assert!(!except.may_start("a", false) && except.may_start("c", false));
         assert!(except.may_start("é", false));
-        assert!(!of(&Expr::Error("never"), &[]).may_start("x", false));
-        assert!(of(&Expr::Eof, &[]).may_start("x", false));
-        assert!(of(&Expr::literal(""), &[]).may_start("x", false));
+        assert!(!of(&Expr::Error("never"), &[], EXPRESSION_NESTING).may_start("x", false));
+        assert!(of(&Expr::Eof, &[], EXPRESSION_NESTING).may_start("x", false));
+        assert!(of(&Expr::literal(""), &[], EXPRESSION_NESTING).may_start("x", false));
     }
 }
