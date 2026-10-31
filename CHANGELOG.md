@@ -89,6 +89,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 ### Fixed
 
 - 名前付き parser の Usage001 サンプルで class 参照する型を公開し、Java/Rust 共通の prefix 回帰を通常テストへ追加する（#1009）。
+- Java `MatchedTokenParser` の空の slice/effect（偶数語の空 pivot、1文字語の空の前半）を入力位置の幅0一致に戻し（反転時は失敗、`WordParser("")` の不一致は維持）、context 全体に残って rollback 済み・前回の候補を使い続けていた候補 cache を撤去した。Usage003 Palindrome の5 recipe を既定 surefire と Rust の owned capture adapter から共通 fixture（再利用・外側失敗後の再試行・非BMP拒否を含む）で検証する（#1017）。
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
 - Java / Rust の local import を通常ファイル・64 MiB以下に制限し、stat後の増大も上限＋1バイトで打ち切る。デバイス・FIFO・socket・directory・過大ファイルは同じ `E-MODULE` で拒否し、両 authoring stdio server の後続応答と CLI を共通fixtureで検証 (#890)。
 - Java / Rust の package manifest/lock を8 MiBの有限読取りと対象別の共通診断・検査順に揃え、Javaには開いたchannelのseek/size検査を追加した。不正なUTF-8は両版とも `invalid JSON` にする。共通stdio・3 CLIのfixtureで通常時の拒否と後続応答を検証する (#908)。Javaのstat後の差替え競合（nonblocking open と完全なhandle型判定）は #907 / #911 に残す。
