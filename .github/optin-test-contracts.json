@@ -155,7 +155,8 @@
         "org.unlaxer.dsl.SimpleAnnotationConformanceTest",
         "org.unlaxer.dsl.CodegenRunnerTest",
         "org.unlaxer.dsl.codegen.BoundedOverflowConformanceTest",
-        "org.unlaxer.dsl.codegen.PrecedenceOverflowConformanceTest"
+        "org.unlaxer.dsl.codegen.PrecedenceOverflowConformanceTest",
+        "org.unlaxer.parser.ParserConstructionParityTest"
       ],
       "cross-language-cli": [
         "org.unlaxer.dsl.codegen.RustConformanceTest",
@@ -342,6 +343,7 @@
       "org.unlaxer.dsl.codegen.CallByValueConformanceTest": ["javaFrontendExpandsToTheHandWrittenCaptureGrammar", "valueUsesKeepTheirSourceOrigins", "theElementLimitCountsTheCaptureWrappersExactly", "valueChainsStopAtTheInlineNestingLimitOnASmallStack", "valueUsesDoNotMultiplyArgumentSize", "capturesOutsideValueScopesAreAccepted", "reorderingDeclarationsDoesNotChangeTheResult", "valueScopeAnalysisStaysLinearOnAWideFan", "generatedCaptureNamesCannotBeWritten", "javaGeneratedParsersEqualTheHandWrittenGrammarAndMatchExpectedValues", "bothRustHostsEmitTheHandWrittenGrammarAndRunExpectedValues"],
       "org.unlaxer.dsl.codegen.propertybased.PropertyBasedParityTest": ["generatorIsDeterministicBoundedAndValid", "legacyCiGenerationKeepsItsFingerprint", "featureCombinationsAreDeterministicBoundedAndCovered", "knownDifferenceConditionOnlyMatchesTheTrackedShape", "generatedGrammarsAgreeAcrossHostsConfigurationsAndInvariants"],
       "org.unlaxer.parser.combinator.CutLabeledFailureTest": ["sharedIndependentOracle", "sharedStateOracle", "aRaisedFailureDoesNotLeakIntoTheNextParse", "anIgnoredRaisedFailureDoesNotTurnALaterOrdinaryFailureIntoACut", "aSharedGrammarCallDoesNotLeakAnInnerCut", "classicNotDoesNotCatchARaisedFailure", "commitStopsFurtherAlternatives", "constructorsRejectMalformedOperators"],
+      "org.unlaxer.parser.ParserConstructionParityTest": ["everyConstructionRouteReproducesTheSharedParseOracle", "constructionAndIdentityObservationsMatchTheSharedTable"],
       "org.unlaxer.context.RuleStackTest": ["sharedIndependentOracle", "aRaisedStackDoesNotLeakIntoALaterParse", "successfulParsesReportNoStackButUnconsumedInputDoes", "namesComeFromTheOverrideOrFallBackToTheClass", "ruleNamesDefaultToTheGeneratedClassName", "stacksAreBoundedAndCarryOriginalOffsets"],
       "org.unlaxer.dsl.codegen.RuleStackLspConformanceTest": ["generatedServersReportTheRuleStack"],
       "org.unlaxer.dsl.codegen.RaisingOperatorConformanceTest": ["syntaxIsParsedAsTheThreeOperators", "validatorRejectsWithSourcePositions", "javaGeneratedParsersMatchIndependentOracle", "bothRustHostsGenerateAndRunTheSameOracle", "deeplyNestedCatchGeneratesInLinearSpaceOnBothHosts", "lspDiagnosticsCarryTheLabeledMessage"],

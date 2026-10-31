@@ -18,6 +18,7 @@
     "2026-10-27 #833/#834/#835: spec corpusの診断差16件を両Rust hostで修正し契約へ移した（issueは本PRのmerge待ちでOPEN）。#784の実行先・独立期待値を維持し、rootあり/なしと複数不正の順序を追加検証する。 前提の#784（PR #836）・#825（PR #831）はmerge済み/CLOSEDを確認した。",
     "2026-10-27 #843: 残る7入力の診断コード・順序を両Rust hostでJava validatorに揃えた。rootあり/なし、単一エラー説明とcheck JSONを共通fixtureで固定する。precedence欠如・重複の#835契約は維持する。性能作業・parser実行経路は対象外。 レビューでvalidateAssocのparams欠落・repeat欠如もJavaの最初のERRORに揃え、nativeの名前述語の隠れは#858へ分離した。",
     "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。",
+    "2026-10-27 #845: parser構築・名前参照・identity の移植境界を conformance/parser-construction に固定した。Java 6経路（ReferenceByName・ReferenceParser名前/predicate・Class/Supplier factory・newInstance）と Rust 5経路（Rule index・RuleNames・構築時predicate・OnceLock・都度構築）が同じ cases.tsv を全memo/diagnosticsで実行する。台帳全体の再監査ではない。",
     "2026-10-27 #858: 名前述語をsource-level capture解析で宣言/loweringより前に検証し、重複注釈・choice形状・未定義参照などによる診断の隠れを解消。全規則のcapture/kind検証後にversion整合性を検査する。元42入力は保持して19入力を追加しrootあり/なしを3経路で比較（対象root/captureの6境界と@ubnf不正値・重複のLF/CRLFを含む）。issueはCI/mergeまでOPEN。",
     "2026-10-27 #826: 正の先読みの到達位置、Classic capture の失敗 frame、native UNTIL の失敗した終端候補を記録。既存の Java oracle 値は変更せず nested/frame-start の全診断列を両Rust host・通常/mappingで一致させる。差分表は実測に一致する memo 会計差だけを保持する。個別修正であり台帳全体の監査日・revision は更新しない。",
     "2026-10-27 #827: failure/success hit は公開 context API と Classic harness に現れる host 依存の内部会計であり、Java/Rust 間の数値一致を契約しないと決定。marker・rule/inline group の cache 粒度と Chain 対照を確認し、非nested Outer を追加。runtime/生成器を変えず、実測全行と memo OFF/SAFE_FAILURES の結果不変を検証する。個別の契約判断であり台帳全体の監査日・revision は更新しない。",
@@ -2609,29 +2610,20 @@
       ]
     },
     {
-      "id": "semantic-predicate",
+      "id": "parser-construction-boundary",
       "category": "contract",
-      "title": "UBNF @predicate の名前付き純粋条件と entry 診断",
-      "hosts": "Java / Rust（Java-host・native）",
+      "title": "parser構築・名前参照・identity の言語別表現",
+      "hosts": "Java runtime / Rust runtime",
       "issues": [
-        1006,
-        851,
-        1023
+        845
       ],
-      "observation": "#1006: `@predicate('name')` は Java 生成 parser・Java-host Rust・native Rust の3 consumer を別々に compile・実行し、semantic-predicate/corpus.json の手書き期待値（8文法38ケース。wrapper class 名が規則・token class と重なる文法、astral・家族絵文字・CRLF の後ろで start が 0 でない候補、CP 3 の LOOKAHEAD / NEGATIVE_LOOKAHEAD / nullable 規則の true・false fallback・syntax 失敗、CP 3 の複数代替規則 `Checked ::= LOOKAHEAD('c') | 'z'` が返す \"c\" で callback が代替を選ぶ2ケースを含む）で prefix cursor・候補 text/CP span 集合・AST 全field/node span・診断 kind/offset/期待名を診断 mode 3種と memo OFF/ON で照合する。候補は rule-local trivia を含む原文で AST source span と同じ範囲、nullable は空 span。false は通常失敗、未登録（未到達 rule 分を含む）・callback 例外/Err/unwind panic・投影/生成 source（空 text を含む）は sticky の predicate_missing / predicate_error / predicate_source。token を返さない成功（PegLookahead / node なし match）は cursor 区間、Java ContainerParser の空 token は入力上の幅0 view で評価し、Java Choice / 生成規則の LazyChoice と Rust Classic Choice/rule は返した Parsed 原文を候補にし（Rust は述語の子の評価中だけ返却 source を記録）、virtual 種別で何も収集しない collector は生成 source として predicate_source、生成・空 text の位置は子の開始、空でない投影は論理開始とすることを、両 runtime が同じ手書き表 conformance/semantic-predicate-source/{classic,full}.tsv（4 token 種別×27形の108行、full-input 21形）と Java 実測の virtual-input.tsv（prefix 0/1/3×4 token 種別×29形の348行）で照合する。token 種別と由来は独立で、入力由来の空 virtual token は直接・Choice 越しに全種別で候補になり、それを収集した virtual collector だけが生成 \"\"（Rust は種別と span から推定せず collector が公開した token の由来で判定）。UBNF lowering は PEG assertion・生成 token・container・virtual 種別に届かないため、これらは corpus 外。収集 wrapper 内の生成 token は wrapper の収集 source に寄与しない両言語共通の限界を契約文書に記す。invalid.json の24件は両 frontend が生成前に拒否し、Java validator と native validation の最初の error code、および Java 生成器・Java-host・native 生成の文言（nativeMessage を含む）が一致する。@embedding/@embedded との併用も E-PREDICATE-COMBINATION、不正な @namePredicate / @lexicalContext が並ぶ文法はそれぞれの code を先に出す。Java の wrapper class 名は文法だけから衝突しない名前（_1 等の接尾辞）を決め、拒否しない。意図した差: Rust 低水準 ParseContext に registry を install しない場合、scope は sticky 失敗を残さず失敗し semantic_predicate_failure() は None（Java の SemanticPredicateBindings.failure は predicate_missing）。生成 API と full-input API は両言語とも predicate_missing で一致する。Rust は panic=abort では callback panic を捕捉できない。Java の規則 class・getRootSyntaxParser() の直接利用は述語を通らない（Rust は失敗する）低水準の差で、生成 mapper の解析入口は両言語とも述語を通る。Rust full-input 入口（root 非 Classic）で低水準の Classic MatchOnly を Optional が包む形は Rust が \"c\"・Java が \"\" で、同じ差が既存の capture_owned + Replay でも master から出る（述語固有でなく、UBNF からは届かない。#1023）。Java も解析中に投影 source を作れ、Java の Chain と Rust の Classic Chain は投影を収集して predicate_source（論理開始、空は子の開始）になる。Rust full-input 入口の非 Classic Sequence だけが host の投影 token を収集せず入力 \"\" で callback を呼ぶ（capture_owned と同じ値。collector 一般の既存差として #1023 で追跡、UBNF からは届かない）。virtual 種別の PEG assertion・入力由来の空 virtual token を capture_owned が Generated にする差も #1023。任意 CST predicate は #851 の範囲で、この text API で完了扱いにしない。性能は未測定（#197 凍結）。",
+      "observation": "construction.tsv の java/rust 列は各言語の構築観測。同じ契約の行は同値を共有し、`-` と値の違いは意図した差: Java は parser instance・親pointer・反射名・PseudoRoot・共有sourceの反転状態を持ち、Rust は構築時に名前を Rule index へ解決（RuleNames の重複/未登録/順序不一致は構築エラー）し、反転は context の token_mode に置く。左再帰は両方とも資源上限（Java ParseLimitException 1024、Rust rule nesting 256）。RootParserIndicator の範囲は、Java は親走査、Rust は scope ごとの grammar と RuleNames で表し、受理と RuleStack は一致する。名前参照の hit と root は Java では instance に cache され、Rust の共有済み grammar も Rule ID を変えない。parse 結果（cursor・根と葉の CST・失敗位置・RuleStack）は cases.tsv で差を許さない。中間 node は言語間で比べず、各言語で構築経路間の一致を検査する。Java の共有 graph の可変状態について、並行時の同値は主張しない。",
       "evidence": [
-        "docs/semantic-predicates.md",
-        "unlaxer-dsl/src/test/resources/semantic-predicate/corpus.json",
-        "unlaxer-dsl/src/test/resources/semantic-predicate/invalid.json",
-        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SemanticPredicateConformanceTest.java",
-        "conformance/semantic-predicate-source/classic.tsv",
-        "conformance/semantic-predicate-source/full.tsv",
-        "conformance/semantic-predicate-source/virtual-input.tsv",
-        "rust/unlaxer-runtime/src/semantic_predicates.rs",
-        "rust/unlaxer-generator/tests/semantic_predicate.rs",
-        "rust/unlaxer-runtime/tests/semantic_predicate_source.rs",
-        "rust/unlaxer-runtime/tests/semantic_predicate_virtual_input.rs",
-        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/SemanticPredicateParserTest.java"
+        "conformance/parser-construction/cases.tsv",
+        "conformance/parser-construction/construction.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/ParserConstructionParityTest.java",
+        "rust/unlaxer-runtime/tests/parser_construction.rs",
+        "docs/java-api-rust-parity.md"
       ]
     },
     {
@@ -2686,6 +2678,32 @@
         "unlaxer-common/src/test/java/sample/XmlTagSampleContract.java",
         "rust/unlaxer-runtime/tests/xml_tag_sample.rs",
         "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java"
+      ]
+    },
+    {
+      "id": "semantic-predicate",
+      "category": "contract",
+      "title": "UBNF @predicate の名前付き純粋条件と entry 診断",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        1006,
+        851,
+        1023
+      ],
+      "observation": "#1006: `@predicate('name')` は Java 生成 parser・Java-host Rust・native Rust の3 consumer を別々に compile・実行し、semantic-predicate/corpus.json の手書き期待値（8文法38ケース。wrapper class 名が規則・token class と重なる文法、astral・家族絵文字・CRLF の後ろで start が 0 でない候補、CP 3 の LOOKAHEAD / NEGATIVE_LOOKAHEAD / nullable 規則の true・false fallback・syntax 失敗、CP 3 の複数代替規則 `Checked ::= LOOKAHEAD('c') | 'z'` が返す \"c\" で callback が代替を選ぶ2ケースを含む）で prefix cursor・候補 text/CP span 集合・AST 全field/node span・診断 kind/offset/期待名を診断 mode 3種と memo OFF/ON で照合する。候補は rule-local trivia を含む原文で AST source span と同じ範囲、nullable は空 span。false は通常失敗、未登録（未到達 rule 分を含む）・callback 例外/Err/unwind panic・投影/生成 source（空 text を含む）は sticky の predicate_missing / predicate_error / predicate_source。token を返さない成功（PegLookahead / node なし match）は cursor 区間、Java ContainerParser の空 token は入力上の幅0 view で評価し、Java Choice / 生成規則の LazyChoice と Rust Classic Choice/rule は返した Parsed 原文を候補にし（Rust は述語の子の評価中だけ返却 source を記録）、virtual 種別で何も収集しない collector は生成 source として predicate_source、生成・空 text の位置は子の開始、空でない投影は論理開始とすることを、両 runtime が同じ手書き表 conformance/semantic-predicate-source/{classic,full}.tsv（4 token 種別×27形の108行、full-input 21形）と Java 実測の virtual-input.tsv（prefix 0/1/3×4 token 種別×29形の348行）で照合する。token 種別と由来は独立で、入力由来の空 virtual token は直接・Choice 越しに全種別で候補になり、それを収集した virtual collector だけが生成 \"\"（Rust は種別と span から推定せず collector が公開した token の由来で判定）。UBNF lowering は PEG assertion・生成 token・container・virtual 種別に届かないため、これらは corpus 外。収集 wrapper 内の生成 token は wrapper の収集 source に寄与しない両言語共通の限界を契約文書に記す。invalid.json の24件は両 frontend が生成前に拒否し、Java validator と native validation の最初の error code、および Java 生成器・Java-host・native 生成の文言（nativeMessage を含む）が一致する。@embedding/@embedded との併用も E-PREDICATE-COMBINATION、不正な @namePredicate / @lexicalContext が並ぶ文法はそれぞれの code を先に出す。Java の wrapper class 名は文法だけから衝突しない名前（_1 等の接尾辞）を決め、拒否しない。意図した差: Rust 低水準 ParseContext に registry を install しない場合、scope は sticky 失敗を残さず失敗し semantic_predicate_failure() は None（Java の SemanticPredicateBindings.failure は predicate_missing）。生成 API と full-input API は両言語とも predicate_missing で一致する。Rust は panic=abort では callback panic を捕捉できない。Java の規則 class・getRootSyntaxParser() の直接利用は述語を通らない（Rust は失敗する）低水準の差で、生成 mapper の解析入口は両言語とも述語を通る。Rust full-input 入口（root 非 Classic）で低水準の Classic MatchOnly を Optional が包む形は Rust が \"c\"・Java が \"\" で、同じ差が既存の capture_owned + Replay でも master から出る（述語固有でなく、UBNF からは届かない。#1023）。Java も解析中に投影 source を作れ、Java の Chain と Rust の Classic Chain は投影を収集して predicate_source（論理開始、空は子の開始）になる。Rust full-input 入口の非 Classic Sequence だけが host の投影 token を収集せず入力 \"\" で callback を呼ぶ（capture_owned と同じ値。collector 一般の既存差として #1023 で追跡、UBNF からは届かない）。virtual 種別の PEG assertion・入力由来の空 virtual token を capture_owned が Generated にする差も #1023。任意 CST predicate は #851 の範囲で、この text API で完了扱いにしない。性能は未測定（#197 凍結）。",
+      "evidence": [
+        "docs/semantic-predicates.md",
+        "unlaxer-dsl/src/test/resources/semantic-predicate/corpus.json",
+        "unlaxer-dsl/src/test/resources/semantic-predicate/invalid.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SemanticPredicateConformanceTest.java",
+        "conformance/semantic-predicate-source/classic.tsv",
+        "conformance/semantic-predicate-source/full.tsv",
+        "conformance/semantic-predicate-source/virtual-input.tsv",
+        "rust/unlaxer-runtime/src/semantic_predicates.rs",
+        "rust/unlaxer-generator/tests/semantic_predicate.rs",
+        "rust/unlaxer-runtime/tests/semantic_predicate_source.rs",
+        "rust/unlaxer-runtime/tests/semantic_predicate_virtual_input.rs",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/SemanticPredicateParserTest.java"
       ]
     }
   ],
@@ -3366,6 +3384,16 @@
       },
       "entries": [
         "cli-locale-path-encoding"
+      ]
+    },
+    {
+      "path": "conformance/parser-construction/construction.tsv",
+      "fields": {
+        "java": 1,
+        "rust": 1
+      },
+      "entries": [
+        "parser-construction-boundary"
       ]
     },
     {
