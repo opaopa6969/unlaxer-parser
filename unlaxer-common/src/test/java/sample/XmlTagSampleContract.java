@@ -51,7 +51,7 @@ public class XmlTagSampleContract {
         assertEquals(70, check("xml-tags.tsv", 5, Map.of("02", 1, "03", 2, "04", 2, "scoped", 3)));
     }
 
-    /** Every close reads the current token stack: no names of earlier closes, uses or rolled-back alternatives. */
+    /** Every close rereads the current stack; finished tokens remain, rolled-back tokens do not. */
     @Test public void pairedCloseUsesCurrentCandidates() throws Exception {
         assertEquals(15, check("xml-tags-current-candidates.tsv", 6, Map.of(
             "shared03", 1, "shared04", 1, "retry03", 2, "retry04", 2, "second03", 3, "second04", 3,

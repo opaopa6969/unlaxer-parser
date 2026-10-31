@@ -1,7 +1,8 @@
 # XML paired samples Usage002_03/04: MatchedTokenParser candidates come from the current token stack (#1016, #1017).
 # Every close reads the TagIdentifier names on the current parse path again, in the order of xml-tags.tsv.
-#   Names of an earlier close, of an earlier use of the same parser instance and of a rolled-back
-#   alternative are not kept; a list kept for the whole parse (the Java behaviour before #1017) fails here.
+#   Candidate lists from an earlier close or parser use are not reused. Tokens still on the current
+#   stack, including finished earlier roots in twice, remain candidates; rolled-back tokens do not.
+#   A list kept for the whole parse (the Java behaviour before #1017) fails here.
 # Model as in xml-tags.tsv; derived by hand and checked against the Java samples. Cells as in xml-tags.tsv.
 # shared: the class-factory instance of NoMixedContentsXmlElementsPaired is the root, the same instance as
 #   every nested level. retry: Choice(Chain(shared, "!"), Chain("<a><ab/></a>", shared)).

@@ -7,8 +7,9 @@
 #   A close tag consumes the first candidate name that prefixes the input; later candidates are not retried.
 #   Candidates are the TagIdentifier names (open and empty-element tags) on the current parse path in Java
 #   transaction-stack order: the closing element's own name and its finished children, then the enclosing
-#   open names from inner to outer. Every close reads the current token stack again, so earlier closes and
-#   rolled-back alternatives do not leak into it (#1017, xml-tags-current-candidates.tsv).
+#   open names from inner to outer, then names outside all open elements. Every close reads the current
+#   token stack again; previous candidate lists are not reused and rolled-back tokens are absent
+#   (#1017, xml-tags-current-candidates.tsv). Finished tokens still on the stack remain candidates.
 #   Rows with prefix-related names were derived from that model and checked against the Java samples (#1016).
 # scoped: owned capture + capture scope + replay of the innermost open name (not a sample class).
 # input	02	paired	scoped	note
