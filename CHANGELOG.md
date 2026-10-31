@@ -89,6 +89,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 ### Fixed
 
 - Rust の token trace 予算が、Classic collector が後で除く leaf（consumed 親の下の match-only token、virtual 親の下の `stop_consume` 終端など）まで数え、最終 trace が予算内でも `Error::Limit` を残していた不具合を修正した (#866)。最終 trace に残る leaf だけを件数・UTF-8 bytes に数え、本当に超えた場合は従来どおり Limit とする。受理・cursor・CST・capture・state、hard ceiling、generated text の複製前の検査、既定 OFF は変えない。Java の実 leaf を基準とする共通 corpus と、Rust の n-1/n/n+1・DAP protocol で検証する。AST value node 直下の custom callback の leaf は value node の kind が決まった時点で判定し、除かれる区間の leaf だけで生じた Limit は戻す。callback が認識したが返さない terminal の leaf は、collector が除くまで数える（Rust 側の保守的な境界）。[上限と collector の scope](docs/token-trace.md#上限custom-parsermemo)。
+- 名前付き parser の Usage001 サンプルで class 参照する型を公開し、Java/Rust 共通の prefix 回帰を通常テストへ追加する（#1009）。
 - Java の Choice / PredictiveChoice は候補の開始時に適用される matched cursor の reset を先読み判定にも反映する。診断方針による受理差と nullable 候補の誤選択を修正し、Java/Rust の共通入力で検証した (#861)。
 - Rust native の名前述語を宣言・body lowering より先に検証し、複数の不正を含む文法でも Java validator / Java-host と同じ名前述語コードを先頭に返す。capture / kind の検証を全規則で終えてから snapshot version の整合性を調べる (#858)。
 
