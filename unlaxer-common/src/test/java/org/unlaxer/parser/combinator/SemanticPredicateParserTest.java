@@ -283,7 +283,7 @@ public class SemanticPredicateParserTest {
                 case "&c": return new PegLookahead(new WordParser("c"), true);
                 case "!z": return new PegLookahead(new WordParser("z"), false);
                 case "Empty": return new org.unlaxer.parser.elementary.EmptyParser();
-                case "gen:g": case "genc:g": return generated("g");
+                case "gen:g": case "gen0:g": case "genc:g": return generated("g");
                 // Java の生成 source は anchor を持たない。Rust の anchor 0 / cursor を同じ値で照合する。
                 case "gen:": case "gen0:": case "genc:": return generated("");
                 case "leaf": return virtualInput();
@@ -294,8 +294,8 @@ public class SemanticPredicateParserTest {
         if (head.equals("Rule") || head.startsWith("UBNF:")) {
             // A generated rule class: LazyChoice for several alternatives, LazyChain otherwise.
             String body = head.equals("Rule") ? name.substring(open + 1, name.length() - 1) : name.substring(5);
-            if (body.indexOf('[') < 0) {
-                // 1 要素の本体（Rule[MO] など）は、その要素だけの LazyChain。
+            if (body.indexOf('[') < 0 || body.startsWith("Rule[")) {
+                // 1 要素の本体（Rule[MO]、規則参照だけの Rule[Rule[..]] など）は、その要素だけの LazyChain。
                 var single = new org.unlaxer.parser.Parsers(shape(body));
                 return new LazyChain() {
                     private static final long serialVersionUID = 1L;
@@ -493,6 +493,34 @@ public class SemanticPredicateParserTest {
                         .parse(context, kind, false).isSucceeded());
                 }
               }
+            }
+          }
+        }
+    }
+
+    /**
+     * CaptureBoundaryParser.input checks the source of the Parsed its child returns, also through a LazyChoice
+     * rule: in the virtual kinds Rule[Choice[leaf,z]] etc. return the selected input child although a virtual
+     * collector that kept nothing is generated "" (#1023 C). A LazyChain whose only element is such a rule
+     * (Rule[Rule[..]]) returns its own collection instead. Shared oracle with Rust,
+     * conformance/input-capture-virtual/classic.tsv.
+     */
+    @Test public void inputCaptureBoundaryFollowsTheReturnedSourceInEveryCallerKind() throws java.io.IOException {
+        var rows = new java.util.ArrayList<String[]>();
+        for (String row : java.nio.file.Files.readAllLines(java.nio.file.Path.of("../conformance/input-capture-virtual/classic.tsv"))) {
+            if (false == row.startsWith("#")) rows.add(row.split("\t"));
+        }
+        assertEquals(624, rows.size());
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String[] row : rows) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            String prefix = prefixes.get(row[1]);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                String label = String.join(" ", row) + " " + memo + "/" + diagnostics;
+                assertEquals(label, Boolean.parseBoolean(row[3]), CaptureBoundaryParser.input(CaptureBoundaryParser.Kind.VALUE,
+                    shape(row[2])).parse(context, TokenKind.valueOf(row[0]), false).isSucceeded());
             }
           }
         }

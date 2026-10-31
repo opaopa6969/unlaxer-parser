@@ -3607,6 +3607,9 @@ impl<'a> ParseContext<'a> {
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
         // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
         // Classic の他の本体は Java LazyChain と同じく、rule 自身の収集 token を返す。
+        // virtual 種別では rule の収集が生成 "" になり得るので、本体が Choice の rule（Java LazyChoice）は
+        // classic_meta_node と同じく入力由来の選択も返す（@f / InputCaptureBoundary の入力判定、#1023 C）。
+        // rule 参照だけの本体は Java の 1 要素 LazyChain なので、内側の選択ではなく自身の収集を返す。
         self.rule_result_source = fragment
             .source
             .as_deref()
@@ -3614,7 +3617,16 @@ impl<'a> ParseContext<'a> {
                 Some(parsed) => Some(parsed),
                 None => self.token_mode.is_none().then_some(source),
             })
-            .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
+            .filter(|source| {
+                self.track_owned_source
+                    || source.text.is_some()
+                    || source.generated
+                    || (self.token_mode().kind.is_virtual()
+                        && matches!(fragment.nodes.as_slice(), [node] if matches!(
+                            self.tokens.values.get(node).and_then(|info| info.parser_label()),
+                            Some("Choice" | "LongestChoice" | "UniqueLongestChoice")
+                        )))
+            })
             .map(|source| Box::new(source.clone()));
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
         let classic = fragment

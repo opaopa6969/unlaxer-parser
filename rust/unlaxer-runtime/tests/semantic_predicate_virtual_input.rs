@@ -49,11 +49,17 @@ fn generated<const AT_CURSOR: bool, const EMPTY: bool>(
     })
 }
 
-/// The names of conformance/semantic-predicate-source, plus `leaf`, `gen0:` and `genc:g`.
-/// `Rule[X]` is rule 1 with body X: a Java LazyChain, or a LazyChoice for a Choice body.
-fn shape(name: &str) -> (Expr, Option<Expr>) {
+/// The names of conformance/semantic-predicate-source, plus `leaf`, `gen0:`, `gen0:g` and `genc:g`.
+/// `Rule[X]` is a rule with body X: a Java LazyChain, or a LazyChoice for a Choice body. The rule
+/// bodies are returned in order as rules 1, 2, ... (`Rule[Rule[X]]` is rule 1 whose body is rule 2).
+fn shape(name: &str) -> (Expr, Vec<Expr>) {
+    let mut rules = vec![];
+    let expression = shape_into(name, &mut rules);
+    (expression, rules)
+}
+fn shape_into(name: &str, rules: &mut Vec<Expr>) -> Expr {
     let Some(open) = name.find('[') else {
-        let atom = match name {
+        return match name {
             "leaf" => Expr::Custom(leaf),
             "MO" => Expr::literal("c").match_only(),
             "&c" | "!z" => Expr::Lookahead {
@@ -62,15 +68,18 @@ fn shape(name: &str) -> (Expr, Option<Expr>) {
             },
             "Empty" => Expr::JavaEmpty,
             "gen0:" => Expr::Custom(generated::<false, true>),
+            "gen0:g" => Expr::Custom(generated::<false, false>),
             "genc:" => Expr::Custom(generated::<true, true>),
             "genc:g" => Expr::Custom(generated::<true, false>),
             _ => Expr::literal(Box::leak(name.to_owned().into_boxed_str())),
         };
-        return (atom, None);
     };
     let inner = &name[open + 1..name.len() - 1];
     if &name[..open] == "Rule" {
-        return (Expr::Rule(1), Some(shape(inner).0));
+        let index = rules.len();
+        rules.push(Expr::JavaEmpty);
+        rules[index] = shape_into(inner, rules);
+        return Expr::Rule(index + 1);
     }
     let mut children = vec![];
     let (mut depth, mut start) = (0, 0);
@@ -79,17 +88,17 @@ fn shape(name: &str) -> (Expr, Option<Expr>) {
             '[' => depth += 1,
             ']' => depth -= 1,
             ',' if depth == 0 => {
-                children.push(shape(&inner[start..index]).0);
+                children.push(shape_into(&inner[start..index], rules));
                 start = index + 1;
             }
             _ => {}
         }
     }
-    children.push(shape(&inner[start..]).0);
+    children.push(shape_into(&inner[start..], rules));
     match &name[..open] {
-        "Choice" => (Expr::choice(children), None),
-        "Chain" => (Expr::sequence(children), None),
-        "Opt" => (children.remove(0).optional_java(), None),
+        "Choice" => Expr::choice(children),
+        "Chain" => Expr::sequence(children),
+        "Opt" => children.remove(0).optional_java(),
         _ => panic!("{name}"),
     }
 }
@@ -101,26 +110,26 @@ fn enter_rules(context: &mut ParseContext<'_>) -> ParseResult {
     let grammar = RULES.with(|rules| rules.borrow().clone()).expect("rules");
     context.parse_shared_grammar(&grammar, 0, false)
 }
-/// `wrap` applied to the shape, inside rule 0 when the shape has a rule body.
+/// `wrap` applied to the shape, inside rule 0 when the shape has rule bodies.
 fn entry(name: &str, wrap: fn(Expr) -> Expr) -> Expr {
-    let (expression, rule) = shape(name);
-    match rule {
-        Some(body) => {
-            let grammar = share_grammar(vec![
-                Rule {
-                    name: "start",
-                    expression: wrap(expression),
-                },
-                Rule {
-                    name: "r",
-                    expression: body,
-                },
-            ]);
-            RULES.with(|rules| *rules.borrow_mut() = Some(grammar));
-            Expr::Custom(enter_rules)
-        }
-        None => wrap(expression),
+    let (expression, bodies) = shape(name);
+    if bodies.is_empty() {
+        return wrap(expression);
     }
+    assert!(bodies.len() <= 3, "{name}");
+    let mut rules = vec![Rule {
+        name: "start",
+        expression: wrap(expression),
+    }];
+    for (body, name) in bodies.into_iter().zip(["r", "s", "t"]) {
+        rules.push(Rule {
+            name,
+            expression: body,
+        });
+    }
+    let grammar = share_grammar(rules);
+    RULES.with(|rules| *rules.borrow_mut() = Some(grammar));
+    Expr::Custom(enter_rules)
 }
 fn gated(child: Expr) -> Expr {
     Expr::SemanticPredicateScope {
@@ -338,6 +347,45 @@ fn virtual_choice_keeps_the_selected_input_child_for_capture_boundaries() {
             }
         }
     }
+}
+
+/// InputCaptureBoundary checks the source of the Parsed its child returns, also through a rule whose
+/// body is a Choice: in the virtual kinds, `Rule[Choice[leaf,z]]` etc. return the selected input child
+/// although the rule's own collection is generated "" (#1023 C). A body that is only a rule reference
+/// (`Rule[Rule[..]]`, a Java single-element LazyChain) returns its own collection instead. Shared oracle,
+/// measured with Java CaptureBoundaryParser.input: conformance/input-capture-virtual/classic.tsv.
+#[test]
+fn input_capture_boundary_follows_the_returned_source_in_every_caller_kind() {
+    fn input(expression: Expr) -> Expr {
+        Expr::InputCaptureBoundary(
+            unlaxer_runtime::capture_tree::Kind::Value,
+            Box::new(expression),
+        )
+    }
+    let rows: Vec<Vec<&str>> =
+        include_str!("../../../conformance/input-capture-virtual/classic.tsv")
+            .lines()
+            .filter(|row| !row.starts_with('#'))
+            .map(|row| row.split('\t').collect())
+            .collect();
+    assert_eq!(rows.len(), 624);
+    let mut failures = vec![];
+    for row in &rows {
+        for options in all_options() {
+            let input_text = format!("{}c", prefix(row[1]));
+            let mut context = ParseContext::with_options(&input_text, options);
+            if row[1] != "0" {
+                context.parse(&Expr::literal(prefix(row[1]))).unwrap();
+            }
+            let accepted = context
+                .parse_with_token_mode(&entry(row[2], input), kind(row[0]), false)
+                .is_ok();
+            if accepted.to_string() != row[3] {
+                failures.push(format!("{row:?} {options:?}: accepted {accepted}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 /// A virtual-kind rule that collected nothing publishes generated "": capture_owned records it at
