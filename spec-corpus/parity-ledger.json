@@ -694,6 +694,10 @@
     "1009": {
       "state": "OPEN",
       "title": "test(sample): 名前付き parser の入れ子クラスを公開し Usage001 を通常回帰へ接続する"
+    },
+    "1017": {
+      "state": "OPEN",
+      "title": "fix(sample): Palindrome の MatchOnly と source slice/reverse を実入力で回復する"
     }
   },
   "entries": [
@@ -2583,6 +2587,23 @@
         "unlaxer-common/src/test/java/sample/Usage001_createParserAndParseWithNamedConcrete.java",
         "unlaxer-common/src/test/java/sample/NamedConcreteSampleTest.java",
         "rust/unlaxer-runtime/tests/named_concrete_sample.rs"
+      ]
+    },
+    {
+      "id": "palindrome-sample",
+      "category": "contract",
+      "title": "MatchOnly + MatchedTokenParser の slice/reverse/effect 回文サンプル",
+      "hosts": "Java MatchOnly/MatchedTokenParser / Rust owned capture + Custom adapter",
+      "issues": [
+        1017
+      ],
+      "observation": "Java Usage003の5 recipe（sliceWithWord・sliceWithSlicer・effectReverse・sliceReverse・pythonian）を既定surefireのPalindromeSampleTestから実sampleのまま実行する。Javaの欠陥2点を修正: 空の投影（偶数語の空pivot・1文字語の空の前半）が2.xのSource移行以降つねに失敗していたものを入力に紐づく幅0 tokenの成功へ戻し（反転時は失敗、WordParser(\"\")＝UBNF ''の不一致契約は維持）、context全体に残りrollback済み・前回の候補を使い続けるmatchedToken cacheを撤去して毎回現在のtoken stackから候補を取る。26行（奇数/偶数/1文字/空/非回文/非BMPとéの拒否/CRLF/同一instanceの再利用/外側Choice失敗後の再試行）の成否・consumed/matched CP・各stepの入力span（空pivotは幅0）を手書きの独立期待値でJava（memo2×診断3、CSTのWordParser tokenが入力由来subSource）とRust（同、最新owned bindingを選びJava Slicer同等のCP投影を照合し入力由来の消費leafを公開するCustom adapter、capture_scopeで寿命を限定）に照合する。RustにMatchedTokenParser相当の公開APIはなく、adapterは移植例（#852は継続）。Classic反転は空投影の単体検査のみ、MatchOnlyで包んだ回文全体は内側MatchOnlyがmatch-only cursorを語末へ進めるため修正前後とも不成立で対象外。性能は#197凍結中で未測定、公開3.3.0は変更しない。",
+      "evidence": [
+        "conformance/samples/palindrome.tsv",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java",
+        "unlaxer-common/src/test/java/sample/Usage003_01_Palindrome.java",
+        "unlaxer-common/src/test/java/sample/PalindromeSampleTest.java",
+        "rust/unlaxer-runtime/tests/palindrome_sample.rs"
       ]
     }
   ],
