@@ -355,15 +355,15 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 ### historical-replay
 
-**対応あり・全API共通検証なし**。MatchedTokenParser は過去の token を predicate で集め、複数候補を cache して slice/effect/reverse 後に試す。Old版は単一 token。Rust Backreference と owned Replay は記録済み名前を replay できるが、token predicate・履歴候補・変換・cache lifetime まで同等ではない。
+**対応あり・全API共通検証なし**。MatchedTokenParser は呼出しごとに現在の token stack から predicate で候補を集め、slice/effect/reverse 後に試す（#1017 で context 全体に残り rollback 済み・前回の候補を使い続ける cache を撤去）。空の投影は入力に紐づく幅0 token で一致し、反転時は失敗する。WordParser("") 自体は UBNF '' の契約どおり一致しない。Old版は単一 token。Rust Backreference と owned Replay は記録済み名前を replay できるが、class 単位の token predicate・複数履歴候補・任意変換・反転まで同等の公開APIはない。
 
-利用経路: 新規コードは `capture_owned("name")` と `Expr::Replay("name")`、UBNF `CAPTURE/SAME_AS`。旧APIを移植する場合は token selector/変換/履歴寿命の明示 adapter を追加し共通 oracle で検証する。
+利用経路: 新規コードは `capture_owned("name")` と `Expr::Replay("name")`、UBNF `CAPTURE/SAME_AS`。旧APIを移植する場合は token selector/変換/履歴寿命の明示 adapter を追加し共通 oracle で検証する。Usage003 の Palindrome 5 recipe は、最新 owned binding を選び Java Slicer と同じ CP 投影を照合して入力由来の消費 leaf を公開する `Expr::Custom` adapter と `capture_scope` で共通 fixture を実行する（#1017、移植例であり API 対応の完了ではない）。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L24](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L24)、[unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19)、[rust/unlaxer-runtime/src/lib.rs#L4117](../rust/unlaxer-runtime/src/lib.rs#L4117)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L25](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L25)、[unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19)、[rust/unlaxer-runtime/src/lib.rs#L4117](../rust/unlaxer-runtime/src/lib.rs#L4117)
 
-テスト: [unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java](../unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java)、[rust/unlaxer-runtime/tests/owned_capture.rs](../rust/unlaxer-runtime/tests/owned_capture.rs)
+テスト: [unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java](../unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java)、[rust/unlaxer-runtime/tests/owned_capture.rs](../rust/unlaxer-runtime/tests/owned_capture.rs)、[unlaxer-common/src/test/java/sample/PalindromeSampleTest.java](../unlaxer-common/src/test/java/sample/PalindromeSampleTest.java)、[rust/unlaxer-runtime/tests/palindrome_sample.rs](../rust/unlaxer-runtime/tests/palindrome_sample.rs)
 
-共通 fixture: [conformance/owned-capture/cases.tsv](../conformance/owned-capture/cases.tsv)
+共通 fixture: [conformance/owned-capture/cases.tsv](../conformance/owned-capture/cases.tsv)、[conformance/samples/palindrome.tsv](../conformance/samples/palindrome.tsv)
 
 追跡: [#852](https://github.com/opaopa6969/unlaxer-parser/issues/852)
 
@@ -1200,8 +1200,8 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 | [`parser.posix.XDigitParser`](../unlaxer-common/src/main/java/org/unlaxer/parser/posix/XDigitParser.java#L5) | type | 対応あり・全API共通検証なし | [character-recipes](#character-recipes) |
 | [`parser.referencer.MatchedChoiceParser`](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13) | type | 未対応（記載した動作） | [selected-choice](#selected-choice) |
 | [`parser.referencer.MatchedNonOrderedParser`](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedNonOrderedParser.java#L16) | type | 未対応（記載した動作） | [selected-order](#selected-order) |
-| [`parser.referencer.MatchedTokenParser`](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L24) | type | 対応あり・全API共通検証なし | [historical-replay](#historical-replay) |
-| [`parser.referencer.MatchedTokenParser.ScopeVariable`](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L94) | type | 対応あり・全API共通検証なし | [historical-replay](#historical-replay) |
+| [`parser.referencer.MatchedTokenParser`](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L25) | type | 対応あり・全API共通検証なし | [historical-replay](#historical-replay) |
+| [`parser.referencer.MatchedTokenParser.ScopeVariable`](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L95) | type | 対応あり・全API共通検証なし | [historical-replay](#historical-replay) |
 | [`parser.referencer.OldMatchedTokenParser`](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19) | type | 対応あり・全API共通検証なし | [historical-replay](#historical-replay) |
 | [`parser.referencer.OldMatchedTokenParser.ScopeVariable`](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L77) | type | 対応あり・全API共通検証なし | [historical-replay](#historical-replay) |
 | [`parser.referencer.ReferenceByNameParser`](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/ReferenceByNameParser.java#L12) | type | 対応あり・全API共通検証なし | [reference-by-name](#reference-by-name) |
