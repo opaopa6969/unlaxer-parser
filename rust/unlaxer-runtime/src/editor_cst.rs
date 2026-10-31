@@ -341,6 +341,12 @@ pub fn literal_completions(grammar: &SharedGrammar) -> Vec<&'static str> {
             | CaptureEquality { child, .. }
             | TriviaScope { child, .. }
             | Recovery { child, .. } => visit(child, result),
+            JavaTerminatedRepeat {
+                child, terminator, ..
+            } => {
+                visit(child, result);
+                visit(terminator, result);
+            }
             _ => {}
         }
     }
