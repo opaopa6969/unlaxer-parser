@@ -119,4 +119,61 @@ public class SemanticPredicateParserTest {
             }
         }
     }
+    @Test public void chainAndNullableCandidatesAreInputBacked() {
+        try (var context = new ParseContext(StringSource.createRootSource("xa😀b"))) {
+            assertTrue(new WordParser("x").parse(context).isSucceeded());
+            var seen = new java.util.ArrayList<Candidate>();
+            SemanticPredicateBindings.install(context, Map.of("valid", candidate -> seen.add(candidate)));
+            Parser sequence = new Chain(new WordParser("a"), new WordParser("😀"), new WordParser("b"));
+            Parser nullable = new SemanticPredicateParser(new Optional(new WordParser("z")), "valid");
+            assertTrue(new SemanticPredicateScope(new Chain(new SemanticPredicateParser(sequence, "valid"), nullable),
+                List.of("valid")).parse(context).isSucceeded());
+            assertEquals(List.of(new Candidate("a😀b", 1, 4), new Candidate("", 4, 4)), seen);
+        }
+    }
+
+    @Test public void generatedCandidateTextIsAnExplicitEntryFailure() {
+        try (var context = new ParseContext(StringSource.createRootSource(""))) {
+            SemanticPredicateBindings.install(context, Map.of("valid", candidate -> true));
+            Parser generated = new org.unlaxer.parser.elementary.EmptyParser() {
+                private static final long serialVersionUID = 1L;
+                @Override public org.unlaxer.Parsed parse(ParseContext parseContext, TokenKind kind, boolean invert) {
+                    return new org.unlaxer.Parsed(new Token(TokenKind.virtualTokenConsumed,
+                        StringSource.createDetachedSource("g"), this));
+                }
+            };
+            Parser parser = new SemanticPredicateScope(new Choice(new SemanticPredicateParser(generated, "valid"),
+                new org.unlaxer.parser.elementary.EmptyParser()), List.of("valid"));
+            assertTrue(parser.parse(context).isFailed());
+            var failure = SemanticPredicateBindings.failure(context).orElseThrow();
+            assertEquals("predicate_source", failure.kind());
+            assertEquals(0, failure.start());
+        }
+    }
+    @Test public void falseInsideOptionalLeavesNoCursorTokenOrState() {
+        for (var memo : org.unlaxer.context.Memoization.values()) {
+            try (var context = ParseContext.withOptions(StringSource.createRootSource("x"), ParseOptions.withMemoization(memo))) {
+                int[] state = {0};
+                context.registerTransactionalState(() -> {
+                    int previous = state[0];
+                    return () -> state[0] = previous;
+                });
+                Parser child = new WordParser("x") {
+                    @Override public Token getToken(ParseContext parseContext, TokenKind kind, boolean invert) {
+                        state[0]++;
+                        return super.getToken(parseContext, kind, invert);
+                    }
+                };
+                // No enclosing Choice: only the predicate's own transaction can discard the candidate.
+                Parser parser = new SemanticPredicateScope(new Chain(new Optional(new SemanticPredicateParser(child, "valid")),
+                    new WordParser("x")), List.of("valid"));
+                SemanticPredicateBindings.install(context, Map.of("valid", candidate -> false));
+                var parsed = parser.parse(context);
+                assertTrue(parsed.isSucceeded());
+                assertEquals(0, state[0]);
+                assertEquals(1, context.getConsumedPosition().value());
+                assertEquals("x", parsed.getConsumed().source.sourceAsString());
+            }
+        }
+    }
 }
