@@ -63,6 +63,22 @@ while True:
                     expected['params'] = params
                 self.assertEqual(expected, actual)
 
+    def test_raw_frames_preserve_order_duplicates_unicode_and_overflow(self):
+        client = self.client("""import sys, json
+while True:
+    header = sys.stdin.buffer.readline()
+    if not header: break
+    count = int(header.split(b':')[1])
+    assert sys.stdin.buffer.readline() == b'\\r\\n'
+    raw = sys.stdin.buffer.read(count).decode('utf-8')
+    data = json.dumps({'jsonrpc': '2.0', 'id': 1, 'result': raw}).encode()
+    sys.stdout.buffer.write(('Content-Length: %d\\r\\n\\r\\n' % len(data)).encode() + data)
+    sys.stdout.buffer.flush()
+""")
+        frame = '{"params":{"text":"😀","line":1e400},"method":"first","method":"last","id":null}'
+        client.send_raw(frame)
+        self.assertEqual({'jsonrpc': '2.0', 'id': 1, 'result': frame}, client.receive(lambda _: True))
+
     def test_diagnostic_envelope_rejects_missing_wrong_or_extra_version_fields(self):
         for extra in ({}, {'version': 1}, {'version': 0, 'extra': True}):
             with self.subTest(extra=extra):

@@ -1,9 +1,211 @@
-//! JSON-RPC/lsp4j compatibility at the authoring transport boundary (#994).
+//! JSON-RPC/lsp4j compatibility at the authoring transport boundary (#994/#1001).
 use crate::Error;
 use serde_json::Value;
 
 pub(crate) fn internal() -> Error {
     (-32603, "Internal error.".into())
+}
+
+fn parse_error() -> Error {
+    (-32700, "Message could not be parsed.".into())
+}
+
+fn object(value: &Value) -> bool {
+    value.is_null() || value.is_object()
+}
+
+// Gson's String adapter coerces scalar numbers/booleans, not containers.
+fn string(value: &Value) -> bool {
+    !value.is_array() && !value.is_object()
+}
+
+fn integer(value: &Value) -> bool {
+    match value {
+        Value::Null => true,
+        Value::Number(n) => stream_int(&n.to_string()).is_some(),
+        Value::String(s) => stream_int(s).is_some(),
+        _ => false,
+    }
+}
+
+fn boolean(value: &Value) -> bool {
+    value.is_null() || value.is_boolean() || value.is_string()
+}
+
+fn position(value: &Value) -> bool {
+    object(value) && integer(&value["line"]) && integer(&value["character"])
+}
+
+fn strings(value: &Value, fields: &[&str]) -> bool {
+    fields.iter().all(|key| string(&value[key]))
+}
+
+// Deliberately bounded DTO coverage: the observed top-level fields and nested
+// representatives are listed in docs/ubnf-authoring-lsp.md (#1001). Unknown
+// properties and untyped initializationOptions/experimental stay untyped.
+fn initialize_dto(params: &Value) -> bool {
+    let caps = &params["capabilities"];
+    let text = &caps["textDocument"];
+    let completion = &text["completion"];
+    let folders = &params["workspaceFolders"];
+    integer(&params["processId"])
+        && strings(params, &["rootPath", "rootUri", "locale", "trace"])
+        && object(&params["clientInfo"])
+        && strings(&params["clientInfo"], &["name", "version"])
+        && (folders.is_null()
+            || folders.as_array().is_some_and(|folders| {
+                folders.iter().all(|f| object(f) && strings(f, &["uri", "name"]))
+            }))
+        && object(caps)
+        && ["workspace", "textDocument", "notebookDocument", "window", "general"]
+            .iter()
+            .all(|field| object(&caps[field]))
+        && object(&text["hover"])
+        && object(completion)
+        && object(&completion["completionItem"])
+        && boolean(&completion["completionItem"]["snippetSupport"])
+        && object(&caps["workspace"]["workspaceEdit"])
+        && boolean(&caps["window"]["workDoneProgress"])
+        // Invalid container/bool workDoneToken makes Java's Either adapter
+        // stop without a response. Keep native's deterministic acceptance.
+        && (!params["workDoneToken"].is_number() || integer(&params["workDoneToken"]))
+}
+
+pub(crate) fn typed_request(method: &str) -> bool {
+    unimplemented_request(method)
+        || matches!(
+            method,
+            "initialize"
+                | "unlaxer/configure"
+                | "ubnf/packageSource"
+                | "textDocument/hover"
+                | "textDocument/completion"
+                | "textDocument/definition"
+                | "textDocument/references"
+                | "textDocument/rename"
+                | "textDocument/documentSymbol"
+                | "textDocument/foldingRange"
+                | "textDocument/linkedEditingRange"
+                | "textDocument/codeAction"
+                | "textDocument/signatureHelp"
+                | "textDocument/semanticTokens/full"
+        )
+}
+
+pub(crate) fn params_shape(method: &str, params: &Value) -> Result<(), Error> {
+    if !typed_request(method) {
+        return Ok(());
+    }
+    let params = initialize_params(params);
+    let valid = object(params)
+        && if matches!(method, "initialize" | "unlaxer/configure") {
+            initialize_dto(params)
+        } else if method == "textDocument/hover" {
+            // Bounded nested request DTO coverage observed on the Java server.
+            object(&params["textDocument"])
+                && string(&params["textDocument"]["uri"])
+                && position(&params["position"])
+        } else {
+            true
+        };
+    if valid {
+        Ok(())
+    } else {
+        Err(parse_error())
+    }
+}
+
+// Read a field from an already validated object. Keep its raw value so stream
+// DTO adapters can reject an earlier ill-typed duplicate before it is replaced.
+fn next_field<'a>(rest: &mut &'a [u8]) -> Result<(String, Value, &'a [u8]), serde_json::Error> {
+    let mut keys = serde_json::Deserializer::from_slice(rest).into_iter::<String>();
+    let key = keys.next().expect("validated object key")?;
+    *rest = rest[keys.byte_offset()..].trim_ascii_start();
+    *rest = rest[1..].trim_ascii_start(); // colon
+    let mut values = serde_json::Deserializer::from_slice(rest).into_iter::<Value>();
+    let value = values.next().expect("validated field value")?;
+    let raw = &rest[..values.byte_offset()];
+    *rest = rest[values.byte_offset()..].trim_ascii_start();
+    if rest[0] == b',' {
+        *rest = rest[1..].trim_ascii_start();
+    }
+    Ok((key, value, raw))
+}
+
+fn initialize_stream_shape(raw: &[u8]) -> Result<Option<Error>, serde_json::Error> {
+    let mut rest = raw.trim_ascii_start();
+    if rest[0] == b'[' {
+        rest = rest[1..].trim_ascii_start();
+    }
+    if rest[0] != b'{' {
+        return Ok(None);
+    }
+    rest = rest[1..].trim_ascii_start();
+    while rest[0] != b'}' {
+        let (key, value, _) = next_field(&mut rest)?;
+        let one_field = Value::Object([(key, value)].into_iter().collect());
+        if !initialize_dto(&one_field) {
+            return Ok(Some(parse_error()));
+        }
+    }
+    Ok(None)
+}
+
+// Preserve the ordering information needed by lsp4j's stream and deferred DTO
+// paths. serde_json decodes escaped keys; raw text/string searches would not.
+// No dependency or general parser hot-path change is needed.
+pub(crate) fn read_message(bytes: &[u8]) -> Result<(Value, Option<Error>), serde_json::Error> {
+    let mut message: Value = serde_json::from_slice(bytes)?;
+    if !message.is_object() {
+        return Ok((message, None));
+    }
+    let mut rest = bytes.trim_ascii_start()[1..].trim_ascii_start();
+    let mut method = String::new();
+    let mut id = None;
+    let mut error_id = None;
+    let mut deferred = None;
+    let mut error = None;
+    while rest[0] != b'}' {
+        let (key, value, raw) = next_field(&mut rest)?;
+        match key.as_str() {
+            "id" => id = Some(value),
+            "method" => method = value.as_str().unwrap_or("").into(),
+            "params" if !typed_request(&method) => deferred = Some(value),
+            "params" => {
+                let shape_error = params_shape(&method, &value).err();
+                let stream_error = if matches!(method.as_str(), "initialize" | "unlaxer/configure")
+                {
+                    initialize_stream_shape(raw)?
+                } else {
+                    None
+                };
+                if error.is_none() {
+                    error = shape_error.or(stream_error);
+                    // For a deterministic parse failure Java echoes the id it
+                    // had read, even if a duplicate id occurs later. When no
+                    // id was recovered keep native's final-id response (#1001).
+                    if error.is_some() && value.as_array().is_none_or(|a| a.len() <= 1) {
+                        error_id = id.clone().filter(|id| !id.is_null());
+                    }
+                }
+                deferred = None;
+            }
+            _ => {}
+        }
+    }
+    if let Some(params) = deferred {
+        // MessageTypeAdapter.parseParams(Object, method) does not unwrap an
+        // array read under a missing/unknown method. Its DTO conversion rejects it.
+        if typed_request(&method) && params.is_array() {
+            error.get_or_insert_with(parse_error);
+        } else if let Err(e) = params_shape(&method, &params) {
+            error.get_or_insert(e);
+        }
+    }
+    if let Some(id) = error_id {
+        message["id"] = id;
+    }
+    Ok((message, error))
 }
 
 pub(crate) fn initialize_params(params: &Value) -> &Value {
@@ -14,16 +216,25 @@ pub(crate) fn initialize_params(params: &Value) -> &Value {
     }
 }
 
-pub(crate) fn initialize_shape(params: &Value) -> Result<(), Error> {
-    let params = initialize_params(params);
-    // Null/missing reaches the Java method (and fails there). Other shapes fail
-    // in Gson first. initializationOptions itself is deliberately untyped.
-    if (!params.is_null() && !params.is_object())
-        || (!params["capabilities"].is_null() && !params["capabilities"].is_object())
-    {
-        Err((-32700, "Message could not be parsed.".into()))
-    } else {
+// Gson reads every TextDocumentContentChangeEvent before Java Ext ignores the
+// range and applies the first text. An ill-typed range/rangeLength/text in any
+// change, including a raw 1e400, drops the whole notification (#1001).
+pub(crate) fn change_shape(params: &Value) -> Result<(), Error> {
+    let valid = params["contentChanges"].as_array().is_none_or(|changes| {
+        changes.iter().all(|change| {
+            let range = &change["range"];
+            object(change)
+                && object(range)
+                && position(&range["start"])
+                && position(&range["end"])
+                && integer(&change["rangeLength"])
+                && string(&change["text"])
+        })
+    });
+    if valid {
         Ok(())
+    } else {
+        Err(parse_error())
     }
 }
 
