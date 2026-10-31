@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import org.unlaxer.CodePointLength;
 import org.unlaxer.Name;
 import org.unlaxer.Parsed;
 import org.unlaxer.Source;
@@ -152,13 +153,11 @@ public class MatchedTokenParser extends AbstractParser{//extends ConstructedSing
 				.orElseThrow(()->new IllegalArgumentException("specified matched parser not found yet."));
 		}
 		
-		List<Token> matchedTokens = parseContext.getList(this, ScopeVariable.matchedToken.get(),Token.class);
-		
-		if(matchedTokens.isEmpty()){
-			matchedTokens = parseContext.getMatchedTokens(tokenPredicator.get());
-			parseContext.put(this, ScopeVariable.matchedToken.get() , matchedTokens);
-		}
-		
+		// Read the current token stack on every call: a list kept from an earlier call
+		// still holds rolled-back or previous matches when this parser is reused (#1017).
+		List<Token> matchedTokens = parseContext.getMatchedTokens(tokenPredicator.get());
+		parseContext.put(this, ScopeVariable.matchedToken.get() , matchedTokens);
+
 		for (Token token : matchedTokens) {
 			
 			Source source = token.getSource();
@@ -178,12 +177,40 @@ public class MatchedTokenParser extends AbstractParser{//extends ConstructedSing
 				wordParser = wordParser.slice(slicerEffector);
 			}
 			
-			Parsed parsed = wordParser.parse(parseContext,tokenKind,invertMatch);
+			Parsed parsed = wordParser.word.isEmpty() ?
+				parseEmptyProjection(parseContext, wordParser, tokenKind, invertMatch):
+				wordParser.parse(parseContext,tokenKind,invertMatch);
 			if(parsed.isSucceeded()) {
 				return parsed;
 			}
 		}
 		return Parsed.FAILED;
+	}
+
+	/**
+	 * An empty slice or effect of a matched token matches zero width at the cursor, as an
+	 * empty owned replay does. WordParser("") itself keeps failing: that is the UBNF '' contract.
+	 * Like the lexical empty literal, an inverted empty projection fails.
+	 */
+	private static Parsed parseEmptyProjection(
+			ParseContext parseContext, WordParser wordParser, TokenKind tokenKind, boolean invertMatch) {
+		parseContext.enterParserCall();
+		try {
+			parseContext.startParse(wordParser, parseContext, tokenKind, invertMatch);
+			Parsed result = Parsed.FAILED;
+			if(false == invertMatch) {
+				Token token = new Token(tokenKind, parseContext.peek(tokenKind, new CodePointLength(0)), wordParser);
+				parseContext.getCurrent().addToken(token, tokenKind);
+				result = new Parsed(token);
+			}
+			parseContext.endParse(wordParser, result, parseContext, tokenKind, invertMatch);
+			return result;
+		} catch (RuntimeException | Error failure) {
+			parseContext.failParserCall(failure);
+			throw failure;
+		} finally {
+			parseContext.leaveParserCall();
+		}
 	}
 
 	/* previous implementation. pasting for reference.
