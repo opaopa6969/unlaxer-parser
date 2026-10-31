@@ -20,6 +20,7 @@ OMIT_PARAMS = object()
 
 class Client:
     def __init__(self, command, native=False, backend=None):
+        self.command = list(command)
         env = dict(os.environ)
         if native:
             env.update(PATH='', JAVA_HOME='/nonexistent-java')
@@ -116,6 +117,18 @@ class Client:
         except (BrokenPipeError, OSError) as error:
             raise self.failure('transport write failed') from error
         return self.serial
+
+    def send_raw(self, frame):
+        """Send authored JSON text unchanged, preserving order/duplicates/numbers."""
+        self.last_request = 'raw frame: ' + self.fixture
+        if self.process.poll() is not None:
+            raise self.failure('unexpected process exit before send')
+        data = frame.encode('utf-8')
+        try:
+            self.process.stdin.write(f'Content-Length: {len(data)}\r\n\r\n'.encode() + data)
+            self.process.stdin.flush()
+        except (BrokenPipeError, OSError) as error:
+            raise self.failure('transport write failed') from error
 
     def receive(self, predicate):
         for i, item in enumerate(self.pending):

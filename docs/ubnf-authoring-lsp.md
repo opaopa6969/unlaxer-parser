@@ -118,7 +118,7 @@ virtual package path に開いた偽 buffer が検証済み source を置換で�
 server が manifest/lock/cache を書き換えないことも両版で検証する。
 現時点の native file URI は Linux のローカル絶対パスを検証対象とし、UNC/Windows 等は #902（親 #886）に残す。
 
-CI は `ubnf-authoring` 必須契約の12メソッドと、基準127件・navigation39件・local import 17件・package metadata 27件・artifact 39件・artifact UTF-8 29件・JSON-RPC 168件の実行件数を別々に検査する。
+CI は `ubnf-authoring` 必須契約の12メソッドと、基準135件・navigation39件・local import 17件・package metadata 27件・artifact 39件・artifact UTF-8 29件・JSON-RPC 558件の実行件数を別々に検査する。
 packaged VSIX は従来 Java smoke を保持し、別の隔離 profile で Java executable を不存在に設定して
 Rust の completion/hover/診断と変更後の修復、および両 backend の definition/references・rename・documentSymbol・foldingRange・linkedEditingRange・readonly package source を確認する。最後に拡張の `deactivate` で
 native server の子プロセスが終了し、残らないことを確認する（tinycalc-vscode #874/#880 と同じ後始末の水準）。
@@ -332,7 +332,7 @@ Rust は stat 後に FIFO・過大ファイルへ差し替えた open も、開�
 64 MiBの正常文字列の読取り成功はreader単体でも検証する。有効な64 MiBコメントは既存Java parserの解析に時間がかかるため、このfixtureだけstdio待ち480秒・CLI待ち240秒、suite全体900秒の有限deadlineを使う。これは製品のtimeout設定や性能作業ではない（#197）。この変更は許容サイズ内の文法の解析時間を制限しない。
 
 #910 の [feature 共通 corpus](../spec-corpus/feature-diagnostics/README.md) で12文法×LF/CRLFを追加し、
-既存103件を含む baseline stdio は127件。feature の全JSONと同一/減少versionでの修復を比較する。
+既存103件を含む baseline stdio は135件。feature の全JSONと同一/減少versionでの修復を比較する。
 既存 lexical 診断の prefix・range は維持し、CLI生成時の prefix 修正とは別経路で検証する。
 
 ## package metadata の読取り（#908）
@@ -408,7 +408,7 @@ JSON-RPC 入力境界だけを native へ移し、新しい crate・ネットワ
 | 入力 / 観測項目 | Java の固定挙動 | native の選択と理由 |
 |---|---|---|
 | initialize/configure の params 欠落、null、`[null]` | `-32603 Internal error.`。initialize は未初期化、configure は旧設定と文書を保持 | 同じ code/message と状態。Java の NPE は欠陥だが、製品を変更せず失敗境界を保つ方が最小・可逆 |
-| params の `[]`、scalar、`[7]`、capabilities の scalar/array | Gson が `-32700 Message could not be parsed.` | lifecycle dispatch より先に型を検査。失敗で構成を変更しない。検査するのは params 自体と `capabilities` の型だけで、他の InitializeParams 欄と入れ子 DTO の型違いは #1001（後述） |
+| params の `[]`、scalar、`[7]`、capabilities の scalar/array | Gson が `-32700 Message could not be parsed.` | lifecycle dispatch より先に型を検査。失敗で構成を変更しない。InitializeParams の top-level 欄と実測した入れ子 DTO の検査を #1001 で追加（後述） |
 | `[有効 InitializeParams]` | 単一 positional 引数として受理 | 同じ。失敗後の initialize 再試行をこの形でも確認 |
 | document version | 省略/null/i32 に加え、数値文字列・整数値の小数・指数を Gson `nextInt` で受理。値の大小は無視 | `Integer.parseInt` 相当の BMP 数字、続いて double→i32→double の一致で判定。ASCII前後空白、符号、浮動小数suffix/16進浮動小数文字列も共通 fixture。範囲外・非整数・真偽値/object/array は通知ごと破棄 |
 | publishDiagnostics | Ext は documentVersions を更新せず常に `version: 0`。configure 自体は通知しない | 同じ欄を追加。実 version を推測して送らず、観測契約を維持 |
@@ -433,23 +433,63 @@ null/省略/空配列/false/0/空文字を勝手に `{}` へ変換しない。
 self-hosted CI の必須契約へ追加する。Java driver の `-Xmx8g`、runs-on、重い local-imports suite は維持する。
 
 #901 の codeAction/signatureHelp/semanticTokens full は範囲外で、既存のホスト別 capability oracle を維持する。
-新たに確認した reader のキー順（params より後の id）・positional arity > 1 による無応答、
-capabilities null の無応答は [#1001](https://github.com/opaopa6969/unlaxer-parser/issues/1001) で追跡する。
-PR #1002 のレビューで実測した次の差も #1001 に記録した（いずれもこの PR の変更前からある reader / DTO 層の差で、この PR では変えない）。
-InitializeParams の他の欄と入れ子 DTO の型違い（`processId: "abc"`/`1.5`、`rootUri: {}`、`workspaceFolders: "x"`、
-`clientInfo: "x"`、`trace: {}`、`locale: []`、`capabilities.textDocument: 7`）は、Java が `-32700` を返して未初期化のまま、native は受理して初期化する。
-`workDoneToken: {}` には Java が応答しない。型付き params の request（例: `textDocument/formatting` の `params: 7`）は Java が `-32700`、native が `-32603`。
-`"id": null` の frame は Java が通知として扱って応答せず、native は `id: null` で応答する。
-JSON 数値の f64 overflow（例: version の生の `1e400`）は、Java が Gson で通知を破棄するか request に `-32700` を返す。
-native は frame 全体を JSON 解析エラーとし、`id: null` の `-32700 Parse error` を返す。
-ただし `cargo build --workspace` では unlaxer-dap の serde_json `arbitrary_precision` が統合されるため、native も受理して破棄する（build 単位で挙動が変わる）。
-この168件の成功を全 DTO・全 raw frame の同等性や親 #885/#864/#111 の完了とは扱わない。
+#1001 で reader / DTO 境界を追補した。#994 の168件を残し、新たな390件を加えた計558件を
+同じ `nativeAndJavaServersShareJsonRpcFixtures` で実行する。新しい test class/job は追加しない。
+この成功を全 DTO・全 raw frame の同等性や親 #885/#864/#111 の完了とは扱わない。
 
-追加 suite の直接実行は JDK21 約2.7秒、JDK17 約4.4秒（共有ホスト上の実測）。
-CI に新しい job や既存 local-imports の重複実行を足さず、追加時間の目標1分未満を満たす。
-診断 version の削除、数値文字列 version の拒否、未知 method 文面の巻戻しの3変異を、
-隔離コピーの実 native stdio に適用すると新 suite が全て失敗することを確認した。
-変異はレビュー用 worktree に加えず、元コードで両 JDK の検証を行う。
+### reader / DTO の選択と恒久差（#1001）
+
+固定 Java revision は引き続き `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34`。
+LSP4J 0.23.1 `MessageTypeAdapter.read/parseParams`、`InitializeParamsTypeAdapter.read`、
+Gson 2.13.2 の実 server を棚卸しした。method が既知なら stream から DTO を読み、
+params が method より先なら JsonElement を保留して全キー読取り後に DTO へ変換する。
+id はその時点まで読めた値だけが Java の error 回復に使われる。
+
+| 手書き入力 / 境界 | 固定 Java の観測 | native の選択・理由 |
+|---|---|---|
+| id/method/params の全6キー順、object params | 全て受理 | 同じ。JSON文字列内のキー風の文字列や escaped property name を raw 検索で誤認しない |
+| `params:[]`、method → params → id | reader の DTO 変換が id 読取り前に失敗し、応答なし | **恒久差**: 最終 id 付き `-32700 Message could not be parsed.` を維持。LSP4J/Gson reader の欠陥を模倣して client を固めず、JSON-RPC に沿った決定的応答を返す。他の5順は両版とも id 付き同エラー |
+| positional arity 0 / 1 / 2 | 0は前行。method が params より先の `[{}]` は受理、`[null]` は `-32603 Internal error.`、`[{},{}]` は reader が失敗し応答なし。params が先なら単一引数の unwrap がなく、これらの配列は id 付き `-32700` | 0/1は同じ。methodより後の params は単一引数として unwrap、保留した配列は Java の決定的エラーに揃える。arity 2の Java 無応答だけは **恒久差** とし、native の id 付き `-32700` を維持（reader欠陥・client停止回避・JSON-RPC応答の理由は前行と同じ） |
+| object の `capabilities:null`、単一 positional の同値 | Java setter が NPE で reader を失敗させ、応答なし。ただし params が method より先の配列は `-32700` | **恒久差**: object / stream の単一 positional は native の既定 capability による成功応答を維持。Java側のnull setter欠陥に合わせて client を固めず、JSON-RPC request を完結させる。保留配列の決定的エラーは同じ |
+| `workDoneToken:{}` / `[]` / `true` | Either adapter が reader を失敗させ、応答なし | **恒久差**: native は従来どおり未使用 token を無視して成功を返す。Java reader 欠陥の移植は client を停止させるため安全でない。JSON-RPC request への決定的応答を維持する。数値 `1.5` は両版 `-32700`、文字列/null は受理 |
+| InitializeParams の他欄・入れ子の型違い | id 付き `-32700 Message could not be parsed.`、initialize 未初期化 / configure 旧状態保持 | 同じ。対象の正確な範囲は下記。成功値の coercion と未知キー・untyped options は削らない |
+| 型付き request の params `7` / `[]` / `"x"` / `false` | 宣言済み50 methodで id 付き `-32700`（実装/default method の dispatch より先） | 同じ。hover/formatting/documentSymbol/packageSource の単一 positional 正常形も比較。#901 の既存 Java 3機能を削らず、不正DTOのparse errorだけをnativeへ追加する |
+| hover の `textDocument:7`、`position.line:[]` / 生 `1e400` | id 付き `-32700` | 同じ。position の Integer 検査は hover の実測範囲。他methodの全DTO schemaを移植したとは扱わない。position の Gson 受理域（`"0"`・`1.0`・`1e-400` 等を Java は受理、native は `-32602`）、hover 以外の入れ子 DTO、hover の `workDoneToken`、ClientCapabilities の他の入れ子欄は [#1005](https://github.com/opaopa6969/unlaxer-parser/issues/1005) で追跡する |
+| 重複 id / method / params | 既知methodの params は出現ごとに検査。正常な重複 id/method は最後の値。不正paramsを後の正常paramsで上書きしても先のparse errorを返す | 同じ入力で比較する。nativeはstream失敗時点の既読idを回復し（未読の場合は最終id付き応答を維持）、先の不正DTOで生じたerrorを後のparamsで消さない。未知methodで保留したparamsは最終methodで変換する。InitializeParamsのtop-level欄も出現ごとに検査する。全ての異種method切替や不正idのreader回復を同等と主張しない |
+| `"id":null`（未知 / `$/foo` / formatting） | 通知として扱い、結果/errorを返さない | 同じ。無いidと同じ通知判定にする。readerの故障ではないため、通知をrequestに変える理由はない |
+| Integer に収まらない数値 id（`0.5`、`2147483648`、`10000000000`、生 `1e400` / `-1e400`）、bool / array / object の id | reader が id を読めず、応答なし | **恒久差**: native は数値 id をそのまま返す（bool / array / object は `id:null` の `-32600 Invalid Request`）。JSON-RPC は応答の id を request と同じ値にすることを求める。Java reader の無応答を移植すると client を固めるため、他の無応答と同じ理由で移植しない |
+| 整数値の小数・指数表記の id（`1.0`、`1E0`、`1e-400`） | Integer に変換し、`1` / `0` を返す | **恒久差**: native は request の数値をそのまま返す。JSON-RPC の「同じ値」に沿い、JSON の数値として等しいため client の対応付けは変わらない |
+| didChange version の生 `1e400`、contentChanges の不正 DTO（`range` / `range.start` / `rangeLength` の型違い・生 `±1e400`、2件目以降の不正な change） | 通知を黙って破棄し、元文書を保持。Gson が全 change を読んでから Ext が先頭 text だけを使う | 同じ。native も全 change の `range`・`rangeLength`・`text` を検査してから先頭 text を適用する。null や Gson が変換できる値（`"0"`、`1e-400`、`"1"`）は両版とも受理する。`unlaxer-ubnf-lsp` 自身が serde_json `arbitrary_precision` を要求する。`-p` / `--workspace` の feature 統合に依存しない。新しい crate は追加しない。JSON を全体で受理した後 DTO Integer 変換で拒否し、request は元id付き `-32700`、通知は応答なし |
+| error.data / stderr | -32603 の data は JVM stack trace、-32700 の data は Gson の説明 object。無応答時の stderr に NPE 等 | data の**内容だけ**を比較から外し、存在と型は検査する（#994 と同じ）。VM呼出履歴・Gson内部位置を移植する契約がないため。stderr の stack trace はwire応答ではなく比較対象外。id/code/message/result/他のキーの有無は全JSON比較 |
+
+DTO の検査範囲は `processId`（Gson Integer）、`rootPath/rootUri/locale/trace`（Gson String）、
+`clientInfo` と `name/version`、`workspaceFolders` と要素の `uri/name`、`workDoneToken` の数値、
+`capabilities` の top-level `workspace/textDocument/notebookDocument/window/general`、代表的な
+`textDocument.hover`、`textDocument.completion.completionItem.snippetSupport`、
+`workspace.workspaceEdit`、`window.workDoneProgress`。null/省略は Java の受理域を保つ（capabilities null の恒久差は表のとおり）。
+`processId:"1"`、`rootUri:1`、`rootPath:true`、`initializationOptions:7`、未知キー、
+clientInfo/folder内の scalar→String、`hover.contentFormat:7` / `general.positionEncodings:7` の受理も固定する。
+ClientCapabilities 全体や全methodの内部DTOは移植しない。広大な将来互換schemaを重複させず、
+この実測範囲に境界を限定する最小・可逆な選択であり、全DTO parityの完了とはしない。
+
+fixture の `reader.orders` / `reader.orderParams` / `reader.duplicates` は手書きraw frameで、
+serializeし直さず両実serverへ同じ文字列を送る。生の数値 `1e400`・重複キー・escaped key・順序を保持する。
+oracleは実測結果から作らず、fixture内の明示されたcode/messageとホスト別の成功/無応答表を使う。
+無応答は後続requestが有限の応答 timeout（suite 共通の既定20秒。共有 runner の負荷で JVM 起動や GC が遅れても誤検知しない）内に処理された後、共有の**1秒deadline**で余分なframeがないことを確認する。
+失敗initializeを同じ未初期化serverへ順次送り、最後の正常initializeが成功することを確認する。
+成功するinitializeだけ別sessionで検証して既初期化エラー・後続request・正常終了も調べ、JVM起動回数を抑える。
+configureの失敗後は、旧文書の全hover/documentSymbolと新規URIの診断抑制で旧設定・文書を検証し、
+後の正常configureで診断が回復することも従来どおり検査する。nativeだけ成功する恒久差のconfigureには
+同じrestricted profileを渡し、対応表の選択と状態保持を混同しない。
+
+#1001 の558件の直接stdio処理は、共有ホスト上で
+JDK21 **17.663秒**、JDK17 **21.043秒**（suiteの elapsedSeconds）だった。
+#994 の168件は約2.7秒/4.4秒だったため、今回の追加時間は約15秒/17秒で目標1分未満。
+CIに新しいjobやlocal-importsの重複実行を足さず、self-hosted runs-onとJava serverの `-Xmx8g` を保つ。
+`processId` 型検査だけを外した隔離nativeコピーは、実stdioの不正initializeが成功を返して新suiteに検出された。
+正常コードでは同じfixtureが両JDKで成功する。変異はworktreeへ残さない。
+
+### syntax / module 診断の限定対応（#894）
 
 #894 の限定対応は共通 [syntax-status.json](../spec-corpus/ubnf-authoring-lsp/syntax-status.json) /
 [stdio runner](../scripts/ubnf_authoring_syntax_status.py) の69ケースで検証する。
