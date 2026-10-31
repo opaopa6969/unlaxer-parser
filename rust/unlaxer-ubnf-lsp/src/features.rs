@@ -87,9 +87,13 @@ fn atom_words(atom: &AtomicElement, out: &mut Vec<String>) {
         _ => {}
     }
 }
-pub fn completion(source: &str, index: &Index, offset: usize) -> Value {
+pub fn completion(source: &str, index: &Index, offset: usize, empty_line: bool) -> Value {
     let line_start = source[..offset].rfind('\n').map_or(0, |i| i + 1);
-    let prefix = &source[line_start..offset];
+    let prefix = if empty_line {
+        ""
+    } else {
+        &source[line_start..offset]
+    };
     let suffix = prefix.trim_end_matches(text::word);
     if suffix.ends_with('@') {
         return Value::Array(data()["annotations"].as_array().unwrap().iter().map(|a|{
@@ -193,7 +197,7 @@ pub fn completion(source: &str, index: &Index, offset: usize) -> Value {
     }
     Value::Array(items)
 }
-pub fn hover(source: &str, index: &Index, offset: usize) -> Value {
+pub fn hover(source: &str, index: &Index, offset: usize, empty_line: bool) -> Value {
     let mut start = offset;
     let mut end = offset;
     while let Some((i, c)) = source[..start].char_indices().next_back() {
@@ -210,8 +214,8 @@ pub fn hover(source: &str, index: &Index, offset: usize) -> Value {
             break;
         }
     }
-    let word = &source[start..end];
-    let annotation = start > 0 && source.as_bytes()[start - 1] == b'@';
+    let word = if empty_line { "" } else { &source[start..end] };
+    let annotation = !empty_line && start > 0 && source.as_bytes()[start - 1] == b'@';
     if annotation || keywords().iter().any(|k| k == word) {
         if let Some(help) = help(word) {
             return json!({"contents":markdown(help)});

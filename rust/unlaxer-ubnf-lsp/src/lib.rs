@@ -163,10 +163,8 @@ impl Server {
                                 .ok_or_else(|| invalid("contentChanges required"))?;
                             let change = changes.first().ok_or_else(|| invalid("empty change"))?;
                             // Java Ext ignores range and applies the first text as a full snapshot.
-                            let source = change["text"]
-                                .as_str()
-                                .ok_or_else(|| invalid("change text required"))?
-                                .to_owned();
+                            let source = rpc::gson_string(&change["text"])
+                                .ok_or_else(|| invalid("change text required"))?;
                             rpc::notified_version(doc)?;
                             // Java Ext parseDocument also opens a URI that was never opened.
                             self.documents.insert(uri.into(), Document { source });
@@ -194,9 +192,9 @@ impl Server {
                     Ok(Value::Null)
                 }
                 "textDocument/hover" | "textDocument/completion" if request => {
-                    let uri = params["textDocument"]["uri"]
-                        .as_str()
+                    let uri = rpc::gson_string(&params["textDocument"]["uri"])
                         .ok_or_else(|| invalid("document URI required"))?;
+                    let uri = uri.as_str();
                     let Some(doc) = self.documents.get(uri) else {
                         return Ok(if method.ends_with("completion") {
                             json!([])
@@ -204,14 +202,24 @@ impl Server {
                             Value::Null
                         });
                     };
+                    // wordAt/substring use the raw character; negative characters
+                    // fail in hover and completion, while navigation clamps to zero.
+                    if params["position"].is_null()
+                        || rpc::gson_integer(&params["position"]["character"])
+                            .is_some_and(|n| n < 0)
+                    {
+                        return Err(rpc::internal());
+                    }
                     let offset = text::offset(&doc.source, &params["position"])
                         .ok_or_else(|| invalid("invalid UTF-16 position"))?;
                     let source = doc.source.clone();
                     let index = self.index(uri).unwrap();
+                    let empty_line = rpc::gson_integer(&params["position"]["line"])
+                        .is_some_and(|n| n < 0 || n as usize >= source.split('\n').count());
                     Ok(if method.ends_with("completion") {
-                        features::completion(&source, &index, offset)
+                        features::completion(&source, &index, offset, empty_line)
                     } else {
-                        features::hover(&source, &index, offset)
+                        features::hover(&source, &index, offset, empty_line)
                     })
                 }
                 "ubnf/packageSource" if request => {
@@ -233,9 +241,9 @@ impl Server {
                 | "textDocument/foldingRange"
                     if request =>
                 {
-                    let uri = params["textDocument"]["uri"]
-                        .as_str()
+                    let uri = rpc::gson_string(&params["textDocument"]["uri"])
                         .ok_or_else(|| invalid("document URI required"))?;
+                    let uri = uri.as_str();
                     let Some(source) = self.documents.get(uri).map(|d| d.source.clone()) else {
                         return Ok(match method {
                             "textDocument/rename" => json!({"changes":{}}),
@@ -249,6 +257,9 @@ impl Server {
                     let index = self.index(uri).unwrap();
                     if method == "textDocument/documentSymbol" {
                         return Ok(navigation::symbols(&source, &index));
+                    }
+                    if params["position"].is_null() {
+                        return Err(rpc::internal());
                     }
                     let offset = text::binding_offset(&source, &params["position"])
                         .ok_or_else(|| invalid("invalid UTF-16 position"))?;
@@ -268,8 +279,7 @@ impl Server {
                             uri,
                             &index,
                             offset,
-                            params["newName"]
-                                .as_str()
+                            &rpc::gson_string(&params["newName"])
                                 .ok_or_else(|| invalid("newName required"))?,
                         ),
                         _ => Ok(navigation::linked(&source, uri, &index, offset)),

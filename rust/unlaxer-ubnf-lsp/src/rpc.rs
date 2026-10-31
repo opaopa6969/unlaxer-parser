@@ -1,6 +1,7 @@
 //! JSON-RPC/lsp4j compatibility at the authoring transport boundary (#994/#1001).
 use crate::Error;
 use serde_json::Value;
+use std::sync::OnceLock;
 
 pub(crate) fn internal() -> Error {
     (-32603, "Internal error.".into())
@@ -14,22 +15,99 @@ fn object(value: &Value) -> bool {
     value.is_null() || value.is_object()
 }
 
-// Gson's String adapter coerces scalar numbers/booleans, not containers.
-fn string(value: &Value) -> bool {
-    !value.is_array() && !value.is_object()
-}
-
-fn integer(value: &Value) -> bool {
+// Gson's String adapter preserves numeric spelling and coerces booleans.
+// Keep validation and consumption on the same conversion boundary.
+pub(crate) fn gson_string(value: &Value) -> Option<String> {
     match value {
-        Value::Null => true,
-        Value::Number(n) => stream_int(&n.to_string()).is_some(),
-        Value::String(s) => stream_int(s).is_some(),
-        _ => false,
+        Value::String(s) => Some(s.clone()),
+        Value::Number(n) => Some(n.to_string()),
+        Value::Bool(b) => Some(b.to_string()),
+        _ => None,
     }
 }
+fn string(value: &Value) -> bool {
+    value.is_null() || gson_string(value).is_some()
+}
 
+pub(crate) fn gson_integer(value: &Value) -> Option<i32> {
+    match value {
+        Value::Number(n) => stream_int(&n.to_string()),
+        Value::String(s) => stream_int(s),
+        _ => None,
+    }
+}
+fn integer(value: &Value) -> bool {
+    value.is_null() || gson_integer(value).is_some()
+}
 fn boolean(value: &Value) -> bool {
     value.is_null() || value.is_boolean() || value.is_string()
+}
+
+fn schema() -> &'static Value {
+    static SCHEMA: OnceLock<Value> = OnceLock::new();
+    SCHEMA.get_or_init(|| serde_json::from_str(include_str!("lsp4j-dto-schema.json")).unwrap())
+}
+
+// lsp4j's collection adapter also accepts a single element. Either selects by
+// token before coercion. Unknown fields and Object/experimental stay untyped.
+fn dto(value: &Value, kind: &Value) -> bool {
+    if value.is_null() {
+        return true;
+    }
+    if let Some(parts) = kind.as_array() {
+        return match parts[0].as_str().unwrap() {
+            "list" => value.as_array().map_or_else(
+                || dto(value, &parts[1]),
+                |items| items.iter().all(|item| dto(item, &parts[1])),
+            ),
+            "tuple" => value.as_array().is_some_and(|items| {
+                items.len() == parts.len() - 1
+                    && items.iter().zip(&parts[1..]).all(|(v, t)| dto(v, t))
+            }),
+            "either" => parts[1..]
+                .iter()
+                .any(|t| token_matches(value, t) && dto(value, t)),
+            _ => unreachable!("generated DTO type"),
+        };
+    }
+    match kind.as_str().unwrap() {
+        "any" => true,
+        "string" => string(value),
+        "integer" => integer(value),
+        "boolean" => boolean(value),
+        "enum" => {
+            if value.is_number() {
+                integer(value)
+            } else {
+                value.is_string()
+            }
+        }
+        // Container/bool token failures leave Java's reader without a response.
+        // Keep deterministic native dispatch, as in #1001 (permanent difference).
+        "workDoneToken" => !value.is_number() || integer(value),
+        name => {
+            value.is_object()
+                && schema()["types"][name]
+                    .as_object()
+                    .unwrap()
+                    .iter()
+                    .all(|(key, ty)| dto(&value[key], ty))
+        }
+    }
+}
+fn token_matches(value: &Value, kind: &Value) -> bool {
+    if let Some(parts) = kind.as_array() {
+        return match parts[0].as_str().unwrap() {
+            "either" => parts[1..].iter().any(|t| token_matches(value, t)),
+            _ => value.is_array(),
+        };
+    }
+    match kind.as_str().unwrap() {
+        "string" => value.is_string(),
+        "integer" | "enum" => value.is_number(),
+        "boolean" => value.is_boolean(),
+        _ => value.is_object(),
+    }
 }
 
 fn position(value: &Value) -> bool {
@@ -40,13 +118,10 @@ fn strings(value: &Value, fields: &[&str]) -> bool {
     fields.iter().all(|key| string(&value[key]))
 }
 
-// Deliberately bounded DTO coverage: the observed top-level fields and nested
-// representatives are listed in docs/ubnf-authoring-lsp.md (#1001). Unknown
-// properties and untyped initializationOptions/experimental stay untyped.
+// InitializeParams uses the #1001 boundary plus the generated complete
+// ClientCapabilities field graph (#1005). Untyped options stay untyped.
 fn initialize_dto(params: &Value) -> bool {
     let caps = &params["capabilities"];
-    let text = &caps["textDocument"];
-    let completion = &text["completion"];
     let folders = &params["workspaceFolders"];
     integer(&params["processId"])
         && strings(params, &["rootPath", "rootUri", "locale", "trace"])
@@ -56,16 +131,7 @@ fn initialize_dto(params: &Value) -> bool {
             || folders.as_array().is_some_and(|folders| {
                 folders.iter().all(|f| object(f) && strings(f, &["uri", "name"]))
             }))
-        && object(caps)
-        && ["workspace", "textDocument", "notebookDocument", "window", "general"]
-            .iter()
-            .all(|field| object(&caps[field]))
-        && object(&text["hover"])
-        && object(completion)
-        && object(&completion["completionItem"])
-        && boolean(&completion["completionItem"]["snippetSupport"])
-        && object(&caps["workspace"]["workspaceEdit"])
-        && boolean(&caps["window"]["workDoneProgress"])
+        && dto(caps, &Value::String("ClientCapabilities".into()))
         // Invalid container/bool workDoneToken makes Java's Either adapter
         // stop without a response. Keep native's deterministic acceptance.
         && (!params["workDoneToken"].is_number() || integer(&params["workDoneToken"]))
@@ -98,13 +164,19 @@ pub(crate) fn params_shape(method: &str, params: &Value) -> Result<(), Error> {
     }
     let params = initialize_params(params);
     let valid = object(params)
+        && (!schema()["workDoneMethods"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|m| m == method)
+            || !params["workDoneToken"].is_number()
+            || integer(&params["workDoneToken"]))
         && if matches!(method, "initialize" | "unlaxer/configure") {
             initialize_dto(params)
-        } else if method == "textDocument/hover" {
-            // Bounded nested request DTO coverage observed on the Java server.
-            object(&params["textDocument"])
-                && string(&params["textDocument"]["uri"])
-                && position(&params["position"])
+        } else if method == "ubnf/packageSource" {
+            string(&params["uri"])
+        } else if let Some(kind) = schema()["requests"].get(method) {
+            dto(params, kind)
         } else {
             true
         };
@@ -151,6 +223,59 @@ fn initialize_stream_shape(raw: &[u8]) -> Result<Option<Error>, serde_json::Erro
     Ok(None)
 }
 
+// serde_json normalizes exponent case/sign (0E5 -> 0e+5). Gson's String
+// adapter exposes the original token instead. Recover only numeric change text
+// from the validated raw notification; all DTO checks still run before mutation.
+fn change_text_spelling(raw: &[u8], params: &mut Value) -> Result<(), serde_json::Error> {
+    let mut rest = raw.trim_ascii_start();
+    if rest[0] != b'{' {
+        return Ok(());
+    }
+    rest = rest[1..].trim_ascii_start();
+    let mut raw_changes = None;
+    while rest[0] != b'}' {
+        let (key, _, raw) = next_field(&mut rest)?;
+        if key == "contentChanges" {
+            raw_changes = Some(raw);
+        }
+    }
+    if let Some(changes) = raw_changes.filter(|raw| raw[0] == b'[') {
+        let mut changes = changes[1..].trim_ascii_start();
+        let mut index = 0;
+        while changes[0] != b']' {
+            let mut values = serde_json::Deserializer::from_slice(changes).into_iter::<Value>();
+            let value = values.next().expect("validated change")?;
+            let length = values.byte_offset();
+            if value.is_object() {
+                let mut fields = changes[1..length].trim_ascii_start();
+                let mut raw_text = None;
+                while fields[0] != b'}' {
+                    let (key, value, text) = next_field(&mut fields)?;
+                    if key == "text" {
+                        raw_text = value.is_number().then_some(text);
+                    }
+                }
+                if let Some(text) = raw_text {
+                    if let Some(target) = params["contentChanges"]
+                        .get_mut(index)
+                        .and_then(|change| change.get_mut("text"))
+                    {
+                        if target.is_number() {
+                            *target = Value::String(std::str::from_utf8(text).unwrap().into());
+                        }
+                    }
+                }
+            }
+            changes = changes[length..].trim_ascii_start();
+            if changes[0] == b',' {
+                changes = changes[1..].trim_ascii_start();
+            }
+            index += 1;
+        }
+    }
+    Ok(())
+}
+
 // Preserve the ordering information needed by lsp4j's stream and deferred DTO
 // paths. serde_json decodes escaped keys; raw text/string searches would not.
 // No dependency or general parser hot-path change is needed.
@@ -165,8 +290,12 @@ pub(crate) fn read_message(bytes: &[u8]) -> Result<(Value, Option<Error>), serde
     let mut error_id = None;
     let mut deferred = None;
     let mut error = None;
+    let mut raw_params = None;
     while rest[0] != b'}' {
         let (key, value, raw) = next_field(&mut rest)?;
+        if key == "params" {
+            raw_params = Some(raw);
+        }
         match key.as_str() {
             "id" => id = Some(value),
             "method" => method = value.as_str().unwrap_or("").into(),
@@ -200,6 +329,11 @@ pub(crate) fn read_message(bytes: &[u8]) -> Result<(Value, Option<Error>), serde
             error.get_or_insert_with(parse_error);
         } else if let Err(e) = params_shape(&method, &params) {
             error.get_or_insert(e);
+        }
+    }
+    if method == "textDocument/didChange" {
+        if let Some(raw) = raw_params {
+            change_text_spelling(raw, &mut message["params"])?;
         }
     }
     if let Some(id) = error_id {
@@ -239,12 +373,7 @@ pub(crate) fn change_shape(params: &Value) -> Result<(), Error> {
 }
 
 pub(crate) fn notified_version(document: &Value) -> Result<(), Error> {
-    let valid = match &document["version"] {
-        Value::Null => true,
-        Value::String(text) => stream_int(text).is_some(),
-        Value::Number(number) => stream_int(&number.to_string()).is_some(),
-        _ => false,
-    };
+    let valid = integer(&document["version"]);
     if valid {
         Ok(())
     } else {
@@ -413,4 +542,27 @@ fn string_int(value: &str) -> Option<i32> {
         }
     }
     normalized.parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn change_text_uses_gson_scalar_spelling() {
+        for (raw, expected) in [
+            ("-0", "-0"),
+            ("0E5", "0E5"),
+            ("1e400", "1e400"),
+            ("1.50", "1.50"),
+        ] {
+            let frame = format!(
+                r#"{{"method":"textDocument/didChange","params":{{"contentChanges":[{{"text":{raw}}}]}}}}"#
+            );
+            let (message, error) = super::read_message(frame.as_bytes()).unwrap();
+            assert!(error.is_none());
+            assert_eq!(
+                super::gson_string(&message["params"]["contentChanges"][0]["text"]).as_deref(),
+                Some(expected)
+            );
+        }
+    }
 }
