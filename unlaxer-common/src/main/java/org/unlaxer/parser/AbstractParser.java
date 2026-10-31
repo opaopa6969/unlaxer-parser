@@ -1,12 +1,12 @@
 package org.unlaxer.parser;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import org.unlaxer.Name;
@@ -27,15 +27,27 @@ public abstract class AbstractParser implements Parser {
 	
 	Name specifiedName;
 
-	Parser parser;
+	/**
+	 * The delegate that the inherited {@link #parse} runs, created on first use. Library and generated
+	 * parsers override parse and return this from createParser, so only user parsers that inherit parse
+	 * read it on every call. Several contexts may reach the first use of a shared graph at once (#1007):
+	 * see {@link #getParser()}.
+	 */
+	volatile Parser parser;
 
 	Parsers children;
 
 	public Optional<Parser> parent;
 	
+	/**
+	 * Lazily resolved root. Several contexts may parse a shared graph at once (#1007): the field is
+	 * read once per call and only ever holds an immutable Optional, so a racing reader sees either
+	 * empty or a complete value (final field semantics, JLS 17.5) and recomputes the same root.
+	 */
 	Optional<Parser> root = Optional.empty();
 	
-	Map<Name,Parser> parserByName = new HashMap<>();
+	/** Name lookups resolved from the root; concurrent parses of a shared graph read and fill it (#1007). */
+	Map<Name,Parser> parserByName = new ConcurrentHashMap<>();
 	
 	volatile boolean donePrepareChildren = false;
 	
@@ -101,20 +113,39 @@ public abstract class AbstractParser implements Parser {
 		}
 	}
 
+	/**
+	 * Returns the delegate, creating it on the first call. Creating it can attach the delegate as a
+	 * child, which changes the graph, so it runs once under this parser's monitor (the one that
+	 * prepares the children) and the field is written only after the delegate has its parent and is a
+	 * child. A thread that reads a non-null field therefore sees the attached delegate, a failed
+	 * creation publishes nothing and the next call retries, and concurrent first uses create one
+	 * delegate. The child list is replaced rather than changed in place, so another thread walking the
+	 * children meanwhile sees the list either before or after the attachment.
+	 */
 	public Parser getParser() {
-		
-		if (parser == null) {
-			parser = createParser();
-			if(this != parser){
-				parser.setParent(this);
+		Parser created = parser;
+		if (created == null) {
+			created = createAttachedParser();
+		}
+		createParserAndThen(created);
+		return created;
+	}
 
-				if(false ==getChildren().contains(parser)){
-					getChildren().add(parser);
-				}
+	private synchronized Parser createAttachedParser() {
+		Parser created = parser;
+		if (created != null) {
+			return created;
+		}
+		created = createParser();
+		if(this != created){
+			created.setParent(this);
+			Parsers attachedTo = getChildren();
+			if(false == attachedTo.contains(created)){
+				attachedTo.appendByCopy(created);
 			}
 		}
-		createParserAndThen(parser);
-		return parser;
+		parser = created;
+		return created;
 	}
 
 	public void createParserAndThen(Parser createdParser){
@@ -130,10 +161,12 @@ public abstract class AbstractParser implements Parser {
 	
 	@Override
 	public Parser getRoot(){
-		if(false == root.isPresent()){
-			root = Optional.of(findFirstToParent(Parser.isRoot).orElse(this));
+		Optional<Parser> resolved = root;
+		if(false == resolved.isPresent()){
+			resolved = Optional.of(findFirstToParent(Parser.isRoot).orElse(this));
+			root = resolved;
 		}
-		return root.get();
+		return resolved.get();
 	}
 
 	@Override
@@ -175,6 +208,10 @@ public abstract class AbstractParser implements Parser {
 	@Override
 	public Optional<Parser> getParser(Name name) {
 		
+		if(name == null){
+			// The concurrent map has no null key; the HashMap answered this from the root uncached.
+			return findFirstFromRoot(parser->parser.getName().equals(name));
+		}
 		Parser matched = parserByName.get(name);
 		if(matched == null ){
 			Optional<Parser> findFirstFromRoot = findFirstFromRoot(parser->parser.getName().equals(name));

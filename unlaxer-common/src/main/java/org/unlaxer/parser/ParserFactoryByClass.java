@@ -1,9 +1,9 @@
 package org.unlaxer.parser;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.unlaxer.ast.ASTNodeKind;
 import org.unlaxer.util.FactoryBoundCache;
@@ -42,11 +42,13 @@ public class ParserFactoryByClass{
 	}
 
 	
+	// Written outside the singleton caches' locks, possibly from lazy children built during
+	// concurrent parses of a shared graph, so the maps must take concurrent puts (#1007).
 	static Map<Class<? extends Parser> , Boolean> 
-		initilizedByClass = new HashMap<>();
+		initilizedByClass = new ConcurrentHashMap<>();
 	
 	static Map<ClassAndKind , Boolean> 
-		initilizedByClassAndKind = new HashMap<>();
+		initilizedByClassAndKind = new ConcurrentHashMap<>();
 
 	
 	static boolean initialized(Class<? extends Parser> clazz) {
@@ -113,8 +115,9 @@ public class ParserFactoryByClass{
 			return kind == other.kind && Objects.equals(parserClass, other.parserClass);
 		}
 
+		/** Empty for {@link #ClassAndKind(Class)}, which has no node kind. */
 		public Optional<ASTNodeKind> kind(){
-			return Optional.of(kind);
+			return Optional.ofNullable(kind);
 		}
 	}
 	
