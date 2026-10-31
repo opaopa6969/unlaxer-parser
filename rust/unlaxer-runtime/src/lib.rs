@@ -2863,6 +2863,11 @@ impl<'a> ParseContext<'a> {
     }
 
     fn checkpoint(&mut self) -> Checkpoint {
+        self.checkpoint_entering(None)
+    }
+
+    /// An expression entry also enters its Classic collector scope when tracing.
+    fn checkpoint_entering(&mut self, expression: Option<&Expr>) -> Checkpoint {
         if self.options.memoization == Memoization::SafeFailures {
             self.failure_memo
                 .observe_cursor(self.code_point(self.position));
@@ -2895,7 +2900,11 @@ impl<'a> ParseContext<'a> {
             scopes_journal_mark,
             recoveries: self.recoveries.len(),
             tokens: Rc::clone(&self.tokens),
-            token_trace: token_trace::Mark::of(self.token_trace.as_ref()),
+            token_trace: token_trace::Mark::enter(
+                self.token_trace.as_mut(),
+                expression,
+                self.token_mode,
+            ),
             state,
         }
     }
@@ -3679,7 +3688,7 @@ impl<'a> ParseContext<'a> {
         if let Expr::MetadataCapture(name, child) = expression {
             return self.expression_metadata_capture(name, child, depth);
         }
-        let checkpoint = self.checkpoint();
+        let checkpoint = self.checkpoint_entering(Some(expression));
         let parent_policy = self.match_cursor_policy;
         // Chain sets the policy before beginning its own transaction, so a Sequence
         // changes the policy for following siblings even when it fails (#809).
@@ -4027,10 +4036,16 @@ impl<'a> ParseContext<'a> {
                             | Expr::InvertMatch(_)
                             | Expr::Rule(_)
                             | Expr::JavaUntil(_)
+                            | Expr::TextValue(_)
+                            | Expr::ValueBoundary(_)
                     ))
             {
                 if let Some(fragment) = &result {
-                    self.collect_classic_trace(checkpoint.token_trace.leaves, &fragment.nodes);
+                    self.collect_classic_trace(
+                        &checkpoint.token_trace,
+                        expression,
+                        &fragment.nodes,
+                    );
                 }
             }
             if self.token_mode.is_none() {
@@ -4541,9 +4556,12 @@ impl<'a> ParseContext<'a> {
                     return None;
                 }
                 let tracing = self.token_trace.is_some();
-                if tracing {
+                let scope = if tracing {
                     self.trace_custom_contracts.push(false);
-                }
+                    self.open_trace_scope()
+                } else {
+                    None
+                };
                 // A callback can re-enter a grammar through any public parser entry.
                 // Carry the active rule depth across that API boundary.
                 let previous_depth = self.call_depth;
@@ -4554,10 +4572,13 @@ impl<'a> ParseContext<'a> {
                     // The callback succeeded, so it caught any raised failure it observed.
                     self.raised = None;
                 }
-                if tracing && !self.trace_custom_contracts.pop().unwrap() && result.is_ok() {
-                    self.unsupported_trace(
-                        "custom parser without explicit terminal trace contract",
-                    );
+                if tracing {
+                    self.close_trace_scope(scope);
+                    if !self.trace_custom_contracts.pop().unwrap() && result.is_ok() {
+                        self.unsupported_trace(
+                            "custom parser without explicit terminal trace contract",
+                        );
+                    }
                 }
                 result.ok().map(|matched| {
                     let info = matched

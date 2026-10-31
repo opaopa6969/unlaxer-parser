@@ -367,3 +367,143 @@ fn disconnect_flushes_response_without_consuming_or_closing_borrowed_transport()
     assert_eq!(reply["success"], true);
     output.write_all(b"caller still owns output").unwrap();
 }
+
+#[test]
+fn token_protocol_shows_exact_budget_trace_and_never_a_partial_limit_or_unsupported() {
+    use unlaxer_runtime::{token_trace::Limits, Expr, ParseContext, ParseOptions, Rule};
+    // The match-only lookahead's leaves are removed by the consumed root (#866), so
+    // three retained leaves fit exactly three; two is a real Limit.
+    fn traced(source: &str, limits: Limits, custom: bool) -> Result<Vec<Step>, String> {
+        let separator = if custom {
+            Expr::Custom(|context| context.parse(&Expr::Literal("|")))
+        } else {
+            Expr::Literal("|")
+        };
+        let rules = vec![Rule {
+            name: "Root",
+            expression: Expr::Sequence(vec![
+                Expr::Literal("a"),
+                Expr::Sequence(vec![Expr::Literal("|"), Expr::Literal("x")]).match_only(),
+                separator,
+                Expr::Literal("x"),
+            ]),
+        }];
+        // Classic collectors are entered through the parser entry, as in the oracle.
+        let options = ParseOptions::default().with_token_trace(limits);
+        let mut context = ParseContext::with_options(source, options);
+        let root = context
+            .parse_grammar(rules, 0, false)
+            .map_err(|error| format!("{error:?}"))?;
+        assert_eq!(context.position(), source.len());
+        let tree = context.tree(root.root_node().unwrap()).unwrap();
+        unlaxer_dap::token_steps(&tree)
+    }
+    fn exact(source: &str) -> Result<Vec<Step>, String> {
+        traced(
+            source,
+            Limits {
+                leaves: 3,
+                source_bytes: 3,
+            },
+            false,
+        )
+    }
+    fn short(source: &str) -> Result<Vec<Step>, String> {
+        traced(
+            source,
+            Limits {
+                leaves: 2,
+                source_bytes: 3,
+            },
+            false,
+        )
+    }
+    fn unsupported(source: &str) -> Result<Vec<Step>, String> {
+        traced(source, Limits::default(), true)
+    }
+    fn no_ast(_: &str) -> Result<Vec<Step>, String> {
+        Err("AST mode is not used".into())
+    }
+    type Tokens = fn(&str) -> Result<Vec<Step>, String>;
+    let cases: [(Tokens, &str); 3] = [
+        (exact, ""),
+        (short, "token trace Limit"),
+        (unsupported, "token trace Unsupported"),
+    ];
+    for (tokens, error) in cases {
+        let path = temp("a|x");
+        let mut input = Vec::new();
+        let requests = [
+            request(1, "initialize", json!({})),
+            request(
+                2,
+                "launch",
+                json!({"program":path,"steppingMode":"token","stopOnEntry":true}),
+            ),
+            request(3, "configurationDone", json!({})),
+            request(4, "stackTrace", json!({"threadId":1})),
+            request(5, "next", json!({"threadId":1})),
+            request(6, "stackTrace", json!({"threadId":1})),
+            request(7, "next", json!({"threadId":1})),
+            request(8, "stackTrace", json!({"threadId":1})),
+            request(9, "next", json!({"threadId":1})),
+            request(10, "disconnect", json!({})),
+        ];
+        for message in &requests {
+            unlaxer_protocol::write_frame(&mut input, &serde_json::to_vec(message).unwrap())
+                .unwrap();
+        }
+        let mut output = Vec::new();
+        Server::new(unlaxer_dap::ParserBackend {
+            mapper: no_ast,
+            tokens,
+        })
+        .serve(&mut Cursor::new(input), &mut output)
+        .unwrap();
+        let mut reader = Cursor::new(output);
+        let mut messages = Vec::new();
+        while let Some(frame) = unlaxer_protocol::read_frame(&mut reader).unwrap() {
+            messages.push(serde_json::from_slice::<Value>(&frame).unwrap());
+        }
+        let frames = messages
+            .iter()
+            .filter(|m| m["command"] == "stackTrace")
+            .map(|m| {
+                m["body"]["stackFrames"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|frame| format!("{}@{}", frame["name"], frame["column"]))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .collect::<Vec<_>>();
+        let stopped = messages.iter().filter(|m| m["event"] == "stopped").count();
+        let stderr = messages
+            .iter()
+            .filter(|m| m["event"] == "output" && m["body"]["category"] == "stderr")
+            .map(|m| m["body"]["output"].as_str().unwrap().to_owned())
+            .collect::<String>();
+        assert!(
+            messages.iter().any(|m| m["event"] == "terminated"),
+            "{error}"
+        );
+        if error.is_empty() {
+            assert_eq!(
+                frames,
+                [
+                    "\"WordParser (1/3)\"@1",
+                    "\"WordParser (2/3)\"@2",
+                    "\"WordParser (3/3)\"@3"
+                ]
+            );
+            assert_eq!(stopped, 3);
+            assert!(stderr.is_empty(), "{stderr}");
+        } else {
+            assert_eq!(frames, ["", "", ""], "{error}");
+            assert_eq!(stopped, 0, "{error}");
+            assert!(stderr.contains(error), "{stderr}");
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+}
