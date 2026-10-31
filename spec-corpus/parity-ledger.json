@@ -2579,33 +2579,18 @@
       "id": "xml-tag-samples",
       "category": "contract",
       "title": "XML tag 使用例のreflection構築サンプル",
-      "hosts": "Java LazyChain/LazyChoice/MatchedTokenParser・NamedCapture/CaptureScope/ReplayParser / Rust public rule composition・capture_owned/capture_scope/Replay・CustomWith adapter",
+      "hosts": "Java LazyChain/LazyChoice/MatchedTokenParser・NamedCapture/CaptureScope/ReplayParser / Rust public rule composition・capture_owned/capture_scope/Replay・CustomWith adapter・user state",
       "issues": [
         1016
       ],
-      "observation": "Java Usage002_02/03/04 のclass参照で使う NoMixedContentsXmlElements(Paired) をpublicにし、既定surefireが実行するXmlTagSampleTest（元sample4クラス＋共通fixture）へ接続する。製品factoryの非公開constructor制約は変えない。57入力の手書きoracleで、02（名前を比較しない教材段階、<test></test2>受理）、03/04（MatchedTokenParserによる既出名の照合）、scoped（owned capture＋capture scope＋最内名のreplay）の成否/consumed/matched CP/原文をJava/Rust双方でmemo2×診断3に照合する。空要素・入れ子・EOF/不完全・名前一致/不一致・CRLF/TAB/非BMP・prefix cursorを含み、siblings/mixed contentは拒否のまま。Rustの03/04は既出名の履歴（capture_sources）を原文順に試す公開CustomWith adapterで、照合後の消費は公開parseで行う。sample修正はruntimeホットパス・公開3.3.0を変更しない。",
+      "observation": "Java Usage002_02/03/04 のclass参照で使う NoMixedContentsXmlElements(Paired) をpublicにし、既定surefireが実行するXmlTagSampleTest（元sample4クラス＋共通fixture）へ接続する。製品factoryの非公開constructor制約は変えない。70入力の手書きoracleで、02（名前を比較しない教材段階、<test></test2>受理）、03/04（MatchedTokenParserによる既出名の照合）、scoped（owned capture＋capture scope＋最内名のreplay）の成否/consumed/matched CP/原文をJava/Rust双方でmemo2×診断3に照合する。空要素・入れ子・EOF/不完全・名前一致/不一致・CRLF/TAB/非BMP・prefix cursorを含み、siblings/mixed contentは拒否のまま。03/04が交差した名前（<a><b></a></b>）を受理する旧仕様も保持する。03/04の候補はJava transaction stack順（閉じる要素の名前と完了した子の名前、続いて外側の開き名を内から外）のTagIdentifier名で、空要素の名前も含む。最初に前方一致した候補を消費し、後続候補は再試行しない。候補一覧はparser instanceごとに初回評価のものを解析の終わりまで保持し、rollbackでも戻らない。rootのinstanceと、全入れ子levelで共有されるclass factoryのinstanceは別に持つ。前方一致する名前の入れ子close（<a><ab></ab></a>、<x><ab><a></a></ab></x>の拒否など）も共通期待値とする。Rustの03/04は公開CustomWith adapterで、capture_sourcesの開き名・空要素名・要素終端の履歴からJavaの候補順を再構成する。候補一覧は呼出側がcontextごとにuser stateへ置くRc<RefCell>に宣言別slotで保持し、checkpointで共有されるためrollbackでも戻らない。照合後の消費は公開parseで行う。xml-tags-candidate-cache.tsvの9入力では、class factory instanceをrootにした場合の一覧共有、Choiceの失敗した第1候補で作られた一覧が第2候補で使われ続けること、新しいcontextで空から始まることを両言語で照合する。MatchedTokenParserのslice/effect/reverseと一般のcache契約は#852の範囲で、ここでは完了扱いにしない。sample修正はruntimeホットパス・公開3.3.0を変更しない。",
       "evidence": [
         "conformance/samples/xml-tags.tsv",
+        "conformance/samples/xml-tags-candidate-cache.tsv",
         "unlaxer-common/src/test/java/sample/Usage002_02_SimpleXmlTagOpenAndClose.java",
         "unlaxer-common/src/test/java/sample/Usage002_03_SimpleXmlTagPaired.java",
         "unlaxer-common/src/test/java/sample/Usage002_04_SimpleXmlTagPaired_alternative.java",
         "unlaxer-common/src/test/java/sample/XmlTagSampleTest.java",
-        "unlaxer-common/src/test/java/sample/XmlTagSampleContract.java",
-        "rust/unlaxer-runtime/tests/xml_tag_sample.rs"
-      ]
-    },
-    {
-      "id": "xml-paired-candidate-history",
-      "category": "unresolved",
-      "title": "MatchedTokenParserの入れ子close候補順とcache寿命",
-      "hosts": "Java MatchedTokenParser / Rust CustomWith adapter over capture_sources",
-      "issues": [
-        852,
-        1016
-      ],
-      "observation": "Java MatchedTokenParserは候補tokenを最内transaction levelから外側へ並べ、parser instanceごとに1回の解析中cacheする。class factoryの入れ子levelは1つのinstanceを共有するため、depth1以深のcloseは最初に評価した入れ子closeの候補順を使う。Rust adapterは既出名を原文順に試す。候補名が前方一致する入れ子close 4入力で受理が異なり、java/rust列にhost別の期待値を記録して両言語で実行する。rootのcloseと前方一致しない名前は共通fixture xml-tags.tsvで一致する。scoped列は両言語共通。",
-      "evidence": [
-        "conformance/samples/xml-tags-history.tsv",
         "unlaxer-common/src/test/java/sample/XmlTagSampleContract.java",
         "rust/unlaxer-runtime/tests/xml_tag_sample.rs",
         "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java"
@@ -3296,16 +3281,6 @@
       },
       "entries": [
         "cli-locale-path-encoding"
-      ]
-    },
-    {
-      "path": "conformance/samples/xml-tags-history.tsv",
-      "fields": {
-        "java": 1,
-        "rust": 1
-      },
-      "entries": [
-        "xml-paired-candidate-history"
       ]
     }
   ],

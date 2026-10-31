@@ -15,6 +15,7 @@ import org.unlaxer.parser.Parser;
 import org.unlaxer.parser.Parsers;
 import org.unlaxer.parser.combinator.CaptureScope;
 import org.unlaxer.parser.combinator.Chain;
+import org.unlaxer.parser.combinator.Choice;
 import org.unlaxer.parser.combinator.LazyChoice;
 import org.unlaxer.parser.combinator.NamedCapture;
 import org.unlaxer.parser.combinator.Optional;
@@ -27,19 +28,39 @@ import sample.Usage002_01_SimpleXmlTag.TagIdentifier;
 
 /** Shared XML tag fixture for the Usage002 class-factory samples; run by {@link XmlTagSampleTest}. */
 public class XmlTagSampleContract {
-    static final Map<String, Supplier<Parser>> RECIPES = Map.of(
-        "02", Usage002_02_SimpleXmlTagOpenAndClose.NoMixedContentsXmlElements::new,
-        "03", Usage002_03_SimpleXmlTagPaired.NoMixedContentsXmlElementsPaired::new,
-        "04", Usage002_04_SimpleXmlTagPaired_alternative.NoMixedContentsXmlElementsPaired::new,
-        "scoped", ScopedXmlElement::new);
+    static final Class<Usage002_03_SimpleXmlTagPaired.NoMixedContentsXmlElementsPaired> SHARED_03 =
+        Usage002_03_SimpleXmlTagPaired.NoMixedContentsXmlElementsPaired.class;
+    static final Class<Usage002_04_SimpleXmlTagPaired_alternative.NoMixedContentsXmlElementsPaired> SHARED_04 =
+        Usage002_04_SimpleXmlTagPaired_alternative.NoMixedContentsXmlElementsPaired.class;
+    static final Map<String, Supplier<Parser>> RECIPES = Map.ofEntries(
+        Map.entry("02", Usage002_02_SimpleXmlTagOpenAndClose.NoMixedContentsXmlElements::new),
+        Map.entry("03", Usage002_03_SimpleXmlTagPaired.NoMixedContentsXmlElementsPaired::new),
+        Map.entry("04", Usage002_04_SimpleXmlTagPaired_alternative.NoMixedContentsXmlElementsPaired::new),
+        Map.entry("scoped", ScopedXmlElement::new),
+        // The class-factory instance that every nested level of 03/04 uses.
+        Map.entry("shared03", () -> Parser.get(SHARED_03)),
+        Map.entry("shared04", () -> Parser.get(SHARED_04)),
+        Map.entry("retry03", () -> retry(SHARED_03)),
+        Map.entry("retry04", () -> retry(SHARED_04)),
+        Map.entry("second03", () -> second(SHARED_03)),
+        Map.entry("second04", () -> second(SHARED_04)));
 
     @Test public void xmlTagSamplesMatchSharedPrefixContract() throws Exception {
-        assertEquals(57, check("xml-tags.tsv", Map.of("02", 1, "03", 2, "04", 2, "scoped", 3)));
+        assertEquals(70, check("xml-tags.tsv", Map.of("02", 1, "03", 2, "04", 2, "scoped", 3)));
     }
 
-    /** The java column records MatchedTokenParser candidate order and cache lifetime (#852). */
-    @Test public void pairedSamplesKeepJavaCandidateHistory() throws Exception {
-        assertEquals(4, check("xml-tags-history.tsv", Map.of("03", 1, "04", 1, "scoped", 3)));
+    /** The MatchedTokenParser candidate list lives as long as the parse and survives rollback. */
+    @Test public void pairedCandidateCacheKeepsJavaLifetime() throws Exception {
+        assertEquals(9, check("xml-tags-candidate-cache.tsv", Map.of(
+            "shared03", 1, "shared04", 1, "retry03", 2, "retry04", 2, "second03", 3, "second04", 3)));
+    }
+
+    static Parser retry(Class<? extends Parser> shared) {
+        return new Choice(new Chain(Parser.get(shared), new WordParser("!")), second(shared));
+    }
+
+    static Parser second(Class<? extends Parser> shared) {
+        return new Chain(new WordParser("<a><ab/></a>"), Parser.get(shared));
     }
 
     static int check(String fixture, Map<String, Integer> columns) throws Exception {
