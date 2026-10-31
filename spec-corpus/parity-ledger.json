@@ -18,11 +18,13 @@
     "2026-10-27 #833/#834/#835: spec corpusの診断差16件を両Rust hostで修正し契約へ移した（issueは本PRのmerge待ちでOPEN）。#784の実行先・独立期待値を維持し、rootあり/なしと複数不正の順序を追加検証する。 前提の#784（PR #836）・#825（PR #831）はmerge済み/CLOSEDを確認した。",
     "2026-10-27 #843: 残る7入力の診断コード・順序を両Rust hostでJava validatorに揃えた。rootあり/なし、単一エラー説明とcheck JSONを共通fixtureで固定する。precedence欠如・重複の#835契約は維持する。性能作業・parser実行経路は対象外。 レビューでvalidateAssocのparams欠落・repeat欠如もJavaの最初のERRORに揃え、nativeの名前述語の隠れは#858へ分離した。",
     "2026-10-27 #716 第1段: origin/master 5a4e5162 の公開parser型/static全441宣言（parser 全階層と context/capture/reducer/listener package を含む）とRust利用経路を docs/java-api-rust-parity.md に固定。未対応・全API共通検証なし・言語固有の境界を #845〜#854・#856 へ分割した。今回の個別監査は台帳全体のaudited_revisionを更新する再監査ではなく、runtimeの変更も行わない。",
+    "2026-10-27 #858: 名前述語をsource-level capture解析で宣言/loweringより前に検証し、重複注釈・choice形状・未定義参照などによる診断の隠れを解消。全規則のcapture/kind検証後にversion整合性を検査する。元42入力は保持して19入力を追加しrootあり/なしを3経路で比較（対象root/captureの6境界と@ubnf不正値・重複のLF/CRLFを含む）。issueはCI/mergeまでOPEN。",
     "2026-10-27 #826: 正の先読みの到達位置、Classic capture の失敗 frame、native UNTIL の失敗した終端候補を記録。既存の Java oracle 値は変更せず nested/frame-start の全診断列を両Rust host・通常/mappingで一致させる。差分表は実測に一致する memo 会計差だけを保持する。個別修正であり台帳全体の監査日・revision は更新しない。",
     "2026-10-27 #827: failure/success hit は公開 context API と Classic harness に現れる host 依存の内部会計であり、Java/Rust 間の数値一致を契約しないと決定。marker・rule/inline group の cache 粒度と Chain 対照を確認し、非nested Outer を追加。runtime/生成器を変えず、実測全行と memo OFF/SAFE_FAILURES の結果不変を検証する。個別の契約判断であり台帳全体の監査日・revision は更新しない。",
     "2026-10-27 #872/#876: 先行先読みのない通常呼出の成功診断をJava実測に揃える。両issueは成功記録の既存watermark必須条件が共通原因。生成grammarのJava互換経路と独立native PEG式入口を区別し、後者の別診断列を維持する。個別修正であり台帳全体の監査日・revisionは更新しない。",
     "2026-10-27 #878: 外部入口の成功時に transaction frame 外の最終消費を記録し、Java 実測の nested-boundary 47経路1128行を追加。#197 は入口ごとの比較1つを指示役が許可し、ノードごとの処理は不変。入口が戻る前の custom parser の途中診断は #881 に分離する。#826/#872/#876 の CLOSED を確認。個別修正であり台帳全体の監査日・revision は更新しない。",
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。",
+    "2026-10-27 #861: Choice/PredictiveChoiceのFIRST判定を候補beginによるmatched reset後と同じ位置へ揃え、Java専用deferred例外30行を削除。公開runtimeの共通cursor/capture回帰を追加。機能や全体の対応宣言は増やさず、CI/mergeまでissueはOPENのまま維持する。",
     "2026-10-31 #866: Rust の Classic collector が後で除く leaf（consumed 親の match-only・virtual 親の stop_consume 終端など）を trace 予算に数えず、最終 trace に残る leaf だけで Limit を判定する。Java には予算 API が無いので、conformance/token-trace/budget.tsv の Java 実 leaf・cursor を保持 trace の基準にし、Rust は n-1/n/n+1 を検証する。AST value node 直下の custom callback の leaf は value node の kind が決まった時点で判定し、除かれる区間の leaf だけで生じた Limit を戻す。callback が認識したが返さない terminal の leaf は collector が除くまで数える Rust 側の保守的な境界（docs/token-trace.md）。issue は本PRのmerge待ちでOPEN。"
   ],
   "issues": {
@@ -2204,13 +2206,16 @@
         843,
         858
       ],
-      "observation": "issue表の7入力はrootあり/なしともJava validatorの最初のERRORと同じコードを先頭に付ける。重複interleave/scopeTreeは値の検査より先、precedenceが1つある結合性はJavaのvalidateAssocの最初のエラー（mapping欠如→paramsのleft/op/right欠落→repeat欠如→rightAssoc非canonical）をchoice/profile・未定義参照より先に返す。params欠落・repeat欠如も従来の結合性の説明にコードを付ける（後段の重複注釈・longestChoice形状・修飾参照のコードでJavaと違うコードを付けないため）。longestChoiceのshapeはprecedenceより先。importなし修飾参照は従来説明を保ったE-RULE-UNDEFINEDとし、解決済みimportは変更しない。#835の元corpusで固定されたprecedence欠如・重複はJavaの最初のERRORと異なる場合があるが、今回の互換要件に従い従来のコードと順序を維持する。その場合は新しい結合性検査を行わない。名前述語の診断はmapping・結合性の診断より先に返し、既存の順序を維持する。nativeで名前述語が重複注釈・longestChoice形状・修飾参照・profile・未定義参照に隠れる差は#858へ分離した。対象外の結合性エラー・choice profileは従来経路を保持する。全42入力を3経路で検査し、issue表の14変種は既存check JSON（code/span/schemaVersion 1/終了コード）をLF/CRLFで固定する。",
+      "observation": "issue表の7入力はrootあり/なしともJava validatorの最初のERRORと同じコードを先頭に付ける。重複interleave/scopeTreeは値の検査より先、precedenceが1つある結合性はJavaのvalidateAssocの最初のエラー（mapping欠如→paramsのleft/op/right欠落→repeat欠如→rightAssoc非canonical）をchoice/profile・未定義参照より先に返す。params欠落・repeat欠如も従来の結合性の説明にコードを付ける（後段の重複注釈・longestChoice形状・修飾参照のコードでJavaと違うコードを付けないため）。longestChoiceのshapeはprecedenceより先。importなし修飾参照は従来説明を保ったE-RULE-UNDEFINEDとし、解決済みimportは変更しない。#835の元corpusで固定されたprecedence欠如・重複はJavaの最初のERRORと異なる場合があるが、今回の互換要件に従い従来のコードと順序を維持する。その場合は新しい結合性検査を行わない。名前述語の診断はmapping・結合性の診断より先に返し、既存の順序を維持する。nativeの名前述語もsource-level capture解析により宣言/loweringより前に検査し、重複注釈・longestChoice形状・修飾参照・profile・未定義参照による隠れを#858で解消する。全規則のcapture/kind等を検証してからsnapshot versionの整合性を調べる。対象外の結合性エラー・choice profileは従来経路を保持する。全61入力を3経路で検査し、issue表の14変種は既存check JSON（code/span/schemaVersion 1/終了コード）をLF/CRLFで固定する。",
       "evidence": [
         "spec-corpus/execution/diagnostic-priority.json",
         "spec-corpus/execution/README.md",
         "rust/unlaxer-generator/tests/fixtures/portability/structure-priority.json",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SpecCorpusExecutionConformanceTest.java",
-        "rust/unlaxer-generator/tests/spec_corpus_execution.rs"
+        "rust/unlaxer-generator/tests/spec_corpus_execution.rs",
+        "rust/unlaxer-generator/src/lowering.rs",
+        "unlaxer-dsl/src/test/resources/name-predicate/invalid.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NamePredicateConformanceTest.java"
       ]
     },
     {
@@ -2234,16 +2239,19 @@
     },
     {
       "id": "java-first-exclusion-reset",
-      "category": "unresolved",
-      "title": "Java Choice の FIRST 除外が reset 前の cursor を読む",
-      "hosts": "Java Classic（DETAILED_ON_FAILURE） / Rust Classic",
+      "category": "contract",
+      "title": "Choice候補のFIRST判定とbegin後cursorの一致",
+      "hosts": "Java / Rust Classic",
       "issues": [
         861,
         848
       ],
-      "observation": "Java ChoiceInterfaceは候補のbegin前のcursorでlookaheadを取り、親のresetMatchedWithConsumed=trueでbeginがmatchedをconsumedへ戻すと、実際に読む位置と除外判定の位置がずれる。DETAILED_ON_FAILUREだけで成功する候補が除かれ受理が変わる（x LF、C=1/M=2/reset=true/matchOnlyの行終端はDETAILEDで成功、DETAILED_ON_FAILUREで失敗。除外を無効にすると成功）。Rust Classicはtoken modeで除外せずJava DETAILEDと同じ結果。line-boundaryのcases.tsvのjava-deferred-defect列30行がJavaの現状値をJava側だけの期待値として固定し、Rustは主の期待値へ照合する。#861の修正時に列を除く。",
+      "observation": "ChoiceとPredictiveChoiceの候補判定は、親reset=trueならconsumed、それ以外は指定kindのcursorを読む。実parserのkindは保持し、除外だけのtransactionは追加しない。全診断policyで受理・両cursor・選択・原CSTが一致する。line-boundaryの旧Java専用deferred例外30行を削除し、1088行を両版の主の期待値で照合する。後続nullable候補への誤選択はchoice-cursorのASCII/非BMP/複数CP共通corpusで固定する。issue861はCI/mergeまで継続。",
       "evidence": [
-        "conformance/line-boundary/README.md",
+        "conformance/choice-cursor/README.md",
+        "conformance/choice-cursor/predictive.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/ChoiceCursorExclusionTest.java",
+        "rust/unlaxer-runtime/tests/choice_cursor.rs",
         "conformance/line-boundary/cases.tsv",
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
         "conformance/line-boundary/probe.rs"
@@ -2257,7 +2265,7 @@
       "issues": [
         848
       ],
-      "observation": "StartOfLine/StartOfSourceはtokenを作らず4kindの参照cursorを検査するCustom adapterで語彙BOL/BOFと接続する。LineTerminator/EndOfLineはChoice/Literal/Eofをそのまま使い、診断モードで分岐するadapterは置かない。DETAILED_ON_FAILUREだけに出るJavaのFIRST除外の欠陥（#861）はRustへ移植しない。既存runtimeへ処理を追加せず、全ケースを独立oracleへ照合。",
+      "observation": "StartOfLine/StartOfSourceはtokenを作らず4kindの参照cursorを検査するCustom adapterで語彙BOL/BOFと接続する。LineTerminator/EndOfLineはChoice/Literal/Eofをそのまま使い、診断モードで分岐するadapterは置かない。JavaのFIRST除外は#861で候補begin後と同じ位置へ修正し、診断modeで分岐しない主oracleを両版で照合する。既存runtimeへ処理を追加せず、全ケースを独立oracleへ照合。",
       "evidence": [
         "conformance/line-boundary/README.md",
         "conformance/line-boundary/cases.tsv",
@@ -3171,15 +3179,6 @@
       },
       "entries": [
         "line-boundary-composition"
-      ]
-    },
-    {
-      "path": "conformance/line-boundary/cases.tsv",
-      "fields": {
-        "java-deferred-defect": 1
-      },
-      "entries": [
-        "java-first-exclusion-reset"
       ]
     },
     {

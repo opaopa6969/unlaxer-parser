@@ -37,7 +37,10 @@ public interface ChoiceInterface extends Parser{
 			 * invertMatch flips what the terminals accept, so the set does not apply under inversion.
 			 */
 			boolean excludeCandidates = false == invertMatch && parseContext.isCandidateExclusionEnabled();
-			int lookahead = excludeCandidates ? parseContext.lookaheadCodePoint(tokenKind) : 0;
+			// begin() resets matched to consumed when the parent requests it (#861).
+			// Preview that position without opening a transaction for a skipped candidate.
+			int lookahead = excludeCandidates ? parseContext.lookaheadCodePoint(
+				parseContext.getCurrent().isResetMatchedWithConsumed() ? TokenKind.consumed : tokenKind) : 0;
 
 			for (Parser parser : children) {
 				if (excludeCandidates && false == FirstSets.of(parser).mayStartWith(lookahead)) {
