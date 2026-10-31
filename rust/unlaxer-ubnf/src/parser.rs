@@ -5,6 +5,8 @@ use crate::{diagnostic, Diagnostic, DiagnosticKind, MAX_NESTING};
 
 type Result<T> = std::result::Result<T, Diagnostic>;
 
+mod recognition;
+
 pub(crate) fn parse(source: &str, tokens: Vec<Token>) -> Result<UbnfFile> {
     let mut parser = Parser {
         source,
@@ -19,15 +21,7 @@ pub(crate) fn parse(source: &str, tokens: Vec<Token>) -> Result<UbnfFile> {
     };
     let mut grammars = Vec::new();
     while parser.current().kind != Kind::Eof {
-        grammars.push(parser.grammar().map_err(|error| {
-            // A native resource limit is not Java syntax (Java parses deeper).
-            // Preserve the first mapper error at that existing boundary.
-            if error.kind == DiagnosticKind::NestingLimit {
-                parser.pending_value.clone().unwrap_or(error)
-            } else {
-                error
-            }
-        })?);
+        grammars.push(parser.grammar()?);
     }
     if grammars.is_empty() {
         return Err(parser.error("expected at least one grammar"));
@@ -58,6 +52,7 @@ struct Parser<'a> {
     parameterized: std::collections::HashSet<String>,
     calls: Vec<crate::params::Call>,
     rule_params: Vec<Vec<Option<Vec<crate::params::Param>>>>,
+    /// First mapper failure, or the first native AST limit until a mapper fails.
     pending_value: Option<Diagnostic>,
 }
 
@@ -82,13 +77,20 @@ impl Parser<'_> {
     fn invalid(&self, span: Span, message: impl Into<String>) -> Diagnostic {
         diagnostic(self.source, span, DiagnosticKind::InvalidValue, message)
     }
+    // Mapper errors precede the native-only AST limit, even when declared later.
+    // Called only on error paths; successful inputs keep the existing single slot.
+    fn needs_mapper_error(&self) -> bool {
+        self.pending_value
+            .as_ref()
+            .is_none_or(|error| error.kind == DiagnosticKind::NestingLimit)
+    }
     // Only invalid inputs allocate a diagnostic. Private placeholder values never
     // leave parse(): syntax (including later grammars) must succeed first.
     fn value<T: Default>(&mut self, span: Span, result: std::result::Result<T, &str>) -> T {
         match result {
             Ok(value) => value,
             Err(message) => {
-                if self.pending_value.is_none() {
+                if self.needs_mapper_error() {
                     self.pending_value = Some(self.invalid(span, message));
                 }
                 T::default()
@@ -317,7 +319,9 @@ impl Parser<'_> {
                 self.quoted()?;
                 self.expect(')')?;
             }
-            self.pending_value.get_or_insert(error);
+            if self.needs_mapper_error() {
+                self.pending_value = Some(error);
+            }
             // A private placeholder lets syntax recognition finish. No removed
             // token can escape parse(), reach expansion, or execute a pattern.
             return Ok(TokenDecl {
@@ -742,7 +746,7 @@ impl Parser<'_> {
                     if (key == "kind"
                         || params.iter().any(|p| p.key == key)
                         || key == "strategy" && strategy.is_some())
-                        && self.pending_value.is_none()
+                        && self.needs_mapper_error()
                     {
                         self.pending_value = Some(
                             self.invalid(arg_start, format!("duplicate @eval argument {key}")),
@@ -898,12 +902,7 @@ impl Parser<'_> {
     }
     fn body(&mut self) -> Result<RuleBody> {
         if self.depth >= MAX_NESTING {
-            return Err(diagnostic(
-                self.source,
-                self.current().span,
-                DiagnosticKind::NestingLimit,
-                "UBNF nesting limit exceeded",
-            ));
+            return self.recognize_limited_body();
         }
         self.depth += 1;
         let start = self.current().span;

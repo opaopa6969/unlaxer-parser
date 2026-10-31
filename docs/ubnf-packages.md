@@ -1177,8 +1177,9 @@ check がともに `P-SYNTAX`（span=null、subject=`UBNF syntax`）を選ぶ。
 移行診断より優先し、Playground の record 表示にも同じ選択を反映する。
 両版・LF/CRLF・import・非BMP・独立期待値・mutation の詳細は
 [REGEX 移行診断](regex-retirement.md)を参照。#983 では CHAR_RANGE・escape・字句 range・
-重複 annotation 引数も保留し、後続の構文不正を優先する。規則本体の native 入れ子上限で
-先を読めなくなる残差は #996 で追跡する。共通 `value` suite の79形・2,528観測は、
+重複 annotation 引数も保留し、後続の構文不正を優先する。#996 では規則本体の native AST 上限後も
+明示 stack で構文を認識する。`regex` suite は計127形・4,064観測とし、Java frame 上限の次段は
+通常構文エラーと区別した host 別期待値で固定する。共通 `value` suite の79形・2,528観測は、
 既存 `regex` / `qualified` suite と同じ1 JVMバッチ・出力先/staging不在の検査を使う。
 CLI から到達する readiness の50 code は本変更の48入力で固定する。
 手組みASTだけの `P-GRAMMAR-COUNT` / `P-GRAMMAR-NAME` / `P-TOKEN-KIND` も同じ分岐のない描画を使うが、

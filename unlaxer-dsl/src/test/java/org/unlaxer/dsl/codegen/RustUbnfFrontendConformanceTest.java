@@ -43,7 +43,7 @@ public class RustUbnfFrontendConformanceTest {
 
     /** #949: syntax of the whole file precedes mapping a retired token. */
     @Test public void regexMigrationWaitsForCompleteSyntax() throws Exception {
-        checkSyntaxCases("regex", 40);
+        checkSyntaxCases("regex", 254);
     }
 
     /** #986: only the namespace prefix is contiguous; the final name permits trivia. */
@@ -75,7 +75,16 @@ public class RustUbnfFrontendConformanceTest {
                 Path input = temporary.newFile().toPath();
                 Files.writeString(input, source);
                 assertEquals(name, expected.get("native"), inspect(binary, input));
-                if (expected.has("javaAst")) {
+                if (expected.has("javaLimit")) {
+                    var limit = expected.getAsJsonObject("javaLimit");
+                    for (boolean snapshot : List.of(false, true)) {
+                        var error = assertThrows(name, org.unlaxer.context.ParseLimitException.class,
+                            () -> { if (snapshot) UBNFMapper.parseWithSource(source); else UBNFMapper.parse(source); });
+                        assertEquals(name, limit.get("code").getAsString(), error.code());
+                        assertEquals(name, limit.get("limit").getAsInt(), error.limit());
+                        assertEquals(name, limit.get("offset").getAsInt(), error.offset());
+                    }
+                } else if (expected.has("javaAst")) {
                     assertEquals(name, expected.get("javaAst"), canonical(UBNFMapper.parse(source)));
                     assertEquals(name, expected.get("javaAst"), canonical(UBNFMapper.parseWithSource(source).ast()));
                 } else {
