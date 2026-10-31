@@ -210,6 +210,9 @@ pub enum AnnotationKind {
     RightAssoc,
     LongestChoice,
     UniqueLongestChoice,
+    Predicate {
+        name: String,
+    },
     NamePredicate {
         snapshot: String,
         version: String,

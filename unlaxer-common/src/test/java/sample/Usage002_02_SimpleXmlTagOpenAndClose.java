@@ -39,7 +39,8 @@ public class Usage002_02_SimpleXmlTagOpenAndClose extends ParserTestBase {
 	}
 	
 
-	static class NoMixedContentsXmlElements extends LazyChoice{
+	// Class-based combinators construct this type through the public parser factory.
+	public static class NoMixedContentsXmlElements extends LazyChoice{
 
 		private static final long serialVersionUID = -4625102353325797710L;
 

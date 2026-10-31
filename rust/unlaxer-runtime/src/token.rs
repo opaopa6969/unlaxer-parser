@@ -1142,7 +1142,10 @@ impl ParseContext<'_> {
     }
     #[inline(never)]
     fn classic_until(&mut self, terminator: &'static str, depth: usize) -> Option<Fragment> {
-        self.classic_until_parser(&Expr::Literal(terminator).match_only(), "Choice", depth)
+        // WildCardStringTerminatorParser(String...) terminates on Choice(MatchOnly(word)):
+        // the Choice token and Occurs' commit of that CollectingParser both stay in the CST.
+        let terminator = Expr::choice([Expr::Literal(terminator).match_only()]);
+        self.classic_until_parser(&terminator, "Choice", depth)
     }
     #[inline(never)]
     fn classic_until_parser(
@@ -1460,9 +1463,15 @@ impl ParseContext<'_> {
         label: &'static str,
     ) -> Fragment {
         // Java Choice は選択した子の Parsed を返す。CST の収集値で上書きしない。
+        // virtual の収集は生成 "" になり得るので、入力由来の選択もそのまま返す。
         let selected_source = fragment
             .parsed_source()
-            .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
+            .filter(|source| {
+                self.track_owned_source
+                    || source.text.is_some()
+                    || source.generated
+                    || kind.is_virtual()
+            })
             .filter(|_| matches!(label, "Choice" | "LongestChoice" | "UniqueLongestChoice"))
             .map(|source| Box::new(source.clone()));
         let mut original = fragment.nodes.clone();
@@ -1487,6 +1496,13 @@ impl ParseContext<'_> {
             .cloned()
             .expect("Classic collection has source");
         let token_source = Self::token_source(&source);
+        // The returned source states what this collector published: one of a virtual kind that
+        // kept nothing is generated "", unlike an input-backed empty token a child returned.
+        fragment
+            .source
+            .as_mut()
+            .expect("Classic collection has source")
+            .generated = matches!(token_source, TokenSource::Generated { .. });
         let id = self
             .add_token_node_inner(super::TOKEN_META_RULE, kind, token_source.clone(), false)
             .expect("validated source");
@@ -1510,6 +1526,30 @@ impl ParseContext<'_> {
                 .parsed_source = selected_source;
         }
         fragment
+    }
+    /// Whether a Classic result returned no token, as a Java Parsed that is neither collected nor
+    /// has original tokens: a node-less success, or a Choice that selected one (its `original`),
+    /// also through the rule node of such a Choice (a Java LazyChoice returns that Parsed).
+    pub(crate) fn classic_returned_no_token(&self, nodes: &[usize]) -> bool {
+        let selected_no_token = |index: usize| {
+            self.tokens.values.get(&index).is_some_and(|info| {
+                matches!(
+                    info.parser,
+                    Some("Choice" | "LongestChoice" | "UniqueLongestChoice")
+                ) && info.original.as_deref() == Some(&[][..])
+            })
+        };
+        self.token_mode.is_some()
+            && match nodes {
+                [] => true,
+                &[index] => {
+                    selected_no_token(index)
+                        || matches!(&self.nodes[index], node
+                            if node.rule < self.rules.len()
+                                && matches!(node.children[..], [child] if selected_no_token(child)))
+                }
+                _ => false,
+            }
     }
     pub(crate) fn mark_classic_node(&mut self, index: usize, source: &FragmentSource) {
         let id = self.token_node_id(index).expect("new node");

@@ -298,6 +298,14 @@ public class MapperGenerator implements CodeGenerator {
 
                 private static ParseDiagnostic failureDiagnostic(String source, ParseContext context, Parsed parsed) {
             """);
+        if(SemanticPredicates.enabled(grammar)) sb.append("""
+                    var predicateFailure = org.unlaxer.context.SemanticPredicateBindings.failure(context);
+                    if (predicateFailure.isPresent()) {
+                        var failure = predicateFailure.get();
+                        return new ParseDiagnostic(failure.kind(), failure.start(), List.of(failure.expected()),
+                            failure.start(), List.of(failure.expected()));
+                    }
+            """);
         if(NamePredicates.enabled(grammar)) sb.append("""
                     var nameFailure = org.unlaxer.context.NameResolution.failure(context);
                     if (nameFailure.isPresent()) {
@@ -341,6 +349,7 @@ public class MapperGenerator implements CodeGenerator {
 
             """);
         if(NamePredicates.enabled(grammar)) sb.append(nameSnapshotEntryPoints(astClass,rootClassName,parsersClass,mayRecover));
+        if(SemanticPredicates.enabled(grammar)) sb.append(predicateEntryPoints(astClass,rootClassName,parsersClass,mayRecover));
         sb.append("    /** Selected parse-tree token and its generated AST mapping. */\n");
         sb.append("    public record MappedAst(Token token, ").append(astClass).append(" ast) {}\n\n");
         sb.append("    /** Immutable identity-based source map; offsets are code points, end exclusive. */\n");
@@ -611,6 +620,69 @@ public class MapperGenerator implements CodeGenerator {
         sb.append("    }\n\n");
     }
 
+
+    private static String predicateEntryPoints(String astClass, String rootClassName, String parsersClass, boolean mayRecover) {
+        return """
+                /** Pure named postconditions; every diagnostic retry uses the same registry snapshot. */
+                public static synchronized Optional<ParseDiagnostic> diagnoseWithPredicates(String source,
+                        java.util.Map<String, java.util.function.Predicate<org.unlaxer.context.SemanticPredicateBindings.Candidate>> predicates,
+                        ParseOptions options) {
+                    var snapshot = java.util.Map.copyOf(predicates);
+                    options = options.resolveDiagnostics(DEFERRED_DIAGNOSTICS_SAFE);
+                    while (true) {
+                        try (ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options)) {
+                            org.unlaxer.context.SemanticPredicateBindings.install(context, snapshot);
+                            Parsed parsed = %s.getRootParser().parse(context);
+                            if (parsed.isSucceeded() && consumedLengthCompat(parsed.getConsumed()) == source.length()) {
+                                %s
+                                return Optional.empty();
+                            }
+                            if (org.unlaxer.context.SemanticPredicateBindings.failure(context).isPresent()
+                                    || options.diagnostics() == ParseOptions.Diagnostics.DETAILED)
+                                return Optional.of(failureDiagnostic(source, context, parsed));
+                        }
+                        options = options.withDiagnostics(ParseOptions.Diagnostics.DETAILED);
+                    }
+                }
+
+                public static synchronized %s parseWithPredicates(String source,
+                        java.util.Map<String, java.util.function.Predicate<org.unlaxer.context.SemanticPredicateBindings.Candidate>> predicates,
+                        ParseOptions options) {
+                    return (%s) parseWithPredicatesAndSourceMap(source, predicates, options).ast();
+                }
+
+                public static synchronized SourceMappedAst<%s> parseWithPredicatesAndSourceMap(String source,
+                        java.util.Map<String, java.util.function.Predicate<org.unlaxer.context.SemanticPredicateBindings.Candidate>> predicates,
+                        ParseOptions options) {
+                    var snapshot = java.util.Map.copyOf(predicates);
+                    options = options.resolveDiagnostics(DEFERRED_DIAGNOSTICS_SAFE);
+                    while (true) {
+                        try (ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options)) {
+                            org.unlaxer.context.SemanticPredicateBindings.install(context, snapshot);
+                            Parsed parsed = %s.getRootParser().parse(context);
+                            if (parsed.isSucceeded() && consumedLengthCompat(parsed.getConsumed()) == source.length()) {
+                                Token root = parsed.getRootToken(false);
+                                Parser syntaxRoot = %s.getRootSyntaxParser();
+                                for (Token committed : context.getCurrent().getTokens()) if (committed.parser == syntaxRoot) { root = committed; break; }
+                                return mapParsedTokenWithSourceMap(root);
+                            }
+                            if (org.unlaxer.context.SemanticPredicateBindings.failure(context).isPresent()
+                                    || options.diagnostics() == ParseOptions.Diagnostics.DETAILED)
+                                throw new IllegalArgumentException("Parse failed: " + failureDiagnostic(source, context, parsed));
+                        }
+                        options = options.withDiagnostics(ParseOptions.Diagnostics.DETAILED);
+                    }
+                }
+
+            """.formatted(parsersClass, mayRecover ? """
+                    var recoveries = org.unlaxer.parser.combinator.RecoveryDiagnostic.from(context);
+                    if (!recoveries.isEmpty()) {
+                        var first = recoveries.get(0);
+                        return Optional.of(new ParseDiagnostic("recovery", first.start(),
+                            List.of(first.message()), first.end(), List.of()));
+                    }
+                    """ : "", rootClassName, rootClassName, astClass, parsersClass, parsersClass);
+    }
 
     private static String nameSnapshotEntryPoints(String astClass, String rootClassName, String parsersClass, boolean mayRecover) {
         return """

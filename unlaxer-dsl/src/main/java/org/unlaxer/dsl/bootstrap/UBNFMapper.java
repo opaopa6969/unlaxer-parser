@@ -702,6 +702,10 @@ public class UBNFMapper {
                 result.add(bind(new LongestChoiceAnnotation(), child));
             } else if (child.parser.getClass() == UBNFParsers.UniqueLongestChoiceAnnotationParser.class) {
                 result.add(bind(new UniqueLongestChoiceAnnotation(), child));
+            } else if (child.parser.getClass() == UBNFParsers.PredicateAnnotationParser.class) {
+                var values = findDescendants(child, org.unlaxer.parser.elementary.SingleQuotedParser.class);
+                if (values.size() != 1) throw new IllegalArgumentException("invalid @predicate arguments");
+                result.add(bind(new UBNFAST.PredicateAnnotation(stripQuotes(values.get(0).source.toString().trim())), child));
             } else if (child.parser.getClass() == UBNFParsers.NamePredicateAnnotationParser.class) {
                 var values = findDescendants(child, org.unlaxer.parser.elementary.SingleQuotedParser.class)
                     .stream().map(value -> stripQuotes(value.source.toString().trim())).toList();
