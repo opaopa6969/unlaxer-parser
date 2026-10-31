@@ -761,10 +761,14 @@ public class ParserConstructionParityTest {
         return ParserPrinter.get(leaf, OutputLevel.simple) + ";" + ParserPrinter.get(leaf, OutputLevel.detail)
             + ";" + ParserPrinter.get(leaf, OutputLevel.mostDetail);
       }
-      case "name-kinds":
+      case "name-kinds": {
+        // 同じ文字列から 2 回作った Name の identity を観測する（同一式の比較は Error Prone が拒否する）。
+        Name first = Name.of("x");
+        Name second = Name.of("x");
         return Name.of(WordParser.class.getName()).equals(Name.of(WordParser.class)) + ";"
             + Name.classBaseOf(w("a")).equals(Name.of(WordParser.class.getName())) + ";"
-            + (Name.of("x") == Name.of("x"));
+            + (first == second);
+      }
       case "new-filtered": {
         Parser excluded = w("c");
         Chain chain = new Chain(w("a"), w("b"), excluded);
