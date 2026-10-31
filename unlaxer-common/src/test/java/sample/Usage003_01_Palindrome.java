@@ -53,7 +53,7 @@ public class Usage003_01_Palindrome extends ParserTestBase {
 		
 	}
 	
-	private Chain sliceWithWord(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
+	Chain sliceWithWord(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
 		
 		return new Chain(
 			//abcba
@@ -85,7 +85,7 @@ public class Usage003_01_Palindrome extends ParserTestBase {
 		);
 	}
 	
-	private Chain sliceWithSlicer(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
+	Chain sliceWithSlicer(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
 
 		return new Chain(
 			//abcba
@@ -118,7 +118,7 @@ public class Usage003_01_Palindrome extends ParserTestBase {
 		);
 	}
 	
-	private Chain effectReverse(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
+	Chain effectReverse(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
 		return new Chain(
 			//abcba
 			wordLookahead,
@@ -129,7 +129,7 @@ public class Usage003_01_Palindrome extends ParserTestBase {
 	}
 	
 
-	private Chain sliceReverse(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
+	Chain sliceReverse(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
 		return new Chain(
 			//abcba
 			wordLookahead,
@@ -139,7 +139,7 @@ public class Usage003_01_Palindrome extends ParserTestBase {
 	}
 
 	
-	private Chain sliceReverseWithPythonian(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
+	Chain sliceReverseWithPythonian(MatchOnly wordLookahead, MatchedTokenParser matchedTokenParser) {
 		return new Chain(
 			//abcba
 			wordLookahead,
