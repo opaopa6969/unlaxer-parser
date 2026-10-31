@@ -1,0 +1,24 @@
+# XML paired samples Usage002_03/04: MatchedTokenParser candidates come from the current token stack (#1016, #1017).
+# Every close reads the TagIdentifier names on the current parse path again, in the order of xml-tags.tsv.
+#   Names of an earlier close, of an earlier use of the same parser instance and of a rolled-back
+#   alternative are not kept; a list kept for the whole parse (the Java behaviour before #1017) fails here.
+# Model as in xml-tags.tsv; derived by hand and checked against the Java samples. Cells as in xml-tags.tsv.
+# shared: the class-factory instance of NoMixedContentsXmlElementsPaired is the root, the same instance as
+#   every nested level. retry: Choice(Chain(shared, "!"), Chain("<a><ab/></a>", shared)).
+# second: the second alternative of retry alone. twice: Chain(shared, shared), the same instance twice.
+# input	shared	retry	second	twice	note
+<ab><a></a></ab>	16	-	-	-	root close (ab a) after the depth 1 close (a ab)
+<😀😁><😀></😀></😀😁>	16	-	-	-	non-BMP form of the row above
+<a\r\nb><a></a></a\r\nb>	20	-	-	-	CRLF-bearing form: root close (a\r\nb a)
+<a><ab></ab></a>	16	-	-	-	root close (a ab) after the depth 1 close (ab a)
+<ab><a/></ab>	13	-	-	-	root close (ab a), the empty child's name second
+<a><ab/></a><ab></ab>	12	21	21	21	retry: the rolled-back names of the first alternative are gone, (ab)
+<a><ab/></a><a></a>	12	19	19	19	retry: the second alternative closes with its own a
+<a><ab/></a>!	12	13	-	-	first alternative succeeds
+<ab></ab>	9	-	-	-	retry: both alternatives fail
+<a></a><ab></ab>	7	-	-	16	twice: the second close (ab a) does not reuse the first close (a)
+<ab></ab><a></a>	9	-	-	16	twice: the second close (a ab) does not reuse the first close (ab)
+<a></a><a></a>	7	-	-	14	twice: same names
+<a></a><b></a>	7	-	-	14	twice: a finished earlier root's name is a candidate after the open names (b a)
+<a/><ab></ab>	4	-	-	13	twice: an earlier empty root's name comes after the own name (ab a)
+<a></a><b><ab></ab></b>	7	-	-	23	twice: nested closes (ab b a) and (b ab a) after an earlier root a

@@ -7,9 +7,8 @@
 #   A close tag consumes the first candidate name that prefixes the input; later candidates are not retried.
 #   Candidates are the TagIdentifier names (open and empty-element tags) on the current parse path in Java
 #   transaction-stack order: the closing element's own name and its finished children, then the enclosing
-#   open names from inner to outer. Each MatchedTokenParser instance keeps the list of its first evaluation
-#   for the rest of the parse; the root instance is separate from the class-factory instance shared by all
-#   nested levels, so a nested close reuses the list of the innermost close (xml-tags-candidate-cache.tsv).
+#   open names from inner to outer. Every close reads the current token stack again, so earlier closes and
+#   rolled-back alternatives do not leak into it (#1017, xml-tags-current-candidates.tsv).
 #   Rows with prefix-related names were derived from that model and checked against the Java samples (#1016).
 # scoped: owned capture + capture scope + replay of the innermost open name (not a sample class).
 # input	02	paired	scoped	note
@@ -44,8 +43,8 @@
 <a><b></c></a>	14	-	-	inner close name unknown
 <a><b></b></c>	14	-	-	outer close name unknown
 <a><ab></ab></a>	16	16	16	nested close tries its own name ab before the enclosing a
-<x><a><ab></ab></ab></x>	24	24	-	depth 1 reuses the nested list of depth 2 (ab a x): crossed close accepted
-<x><ab><a></a></ab></x>	23	-	23	depth 1 reuses the nested list of depth 2 (a ab x): a wins the prefix, then > fails
+<x><a><ab></ab></ab></x>	24	-	-	depth 1 close (a ab x): a wins the prefix, then > fails
+<x><ab><a></a></ab></x>	23	23	23	closes (a ab x), (ab a x), (x ab a): each close reads its own current names
 <x><a><ab></ab></a></x>	23	23	23	depth 2 tries its own name ab before the enclosing a
 <ab><a/></a>	12	12	-	an empty child's name is a root close candidate
 <a><ab/></ab>	13	-	-	root list (a ab): a wins the prefix, then > fails

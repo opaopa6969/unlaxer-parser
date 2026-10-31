@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use unlaxer_runtime::token::TokenSource;
 use unlaxer_runtime::{
     share_grammar, Diagnostics, Expr, Memoization, ParseContext, ParseOptions, ParseResult, Rule,
@@ -81,14 +79,6 @@ fn element(rule: usize, open_name: Expr, close_name: Expr, scoped: bool, paired:
     Expr::choice([element, empty_element_tag(empty_name, end())])
 }
 
-/// Java MatchedTokenParser keeps its candidate tokens in the ParseContext per parser
-/// instance, from its first evaluation to the end of the parse; rollback does not
-/// restore them. Slot 0 is the root sample instance, slot 1 the class-factory instance
-/// shared by every nested level. The Rc is shared by state checkpoints, so rollback
-/// keeps the lists too. Each context installs a new cache.
-type CandidateCache = Rc<RefCell<[Vec<String>; 2]>>;
-const CANDIDATES: &str = "xml.matchedToken";
-
 fn source_text<'a>(context: &ParseContext<'a>, source: &'a TokenSource) -> &'a str {
     match source {
         TokenSource::Input(span) => context.text(*span).unwrap(),
@@ -104,11 +94,11 @@ fn source_start(source: &TokenSource) -> usize {
     }
 }
 
-/// Java's candidate order: TagIdentifier tokens on the transaction stack, innermost
-/// frame first. Replaying the `tag` (name) and `closed` (final `>`) histories in source
-/// order gives the open elements; each frame holds an open element's name and its
-/// finished children. Names outside every open element (none in these recipes) come
-/// last, in source order.
+/// Java's candidate order: TagIdentifier tokens on the current transaction stack,
+/// innermost frame first. Replaying the `tag` (name) and `closed` (final `>`) histories
+/// in source order gives the open elements; each frame holds an open element's name and
+/// its finished children. Names outside every open element (earlier roots of `Twice`)
+/// come last, in source order. The histories roll back with the parse, as the stack does.
 fn java_candidates(context: &ParseContext<'_>) -> Vec<String> {
     let mut events = context
         .capture_sources("tag")
@@ -144,21 +134,12 @@ fn java_candidates(context: &ParseContext<'_>) -> Vec<String> {
     candidates
 }
 
-/// Java MatchedTokenParser over earlier TagIdentifier tokens: the first candidate that
-/// prefixes the input wins, and later candidates are not retried. An empty list is
-/// computed again, as in Java. The match is consumed through a public parse so that it
-/// yields a token like Java's WordParser.
-fn earlier_tag_name(context: &mut ParseContext<'_>, slot: usize) -> ParseResult {
-    let cache = Rc::clone(
-        context
-            .state::<CandidateCache>(CANDIDATES)
-            .expect("check installs a candidate cache in every context"),
-    );
-    if cache.borrow()[slot].is_empty() {
-        let candidates = java_candidates(context);
-        cache.borrow_mut()[slot] = candidates;
-    }
-    let length = cache.borrow()[slot]
+/// Java MatchedTokenParser over earlier TagIdentifier tokens, read again at every close
+/// (#1017): the first candidate that prefixes the input wins, and later candidates are
+/// not retried. The match is consumed through a public parse so that it yields a token
+/// like Java's WordParser.
+fn earlier_tag_name(context: &mut ParseContext<'_>) -> ParseResult {
+    let length = java_candidates(context)
         .iter()
         .find(|text| !text.is_empty() && context.remaining().starts_with(text.as_str()))
         .map(|text| text.chars().count());
@@ -168,21 +149,13 @@ fn earlier_tag_name(context: &mut ParseContext<'_>, slot: usize) -> ParseResult 
     }
 }
 
-fn root_close_name(context: &mut ParseContext<'_>) -> ParseResult {
-    earlier_tag_name(context, 0)
-}
-
-fn nested_close_name(context: &mut ParseContext<'_>) -> ParseResult {
-    earlier_tag_name(context, 1)
-}
-
-/// The adapter reads the caller-installed cache, so a fresh-context retry would not
-/// reproduce it: declared not replayable.
-fn close_name(parser: fn(&mut ParseContext<'_>) -> ParseResult) -> Expr {
+/// The adapter reads only the input and the captures, so a fresh-context retry
+/// reproduces it.
+fn close_name() -> Expr {
     Expr::CustomWith {
-        parser,
+        parser: earlier_tag_name,
         reads_diagnostics: false,
-        replayable: false,
+        replayable: true,
     }
 }
 
@@ -205,21 +178,26 @@ fn unescape(text: &str) -> String {
     out
 }
 
-const ROOT: usize = 1;
-const SHARED: usize = 3;
+const PAIRED: usize = 1;
 
 fn grammar() -> SharedGrammar {
-    let paired = |rule, close| element(rule, tag_name().capture_owned("tag"), close, false, true);
     share_grammar(vec![
         // Usage002_02: the close name is not compared with the open name.
         Rule {
             name: "NoMixedContentsXmlElements",
             expression: element(0, tag_name(), tag_name(), false, false),
         },
-        // Usage002_03 / Usage002_04 root instance: MatchedTokenParser over earlier names.
+        // Usage002_03 / Usage002_04: MatchedTokenParser over earlier names. Without a kept
+        // list the root and the class-factory instance behave alike, so one rule serves both.
         Rule {
             name: "NoMixedContentsXmlElementsPaired",
-            expression: paired(SHARED, close_name(root_close_name)),
+            expression: element(
+                PAIRED,
+                tag_name().capture_owned("tag"),
+                close_name(),
+                false,
+                true,
+            ),
         },
         // Owned replay of the innermost open name.
         Rule {
@@ -232,29 +210,29 @@ fn grammar() -> SharedGrammar {
                 false,
             ),
         },
-        // The class-factory instance shared by every nested level.
-        Rule {
-            name: "SharedNoMixedContentsXmlElementsPaired",
-            expression: paired(SHARED, close_name(nested_close_name)),
-        },
-        // xml-tags-candidate-cache.tsv: Choice(Chain(shared, "!"), Chain("<a><ab/></a>", shared)).
+        // xml-tags-current-candidates.tsv: Choice(Chain(shared, "!"), Chain("<a><ab/></a>", shared)).
         Rule {
             name: "Retry",
             expression: Expr::choice([
-                Expr::sequence([Expr::Rule(SHARED), Expr::literal("!")]),
-                Expr::sequence([Expr::literal("<a><ab/></a>"), Expr::Rule(SHARED)]),
+                Expr::sequence([Expr::Rule(PAIRED), Expr::literal("!")]),
+                Expr::sequence([Expr::literal("<a><ab/></a>"), Expr::Rule(PAIRED)]),
             ]),
         },
         // Its second alternative alone.
         Rule {
             name: "RetrySecond",
-            expression: Expr::sequence([Expr::literal("<a><ab/></a>"), Expr::Rule(SHARED)]),
+            expression: Expr::sequence([Expr::literal("<a><ab/></a>"), Expr::Rule(PAIRED)]),
+        },
+        // Chain(shared, shared): the same instance twice.
+        Rule {
+            name: "Twice",
+            expression: Expr::sequence([Expr::Rule(PAIRED), Expr::Rule(PAIRED)]),
         },
     ])
 }
 
 /// Checks each (root rule, fixture column) pair and returns the row count.
-fn check(fixture: &str, roots: &[(usize, usize)]) -> usize {
+fn check(fixture: &str, width: usize, roots: &[(usize, usize)]) -> usize {
     let grammar = grammar();
     let mut cases = 0;
     for line in fixture.lines() {
@@ -262,7 +240,7 @@ fn check(fixture: &str, roots: &[(usize, usize)]) -> usize {
             continue;
         }
         let row = line.split('\t').collect::<Vec<_>>();
-        assert_eq!(row.len(), 5, "{line}");
+        assert_eq!(row.len(), width, "{line}");
         cases += 1;
         let input = unescape(row[0]);
         for &(root, column) in roots {
@@ -288,7 +266,6 @@ fn check(fixture: &str, roots: &[(usize, usize)]) -> usize {
                             ..ParseOptions::default()
                         },
                     );
-                    context.set_state(CANDIDATES, CandidateCache::default());
                     let parsed = context.parse_shared_grammar(&grammar, root, false);
                     assert_eq!(parsed.is_ok(), success, "{label}");
                     assert_eq!(context.position(), consumed, "{label}");
@@ -307,11 +284,14 @@ fn check(fixture: &str, roots: &[(usize, usize)]) -> usize {
 #[test]
 fn xml_tag_samples_match_shared_prefix_contract() {
     let fixture = include_str!("../../../conformance/samples/xml-tags.tsv");
-    assert_eq!(check(fixture, &[(0, 1), (ROOT, 2), (2, 3)]), 70);
+    assert_eq!(check(fixture, 5, &[(0, 1), (PAIRED, 2), (2, 3)]), 70);
 }
 
 #[test]
-fn paired_candidate_cache_matches_java_lifetime() {
-    let fixture = include_str!("../../../conformance/samples/xml-tags-candidate-cache.tsv");
-    assert_eq!(check(fixture, &[(SHARED, 1), (4, 2), (5, 3)]), 9);
+fn paired_close_uses_current_candidates() {
+    let fixture = include_str!("../../../conformance/samples/xml-tags-current-candidates.tsv");
+    assert_eq!(
+        check(fixture, 6, &[(PAIRED, 1), (3, 2), (4, 3), (5, 4)]),
+        15
+    );
 }

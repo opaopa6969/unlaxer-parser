@@ -43,16 +43,19 @@ public class XmlTagSampleContract {
         Map.entry("retry03", () -> retry(SHARED_03)),
         Map.entry("retry04", () -> retry(SHARED_04)),
         Map.entry("second03", () -> second(SHARED_03)),
-        Map.entry("second04", () -> second(SHARED_04)));
+        Map.entry("second04", () -> second(SHARED_04)),
+        Map.entry("twice03", () -> twice(SHARED_03)),
+        Map.entry("twice04", () -> twice(SHARED_04)));
 
     @Test public void xmlTagSamplesMatchSharedPrefixContract() throws Exception {
-        assertEquals(70, check("xml-tags.tsv", Map.of("02", 1, "03", 2, "04", 2, "scoped", 3)));
+        assertEquals(70, check("xml-tags.tsv", 5, Map.of("02", 1, "03", 2, "04", 2, "scoped", 3)));
     }
 
-    /** The MatchedTokenParser candidate list lives as long as the parse and survives rollback. */
-    @Test public void pairedCandidateCacheKeepsJavaLifetime() throws Exception {
-        assertEquals(9, check("xml-tags-candidate-cache.tsv", Map.of(
-            "shared03", 1, "shared04", 1, "retry03", 2, "retry04", 2, "second03", 3, "second04", 3)));
+    /** Every close reads the current token stack: no names of earlier closes, uses or rolled-back alternatives. */
+    @Test public void pairedCloseUsesCurrentCandidates() throws Exception {
+        assertEquals(15, check("xml-tags-current-candidates.tsv", 6, Map.of(
+            "shared03", 1, "shared04", 1, "retry03", 2, "retry04", 2, "second03", 3, "second04", 3,
+            "twice03", 4, "twice04", 4)));
     }
 
     static Parser retry(Class<? extends Parser> shared) {
@@ -63,14 +66,18 @@ public class XmlTagSampleContract {
         return new Chain(new WordParser("<a><ab/></a>"), Parser.get(shared));
     }
 
-    static int check(String fixture, Map<String, Integer> columns) throws Exception {
+    static Parser twice(Class<? extends Parser> shared) {
+        return new Chain(Parser.get(shared), Parser.get(shared));
+    }
+
+    static int check(String fixture, int width, Map<String, Integer> columns) throws Exception {
         int cases = 0;
         for (String line : Files.readAllLines(Path.of("..", "conformance", "samples", fixture))) {
             if (line.startsWith("#") || line.isEmpty()) {
                 continue;
             }
             String[] row = line.split("\t", -1);
-            assertEquals(line, 5, row.length);
+            assertEquals(line, width, row.length);
             cases++;
             String input = unescape(row[0]);
             for (Map.Entry<String, Integer> column : columns.entrySet()) {
