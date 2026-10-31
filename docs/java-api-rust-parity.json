@@ -1028,7 +1028,7 @@
     },
     "line-terminator": {
       "status": "verified",
-      "reason": "LineTerminatorParser / EndOfLineParserのCRLF→CR→LF→EOFの順序、Classicの4kind/invert、両cursor/reset、原CST/reduced CST、失敗CP、isEndOfSourceとstatic構築経路を独立corpusで比較する。memo OFF/SAFE_FAILURESと診断3モード、choice敗者・先読み・外側失敗後の再試行も比較。DETAILED_ON_FAILUREだけに出るJava FIRST候補除外の欠陥（reset前のcursorを読む、#861）はRustへ移植せず、Javaの現状値30行をcases.tsvの別列に分けて固定する。既存runtimeの成功経路は変更しない。",
+      "reason": "LineTerminatorParser / EndOfLineParserのCRLF→CR→LF→EOFの順序、Classicの4kind/invert、両cursor/reset、原CST/reduced CST、失敗CP、isEndOfSourceとstatic構築経路を独立corpusで比較する。memo OFF/SAFE_FAILURESと診断3モード、choice敗者・先読み・外側失敗後の再試行も比較。候補begin前のresetを反映しないJava FIRST除外は#861で修正し、旧Java専用例外30行を除いて全診断modeを主の共通oracleへ照合する。Rustは既存の正しいClassic経路を維持する。",
       "route": "`Expr::choice([Literal(\"\\r\\n\"), Literal(\"\\r\"), Literal(\"\\n\"), Eof])`。`probe.rs::line_end` をそのまま使い、診断モードで分岐するadapterは置かない。既存の語彙EOLは非消費の別契約としてlexical.tsvで比較する。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/elementary/LineTerminatorParser.java#L12", "anchor": "public class LineTerminatorParser extends LazyChoice"},
@@ -1036,7 +1036,7 @@
         {"location": "rust/unlaxer-runtime/src/lib.rs#L366", "anchor": "pub fn choice(alternatives: impl IntoIterator<Item = Self>) -> Self"},
         {"location": "conformance/line-boundary/probe.rs#L58", "anchor": "pub fn line_end() -> Expr {"},
         {"location": "conformance/line-boundary/probe.rs#L66", "anchor": "fn parser(name: &str) -> Expr {"},
-        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L40", "anchor": "int lookahead = excludeCandidates ? parseContext.lookaheadCodePoint(tokenKind) : 0;"}
+        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L39", "anchor": "boolean excludeCandidates = false == invertMatch && parseContext.isCandidateExclusionEnabled();"}
       ],
       "tests": [
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/LineBoundaryConformanceTest.java",
