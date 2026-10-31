@@ -10,7 +10,7 @@ publish = false
 unlaxer-lsp = { path = "../unlaxer-lsp" }
 unlaxer-ubnf = { path = "../unlaxer-ubnf" }
 unlaxer-generator = { path = "../unlaxer-generator" }
-serde_json = "1"
+serde_json = { version = "1", features = ["arbitrary_precision"] }
 
 [[bin]]
 name = "ubnf-language-server"
