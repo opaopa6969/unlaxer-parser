@@ -28,7 +28,7 @@ pub struct Index {
     pub scopes: Vec<Scope>,
     pub diagnostics: Vec<Value>,
     pub valid: bool,
-    pub error_offset: usize,
+    pub consumed_length: usize,
     pub declarations: Vec<Symbol>,
     pub safe: bool,
     pub virtual_sources: BTreeMap<String, String>,
@@ -54,7 +54,7 @@ impl Index {
             scopes: Vec::new(),
             diagnostics: Vec::new(),
             valid: parsed.is_ok(),
-            error_offset: 0,
+            consumed_length: 0,
             declarations: Vec::new(),
             safe: parsed.is_ok(),
             virtual_sources: BTreeMap::new(),
@@ -62,8 +62,10 @@ impl Index {
         let mut file = match parsed {
             Ok(file) => file,
             Err(error) => {
-                result.error_offset = source[..error.span.byte_start].encode_utf16().count();
-                result.diagnostics.push(json!({"range":text::range(source,error.span.byte_start,error.span.byte_end),"severity":1,"code":"ULX-PARSE-001","source":"unlaxer","message":error.message}));
+                let replay = crate::failure::replay(source);
+                result.consumed_length = replay.consumed;
+                result.valid = replay.complete;
+                result.diagnostics.push(replay.root_diagnostic.unwrap_or_else(|| json!({"range":text::range(source,error.span.byte_start,error.span.byte_end),"severity":1,"code":"ULX-PARSE-001","source":"unlaxer","message":error.message})));
                 let mut scope = Scope {
                     start: 0,
                     end: source.len(),
@@ -132,6 +134,13 @@ impl Index {
                             }
                         }
                     }
+                }
+                if let Some(error) = text::file_path(uri)
+                    .err()
+                    .filter(|_| text::mask(source).contains("@import"))
+                {
+                    result.module_failure(source, error);
+                    return result;
                 }
                 let mut resolver = text::file_path(uri)
                     .ok()
@@ -218,6 +227,14 @@ impl Index {
             result.scopes.push(scope);
         }
         let path = text::file_path(uri);
+        if let Some(error) = path
+            .as_ref()
+            .err()
+            .filter(|_| text::mask(source).contains("@import"))
+        {
+            result.module_failure(source, error.clone());
+            return result;
+        }
         let mut resolver = path
             .as_ref()
             .ok()
@@ -231,12 +248,30 @@ impl Index {
             if let (Ok(path), Some(resolver)) = (path, resolver.as_mut()) {
                 match modules::resolve(source, &path, resolver) {
                     Ok(linked) => file = linked,
-                    Err(error) => result.module_error(
-                        source,
-                        0,
-                        source.chars().next().map_or(0, char::len_utf8),
-                        error,
-                    ),
+                    Err(error) => {
+                        // Java's editor resolves an AST, not a source snapshot.
+                        // The CLI resolver adds a root grammar location for a
+                        // multi-grammar file; that wrapper is not part of the
+                        // editor's error. Match it against this AST's CP spans,
+                        // and preserve the actual resolver failure verbatim.
+                        let message = if file.grammars.len() > 1 {
+                            file.grammars
+                                .iter()
+                                .find_map(|grammar| {
+                                    let prefix = format!(
+                                        "grammar {} [{},{}): ",
+                                        grammar.name,
+                                        grammar.span.codepoint_start,
+                                        grammar.span.codepoint_end
+                                    );
+                                    error.strip_prefix(&prefix)
+                                })
+                                .unwrap_or(&error)
+                        } else {
+                            &error
+                        };
+                        result.module_failure(source, message.to_owned());
+                    }
                 }
             }
         }
@@ -263,7 +298,27 @@ impl Index {
         result
     }
     fn module_error(&mut self, source: &str, start: usize, end: usize, message: String) {
-        self.diagnostics.push(json!({"range":text::range(source,start,end),"severity":1,"code":"E-MODULE","source":"ubnf-module","message":message}));
+        let mut range = text::range(source, start, end);
+        // UbnfEditorIndex's outer/recovery catch uses min(1, String.length),
+        // unlike the base syntax diagnostic's one-code-point range. Preserve
+        // that UTF-16 width even when it bisects a supplementary scalar.
+        if start == 0
+            && source.chars().next().is_some_and(|c| c.len_utf16() == 2)
+            && end == source.chars().next().unwrap().len_utf8()
+        {
+            range["end"] = json!({"line":0,"character":1});
+        }
+        self.diagnostics.push(json!({"range":range,"severity":1,"code":"E-MODULE","source":"ubnf-module","message":message}));
+    }
+    fn module_failure(&mut self, source: &str, error: String) {
+        self.module_error(
+            source,
+            0,
+            source.chars().next().map_or(0, char::len_utf8),
+            format!(
+                "import を解決できません。保存場所・alias・token 名を確認してください: {error}"
+            ),
+        );
     }
     fn import(
         &mut self,

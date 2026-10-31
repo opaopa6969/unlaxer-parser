@@ -246,5 +246,5 @@ pub fn hover(source: &str, index: &Index, offset: usize) -> Value {
             }
         }
     }
-    json!({"contents":markdown(if index.valid {"Valid UBNF".into()}else{format!("Parse error at offset {}", index.error_offset)})})
+    json!({"contents":markdown(if index.valid {"Valid UBNF".into()}else{format!("Parse error at offset {}", index.consumed_length)})})
 }

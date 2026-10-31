@@ -1,5 +1,38 @@
 # UBNF authoring LSP の Java / Rust 対応
 
+## syntax failure の固定棚卸し（#894）
+
+Java 参照は `d8af6d9be6ad45cdad5eddf0a040cd5ce80d0602`。
+生成 server の root は generated/UBNFParsers の shim から bootstrap/UBNFParsers へ委譲する。
+LSPServerEmitter.emitParseDocument の doParse / publishDiagnostics / parseErrorMessage、
+ParseContext.getParseFailureDiagnostics / getUnconsumedInputRuleStack と UbnfEditorIndex を棚卸しした。
+UBNFMapper.parseWithSource は全入力と mapper 値検査も要求するため、
+その最初の例外を LSP の syntax failure と同一視しない。
+
+| 欄 | 固定 Java の情報源・変換 | native frontend の現状 / 今回の扱い |
+|---|---|---|
+| code / severity / source | ULX-PARSE-001 / Error / unlaxer | 既存値は同じ。これだけで完全一致とはしない |
+| schemaVersion / kind / data.code | publishDiagnostics が 1 / syntax / ULX-PARSE-001 を組立てる | 根のkeyword失敗は同じdataを組立てる。深い失敗はnative Diagnosticにdataがなく#1024 |
+| offset / range / line / character | failed frame の最遠 CP、部分成功なら consumed との最大。UTF-16 へ変換し、range は1 CP、CRLFを分断しない | native span は最初のエラーの byte/CP 範囲。根のkeyword失敗は専用経路で一致。深い失敗を最遠へ位置置換せず#1024 |
+| consumedLength / totalLength | root の成功 token 全文の UTF-16 長。root 失敗は0、複数 grammar の部分成功は成功 prefix。total は String.length | native は全入力成功か最初のエラーのみ。LSP失敗時だけ完了 grammar prefix を再認識し hover の消費長を得る。根のsyntax dataは同じ。深い失敗のdataは#1024 |
+| expectedTokens / expectedHints / expectedParsers | 最遠で失敗した各 frame の子を深さ2まで展開し TerminalSymbol の hint を収集。innermost terminal も追加。各配列を distinct/sorted/limit(20) | 予測型再帰下降の Diagnostic.message は単一の期待で、代替候補・試行失敗を保持しない。文字列からの推測はしない。後続 |
+| deepestMatchedRule | trial recording がなければ最遠失敗 stack の最深 parser class 名 | native は当該 stack を持たない。ubnf.ubnf の Annotation / RuleBody / GrammarDecl 等の rule に対応づける失敗専用 recognizer が必要。後続 |
+| ruleStack / ruleStackOmitted / relatedInformation | GrammarRule の失敗で最遠に達した stack（frame数最大、同数は先着）。成功 prefix の残入力 stack は別 API。offset一致時だけ公開し frame 開始を CP→UTF16 変換 | bootstrap UBNF parser は GrammarRule 非実装のため参照の通常syntaxでは欄自体が不在。存在しない stack を空配列として捏造しない。native 一般 runtime の stack はこの frontend とは別 |
+| fallback hover | Ext は base DocumentState の consumedLength を表示。editor snapshot の成功/失敗とは別 | 最初の frontend error offset を表示していた。失敗時の prefix 再認識へ分離 |
+| module/package | 個別 import の失敗は宣言 range で順に集約。URI変換/最終link失敗は文書先頭で説明prefix付き。既存 resolver が lock/hash/依存/境界を検証 | 個別解決は既存 Resolver を継続使用。最終link/URIのLSP envelopeを合わせる。import先のsyntax本文は上記provenanceと一緒に後続 |
+
+rule の写像は `UBNFFileParser → UBNFFile`、`GrammarDeclParser → GrammarDecl`、
+`AnnotationParser → Annotation`、`RuleBodyParser → RuleBody` として ubnf.ubnf に合わせる。
+根のkeyword失敗の最深 terminal は `WordParser` で、これは Java が data に返す class 名を保つ。
+ただし grammar を1つも消費せず、入力全体が trivia で末尾が改行のない `//` コメントの場合は、
+CPPComment の LineTerminator が EOF で失敗するため、最深は `WildCardCharacterParser`、期待集合は改行3種を含む7個になる。
+syntax 診断の range と data.line/character は DocumentSnapshot の規則（CR・LF・CRLF をそれぞれ1改行）で数え、
+LF だけを数える module 回復 range とは別に扱う。
+
+この棚卸しはsyntax全JSON一致の達成を意味しない。期待集合と失敗stackの再現には、
+Java combinator の投機的失敗も再現する専用recognizerが必要で、通常frontendへの計測追加は
+#197 の凍結と正常系コスト維持に反するため採用しない。
+
 追跡: #864、親 #111。Java 参照 revision は `465b434eb7b1321bc5450600401869fde7a18e13`（#888 / #896 merge 後）。第一段の基準は `b96a9c07`。
 生成した言語の LSP と、ここで扱う `.ubnf` 文法作者向け LSP は別のサーバーである。
 Java の既存経路は維持し、Rust は対応した capability だけを広告する。
@@ -417,3 +450,31 @@ CI に新しい job や既存 local-imports の重複実行を足さず、追加
 診断 version の削除、数値文字列 version の拒否、未知 method 文面の巻戻しの3変異を、
 隔離コピーの実 native stdio に適用すると新 suite が全て失敗することを確認した。
 変異はレビュー用 worktree に加えず、元コードで両 JDK の検証を行う。
+
+#894 の限定対応は共通 [syntax-status.json](../spec-corpus/ubnf-authoring-lsp/syntax-status.json) /
+[stdio runner](../scripts/ubnf_authoring_syntax_status.py) の69ケースで検証する。
+10根失敗は空文書・無効入力・非BMP・trivia・LF/CRLF・成功prefix・複数grammarを全JSONで照合する。
+JavaのChainはrollback後の自身のcursorで失敗候補を登録するため、根の前にtriviaがあると
+parentのbrace候補は最遠へ届かず、期待集合は空文書の5候補ではなく3候補になる。
+通常のbootstrap UBNFにはGrammarRuleがないためstack関連欄・relatedInformationは不在が正しい。
+
+不完全annotation/FQN/group・無効body・複数grammarの9ケースはfallback hoverだけを全JSON比較する。
+そのsyntax診断のcode存在は確認するが、message/range/dataの一致は未完了と証跡へ明示する。
+この9ケースをsyntax完全一致として数えない。第一段のincomplete-annotationのhost別hover期待値は削除した。
+
+24 module/package形をLF/CRLFの48ケースで検証する。欠落・複数失敗・循環、alias衝突、未解決token、
+network拒否、非file/相対/opaque/authority/query/fragment/escape/space URI、
+missing/stale lock・raw hash・依存未宣言・artifact依存/identity不一致を含む。
+URI失敗はimportごとの推測位置へ変換せず、Javaの外側catchの全文と文書先頭rangeにする。
+最終link失敗も同じ外側説明prefixを付け、個別import失敗は宣言順に集約する。
+Java editorはsource snapshotではなくASTをresolveするため、複数grammar時にnative CLI resolverが足す
+grammar名/CP範囲の外側wrapperを、このASTのspanと照合して除く。resolverの原因本文は保持する。
+複数文書のopen/change/save/closeでimporter再診断・同じ/減少version・local overlayの復帰、
+終了後requestの全error JSONを検証する。全package/local入力のbytesが不変で、lock更新・取得をしない。
+
+完全一致が安全にできない欄は固定参照と理由を上表に残し、受け入れ条件付きの
+[#1024](https://github.com/opaopa6969/unlaxer-parser/issues/1024)へ分離した。
+Javaのkeyword prefix受理、parameterized syntax state、mapper値エラー時のroot成功、深い資源境界は
+prefix再認識でも一般には同じにならない。この変更で全入力域のhover一致を主張しない。
+URIの任意Unicode/percent-decoding/platformと特殊非file bufferの既存差は#902、DTO受理域は#1005。
+#893のvalidator意味解析・#901のcapabilityには手を入れず、#894/#885/#864/#111は閉じない。
