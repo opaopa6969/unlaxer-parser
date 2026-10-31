@@ -112,5 +112,35 @@
     "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token GT ::= '>';\n  token END = EOF\n  @root @mapping(Value, params=[value])\n  @lexicalContext(tokens=['MISSING'])\n  @namePredicate(snapshot='scope', version='v1', name='missing', kind='type')\n  Root ::= Item @value END;\n  @predicate('p') @mapping(ItemValue, params=[gt])\n  Item ::= GT @gt;\n}\n",
     "code": "E-LEXICAL-CONTEXT-TOKEN",
     "nativeMessage": "E-LEXICAL-CONTEXT-TOKEN: MISSING"
+  },
+  {
+    "name": "invalid-token-stream-setting-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @tokenStream: invalid\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-TOKEN-STREAM-SETTING",
+    "nativeMessage": "E-TOKEN-STREAM-SETTING: tokenStream"
+  },
+  {
+    "name": "token-stream-version-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @tokenStream: enabled\n  @package: org.example.semanticpredicate\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= 'x' @digits;\n}\n",
+    "code": "E-TOKEN-STREAM-VERSION",
+    "nativeMessage": "E-TOKEN-STREAM-VERSION: tokenStream"
+  },
+  {
+    "name": "nullable-token-stream-token-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @tokenStream: enabled\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')*;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-TOKEN-STREAM-TOKEN",
+    "nativeMessage": "E-TOKEN-STREAM-TOKEN: DIGITS"
+  },
+  {
+    "name": "valid-token-stream-profile-is-refused",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @tokenStream: enabled\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: token-stream grammar"
+  },
+  {
+    "name": "invalid-comment-setting-precedes-invalid-predicate-name",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @comment: invalid\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-COMMENT-SETTING",
+    "nativeMessage": "E-COMMENT-SETTING: comment"
   }
 ]

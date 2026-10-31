@@ -546,6 +546,16 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     // Match Java RustGrammarLowering: schema failures precede enum/eval/embedding
     // and ordinary lowering failures, but not bounded/precedence/nested failures.
     crate::common_fields::families(grammar)?;
+    // GenContext checks lexical profile settings before @predicate, including a
+    // malformed profile that the predicate also cannot compose with (#1006).
+    if crate::semantic_predicates::enabled(grammar) {
+        if let Some(issue) = crate::token_stream::problems(grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
+        if let Some(issue) = crate::global_comment::problems(grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
+    }
     crate::lexical_contexts::validate(grammar)?;
     // Java checks @predicate after lexical contexts and name predicates. Native checks
     // name predicates in source preflight, so a grammar with both waits until then.
