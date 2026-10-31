@@ -4665,8 +4665,23 @@ impl<'a> ParseContext<'a> {
                         info.kind != token::TokenKind::Consumed
                             && matches!(info.source, token::TokenSource::Input(_))
                     });
+                    // A host's one root token of the consumed kind over other input than it consumed
+                    // (Java's `Token(consumed, peek(at, n))` away from the cursor or past what it
+                    // consumed) is what it returned, as a Classic child returns its collection.
+                    let returned = match (&matched.nodes[..], info) {
+                        (
+                            [_],
+                            Some(token::TokenInfo {
+                                kind: token::TokenKind::Consumed,
+                                source: token::TokenSource::Input(span),
+                                ..
+                            }),
+                        ) if *span != matched.span => Some(*span),
+                        _ => None,
+                    };
                     let classic = self.token_mode.is_some()
                         || other_kind_input
+                        || returned.is_some()
                         || matched.nodes.iter().any(|index| {
                             self.tokens
                                 .values
@@ -4679,7 +4694,7 @@ impl<'a> ParseContext<'a> {
                     let source = (classic || non_input).then(|| {
                         Box::new(FragmentSource {
                             parsed_source: None,
-                            span: matched.span,
+                            span: returned.unwrap_or(matched.span),
                             kind: info.map_or(self.token_mode().kind, |info| info.kind),
                             classic,
                             generated: info.is_some_and(|info| {

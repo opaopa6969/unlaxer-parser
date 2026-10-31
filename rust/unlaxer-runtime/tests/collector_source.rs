@@ -201,6 +201,34 @@ fn host_c<const ADVANCE: bool>(context: &mut ParseContext<'_>) -> ParseResult {
     })
 }
 
+/// hxc: a host that consumes 'c' at the cursor and returns an empty token of the consumed kind
+/// over the input at 0, away from what it consumed.
+fn host_at_zero_consuming(context: &mut ParseContext<'_>) -> ParseResult {
+    let start = context.position();
+    let span = Span {
+        start,
+        end: start + 1,
+    };
+    if context.text(span) != Some("c") {
+        return Err(context.error("c"));
+    }
+    let id = context
+        .add_token_node(
+            0,
+            TokenKind::Consumed,
+            TokenSource::Input(Span { start: 0, end: 0 }),
+        )
+        .ok_or_else(|| context.error("token"))?;
+    if !context.advance(1) {
+        return Err(context.error("input"));
+    }
+    Ok(ParseMatch {
+        span,
+        nodes: vec![id.index()],
+        captures: vec![],
+    })
+}
+
 /// LX: Java LexicalTokenParser("LX", z?), which matches nothing here.
 fn lexical_optional_z() -> Expr {
     use unlaxer_runtime::lexical::{LexicalExpression, Op};
@@ -256,6 +284,7 @@ fn shape_into(name: &str, rules: &mut Vec<Expr>) -> Expr {
             "hv" => Expr::Custom(host_empty_virtual),
             "h1" => Expr::Custom(host_c::<true>),
             "hc" => Expr::Custom(host_c::<false>),
+            "hxc" => Expr::Custom(host_at_zero_consuming),
             "EL" => Expr::JavaEmptyLiteral,
             "LX" => lexical_optional_z(),
             _ => Expr::literal(Box::leak(name.to_owned().into_boxed_str())),
@@ -553,6 +582,49 @@ fn wrappers_and_hosts_return_the_capture_less_spans() {
     check_boundary_table(
         include_str!("../../../conformance/collector-source/returned-token-boundary.tsv"),
         915,
+        true,
+    );
+}
+
+/// A host returns the source of its token, as Java's Parsed(token) does: when its one root token of
+/// the consumed kind is over other input than it consumed (hx at 0, hc over 'c' it did not consume,
+/// hxc at 0 after consuming 'c'), owned capture, Replay, the predicate candidate, @f and
+/// InputCaptureBoundary read that token, and a later collection collects it in order (#1023).
+#[test]
+fn hosts_return_the_source_of_their_token_on_every_entry() {
+    check_table(
+        include_str!("../../../conformance/collector-source/host-token.tsv"),
+        1065,
+        true,
+    );
+}
+
+/// The capture-less spans of the shapes of host-token.tsv (#1023).
+#[test]
+fn hosts_return_the_capture_less_spans_of_their_token() {
+    check_boundary_table(
+        include_str!("../../../conformance/collector-source/host-token-boundary.tsv"),
+        1062,
+        true,
+    );
+}
+
+/// The shapes of host-token.tsv with a lexical leaf that matches nothing (#1023).
+#[test]
+fn hosts_return_the_source_of_their_token_next_to_lexical_leaves() {
+    check_table(
+        include_str!("../../../conformance/collector-source/host-token-lexical.tsv"),
+        72,
+        true,
+    );
+}
+
+/// The capture-less spans of the shapes of host-token-lexical.tsv (#1023).
+#[test]
+fn hosts_return_the_capture_less_spans_next_to_lexical_leaves() {
+    check_boundary_table(
+        include_str!("../../../conformance/collector-source/host-token-lexical-boundary.tsv"),
+        72,
         true,
     );
 }

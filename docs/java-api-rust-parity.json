@@ -94,10 +94,10 @@
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67", "anchor": "if(terminator.isPresent())"},
         {"location": "rust/unlaxer-runtime/src/lib.rs#L236", "anchor": "JavaTerminatedRepeat {"},
         {"location": "rust/unlaxer-runtime/src/lib.rs#L443", "anchor": "pub fn repeat_java_until(self, terminator: Self, min: usize, max: Option<usize>) -> Self"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5058", "anchor": "fn expression_terminated_repeat("},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5117", "anchor": "fn begin_java_terminator(&mut self, state: &mut TerminatedRepeat) -> Box<TerminatorFrame>"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5073", "anchor": "fn expression_terminated_repeat("},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5132", "anchor": "fn begin_java_terminator(&mut self, state: &mut TerminatedRepeat) -> Box<TerminatorFrame>"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L131", "anchor": "if (parser instanceof CollectingParser && outputCollected)"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L8082", "anchor": "fn java_collector_label(expression: &Expr) -> Option<&'static str>"}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L8097", "anchor": "fn java_collector_label(expression: &Expr) -> Option<&'static str>"}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/TerminatedRepeatParityTest.java",
@@ -150,7 +150,7 @@
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13", "anchor": "public class MatchedChoiceParser extends NoneChildParser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7", "anchor": "public class ChoiceCommitAction implements AdditionalPreCommitAction"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5829", "anchor": "fn ordered_choice<'b>("}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5844", "anchor": "fn ordered_choice<'b>("}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedChoiceParserTest.java"
@@ -570,7 +570,7 @@
       "reason": "通常失敗のcommit/label昇格、指定labelのcatch、原位置とstate rollbackを共通 corpus で比較する。資源失敗を通常の選択へ吸収しない。",
       "route": "`expr.commit()/label(\"x\")/catch_labels(other, [\"x\"])`。UBNF `COMMIT/LABEL/CATCH`。",
       "code": [
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L4841", "anchor": "fn expression_raising(&mut self, expression: &Expr, depth: usize) -> Option<Fragment>"},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L4856", "anchor": "fn expression_raising(&mut self, expression: &Expr, depth: usize) -> Option<Fragment>"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Commit.java#L22", "anchor": "public class Commit extends ConstructedSingleChildParser implements MetaFunctionParser,"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Label.java#L22", "anchor": "public class Label extends ConstructedSingleChildParser implements MetaFunctionParser,"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CatchLabels.java#L28", "anchor": "public class CatchLabels extends ConstructedAbstractParser implements MetaFunctionParser,"}
@@ -591,7 +591,7 @@
       "route": "`Expr::sequence/choice/longest_choice/unique_longest_choice/predictive_choice/zero_match`。Lazy版は構築済み Rule参照へ移す。min/max反復の terminator は別行。",
       "code": [
         {"location": "rust/unlaxer-runtime/src/lib.rs#L373", "anchor": "pub fn sequence(elements: impl IntoIterator<Item = Self>) -> Self"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5829", "anchor": "fn ordered_choice<'b>("},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5844", "anchor": "fn ordered_choice<'b>("},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11", "anchor": "public interface ChainInterface extends Parser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14", "anchor": "public interface ChoiceInterface extends Parser"}
       ],
@@ -749,7 +749,7 @@
       "route": "`expr.recover(mode, [\";\"], \"message\")`、`Tree.recoveries` / `ParseContext::recoveries`、UBNF `@recovery`。",
       "code": [
         {"location": "rust/unlaxer-runtime/src/lib.rs#L517", "anchor": "pub fn recover("},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L4753", "anchor": "fn recover_after_failure("},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L4768", "anchor": "fn recover_after_failure("},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java#L11", "anchor": "public record RecoveryDiagnostic(int start, int end, String message)"}
       ],
       "tests": [

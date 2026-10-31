@@ -107,6 +107,47 @@ public class LexicalCollectorSourceTest {
         };
     }
 
+    /** hc: a host that returns a token of the consumed kind over 'c' at the consumed cursor without consuming it. */
+    private static Parser hostPeekC() {
+        return new EmptyParser() {
+            private static final long serialVersionUID = 1L;
+            @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+                CodePointIndex at = context.getConsumedPosition();
+                if (at.value() + 1 > context.source.codePointLength().value()) {
+                    return Parsed.FAILED;
+                }
+                Source peeked = context.peek(at, new CodePointLength(1));
+                if (false == peeked.sourceAsString().equals("c")) {
+                    return Parsed.FAILED;
+                }
+                Token token = new Token(TokenKind.consumed, peeked, this);
+                context.getCurrent().addToken(token, TokenKind.consumed);
+                return new Parsed(token);
+            }
+        };
+    }
+
+    /** hxc: a host that consumes 'c' at the consumed cursor and returns an empty consumed token over the input at 0. */
+    private static Parser hostAtZeroConsuming() {
+        return new EmptyParser() {
+            private static final long serialVersionUID = 1L;
+            @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+                CodePointIndex at = context.getConsumedPosition();
+                if (at.value() + 1 > context.source.codePointLength().value()) {
+                    return Parsed.FAILED;
+                }
+                if (false == context.peek(at, new CodePointLength(1)).sourceAsString().equals("c")) {
+                    return Parsed.FAILED;
+                }
+                Token empty = new Token(TokenKind.consumed,
+                    context.peek(new CodePointIndex(0), new CodePointLength(0)), this);
+                context.getCurrent().addToken(empty, TokenKind.consumed);
+                context.consume(new CodePointLength(1));
+                return new Parsed(empty);
+            }
+        };
+    }
+
     private Parser observe() {
         return new EmptyParser() {
             private static final long serialVersionUID = 1L;
@@ -136,6 +177,10 @@ public class LexicalCollectorSourceTest {
                     return hostWithoutToken();
                 case "hx":
                     return hostAtZero();
+                case "hc":
+                    return hostPeekC();
+                case "hxc":
+                    return hostAtZeroConsuming();
                 case "vc":
                     return virtualC();
                 case "vci":
@@ -263,7 +308,28 @@ public class LexicalCollectorSourceTest {
     }
 
     @Test public void emptyLexicalTokensStartTheCollection() throws java.io.IOException {
-        for (String[] row : rows("lexical-token.tsv", 189)) {
+        checkTable("lexical-token.tsv", 189);
+    }
+
+    @Test public void emptyLexicalTokensStartTheCaptureLessOrigins() throws java.io.IOException {
+        checkBoundaryTable("lexical-token-boundary.tsv", 189);
+    }
+
+    /**
+     * A host returns its Token, whose source is the input it peeked, also next to a lexical leaf: hx at 0, hc over 'c'
+     * it did not consume, hxc at 0 after consuming 'c' (conformance/collector-source/host-token-lexical.tsv, #1023).
+     */
+    @Test public void hostsReturnTheSourceOfTheirTokenNextToLexicalLeaves() throws java.io.IOException {
+        checkTable("host-token-lexical.tsv", 72);
+    }
+
+    /** The capture-less origins of the shapes of host-token-lexical.tsv (#1023). */
+    @Test public void hostsReturnTheCaptureLessOriginsNextToLexicalLeaves() throws java.io.IOException {
+        checkBoundaryTable("host-token-lexical-boundary.tsv", 72);
+    }
+
+    private void checkTable(String table, int expectedRows) throws java.io.IOException {
+        for (String[] row : rows(table, expectedRows)) {
             for (Memoization memo : Memoization.values()) {
                 for (ParseOptions.Diagnostics diagnostics : ParseOptions.Diagnostics.values()) {
                     String prefix = PREFIXES.get(row[0]);
@@ -310,8 +376,8 @@ public class LexicalCollectorSourceTest {
         }
     }
 
-    @Test public void emptyLexicalTokensStartTheCaptureLessOrigins() throws java.io.IOException {
-        for (String[] row : rows("lexical-token-boundary.tsv", 189)) {
+    private void checkBoundaryTable(String table, int expectedRows) throws java.io.IOException {
+        for (String[] row : rows(table, expectedRows)) {
             for (Memoization memo : Memoization.values()) {
                 for (ParseOptions.Diagnostics diagnostics : ParseOptions.Diagnostics.values()) {
                     String prefix = PREFIXES.get(row[0]);

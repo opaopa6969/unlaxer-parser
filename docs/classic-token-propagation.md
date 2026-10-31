@@ -61,15 +61,21 @@ returned: the consumed tokens over the input among the CST roots the earlier
 children returned (an empty Java `Token(consumed, peek(cursor, 0))`, or input
 the host did not consume) are collected in order at their own positions, after
 an earlier collector's token at the cursor, while a host that returns no token
-leaves "" at the consumed cursor. A
+leaves "" at the consumed cursor. A host whose one root token of the consumed
+kind is over other input than it consumed (a Java `Token(consumed, peek(0, 0))`,
+or 'c' it peeked without consuming) returns that token's source, as Java's
+`Parsed(token)` does: owned capture, a predicate, `@f` and
+`InputCaptureBoundary` read it, and a collector collects it as a Classic child's
+collection, in order (`Chain[hc, c]` is the projection "cc"). A host that returns
+the input it consumed keeps the ordinary path. A
 native rule commits what a one-child consumed collector collects from its body,
 including plain input without CST nodes
 (`conformance/collector-source/empty-token.tsv`, `returned-token.tsv`,
-`lexical-token.tsv` and their `-boundary.tsv` tables).
+`lexical-token.tsv`, `host-token.tsv`, `host-token-lexical.tsv` and their
+`-boundary.tsv` tables).
 These tables bound what is verified. Differences that remain open in #1023
-include a host Input token at a position other than the cursor, a lone host
-token where no collection starts (`hx`, `hc`, `Chain[hc,c]`), the node span of a
-value boundary around a projection, the Classic-entry rows whose Java
+include a host token of another kind at a position other than the cursor
+(`hvx`, `hmx`, `hvc`), the node span of a value boundary around a projection, the Classic-entry rows whose Java
 counterpart is still unconfirmed, and generated anchors/text (D); they are not
 treated as language-specific exceptions.
 
