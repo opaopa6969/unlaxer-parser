@@ -1,0 +1,10 @@
+# Java Usage001 named concrete classes / Rust named rule composition.
+# input (empty is an empty first column)	success	consumed CP	matched CP
+1+2+3	true	5	5
+12/3	true	4	4
+	false	0	0
+x	false	0	0
+1+	true	1	1
+1+2x	true	3	3
+-1	false	0	0
+12*3-4/2	true	8	8
