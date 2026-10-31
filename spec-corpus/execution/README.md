@@ -32,7 +32,7 @@ validate は元入力のまま、syntax 受理後に validator / lowering / gene
 OPEN issue を必須とし、`observation` の backtick で列挙する corpus ID と既知差の集合を完全一致させる。
 解消後に未修正項目だけ残すことも検査で落ちる。
 
-`diagnostic-priority.json` は別途、単一・複数エラーを持つ 42 入力を root なし／root 付きで
+`diagnostic-priority.json` は別途、単一・複数エラーを持つ 61 入力を root なし／root 付きで
 実行する。Java validator の最初の ERROR と独立期待値を照合し、両 Rust host の lowering / generator が
 同じコードを選ぶことを確認する。既存入力は独立した有効な root を追加し、#843 の入力は
 `rootRule` で指定した対象規則に root を付ける。`detail` がある入力は両 host の従来説明も
@@ -44,7 +44,7 @@ interleave（重複→profile）→scopeTree（重複→mode）、その後に�
 Java の root 欠如は `W-GENERAL-NO-ROOT` なのでこれらを遮らない。Rust の root 必須エラーは
 対象診断が無い場合の従来の説明を保つ。
 
-これは #833–#835 / #843 の診断群の順序であり、Java validator 全体を Rust lowering に移したものではない。
+これは #833–#835 / #843 / #858 の診断群の順序であり、Java validator 全体を Rust lowering に移したものではない。
 例えば元の `annotation/assoc-without-precedence` では Java は mapping 欠如も列挙するが、
 corpus が指定する `E-ASSOC-NO-PRECEDENCE` を引き続き独立期待値とする。
 `annotation/precedence-duplicate` の `E-PRECEDENCE-DUPLICATE` も保持するため、#843 の新しい
@@ -55,11 +55,15 @@ corpus が指定する `E-ASSOC-NO-PRECEDENCE` を引き続き独立期待値と
 Java generator API は全 validator の代替ではなく、通常 frontend が共通 validator を先に呼ぶ。
 Java-host の既存 `Rust subset: ` は説明内へ残し、対象コードを先頭に置く。
 `E-LONGEST-CHOICE-SHAPE` は precedence より先に従来説明へコードを付ける。他の choice profile の失敗は従来経路へ委ねる。
-名前述語の検証が mapping 診断・結合性の params 欠落・repeat 欠如・rightAssoc 非canonical に先行する契約も保持する。native は
-その検証に必要な body を構築する間だけ診断を保留し、検証後は root 欠如より先に返す。保留中に起きた
-名前述語以外の lowering エラー（未定義参照など）より保留した診断を優先し、Java-host と同じ順にする。
-ただし native の lowering 前半（重複注釈・body の lowering）が先に失敗すると名前述語の検証まで届かず、
-重複注釈・longestChoice 形状・修飾参照・profile・未定義参照が名前述語より先に出る差が残る（#858）。
+名前述語は、body の lowering より前に共通の source-level capture 解析で検証する（#858）。
+これにより mapping / 結合性だけでなく、重複 interleave / scopeTree、longestChoice の形状、
+修飾参照・profile・未定義参照に名前述語の不正が隠れない。追加した7入力を root あり／なしで
+Java validator と両 Rust host に照合する。さらに、全規則の名前述語を検証してから snapshot version の
+整合性を調べるため、後の規則の不正 capture / kind が前の version 競合より先になる2入力も比較する。
+`name-predicate/invalid.json` の assoc-conflict も、旧 native 専用の説明から共通の `E-NAME-PREDICATE-CONFLICT` へ揃えた。
+対象規則自身の root、optional/repeat/node/choice の capture と元の assoc-conflict も共通 fixture に含める。
+`@ubnf` の不正値・重複との組合せは LF / CRLF を固定し、名前述語の診断が先になることを比較する。
+名前述語なしの診断、単一エラーの説明と既存 check JSON は維持する。
 import なし修飾参照（`ns.Name`）は両 host とも従来の説明（qualified rule reference）を残して
 `E-RULE-UNDEFINED:` を付け、root 欠如より先に返す（#843）。import の解決経路は変更しない。
 check JSON は説明文を公開せず、従来の inventory code / `P-STRUCTURE` と CP span・終了コードを維持する。
