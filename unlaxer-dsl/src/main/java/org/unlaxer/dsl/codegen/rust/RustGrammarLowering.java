@@ -152,6 +152,11 @@ public final class RustGrammarLowering {
 
     private GrammarIR runWithDeclarations() {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
+        // Match GenContext's lexical profile refusal before a semantic combination error (#1006).
+        if (org.unlaxer.dsl.codegen.SemanticPredicates.enabled(grammar)) {
+            org.unlaxer.dsl.codegen.TokenStreamGrammar.requireValid(grammar);
+            org.unlaxer.dsl.codegen.GlobalComment.requireValid(grammar);
+        }
         org.unlaxer.dsl.codegen.LexicalContexts.requireValid(grammar);
         org.unlaxer.dsl.codegen.NamePredicates.requireValid(grammar);
         org.unlaxer.dsl.codegen.SemanticPredicates.requireValid(grammar);
