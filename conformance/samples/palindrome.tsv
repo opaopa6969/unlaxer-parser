@@ -1,0 +1,33 @@
+# Java Usage003_01 palindrome recipes (MatchOnly + MatchedTokenParser slice/effect) / Rust owned-capture adapter.
+# The word is the greedy MatchOnly(OneOrMore(AsciiParser)) prefix: U+0000..U+007F only, no shorter retry.
+# grammar: single = pal, reuse = pal '😀' pal (same parser instances), retry = ('a' pal) | pal.
+# input escapes: \r \n (empty is an empty column). Spans are code points start-end, joined by ','.
+# halves: sliceWithWord / sliceWithSlicer steps (first half, pivot or empty, reversed first half).
+# whole: effectReverse / sliceReverse / sliceReverseWithPythonian (one reversed word step).
+# grammar	input	success	consumed CP	matched CP	halves	whole
+single	a	true	1	1	0-0,0-1,1-1	0-1
+single	abcba	true	5	5	0-2,2-3,3-5	0-5
+single	abccba	true	6	6	0-3,3-3,3-6	0-6
+single	aa	true	2	2	0-1,1-1,1-2	0-2
+single	ab	false	0	0	-	-
+single		false	0	0	-	-
+single	abca	false	0	0	-	-
+single	abcab	false	0	0	-	-
+single	abba!	false	0	0	-	-
+single	😀	false	0	0	-	-
+single	a😀a	true	1	1	0-0,0-1,1-1	0-1
+single	ab😀	false	0	0	-	-
+single	é	false	0	0	-	-
+single	\r\n\r	true	3	3	0-1,1-2,2-3	0-3
+single	\r\n	false	0	0	-	-
+single	aba\r\naba	false	0	0	-	-
+reuse	aba😀cdc	true	7	7	0-1,1-2,2-3,4-5,5-6,6-7	0-3,4-7
+reuse	abba😀c	true	6	6	0-2,2-2,2-4,5-5,5-6,6-6	0-4,5-6
+reuse	aa😀aa	true	5	5	0-1,1-1,1-2,3-4,4-4,4-5	0-2,3-5
+reuse	ab😀ba	false	0	0	-	-
+reuse	aba😀cd	false	0	0	-	-
+retry	abba	true	4	4	0-2,2-2,2-4	0-4
+retry	abcba	true	5	5	0-2,2-3,3-5	0-5
+retry	aaa	true	3	3	1-2,2-2,2-3	1-3
+retry	a	true	1	1	0-0,0-1,1-1	0-1
+retry	aab	false	0	0	-	-

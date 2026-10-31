@@ -93,6 +93,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Rust の低水準 Classic 入口で、virtual 種別の規則のうち本体が `Choice` のもの（Java `LazyChoice`）が、選んだ子の source を返すよう修正した。入力由来の子は、入力 capture 境界（`InputCaptureBoundary`）と `@f` で受理される。本体が規則参照だけの規則は、Java の 1 要素 `LazyChain` と同じく自身の収集を返す。Java 実測の共通表 624 行を両言語で照合する（#1023 の C の境界部分）。
 - Rust の低水準 Classic 入口（`parse_with_token_mode`）の `capture_owned` が、token 種別と空 span から生成を推定せず、子が返した token の由来を記録するよう修正した。入力由来の空 virtual token と token を返さない PEG 成功（それを選んだ `Choice` / 生成規則を含む）は、Java `NamedCapture` と同じ子の後の cursor 位置の入力になる。Java 実測の共通表 516 行を両言語で照合する（#1023 の C の owned 部分。virtual 規則越しの入力 capture 境界と生成 anchor の差は #1023 に残る）。
 - 名前付き parser の Usage001 サンプルで class 参照する型を公開し、Java/Rust 共通の prefix 回帰を通常テストへ追加する（#1009）。
+- Java `MatchedTokenParser` の空の slice/effect（偶数語の空 pivot、1文字語の空の前半）を入力位置の幅0一致に戻し（反転時は失敗、`WordParser("")` の不一致は維持）、context 全体に残って rollback 済み・前回の候補を使い続けていた候補 cache を撤去した。Usage003 Palindrome の5 recipe を既定 surefire と Rust の owned capture adapter から共通 fixture（再利用・外側失敗後の再試行・非BMP拒否を含む）で検証する（#1017）。
 - Java の Choice / PredictiveChoice は候補の開始時に適用される matched cursor の reset を先読み判定にも反映する。診断方針による受理差と nullable 候補の誤選択を修正し、Java/Rust の共通入力で検証した (#861)。
 - Rust native の名前述語を宣言・body lowering より先に検証し、対象の宣言不正と重なる共通61入力（rootあり/なし）で Java validator / Java-host と同じ名前述語コードを先頭に返すことを確認。一般の profile / schema 検証フェーズの差は #917 で継続する。capture / kind の検証を全規則で終えてから snapshot version の整合性を調べる (#858)。
 
@@ -126,6 +127,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - native Rust の rule を含む local module の拒否診断に絶対元パスを付け、generate / deps inspect と authoring LSP の表示を Java に揃えた。入口・推移的 import、非 ASCII・非 BMP・空白パスと LF/CRLF を共通 fixture で検証し、check / Playground の P-MODULE は維持する (#988)。
 - native Rust の複数 grammar・不正 module feature・network import の E-MODULE 拒否末尾へ対象パス/URLを付け、Java の全診断と揃えた。字句正規化・symlink 非解決・推移的 import、URL の元表記と通信前拒否を共通 CLI / authoring stdio fixture で固定した (#999)。
 - native UBNF frontend の CHAR_RANGE・v2 escape・宣言的字句 range・重複 annotation 引数の値エラーを全体構文認識後へ保留し、後続構文不正を Java と同じく優先する。最初の値／移行診断を維持し、native 固有の入れ子上限後の走査は #996 に分離した (#983)。
+- native UBNF は規則本体の AST 上限128段後も明示 stack で構文を認識し、後続の構文不正を旧 REGEX・値診断より優先する。Java の構文到達境界と frame 上限の残差、debug 2 MiB stack の10,000段を共通 fixture で検証し、AST の上限と正常入力の走査を維持する (#996)。
 - native Rust の generate / Playground の出力先パスを Java に揃えた。成功 stdout は generate の末尾・連続 `/` を整理し、Playground は絶対・字句正規化したパスを表示する。不存在成分を含む `..`・`.` を含む作成先の失敗文、生成先の親の symlink の検査順と mode 444 の既存生成物の書込み失敗も一致させ、generate の symlink 祖先拒否は理由付きの意図した差として維持する。[移行案内](docs/migration-after-3.3.0.md) (#952)。
 - native Rust の generate が既存生成物の mode を保持し、hard link と書込み不可 directory 内の書込み可能な既存ファイルは Java と同じその場書込みへ退避する。通常 rename の失敗時保護を維持し、退避時の部分書込みと所有者・ACL・xattr の保存境界を共通 fixture・台帳に明記した (#971)。
 - native Rust の `playground --profile` で profile 自体と参照 grammar の入力 I/O を Java の終了4・パス・不正 UTF-8 の長さ表示へ揃えた。空・BOM・CRLF の形式エラーと正常な68生成ファイルも共通 fixture で検証し、参照 grammar の構文エラーは generate と同じ意図した差（位置付き native 診断）として固定する (#953)。

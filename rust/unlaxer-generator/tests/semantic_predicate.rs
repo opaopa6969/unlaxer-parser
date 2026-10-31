@@ -43,7 +43,7 @@ fn invalid_grammars_are_refused_with_the_java_code_before_generation() {
 #[test]
 fn valid_grammars_wrap_rules_and_expose_the_registry_entry() {
     let corpus = rows("corpus.json");
-    assert_eq!(6, corpus.len());
+    assert_eq!(8, corpus.len(), "all corpus grammars generate");
     for fixture in corpus {
         let source = fixture["grammar"].as_str().unwrap();
         let grammar = &unlaxer_ubnf::parse(source).unwrap().grammars[0];
