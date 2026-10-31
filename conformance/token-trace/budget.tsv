@@ -1,0 +1,25 @@
+# Independent oracle for #866: Java real filtered Token leaves; Rust also checks trace budgets n-1/n/n+1.
+# name	input	parser	kind	invert	reset	accepted	consumed	matched	leaves(label,kind,start,end,text)	leaf_cursors(consumed:matched)
+matchonly-tail	a|x	matchonly-tail	consumed	false	false	true	1	3	WordParser,consumed,0,1,a	1:1
+matchonly-tail-reset	a|x	matchonly-tail	consumed	false	true	true	1	3	WordParser,consumed,0,1,a	1:1
+matchonly-tail-matchOnly	a|x	matchonly-tail	matchOnly	false	false	true	0	3	WordParser,matchOnly,0,1,a;WordParser,matchOnly,1,2,|;WordParser,matchOnly,2,3,x	0:1;0:2;0:3
+matchonly-tail-virtualConsumed	a|x	matchonly-tail	virtualTokenConsumed	false	false	true	1	3	WordParser,virtualTokenConsumed,0,1,a	1:1
+matchonly-tail-virtualMatchOnly	a|x	matchonly-tail	virtualTokenMatchOnly	false	false	true	0	3	WordParser,virtualTokenMatchOnly,0,1,a	0:1
+optional-matchonly	a|x	optional-matchonly	consumed	false	false	true	1	3	WordParser,consumed,0,1,a;Optional,consumed,1,1,~	1:1;1:3
+stopconsume-tail-virtualConsumed	a|x	stopconsume-tail	virtualTokenConsumed	false	false	true	3	3	WordParser,virtualTokenConsumed,0,1,a	1:1
+stopconsume-tail-matchOnly	a|x	stopconsume-tail	matchOnly	false	false	false	0	0	~	~
+stopconsume-tail-virtualMatchOnly	a|x	stopconsume-tail	virtualTokenMatchOnly	false	false	false	0	0	~	~
+stopconsume-tail-consumed	a|x	stopconsume-tail	consumed	false	false	true	3	3	WordParser,consumed,0,1,a;WordParser,consumed,1,2,|;WordParser,consumed,2,3,x	1:1;2:2;3:3
+matchonly-empty	a	matchonly-empty	consumed	false	false	true	1	1	WordParser,consumed,0,1,a	1:1
+zero-width	a|x	zero-width	consumed	false	false	true	1	3	Optional,consumed,0,0,~;WordParser,consumed,0,1,a	0:0;1:1
+choice-loser	a|x	choice-loser	consumed	false	false	true	1	3	WordParser,consumed,0,1,a	1:1
+not-tail	a|x	not-tail	consumed	false	false	true	1	3	WordParser,consumed,0,1,a	1:1
+lookahead-tail	a|x	lookahead-tail	consumed	false	false	true	1	3	WordParser,consumed,0,1,a	1:1
+outer-failure	a|x	outer-failure	consumed	false	false	false	0	0	~	~
+unicode-crlf	😀\r\nx	unicode-crlf	consumed	false	false	true	1	4	WordParser,consumed,0,1,😀	1:1
+interleave	a|x	interleave	consumed	false	false	true	3	3	WordParser,consumed,0,1,a;WordParser,consumed,1,2,|;WordParser,consumed,2,3,x	1:1;2:2;3:3
+number-tail	12|	number-tail	consumed	false	false	true	2	3	Optional,consumed,0,0,~;DigitParser,consumed,0,1,1;DigitParser,consumed,1,2,2;Optional,consumed,2,2,~	0:0;1:1;2:2;2:2
+invert-stop	a|x	invert-stop	consumed	true	false	true	1	3	WordParser,consumed,0,1,a	1:1
+invert-matchonly	bc	invert-matchonly	consumed	true	false	true	1	2	WordParser,consumed,0,1,b	1:1
+closed-nesting	a|x|	closed-nesting	consumed	false	false	true	4	4	WordParser,consumed,0,1,a;WordParser,consumed,3,4,|	1:1;4:4
+matchonly-root	a|	matchonly-root	consumed	false	false	true	0	2	WordParser,matchOnly,0,1,a;WordParser,matchOnly,1,2,|	0:1;0:2
