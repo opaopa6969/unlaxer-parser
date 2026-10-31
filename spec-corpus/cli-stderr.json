@@ -5865,7 +5865,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -5877,7 +5877,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -5923,7 +5923,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -5935,7 +5935,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6066,7 +6066,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6078,7 +6078,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6126,7 +6126,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6138,7 +6138,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6190,7 +6190,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6202,7 +6202,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6250,7 +6250,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6262,7 +6262,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6310,7 +6310,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6322,7 +6322,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6370,7 +6370,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6382,7 +6382,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6434,7 +6434,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6446,7 +6446,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6500,7 +6500,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6512,7 +6512,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6560,7 +6560,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6572,7 +6572,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6616,7 +6616,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6628,7 +6628,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6674,7 +6674,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6686,7 +6686,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6736,7 +6736,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6748,7 +6748,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6938,7 +6938,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6950,7 +6950,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -9560,14 +9560,14 @@
         "LF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
         "CRLF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -10070,14 +10070,14 @@
         "LF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
         "CRLF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -10108,14 +10108,14 @@
         "LF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
         "CRLF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -10146,14 +10146,14 @@
         "LF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
         "CRLF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -19865,7 +19865,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "stderr": "",
             "lastError": ""
           },
@@ -19891,7 +19891,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "stderr": "",
             "lastError": ""
           },
@@ -19952,7 +19952,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "stderr": "",
             "lastError": ""
           },
@@ -19978,7 +19978,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 67 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "stderr": "",
             "lastError": ""
           },
@@ -40231,7 +40231,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "31366ecbc863953b567e34f7252e03b1f1aeff0d0b6d91c9577fd8ea179ab81f"
+          "260325f099c497ff7ef5da42c2204e7c70aa078438ace5c6e4381a0be6d9608b"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -40260,6 +40260,10 @@
         "runtime/src/provider_protocol.rs": [
           33188,
           "5803a1f8221d8c7303a9dade5cc6b94156875b971c264d7b29bcdb81314204b3"
+        ],
+        "runtime/src/rule_names.rs": [
+          33188,
+          "59914d134f4b23e769ac8f439ba19452575c5681f81533399f0c87e7e8e3dc5d"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -40536,7 +40540,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "31366ecbc863953b567e34f7252e03b1f1aeff0d0b6d91c9577fd8ea179ab81f"
+          "260325f099c497ff7ef5da42c2204e7c70aa078438ace5c6e4381a0be6d9608b"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -40565,6 +40569,10 @@
         "runtime/src/provider_protocol.rs": [
           33188,
           "5803a1f8221d8c7303a9dade5cc6b94156875b971c264d7b29bcdb81314204b3"
+        ],
+        "runtime/src/rule_names.rs": [
+          33188,
+          "59914d134f4b23e769ac8f439ba19452575c5681f81533399f0c87e7e8e3dc5d"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -40836,7 +40844,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "31366ecbc863953b567e34f7252e03b1f1aeff0d0b6d91c9577fd8ea179ab81f"
+          "260325f099c497ff7ef5da42c2204e7c70aa078438ace5c6e4381a0be6d9608b"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -40865,6 +40873,10 @@
         "runtime/src/provider_protocol.rs": [
           33188,
           "5803a1f8221d8c7303a9dade5cc6b94156875b971c264d7b29bcdb81314204b3"
+        ],
+        "runtime/src/rule_names.rs": [
+          33188,
+          "59914d134f4b23e769ac8f439ba19452575c5681f81533399f0c87e7e8e3dc5d"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -41141,7 +41153,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "31366ecbc863953b567e34f7252e03b1f1aeff0d0b6d91c9577fd8ea179ab81f"
+          "260325f099c497ff7ef5da42c2204e7c70aa078438ace5c6e4381a0be6d9608b"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -41170,6 +41182,10 @@
         "runtime/src/provider_protocol.rs": [
           33188,
           "5803a1f8221d8c7303a9dade5cc6b94156875b971c264d7b29bcdb81314204b3"
+        ],
+        "runtime/src/rule_names.rs": [
+          33188,
+          "59914d134f4b23e769ac8f439ba19452575c5681f81533399f0c87e7e8e3dc5d"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -41502,7 +41518,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "31366ecbc863953b567e34f7252e03b1f1aeff0d0b6d91c9577fd8ea179ab81f"
+          "260325f099c497ff7ef5da42c2204e7c70aa078438ace5c6e4381a0be6d9608b"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -41531,6 +41547,10 @@
         "runtime/src/provider_protocol.rs": [
           33188,
           "5803a1f8221d8c7303a9dade5cc6b94156875b971c264d7b29bcdb81314204b3"
+        ],
+        "runtime/src/rule_names.rs": [
+          33188,
+          "59914d134f4b23e769ac8f439ba19452575c5681f81533399f0c87e7e8e3dc5d"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -41807,7 +41827,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "31366ecbc863953b567e34f7252e03b1f1aeff0d0b6d91c9577fd8ea179ab81f"
+          "260325f099c497ff7ef5da42c2204e7c70aa078438ace5c6e4381a0be6d9608b"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -41836,6 +41856,10 @@
         "runtime/src/provider_protocol.rs": [
           33188,
           "5803a1f8221d8c7303a9dade5cc6b94156875b971c264d7b29bcdb81314204b3"
+        ],
+        "runtime/src/rule_names.rs": [
+          33188,
+          "59914d134f4b23e769ac8f439ba19452575c5681f81533399f0c87e7e8e3dc5d"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
