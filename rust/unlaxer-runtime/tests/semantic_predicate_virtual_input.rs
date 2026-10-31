@@ -388,6 +388,72 @@ fn input_capture_boundary_follows_the_returned_source_in_every_caller_kind() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
+/// An AST field capture (`@f`) checks the returned source as InputCaptureBoundary does, so the rules
+/// with a Choice body are accepted in the virtual kinds too (#1023 C). Its span is the raw extent of
+/// the token the Java site publishes: generated "" at 0-0 when the virtual site collected nothing.
+/// A rejection leaves the cursor at the prefix and no capture. Shared oracle, measured with the
+/// generated Java __CaptureSite: conformance/input-capture-virtual/field.tsv.
+#[test]
+fn field_capture_follows_the_java_capture_site_in_every_caller_kind() {
+    fn field(expression: Expr) -> Expr {
+        expression.capture("f")
+    }
+    let rows: Vec<Vec<&str>> = include_str!("../../../conformance/input-capture-virtual/field.tsv")
+        .lines()
+        .filter(|row| !row.starts_with('#'))
+        .map(|row| row.split('\t').collect())
+        .collect();
+    assert_eq!(rows.len(), 432);
+    let mut failures = vec![];
+    for row in &rows {
+        // The rust column names a known difference from Java, else Rust reads the Java field.
+        let expected_field = match row[10] {
+            "=" if row[3] == "false" => String::new(),
+            "=" => format!("{}-{}'{}'", row[5], row[6], row[7].replace('~', "")),
+            known => known.replace('~', ""),
+        };
+        let expected = (
+            row[3] == "true",
+            expected_field,
+            (row[8].parse().unwrap(), row[9].parse().unwrap()),
+        );
+        for options in all_options() {
+            let input = format!("{}c", prefix(row[1]));
+            let mut context = ParseContext::with_options(&input, options);
+            if row[1] != "0" {
+                context.parse(&Expr::literal(prefix(row[1]))).unwrap();
+            }
+            let accepted = context
+                .parse_with_token_mode(&entry(row[2], field), kind(row[0]), false)
+                .is_ok();
+            let spans = context
+                .capture_spans("f")
+                .iter()
+                .map(|span| {
+                    format!(
+                        "{}-{}'{}'",
+                        span.start,
+                        span.end,
+                        context.text(*span).unwrap()
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            let actual = (
+                accepted,
+                spans,
+                (context.position(), context.matched_position()),
+            );
+            if actual != expected {
+                failures.push(format!(
+                    "{row:?} {options:?}: actual {actual:?}, expected {expected:?}"
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
 /// A virtual-kind rule that collected nothing publishes generated "": capture_owned records it at
 /// the capture position, as Java's NamedCapture over the LazyChain records GENERATED there
 /// (namedCaptureOfAnEmptyVirtualRuleIsGeneratedAtTheCursor). Not at the rule's own anchor 0.

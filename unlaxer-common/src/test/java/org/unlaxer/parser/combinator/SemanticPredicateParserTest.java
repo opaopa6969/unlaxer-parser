@@ -526,6 +526,78 @@ public class SemanticPredicateParserTest {
         }
     }
 
+    /** The generated UBNF @f site: the body of ParserGenerator's __CaptureSite, without its bindings. */
+    private static final class FieldCaptureSite extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
+        private static final long serialVersionUID = 1L;
+        private final Parser child;
+        FieldCaptureSite(Parser child) { this.child = child; }
+        @Override public org.unlaxer.parser.Parsers getLazyParsers() { return new org.unlaxer.parser.Parsers(child); }
+        @Override public org.unlaxer.Parsed parseChainElement(Parser child, ParseContext context, TokenKind kind, boolean invert) {
+            org.unlaxer.Parsed parsed = child.parse(context, kind, invert);
+            if (parsed.isSucceeded() && (parsed.getTokenOptional().isPresent() || false == parsed.getOriginalTokens().isEmpty())) {
+                if (org.unlaxer.CapturedValue.provenanceOf(parsed.getRootToken().source, context.getSource())
+                        != org.unlaxer.CapturedValue.Provenance.INPUT) {
+                    return org.unlaxer.parser.ErrorMessageParser.expected(
+                        "AST field capture requires original input source; use CAPTURE/SAME_AS for general replay")
+                        .parse(context, kind, invert);
+                }
+            }
+            return parsed;
+        }
+        @Override public java.util.Optional<org.unlaxer.RecursiveMode> getNotAstNodeSpecifier() {
+            return java.util.Optional.empty();
+        }
+    }
+    private static void fieldSites(Token token, List<Token> sites) {
+        if (token.parser instanceof FieldCaptureSite) sites.add(token);
+        for (Token child : token.filteredChildren) fieldSites(child, sites);
+    }
+
+    /**
+     * The generated @f site checks the source of the Parsed its child returns, so a LazyChoice rule is accepted
+     * in the virtual kinds too (#1023 C). Its field is the site token the mapper reads: generated "" at raw 0-0
+     * when the virtual site collected nothing. A rejection leaves the cursor at the prefix and no site token.
+     * Shared oracle with Rust Expr::Capture, conformance/input-capture-virtual/field.tsv.
+     */
+    @Test public void fieldCaptureSiteFollowsTheReturnedSourceInEveryCallerKind() throws java.io.IOException {
+        var rows = new java.util.ArrayList<String[]>();
+        for (String row : java.nio.file.Files.readAllLines(java.nio.file.Path.of("../conformance/input-capture-virtual/field.tsv"))) {
+            if (false == row.startsWith("#")) rows.add(row.split("\t"));
+        }
+        assertEquals(432, rows.size());
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String[] row : rows) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            String prefix = prefixes.get(row[1]);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                String label = String.join(" ", row) + " " + memo + "/" + diagnostics;
+                int before = context.getCurrent().getTokens().size();
+                var parsed = new FieldCaptureSite(shape(row[2])).parse(context, TokenKind.valueOf(row[0]), false);
+                var sites = new java.util.ArrayList<Token>();
+                var tokens = context.getCurrent().getTokens();
+                for (int index = before; index < tokens.size(); index++) fieldSites(tokens.get(index), sites);
+                String field = "-";
+                if (parsed.isSucceeded()) {
+                    Token site = parsed.getTokenOptional().orElseThrow();
+                    assertEquals(label, List.of(site), sites);
+                    int start = site.source.offsetFromRoot().value();
+                    String text = site.source.sourceAsString();
+                    field = org.unlaxer.CapturedValue.provenanceOf(site.source, context.getSource()) + " " + start + " "
+                        + (start + site.source.codePointLength().value()) + " " + (text.isEmpty() ? "~" : text);
+                } else {
+                    assertEquals(label, List.of(), sites);
+                }
+                assertEquals(label, row[3], String.valueOf(parsed.isSucceeded()));
+                assertEquals(label, parsed.isSucceeded() ? String.join(" ", row[4], row[5], row[6], row[7]) : row[5], field);
+                assertEquals(label, row[8] + "/" + row[9],
+                    context.getConsumedPosition().value() + "/" + context.getMatchedPosition().value());
+            }
+          }
+        }
+    }
+
     /**
      * A virtual-kind rule (LazyChain) that collected nothing returns generated "": NamedCapture records it
      * at the cursor (Rust owned_capture_of_an_empty_virtual_rule_is_generated_at_the_cursor).
