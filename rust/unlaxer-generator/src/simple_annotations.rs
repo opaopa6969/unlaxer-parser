@@ -18,7 +18,7 @@ pub const FUNCTIONAL: [&str; 2] = ["nestedCaptures", "autoCommit"];
 
 /// The dedicated annotation keywords. A Simple annotation with one of these names was written
 /// with trivia after `@` (`@ leftAssoc`) or, for an argument keyword, without its `(`.
-pub const KEYWORDS: [&str; 22] = [
+pub const KEYWORDS: [&str; 23] = [
     "root",
     "mapping",
     "eval",
@@ -33,6 +33,7 @@ pub const KEYWORDS: [&str; 22] = [
     "rightAssoc",
     "longestChoice",
     "uniqueLongestChoice",
+    "predicate",
     "namePredicate",
     "predictiveChoice",
     "precedence",
@@ -44,7 +45,7 @@ pub const KEYWORDS: [&str; 22] = [
 ];
 
 /// The keywords that require arguments.
-const ARGUMENTS: [&str; 13] = [
+const ARGUMENTS: [&str; 14] = [
     "mapping",
     "eval",
     "interleave",
@@ -53,6 +54,7 @@ const ARGUMENTS: [&str; 13] = [
     "scopeTree",
     "declares",
     "catalog",
+    "predicate",
     "namePredicate",
     "precedence",
     "doc",

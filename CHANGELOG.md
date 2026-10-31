@@ -57,6 +57,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Added
 
+- UBNF に名前付き汎用 semantic predicate `@predicate('name')` を追加 (issue #1006)。規則本体の成功候補の原文と code point 範囲に、呼出し側が登録した純粋条件を適用する。`false` は rollback して次の候補へ進み、未登録・callback 例外/`Err`/unwind panic・投影 source は `predicate_missing` / `predicate_error` / `predicate_source` の明示診断になる。Java は `SemanticPredicateBindings` と生成 mapper の `parseWithPredicates` / `diagnoseWithPredicates`、Rust は `semantic_predicates::Bindings` と生成 `parse_tree_detailed_with_semantic_predicates`。`@root` / `@mapping` / `@doc` 以外の規則注釈や `@namePredicate` との併用は `E-PREDICATE-COMBINATION` で拒否する。述語を使わない grammar の生成物は変わらない。Rust の低水準 Classic 入口では、virtual 種別で何も収集しなかった collector の内部 source を公開 token と同じ生成 `""` として扱い、token 種別だけから由来を推定しない（入力由来の空 virtual token は候補になる）。これに伴い同じ入口の `@f` / `capture_owned` の一部の判定が Java に揃う。残る owned capture の差は #1023。性能は未測定。[契約・制限](docs/semantic-predicates.md)。
 - cut とラベル付き失敗を Java/Rust runtime および UBNF の `COMMIT` / `LABEL` / `CATCH` に追加 (PR #707、#710、issue #700)。確定エラーは recovery 境界へ、ラベル付き失敗は指定した CATCH へ伝わる。[契約](docs/cut-and-labeled-failures.md)。
 - 一階の引数付き規則を両 frontend で生成前に単相化し、`F(=x, y)` の値渡し引数を `CAPTURE_SCOPE` / `CAPTURE` / `SAME_AS` へ展開する (PR #708、#711、issue #701、#704)。[引数付き規則](docs/parameterized-rules.md)、[値渡し](docs/call-by-value-arguments.md)。
 - FIRST 集合と外側の文脈による cut 位置の lint、規則単位で opt-in する `@autoCommit` を追加。文法全体の `@whitespace: javaStyle` にも対応する (PR #724、#731、issue #702、#728)。対象外の警告は lint API から取得する。[条件と制限](docs/auto-commit.md)。
@@ -93,7 +94,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Java `MatchedTokenParser` の空の slice/effect（偶数語の空 pivot、1文字語の空の前半）を入力位置の幅0一致に戻し（反転時は失敗、`WordParser("")` の不一致は維持）、context 全体に残って rollback 済み・前回の候補を使い続けていた候補 cache を撤去した。Usage003 Palindrome の5 recipe を既定 surefire と Rust の owned capture adapter から共通 fixture（再利用・外側失敗後の再試行・非BMP拒否を含む）で検証する（#1017）。
 - XML tag の Usage002_02/03/04 サンプルで class 参照する型を公開し、元 sample と Java/Rust 共通の 70 入力 fixture（02 の名前非比較・03/04 の既出名照合・owned replay 版）を通常テストへ追加する。03/04 の Rust adapter は Java MatchedTokenParser の候補順（transaction stack 順、空要素名を含む）を close のたびに現在の capture から組み直し、#1017 の修正後の Java と同じく古い候補一覧を再利用しない。完了した要素の token が現在の stack に残っていれば候補に含め、rollback された選択肢の token は含めない。前方一致する名前の入れ子 close も共通期待値で照合し、候補の取り直しは 15 入力の共通 fixture（retry と同じ instance の連続使用）で固定する（#1016）。
 - Java の Choice / PredictiveChoice は候補の開始時に適用される matched cursor の reset を先読み判定にも反映する。診断方針による受理差と nullable 候補の誤選択を修正し、Java/Rust の共通入力で検証した (#861)。
-- Rust native の名前述語を宣言・body lowering より先に検証し、複数の不正を含む文法でも Java validator / Java-host と同じ名前述語コードを先頭に返す。capture / kind の検証を全規則で終えてから snapshot version の整合性を調べる (#858)。
+- Rust native の名前述語を宣言・body lowering より先に検証し、対象の宣言不正と重なる共通61入力（rootあり/なし）で Java validator / Java-host と同じ名前述語コードを先頭に返すことを確認。一般の profile / schema 検証フェーズの差は #917 で継続する。capture / kind の検証を全規則で終えてから snapshot version の整合性を調べる (#858)。
 
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
 - Java / Rust の local import を通常ファイル・64 MiB以下に制限し、stat後の増大も上限＋1バイトで打ち切る。デバイス・FIFO・socket・directory・過大ファイルは同じ `E-MODULE` で拒否し、両 authoring stdio server の後続応答と CLI を共通fixtureで検証 (#890)。

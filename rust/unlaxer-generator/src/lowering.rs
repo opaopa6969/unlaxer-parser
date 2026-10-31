@@ -37,7 +37,9 @@ fn whitespace_style(style: &str) -> Result<bool> {
 /// Validate source-level name predicates before declaration/lowering errors (#858).
 /// Share Java's SemanticCardinality-equivalent capture analysis with common fields;
 /// it does not require a successfully lowered body (undefined refs are text here).
-fn validate_name_predicates(grammar: &ast::GrammarDecl) -> Result<Vec<(String, String)>> {
+pub(crate) fn validate_name_predicates(
+    grammar: &ast::GrammarDecl,
+) -> Result<Vec<(String, String)>> {
     if !grammar.rules.iter().any(|rule| {
         rule.annotations
             .iter()
@@ -544,7 +546,22 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     // Match Java RustGrammarLowering: schema failures precede enum/eval/embedding
     // and ordinary lowering failures, but not bounded/precedence/nested failures.
     crate::common_fields::families(grammar)?;
+    // GenContext checks lexical profile settings before @predicate, including a
+    // malformed profile that the predicate also cannot compose with (#1006).
+    if crate::semantic_predicates::enabled(grammar) {
+        if let Some(issue) = crate::token_stream::problems(grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
+        if let Some(issue) = crate::global_comment::problems(grammar).first() {
+            return Err(format!("{}: {}", issue.code, issue.subject));
+        }
+    }
     crate::lexical_contexts::validate(grammar)?;
+    // Java checks @predicate after lexical contexts and name predicates. Native checks
+    // name predicates in source preflight, so a grammar with both waits until then.
+    if !crate::semantic_predicates::waits_for_name_predicates(grammar) {
+        crate::semantic_predicates::validate(grammar)?;
+    }
     let format_two = grammar.settings.iter().any(|setting| {
         setting.key == "ubnf"
             && matches!(&setting.value, ast::SettingValue::String(value) if value == "v2")
@@ -825,6 +842,9 @@ impl Lowering<'_> {
             return Err(format!("{}: {}", issue.code, issue.subject));
         }
         let name_versions = validate_name_predicates(self.grammar)?;
+        if crate::semantic_predicates::waits_for_name_predicates(self.grammar) {
+            crate::semantic_predicates::validate(self.grammar)?;
+        }
         let declaration_error = match validate_declarations(self.grammar, &lexical) {
             // Preserve the existing root-projection explanation when it fails;
             // otherwise use the assoc explanation, still before undefined refs.
@@ -845,7 +865,13 @@ impl Lowering<'_> {
                 {
                     format!("E-ASSOC-NO-MAPPING: {error}")
                 }
-                Some(deferred) if !error.starts_with("E-NAME-PREDICATE-") => deferred,
+                // A semantic predicate refusal follows name predicates in Java too.
+                Some(deferred)
+                    if !error.starts_with("E-NAME-PREDICATE-")
+                        && !error.starts_with("E-PREDICATE-") =>
+                {
+                    deferred
+                }
                 _ => error,
             })
     }
@@ -979,7 +1005,7 @@ impl Lowering<'_> {
             let mut comparison = None;
             for annotation in &rule.annotations {
                 match &annotation.kind {
-                    AnnotationKind::NamePredicate { .. } => {}
+                    AnnotationKind::NamePredicate { .. } | AnnotationKind::Predicate { .. } => {}
                     AnnotationKind::Root => {
                         if root.replace(i).is_some() {
                             return Err("multiple @root annotations".into());
@@ -1605,6 +1631,20 @@ impl Lowering<'_> {
             rules[root].body = Expression::NameResolutionScope {
                 child: Box::new(rules[root].body.clone()),
                 requirements: name_versions,
+            };
+        }
+        for (i, rule) in rules.iter_mut().enumerate() {
+            if let Some(name) = crate::semantic_predicates::annotation(&self.grammar.rules[i]) {
+                rule.body = Expression::SemanticPredicate {
+                    child: Box::new(rule.body.clone()),
+                    name: name.to_owned(),
+                };
+            }
+        }
+        if crate::semantic_predicates::enabled(self.grammar) {
+            rules[root].body = Expression::SemanticPredicateScope {
+                child: Box::new(rules[root].body.clone()),
+                requirements: crate::semantic_predicates::requirements(self.grammar),
             };
         }
         let ir = GrammarIr {

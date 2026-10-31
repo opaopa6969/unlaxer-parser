@@ -385,6 +385,12 @@ fn transparent_constraint_projection(root: &Expression) -> bool {
             | NameResolutionScope {
                 child: expression, ..
             }
+            | SemanticPredicate {
+                child: expression, ..
+            }
+            | SemanticPredicateScope {
+                child: expression, ..
+            }
             | LexicalContextScope {
                 child: expression, ..
             }
@@ -534,6 +540,26 @@ fn expression(
                 name_requirement(id, version)?;
                 if !ids.insert(id) {
                     return Err(fail("duplicate name requirement"));
+                }
+            }
+            expression(child, count, captures)?;
+        }
+        SemanticPredicate { child, name } => {
+            predicate_name(name)?;
+            expression(child, count, captures)?;
+        }
+        SemanticPredicateScope {
+            child,
+            requirements,
+        } => {
+            if requirements.len() > 64 {
+                return Err(fail("semantic predicate limit exceeds 64"));
+            }
+            let mut names = BTreeSet::new();
+            for name in requirements {
+                predicate_name(name)?;
+                if !names.insert(name) {
+                    return Err(fail("duplicate semantic predicate requirement"));
                 }
             }
             expression(child, count, captures)?;
@@ -718,8 +744,25 @@ fn enum_body_literals<'a>(expression: &'a Expression, out: &mut Vec<&'a str>) ->
         | Expression::LexicalContextScope { child, .. }
         | Expression::RuleEffects { child, .. }
         | Expression::NameResolutionScope { child, .. }
+        | Expression::SemanticPredicateScope { child, .. }
         | Expression::NamePredicate { child, .. }
+        | Expression::SemanticPredicate { child, .. }
         | Expression::Recovery { child, .. } => enum_body_literals(child, out),
         _ => false,
     }
+}
+
+/// Runtime `semantic_predicates::validate_name`: ASCII `[A-Za-z_][A-Za-z0-9_.-]*`, at most 128 bytes.
+fn predicate_name(name: &str) -> Result<(), GenerateError> {
+    let bytes = name.as_bytes();
+    if bytes.is_empty()
+        || bytes.len() > 128
+        || !(bytes[0].is_ascii_alphabetic() || bytes[0] == b'_')
+        || bytes[1..]
+            .iter()
+            .any(|c| !(c.is_ascii_alphanumeric() || b"_.-".contains(c)))
+    {
+        return Err(fail("invalid semantic predicate name"));
+    }
+    Ok(())
 }

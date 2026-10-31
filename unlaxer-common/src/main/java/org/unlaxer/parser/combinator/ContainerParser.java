@@ -4,6 +4,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.unlaxer.CodePointLength;
 import org.unlaxer.CursorRange;
 import org.unlaxer.Name;
 import org.unlaxer.Parsed;
@@ -26,9 +27,11 @@ public abstract class ContainerParser<T> extends NoneChildParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-		Token token = Token.empty(
-				tokenKind, 
-				parseContext.getCursor(TokenKind.consumed),
+		// A zero-length view of the input at the consumed cursor. Token.empty cannot be used here:
+		// in a root context its "" belongs to a new root, not the input, so it reads as generated.
+		Token token = new Token(
+				tokenKind,
+				parseContext.peek(parseContext.getConsumedPosition(), new CodePointLength(0)),
 				this
 		);
 		parseContext.getCurrent().addToken(token);

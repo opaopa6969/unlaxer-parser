@@ -165,6 +165,12 @@ public final class GrammarValidator {
             String code=message!=null && message.startsWith("E-NAME-PREDICATE-") ? message.split(":",2)[0] : "E-NAME-PREDICATE-CAPTURE";
             errors.add(new ValidationIssue(code,message,"Use one versioned name predicate over a required scalar text capture."));
         }
+        try { SemanticPredicates.requireValid(grammar); }
+        catch (IllegalArgumentException error) {
+            String message = error.getMessage();
+            errors.add(new ValidationIssue(message.split(":", 2)[0], message,
+                "Use one @predicate('registeredName') per rule beside only @root/@mapping/@doc, at most 64 distinct names, without @namePredicate, token-stream or embedding grammars."));
+        }
         try { EmbeddedGrammarEmitter.declarations(grammar); }
         catch (IllegalArgumentException error) {
             errors.add(new ValidationIssue("E-EMBEDDING", error.getMessage(), "Use one scalar body capture and exact language identity."));

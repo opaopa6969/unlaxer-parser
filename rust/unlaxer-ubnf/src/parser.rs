@@ -693,6 +693,12 @@ impl Parser<'_> {
             "rightAssoc" => AnnotationKind::RightAssoc,
             "longestChoice" => AnnotationKind::LongestChoice,
             "uniqueLongestChoice" => AnnotationKind::UniqueLongestChoice,
+            "predicate" => {
+                self.expect('(')?;
+                let name = self.quoted()?;
+                self.expect(')')?;
+                AnnotationKind::Predicate { name }
+            }
             "namePredicate" => {
                 self.expect('(')?;
                 self.named_arg("snapshot")?;

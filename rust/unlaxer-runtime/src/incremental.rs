@@ -247,7 +247,9 @@ pub fn grammar_is_snapshot_cacheable(rules: &[crate::Rule]) -> bool {
             | Expr::RuleEffects { child, .. }
             | Expr::CaptureEquality { child, .. }
             | Expr::NamePredicate { child, .. }
+            | Expr::SemanticPredicate { child, .. }
             | Expr::NameResolutionScope { child, .. }
+            | Expr::SemanticPredicateScope { child, .. }
             | Expr::Recovery { child, .. }
             | Expr::TriviaScope { child, .. }
             | Expr::LexicalTriviaScope { child, .. }
