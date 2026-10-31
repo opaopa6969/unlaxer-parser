@@ -179,6 +179,7 @@ fn generate_resolved(
     runtime!("source.rs");
     runtime!("shared_calls.rs");
     runtime!("rule_stack.rs");
+    runtime!("rule_names.rs");
     runtime!("language_profile.rs");
     runtime!("embedded.rs");
     runtime!("provider_protocol.rs");
