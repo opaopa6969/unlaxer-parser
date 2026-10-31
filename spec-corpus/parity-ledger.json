@@ -947,7 +947,7 @@
         994,
         1001
       ],
-      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通103件（既存27件＋validator76文法の全JSON）で検証。同一/減少versionもJava通り適用。validatorの意味解析/classpathは #893、syntax/module全診断は #894、profile再設定は #895でinitialize options/configure・experimental metadataを共通62件の独立全JSONで接続した。失敗設定復元、VALIDATE gate、Ext queryの継続、文書保持・range付きFull change・package snapshot寿命を含む（親 #885は継続）。#886 第一単位で AST definition/references・rename・outline/folding・linked editing と検証済み packageSource を追加し、共通stdio39件と両backendのpackaged IDEで元位置/拒否/cache境界を検証。残るFQN quick fix/signature/semantic tokensは #901、completion/hoverのUTF16内部/BMP分類・frontend制約・非file didOpen時のJava provider解決エラー・特殊URI/platform/起動失敗は #902。native配布は方針の文書化のみで公開しない。親 #886 はopenのまま。 #890でlocal importの通常ファイル・64 MiB・bounded readを両版に適用し、共通17件で実stdio後続応答と3 CLI経路、新しい拒否の全診断JSONを検証する。#908でmanifest/lockを8 MiBのbounded readerと共通診断・検査順へ接続し、共通27件で両stdioと3 CLIを照合する（#908はPR #912でCLOSED）。RustはO_NONBLOCKとhandle fstatを共用。Javaはhandleのseek/size検査までで、stat後の差替え競合（writerなしFIFOのopenと完全な型検査）は#907/#911に残る。#913でcache/local artifactも同じ8 MiB readerへ接続し、既存cache診断/raw hashを維持する。共通39件で両stdio/3 CLI/両deps resolveと推移的依存を照合する（#913はPR #920でCLOSED）。artifactにも同じJava差替え競合の制限（Refs #911）が残る。BOMは#914でJava同様に先頭1つだけ受理し、共通JSON fixtureでraw hash維持を検証する（merge待ち）。#919で不正UTF-8 artifactをJavaの既存文言に統一し、raw hash→strict UTF-8→JSONの順を共通29件の両stdio/3 CLI/両deps resolveで検証する（#919はPR #924でCLOSED）。#921で明示localのパスと推移的依存の基準をJavaの絶対・字句正規化へ揃え、不正パスを既存のcannot read local artifactで拒否する。共通30件を両deps resolveへ送り、lock/cacheの有無を含む120回で成功時のbytesと失敗時不変を照合する（単独サロゲートescapeの先行JSON拒否の差はJSON受理段階の別単位として#926が追跡し、#921はパス解決の単位として閉じる）。#926ではlocal source・ID/version/lock等をJavaの既存診断へ揃える。artifact file/entry/本文・HTTPS sourceは#939に分離し、#926はRefsのまま残す。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。 #928でgrammar/manifestの基準をJavaの絶対・字句正規化へ揃え、CLIの先行する本文読取りとRust editor resolverも同じ場所を使う。共通14形で両実CLI・stdio・file APIを比較し、reader/raw hash/local規則は維持する（#928はPR #933でCLOSED）。 #994 は固定 Java 384fcf3e の JSON-RPC params エラー、Gson Integer version 型変換、publishDiagnostics version:0、未知/未実装 method を共通168件で照合する。JVM/Gson 固有 error.data だけを除外し code/message/id/result と診断通知 params 全体を比較する。失敗 initialize 後再試行、configure 失敗時の旧設定・文書・新入力を検証。キー順/positional arity/capabilities null の reader 残差は #1001。",
+      "observation": "#864 第一段は JVM 不要の起動、Full sync、completion/hover、生成警告と安全な import/package 読取り、VSIX の明示選択を提供する。実 stdio 共通103件（既存27件＋validator76文法の全JSON）で検証。同一/減少versionもJava通り適用。validatorの意味解析/classpathは #893、syntax/module全診断は #894、profile再設定は #895でinitialize options/configure・experimental metadataを共通62件の独立全JSONで接続した。失敗設定復元、VALIDATE gate、Ext queryの継続、文書保持・range付きFull change・package snapshot寿命を含む（親 #885は継続）。#886 第一単位で AST definition/references・rename・outline/folding・linked editing と検証済み packageSource を追加し、共通stdio39件と両backendのpackaged IDEで元位置/拒否/cache境界を検証。残るFQN quick fix/signature/semantic tokensは #901、completion/hoverのUTF16内部/BMP分類・frontend制約・非file didOpen時のJava provider解決エラー・特殊URI/platform/起動失敗は #902。native配布は方針の文書化のみで公開しない。親 #886 はopenのまま。 #890でlocal importの通常ファイル・64 MiB・bounded readを両版に適用し、共通17件で実stdio後続応答と3 CLI経路、新しい拒否の全診断JSONを検証する。#908でmanifest/lockを8 MiBのbounded readerと共通診断・検査順へ接続し、共通27件で両stdioと3 CLIを照合する（#908はPR #912でCLOSED）。RustはO_NONBLOCKとhandle fstatを共用。Javaはhandleのseek/size検査までで、stat後の差替え競合（writerなしFIFOのopenと完全な型検査）は#907/#911に残る。#913でcache/local artifactも同じ8 MiB readerへ接続し、既存cache診断/raw hashを維持する。共通39件で両stdio/3 CLI/両deps resolveと推移的依存を照合する（#913はPR #920でCLOSED）。artifactにも同じJava差替え競合の制限（Refs #911）が残る。BOMは#914でJava同様に先頭1つだけ受理し、共通JSON fixtureでraw hash維持を検証する（merge待ち）。#919で不正UTF-8 artifactをJavaの既存文言に統一し、raw hash→strict UTF-8→JSONの順を共通29件の両stdio/3 CLI/両deps resolveで検証する（#919はPR #924でCLOSED）。#921で明示localのパスと推移的依存の基準をJavaの絶対・字句正規化へ揃え、不正パスを既存のcannot read local artifactで拒否する。共通30件を両deps resolveへ送り、lock/cacheの有無を含む120回で成功時のbytesと失敗時不変を照合する（単独サロゲートescapeの先行JSON拒否の差はJSON受理段階の別単位として#926が追跡し、#921はパス解決の単位として閉じる）。#926ではlocal source・ID/version/lock等をJavaの既存診断へ揃える。artifact file/entry/本文・HTTPS sourceは#939に分離し、#926はRefsのまま残す。Java を既定として維持し、一般の生成 LSP の成功をこの完了証拠にはしない。 #928でgrammar/manifestの基準をJavaの絶対・字句正規化へ揃え、CLIの先行する本文読取りとRust editor resolverも同じ場所を使う。共通14形で両実CLI・stdio・file APIを比較し、reader/raw hash/local規則は維持する（#928はPR #933でCLOSED）。 #994 は固定 Java 384fcf3e の JSON-RPC params エラー、Gson Integer version 型変換、publishDiagnostics version:0、未知/未実装 method を共通168件で照合する。JVM/Gson 固有 error.data だけを除外し code/message/id/result と診断通知 params 全体を比較する。失敗 initialize 後再試行、configure 失敗時の旧設定・文書・新入力を検証。キー順/positional arity/capabilities null の reader 残差は #1001。 #1001でraw reader/DTOの390件を追加し同suiteは558件。全6キー順・重複・positional arity、InitializeParamsの全top-levelと実測した入れ子代表、50型付きrequestのparams型違い、null id通知、生1e400を照合する。serde_json arbitrary_precisionはcrateで明示し-p/workspaceの差を解消。Java readerのid回復失敗・arity>1・capabilities null・不正workDoneTokenの無応答は欠陥として恒久差を記録し、client停止を避けnativeの決定的JSON-RPC応答を維持。1秒deadline・後続request・初期化再試行・configure失敗後の旧設定/文書と新入力を検証する。全ClientCapabilities schemaは移植せず明記した実測代表に限定。#901のJava3機能と親issueは継続。",
       "evidence": [
         "docs/ubnf-authoring-lsp.md",
         "spec-corpus/ubnf-authoring-lsp/cases.json",
@@ -2718,6 +2718,24 @@
         "rust/unlaxer-runtime/tests/semantic_predicate_virtual_input.rs",
         "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/SemanticPredicateParserTest.java"
       ]
+    },
+    {
+      "id": "ubnf-authoring-jsonrpc-reader",
+      "category": "contract",
+      "title": "UBNF authoring JSON-RPC reader の Java 欠陥による無応答と native の決定的応答",
+      "hosts": "Java LSP4J 0.23.1 / Gson 2.13.2、Rust native authoring",
+      "issues": [
+        1001
+      ],
+      "observation": "固定Java revision 384fcf3eb1c0ce3e207ac580cec5fcac4b478b34。method→params→idでの空配列、stream positional arity>1、capabilities null、不正Either workDoneToken、Integer外・非scalarのidはJava readerが失敗して応答しない（数値idはnativeが同じ値を返す）。clientを固める欠陥を互換のために移植せず、nativeはid付きparse errorまたは既存の成功応答でJSON-RPCを完結する恒久差とする。他のキー順でJavaが決定的エラーを返す場合は揃える。全6キー順・重複・arity・null・overflowの独立raw oracleを両実stdioへ送り、1秒deadlineの無応答・後続request・initialize再試行・configure旧設定/文書保持を558件の既存必須suiteで確認する。host別fieldはこの恒久差のoracleと固定revision metadataであり無条件skipではない。JVM/Gson固有error.dataは存在/型を確認して内容を除外し、id/code/messageと他のキーは比較する。ClientCapabilitiesの全schemaは対象外で実測代表を対応表に列挙する。position受理域とhover以外のDTOは #1005。",
+      "evidence": [
+        "docs/ubnf-authoring-lsp.md",
+        "spec-corpus/ubnf-authoring-lsp/jsonrpc.json",
+        "scripts/ubnf_authoring_jsonrpc.py",
+        "rust/unlaxer-ubnf-lsp/src/rpc.rs",
+        "rust/unlaxer-ubnf-lsp/Cargo.toml",
+        "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
+      ]
     }
   ],
   "corpora": [
@@ -3417,6 +3435,17 @@
       "entries": [
         "semantic-predicate",
         "generator-diagnostics"
+      ]
+    },
+    {
+      "path": "spec-corpus/ubnf-authoring-lsp/jsonrpc.json",
+      "fields": {
+        "java": 10,
+        "javaRevision": 1,
+        "rust": 10
+      },
+      "entries": [
+        "ubnf-authoring-jsonrpc-reader"
       ]
     }
   ],
