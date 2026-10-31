@@ -337,6 +337,7 @@ impl Inventory {
             | AnnotationKind::LongestChoice
             | AnnotationKind::UniqueLongestChoice
             | AnnotationKind::NamePredicate { .. }
+            | AnnotationKind::Predicate { .. }
             | AnnotationKind::PredictiveChoice
             | AnnotationKind::Precedence { .. }
             | AnnotationKind::Declares { .. }

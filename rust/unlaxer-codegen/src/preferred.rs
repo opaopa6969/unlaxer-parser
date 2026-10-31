@@ -24,7 +24,9 @@ pub fn parser(
     }
     // Tag every rule so explicitly selected alternate entries retain provenance too.
     for rule in &mut copy.rules {
-        let body = if let Expression::NameResolutionScope { child, .. } = &mut rule.body {
+        let body = if let Expression::NameResolutionScope { child, .. }
+        | Expression::SemanticPredicateScope { child, .. } = &mut rule.body
+        {
             child.as_mut()
         } else {
             &mut rule.body
@@ -75,7 +77,9 @@ fn instrument(
         | LexicalTriviaScope { child, .. }
         | LexicalContextScope { child, .. }
         | NamePredicate { child, .. }
-        | NameResolutionScope { child, .. } => instrument(child, calls)?,
+        | SemanticPredicate { child, .. }
+        | NameResolutionScope { child, .. }
+        | SemanticPredicateScope { child, .. } => instrument(child, calls)?,
         Sequence(items)
         | Choice(items)
         | LongestChoice(items)
@@ -125,7 +129,9 @@ pub(crate) fn contains_depth(expr: &Expression) -> bool {
         | LexicalTriviaScope { child, .. }
         | LexicalContextScope { child, .. }
         | NamePredicate { child, .. }
-        | NameResolutionScope { child, .. } => contains_depth(child),
+        | SemanticPredicate { child, .. }
+        | NameResolutionScope { child, .. }
+        | SemanticPredicateScope { child, .. } => contains_depth(child),
         Sequence(items)
         | Choice(items)
         | LongestChoice(items)

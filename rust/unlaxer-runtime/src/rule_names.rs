@@ -182,6 +182,8 @@ fn first_out_of_range(expression: &Expr, rules: usize) -> Option<usize> {
             | Expr::InputCaptureBoundary(_, child)
             | Expr::RuleEffects { child, .. }
             | Expr::NamePredicate { child, .. }
+            | Expr::SemanticPredicate { child, .. }
+            | Expr::SemanticPredicateScope { child, .. }
             | Expr::NameResolutionScope { child, .. }
             | Expr::CaptureEquality { child, .. }
             | Expr::LexicalTriviaScope { child, .. }
@@ -291,5 +293,14 @@ mod tests {
             let terminated = Expr::Rule(child).repeat_java_until(Expr::Rule(terminator), 0, None);
             assert_eq!(first_out_of_range(&terminated, 2), missing);
         }
+        // A semantic predicate and its entry scope are checked through to the guarded body.
+        let gated = Expr::SemanticPredicateScope {
+            child: Box::new(Expr::SemanticPredicate {
+                child: Box::new(Expr::Rule(5)),
+                name: "valid",
+            }),
+            requirements: vec!["valid"],
+        };
+        assert_eq!(first_out_of_range(&gated, 2), Some(5));
     }
 }

@@ -5865,7 +5865,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -5877,7 +5877,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -5923,7 +5923,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -5935,7 +5935,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6066,7 +6066,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6078,7 +6078,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6126,7 +6126,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6138,7 +6138,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6190,7 +6190,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6202,7 +6202,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6250,7 +6250,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6262,7 +6262,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6310,7 +6310,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6322,7 +6322,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6370,7 +6370,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6382,7 +6382,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6434,7 +6434,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6446,7 +6446,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out/x\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6500,7 +6500,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6512,7 +6512,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6560,7 +6560,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6572,7 +6572,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6616,7 +6616,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6628,7 +6628,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6674,7 +6674,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6686,7 +6686,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6736,7 +6736,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6748,7 +6748,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/pg2\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -6938,7 +6938,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
@@ -6950,7 +6950,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -9560,14 +9560,14 @@
         "LF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 70 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
         "CRLF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 70 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -10070,14 +10070,14 @@
         "LF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
         "CRLF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -10108,14 +10108,14 @@
         "LF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
         "CRLF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -10146,14 +10146,14 @@
         "LF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         },
         "CRLF": {
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "lastError": ""
           }
         }
@@ -19865,7 +19865,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "stderr": "",
             "lastError": ""
           },
@@ -19891,7 +19891,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "stderr": "",
             "lastError": ""
           },
@@ -19952,7 +19952,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "stderr": "",
             "lastError": ""
           },
@@ -19978,7 +19978,7 @@
           },
           "playground": {
             "exit": 0,
-            "stdout": "Generated 68 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
+            "stdout": "Generated 69 playground files in ${WORK}/out\nNext: cd <output>, npm run build, npm start. Rust wasm32 target and Node 20+ are required.\n",
             "stderr": "",
             "lastError": ""
           },
@@ -65106,7 +65106,7 @@
         ],
         "runtime/src/editor_cst.rs": [
           33188,
-          "a20b9a3fb6312c28d4fa6e0ecc596e8fe25f524a4147b9cdfed75fd806a229fa"
+          "10d0648b5250517e41cd60eadb73f9c1ffa69ec6ded9e593127fd4d019007a53"
         ],
         "runtime/src/editor_queries.rs": [
           33188,
@@ -65118,7 +65118,7 @@
         ],
         "runtime/src/first.rs": [
           33188,
-          "29d55505b2e7b98ca8e2950a2c04f1b746fb647b493178d61f5498059823385b"
+          "92f90054ea6d65d494c37e5a6aea8420578c54e64d308899b78373671b9c3e7f"
         ],
         "runtime/src/grapheme.rs": [
           33188,
@@ -65126,7 +65126,7 @@
         ],
         "runtime/src/incremental.rs": [
           33188,
-          "245b2adfbcd9b490736c89121247db1c9900d49098643b0a63aa6db2f5c352a8"
+          "a8af31f06b8d7d09ca33fd477a038547f781f1756251bb463bdaa662308dae8a"
         ],
         "runtime/src/language_profile.rs": [
           33188,
@@ -65146,7 +65146,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "83be683d90c49cb848525bd245c57489cfd56f527f851baaa192a315760d07be"
+          "574edfecd4ad80f87860eb6d29fb8dfce401e73f725bff507c909999032b7301"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -65178,7 +65178,7 @@
         ],
         "runtime/src/rule_names.rs": [
           33188,
-          "f33009cc0cd1b85ead380364d96c127718f6028af8eda491a46ce1b962b3a2cb"
+          "b5364092053ba02b1ef73e58a0e740948359bbd3f453632ffcccb75c598f7066"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -65191,6 +65191,10 @@
         "runtime/src/semantic.rs": [
           33188,
           "dcfaa27755691fca28b0f4af013b13938ec3cd404697e311acd8a9e8454d2770"
+        ],
+        "runtime/src/semantic_predicates.rs": [
+          33188,
+          "0d72e7b91743ec9e07dc1cb07bc4330d47042cfad4efbaa34a5cfd59b32499e9"
         ],
         "runtime/src/semantic_project.rs": [
           33188,
@@ -65226,7 +65230,7 @@
         ],
         "runtime/src/token.rs": [
           33188,
-          "22068f4af538ba42a6030f91894e30f7aee7e452d9f13a6705b5b2a6bc236900"
+          "f3de396645d534c401364e746b8ff639b68c60484773bd89d7ca30a6a304b70f"
         ],
         "runtime/src/token_trace.rs": [
           33188,
@@ -65415,7 +65419,7 @@
         ],
         "runtime/src/editor_cst.rs": [
           33188,
-          "a20b9a3fb6312c28d4fa6e0ecc596e8fe25f524a4147b9cdfed75fd806a229fa"
+          "10d0648b5250517e41cd60eadb73f9c1ffa69ec6ded9e593127fd4d019007a53"
         ],
         "runtime/src/editor_queries.rs": [
           33188,
@@ -65427,7 +65431,7 @@
         ],
         "runtime/src/first.rs": [
           33188,
-          "29d55505b2e7b98ca8e2950a2c04f1b746fb647b493178d61f5498059823385b"
+          "92f90054ea6d65d494c37e5a6aea8420578c54e64d308899b78373671b9c3e7f"
         ],
         "runtime/src/grapheme.rs": [
           33188,
@@ -65435,7 +65439,7 @@
         ],
         "runtime/src/incremental.rs": [
           33188,
-          "245b2adfbcd9b490736c89121247db1c9900d49098643b0a63aa6db2f5c352a8"
+          "a8af31f06b8d7d09ca33fd477a038547f781f1756251bb463bdaa662308dae8a"
         ],
         "runtime/src/language_profile.rs": [
           33188,
@@ -65455,7 +65459,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "83be683d90c49cb848525bd245c57489cfd56f527f851baaa192a315760d07be"
+          "574edfecd4ad80f87860eb6d29fb8dfce401e73f725bff507c909999032b7301"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -65487,7 +65491,7 @@
         ],
         "runtime/src/rule_names.rs": [
           33188,
-          "f33009cc0cd1b85ead380364d96c127718f6028af8eda491a46ce1b962b3a2cb"
+          "b5364092053ba02b1ef73e58a0e740948359bbd3f453632ffcccb75c598f7066"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -65500,6 +65504,10 @@
         "runtime/src/semantic.rs": [
           33188,
           "dcfaa27755691fca28b0f4af013b13938ec3cd404697e311acd8a9e8454d2770"
+        ],
+        "runtime/src/semantic_predicates.rs": [
+          33188,
+          "0d72e7b91743ec9e07dc1cb07bc4330d47042cfad4efbaa34a5cfd59b32499e9"
         ],
         "runtime/src/semantic_project.rs": [
           33188,
@@ -65535,7 +65543,7 @@
         ],
         "runtime/src/token.rs": [
           33188,
-          "22068f4af538ba42a6030f91894e30f7aee7e452d9f13a6705b5b2a6bc236900"
+          "f3de396645d534c401364e746b8ff639b68c60484773bd89d7ca30a6a304b70f"
         ],
         "runtime/src/token_trace.rs": [
           33188,
@@ -65719,7 +65727,7 @@
         ],
         "runtime/src/editor_cst.rs": [
           33188,
-          "a20b9a3fb6312c28d4fa6e0ecc596e8fe25f524a4147b9cdfed75fd806a229fa"
+          "10d0648b5250517e41cd60eadb73f9c1ffa69ec6ded9e593127fd4d019007a53"
         ],
         "runtime/src/editor_queries.rs": [
           33188,
@@ -65731,7 +65739,7 @@
         ],
         "runtime/src/first.rs": [
           33188,
-          "29d55505b2e7b98ca8e2950a2c04f1b746fb647b493178d61f5498059823385b"
+          "92f90054ea6d65d494c37e5a6aea8420578c54e64d308899b78373671b9c3e7f"
         ],
         "runtime/src/grapheme.rs": [
           33188,
@@ -65739,7 +65747,7 @@
         ],
         "runtime/src/incremental.rs": [
           33188,
-          "245b2adfbcd9b490736c89121247db1c9900d49098643b0a63aa6db2f5c352a8"
+          "a8af31f06b8d7d09ca33fd477a038547f781f1756251bb463bdaa662308dae8a"
         ],
         "runtime/src/language_profile.rs": [
           33188,
@@ -65759,7 +65767,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "83be683d90c49cb848525bd245c57489cfd56f527f851baaa192a315760d07be"
+          "574edfecd4ad80f87860eb6d29fb8dfce401e73f725bff507c909999032b7301"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -65791,7 +65799,7 @@
         ],
         "runtime/src/rule_names.rs": [
           33188,
-          "f33009cc0cd1b85ead380364d96c127718f6028af8eda491a46ce1b962b3a2cb"
+          "b5364092053ba02b1ef73e58a0e740948359bbd3f453632ffcccb75c598f7066"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -65804,6 +65812,10 @@
         "runtime/src/semantic.rs": [
           33188,
           "dcfaa27755691fca28b0f4af013b13938ec3cd404697e311acd8a9e8454d2770"
+        ],
+        "runtime/src/semantic_predicates.rs": [
+          33188,
+          "0d72e7b91743ec9e07dc1cb07bc4330d47042cfad4efbaa34a5cfd59b32499e9"
         ],
         "runtime/src/semantic_project.rs": [
           33188,
@@ -65839,7 +65851,7 @@
         ],
         "runtime/src/token.rs": [
           33188,
-          "22068f4af538ba42a6030f91894e30f7aee7e452d9f13a6705b5b2a6bc236900"
+          "f3de396645d534c401364e746b8ff639b68c60484773bd89d7ca30a6a304b70f"
         ],
         "runtime/src/token_trace.rs": [
           33188,
@@ -66028,7 +66040,7 @@
         ],
         "runtime/src/editor_cst.rs": [
           33188,
-          "a20b9a3fb6312c28d4fa6e0ecc596e8fe25f524a4147b9cdfed75fd806a229fa"
+          "10d0648b5250517e41cd60eadb73f9c1ffa69ec6ded9e593127fd4d019007a53"
         ],
         "runtime/src/editor_queries.rs": [
           33188,
@@ -66040,7 +66052,7 @@
         ],
         "runtime/src/first.rs": [
           33188,
-          "29d55505b2e7b98ca8e2950a2c04f1b746fb647b493178d61f5498059823385b"
+          "92f90054ea6d65d494c37e5a6aea8420578c54e64d308899b78373671b9c3e7f"
         ],
         "runtime/src/grapheme.rs": [
           33188,
@@ -66048,7 +66060,7 @@
         ],
         "runtime/src/incremental.rs": [
           33188,
-          "245b2adfbcd9b490736c89121247db1c9900d49098643b0a63aa6db2f5c352a8"
+          "a8af31f06b8d7d09ca33fd477a038547f781f1756251bb463bdaa662308dae8a"
         ],
         "runtime/src/language_profile.rs": [
           33188,
@@ -66068,7 +66080,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "83be683d90c49cb848525bd245c57489cfd56f527f851baaa192a315760d07be"
+          "574edfecd4ad80f87860eb6d29fb8dfce401e73f725bff507c909999032b7301"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -66100,7 +66112,7 @@
         ],
         "runtime/src/rule_names.rs": [
           33188,
-          "f33009cc0cd1b85ead380364d96c127718f6028af8eda491a46ce1b962b3a2cb"
+          "b5364092053ba02b1ef73e58a0e740948359bbd3f453632ffcccb75c598f7066"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -66113,6 +66125,10 @@
         "runtime/src/semantic.rs": [
           33188,
           "dcfaa27755691fca28b0f4af013b13938ec3cd404697e311acd8a9e8454d2770"
+        ],
+        "runtime/src/semantic_predicates.rs": [
+          33188,
+          "0d72e7b91743ec9e07dc1cb07bc4330d47042cfad4efbaa34a5cfd59b32499e9"
         ],
         "runtime/src/semantic_project.rs": [
           33188,
@@ -66148,7 +66164,7 @@
         ],
         "runtime/src/token.rs": [
           33188,
-          "22068f4af538ba42a6030f91894e30f7aee7e452d9f13a6705b5b2a6bc236900"
+          "f3de396645d534c401364e746b8ff639b68c60484773bd89d7ca30a6a304b70f"
         ],
         "runtime/src/token_trace.rs": [
           33188,
@@ -66393,7 +66409,7 @@
         ],
         "runtime/src/editor_cst.rs": [
           33188,
-          "a20b9a3fb6312c28d4fa6e0ecc596e8fe25f524a4147b9cdfed75fd806a229fa"
+          "10d0648b5250517e41cd60eadb73f9c1ffa69ec6ded9e593127fd4d019007a53"
         ],
         "runtime/src/editor_queries.rs": [
           33188,
@@ -66405,7 +66421,7 @@
         ],
         "runtime/src/first.rs": [
           33188,
-          "29d55505b2e7b98ca8e2950a2c04f1b746fb647b493178d61f5498059823385b"
+          "92f90054ea6d65d494c37e5a6aea8420578c54e64d308899b78373671b9c3e7f"
         ],
         "runtime/src/grapheme.rs": [
           33188,
@@ -66413,7 +66429,7 @@
         ],
         "runtime/src/incremental.rs": [
           33188,
-          "245b2adfbcd9b490736c89121247db1c9900d49098643b0a63aa6db2f5c352a8"
+          "a8af31f06b8d7d09ca33fd477a038547f781f1756251bb463bdaa662308dae8a"
         ],
         "runtime/src/language_profile.rs": [
           33188,
@@ -66433,7 +66449,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "83be683d90c49cb848525bd245c57489cfd56f527f851baaa192a315760d07be"
+          "574edfecd4ad80f87860eb6d29fb8dfce401e73f725bff507c909999032b7301"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -66465,7 +66481,7 @@
         ],
         "runtime/src/rule_names.rs": [
           33188,
-          "f33009cc0cd1b85ead380364d96c127718f6028af8eda491a46ce1b962b3a2cb"
+          "b5364092053ba02b1ef73e58a0e740948359bbd3f453632ffcccb75c598f7066"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -66478,6 +66494,10 @@
         "runtime/src/semantic.rs": [
           33188,
           "dcfaa27755691fca28b0f4af013b13938ec3cd404697e311acd8a9e8454d2770"
+        ],
+        "runtime/src/semantic_predicates.rs": [
+          33188,
+          "0d72e7b91743ec9e07dc1cb07bc4330d47042cfad4efbaa34a5cfd59b32499e9"
         ],
         "runtime/src/semantic_project.rs": [
           33188,
@@ -66513,7 +66533,7 @@
         ],
         "runtime/src/token.rs": [
           33188,
-          "22068f4af538ba42a6030f91894e30f7aee7e452d9f13a6705b5b2a6bc236900"
+          "f3de396645d534c401364e746b8ff639b68c60484773bd89d7ca30a6a304b70f"
         ],
         "runtime/src/token_trace.rs": [
           33188,
@@ -66702,7 +66722,7 @@
         ],
         "runtime/src/editor_cst.rs": [
           33188,
-          "a20b9a3fb6312c28d4fa6e0ecc596e8fe25f524a4147b9cdfed75fd806a229fa"
+          "10d0648b5250517e41cd60eadb73f9c1ffa69ec6ded9e593127fd4d019007a53"
         ],
         "runtime/src/editor_queries.rs": [
           33188,
@@ -66714,7 +66734,7 @@
         ],
         "runtime/src/first.rs": [
           33188,
-          "29d55505b2e7b98ca8e2950a2c04f1b746fb647b493178d61f5498059823385b"
+          "92f90054ea6d65d494c37e5a6aea8420578c54e64d308899b78373671b9c3e7f"
         ],
         "runtime/src/grapheme.rs": [
           33188,
@@ -66722,7 +66742,7 @@
         ],
         "runtime/src/incremental.rs": [
           33188,
-          "245b2adfbcd9b490736c89121247db1c9900d49098643b0a63aa6db2f5c352a8"
+          "a8af31f06b8d7d09ca33fd477a038547f781f1756251bb463bdaa662308dae8a"
         ],
         "runtime/src/language_profile.rs": [
           33188,
@@ -66742,7 +66762,7 @@
         ],
         "runtime/src/lib.rs": [
           33188,
-          "83be683d90c49cb848525bd245c57489cfd56f527f851baaa192a315760d07be"
+          "574edfecd4ad80f87860eb6d29fb8dfce401e73f725bff507c909999032b7301"
         ],
         "runtime/src/long_code_fence.rs": [
           33188,
@@ -66774,7 +66794,7 @@
         ],
         "runtime/src/rule_names.rs": [
           33188,
-          "f33009cc0cd1b85ead380364d96c127718f6028af8eda491a46ce1b962b3a2cb"
+          "b5364092053ba02b1ef73e58a0e740948359bbd3f453632ffcccb75c598f7066"
         ],
         "runtime/src/rule_stack.rs": [
           33188,
@@ -66787,6 +66807,10 @@
         "runtime/src/semantic.rs": [
           33188,
           "dcfaa27755691fca28b0f4af013b13938ec3cd404697e311acd8a9e8454d2770"
+        ],
+        "runtime/src/semantic_predicates.rs": [
+          33188,
+          "0d72e7b91743ec9e07dc1cb07bc4330d47042cfad4efbaa34a5cfd59b32499e9"
         ],
         "runtime/src/semantic_project.rs": [
           33188,
@@ -66822,7 +66846,7 @@
         ],
         "runtime/src/token.rs": [
           33188,
-          "22068f4af538ba42a6030f91894e30f7aee7e452d9f13a6705b5b2a6bc236900"
+          "f3de396645d534c401364e746b8ff639b68c60484773bd89d7ca30a6a304b70f"
         ],
         "runtime/src/token_trace.rs": [
           33188,

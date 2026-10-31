@@ -123,7 +123,9 @@ public class UBNFLanguageServerExt extends UBNFLanguageServer {
             "Associates the rule with an external symbol catalog context."),
         new AnnotationDoc("@eval", "@eval", "@eval", "Marks the rule for evaluator generation."),
         new AnnotationDoc("@doc", "@doc('${1:description}')", "@doc('text')",
-            "Attaches documentation text to the rule."));
+            "Attaches documentation text to the rule."),
+        new AnnotationDoc("@predicate", "@predicate('${1:name}')", "@predicate('name')",
+            "Accepts the rule's match only if the pure condition registered under this name returns true."));
 
     /** token 宣言の補完候補にする同梱パーサー FQN。 */
     static final List<String> KNOWN_PARSER_CLASSES = List.of(

@@ -30,6 +30,7 @@ pub mod rule_names;
 mod rule_stack;
 mod scope;
 pub mod semantic;
+pub mod semantic_predicates;
 pub mod semantic_project;
 pub mod semantic_queries;
 pub mod semantic_query_cache;
@@ -181,6 +182,18 @@ pub enum Expr {
     NameResolutionScope {
         child: Box<Expr>,
         requirements: Vec<names::Requirement>,
+    },
+    /// Caller-registered pure postcondition over the child's original matched text (#1006).
+    /// CST-transparent; `false` is an ordinary failure that rolls the child back.
+    SemanticPredicate {
+        child: Box<Expr>,
+        name: &'static str,
+    },
+    /// Entry boundary: every declared predicate is registered before any body runs, so a
+    /// missing binding or callback error cannot become discarded-alternative success.
+    SemanticPredicateScope {
+        child: Box<Expr>,
+        requirements: Vec<&'static str>,
     },
     CaptureEquality {
         child: Box<Expr>,
@@ -2001,8 +2014,33 @@ fn parse_detailed_owned(
     options: ParseOptions,
     bindings: BTreeMap<String, Vec<String>>,
 ) -> Result<Tree, ParseDiagnostic> {
-    parse_detailed_stacked(rules, root, whitespace, input, options, bindings, false)
+    parse_detailed_stacked(rules, root, whitespace, input, options, bindings, (), false)
         .map_err(|failure| failure.diagnostic)
+}
+
+/// Full-input parsing with a caller-owned immutable registry of pure named predicates.
+/// Diagnostic retries reuse the same registry; `predicate_missing`, `predicate_error`,
+/// `predicate_source`, `predicate_limit` and `predicate_scope_missing` are sticky entry
+/// failures, distinct from a `false` condition that lets another alternative match.
+pub fn parse_detailed_shared_with_semantic_predicates(
+    grammar: &SharedGrammar,
+    root: usize,
+    whitespace: bool,
+    input: &str,
+    options: ParseOptions,
+    predicates: &semantic_predicates::Bindings,
+) -> Result<Tree, ParseDiagnostic> {
+    parse_detailed_stacked(
+        Arc::clone(grammar),
+        root,
+        whitespace,
+        input,
+        options,
+        BTreeMap::new(),
+        predicates,
+        false,
+    )
+    .map_err(|failure| failure.diagnostic)
 }
 
 /// Full-input parsing that also returns the rule stack of the failure (#703).
@@ -2026,17 +2064,20 @@ pub fn parse_detailed_shared_with_rule_stack(
         input,
         options,
         BTreeMap::new(),
+        (),
         true,
     )
 }
 
-fn parse_detailed_stacked(
+#[allow(clippy::too_many_arguments)]
+fn parse_detailed_stacked<P: semantic_predicates::Entry>(
     rules: SharedGrammar,
     root: usize,
     whitespace: bool,
     input: &str,
     options: ParseOptions,
     bindings: BTreeMap<String, Vec<String>>,
+    predicates: P,
     stacked: bool,
 ) -> Result<Tree, RuleStackDiagnostic> {
     let unstacked = |diagnostic| RuleStackDiagnostic {
@@ -2053,6 +2094,7 @@ fn parse_detailed_stacked(
         options
     };
     let mut parser = ParseContext::with_bindings(input, bindings, options);
+    predicates.prepare(&mut parser);
     parser.track_owned_source = shared_grammar_needs_owned_source(&rules);
     parser.rules = rules;
     parser.whitespace = whitespace;
@@ -2087,6 +2129,14 @@ fn parse_detailed_stacked(
             offset: error.offset,
             expected: error.expected.clone(),
             farthest: error,
+        }));
+    }
+    if let Some(failure) = predicates.failure(&parser, root) {
+        return Err(unstacked(ParseDiagnostic {
+            kind: failure.kind,
+            offset: failure.span.start,
+            expected: vec![failure.expected.clone()],
+            farthest: failure.error(),
         }));
     }
     if let Some(failure) = parser.name_failure() {
@@ -2127,6 +2177,7 @@ fn parse_detailed_stacked(
             input,
             options.with_diagnostics(Diagnostics::Detailed),
             bindings,
+            predicates,
             stacked,
         );
     }
@@ -3578,8 +3629,14 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
         // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
+        // Classic の他の本体は Java LazyChain と同じく、rule 自身の収集 token を返す。
         self.rule_result_source = fragment
-            .parsed_source()
+            .source
+            .as_deref()
+            .and_then(|source| match source.parsed_source.as_deref() {
+                Some(parsed) => Some(parsed),
+                None => self.token_mode.is_none().then_some(source),
+            })
             .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
             .map(|source| Box::new(source.clone()));
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
@@ -3651,7 +3708,9 @@ impl<'a> ParseContext<'a> {
                 | Expr::Recovery { .. }
                 | Expr::CatchLabels { .. }
                 | Expr::NameResolutionScope { .. }
+                | Expr::SemanticPredicateScope { .. }
                 | Expr::NamePredicate { .. }
+                | Expr::SemanticPredicate { .. }
         );
         let no_repeat_attempt = matches!(expression,
             Expr::Repeat { min, max: Some(max), .. }
@@ -3739,6 +3798,9 @@ impl<'a> ParseContext<'a> {
                 capture,
                 kind,
             } => self.name_predicate(child, snapshot, version, capture, kind, depth),
+            Expr::SemanticPredicate { .. } | Expr::SemanticPredicateScope { .. } => {
+                self.expression_semantic_predicate(expression, depth)
+            }
             Expr::Custom(_) | Expr::CustomWith { .. } => self.expression_custom(expression, depth),
             Expr::Recovery { .. } => self.expression_recovery(expression, depth),
             Expr::Optional(_) | Expr::JavaOptional(_) => {
@@ -3789,7 +3851,13 @@ impl<'a> ParseContext<'a> {
                 kind: value.kind,
                 classic: value.classic,
                 generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                text: value.source.owned_shared().map(Box::new),
+                // A rule's own generated "" is a virtual collection that kept nothing, as a
+                // collector's returned source has no text: capture_owned anchors it at the cursor.
+                text: value
+                    .source
+                    .owned_shared()
+                    .filter(|text| !text.is_empty())
+                    .map(Box::new),
             })
         });
         let classic = committed_source
@@ -4431,7 +4499,9 @@ impl<'a> ParseContext<'a> {
             | Expr::LongestChoice(_)
             | Expr::UniqueLongestChoice(_)
             | Expr::NameResolutionScope { .. }
+            | Expr::SemanticPredicateScope { .. }
             | Expr::NamePredicate { .. }
+            | Expr::SemanticPredicate { .. }
             | Expr::PredictiveChoice { .. } => {
                 unreachable!("combinators are dispatched by expression")
             }
@@ -5217,7 +5287,12 @@ impl<'a> ParseContext<'a> {
         }
         let source = match source {
             Some(source) if source.generated => token::TokenSource::Generated {
-                anchor: source.span.start,
+                // Only a virtual collector that kept nothing has no text: it anchors here.
+                anchor: if source.text.is_some() {
+                    source.span.start
+                } else {
+                    anchor
+                },
                 text: source
                     .text
                     .as_deref()
@@ -6114,7 +6189,9 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::RuleEffects { child, .. }
         | Expr::CaptureEquality { child, .. }
         | Expr::NamePredicate { child, .. }
+        | Expr::SemanticPredicate { child, .. }
         | Expr::NameResolutionScope { child, .. }
+        | Expr::SemanticPredicateScope { child, .. }
         | Expr::Recovery { child, .. }
         | Expr::TriviaScope { child, .. }
         | Expr::LexicalTriviaScope { child, .. }
@@ -6261,7 +6338,9 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             | Expr::RuleEffects { child, .. }
             | Expr::CaptureEquality { child, .. }
             | Expr::NamePredicate { child, .. }
+            | Expr::SemanticPredicate { child, .. }
             | Expr::NameResolutionScope { child, .. }
+            | Expr::SemanticPredicateScope { child, .. }
             | Expr::Recovery { child, .. }
             | Expr::TriviaScope { child, .. }
             | Expr::LexicalTriviaScope { child, .. }
@@ -6366,7 +6445,9 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::CaptureScope(_)
         | Expr::CaptureEquality { .. }
         | Expr::NamePredicate { .. }
+        | Expr::SemanticPredicate { .. }
         | Expr::NameResolutionScope { .. }
+        | Expr::SemanticPredicateScope { .. }
         | Expr::Recovery { .. } => false,
         // No memo safety review (#184) covers the terminator transaction and its
         // rollback under match-only callers, so rules containing it are never cached.
@@ -7992,7 +8073,9 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
             | Expr::RuleEffects { child, .. }
             | Expr::CaptureEquality { child, .. }
             | Expr::NamePredicate { child, .. }
+            | Expr::SemanticPredicate { child, .. }
             | Expr::NameResolutionScope { child, .. }
+            | Expr::SemanticPredicateScope { child, .. }
             | Expr::Recovery { child, .. }
             | Expr::TriviaScope { child, .. }
             | Expr::LexicalTriviaScope { child, .. }

@@ -1,0 +1,10 @@
+grammar PredicateBoundaries {
+  @predicate ('spaced.paren') @root @mapping(Result, params=[value])
+  R ::= 'T' @value | A @value | B @value | C @value;
+  @predicate( 'inner_space' )
+  A ::= 'U';
+  @predicateExtra
+  B ::= 'V';
+  @ predicate
+  C ::= 'W';
+}

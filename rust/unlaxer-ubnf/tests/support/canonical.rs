@@ -160,6 +160,7 @@ fn annotation(a: &Annotation) -> String {
         AnnotationKind::RightAssoc => ("RightAssocAnnotation", vec![]),
         AnnotationKind::LongestChoice => ("LongestChoiceAnnotation", vec![]),
         AnnotationKind::UniqueLongestChoice => ("UniqueLongestChoiceAnnotation", vec![]),
+        AnnotationKind::Predicate { name } => ("PredicateAnnotation", vec![quote(name)]),
         AnnotationKind::NamePredicate {
             snapshot,
             version,
