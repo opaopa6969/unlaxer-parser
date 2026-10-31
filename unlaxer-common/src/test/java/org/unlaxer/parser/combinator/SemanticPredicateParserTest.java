@@ -651,4 +651,77 @@ public class SemanticPredicateParserTest {
           }
         }
     }
+
+    /**
+     * A rule whose body is only a rule reference is a single-element LazyChain: NamedCapture, the predicate,
+     * CaptureBoundaryParser.input and the generated @f site read its own collection, not the source its inner
+     * rule returned (#1023). A Choice of a rule reference still returns the selected child. Shared oracle with
+     * Rust, conformance/owned-capture-virtual/rule-reference.tsv (Java is the expected side; its rust column is
+     * Rust's).
+     */
+    @Test public void ruleReferenceBodyReturnsItsOwnCollectionInEveryCallerKind() throws java.io.IOException {
+        var rows = new java.util.ArrayList<String[]>();
+        for (String row : java.nio.file.Files.readAllLines(java.nio.file.Path.of("../conformance/owned-capture-virtual/rule-reference.tsv"))) {
+            if (false == row.startsWith("#")) rows.add(row.split("\t"));
+        }
+        assertEquals(420, rows.size());
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String[] row : rows) {
+          String prefix = prefixes.get(row[1]);
+          String expected = row[3] + "@" + row[4] + "-" + row[5] + "'" + row[6].replace("~", "") + "'";
+          String cursor = row[7] + "/" + row[8];
+          boolean accepted = Boolean.parseBoolean(row[9]);
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            var options = ParseOptions.withMemoization(memo).withDiagnostics(diagnostics);
+            String label = String.join(" ", row) + " " + memo + "/" + diagnostics;
+            TokenKind kind = TokenKind.valueOf(row[0]);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"), options)) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                assertTrue(label, new NamedCapture("v", shape(row[2])).parse(context, kind, false).isSucceeded());
+                var value = context.captured("v").orElseThrow();
+                assertEquals(label, expected, value.provenance() + "@" + value.start() + "-" + value.end() + "'" + value.text() + "'");
+                assertEquals(label, cursor, context.getConsumedPosition().value() + "/" + context.getMatchedPosition().value());
+            }
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"), options)) {
+                var seen = new java.util.TreeSet<String>();
+                SemanticPredicateBindings.install(context, Map.of("valid", candidate -> {
+                    seen.add("INPUT@" + candidate.start() + "-" + candidate.end() + "'" + candidate.text() + "'");
+                    return true;
+                }));
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                boolean input = row[3].equals("INPUT");
+                assertEquals(label, input, gate(shape(row[2])).parse(context, kind, false).isSucceeded());
+                assertEquals(label, input ? List.of(expected) : List.of(), List.copyOf(seen));
+                assertEquals(label, input ? null : "predicate_source",
+                    SemanticPredicateBindings.failure(context).map(failure -> failure.kind()).orElse(null));
+            }
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"), options)) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                assertEquals(label, accepted, CaptureBoundaryParser.input(CaptureBoundaryParser.Kind.VALUE, shape(row[2]))
+                    .parse(context, kind, false).isSucceeded());
+            }
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"), options)) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                int before = context.getCurrent().getTokens().size();
+                var parsed = new FieldCaptureSite(shape(row[2])).parse(context, kind, false);
+                var sites = new java.util.ArrayList<Token>();
+                var tokens = context.getCurrent().getTokens();
+                for (int index = before; index < tokens.size(); index++) fieldSites(tokens.get(index), sites);
+                assertEquals(label, accepted, parsed.isSucceeded());
+                if (accepted) {
+                    Token site = parsed.getTokenOptional().orElseThrow();
+                    assertEquals(label, List.of(site), sites);
+                    int start = site.source.offsetFromRoot().value();
+                    String text = site.source.sourceAsString();
+                    assertEquals(label, row[10] + " " + row[11] + " " + row[12],
+                        start + " " + (start + site.source.codePointLength().value()) + " " + (text.isEmpty() ? "~" : text));
+                    assertEquals(label, cursor, context.getConsumedPosition().value() + "/" + context.getMatchedPosition().value());
+                } else {
+                    assertEquals(label, List.of(), sites);
+                    assertEquals(label, row[1] + "/" + row[1], context.getConsumedPosition().value() + "/" + context.getMatchedPosition().value());
+                }
+            }
+          }
+        }
+    }
 }

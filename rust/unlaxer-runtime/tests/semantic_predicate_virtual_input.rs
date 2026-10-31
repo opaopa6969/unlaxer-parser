@@ -591,3 +591,155 @@ fn owned_capture_follows_the_returned_source_in_every_caller_kind() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+/// A rule whose body is only a rule reference (`Rule[Rule[X]]`, a Java single-element LazyChain)
+/// returns its own collection, as `Rule[Chain[Rule[X]]]` does, not the source its inner rule
+/// returned: capture_owned, the predicate, InputCaptureBoundary and `@f` all read it (#1023). A
+/// Choice of a rule reference still returns the selected child. Shared oracle, measured with Java
+/// NamedCapture, CaptureBoundaryParser.input and the generated @f site:
+/// conformance/owned-capture-virtual/rule-reference.tsv.
+#[test]
+fn rule_reference_body_returns_its_own_collection_in_every_caller_kind() {
+    fn owned(expression: Expr) -> Expr {
+        expression.capture_owned("v")
+    }
+    fn input(expression: Expr) -> Expr {
+        Expr::InputCaptureBoundary(
+            unlaxer_runtime::capture_tree::Kind::Value,
+            Box::new(expression),
+        )
+    }
+    fn field(expression: Expr) -> Expr {
+        expression.capture("f")
+    }
+    let rows: Vec<Vec<&str>> =
+        include_str!("../../../conformance/owned-capture-virtual/rule-reference.tsv")
+            .lines()
+            .filter(|row| !row.starts_with('#'))
+            .map(|row| row.split('\t').collect())
+            .collect();
+    assert_eq!(rows.len(), 420);
+    let mut failures = vec![];
+    for row in &rows {
+        let before: usize = row[1].parse().unwrap();
+        let cursor: (usize, usize) = (row[7].parse().unwrap(), row[8].parse().unwrap());
+        // The rust column names a known #1023 D difference from Java, else Rust reads the Java value.
+        let expected = match row[13] {
+            "=" => format!(
+                "{}@{}-{}'{}'",
+                row[3],
+                row[4],
+                row[5],
+                row[6].replace('~', "")
+            ),
+            known => known.replace('~', ""),
+        };
+        let accepted = row[9] == "true";
+        for options in all_options() {
+            let label = format!("{row:?} {options:?}");
+            let input_text = format!("{}c", prefix(row[1]));
+            let fresh = |context: &mut ParseContext<'_>| {
+                if before > 0 {
+                    context.parse(&Expr::literal(prefix(row[1]))).unwrap();
+                }
+            };
+            let mut context = ParseContext::with_options(&input_text, options);
+            fresh(&mut context);
+            if context
+                .parse_with_token_mode(&entry(row[2], owned), kind(row[0]), false)
+                .is_err()
+            {
+                failures.push(format!("{label}: failed"));
+                continue;
+            }
+            let actual = match context.captured_source("v") {
+                Some(TokenSource::Input(span)) => format!(
+                    "INPUT@{}-{}'{}'",
+                    span.start,
+                    span.end,
+                    context.text(*span).unwrap()
+                ),
+                Some(TokenSource::Projected { span, text }) => {
+                    format!("PROJECTED@{}-{}'{text}'", span.start, span.end)
+                }
+                Some(TokenSource::Generated { anchor, text }) => {
+                    format!("GENERATED@{anchor}-{anchor}'{text}'")
+                }
+                None => "-".to_owned(),
+            };
+            let actual_cursor = (context.position(), context.matched_position());
+            if (&actual, actual_cursor) != (&expected, cursor) {
+                failures.push(format!(
+                    "{label}: owned {actual} {actual_cursor:?}, expected {expected} {cursor:?}"
+                ));
+            }
+            // The predicate at the same entry reads the same returned source.
+            let seen = Arc::new(Mutex::new(std::collections::BTreeSet::<String>::new()));
+            let record = Arc::clone(&seen);
+            let bindings = Bindings::new()
+                .with("valid", move |candidate| {
+                    record.lock().unwrap().insert(format!(
+                        "INPUT@{}-{}'{}'",
+                        candidate.span.start, candidate.span.end, candidate.text
+                    ));
+                    true
+                })
+                .unwrap();
+            let mut gate = ParseContext::with_semantic_predicates(&input_text, &bindings, options);
+            fresh(&mut gate);
+            let gated_ok = gate
+                .parse_with_token_mode(&entry(row[2], gated), kind(row[0]), false)
+                .is_ok();
+            let failure = gate
+                .semantic_predicate_failure()
+                .map(|failure| failure.kind);
+            let seen = seen.lock().unwrap().iter().cloned().collect::<Vec<_>>();
+            let predicate = (gated_ok, seen.join(","), failure);
+            let agreed = if expected.starts_with("INPUT@") {
+                (true, expected.clone(), None)
+            } else {
+                (false, String::new(), Some("predicate_source"))
+            };
+            if predicate != agreed {
+                failures.push(format!(
+                    "{label}: predicate {predicate:?}, expected {agreed:?}"
+                ));
+            }
+            let mut boundary = ParseContext::with_options(&input_text, options);
+            fresh(&mut boundary);
+            let boundary_ok = boundary
+                .parse_with_token_mode(&entry(row[2], input), kind(row[0]), false)
+                .is_ok();
+            if boundary_ok != accepted {
+                failures.push(format!("{label}: input accepted {boundary_ok}"));
+            }
+            let mut site = ParseContext::with_options(&input_text, options);
+            fresh(&mut site);
+            let site_ok = site
+                .parse_with_token_mode(&entry(row[2], field), kind(row[0]), false)
+                .is_ok();
+            let spans = site
+                .capture_spans("f")
+                .iter()
+                .map(|span| format!("{}-{}'{}'", span.start, span.end, site.text(*span).unwrap()))
+                .collect::<Vec<_>>()
+                .join(",");
+            let actual_field = (site_ok, spans, (site.position(), site.matched_position()));
+            let expected_field = if accepted {
+                (
+                    true,
+                    format!("{}-{}'{}'", row[10], row[11], row[12].replace('~', "")),
+                    cursor,
+                )
+            } else {
+                (false, String::new(), (before, before))
+            };
+            if actual_field != expected_field {
+                failures.push(format!(
+                    "{label}: field {actual_field:?}, expected {expected_field:?}"
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

@@ -89,6 +89,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- Rust の低水準 Classic 入口で、本体が規則参照だけの規則（手書きの `Rule { expression: Expr::Rule(n) }`。Java の 1 要素 `LazyChain`）が、内側の規則が返した source（選んだ子や生成 text）ではなく自身の収集を返すよう修正した。`capture_owned`・述語の候補・`InputCaptureBoundary`・`@f` が、本体が `Sequence[規則参照]` の規則と同じ値になる。UBNF の生成 grammar はこの形を `Sequence[Rule]` にするので届かない。Java 実測の共通表 420 行を両言語で照合する（#1023。生成 anchor と virtual `Chain[生成 "g"]` の収集 text の差は #1023 に残る）。
 - Rust の低水準 Classic 入口で、virtual 種別の規則のうち本体が `Choice` のもの（Java `LazyChoice`）が、選んだ子の source を返すよう修正した。入力由来の子は、入力 capture 境界（`InputCaptureBoundary`）と `@f` で受理される。本体が規則参照だけの規則は、Java の 1 要素 `LazyChain` と同じく自身の収集を返す。Java 実測の共通表 624 行を両言語で照合する（#1023 の C の境界部分）。
 - Rust の低水準 Classic 入口（`parse_with_token_mode`）の `capture_owned` が、token 種別と空 span から生成を推定せず、子が返した token の由来を記録するよう修正した。入力由来の空 virtual token と token を返さない PEG 成功（それを選んだ `Choice` / 生成規則を含む）は、Java `NamedCapture` と同じ子の後の cursor 位置の入力になる。Java 実測の共通表 516 行を両言語で照合する（#1023 の C の owned 部分。virtual 規則越しの入力 capture 境界と生成 anchor の差は #1023 に残る）。
 - 名前付き parser の Usage001 サンプルで class 参照する型を公開し、Java/Rust 共通の prefix 回帰を通常テストへ追加する（#1009）。
