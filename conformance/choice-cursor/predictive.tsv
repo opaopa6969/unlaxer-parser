@@ -1,0 +1,5 @@
+# input-utf8-hex	prefix-utf8-hex	peek-utf8-hex	literal-utf8-hex	reset	consumed	matched
+7861	78	61	61	true	1	2
+f09f9880e7958c	f09f9880	e7958c	e7958c	true	1	2
+78616263	78	6162	6162	true	1	3
+786162	78	61	62	false	1	3
