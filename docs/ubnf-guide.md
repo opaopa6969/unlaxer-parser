@@ -524,6 +524,7 @@ The imported rules are available under the alias namespace.
 | `@leftAssoc` / `@rightAssoc` | annotation | Stable |
 | `@longestChoice` | annotation | Stable (v3.0.15+) |
 | `@predictiveChoice` | annotation | Development |
+| `@predicate('name')` | annotation | Development ([semantic predicates](semantic-predicates.md)) |
 | `@whitespace` | global setting | Stable |
 | `@comment` | global setting | Stable |
 | `@enum` | annotation | Stable (v3.0+) |

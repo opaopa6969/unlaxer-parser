@@ -1,0 +1,1 @@
+grammar PredicateGrammar { @predicate('valid.name-1') @root @mapping(Result, params=[value]) R ::= 'T' @value | Other @value; @predicate('_other') Other ::= 'U'; }

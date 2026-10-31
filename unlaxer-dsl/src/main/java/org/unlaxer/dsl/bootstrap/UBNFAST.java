@@ -183,6 +183,7 @@ public sealed interface UBNFAST permits
         UBNFAST.LongestChoiceAnnotation,
         UBNFAST.UniqueLongestChoiceAnnotation,
         UBNFAST.NamePredicateAnnotation,
+        UBNFAST.PredicateAnnotation,
         UBNFAST.PredictiveChoiceAnnotation,
         UBNFAST.PrecedenceAnnotation,
         UBNFAST.DocAnnotation,
@@ -254,6 +255,9 @@ public sealed interface UBNFAST permits
 
     /** Pure lookup in an explicit immutable, versioned snapshot. */
     record NamePredicateAnnotation(String snapshot, String version, String name, String kind) implements Annotation {}
+
+    /** @predicate('name') — a caller-registered pure postcondition over this rule's matched text. */
+    record PredicateAnnotation(String name) implements Annotation {}
 
     /** @predictiveChoice — conservatively prune alternatives by their FIRST prefix. */
     record PredictiveChoiceAnnotation() implements Annotation {}

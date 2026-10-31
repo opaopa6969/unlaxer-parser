@@ -1,0 +1,28 @@
+# #1006 shared hand oracle: the predicate candidate decides the whole parse at the full-input entry.
+# Grammar: scope("😀\r\n" X 'c') over "😀\r\nc"; X is predicate(shape), or for UBNF:... the rule
+# `@predicate R ::= shape` referenced from the entry (both frontends lower `LA | 'z'` to a Choice and a
+# single element to a one-element Chain; Java emits LazyChoice / LazyChain). The callback reads the text,
+# so a wrong candidate flips acceptance: with oneOf:c the parse succeeds exactly when the candidate is "c",
+# with its complement exactly when it is not. Same contract as classic.tsv for the consumed kind.
+# shape	candidate	failure
+LA	c@3	-
+MO	c@3	-
+Choice[LA]	c@3	-
+Choice[MO]	c@3	-
+Choice[LA,z]	c@3	-
+Chain[LA]	~@3	-
+Chain[MO]	~@3	-
+Opt[LA]	~@3	-
+Choice[Opt[LA]]	~@3	-
+Rule[Choice[LA,z]]	c@3	-
+Rule[Choice[MO,z]]	c@3	-
+Rule[Chain[LA]]	~@3	-
+UBNF:Choice[LA,z]	c@3	-
+UBNF:Chain[LA]	~@3	-
+&c	~@3	-
+Choice[!z]	~@3	-
+gen:g	-	predicate_source@3
+gen:	-	predicate_source@3
+Choice[gen:g]	-	predicate_source@3
+Chain[gen:g]	~@3	-
+Chain[gen:]	~@3	-

@@ -1,0 +1,1482 @@
+[
+  {
+    "name": "octet-choice-fallback",
+    "grammar": "grammar Octets {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @whitespace: javaStyle\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  token WORD ::= (CHAR_RANGE('a','z') | '😀' | '𠮷')+;\n  @root @mapping(Address, params=[value])\n  Start ::= Octet @value | Label @value | Big @value;\n  @predicate('octet')\n  @mapping(OctetValue, params=[digits])\n  Octet ::= DIGITS @digits;\n  @predicate('known')\n  @mapping(WordValue, params=[word])\n  Label ::= WORD @word;\n  @mapping(BigValue, params=[digits])\n  Big ::= DIGITS @digits;\n}\n",
+    "cases": [
+      {
+        "id": "octet-true",
+        "input": "42",
+        "bindings": {
+          "octet": "range:0:255",
+          "known": "oneOf:😀a|𠮷"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "candidates": [
+          [
+            "42",
+            0,
+            2
+          ]
+        ],
+        "ast": {
+          "type": "Address",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "value": {
+              "type": "OctetValue",
+              "span": [
+                0,
+                2
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "octet-false-falls-back-to-big",
+        "input": "300",
+        "bindings": {
+          "octet": "range:0:255",
+          "known": "oneOf:😀a|𠮷"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "candidates": [
+          [
+            "300",
+            0,
+            3
+          ]
+        ],
+        "ast": {
+          "type": "Address",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": {
+              "type": "BigValue",
+              "span": [
+                0,
+                3
+              ],
+              "fields": {
+                "digits": "300"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "astral-word-true",
+        "input": "𠮷",
+        "bindings": {
+          "octet": "range:0:255",
+          "known": "oneOf:😀a|𠮷"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "candidates": [
+          [
+            "𠮷",
+            0,
+            1
+          ]
+        ],
+        "ast": {
+          "type": "Address",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "value": {
+              "type": "WordValue",
+              "span": [
+                0,
+                1
+              ],
+              "fields": {
+                "word": "𠮷"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "emoji-word-false-is-syntax",
+        "input": "😀b",
+        "bindings": {
+          "octet": "range:0:255",
+          "known": "oneOf:😀a|𠮷"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "😀b",
+            0,
+            2
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 2,
+          "expected": "predicate known"
+        }
+      },
+      {
+        "id": "crlf-rule-trivia-is-part-of-candidate",
+        "input": "\r\n42\r\n",
+        "bindings": {
+          "octet": "range:0:255",
+          "known": "oneOf:😀a|𠮷"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "candidates": [
+          [
+            "\r\n42\r\n",
+            0,
+            6
+          ]
+        ],
+        "ast": {
+          "type": "Address",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": {
+              "type": "BigValue",
+              "span": [
+                0,
+                6
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "stripping-callback-accepts-trivia-candidate",
+        "input": "\r\n42\r\n",
+        "bindings": {
+          "octet": "rangeStripped:0:255",
+          "known": "oneOf:😀a|𠮷"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "candidates": [
+          [
+            "\r\n42\r\n",
+            0,
+            6
+          ]
+        ],
+        "ast": {
+          "type": "Address",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "value": {
+              "type": "OctetValue",
+              "span": [
+                0,
+                6
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "missing-binding-not-hidden-by-big",
+        "input": "42",
+        "bindings": {
+          "octet": "range:0:255"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [],
+        "diagnostic": {
+          "kind": "predicate_missing",
+          "offset": 0,
+          "expected": "registered predicate known"
+        }
+      },
+      {
+        "id": "callback-error-not-hidden-by-big",
+        "input": "42",
+        "bindings": {
+          "octet": "error",
+          "known": "const:true"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "42",
+            0,
+            2
+          ]
+        ],
+        "diagnostic": {
+          "kind": "predicate_error",
+          "offset": 0,
+          "expected": "predicate octet completed normally"
+        }
+      },
+      {
+        "id": "callback-panic-or-throw",
+        "input": "7",
+        "bindings": {
+          "octet": "panic",
+          "known": "const:true"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "7",
+            0,
+            1
+          ]
+        ],
+        "diagnostic": {
+          "kind": "predicate_error",
+          "offset": 0,
+          "expected": "predicate octet completed normally"
+        }
+      },
+      {
+        "id": "plain-api-has-no-registry",
+        "input": "42",
+        "bindings": null,
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [],
+        "diagnostic": {
+          "kind": "predicate_missing",
+          "offset": 0,
+          "expected": "registered predicate octet"
+        }
+      },
+      {
+        "id": "trailing-input-after-predicate",
+        "input": "42 x!",
+        "bindings": {
+          "octet": "range:0:255",
+          "known": "oneOf:😀a|𠮷"
+        },
+        "accepted": false,
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "candidates": [
+          [
+            "42 ",
+            0,
+            3
+          ]
+        ],
+        "diagnostic": {
+          "kind": "trailing_input",
+          "offset": 3,
+          "expected": "end of input"
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested-root-and-nullable",
+    "grammar": "grammar Ranges {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @predicate('ordered') @mapping(Range, params=[low, high, mark])\n  Range ::= Number @low '-' Number @high Mark @mark;\n  @predicate('number') @mapping(NumberValue, params=[digits])\n  Number ::= DIGITS @digits;\n  @predicate('mark') @mapping(MarkValue, params=[bang])\n  Mark ::= ['!' @bang];\n}\n",
+    "cases": [
+      {
+        "id": "nested-and-root-true",
+        "input": "1-2!",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "candidates": [
+          [
+            "1",
+            0,
+            1
+          ],
+          [
+            "1-2!",
+            0,
+            4
+          ],
+          [
+            "2",
+            2,
+            3
+          ],
+          [
+            "!",
+            3,
+            4
+          ]
+        ],
+        "ast": {
+          "type": "Range",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "low": {
+              "type": "NumberValue",
+              "span": [
+                0,
+                1
+              ],
+              "fields": {
+                "digits": "1"
+              }
+            },
+            "high": {
+              "type": "NumberValue",
+              "span": [
+                2,
+                3
+              ],
+              "fields": {
+                "digits": "2"
+              }
+            },
+            "mark": {
+              "type": "MarkValue",
+              "span": [
+                3,
+                4
+              ],
+              "fields": {
+                "bang": "!"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "nullable-candidate-is-empty-span",
+        "input": "10-20",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "10",
+            0,
+            2
+          ],
+          [
+            "10-20",
+            0,
+            5
+          ],
+          [
+            "20",
+            3,
+            5
+          ],
+          [
+            "",
+            5,
+            5
+          ]
+        ],
+        "ast": {
+          "type": "Range",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "low": {
+              "type": "NumberValue",
+              "span": [
+                0,
+                2
+              ],
+              "fields": {
+                "digits": "10"
+              }
+            },
+            "high": {
+              "type": "NumberValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "20"
+              }
+            },
+            "mark": {
+              "type": "MarkValue",
+              "span": [
+                5,
+                5
+              ],
+              "fields": {
+                "bang": null
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "root-false-is-syntax-at-candidate-end",
+        "input": "2-1",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "2",
+            0,
+            1
+          ],
+          [
+            "2-1",
+            0,
+            3
+          ],
+          [
+            "1",
+            2,
+            3
+          ],
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 3,
+          "expected": "predicate ordered"
+        }
+      },
+      {
+        "id": "nested-false-stops-sequence",
+        "input": "1000-2",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "1000",
+            0,
+            4
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 4,
+          "expected": "predicate number"
+        }
+      },
+      {
+        "id": "unreachable-requirement-still-checked",
+        "input": "1-2",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [],
+        "diagnostic": {
+          "kind": "predicate_missing",
+          "offset": 0,
+          "expected": "registered predicate mark"
+        }
+      }
+    ]
+  },
+  {
+    "name": "memo-retry-same-position",
+    "grammar": "grammar Retry {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Choice, params=[value, tail])\n  Start ::= Even @value 'x' @tail | Even @value 'y' @tail | Odd @value 'y' @tail;\n  @predicate('even') @mapping(EvenValue, params=[digits])\n  Even ::= DIGITS @digits;\n  @mapping(OddValue, params=[digits])\n  Odd ::= DIGITS @digits;\n}\n",
+    "cases": [
+      {
+        "id": "same-rule-retried-at-same-position",
+        "input": "42y",
+        "bindings": {
+          "even": "even"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "candidates": [
+          [
+            "42",
+            0,
+            2
+          ]
+        ],
+        "ast": {
+          "type": "Choice",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": {
+              "type": "EvenValue",
+              "span": [
+                0,
+                2
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            },
+            "tail": "y"
+          }
+        }
+      },
+      {
+        "id": "false-retried-then-other-rule",
+        "input": "43y",
+        "bindings": {
+          "even": "even"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          3,
+          3
+        ],
+        "candidates": [
+          [
+            "43",
+            0,
+            2
+          ]
+        ],
+        "ast": {
+          "type": "Choice",
+          "span": [
+            0,
+            3
+          ],
+          "fields": {
+            "value": {
+              "type": "OddValue",
+              "span": [
+                0,
+                2
+              ],
+              "fields": {
+                "digits": "43"
+              }
+            },
+            "tail": "y"
+          }
+        }
+      },
+      {
+        "id": "all-alternatives-fail",
+        "input": "43x",
+        "bindings": {
+          "even": "even"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "43",
+            0,
+            2
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 2,
+          "expected": "predicate even"
+        }
+      }
+    ]
+  },
+  {
+    "name": "optional-without-outer-choice",
+    "grammar": "grammar Optionals {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Tail, params=[head, digits])\n  Start ::= [Even @head] DIGITS @digits;\n  @predicate('even') @mapping(EvenValue, params=[digits])\n  Even ::= DIGITS @digits;\n}\n",
+    "cases": [
+      {
+        "id": "false-inside-optional-is-rolled-back",
+        "input": "43",
+        "bindings": {
+          "even": "even"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          2,
+          2
+        ],
+        "candidates": [
+          [
+            "43",
+            0,
+            2
+          ]
+        ],
+        "ast": {
+          "type": "Tail",
+          "span": [
+            0,
+            2
+          ],
+          "fields": {
+            "head": null,
+            "digits": "43"
+          }
+        }
+      },
+      {
+        "id": "single-digit-false",
+        "input": "7",
+        "bindings": {
+          "even": "even"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          1,
+          1
+        ],
+        "candidates": [
+          [
+            "7",
+            0,
+            1
+          ]
+        ],
+        "ast": {
+          "type": "Tail",
+          "span": [
+            0,
+            1
+          ],
+          "fields": {
+            "head": null,
+            "digits": "7"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "generated-wrapper-names-avoid-rule-and-token-classes",
+    "grammar": "grammar Wrappers {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  token NUMBER_PREDICATE ::= 'z';\n  @root @predicate('ordered') @mapping(Range, params=[low, high, mark])\n  Range ::= Number @low '-' Number @high Mark @mark;\n  @predicate('number') @mapping(NumberValue, params=[digits])\n  Number ::= DIGITS @digits;\n  @predicate('mark') @mapping(MarkValue, params=[bang])\n  Mark ::= ['!' @bang];\n  RangePredicate ::= DIGITS;\n}\n",
+    "cases": [
+      {
+        "id": "nested-and-root-true",
+        "input": "1-2!",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "candidates": [
+          [
+            "1",
+            0,
+            1
+          ],
+          [
+            "1-2!",
+            0,
+            4
+          ],
+          [
+            "2",
+            2,
+            3
+          ],
+          [
+            "!",
+            3,
+            4
+          ]
+        ],
+        "ast": {
+          "type": "Range",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "low": {
+              "type": "NumberValue",
+              "span": [
+                0,
+                1
+              ],
+              "fields": {
+                "digits": "1"
+              }
+            },
+            "high": {
+              "type": "NumberValue",
+              "span": [
+                2,
+                3
+              ],
+              "fields": {
+                "digits": "2"
+              }
+            },
+            "mark": {
+              "type": "MarkValue",
+              "span": [
+                3,
+                4
+              ],
+              "fields": {
+                "bang": "!"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "root-false-is-syntax-at-candidate-end",
+        "input": "2-1",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "2",
+            0,
+            1
+          ],
+          [
+            "2-1",
+            0,
+            3
+          ],
+          [
+            "1",
+            2,
+            3
+          ],
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 3,
+          "expected": "predicate ordered"
+        }
+      },
+      {
+        "id": "nested-false-stops-sequence",
+        "input": "1000-2",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "1000",
+            0,
+            4
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 4,
+          "expected": "predicate number"
+        }
+      },
+      {
+        "id": "unreachable-requirement-still-checked",
+        "input": "1-2",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [],
+        "diagnostic": {
+          "kind": "predicate_missing",
+          "offset": 0,
+          "expected": "registered predicate mark"
+        }
+      }
+    ]
+  },
+  {
+    "name": "nonzero-start-after-astral-and-family-emoji",
+    "grammar": "grammar Prefix {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token WORD ::= (CHAR_RANGE('a','z') | '👨' | '👩' | '👧' | '👦' | '‍' | '𠮷' | '\\r' | '\\n')+;\n  token SEP ::= ':';\n  @root @mapping(Result, params=[head, value])\n  Start ::= WORD @head SEP Item @value;\n  @predicate('known')\n  @mapping(ItemValue, params=[word])\n  Item ::= WORD @word;\n}\n",
+    "cases": [
+      {
+        "id": "astral-family-prefix-then-crlf-candidate",
+        "input": "𠮷👨‍👩‍👧‍👦:a👨‍👩‍👧‍👦\r\nb",
+        "bindings": {
+          "known": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          20,
+          20
+        ],
+        "candidates": [
+          [
+            "a👨‍👩‍👧‍👦\r\nb",
+            9,
+            20
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            20
+          ],
+          "fields": {
+            "head": "𠮷👨‍👩‍👧‍👦",
+            "value": {
+              "type": "ItemValue",
+              "span": [
+                9,
+                20
+              ],
+              "fields": {
+                "word": "a👨‍👩‍👧‍👦\r\nb"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "false-after-astral-crlf-prefix-is-syntax-at-candidate-end",
+        "input": "𠮷\r\n:x",
+        "bindings": {
+          "known": "const:false"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "x",
+            4,
+            5
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 5,
+          "expected": "predicate known"
+        }
+      },
+      {
+        "id": "error-after-astral-crlf-prefix-is-at-candidate-start",
+        "input": "𠮷\r\n:x",
+        "bindings": {
+          "known": "error"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "x",
+            4,
+            5
+          ]
+        ],
+        "diagnostic": {
+          "kind": "predicate_error",
+          "offset": 4,
+          "expected": "predicate known completed normally"
+        }
+      }
+    ]
+  },
+  {
+    "name": "lookahead-and-nullable-after-astral-prefix",
+    "grammar": "grammar Ahead {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token WORD ::= (CHAR_RANGE('a','z') | '😀' | '𠮷')+;\n  token SEP ::= ':';\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  token SEVEN = LOOKAHEAD('7')\n  token NOT_SEVEN = NEGATIVE_LOOKAHEAD('7')\n  @root @mapping(Result, params=[head, value])\n  Start ::= WORD @head SEP Lucky @value | WORD @head SEP Other @value | WORD @head SEP Plain @value;\n  @predicate('ahead')\n  Seven ::= SEVEN;\n  @predicate('clear')\n  Clear ::= NOT_SEVEN;\n  @predicate('blank')\n  Blank ::= ['-'];\n  @predicate('lucky') @mapping(LuckyValue, params=[digits])\n  Lucky ::= Seven DIGITS @digits;\n  @mapping(OtherValue, params=[digits])\n  Other ::= Clear Blank DIGITS @digits;\n  @mapping(PlainValue, params=[digits])\n  Plain ::= DIGITS @digits;\n}\n",
+    "cases": [
+      {
+        "id": "positive-lookahead-true-keeps-cursor",
+        "input": "😀𠮷:75",
+        "bindings": {
+          "ahead": "oneOf:",
+          "lucky": "oneOf:75",
+          "clear": "const:true",
+          "blank": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ],
+          [
+            "75",
+            3,
+            5
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "LuckyValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "75"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "positive-lookahead-false-falls-back",
+        "input": "😀𠮷:75",
+        "bindings": {
+          "ahead": "const:false",
+          "lucky": "const:true",
+          "clear": "const:true",
+          "blank": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "PlainValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "75"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "lookahead-then-digits-false-falls-back",
+        "input": "😀𠮷:75",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:false",
+          "clear": "const:true",
+          "blank": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ],
+          [
+            "75",
+            3,
+            5
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "PlainValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "75"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "negative-lookahead-and-absent-nullable-are-empty",
+        "input": "😀𠮷:42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "oneOf:",
+          "blank": "oneOf:"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "OtherValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "negative-lookahead-false-falls-back",
+        "input": "😀𠮷:42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "const:false",
+          "blank": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "PlainValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "absent-nullable-false-falls-back",
+        "input": "😀𠮷:42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "oneOf:",
+          "blank": "const:false"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "PlainValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "present-nullable-after-empty-lookahead",
+        "input": "😀𠮷:-42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "oneOf:",
+          "blank": "oneOf:-"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ],
+          [
+            "-",
+            3,
+            4
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "OtherValue",
+              "span": [
+                3,
+                6
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "nullable-false-without-fallback-is-syntax",
+        "input": "😀𠮷:-42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "const:true",
+          "blank": "const:false"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ],
+          [
+            "-",
+            3,
+            4
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 4,
+          "expected": "predicate blank"
+        }
+      }
+    ]
+  },
+  {
+    "name": "returned-choice-lookahead-after-astral-prefix",
+    "grammar": "grammar Returned {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token WORD ::= (CHAR_RANGE('a','b') | '😀' | '𠮷')+;\n  token SEP ::= ':';\n  token C_AHEAD = LOOKAHEAD('c')\n  @root @mapping(Result, params=[head, value])\n  Start ::= WORD @head SEP Checked @value 'c' | WORD @head SEP Fallback @value;\n  @predicate('ahead') @mapping(CheckedValue, params=[mark])\n  Checked ::= C_AHEAD | 'z' @mark;\n  @mapping(FallbackValue, params=[text])\n  Fallback ::= 'c' @text;\n}\n",
+    "cases": [
+      {
+        "id": "choice-returned-lookahead-text-keeps-checked",
+        "input": "😀𠮷:c",
+        "bindings": {
+          "ahead": "oneOf:c"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "candidates": [
+          [
+            "c",
+            3,
+            4
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "CheckedValue",
+              "span": [
+                3,
+                3
+              ],
+              "fields": {
+                "mark": null
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "choice-returned-lookahead-text-rejects-empty-only-callback",
+        "input": "😀𠮷:c",
+        "bindings": {
+          "ahead": "oneOf:"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "candidates": [
+          [
+            "c",
+            3,
+            4
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "FallbackValue",
+              "span": [
+                3,
+                4
+              ],
+              "fields": {
+                "text": "c"
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+]

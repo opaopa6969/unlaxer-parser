@@ -32,6 +32,8 @@ public class ResourcePublicationTest {
         case "capture"->new NamedCapture("inside",child);
         case "scope"->new CaptureScope(child);
         case "repeat"->new ZeroOrMore(child);
+        case "terminator"->new ZeroOrMore(new WordParser("q"),child);
+        case "terminated-body"->new ZeroOrMore(child,new WordParser("q"));
         default->throw new AssertionError(name);
     };}
     private static int frameCount(ParseContext c,String name) throws Exception {

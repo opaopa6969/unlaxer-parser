@@ -73,7 +73,9 @@ final class PreferredAstEmitter {
                 var iter = calls.get(i).iterator();
                 Expression body = instrument(rule.body(), iter);
                 if (iter.hasNext()) throw new IllegalArgumentException("source call sites differ");
-                if (body instanceof NameResolutionScope scope)
+                if (body instanceof SemanticPredicateScope scope)
+                    body = new SemanticPredicateScope(new Capture(marker, scope.child()), scope.requirements());
+                else if (body instanceof NameResolutionScope scope)
                     body =
                             new NameResolutionScope(
                                     new Capture(marker, scope.child()), scope.requirements());

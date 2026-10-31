@@ -140,6 +140,11 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             min,
             max: Some(max),
             ..
+        }
+        | Expr::JavaTerminatedRepeat {
+            min,
+            max: Some(max),
+            ..
         } if *max == 0 || *max < *min => {
             if *min == 0 && *max == 0 {
                 FirstSet::NULLABLE
@@ -235,6 +240,17 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             set.nullable |= *min == 0;
             set
         }
+        // Java FirstSets: the body, then the terminator, which may also end the repetition.
+        Expr::JavaTerminatedRepeat {
+            child,
+            terminator,
+            min,
+            ..
+        } => {
+            let mut set = of(child, rules).union(of(terminator, rules));
+            set.nullable |= *min == 0;
+            set
+        }
         // A lookahead consumes nothing, but its child still runs at this position.
         Expr::Lookahead { child, .. } => {
             if of(child, rules).unknown {
@@ -283,7 +299,9 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::ZeroMatch(_)
         | Expr::Backreference(_)
         | Expr::NamePredicate { .. }
-        | Expr::NameResolutionScope { .. } => FirstSet::UNKNOWN,
+        | Expr::SemanticPredicate { .. }
+        | Expr::NameResolutionScope { .. }
+        | Expr::SemanticPredicateScope { .. } => FirstSet::UNKNOWN,
         // A raising operator turns a failure at any code point into a committed or labeled
         // failure, so skipping it from its child's FIRST set would change the result (#700).
         Expr::Commit { .. } | Expr::Label { .. } | Expr::CatchLabels { .. } => FirstSet::UNKNOWN,

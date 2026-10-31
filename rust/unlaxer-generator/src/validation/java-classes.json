@@ -77,6 +77,8 @@
   "org.unlaxer.parser.combinator.RecoveryDiagnostic",
   "org.unlaxer.parser.combinator.Repeat",
   "org.unlaxer.parser.combinator.Reverse",
+  "org.unlaxer.parser.combinator.SemanticPredicateParser",
+  "org.unlaxer.parser.combinator.SemanticPredicateScope",
   "org.unlaxer.parser.combinator.SingleChildCollectingParser",
   "org.unlaxer.parser.combinator.SyncPointRecoveryParser",
   "org.unlaxer.parser.combinator.TagWrapper",
