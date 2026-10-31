@@ -1,6 +1,6 @@
 {
   "ubnf-authoring": {
-    "description": "maven.yml / vsix: 実 Java と JVM 不要 Rust の UBNF authoring stdio 契約。",
+    "description": "maven.yml / vsix: 実 Java と JVM 不要 Rust の UBNF authoring stdio 契約（JSON-RPC #1001 の raw reader/DTO・有限deadlineの無応答を含む）。",
     "reports": ["unlaxer-dsl/ubnf-vscode/target/surefire-reports"],
     "properties": {"rustConformance": "true"},
     "required": {
