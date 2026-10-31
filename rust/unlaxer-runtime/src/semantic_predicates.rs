@@ -377,9 +377,9 @@ impl<'a> ParseContext<'a> {
         let start = self.mode_cursor();
         let fragment = self.expression(child, depth)?;
         let source = fragment.source.as_deref().filter(|source| source.classic);
+        // As for @f, inspect the Parsed source a Classic Choice/rule returned, not its collection.
         if fragment
-            .source
-            .as_deref()
+            .parsed_source()
             .is_some_and(|source| source.generated || source.text.is_some())
         {
             // Projected or generated text has no original input span to report.

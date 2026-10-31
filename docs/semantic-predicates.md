@@ -64,7 +64,9 @@ registry は解析前に所有コピーし（Java `Map.copyOf`、Rust は `Arc` 
 - text は規則本体が実際に一致した原文。`@whitespace` の grammar では、規則が自分で読んだ前後の空白・comment も含む（生成 AST の source map span と同じ範囲）。`"\r\n42\r\n"` 全体が `Octet` なら候補は `("\r\n42\r\n", 0, 6)` で、数値として読みたい callback は自分で trim する。
 - 空に一致した nullable 規則は、その位置の空 span（例 `("", 5, 5)`）で評価する。
 - Classic の MatchOnly / virtual kind・反転でも、consume 前の一致 text を渡す（Java `getRootToken(false).source`。`getConsumed()` は MatchOnly/virtual で空になるため使わない）。
-- 投影・生成された token source（入力の連続区間でない text）には元の span がないため、評価せず `predicate_source` で entry を失敗させる。UBNF だけから生成した grammar ではこの経路は起きず、host の custom parser / adapter が生成 token を返した場合に限る。
+- 投影・生成された token source（入力の連続区間でない text）には元の span がないため、評価せず `predicate_source` で entry を失敗させる。text が空でも同じで、診断の位置は子の開始。UBNF だけから生成した grammar ではこの経路は起きず、host の custom parser / adapter が生成 token を返した場合に限る。Java の `Choice` は選んだ子の `Parsed` を返すので、その source を検査する。Rust の Classic `Choice` / rule も、`@f` と同じく返した Parsed 原文を検査する。
+- 子が token を返さずに成功した場合（Java `PegLookahead` の `Parsed.SUCCEEDED`、Rust の node を返さない match）は、子の前後の cursor の入力区間で評価する。幅 0 なら、その位置の `("", at, at)` になる。Java の `ContainerParser`（hint でない `ErrorMessageParser`、`SuggestsCollectorParser`）が置く空 token は、入力上の幅 0 の view である（`Token.empty` は root context で入力の root を持たないため使わない）。`Optional`・`EmptyParser`・空の `Chain` は、従来どおり入力の空 span になる。
+- UBNF の `LOOKAHEAD(...)` / `NEGATIVE_LOOKAHEAD(...)` は Classic の `MatchOnly` / `Not` で、PEG assertion ではない。これだけを本体にした規則では、consumed の収集に一致 text が入らないので、候補はその位置の `""` になる。後ろに消費が続く規則では、消費した原文が候補になる。
 - 候補は text と span だけで、Java/Rust 共通の CST オブジェクトではない。任意の解析木を読む predicate（#851）はこの API の対象外。
 
 ## 失敗の種類
@@ -95,7 +97,17 @@ sticky 失敗の後でも、同じ context に別の registry を `install` す�
 
 ## 検証
 
-`unlaxer-dsl/src/test/resources/semantic-predicate/{corpus,invalid}.json` が手書きの独立期待値を持つ（6 文法 28 ケース、拒否 24 件。拒否は最初の error code を照合する）。corpus には wrapper 名が規則 class・token class と重なる文法（生成 Java の compile と両 Rust host の実行を含む）と、astral 文字・ZWJ 家族絵文字・CRLF の後ろで start が 0 でない候補（CP 9..20、false は CP 5、例外は CP 4。UTF-16 や書記素の位置ではない）を含む。`SemanticPredicateConformanceTest`（`-DrustConformance=true` が必要。素の `mvn test` では skip）は、Java 生成 parser/mapper、Java frontend の Rust 生成物、native frontend の Rust 生成物を別々に compile・実行し、prefix cursor、候補 text/span 集合、full-input 受理、AST 全 field・node span、診断 kind/offset/期待名を各診断 mode・memo OFF/ON で照合する（生成物のバイト一致は追加の確認で、それだけを根拠にしない）。さらに「false を無視」「未登録を false で隠す」「retry で registry を失う」「`@predicate` を外す」と期待値が崩れることを同じテストで確認する。実装へ一時的に入れた変異（Java の false 無視・未登録の握りつぶし・wrapper の rollback を commit に置換、Rust の false 無視・未登録の握りつぶし・診断 retry での registry 喪失）はすべて既存テストで失敗する。ただし wrapper 自身の rollback 欠落は、生成 grammar では wrapper が常に transaction を持つ親に包まれるため共通 corpus では観測できず、Java 単体の Optional 直下のケースが検出する。CI core shard で実行し `rust-semantic-predicate.tsv` を必須保存する。runtime 単体は Java `SemanticPredicateParserTest`、Rust `semantic_predicates::tests`、native generator は `rust/unlaxer-generator/tests/semantic_predicate.rs`。
+`unlaxer-dsl/src/test/resources/semantic-predicate/{corpus,invalid}.json` が手書きの独立期待値を持つ（7 文法 36 ケース、拒否 24 件。拒否は最初の error code を照合する）。corpus には wrapper 名が規則 class・token class と重なる文法（生成 Java の compile と両 Rust host の実行を含む）と、astral 文字・ZWJ 家族絵文字・CRLF の後ろで start が 0 でない候補（CP 9..20、false は CP 5、例外は CP 4。UTF-16 や書記素の位置ではない）を含む。7 番目の文法は astral 文字の後ろ（CP 3）で、`LOOKAHEAD` だけの規則、それに消費が続く規則、`NEGATIVE_LOOKAHEAD` だけの規則、nullable 規則に `@predicate` を付け、true の受理・false での fallback・fallback のない false の syntax 失敗を照合する。`SemanticPredicateConformanceTest`（`-DrustConformance=true` が必要。素の `mvn test` では skip）は、Java 生成 parser/mapper、Java frontend の Rust 生成物、native frontend の Rust 生成物を別々に compile・実行し、prefix cursor、候補 text/span 集合、full-input 受理、AST 全 field・node span、診断 kind/offset/期待名を各診断 mode・memo OFF/ON で照合する（生成物のバイト一致は追加の確認で、それだけを根拠にしない）。さらに「false を無視」「未登録を false で隠す」「retry で registry を失う」「`@predicate` を外す」と期待値が崩れることを同じテストで確認する。実装へ一時的に入れた変異（Java の false 無視・未登録の握りつぶし・wrapper の rollback を commit に置換、Rust の false 無視・未登録の握りつぶし・診断 retry での registry 喪失）はすべて既存テストで失敗する。ただし wrapper 自身の rollback 欠落は、生成 grammar では wrapper が常に transaction を持つ親に包まれるため共通 corpus では観測できず、Java 単体の Optional 直下のケースが検出する。CI core shard で実行し `rust-semantic-predicate.tsv` を必須保存する。runtime 単体は Java `SemanticPredicateParserTest`、Rust `semantic_predicates::tests` と `tests/semantic_predicate_source.rs`、native generator は `rust/unlaxer-generator/tests/semantic_predicate.rs`。
+
+空の候補の source は、UBNF の lowering（`LOOKAHEAD` は `MatchOnly`、`ERROR` は失敗 hint）では生成 token・PEG assertion・container に届かない。そのため共通 corpus では観測できず、runtime 単体で確かめる。Java と Rust の単体テストは、CP 2 の後ろで次の 2 点を memo 2 種 × 診断 mode 3 種で照合する。Rust では Classic と非 Classic の両方を見る。
+
+- 生成 token の text が `""` でも `"g"` でも、直接返しても `Choice` 越しに返しても、callback を呼ばずに `predicate_source`@2 で失敗し、fallback で回復しない。
+- 正負の PEG assertion、`Choice` 越しの assertion、`Optional`・空 span の対照は、true のとき `("", 2, 2)` で cursor 2、false のときは巻き戻して後続の `c` で cursor 3 になり、sticky 失敗を残さない。Java ではさらに container を確かめる。Rust には成功する container がない。
+
+次の変異は、それぞれの単体テストで失敗する（共通 corpus は上記の理由で検出しない）。
+
+- Java: 空を由来の検査より先に受理する、token のない成功も root token の source で判定する、container を `Token.empty` に戻す、由来の検査を外す、生成 source の診断位置を `offsetFromRoot` にする。
+- Rust: 由来の検査を `parsed_source` でなく収集後の source で行う、由来の検査を外す。
 
 ## 制限と残り
 
@@ -105,4 +117,5 @@ sticky 失敗の後でも、同じ context に別の registry を `install` す�
 - Rust の低水準 `ParseContext::new` など registry を install していない context では、scope は sticky 失敗を残さずに本体を解析せず失敗する（`semantic_predicate_failure()` は `None`）。Java の低水準 `SemanticPredicateBindings.failure(context)` は `predicate_missing` を返す。生成 API と full-input API は両言語とも `predicate_missing` で一致する。
 - Java の規則 class（`Parser.get(RangeParser.class)`）と `getRootSyntaxParser()` を直接使うと、wrapper と scope を含まないので述語を評価せず成功しうる（mapper が選んだ root token を探すための低水準 API）。Rust の生成規則は本体に `SemanticPredicate` を含むため、同じ使い方でも registry が無ければ失敗する。この差は低水準 API に限り、上記の mapper の解析入口は両言語とも述語を通る。直接使う場合は `getRootParser()` と `SemanticPredicateBindings.install` を使う。
 - 生成 LSP / DAP / editor CST（`parse_editor_cst`、Java `parseEditorCst`）と plain の `parse` 系入口は registry を受け取らないため、述語 grammar では本体を解析せず `predicate_missing`（editor では失敗）になる。両言語とも黙って成功させないが、IDE で述語 grammar を使う入口は未提供。
+- 由来の検査は、子が返した source（Java は `getRootToken(false).source`、Rust は Parsed 原文）だけを見る。収集する wrapper（Java の `Chain`・`Optional`・`ZeroOrMore`、Rust の `Sequence`・`Optional`）の内側にある生成 token は、wrapper の収集 source に寄与しない（収集は現在の種別の token だけで、空の生成 token は text を持たない）。そのため wrapper の結果は、cursor 位置の入力の `""` として評価される（Java `Transaction.anchorCollectedEmptySource`、Rust `collected_source`）。両言語で同じ挙動だが、入れ子の token 全体の由来を保証するものではない。CST にはその生成 token が残る。
 - 候補は text/span のみ。CST を読む汎用 predicate（#851）、`@namePredicate` との併用、上記の注釈組合せは後続の対象。

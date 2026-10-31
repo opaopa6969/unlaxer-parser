@@ -1037,5 +1037,360 @@
         }
       }
     ]
+  },
+  {
+    "name": "lookahead-and-nullable-after-astral-prefix",
+    "grammar": "grammar Ahead {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token WORD ::= (CHAR_RANGE('a','z') | '😀' | '𠮷')+;\n  token SEP ::= ':';\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  token SEVEN = LOOKAHEAD('7')\n  token NOT_SEVEN = NEGATIVE_LOOKAHEAD('7')\n  @root @mapping(Result, params=[head, value])\n  Start ::= WORD @head SEP Lucky @value | WORD @head SEP Other @value | WORD @head SEP Plain @value;\n  @predicate('ahead')\n  Seven ::= SEVEN;\n  @predicate('clear')\n  Clear ::= NOT_SEVEN;\n  @predicate('blank')\n  Blank ::= ['-'];\n  @predicate('lucky') @mapping(LuckyValue, params=[digits])\n  Lucky ::= Seven DIGITS @digits;\n  @mapping(OtherValue, params=[digits])\n  Other ::= Clear Blank DIGITS @digits;\n  @mapping(PlainValue, params=[digits])\n  Plain ::= DIGITS @digits;\n}\n",
+    "cases": [
+      {
+        "id": "positive-lookahead-true-keeps-cursor",
+        "input": "😀𠮷:75",
+        "bindings": {
+          "ahead": "oneOf:",
+          "lucky": "oneOf:75",
+          "clear": "const:true",
+          "blank": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ],
+          [
+            "75",
+            3,
+            5
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "LuckyValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "75"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "positive-lookahead-false-falls-back",
+        "input": "😀𠮷:75",
+        "bindings": {
+          "ahead": "const:false",
+          "lucky": "const:true",
+          "clear": "const:true",
+          "blank": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "PlainValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "75"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "lookahead-then-digits-false-falls-back",
+        "input": "😀𠮷:75",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:false",
+          "clear": "const:true",
+          "blank": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ],
+          [
+            "75",
+            3,
+            5
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "PlainValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "75"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "negative-lookahead-and-absent-nullable-are-empty",
+        "input": "😀𠮷:42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "oneOf:",
+          "blank": "oneOf:"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "OtherValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "negative-lookahead-false-falls-back",
+        "input": "😀𠮷:42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "const:false",
+          "blank": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "PlainValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "absent-nullable-false-falls-back",
+        "input": "😀𠮷:42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "oneOf:",
+          "blank": "const:false"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          5,
+          5
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            5
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "PlainValue",
+              "span": [
+                3,
+                5
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "present-nullable-after-empty-lookahead",
+        "input": "😀𠮷:-42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "oneOf:",
+          "blank": "oneOf:-"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          6,
+          6
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ],
+          [
+            "-",
+            3,
+            4
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            6
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "OtherValue",
+              "span": [
+                3,
+                6
+              ],
+              "fields": {
+                "digits": "42"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "nullable-false-without-fallback-is-syntax",
+        "input": "😀𠮷:-42",
+        "bindings": {
+          "ahead": "const:true",
+          "lucky": "const:true",
+          "clear": "const:true",
+          "blank": "const:false"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "",
+            3,
+            3
+          ],
+          [
+            "-",
+            3,
+            4
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 4,
+          "expected": "predicate blank"
+        }
+      }
+    ]
   }
 ]

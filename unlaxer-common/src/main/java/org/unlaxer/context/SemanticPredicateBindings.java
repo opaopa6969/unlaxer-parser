@@ -73,20 +73,24 @@ public final class SemanticPredicateBindings {
 
     /**
      * Evaluates {@code name} over a successful child's matched source. Only input-backed text has an
-     * original span: projected or generated text is the sticky {@code predicate_source} failure.
+     * original span: projected or generated text, even empty, is the sticky {@code predicate_source}
+     * failure. A tokenless child passes its cursor span as an input view.
      */
     public static boolean test(ParseContext context, String name, Source matched, int emptyAt) {
         State state = state(context);
-        int at = matched.codePointLength().value() == 0 ? emptyAt : matched.offsetFromRoot().value();
+        CapturedValue.Provenance provenance = CapturedValue.provenanceOf(matched, context.source);
+        // Generated text has no input offset of its own; like Rust, report the child's start.
+        int at = matched.codePointLength().value() == 0 || provenance == CapturedValue.Provenance.GENERATED
+            ? emptyAt : matched.offsetFromRoot().value();
         if (state.frames.isEmpty()) {
             reject(context, "predicate_scope_missing", at, at, "semantic predicate entry scope");
             return false;
         }
-        if (matched.codePointLength().value() == 0) return test(state, context, name, new Candidate("", at, at));
-        if (CapturedValue.provenanceOf(matched, context.source) != CapturedValue.Provenance.INPUT) {
+        if (provenance != CapturedValue.Provenance.INPUT) {
             reject(context, "predicate_source", at, at, "input-backed candidate for predicate " + name);
             return false;
         }
+        if (matched.codePointLength().value() == 0) return test(state, context, name, new Candidate("", at, at));
         String text = matched.sourceAsString();
         return test(state, context, name, new Candidate(text, at, at + text.codePointCount(0, text.length())));
     }

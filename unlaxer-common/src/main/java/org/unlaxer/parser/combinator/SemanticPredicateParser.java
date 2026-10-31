@@ -1,6 +1,9 @@
 package org.unlaxer.parser.combinator;
 
+import org.unlaxer.CodePointIndex;
+import org.unlaxer.CodePointLength;
 import org.unlaxer.Parsed;
+import org.unlaxer.Source;
 import org.unlaxer.TokenKind;
 import org.unlaxer.context.DiagnosticsAgnostic;
 import org.unlaxer.context.ParseContext;
@@ -36,7 +39,13 @@ public class SemanticPredicateParser extends ConstructedAbstractParser implement
             boolean accepted = parsed.isSucceeded();
             if (accepted) {
                 // getConsumed() empties MatchOnly/virtual results; the root token keeps the matched source.
-                accepted = SemanticPredicateBindings.test(context, predicate, parsed.getRootToken(false).source, before);
+                // A tokenless success (PEG assertion) returned no source: its candidate is the cursor span,
+                // as for a node-less Rust match. A returned token, even an empty one, keeps its own origin.
+                Source matched = parsed.isCollected() || !parsed.getOriginalTokens().isEmpty()
+                    ? parsed.getRootToken(false).source
+                    : context.peek(new CodePointIndex(before), new CodePointLength(
+                        (kind.isConsumed() ? context.getConsumedPosition() : context.getMatchedPosition()).value() - before));
+                accepted = SemanticPredicateBindings.test(context, predicate, matched, before);
                 if (!accepted && SemanticPredicateBindings.failure(context).isEmpty())
                     ErrorMessageParser.expected("predicate " + predicate).parse(context, kind, invert);
             }

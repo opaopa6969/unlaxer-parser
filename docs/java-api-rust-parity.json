@@ -779,11 +779,11 @@
     },
     "error-container": {
       "status": "uncorroborated",
-      "reason": "ErrorMessageParser.expected は失敗hint、通常constructorは成功する空token Container。Rust Error は失敗であり通常constructorの代替ではない。Container.getRangedContents は Java classでtokenを探す。",
+      "reason": "ErrorMessageParser.expected は失敗hint、通常constructorは成功する空token Container（token source は入力上の幅0 view、#1006）。Rust Error は失敗であり通常constructorの代替ではない。Container.getRangedContents は Java classでtokenを探す。",
       "route": "失敗hintは `Expr::Error(\"expected\")`。成功containerは `add_token_node` と portable metadata/owned値、typed抽出は明示 Rule ID に移す。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/ErrorMessageParser.java#L15", "anchor": "public class ErrorMessageParser extends ContainerParser<String> implements TerminalSymbol"},
-        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ContainerParser.java#L15", "anchor": "public abstract class ContainerParser<T> extends NoneChildParser"},
+        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ContainerParser.java#L16", "anchor": "public abstract class ContainerParser<T> extends NoneChildParser"},
         {"location": "rust/unlaxer-runtime/src/lib.rs#L263", "anchor": "Error(&'static str),"},
         {"location": "rust/unlaxer-runtime/src/token.rs#L1", "anchor": "//! Explicit Classic token parsing and owned portable metadata."}
       ],
@@ -1060,7 +1060,7 @@
       "route": "UBNF `@predicate('name')` と生成 `parse_tree_detailed_with_semantic_predicates`、runtime の `semantic_predicates::Bindings` / `ParseContext::with_semantic_predicates` / `Expr::SemanticPredicate` / `Expr::SemanticPredicateScope` / `parse_detailed_shared_with_semantic_predicates`。",
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L14", "anchor": "public final class SemanticPredicateBindings {"},
-        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateParser.java#L16", "anchor": "public class SemanticPredicateParser extends ConstructedAbstractParser implements HasChildrenParser, DiagnosticsAgnostic {"},
+        {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateParser.java#L19", "anchor": "public class SemanticPredicateParser extends ConstructedAbstractParser implements HasChildrenParser, DiagnosticsAgnostic {"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateScope.java#L16", "anchor": "public final class SemanticPredicateScope extends ConstructedAbstractParser implements HasChildrenParser, DiagnosticsAgnostic {"},
         {"location": "rust/unlaxer-runtime/src/semantic_predicates.rs#L46", "anchor": "pub struct Bindings {"},
         {"location": "rust/unlaxer-runtime/src/lib.rs#L186", "anchor": "SemanticPredicate {"},
@@ -1070,7 +1070,8 @@
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SemanticPredicateConformanceTest.java",
         "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/SemanticPredicateParserTest.java",
         "rust/unlaxer-runtime/src/semantic_predicates.rs",
-        "rust/unlaxer-generator/tests/semantic_predicate.rs"
+        "rust/unlaxer-generator/tests/semantic_predicate.rs",
+        "rust/unlaxer-runtime/tests/semantic_predicate_source.rs"
       ],
       "fixtures": [
         "unlaxer-dsl/src/test/resources/semantic-predicate/corpus.json",
