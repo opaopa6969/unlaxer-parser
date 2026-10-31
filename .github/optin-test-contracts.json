@@ -16,6 +16,7 @@
       "cross-language-core": [
         "org.unlaxer.dsl.codegen.MidParseDiagnosticsConformanceTest",
         "org.unlaxer.dsl.codegen.LineBoundaryConformanceTest",
+        "org.unlaxer.dsl.codegen.SemanticPredicateConformanceTest",
         "org.unlaxer.dsl.RustBackendTest",
         "org.unlaxer.dsl.codegen.RustUbnfFrontendConformanceTest",
         "org.unlaxer.dsl.codegen.RustUbnfSourceConformanceTest",
@@ -254,6 +255,7 @@
       "org.unlaxer.dsl.codegen.UniqueLongestConformanceTest": ["uniqueLongestChoicesPreserveIndependentOracles"],
       "org.unlaxer.dsl.codegen.NameSnapshotConformanceTest": ["immutableNamesAndFatalUnknownAgreeAcrossHosts"],
       "org.unlaxer.dsl.codegen.NamePredicateConformanceTest": ["namePredicatesPreserveIndependentOracles"],
+      "org.unlaxer.dsl.codegen.SemanticPredicateConformanceTest": ["semanticPredicatesPreserveIndependentOracles"],
       "org.unlaxer.dsl.codegen.ContextualLexingConformanceTest": ["javaModesPreserveAuthoredOracles", "rustAndNativeFrontendMatchAllModes", "invalidGoalsHaveIndependentSourceDiagnostics", "lookaheadAndIndependentGrammarRestoreLexicalState"],
       "org.unlaxer.dsl.codegen.CodePointEscapeConformanceTest": ["legacyEscapesAndUnrelatedConstructorsKeepTheirValues", "unknownSupplementaryEscapePreservesItsRawValue", "programmaticFormatTwoRangeRejectsTheSurrogateInterval", "malformedEscapesAgreeOnCodesAndUnicodeSourcePositions"],
       "org.unlaxer.dsl.codegen.ClassicDapProtocolConformanceTest": ["generatedJavaAndRustShareStrictTypedAstInspection"],

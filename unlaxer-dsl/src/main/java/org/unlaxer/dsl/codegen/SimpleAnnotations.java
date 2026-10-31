@@ -38,13 +38,13 @@ public final class SimpleAnnotations {
     public static final List<String> KEYWORDS = List.of(
         "root", "mapping", "eval", "whitespace", "interleave", "lexicalContext", "backref",
         "scopeTree", "declares", "catalog", "leftAssoc", "rightAssoc", "longestChoice",
-        "uniqueLongestChoice", "namePredicate", "predictiveChoice", "precedence", "doc",
+        "uniqueLongestChoice", "predicate", "namePredicate", "predictiveChoice", "precedence", "doc",
         "recovery", "skip", "commonField", "enum");
 
     /** The keywords that require arguments. */
     private static final Set<String> ARGUMENTS = Set.of(
         "mapping", "eval", "interleave", "lexicalContext", "backref", "scopeTree", "declares",
-        "catalog", "namePredicate", "precedence", "doc", "recovery", "commonField");
+        "catalog", "predicate", "namePredicate", "precedence", "doc", "recovery", "commonField");
 
     /**
      * One ignored Simple annotation; {@code node} is the annotation, whose source span runs from

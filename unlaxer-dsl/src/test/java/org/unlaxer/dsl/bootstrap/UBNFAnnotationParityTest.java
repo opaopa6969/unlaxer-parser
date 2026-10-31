@@ -34,6 +34,8 @@ public class UBNFAnnotationParityTest {
             }
         }
         assertEquals(new UBNFAST.RootAnnotation(), annotation("@root"));
+        assertEquals(new UBNFAST.SimpleAnnotation("predicateExtra"), annotation("@predicateExtra"));
+        assertEquals(new UBNFAST.PredicateAnnotation("valid"), annotation("@predicate('valid')"));
         assertEquals(new UBNFAST.EnumAnnotation(), annotation("@enum"));
         assertThrows(IllegalArgumentException.class, () -> annotation("@rooted('x')"));
     }
@@ -46,7 +48,7 @@ public class UBNFAnnotationParityTest {
                 "declares", "catalog", "precedence", "doc", "recovery", "commonField"))
             assertEquals(new UBNFAST.SimpleAnnotation(keyword), annotation("@" + keyword));
         assertEquals(new UBNFAST.MappingAnnotation("Root", List.of()), annotation("@mapping (Root)"));
-        for (String text : List.of("@ mapping(X)", "@ root('x')", "@namePredicate"))
+        for (String text : List.of("@ mapping(X)", "@ root('x')", "@namePredicate", "@predicate", "@predicate(valid)"))
             assertThrows(text, IllegalArgumentException.class, () -> annotation(text));
     }
 

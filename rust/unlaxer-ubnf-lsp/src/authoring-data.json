@@ -131,6 +131,12 @@
       "snippet": "@doc('${1:description}')",
       "signature": "@doc('text')",
       "doc": "Attaches documentation text to the rule."
+    },
+    {
+      "label": "@predicate",
+      "snippet": "@predicate('${1:name}')",
+      "signature": "@predicate('name')",
+      "doc": "Accepts the rule's match only if the pure condition registered under this name returns true."
     }
   ],
   "snippets": [

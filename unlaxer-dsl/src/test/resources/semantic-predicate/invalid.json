@@ -1,0 +1,146 @@
+[
+  {
+    "name": "duplicate",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('a') @predicate('b')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-DUPLICATE",
+    "nativeMessage": "E-PREDICATE-DUPLICATE: Item"
+  },
+  {
+    "name": "empty-name",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-NAME",
+    "nativeMessage": "E-PREDICATE-NAME: Item"
+  },
+  {
+    "name": "leading-digit",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('1bad')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-NAME",
+    "nativeMessage": "E-PREDICATE-NAME: Item"
+  },
+  {
+    "name": "non-ascii",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('é')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-NAME",
+    "nativeMessage": "E-PREDICATE-NAME: Item"
+  },
+  {
+    "name": "too-long",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-NAME",
+    "nativeMessage": "E-PREDICATE-NAME: Item"
+  },
+  {
+    "name": "recovery",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p') @recovery(sync=';')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: Item @recovery"
+  },
+  {
+    "name": "whitespace",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p') @whitespace\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: Item @whitespace"
+  },
+  {
+    "name": "longest-choice",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p') @longestChoice\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: Item @longestChoice"
+  },
+  {
+    "name": "left-assoc",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Sum @value;\n  @predicate('p') @leftAssoc @precedence(level=1) @mapping(Sum, params=[left, op, right])\n  Sum ::= DIGITS @left { '+' @op DIGITS @right };\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: Sum @leftAssoc"
+  },
+  {
+    "name": "name-predicate-grammar",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @whitespace: javaStyle\n  token ID ::= CHAR_RANGE('A','Z')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Declaration @value | Item @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name])\n  Declaration ::= ID @name ';';\n  @predicate('p') @mapping(ItemValue, params=[name])\n  Item ::= ID @name;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: @namePredicate"
+  },
+  {
+    "name": "limit",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= R0 @value | R1 @value | R2 @value | R3 @value | R4 @value | R5 @value | R6 @value | R7 @value | R8 @value | R9 @value | R10 @value | R11 @value | R12 @value | R13 @value | R14 @value | R15 @value | R16 @value | R17 @value | R18 @value | R19 @value | R20 @value | R21 @value | R22 @value | R23 @value | R24 @value | R25 @value | R26 @value | R27 @value | R28 @value | R29 @value | R30 @value | R31 @value | R32 @value | R33 @value | R34 @value | R35 @value | R36 @value | R37 @value | R38 @value | R39 @value | R40 @value | R41 @value | R42 @value | R43 @value | R44 @value | R45 @value | R46 @value | R47 @value | R48 @value | R49 @value | R50 @value | R51 @value | R52 @value | R53 @value | R54 @value | R55 @value | R56 @value | R57 @value | R58 @value | R59 @value | R60 @value | R61 @value | R62 @value | R63 @value | R64 @value;\n  @predicate('p0') @mapping(V0, params=[digits])\n  R0 ::= DIGITS @digits;\n  @predicate('p1') @mapping(V1, params=[digits])\n  R1 ::= DIGITS @digits;\n  @predicate('p2') @mapping(V2, params=[digits])\n  R2 ::= DIGITS @digits;\n  @predicate('p3') @mapping(V3, params=[digits])\n  R3 ::= DIGITS @digits;\n  @predicate('p4') @mapping(V4, params=[digits])\n  R4 ::= DIGITS @digits;\n  @predicate('p5') @mapping(V5, params=[digits])\n  R5 ::= DIGITS @digits;\n  @predicate('p6') @mapping(V6, params=[digits])\n  R6 ::= DIGITS @digits;\n  @predicate('p7') @mapping(V7, params=[digits])\n  R7 ::= DIGITS @digits;\n  @predicate('p8') @mapping(V8, params=[digits])\n  R8 ::= DIGITS @digits;\n  @predicate('p9') @mapping(V9, params=[digits])\n  R9 ::= DIGITS @digits;\n  @predicate('p10') @mapping(V10, params=[digits])\n  R10 ::= DIGITS @digits;\n  @predicate('p11') @mapping(V11, params=[digits])\n  R11 ::= DIGITS @digits;\n  @predicate('p12') @mapping(V12, params=[digits])\n  R12 ::= DIGITS @digits;\n  @predicate('p13') @mapping(V13, params=[digits])\n  R13 ::= DIGITS @digits;\n  @predicate('p14') @mapping(V14, params=[digits])\n  R14 ::= DIGITS @digits;\n  @predicate('p15') @mapping(V15, params=[digits])\n  R15 ::= DIGITS @digits;\n  @predicate('p16') @mapping(V16, params=[digits])\n  R16 ::= DIGITS @digits;\n  @predicate('p17') @mapping(V17, params=[digits])\n  R17 ::= DIGITS @digits;\n  @predicate('p18') @mapping(V18, params=[digits])\n  R18 ::= DIGITS @digits;\n  @predicate('p19') @mapping(V19, params=[digits])\n  R19 ::= DIGITS @digits;\n  @predicate('p20') @mapping(V20, params=[digits])\n  R20 ::= DIGITS @digits;\n  @predicate('p21') @mapping(V21, params=[digits])\n  R21 ::= DIGITS @digits;\n  @predicate('p22') @mapping(V22, params=[digits])\n  R22 ::= DIGITS @digits;\n  @predicate('p23') @mapping(V23, params=[digits])\n  R23 ::= DIGITS @digits;\n  @predicate('p24') @mapping(V24, params=[digits])\n  R24 ::= DIGITS @digits;\n  @predicate('p25') @mapping(V25, params=[digits])\n  R25 ::= DIGITS @digits;\n  @predicate('p26') @mapping(V26, params=[digits])\n  R26 ::= DIGITS @digits;\n  @predicate('p27') @mapping(V27, params=[digits])\n  R27 ::= DIGITS @digits;\n  @predicate('p28') @mapping(V28, params=[digits])\n  R28 ::= DIGITS @digits;\n  @predicate('p29') @mapping(V29, params=[digits])\n  R29 ::= DIGITS @digits;\n  @predicate('p30') @mapping(V30, params=[digits])\n  R30 ::= DIGITS @digits;\n  @predicate('p31') @mapping(V31, params=[digits])\n  R31 ::= DIGITS @digits;\n  @predicate('p32') @mapping(V32, params=[digits])\n  R32 ::= DIGITS @digits;\n  @predicate('p33') @mapping(V33, params=[digits])\n  R33 ::= DIGITS @digits;\n  @predicate('p34') @mapping(V34, params=[digits])\n  R34 ::= DIGITS @digits;\n  @predicate('p35') @mapping(V35, params=[digits])\n  R35 ::= DIGITS @digits;\n  @predicate('p36') @mapping(V36, params=[digits])\n  R36 ::= DIGITS @digits;\n  @predicate('p37') @mapping(V37, params=[digits])\n  R37 ::= DIGITS @digits;\n  @predicate('p38') @mapping(V38, params=[digits])\n  R38 ::= DIGITS @digits;\n  @predicate('p39') @mapping(V39, params=[digits])\n  R39 ::= DIGITS @digits;\n  @predicate('p40') @mapping(V40, params=[digits])\n  R40 ::= DIGITS @digits;\n  @predicate('p41') @mapping(V41, params=[digits])\n  R41 ::= DIGITS @digits;\n  @predicate('p42') @mapping(V42, params=[digits])\n  R42 ::= DIGITS @digits;\n  @predicate('p43') @mapping(V43, params=[digits])\n  R43 ::= DIGITS @digits;\n  @predicate('p44') @mapping(V44, params=[digits])\n  R44 ::= DIGITS @digits;\n  @predicate('p45') @mapping(V45, params=[digits])\n  R45 ::= DIGITS @digits;\n  @predicate('p46') @mapping(V46, params=[digits])\n  R46 ::= DIGITS @digits;\n  @predicate('p47') @mapping(V47, params=[digits])\n  R47 ::= DIGITS @digits;\n  @predicate('p48') @mapping(V48, params=[digits])\n  R48 ::= DIGITS @digits;\n  @predicate('p49') @mapping(V49, params=[digits])\n  R49 ::= DIGITS @digits;\n  @predicate('p50') @mapping(V50, params=[digits])\n  R50 ::= DIGITS @digits;\n  @predicate('p51') @mapping(V51, params=[digits])\n  R51 ::= DIGITS @digits;\n  @predicate('p52') @mapping(V52, params=[digits])\n  R52 ::= DIGITS @digits;\n  @predicate('p53') @mapping(V53, params=[digits])\n  R53 ::= DIGITS @digits;\n  @predicate('p54') @mapping(V54, params=[digits])\n  R54 ::= DIGITS @digits;\n  @predicate('p55') @mapping(V55, params=[digits])\n  R55 ::= DIGITS @digits;\n  @predicate('p56') @mapping(V56, params=[digits])\n  R56 ::= DIGITS @digits;\n  @predicate('p57') @mapping(V57, params=[digits])\n  R57 ::= DIGITS @digits;\n  @predicate('p58') @mapping(V58, params=[digits])\n  R58 ::= DIGITS @digits;\n  @predicate('p59') @mapping(V59, params=[digits])\n  R59 ::= DIGITS @digits;\n  @predicate('p60') @mapping(V60, params=[digits])\n  R60 ::= DIGITS @digits;\n  @predicate('p61') @mapping(V61, params=[digits])\n  R61 ::= DIGITS @digits;\n  @predicate('p62') @mapping(V62, params=[digits])\n  R62 ::= DIGITS @digits;\n  @predicate('p63') @mapping(V63, params=[digits])\n  R63 ::= DIGITS @digits;\n  @predicate('p64') @mapping(V64, params=[digits])\n  R64 ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-LIMIT",
+    "nativeMessage": "E-PREDICATE-LIMIT: at most 64 predicates"
+  },
+  {
+    "name": "embedding-profile",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @embedding: enabled\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: embedding grammar"
+  },
+  {
+    "name": "embedded-binding",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @embedding: enabled\n  @embedded: { rule: 'Item' body: 'digits' language: 'tiny' package: 'example' version: '1' grammar: 'TinyExpression' entry: 'Expression' }\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: embedding grammar"
+  },
+  {
+    "name": "embedded-binding-without-profile",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @embedded: { rule: 'Item' body: 'digits' language: 'tiny' package: 'example' version: '1' grammar: 'TinyExpression' entry: 'Expression' }\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: embedding grammar"
+  },
+  {
+    "name": "invalid-name-predicate-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @whitespace: javaStyle\n  token ID ::= CHAR_RANGE('A','Z')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Declaration @value | Item @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='missingCapture', kind='type')\n  @mapping(Declaration, params=[name])\n  Declaration ::= ID @name ';';\n  @predicate('p') @mapping(ItemValue, params=[name])\n  Item ::= ID @name;\n}\n",
+    "code": "E-NAME-PREDICATE-CAPTURE",
+    "nativeMessage": "E-NAME-PREDICATE-CAPTURE: Declaration"
+  },
+  {
+    "name": "invalid-lexical-context-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token GT ::= '>';\n  token END = EOF\n  @root @mapping(Value, params=[value])\n  @lexicalContext(tokens=['MISSING'])\n  Root ::= Item @value END;\n  @predicate('p') @mapping(ItemValue, params=[gt])\n  Item ::= GT @gt;\n}\n",
+    "code": "E-LEXICAL-CONTEXT-TOKEN",
+    "nativeMessage": "E-LEXICAL-CONTEXT-TOKEN: MISSING"
+  },
+  {
+    "name": "invalid-name-predicate-before-undefined-reference",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @whitespace: javaStyle\n  token ID ::= CHAR_RANGE('A','Z')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Declaration @value | Item @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='missingCapture', kind='type')\n  @mapping(Declaration, params=[name])\n  Declaration ::= Missing @name ';';\n  @predicate('p') @mapping(ItemValue, params=[name])\n  Item ::= ID @name;\n}\n",
+    "code": "E-NAME-PREDICATE-CAPTURE",
+    "nativeMessage": "E-NAME-PREDICATE-CAPTURE: Declaration"
+  },
+  {
+    "name": "predicate-combination-before-undefined-reference",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @whitespace: javaStyle\n  token ID ::= CHAR_RANGE('A','Z')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Declaration @value | Item @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name])\n  Declaration ::= ID @name ';';\n  @predicate('p') @mapping(ItemValue, params=[name])\n  Item ::= ID @name;\n  Unused ::= Missing;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: @namePredicate"
+  },
+  {
+    "name": "invalid-lexical-context-before-invalid-name-and-predicate",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token GT ::= '>';\n  token END = EOF\n  @root @mapping(Value, params=[value])\n  @lexicalContext(tokens=['MISSING'])\n  @namePredicate(snapshot='scope', version='v1', name='missing', kind='type')\n  Root ::= Item @value END;\n  @predicate('p') @mapping(ItemValue, params=[gt])\n  Item ::= GT @gt;\n}\n",
+    "code": "E-LEXICAL-CONTEXT-TOKEN",
+    "nativeMessage": "E-LEXICAL-CONTEXT-TOKEN: MISSING"
+  },
+  {
+    "name": "invalid-token-stream-setting-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @tokenStream: invalid\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-TOKEN-STREAM-SETTING",
+    "nativeMessage": "E-TOKEN-STREAM-SETTING: tokenStream"
+  },
+  {
+    "name": "token-stream-version-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @tokenStream: enabled\n  @package: org.example.semanticpredicate\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= 'x' @digits;\n}\n",
+    "code": "E-TOKEN-STREAM-VERSION",
+    "nativeMessage": "E-TOKEN-STREAM-VERSION: tokenStream"
+  },
+  {
+    "name": "nullable-token-stream-token-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @tokenStream: enabled\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')*;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-TOKEN-STREAM-TOKEN",
+    "nativeMessage": "E-TOKEN-STREAM-TOKEN: DIGITS"
+  },
+  {
+    "name": "valid-token-stream-profile-is-refused",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @tokenStream: enabled\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: token-stream grammar"
+  },
+  {
+    "name": "invalid-comment-setting-precedes-invalid-predicate-name",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @comment: invalid\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-COMMENT-SETTING",
+    "nativeMessage": "E-COMMENT-SETTING: comment"
+  }
+]
