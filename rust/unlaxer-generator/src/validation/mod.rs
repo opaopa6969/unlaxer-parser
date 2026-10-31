@@ -147,13 +147,28 @@ pub fn collect(grammar: &GrammarDecl) -> Vec<Issue> {
             "Select non-nullable declarative tokens and nonempty unique literals.",
         );
     }
+    // Java reports a name-predicate problem before the @predicate refusal. Only lowering
+    // checks name predicates natively, so consult it for a grammar with both annotations.
+    if crate::semantic_predicates::waits_for_name_predicates(grammar) {
+        if let Err(message) = crate::lowering::lower(grammar) {
+            if message.starts_with("E-NAME-PREDICATE-") {
+                let code = message.split(':').next().unwrap().to_owned();
+                add(
+                    &mut out,
+                    &code,
+                    message,
+                    "Use one versioned name predicate over a required scalar text capture.",
+                );
+            }
+        }
+    }
     if let Err(message) = crate::semantic_predicates::validate(grammar) {
         let code = message.split(':').next().unwrap().to_owned();
         add(
             &mut out,
             &code,
             message,
-            "Use one @predicate('registeredName') per rule beside only @root/@mapping/@doc, at most 64 distinct names, without @namePredicate or token-stream grammars.",
+            "Use one @predicate('registeredName') per rule beside only @root/@mapping/@doc, at most 64 distinct names, without @namePredicate, token-stream or embedding grammars.",
         );
     }
     failure(

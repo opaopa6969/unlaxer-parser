@@ -551,7 +551,10 @@ mod tests {
             assert_eq!((context.position(), context.matched_position()), (0, 0));
             assert!(context.nodes.is_empty());
             always(true).install(&mut context).unwrap();
+            // Java install clears the previous failure the same way.
+            assert_eq!(context.semantic_predicate_failure(), None);
             assert!(context.parse(&parser).is_ok());
+            assert_eq!(context.semantic_predicate_failure(), None);
             assert_eq!(context.position(), 1);
         }
     }

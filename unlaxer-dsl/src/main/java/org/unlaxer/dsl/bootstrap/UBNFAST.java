@@ -253,11 +253,11 @@ public sealed interface UBNFAST permits
     /** @uniqueLongestChoice — reject ties and empty winners. */
     record UniqueLongestChoiceAnnotation() implements Annotation {}
 
-    /** A caller-registered pure postcondition over this rule's matched text. */
-    record PredicateAnnotation(String name) implements Annotation {}
-
     /** Pure lookup in an explicit immutable, versioned snapshot. */
     record NamePredicateAnnotation(String snapshot, String version, String name, String kind) implements Annotation {}
+
+    /** @predicate('name') — a caller-registered pure postcondition over this rule's matched text. */
+    record PredicateAnnotation(String name) implements Annotation {}
 
     /** @predictiveChoice — conservatively prune alternatives by their FIRST prefix. */
     record PredictiveChoiceAnnotation() implements Annotation {}

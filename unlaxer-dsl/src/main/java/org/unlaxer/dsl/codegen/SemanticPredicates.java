@@ -23,8 +23,9 @@ public final class SemanticPredicates {
     }
     /**
      * Version 1 accepts {@code @root}, {@code @mapping} and {@code @doc} beside {@code @predicate}.
-     * Other rule annotations, name predicates and token-stream grammars are refused with the
-     * same code by both frontends instead of being silently ignored.
+     * Other rule annotations, name predicates, token-stream and embedding grammars are refused
+     * with the same code by both frontends instead of being silently ignored. Callers check
+     * lexical contexts and name predicates first, so their own codes win.
      */
     public static void requireValid(GrammarDecl grammar) {
         if (!enabled(grammar)) return;
@@ -34,10 +35,6 @@ public final class SemanticPredicates {
             if (annotations.isEmpty()) continue;
             try { SemanticPredicateBindings.requireName(((PredicateAnnotation) annotations.get(0)).name()); }
             catch (IllegalArgumentException badName) { throw invalid("NAME", rule.name()); }
-            String wrapper = rule.name() + "Predicate";
-            if (grammar.rules().stream().anyMatch(candidate -> candidate.name().equals(wrapper))) {
-                throw invalid("COMBINATION", rule.name() + " generated class " + wrapper + "Parser");
-            }
             for (var other : rule.annotations()) {
                 if (!(other instanceof PredicateAnnotation || other instanceof RootAnnotation
                         || other instanceof MappingAnnotation || other instanceof DocAnnotation)) {
@@ -48,6 +45,8 @@ public final class SemanticPredicates {
         if (NamePredicates.enabled(grammar)) throw invalid("COMBINATION", "@namePredicate");
         if (TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar))
             throw invalid("COMBINATION", "token-stream grammar");
+        // Embedded entries resolve rule classes without the registry; version 1 refuses them.
+        if (EmbeddedGrammarEmitter.enabled(grammar)) throw invalid("COMBINATION", "embedding grammar");
         if (requirements(grammar).size() > 64) throw invalid("LIMIT", "at most 64 predicates");
     }
     private static String annotationName(Annotation annotation) {
@@ -58,16 +57,41 @@ public final class SemanticPredicates {
     private static IllegalArgumentException invalid(String code, String subject) {
         return new IllegalArgumentException("E-PREDICATE-" + code + ": " + subject);
     }
+    /**
+     * Generated wrapper class by predicate rule, computed from the grammar alone. The default is
+     * {@code RulePredicateParser}; a name already taken by a rule class, a token class or another
+     * rule wrapper gets the first free {@code _1}, {@code _2}... suffix, in rule order. Body helper
+     * classes end with a digit or {@code Body} before {@code Parser}, so they never take one.
+     */
+    static java.util.Map<String, String> wrapperClassNames(GrammarDecl grammar) {
+        var occupied = new java.util.HashSet<String>();
+        for (var rule : grammar.rules()) {
+            occupied.add(rule.name() + "Parser");
+            if (ParserRuleEmitter.findRecoveryAnnotation(rule).isPresent()) occupied.add(rule.name() + "RecoveryParser");
+            if (NamePredicates.annotation(rule).isPresent()) occupied.add(rule.name() + "NamePredicateParser");
+        }
+        for (var token : grammar.tokens()) occupied.add(ParserCodegenUtil.toParserClassName(token.name()));
+        var names = new java.util.LinkedHashMap<String, String>();
+        for (var rule : grammar.rules()) {
+            if (annotation(rule).isEmpty()) continue;
+            String name = rule.name() + "PredicateParser";
+            for (int suffix = 1; occupied.contains(name); suffix++) name = rule.name() + "PredicateParser_" + suffix;
+            occupied.add(name);
+            names.put(rule.name(), name);
+        }
+        return java.util.Map.copyOf(names);
+    }
     static String wrapper(ParserGenerator.GenContext context, RuleDecl rule) {
+        String className = context.semanticPredicateWrappers.get(rule.name());
         return """
-                public static class %sPredicateParser extends org.unlaxer.parser.combinator.SemanticPredicateParser {
+                public static class %s extends org.unlaxer.parser.combinator.SemanticPredicateParser {
                     private static final long serialVersionUID = 1L;
-                    public %sPredicateParser() {
+                    public %s() {
                         super(Parser.get(%sParser.class), "%s");
                     }
                 }
 
-            """.formatted(rule.name(), rule.name(), rule.name(),
+            """.formatted(className, className, rule.name(),
                 ParserCodegenUtil.escapeString(annotation(rule).orElseThrow().name()));
     }
     static String javaRequirements(GrammarDecl grammar) {

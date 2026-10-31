@@ -124,3 +124,25 @@ fn coincident_captures_have_deterministic_name_order() {
         assert!(!capture.synthetic);
     }
 }
+
+#[test]
+fn literal_completions_see_through_semantic_predicates() {
+    let grammar = vec![
+        Rule {
+            name: "Root",
+            expression: Expr::SemanticPredicateScope {
+                child: Box::new(Expr::Sequence(vec![Expr::Literal("begin"), Expr::Rule(1)])),
+                requirements: vec!["valid"],
+            },
+        },
+        Rule {
+            name: "Item",
+            expression: Expr::SemanticPredicate {
+                child: Box::new(Expr::Literal("item")),
+                name: "valid",
+            },
+        },
+    ]
+    .into();
+    assert_eq!(editor_cst::literal_completions(&grammar), ["item", "begin"]);
+}

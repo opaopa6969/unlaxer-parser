@@ -123,7 +123,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: 通常は `Expr::Sequence/Choice` の Fragment、所有する CST が必要なら `Rule` node と明示 mapper へ移す。原 CST と reduced CST の違い、LazyInstance と createMetaToken の全設定を比較する。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/MetaFunctionParser.java#L3](../unlaxer-common/src/main/java/org/unlaxer/parser/MetaFunctionParser.java#L3)、[unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L125](../unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L125)、[unlaxer-common/src/main/java/org/unlaxer/reducer/MetaFunctionTokenReducer.java#L8](../unlaxer-common/src/main/java/org/unlaxer/reducer/MetaFunctionTokenReducer.java#L8)、[rust/unlaxer-runtime/src/lib.rs#L4053](../rust/unlaxer-runtime/src/lib.rs#L4053)、[unlaxer-common/src/main/java/org/unlaxer/context/CreateMetaTokenSpecifier.java#L3](../unlaxer-common/src/main/java/org/unlaxer/context/CreateMetaTokenSpecifier.java#L3)、[unlaxer-common/src/main/java/org/unlaxer/reducer/CommittedReducer.java#L6](../unlaxer-common/src/main/java/org/unlaxer/reducer/CommittedReducer.java#L6)、[unlaxer-common/src/main/java/org/unlaxer/Committed.java#L15](../unlaxer-common/src/main/java/org/unlaxer/Committed.java#L15)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/MetaFunctionParser.java#L3](../unlaxer-common/src/main/java/org/unlaxer/parser/MetaFunctionParser.java#L3)、[unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L125](../unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L125)、[unlaxer-common/src/main/java/org/unlaxer/reducer/MetaFunctionTokenReducer.java#L8](../unlaxer-common/src/main/java/org/unlaxer/reducer/MetaFunctionTokenReducer.java#L8)、[rust/unlaxer-runtime/src/lib.rs#L4042](../rust/unlaxer-runtime/src/lib.rs#L4042)、[unlaxer-common/src/main/java/org/unlaxer/context/CreateMetaTokenSpecifier.java#L3](../unlaxer-common/src/main/java/org/unlaxer/context/CreateMetaTokenSpecifier.java#L3)、[unlaxer-common/src/main/java/org/unlaxer/reducer/CommittedReducer.java#L6](../unlaxer-common/src/main/java/org/unlaxer/reducer/CommittedReducer.java#L6)、[unlaxer-common/src/main/java/org/unlaxer/Committed.java#L15](../unlaxer-common/src/main/java/org/unlaxer/Committed.java#L15)
 
 テスト: 全API動作の共通根拠は未整備。
 
@@ -137,7 +137,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `repeat_java` と `JavaUntil` が部分的な既存部品。任意 terminator を PEG not_ahead へ単純置換すると cursor/CST/state が変わるため、新しい小さな runtime API または実証した組合せが必要。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChildOccursWithTerminator.java#L12](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChildOccursWithTerminator.java#L12)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67)、[rust/unlaxer-runtime/src/lib.rs#L423](../rust/unlaxer-runtime/src/lib.rs#L423)、[rust/unlaxer-runtime/src/lib.rs#L4824](../rust/unlaxer-runtime/src/lib.rs#L4824)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChildOccursWithTerminator.java#L12](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChildOccursWithTerminator.java#L12)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Occurs.java#L67)、[rust/unlaxer-runtime/src/lib.rs#L423](../rust/unlaxer-runtime/src/lib.rs#L423)、[rust/unlaxer-runtime/src/lib.rs#L4813](../rust/unlaxer-runtime/src/lib.rs#L4813)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/combinator/ZeroOrMoreTest.java](../unlaxer-common/src/test/java/org/unlaxer/combinator/ZeroOrMoreTest.java)、[rust/unlaxer-runtime/tests/nullable_repeat.rs](../rust/unlaxer-runtime/tests/nullable_repeat.rs)
 
@@ -165,7 +165,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: 明示 Choice ID と選択 branch ID の transaction 管理、および branch 再呼出しの API/例が必要。既存 `Expr::Choice` と `ParseContext::state` は部品であり完成した対応ではない。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7)、[rust/unlaxer-runtime/src/lib.rs#L5457](../rust/unlaxer-runtime/src/lib.rs#L5457)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7)、[rust/unlaxer-runtime/src/lib.rs#L5446](../rust/unlaxer-runtime/src/lib.rs#L5446)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedChoiceParserTest.java](../unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedChoiceParserTest.java)
 
@@ -179,7 +179,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: NonOrdered ID ごとに選択 occurrence の順序を保存し、同じ順序で再実行する API と rollback の共通 oracle を追加する。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedNonOrderedParser.java#L16](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedNonOrderedParser.java#L16)、[rust/unlaxer-runtime/src/lib.rs#L4075](../rust/unlaxer-runtime/src/lib.rs#L4075)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedNonOrderedParser.java#L16](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedNonOrderedParser.java#L16)、[rust/unlaxer-runtime/src/lib.rs#L4064](../rust/unlaxer-runtime/src/lib.rs#L4064)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedNonOrderedParserTest.java](../unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedNonOrderedParserTest.java)、[rust/unlaxer-runtime/tests/nonordered.rs](../rust/unlaxer-runtime/tests/nonordered.rs)
 
@@ -193,7 +193,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `Expr::non_ordered([Expr::literal("a"), Expr::literal("b")])`。専用 UBNF 構文はない。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NonOrdered.java#L22](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NonOrdered.java#L22)、[rust/unlaxer-runtime/src/lib.rs#L4075](../rust/unlaxer-runtime/src/lib.rs#L4075)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NonOrdered.java#L22](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NonOrdered.java#L22)、[rust/unlaxer-runtime/src/lib.rs#L4064](../rust/unlaxer-runtime/src/lib.rs#L4064)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/parser/combinator/NonOrderedParityTest.java](../unlaxer-common/src/test/java/org/unlaxer/parser/combinator/NonOrderedParityTest.java)、[unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NonOrderedStateTest.java](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/NonOrderedStateTest.java)、[rust/unlaxer-runtime/tests/nonordered.rs](../rust/unlaxer-runtime/tests/nonordered.rs)
 
@@ -275,7 +275,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `ParseContext::parse/transaction` と返却 nodes/Tree の走査は部品。predicate 失敗時の consumed/matched・CST・state・failure位置を保つ公開 wrapper または adapter 例が必要。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PredicateAnyMatchForParsedParser.java#L13](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PredicateAnyMatchForParsedParser.java#L13)、[rust/unlaxer-runtime/src/lib.rs#L2416](../rust/unlaxer-runtime/src/lib.rs#L2416)、[rust/unlaxer-runtime/src/lib.rs#L2638](../rust/unlaxer-runtime/src/lib.rs#L2638)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PredicateAnyMatchForParsedParser.java#L13](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/PredicateAnyMatchForParsedParser.java#L13)、[rust/unlaxer-runtime/src/lib.rs#L2405](../rust/unlaxer-runtime/src/lib.rs#L2405)、[rust/unlaxer-runtime/src/lib.rs#L2627](../rust/unlaxer-runtime/src/lib.rs#L2627)
 
 テスト: 全API動作の共通根拠は未整備。
 
@@ -289,7 +289,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: 単独なら `Expr::sequence([Expr::literal("\\"), Expr::Any])`、引用全体なら `Expr::Quoted(quote)`。trivia policy と短い末尾 backslash の位置を確認して使い分ける。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EscapeInQuotedParser.java#L9](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EscapeInQuotedParser.java#L9)、[rust/unlaxer-runtime/src/lib.rs#L121](../rust/unlaxer-runtime/src/lib.rs#L121)、[rust/unlaxer-runtime/src/lib.rs#L4053](../rust/unlaxer-runtime/src/lib.rs#L4053)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EscapeInQuotedParser.java#L9](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/EscapeInQuotedParser.java#L9)、[rust/unlaxer-runtime/src/lib.rs#L121](../rust/unlaxer-runtime/src/lib.rs#L121)、[rust/unlaxer-runtime/src/lib.rs#L4042](../rust/unlaxer-runtime/src/lib.rs#L4042)
 
 テスト: [unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustConformanceTest.java](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustConformanceTest.java)
 
@@ -359,7 +359,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: 新規コードは `capture_owned("name")` と `Expr::Replay("name")`、UBNF `CAPTURE/SAME_AS`。旧APIを移植する場合は token selector/変換/履歴寿命の明示 adapter を追加し共通 oracle で検証する。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L24](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L24)、[unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19)、[rust/unlaxer-runtime/src/lib.rs#L4157](../rust/unlaxer-runtime/src/lib.rs#L4157)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L24](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java#L24)、[unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/OldMatchedTokenParser.java#L19)、[rust/unlaxer-runtime/src/lib.rs#L4146](../rust/unlaxer-runtime/src/lib.rs#L4146)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java](../unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java)、[rust/unlaxer-runtime/tests/owned_capture.rs](../rust/unlaxer-runtime/tests/owned_capture.rs)
 
@@ -373,7 +373,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `expr.capture_owned("x").capture_scope()`、`Expr::Replay("x")`。UBNF `CAPTURE/CAPTURE_SCOPE/SAME_AS`。
 
-実装: [rust/unlaxer-runtime/src/lib.rs#L437](../rust/unlaxer-runtime/src/lib.rs#L437)、[rust/unlaxer-runtime/src/lib.rs#L4157](../rust/unlaxer-runtime/src/lib.rs#L4157)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NamedCapture.java#L15](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NamedCapture.java#L15)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureScope.java#L15](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureScope.java#L15)、[unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ReplayParser.java#L18](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ReplayParser.java#L18)
+実装: [rust/unlaxer-runtime/src/lib.rs#L437](../rust/unlaxer-runtime/src/lib.rs#L437)、[rust/unlaxer-runtime/src/lib.rs#L4146](../rust/unlaxer-runtime/src/lib.rs#L4146)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NamedCapture.java#L15](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/NamedCapture.java#L15)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureScope.java#L15](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CaptureScope.java#L15)、[unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ReplayParser.java#L18](../unlaxer-common/src/main/java/org/unlaxer/parser/elementary/ReplayParser.java#L18)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java](../unlaxer-common/src/test/java/org/unlaxer/context/OwnedCaptureTest.java)、[rust/unlaxer-runtime/tests/owned_capture.rs](../rust/unlaxer-runtime/tests/owned_capture.rs)、[unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/OwnedCaptureConformanceTest.java](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/OwnedCaptureConformanceTest.java)
 
@@ -449,7 +449,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `expr.commit()/label("x")/catch_labels(other, ["x"])`。UBNF `COMMIT/LABEL/CATCH`。
 
-実装: [rust/unlaxer-runtime/src/lib.rs#L4706](../rust/unlaxer-runtime/src/lib.rs#L4706)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Commit.java#L22](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Commit.java#L22)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Label.java#L22](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Label.java#L22)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CatchLabels.java#L28](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CatchLabels.java#L28)
+実装: [rust/unlaxer-runtime/src/lib.rs#L4695](../rust/unlaxer-runtime/src/lib.rs#L4695)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Commit.java#L22](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Commit.java#L22)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Label.java#L22](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/Label.java#L22)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CatchLabels.java#L28](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/CatchLabels.java#L28)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/parser/combinator/CutLabeledFailureTest.java](../unlaxer-common/src/test/java/org/unlaxer/parser/combinator/CutLabeledFailureTest.java)、[rust/unlaxer-runtime/tests/cut_labeled_failure.rs](../rust/unlaxer-runtime/tests/cut_labeled_failure.rs)
 
@@ -461,7 +461,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `Expr::sequence/choice/longest_choice/unique_longest_choice/predictive_choice/zero_match`。Lazy版は構築済み Rule参照へ移す。min/max反復の terminator は別行。
 
-実装: [rust/unlaxer-runtime/src/lib.rs#L363](../rust/unlaxer-runtime/src/lib.rs#L363)、[rust/unlaxer-runtime/src/lib.rs#L5457](../rust/unlaxer-runtime/src/lib.rs#L5457)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14)
+実装: [rust/unlaxer-runtime/src/lib.rs#L363](../rust/unlaxer-runtime/src/lib.rs#L363)、[rust/unlaxer-runtime/src/lib.rs#L5446](../rust/unlaxer-runtime/src/lib.rs#L5446)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/parser/combinator/LongestChoiceTest.java](../unlaxer-common/src/test/java/org/unlaxer/parser/combinator/LongestChoiceTest.java)、[unlaxer-common/src/test/java/org/unlaxer/parser/combinator/UniqueLongestChoiceTest.java](../unlaxer-common/src/test/java/org/unlaxer/parser/combinator/UniqueLongestChoiceTest.java)、[unlaxer-common/src/test/java/org/unlaxer/parser/combinator/PredictiveChoiceTest.java](../unlaxer-common/src/test/java/org/unlaxer/parser/combinator/PredictiveChoiceTest.java)、[rust/unlaxer-runtime/tests/longest_choice.rs](../rust/unlaxer-runtime/tests/longest_choice.rs)、[rust/unlaxer-runtime/tests/unique_longest.rs](../rust/unlaxer-runtime/tests/unique_longest.rs)、[rust/unlaxer-runtime/tests/zero_repeat.rs](../rust/unlaxer-runtime/tests/zero_repeat.rs)
 
@@ -489,7 +489,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `Expr::sequence(...).trivia_scope(true)`、`line_comment_scope()`、UBNF `@whitespace/@comment/@interleave`。コメントだけの CPPComment は line_comment_scope。直接 comment leafは専用 lexical式/adapterで抽出する。
 
-実装: [rust/unlaxer-runtime/src/lib.rs#L4053](../rust/unlaxer-runtime/src/lib.rs#L4053)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/WhiteSpaceDelimitedLazyChain.java#L16](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/WhiteSpaceDelimitedLazyChain.java#L16)、[unlaxer-common/src/main/java/org/unlaxer/parser/clang/BlockComment.java#L10](../unlaxer-common/src/main/java/org/unlaxer/parser/clang/BlockComment.java#L10)、[unlaxer-common/src/main/java/org/unlaxer/parser/clang/CPPComment.java#L15](../unlaxer-common/src/main/java/org/unlaxer/parser/clang/CPPComment.java#L15)
+実装: [rust/unlaxer-runtime/src/lib.rs#L4042](../rust/unlaxer-runtime/src/lib.rs#L4042)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/WhiteSpaceDelimitedLazyChain.java#L16](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/WhiteSpaceDelimitedLazyChain.java#L16)、[unlaxer-common/src/main/java/org/unlaxer/parser/clang/BlockComment.java#L10](../unlaxer-common/src/main/java/org/unlaxer/parser/clang/BlockComment.java#L10)、[unlaxer-common/src/main/java/org/unlaxer/parser/clang/CPPComment.java#L15](../unlaxer-common/src/main/java/org/unlaxer/parser/clang/CPPComment.java#L15)
 
 テスト: [unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RuleTriviaConformanceTest.java](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RuleTriviaConformanceTest.java)
 
@@ -567,7 +567,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `expr.recover(mode, [";"], "message")`、`Tree.recoveries` / `ParseContext::recoveries`、UBNF `@recovery`。
 
-実装: [rust/unlaxer-runtime/src/lib.rs#L496](../rust/unlaxer-runtime/src/lib.rs#L496)、[rust/unlaxer-runtime/src/lib.rs#L4618](../rust/unlaxer-runtime/src/lib.rs#L4618)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java#L11](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java#L11)
+実装: [rust/unlaxer-runtime/src/lib.rs#L496](../rust/unlaxer-runtime/src/lib.rs#L496)、[rust/unlaxer-runtime/src/lib.rs#L4607](../rust/unlaxer-runtime/src/lib.rs#L4607)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java#L11](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/RecoveryDiagnostic.java#L11)
 
 テスト: [unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RecoveryConformanceTest.java](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RecoveryConformanceTest.java)、[rust/unlaxer-runtime/tests/recovery.rs](../rust/unlaxer-runtime/tests/recovery.rs)
 
@@ -581,7 +581,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `ParseContext::parse/parse_classic/transaction`、`position()/matched_position()`、`state/with_scope`、`Tree` と token metadata。任意外部副作用は登録state以外rollback対象にならない。
 
-実装: [rust/unlaxer-runtime/src/lib.rs#L2416](../rust/unlaxer-runtime/src/lib.rs#L2416)、[rust/unlaxer-runtime/src/lib.rs#L2511](../rust/unlaxer-runtime/src/lib.rs#L2511)、[rust/unlaxer-runtime/src/lib.rs#L2638](../rust/unlaxer-runtime/src/lib.rs#L2638)、[unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39](../unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39)、[rust/unlaxer-runtime/src/token.rs#L1](../rust/unlaxer-runtime/src/token.rs#L1)、[unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L31](../unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L31)
+実装: [rust/unlaxer-runtime/src/lib.rs#L2405](../rust/unlaxer-runtime/src/lib.rs#L2405)、[rust/unlaxer-runtime/src/lib.rs#L2500](../rust/unlaxer-runtime/src/lib.rs#L2500)、[rust/unlaxer-runtime/src/lib.rs#L2627](../rust/unlaxer-runtime/src/lib.rs#L2627)、[unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39](../unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39)、[rust/unlaxer-runtime/src/token.rs#L1](../rust/unlaxer-runtime/src/token.rs#L1)、[unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L31](../unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L31)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/context/PortableTokenMetadataTest.java](../unlaxer-common/src/test/java/org/unlaxer/context/PortableTokenMetadataTest.java)、[rust/unlaxer-runtime/tests/token_metadata.rs](../rust/unlaxer-runtime/tests/token_metadata.rs)、[rust/unlaxer-runtime/tests/scopes.rs](../rust/unlaxer-runtime/tests/scopes.rs)
 
@@ -595,7 +595,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `ParseContext::with_bindings(source, map, options)`。
 
-実装: [rust/unlaxer-runtime/src/lib.rs#L2236](../rust/unlaxer-runtime/src/lib.rs#L2236)、[unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39](../unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39)
+実装: [rust/unlaxer-runtime/src/lib.rs#L2225](../rust/unlaxer-runtime/src/lib.rs#L2225)、[unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39](../unlaxer-common/src/main/java/org/unlaxer/context/ParseContext.java#L39)
 
 テスト: [unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ParseBindingsConformanceTest.java](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/ParseBindingsConformanceTest.java)
 
@@ -773,7 +773,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: UBNF `@predicate('name')` と生成 `parse_tree_detailed_with_semantic_predicates`、runtime の `semantic_predicates::Bindings` / `ParseContext::with_semantic_predicates` / `Expr::SemanticPredicate` / `Expr::SemanticPredicateScope` / `parse_detailed_shared_with_semantic_predicates`。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L14](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L14)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateParser.java#L16](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateParser.java#L16)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateScope.java#L16](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateScope.java#L16)、[rust/unlaxer-runtime/src/semantic_predicates.rs#L46](../rust/unlaxer-runtime/src/semantic_predicates.rs#L46)、[rust/unlaxer-runtime/src/lib.rs#L186](../rust/unlaxer-runtime/src/lib.rs#L186)、[rust/unlaxer-runtime/src/lib.rs#L2004](../rust/unlaxer-runtime/src/lib.rs#L2004)
+実装: [unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L14](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L14)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateParser.java#L16](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateParser.java#L16)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateScope.java#L16](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/SemanticPredicateScope.java#L16)、[rust/unlaxer-runtime/src/semantic_predicates.rs#L46](../rust/unlaxer-runtime/src/semantic_predicates.rs#L46)、[rust/unlaxer-runtime/src/lib.rs#L186](../rust/unlaxer-runtime/src/lib.rs#L186)、[rust/unlaxer-runtime/src/lib.rs#L2002](../rust/unlaxer-runtime/src/lib.rs#L2002)
 
 テスト: [unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SemanticPredicateConformanceTest.java](../unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SemanticPredicateConformanceTest.java)、[unlaxer-common/src/test/java/org/unlaxer/parser/combinator/SemanticPredicateParserTest.java](../unlaxer-common/src/test/java/org/unlaxer/parser/combinator/SemanticPredicateParserTest.java)、[rust/unlaxer-runtime/src/semantic_predicates.rs](../rust/unlaxer-runtime/src/semantic_predicates.rs)、[rust/unlaxer-generator/tests/semantic_predicate.rs](../rust/unlaxer-generator/tests/semantic_predicate.rs)
 
@@ -938,12 +938,12 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 | [`context.SafeFailureMemoizable`](../unlaxer-common/src/main/java/org/unlaxer/context/SafeFailureMemoizable.java#L8) | type | 対応あり・全API共通検証なし | [memo-policy](#memo-policy) |
 | [`context.SafeSuccessMemoizable`](../unlaxer-common/src/main/java/org/unlaxer/context/SafeSuccessMemoizable.java#L9) | type | 対応あり・全API共通検証なし | [memo-policy](#memo-policy) |
 | [`context.SemanticPredicateBindings`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L14) | type | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
-| [`context.SemanticPredicateBindings#begin(ParseContext,List<String>)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L56) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
-| [`context.SemanticPredicateBindings#end(ParseContext,Frame)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L115) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
-| [`context.SemanticPredicateBindings#failure(ParseContext)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L121) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
+| [`context.SemanticPredicateBindings#begin(ParseContext,List<String>)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L58) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
+| [`context.SemanticPredicateBindings#end(ParseContext,Frame)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L117) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
+| [`context.SemanticPredicateBindings#failure(ParseContext)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L123) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
 | [`context.SemanticPredicateBindings#install(ParseContext,Map<String, Predicate<Candidate>>)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L35) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
-| [`context.SemanticPredicateBindings#requireName(String)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L43) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
-| [`context.SemanticPredicateBindings#test(ParseContext,String,Source,int)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L76) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
+| [`context.SemanticPredicateBindings#requireName(String)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L45) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
+| [`context.SemanticPredicateBindings#test(ParseContext,String,Source,int)`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L78) | static | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
 | [`context.SemanticPredicateBindings.Candidate`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L19) | type | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
 | [`context.SemanticPredicateBindings.Failure`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L20) | type | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |
 | [`context.SemanticPredicateBindings.Frame`](../unlaxer-common/src/main/java/org/unlaxer/context/SemanticPredicateBindings.java#L21) | type | 対応済み（記載した共通契約） | [semantic-predicates](#semantic-predicates) |

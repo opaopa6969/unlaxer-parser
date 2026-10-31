@@ -69,6 +69,8 @@ public class ParserGenerator implements CodeGenerator {
         final boolean adapterShadowsWordParser;
         final boolean tokenStream;
         final String spaceParserClass;
+        /** rule name -> generated {@code @predicate} wrapper class, fixed before any emission. */
+        final Map<String, String> semanticPredicateWrappers;
 
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
@@ -78,6 +80,7 @@ public class ParserGenerator implements CodeGenerator {
             LexicalContexts.requireValid(grammar);
             NamePredicates.requireValid(grammar);
             SemanticPredicates.requireValid(grammar);
+            this.semanticPredicateWrappers = SemanticPredicates.wrapperClassNames(grammar);
             this.tokenStream = TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar);
             this.grammarName = grammar.name();
             TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);

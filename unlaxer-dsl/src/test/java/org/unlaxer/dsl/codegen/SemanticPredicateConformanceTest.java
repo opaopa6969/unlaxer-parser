@@ -183,15 +183,17 @@ public class SemanticPredicateConformanceTest {
             assertPredicateRemovalIsDetected(name, source, cases);
         }
         assertTrue(String.join("\n", mismatches), mismatches.isEmpty());
-        assertEquals("executed corpus cases", 21, executedCases);
+        assertEquals("executed corpus cases", 28, executedCases);
 
         JsonArray invalid = JsonParser.parseString(Files.readString(fixtures.resolve("invalid.json"))).getAsJsonArray();
         for (var element : invalid) {
             JsonObject row = element.getAsJsonObject();
             var grammar = UBNFMapper.parse(row.get("grammar").getAsString()).grammars().get(0);
             String name = row.get("name").getAsString();
-            assertTrue(name + " independent invalid code", GrammarValidator.validateWithoutClassLoading(grammar)
-                .stream().anyMatch(issue -> issue.code().equals(row.get("code").getAsString())));
+            // The first error, not any error: frontends must agree on which refusal wins (B3).
+            assertEquals(name + " independent first invalid code", row.get("code").getAsString(),
+                GrammarValidator.validateWithoutClassLoading(grammar).stream()
+                    .filter(issue -> issue.severity().equals("ERROR")).findFirst().orElseThrow().code());
             var javaGenerator = assertThrows(name + " Java generator refusal", IllegalArgumentException.class,
                 () -> new ParserGenerator().generate(grammar));
             assertTrue(name + ": " + javaGenerator.getMessage(), javaGenerator.getMessage().contains(row.get("nativeMessage").getAsString()));
@@ -206,7 +208,7 @@ public class SemanticPredicateConformanceTest {
             assertTrue(name + ": " + nativeResult.output(), nativeResult.output().contains(row.get("nativeMessage").getAsString()));
             report.add("invalid\t" + name + "\t\t" + row.get("code") + "\t" + nativeResult.output().strip().replace('\n', ' '));
         }
-        assertEquals("invalid grammars", 12, invalid.size());
+        assertEquals("invalid grammars", 16, invalid.size());
 
         Path target = Path.of("target");
         Files.createDirectories(target);

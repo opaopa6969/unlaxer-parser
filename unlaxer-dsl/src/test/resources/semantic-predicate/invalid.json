@@ -66,9 +66,33 @@
     "nativeMessage": "E-PREDICATE-LIMIT: at most 64 predicates"
   },
   {
-    "name": "wrapper-class-collision",
-    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n  ItemPredicate ::= DIGITS;\n}\n",
+    "name": "embedding-profile",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @embedding: enabled\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
     "code": "E-PREDICATE-COMBINATION",
-    "nativeMessage": "E-PREDICATE-COMBINATION: Item generated class ItemPredicateParser"
+    "nativeMessage": "E-PREDICATE-COMBINATION: embedding grammar"
+  },
+  {
+    "name": "embedded-binding",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @embedding: enabled\n  @embedded: { rule: 'Item' body: 'digits' language: 'tiny' package: 'example' version: '1' grammar: 'TinyExpression' entry: 'Expression' }\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: embedding grammar"
+  },
+  {
+    "name": "embedded-binding-without-profile",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @embedded: { rule: 'Item' body: 'digits' language: 'tiny' package: 'example' version: '1' grammar: 'TinyExpression' entry: 'Expression' }\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Item @value;\n  @predicate('p')\n  @mapping(ItemValue, params=[digits])\n  Item ::= DIGITS @digits;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: embedding grammar"
+  },
+  {
+    "name": "invalid-name-predicate-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @whitespace: javaStyle\n  token ID ::= CHAR_RANGE('A','Z')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Declaration @value | Item @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='missingCapture', kind='type')\n  @mapping(Declaration, params=[name])\n  Declaration ::= ID @name ';';\n  @predicate('p') @mapping(ItemValue, params=[name])\n  Item ::= ID @name;\n}\n",
+    "code": "E-NAME-PREDICATE-CAPTURE",
+    "nativeMessage": "E-NAME-PREDICATE-CAPTURE: Declaration"
+  },
+  {
+    "name": "invalid-lexical-context-precedes-predicate-refusal",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token GT ::= '>';\n  token END = EOF\n  @root @mapping(Value, params=[value])\n  @lexicalContext(tokens=['MISSING'])\n  Root ::= Item @value END;\n  @predicate('p') @mapping(ItemValue, params=[gt])\n  Item ::= GT @gt;\n}\n",
+    "code": "E-LEXICAL-CONTEXT-TOKEN",
+    "nativeMessage": "E-LEXICAL-CONTEXT-TOKEN: MISSING"
   }
 ]

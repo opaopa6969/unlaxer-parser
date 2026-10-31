@@ -31,7 +31,11 @@ Optional<ParseDiagnostic> diagnostic = OctetsMapper.diagnoseWithPredicates(sourc
 var mapped = OctetsMapper.parseWithPredicatesAndSourceMap(source, predicates, ParseOptions.DEFAULT);
 ```
 
-低水準では `ParseContext` を作った直後に `SemanticPredicateBindings.install(context, predicates)` を呼び、`OctetsParsers.getRootParser()`（`SemanticPredicateScope` を含む）で解析し、`SemanticPredicateBindings.failure(context)` で sticky 失敗を読む。
+低水準では `ParseContext` を作った直後に `SemanticPredicateBindings.install(context, predicates)` を呼び、`OctetsParsers.getRootParser()`（`SemanticPredicateScope` を含む）で解析し、`SemanticPredicateBindings.failure(context)` で sticky 失敗を読む。`install` は前回の解析の失敗も消す（Rust の `Bindings::install` と同じ）。
+
+生成 mapper の解析入口（`parse` / `parseWithOptions` / `parseWithSourceMap` / `diagnose` / `parseEditorCst` と `*WithPredicates`）は両言語とも必ず `getRootParser()` の scope と wrapper を通る。registry を渡さない入口は `predicate_missing` で失敗し、述語を飛ばして成功することはない。
+
+Java の述語付き規則は `RulePredicateParser` という wrapper class を持ち、規則参照と `getRootParser()` はこの wrapper を指す。既存の規則 class・token class・他の wrapper と名前が重なる場合は、文法だけから決まる規則で `_1`、`_2`… を後ろに付ける（規則の宣言順に、最初の空き名）。たとえば規則 `RangePredicate` がある文法の `@predicate` 規則 `Range` は `RangePredicatePredicateParser` ではなく `RangePredicateParser_1`、token `NUMBER_PREDICATE` がある文法の規則 `Number` は `NumberPredicateParser_1` になる。衝突は拒否しない。
 
 Rust（生成 parser と runtime）:
 
@@ -75,19 +79,23 @@ sticky 失敗の後でも、同じ context に別の registry を `install` す�
 - callback は純粋でなければならない。backtracking、同位置での再試行、`DetailedOnFailure` の診断 retry で同じ候補を複数回評価しうる。呼出し回数は契約に含めない。retry は最初の呼出しと同じ registry snapshot を使う。
 - Java: entry scope が context の memo と FIRST 候補除外を無効化する（`disableSpeculativeOptimizations`）。生成 wrapper は `DiagnosticsAgnostic` で、診断 retry は通常の grammar と同じ規則で選ばれる。
 - Rust: `SemanticPredicate` / `SemanticPredicateScope` は memo unsafe で、それを参照する祖先 rule も unsafe になる。scope の内側では FIRST 除外を止める。述語を含まない子規則の memo は残るが、観測結果は memo OFF/ON・各診断 mode で同一であることを共通 fixture で確認している。
-- registry は Rust では typed user state に置き、checkpoint は handle だけを複製する。`ParseContext` の field・通常経路の分岐・確保は増やしていない。新しい `Expr` variant は既存 dispatch の match arm だけである。
+- registry は Rust では typed user state に置き、checkpoint は handle だけを複製する。`ParseContext` の field は増やしていない。full-input entry の registry 設定は型で特殊化し、述語を渡さない入口の成功経路には registry の確認・分岐・確保を足していない。失敗時だけ、未登録の requirement を調べる。新しい `Expr` variant は既存 dispatch の match arm だけである。
 
 ## 初版で拒否する組合せ
 
-同じ規則で `@predicate` と並べてよいのは `@root`・`@mapping`・`@doc` だけ。他の規則注釈（`@recovery`、`@leftAssoc`、`@rightAssoc`、`@precedence`、`@whitespace`、`@longestChoice` など）、grammar 内の `@namePredicate`、token-stream / lexical-context grammar、生成 class 名が衝突する規則名（`X` と `XPredicate`）は、両 frontend が生成前に同じ `E-PREDICATE-COMBINATION` で拒否する。黙って注釈を無視しない。ほかに `E-PREDICATE-DUPLICATE`（同じ規則に複数）、`E-PREDICATE-NAME`（ASCII `[A-Za-z_][A-Za-z0-9_.-]*`、1..128 文字以外）、`E-PREDICATE-LIMIT`（異なる名前が 64 を超える）。registry 側も 64 件・同じ名前規則で制限する。`@predicate` の引数なし・引用なし・複数引数・名前付き引数は構文エラー。
+同じ規則で `@predicate` と並べてよいのは `@root`・`@mapping`・`@doc` だけ。他の規則注釈（`@recovery`、`@leftAssoc`、`@rightAssoc`、`@precedence`、`@whitespace`、`@longestChoice` など）、grammar 内の `@namePredicate`、token-stream / lexical-context grammar、grammar 設定の `@embedding` / `@embedded`（Java の `embeddedGrammar()` の entry は wrapper の外側の規則 class を指し、registry を受け取らないため）は、両 frontend が生成前に同じ `E-PREDICATE-COMBINATION` で拒否する。黙って注釈を無視しない。embedding の API に registry を渡す方法は初版の対象外。ほかに `E-PREDICATE-DUPLICATE`（同じ規則に複数）、`E-PREDICATE-NAME`（ASCII `[A-Za-z_][A-Za-z0-9_.-]*`、1..128 文字以外）、`E-PREDICATE-LIMIT`（異なる名前が 64 を超える）。registry 側も 64 件・同じ名前規則で制限する。`@predicate` の引数なし・引用なし・二重引用・複数引数・名前付き引数、`@ predicate('x')`（`@` の後に空白）と `@predicates('x')` は構文エラー。`@predicate ('x')` と `@predicate( 'x' )` は受理し、`@predicateExtra` と `@ predicate` は従来どおり生成に作用しない Simple annotation。3.3.0 からの移行は [migration-after-3.3.0.md](migration-after-3.3.0.md)。
+
+一つの文法に複数の問題があるとき、最初に報告する診断は Java の validator・Java 生成器・Java frontend の Rust 生成・native frontend で同じにする。`@lexicalContext` と `@namePredicate` の検査が `@predicate` の検査より先で、たとえば不正な `@namePredicate` と `@predicate` が並ぶ文法は `E-PREDICATE-COMBINATION` ではなく `E-NAME-PREDICATE-*` を先に出す。native frontend は `@namePredicate` を lowering 後の本体で検査するため、両方を持つ文法だけ `@predicate` の検査をその後へ回す。
 
 ## 検証
 
-`unlaxer-dsl/src/test/resources/semantic-predicate/{corpus,invalid}.json` が手書きの独立期待値を持つ（4 文法 21 ケース、拒否 12 件）。`SemanticPredicateConformanceTest`（`-DrustConformance=true` が必要。素の `mvn test` では skip）は、Java 生成 parser/mapper、Java frontend の Rust 生成物、native frontend の Rust 生成物を別々に compile・実行し、prefix cursor、候補 text/span 集合、full-input 受理、AST 全 field・node span、診断 kind/offset/期待名を各診断 mode・memo OFF/ON で照合する（生成物のバイト一致は追加の確認で、それだけを根拠にしない）。さらに「false を無視」「未登録を false で隠す」「retry で registry を失う」「`@predicate` を外す」と期待値が崩れることを同じテストで確認する。実装へ一時的に入れた変異（Java の false 無視・未登録の握りつぶし・wrapper の rollback を commit に置換、Rust の false 無視・未登録の握りつぶし・診断 retry での registry 喪失）はすべて既存テストで失敗する。ただし wrapper 自身の rollback 欠落は、生成 grammar では wrapper が常に transaction を持つ親に包まれるため共通 corpus では観測できず、Java 単体の Optional 直下のケースが検出する。CI core shard で実行し `rust-semantic-predicate.tsv` を必須保存する。runtime 単体は Java `SemanticPredicateParserTest`、Rust `semantic_predicates::tests`、native generator は `rust/unlaxer-generator/tests/semantic_predicate.rs`。
+`unlaxer-dsl/src/test/resources/semantic-predicate/{corpus,invalid}.json` が手書きの独立期待値を持つ（6 文法 28 ケース、拒否 16 件。拒否は最初の error code を照合する）。corpus には wrapper 名が規則 class・token class と重なる文法（生成 Java の compile と両 Rust host の実行を含む）と、astral 文字・ZWJ 家族絵文字・CRLF の後ろで start が 0 でない候補（CP 9..20、false は CP 5、例外は CP 4。UTF-16 や書記素の位置ではない）を含む。`SemanticPredicateConformanceTest`（`-DrustConformance=true` が必要。素の `mvn test` では skip）は、Java 生成 parser/mapper、Java frontend の Rust 生成物、native frontend の Rust 生成物を別々に compile・実行し、prefix cursor、候補 text/span 集合、full-input 受理、AST 全 field・node span、診断 kind/offset/期待名を各診断 mode・memo OFF/ON で照合する（生成物のバイト一致は追加の確認で、それだけを根拠にしない）。さらに「false を無視」「未登録を false で隠す」「retry で registry を失う」「`@predicate` を外す」と期待値が崩れることを同じテストで確認する。実装へ一時的に入れた変異（Java の false 無視・未登録の握りつぶし・wrapper の rollback を commit に置換、Rust の false 無視・未登録の握りつぶし・診断 retry での registry 喪失）はすべて既存テストで失敗する。ただし wrapper 自身の rollback 欠落は、生成 grammar では wrapper が常に transaction を持つ親に包まれるため共通 corpus では観測できず、Java 単体の Optional 直下のケースが検出する。CI core shard で実行し `rust-semantic-predicate.tsv` を必須保存する。runtime 単体は Java `SemanticPredicateParserTest`、Rust `semantic_predicates::tests`、native generator は `rust/unlaxer-generator/tests/semantic_predicate.rs`。
 
 ## 制限と残り
 
-- 性能は #197 の凍結に従い未測定。述語を使わない grammar の生成物は変わらず、通常経路に field/分岐を足していないが、速度の合格は主張しない。
+- 性能は #197 の凍結に従い未測定。述語を使わない grammar の生成物は変わらず、通常経路に field/分岐を足していないが、速度の合格は主張しない。Rust の述語 entry は解析と診断 retry のたびに registry（名前の表）を複製し、root への再帰参照のたびに scope に入り直す。観測結果は Java と一致し、述語を使う grammar だけの費用である（改善は凍結解除後）。
+- Rust の editor 補完候補（`editor_cst::literal_completions`）は `SemanticPredicate` / `SemanticPredicateScope` の子を走査する。`@namePredicate` の式は従来どおり走査しない（既存の簡易走査の範囲）。
 - Rust の低水準 `ParseContext::new` など registry を install していない context では、scope は sticky 失敗を残さずに本体を解析せず失敗する（`semantic_predicate_failure()` は `None`）。Java の低水準 `SemanticPredicateBindings.failure(context)` は `predicate_missing` を返す。生成 API と full-input API は両言語とも `predicate_missing` で一致する。
+- Java の規則 class（`Parser.get(RangeParser.class)`）と `getRootSyntaxParser()` を直接使うと、wrapper と scope を含まないので述語を評価せず成功しうる（mapper が選んだ root token を探すための低水準 API）。Rust の生成規則は本体に `SemanticPredicate` を含むため、同じ使い方でも registry が無ければ失敗する。この差は低水準 API に限り、上記の mapper の解析入口は両言語とも述語を通る。直接使う場合は `getRootParser()` と `SemanticPredicateBindings.install` を使う。
 - 生成 LSP / DAP / editor CST（`parse_editor_cst`、Java `parseEditorCst`）と plain の `parse` 系入口は registry を受け取らないため、述語 grammar では本体を解析せず `predicate_missing`（editor では失敗）になる。両言語とも黙って成功させないが、IDE で述語 grammar を使う入口は未提供。
 - 候補は text/span のみ。CST を読む汎用 predicate（#851）、`@namePredicate` との併用、上記の注釈組合せは後続の対象。

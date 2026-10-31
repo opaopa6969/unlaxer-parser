@@ -12,6 +12,20 @@ pub fn enabled(grammar: &GrammarDecl) -> bool {
     grammar.rules.iter().any(|rule| annotation(rule).is_some())
 }
 
+fn name_predicates(grammar: &GrammarDecl) -> bool {
+    grammar.rules.iter().any(|rule| {
+        rule.annotations
+            .iter()
+            .any(|a| matches!(a.kind, AnnotationKind::NamePredicate { .. }))
+    })
+}
+
+/// Java validates name predicates first. Native lowering checks them on lowered bodies,
+/// so it validates `@predicate` there when a grammar has both annotations.
+pub fn waits_for_name_predicates(grammar: &GrammarDecl) -> bool {
+    enabled(grammar) && name_predicates(grammar)
+}
+
 /// Distinct names in rule order, including rules unreachable from the root.
 pub fn requirements(grammar: &GrammarDecl) -> Vec<String> {
     let mut names = Vec::<String>::new();
@@ -24,7 +38,7 @@ pub fn requirements(grammar: &GrammarDecl) -> Vec<String> {
 }
 
 /// Version 1 accepts `@root`, `@mapping` and `@doc` beside `@predicate`; other rule
-/// annotations, name predicates and token-stream grammars are refused, never ignored.
+/// annotations, name predicates, token-stream and embedding grammars are refused, never ignored.
 pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
     if !enabled(grammar) {
         return Ok(());
@@ -47,17 +61,6 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
         if unlaxer_runtime::semantic_predicates::validate_name(name).is_err() {
             return Err(format!("E-PREDICATE-NAME: {}", rule.name));
         }
-        let wrapper = format!("{}Predicate", rule.name);
-        if grammar
-            .rules
-            .iter()
-            .any(|candidate| candidate.name == wrapper)
-        {
-            return Err(format!(
-                "E-PREDICATE-COMBINATION: {} generated class {wrapper}Parser",
-                rule.name
-            ));
-        }
         for other in &rule.annotations {
             if !matches!(
                 other.kind,
@@ -74,15 +77,15 @@ pub fn validate(grammar: &GrammarDecl) -> Result<(), String> {
             }
         }
     }
-    if grammar.rules.iter().any(|rule| {
-        rule.annotations
-            .iter()
-            .any(|a| matches!(a.kind, AnnotationKind::NamePredicate { .. }))
-    }) {
+    if name_predicates(grammar) {
         return Err("E-PREDICATE-COMBINATION: @namePredicate".into());
     }
     if crate::token_stream::enabled(grammar) || crate::lexical_contexts::enabled(grammar) {
         return Err("E-PREDICATE-COMBINATION: token-stream grammar".into());
+    }
+    // Java's embedded entries resolve rule classes without the registry; version 1 refuses them.
+    if crate::embedded::enabled(grammar) {
+        return Err("E-PREDICATE-COMBINATION: embedding grammar".into());
     }
     if requirements(grammar).len() > unlaxer_runtime::semantic_predicates::MAX_PREDICATES {
         return Err("E-PREDICATE-LIMIT: at most 64 predicates".into());

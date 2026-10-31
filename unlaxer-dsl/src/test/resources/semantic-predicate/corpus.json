@@ -770,5 +770,272 @@
         }
       }
     ]
+  },
+  {
+    "name": "generated-wrapper-names-avoid-rule-and-token-classes",
+    "grammar": "grammar Wrappers {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token DIGITS ::= CHAR_RANGE('0','9')+;\n  token NUMBER_PREDICATE ::= 'z';\n  @root @predicate('ordered') @mapping(Range, params=[low, high, mark])\n  Range ::= Number @low '-' Number @high Mark @mark;\n  @predicate('number') @mapping(NumberValue, params=[digits])\n  Number ::= DIGITS @digits;\n  @predicate('mark') @mapping(MarkValue, params=[bang])\n  Mark ::= ['!' @bang];\n  RangePredicate ::= DIGITS;\n}\n",
+    "cases": [
+      {
+        "id": "nested-and-root-true",
+        "input": "1-2!",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "candidates": [
+          [
+            "1",
+            0,
+            1
+          ],
+          [
+            "1-2!",
+            0,
+            4
+          ],
+          [
+            "2",
+            2,
+            3
+          ],
+          [
+            "!",
+            3,
+            4
+          ]
+        ],
+        "ast": {
+          "type": "Range",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "low": {
+              "type": "NumberValue",
+              "span": [
+                0,
+                1
+              ],
+              "fields": {
+                "digits": "1"
+              }
+            },
+            "high": {
+              "type": "NumberValue",
+              "span": [
+                2,
+                3
+              ],
+              "fields": {
+                "digits": "2"
+              }
+            },
+            "mark": {
+              "type": "MarkValue",
+              "span": [
+                3,
+                4
+              ],
+              "fields": {
+                "bang": "!"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "root-false-is-syntax-at-candidate-end",
+        "input": "2-1",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "2",
+            0,
+            1
+          ],
+          [
+            "2-1",
+            0,
+            3
+          ],
+          [
+            "1",
+            2,
+            3
+          ],
+          [
+            "",
+            3,
+            3
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 3,
+          "expected": "predicate ordered"
+        }
+      },
+      {
+        "id": "nested-false-stops-sequence",
+        "input": "1000-2",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999",
+          "mark": "const:true"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "1000",
+            0,
+            4
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 4,
+          "expected": "predicate number"
+        }
+      },
+      {
+        "id": "unreachable-requirement-still-checked",
+        "input": "1-2",
+        "bindings": {
+          "ordered": "ordered",
+          "number": "range:0:999"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [],
+        "diagnostic": {
+          "kind": "predicate_missing",
+          "offset": 0,
+          "expected": "registered predicate mark"
+        }
+      }
+    ]
+  },
+  {
+    "name": "nonzero-start-after-astral-and-family-emoji",
+    "grammar": "grammar Prefix {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token WORD ::= (CHAR_RANGE('a','z') | '👨' | '👩' | '👧' | '👦' | '‍' | '𠮷' | '\\r' | '\\n')+;\n  token SEP ::= ':';\n  @root @mapping(Result, params=[head, value])\n  Start ::= WORD @head SEP Item @value;\n  @predicate('known')\n  @mapping(ItemValue, params=[word])\n  Item ::= WORD @word;\n}\n",
+    "cases": [
+      {
+        "id": "astral-family-prefix-then-crlf-candidate",
+        "input": "𠮷👨‍👩‍👧‍👦:a👨‍👩‍👧‍👦\r\nb",
+        "bindings": {
+          "known": "const:true"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          20,
+          20
+        ],
+        "candidates": [
+          [
+            "a👨‍👩‍👧‍👦\r\nb",
+            9,
+            20
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            20
+          ],
+          "fields": {
+            "head": "𠮷👨‍👩‍👧‍👦",
+            "value": {
+              "type": "ItemValue",
+              "span": [
+                9,
+                20
+              ],
+              "fields": {
+                "word": "a👨‍👩‍👧‍👦\r\nb"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "false-after-astral-crlf-prefix-is-syntax-at-candidate-end",
+        "input": "𠮷\r\n:x",
+        "bindings": {
+          "known": "const:false"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "x",
+            4,
+            5
+          ]
+        ],
+        "diagnostic": {
+          "kind": "syntax",
+          "offset": 5,
+          "expected": "predicate known"
+        }
+      },
+      {
+        "id": "error-after-astral-crlf-prefix-is-at-candidate-start",
+        "input": "𠮷\r\n:x",
+        "bindings": {
+          "known": "error"
+        },
+        "accepted": false,
+        "prefix": [
+          false,
+          0,
+          0
+        ],
+        "candidates": [
+          [
+            "x",
+            4,
+            5
+          ]
+        ],
+        "diagnostic": {
+          "kind": "predicate_error",
+          "offset": 4,
+          "expected": "predicate known completed normally"
+        }
+      }
+    ]
   }
 ]

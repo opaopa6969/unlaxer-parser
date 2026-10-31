@@ -447,11 +447,15 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     }
     crate::nested_captures::validate(grammar)?;
     crate::raising::validate(grammar)?;
-    crate::semantic_predicates::validate(grammar)?;
     // Match Java RustGrammarLowering: schema failures precede enum/eval/embedding
     // and ordinary lowering failures, but not bounded/precedence/nested failures.
     crate::common_fields::families(grammar)?;
     crate::lexical_contexts::validate(grammar)?;
+    // Java checks @predicate after lexical contexts and name predicates. Native checks
+    // name predicates on lowered bodies, so a grammar with both waits until then.
+    if !crate::semantic_predicates::waits_for_name_predicates(grammar) {
+        crate::semantic_predicates::validate(grammar)?;
+    }
     let format_two = grammar.settings.iter().any(|setting| {
         setting.key == "ubnf"
             && matches!(&setting.value, ast::SettingValue::String(value) if value == "v2")
@@ -767,7 +771,13 @@ impl Lowering<'_> {
                 {
                     format!("E-ASSOC-NO-MAPPING: {error}")
                 }
-                Some(deferred) if !error.starts_with("E-NAME-PREDICATE-") => deferred,
+                // A semantic predicate refusal follows name predicates in Java too.
+                Some(deferred)
+                    if !error.starts_with("E-NAME-PREDICATE-")
+                        && !error.starts_with("E-PREDICATE-") =>
+                {
+                    deferred
+                }
                 _ => error,
             })
     }
@@ -1217,6 +1227,9 @@ impl Lowering<'_> {
         }
         if name_versions.len() > 64 {
             return Err("E-NAME-PREDICATE-LIMIT: at most 64 snapshots".into());
+        }
+        if crate::semantic_predicates::waits_for_name_predicates(self.grammar) {
+            crate::semantic_predicates::validate(self.grammar)?;
         }
         if let Some(error) = declaration_error {
             return Err(error);

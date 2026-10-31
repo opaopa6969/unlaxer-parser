@@ -14,7 +14,7 @@ fn rows(name: &str) -> Vec<Value> {
 #[test]
 fn invalid_grammars_are_refused_with_the_java_code_before_generation() {
     let invalid = rows("invalid.json");
-    assert_eq!(12, invalid.len(), "all invalid grammars execute");
+    assert_eq!(16, invalid.len(), "all invalid grammars execute");
     for row in invalid {
         let name = row["name"].as_str().unwrap();
         for separator in ["\n", "\r\n"] {
@@ -23,11 +23,12 @@ fn invalid_grammars_are_refused_with_the_java_code_before_generation() {
             let codes: Vec<_> = validation::collect(grammar)
                 .into_iter()
                 .map(|issue| issue.code)
+                .filter(|code| code.starts_with("E-"))
                 .collect();
-            assert!(
-                codes
-                    .iter()
-                    .any(|code| code == row["code"].as_str().unwrap()),
+            // The first error, like Java GrammarValidator: the refusal order is shared (B3).
+            assert_eq!(
+                codes.first().map(String::as_str),
+                row["code"].as_str(),
                 "{name}: {codes:?}"
             );
             let error = generate(&source).unwrap_err();
@@ -42,7 +43,7 @@ fn invalid_grammars_are_refused_with_the_java_code_before_generation() {
 #[test]
 fn valid_grammars_wrap_rules_and_expose_the_registry_entry() {
     let corpus = rows("corpus.json");
-    assert_eq!(4, corpus.len());
+    assert_eq!(6, corpus.len());
     for fixture in corpus {
         let source = fixture["grammar"].as_str().unwrap();
         let grammar = &unlaxer_ubnf::parse(source).unwrap().grammars[0];

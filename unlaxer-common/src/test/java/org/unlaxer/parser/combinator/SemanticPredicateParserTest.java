@@ -53,6 +53,7 @@ public class SemanticPredicateParserTest {
             assertEquals("predicate_missing", SemanticPredicateBindings.failure(context).orElseThrow().kind());
             assertEquals(0, context.getConsumedPosition().value());
             SemanticPredicateBindings.install(context, Map.of("valid", candidate -> true));
+            assertTrue(SemanticPredicateBindings.failure(context).isEmpty());
             assertTrue(choice.parse(context).isSucceeded());
             assertTrue(SemanticPredicateBindings.failure(context).isEmpty());
         }
@@ -68,7 +69,10 @@ public class SemanticPredicateParserTest {
             assertFalse(failure.expected().contains("private detail"));
             assertEquals(0, context.getConsumedPosition().value());
             SemanticPredicateBindings.install(context, Map.of("valid", candidate -> true));
+            // Like Rust install, a new registry does not report the previous parse's failure.
+            assertTrue(SemanticPredicateBindings.failure(context).isEmpty());
             assertTrue(parser.parse(context).isSucceeded());
+            assertTrue(SemanticPredicateBindings.failure(context).isEmpty());
         }
     }
     @Test public void registryIsCopiedAndNamesAreBounded() {

@@ -38,6 +38,8 @@ public final class SemanticPredicateBindings {
         if (predicates.size() > 64) throw new IllegalArgumentException("at most 64 semantic predicates");
         for (String name : predicates.keySet()) requireName(name);
         state.predicates = Map.copyOf(predicates);
+        // A reused context reports only failures of parses under this registry, like Rust.
+        state.last = null;
     }
 
     public static void requireName(String name) {

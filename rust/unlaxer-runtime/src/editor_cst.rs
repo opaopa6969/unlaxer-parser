@@ -340,6 +340,8 @@ pub fn literal_completions(grammar: &SharedGrammar) -> Vec<&'static str> {
             | RuleEffects { child, .. }
             | CaptureEquality { child, .. }
             | TriviaScope { child, .. }
+            | SemanticPredicate { child, .. }
+            | SemanticPredicateScope { child, .. }
             | Recovery { child, .. } => visit(child, result),
             _ => {}
         }
