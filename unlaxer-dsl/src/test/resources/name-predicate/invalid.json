@@ -63,7 +63,7 @@
     "name": "assoc-conflict",
     "grammar": "grammar NameStatement {\n  @ubnf: v2\n  @package: org.example.namepredicate\n  @whitespace: javaStyle\n  token ID ::= (CHAR_RANGE('A','Z') | CHAR_RANGE('a','z') | '𠮷')+;\n  @root @mapping(Statement, params=[value])\n  Start ::= Declaration @value | Expression @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type') @leftAssoc\n  @mapping(Declaration, params=[name,argument])\n  Declaration ::= ID @name '(' ID @argument ')' ';';\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='resolved')\n  @mapping(Expression, params=[name,argument])\n  Expression ::= ID @name '(' ID @argument ')' ['++'] ';';\n}\n",
     "code": "E-NAME-PREDICATE-CONFLICT",
-    "nativeMessage": "associativity"
+    "nativeMessage": "E-NAME-PREDICATE-CONFLICT"
   },
   {
     "name": "left-recursion",

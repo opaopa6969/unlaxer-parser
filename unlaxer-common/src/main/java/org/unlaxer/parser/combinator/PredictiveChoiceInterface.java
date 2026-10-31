@@ -26,10 +26,14 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
             parseContext.startParse(this, parseContext, tokenKind, invertMatch);
             List<Parser> children = getChildren();
             List<ChoicePredictor> predictors = getChoicePredictors();
+            // Predictors inspect the cursor that candidate begin() will publish (#861).
+            // The real parser still receives the caller's token kind unchanged.
+            TokenKind lookaheadKind = parseContext.getCurrent().isResetMatchedWithConsumed()
+                ? TokenKind.consumed : tokenKind;
             int candidateCount = 0;
             for (int i = 0; i < children.size(); i++) {
                 ChoicePredictor predictor = i < predictors.size() ? predictors.get(i) : ChoicePredictor.any();
-                if (invertMatch || predictor == null || predictor.mayMatch(parseContext, tokenKind)) {
+                if (invertMatch || predictor == null || predictor.mayMatch(parseContext, lookaheadKind)) {
                     candidateCount++;
                 }
             }
@@ -39,7 +43,7 @@ public interface PredictiveChoiceInterface extends ChoiceInterface {
             for (int i = 0; i < children.size(); i++) {
                 ChoicePredictor predictor = i < predictors.size() ? predictors.get(i) : ChoicePredictor.any();
                 if (!useAllChildren && !invertMatch && predictor != null
-                        && !predictor.mayMatch(parseContext, tokenKind)) continue;
+                        && !predictor.mayMatch(parseContext, lookaheadKind)) continue;
                 Parser parser = children.get(i);
                 parseContext.begin(this);
                 Parsed parsed = parser.parse(parseContext, tokenKind, invertMatch);
