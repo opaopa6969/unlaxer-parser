@@ -688,6 +688,10 @@
     "1001": {
       "state": "OPEN",
       "title": "parity(lsp): JSON-RPC reader のキー順・positional arity・capabilities null による id 回復と無応答を照合する"
+    },
+    "1006": {
+      "state": "OPEN",
+      "title": "feat(ubnf): 名前付き汎用 semantic predicate を Java/Rust の生成 parser に接続する"
     }
   },
   "entries": [
@@ -1009,6 +1013,7 @@
         "spec-corpus/family-projection/invalid-cases.json",
         "unlaxer-dsl/src/test/resources/unique-longest/invalid.json",
         "unlaxer-dsl/src/test/resources/name-predicate/invalid.json",
+        "unlaxer-dsl/src/test/resources/semantic-predicate/invalid.json",
         "unlaxer-dsl/src/test/resources/ambiguity-boundaries/invalid.json",
         "rust/unlaxer-generator/tests/fixtures/portability/structure-priority.json",
         "rust/unlaxer-generator/tests/portability.rs",
@@ -2550,6 +2555,25 @@
         "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java",
         "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
       ]
+    },
+    {
+      "id": "semantic-predicate",
+      "category": "contract",
+      "title": "UBNF @predicate の名前付き純粋条件と entry 診断",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        1006,
+        851
+      ],
+      "observation": "#1006: `@predicate('name')` は Java 生成 parser・Java-host Rust・native Rust の3 consumer を別々に compile・実行し、semantic-predicate/corpus.json の手書き期待値（4文法21ケース）で prefix cursor・候補 text/CP span 集合・AST 全field/node span・診断 kind/offset/期待名を診断 mode 3種と memo OFF/ON で照合する。候補は rule-local trivia を含む原文で AST source span と同じ範囲、nullable は空 span。false は通常失敗、未登録（未到達 rule 分を含む）・callback 例外/Err/unwind panic・投影/生成 source は sticky の predicate_missing / predicate_error / predicate_source。invalid.json の12件は両 frontend が生成前に同じ E-PREDICATE-* で拒否し、nativeMessage は native generator の文言を固定する（Java も同じ文言を含む）。意図した差: Rust 低水準 ParseContext に registry を install しない場合、scope は sticky 失敗を残さず失敗し semantic_predicate_failure() は None（Java の SemanticPredicateBindings.failure は predicate_missing）。生成 API と full-input API は両言語とも predicate_missing で一致する。Rust は panic=abort では callback panic を捕捉できない。任意 CST predicate は #851 の範囲で、この text API で完了扱いにしない。性能は未測定（#197 凍結）。",
+      "evidence": [
+        "docs/semantic-predicates.md",
+        "unlaxer-dsl/src/test/resources/semantic-predicate/corpus.json",
+        "unlaxer-dsl/src/test/resources/semantic-predicate/invalid.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SemanticPredicateConformanceTest.java",
+        "rust/unlaxer-runtime/src/semantic_predicates.rs",
+        "rust/unlaxer-generator/tests/semantic_predicate.rs"
+      ]
     }
   ],
   "corpora": [
@@ -3236,6 +3260,16 @@
       },
       "entries": [
         "cli-locale-path-encoding"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/resources/semantic-predicate/invalid.json",
+      "fields": {
+        "nativeMessage": 12
+      },
+      "entries": [
+        "semantic-predicate",
+        "generator-diagnostics"
       ]
     }
   ],
