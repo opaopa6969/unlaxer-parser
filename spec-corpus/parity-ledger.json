@@ -24,7 +24,8 @@
     "2026-10-27 #872/#876: 先行先読みのない通常呼出の成功診断をJava実測に揃える。両issueは成功記録の既存watermark必須条件が共通原因。生成grammarのJava互換経路と独立native PEG式入口を区別し、後者の別診断列を維持する。個別修正であり台帳全体の監査日・revisionは更新しない。",
     "2026-10-27 #878: 外部入口の成功時に transaction frame 外の最終消費を記録し、Java 実測の nested-boundary 47経路1128行を追加。#197 は入口ごとの比較1つを指示役が許可し、ノードごとの処理は不変。入口が戻る前の custom parser の途中診断は #881 に分離する。#826/#872/#876 の CLOSED を確認。個別修正であり台帳全体の監査日・revision は更新しない。",
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。",
-    "2026-10-27 #861: Choice/PredictiveChoiceのFIRST判定を候補beginによるmatched reset後と同じ位置へ揃え、Java専用deferred例外30行を削除。公開runtimeの共通cursor/capture回帰を追加。機能や全体の対応宣言は増やさず、CI/mergeまでissueはOPENのまま維持する。"
+    "2026-10-27 #861: Choice/PredictiveChoiceのFIRST判定を候補beginによるmatched reset後と同じ位置へ揃え、Java専用deferred例外30行を削除。公開runtimeの共通cursor/capture回帰を追加。機能や全体の対応宣言は増やさず、CI/mergeまでissueはOPENのまま維持する。",
+    "2026-10-31 #866: Rust の Classic collector が後で除く leaf（consumed 親の match-only・virtual 親の stop_consume 終端など）を trace 予算に数えず、最終 trace に残る leaf だけで Limit を判定する。Java には予算 API が無いので、conformance/token-trace/budget.tsv の Java 実 leaf・cursor を保持 trace の基準にし、Rust は n-1/n/n+1 を検証する。AST value node 直下の custom callback の leaf は value node の kind が決まった時点で判定し、除かれる区間の leaf だけで生じた Limit を戻す。callback が認識したが返さない terminal の leaf は collector が除くまで数える Rust 側の保守的な境界（docs/token-trace.md）。issue は本PRのmerge待ちでOPEN。"
   ],
   "issues": {
     "111": {
@@ -394,6 +395,10 @@
     "846": {
       "state": "OPEN",
       "title": "parity: 任意terminator付き反復のRust利用経路と共通corpusを追加する"
+    },
+    "866": {
+      "state": "OPEN",
+      "title": "fix(trace): Classic collectorが除外するleafの予算超過を最終traceへ残さない"
     },
     "847": {
       "state": "OPEN",
@@ -2143,12 +2148,14 @@
       "issues": [
         438,
         463,
-        571
+        571,
+        866
       ],
-      "observation": "補助CSTのJava class名とRust node/trace labelはhost固有。portable metadataはstringと同一parseの安定IDを共通化し、Java任意Object identity/raw mapの自動移植は行わない。Java observerでmemoが無効になる観測は別probeで検証する。choice root の #767 は返却Parsedとcommit済みCSTの区別（choice-root-cst）であり、補助wrapperの差として扱わない。",
+      "observation": "補助CSTのJava class名とRust node/trace labelはhost固有。portable metadataはstringと同一parseの安定IDを共通化し、Java任意Object identity/raw mapの自動移植は行わない。Java observerでmemoが無効になる観測は別probeで検証する。choice root の #767 は返却Parsedとcommit済みCSTの区別（choice-root-cst）であり、補助wrapperの差として扱わない。Rust の trace 予算（#866）は Java の実 leaf と同じ保持 trace だけを数える。Java に予算 API は無く、custom callback が認識したが返さない terminal の leaf は Rust が collector の除去まで保守的に数える（不完全な trace は返さない）。",
       "evidence": [
         "docs/portable-token-metadata.md",
         "docs/token-trace.md",
+        "conformance/token-trace/budget.tsv",
         "spec-corpus/token-stream/README.md",
         "conformance/classic-memo/README.md"
       ]
