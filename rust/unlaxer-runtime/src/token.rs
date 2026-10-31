@@ -1460,9 +1460,15 @@ impl ParseContext<'_> {
         label: &'static str,
     ) -> Fragment {
         // Java Choice は選択した子の Parsed を返す。CST の収集値で上書きしない。
+        // virtual の収集は生成 "" になり得るので、入力由来の選択もそのまま返す。
         let selected_source = fragment
             .parsed_source()
-            .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
+            .filter(|source| {
+                self.track_owned_source
+                    || source.text.is_some()
+                    || source.generated
+                    || kind.is_virtual()
+            })
             .filter(|_| matches!(label, "Choice" | "LongestChoice" | "UniqueLongestChoice"))
             .map(|source| Box::new(source.clone()));
         let mut original = fragment.nodes.clone();
@@ -1487,6 +1493,13 @@ impl ParseContext<'_> {
             .cloned()
             .expect("Classic collection has source");
         let token_source = Self::token_source(&source);
+        // The returned source states what this collector published: one of a virtual kind that
+        // kept nothing is generated "", unlike an input-backed empty token a child returned.
+        fragment
+            .source
+            .as_mut()
+            .expect("Classic collection has source")
+            .generated = matches!(token_source, TokenSource::Generated { .. });
         let id = self
             .add_token_node_inner(super::TOKEN_META_RULE, kind, token_source.clone(), false)
             .expect("validated source");

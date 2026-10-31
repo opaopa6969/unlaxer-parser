@@ -3606,8 +3606,14 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn build_rule_node(&mut self, id: usize, start: usize, fragment: Fragment) -> usize {
         // Choice が返す Parsed の原文は、commit した CST の原文と区別する。
+        // Classic の他の本体は Java LazyChain と同じく、rule 自身の収集 token を返す。
         self.rule_result_source = fragment
-            .parsed_source()
+            .source
+            .as_deref()
+            .and_then(|source| match source.parsed_source.as_deref() {
+                Some(parsed) => Some(parsed),
+                None => self.token_mode.is_none().then_some(source),
+            })
             .filter(|source| self.track_owned_source || source.text.is_some() || source.generated)
             .map(|source| Box::new(source.clone()));
         let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
@@ -3816,7 +3822,13 @@ impl<'a> ParseContext<'a> {
                 kind: value.kind,
                 classic: value.classic,
                 generated: matches!(value.source, token::TokenSource::Generated { .. }),
-                text: value.source.owned_shared().map(Box::new),
+                // A rule's own generated "" is a virtual collection that kept nothing, as a
+                // collector's returned source has no text: capture_owned anchors it at the cursor.
+                text: value
+                    .source
+                    .owned_shared()
+                    .filter(|text| !text.is_empty())
+                    .map(Box::new),
             })
         });
         let classic = committed_source
@@ -5046,7 +5058,12 @@ impl<'a> ParseContext<'a> {
         }
         let source = match source {
             Some(source) if source.generated => token::TokenSource::Generated {
-                anchor: source.span.start,
+                // Only a virtual collector that kept nothing has no text: it anchors here.
+                anchor: if source.text.is_some() {
+                    source.span.start
+                } else {
+                    anchor
+                },
                 text: source
                     .text
                     .as_deref()

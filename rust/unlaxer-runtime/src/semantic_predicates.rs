@@ -382,16 +382,12 @@ impl<'a> ParseContext<'a> {
         self.track_owned_source = tracked;
         let fragment = fragment?;
         // As Java, a success that returned no token (a PEG assertion, or a Choice that selected
-        // one) is the cursor span of the input. Otherwise a virtual collector that kept nothing
-        // is generated "", as its CST token and capture_owned already are.
+        // one) is the cursor span of the input. A returned token keeps its own origin: a virtual
+        // collector that kept nothing is generated "", an input-backed empty virtual token is not.
         let source = fragment
             .parsed_source()
             .filter(|_| !self.classic_returned_no_token(&fragment.nodes));
-        if source.is_some_and(|source| {
-            source.generated
-                || source.text.is_some()
-                || source.kind.is_virtual() && source.span.start == source.span.end
-        }) {
+        if source.is_some_and(|source| source.generated || source.text.is_some()) {
             // Projected or generated text has no original input span to report. As Java's
             // emptyAt, generated or empty text anchors at the child's start, never a host anchor.
             let at = source

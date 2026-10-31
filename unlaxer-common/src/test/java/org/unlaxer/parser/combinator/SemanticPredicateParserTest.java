@@ -168,6 +168,48 @@ public class SemanticPredicateParserTest {
         }
     }
 
+    /** Projected text a host returns: "Z" or "" whose logical start is 0, away from the cursor. */
+    private static Parser projected(String text) {
+        return new org.unlaxer.parser.elementary.EmptyParser() {
+            private static final long serialVersionUID = 1L;
+            @Override public org.unlaxer.Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+                var source = StringSource.createSubSource(text, context.source, new org.unlaxer.CodePointOffset(0));
+                var token = new Token(kind, source, this);
+                context.getCurrent().addToken(token, kind);
+                return new org.unlaxer.Parsed(token);
+            }
+        };
+    }
+    /**
+     * Java builds projected sources during a parse too. A returned projection fails at its logical start
+     * when nonempty and at the child's start when empty, directly, through a Choice and collected by a
+     * Chain, as Rust's returned_projection_fails_at_the_same_offset_on_every_entry and its Classic Chain.
+     */
+    @Test public void returnedProjectionIsAnExplicitEntryFailureAtTheSameOffsetAsRust() {
+        for (String text : List.of("Z", "")) for (String wrap : List.of("direct", "Choice", "Chain")) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(PREFIX),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                int[] calls = {0};
+                SemanticPredicateBindings.install(context, Map.of("valid", candidate -> { calls[0]++; return true; }));
+                Parser child = switch (wrap) {
+                    case "Choice" -> new Choice(projected(text));
+                    case "Chain" -> new Chain(projected(text));
+                    default -> projected(text);
+                };
+                Parser parser = new SemanticPredicateScope(new Chain(new WordParser(PREFIX), new Choice(
+                    new SemanticPredicateParser(child, "valid"), new org.unlaxer.parser.elementary.EmptyParser())), List.of("valid"));
+                String label = "projected text=" + text + " " + wrap + " " + memo + "/" + diagnostics;
+                assertTrue(label, parser.parse(context).isFailed());
+                var failure = SemanticPredicateBindings.failure(context).orElseThrow();
+                assertEquals(label, "predicate_source", failure.kind());
+                assertEquals(label, text.isEmpty() ? 3 : 0, failure.start());
+                assertEquals("origin-less text never reaches the callback: " + label, 0, calls[0]);
+            }
+          }
+        }
+    }
+
     /** A PEG assertion returns no token and a container an empty input view: both are "" at the cursor. */
     @Test public void sourceLessZeroWidthSuccessIsAnInputCandidateAtTheCursor() {
         Map<String, java.util.function.Supplier<Parser>> children = new java.util.LinkedHashMap<>();
@@ -241,8 +283,10 @@ public class SemanticPredicateParserTest {
                 case "&c": return new PegLookahead(new WordParser("c"), true);
                 case "!z": return new PegLookahead(new WordParser("z"), false);
                 case "Empty": return new org.unlaxer.parser.elementary.EmptyParser();
-                case "gen:g": return generated("g");
-                case "gen:": return generated("");
+                case "gen:g": case "genc:g": return generated("g");
+                // Java の生成 source は anchor を持たない。Rust の anchor 0 / cursor を同じ値で照合する。
+                case "gen:": case "gen0:": case "genc:": return generated("");
+                case "leaf": return virtualInput();
                 default: return new WordParser(name);
             }
         }
@@ -250,6 +294,14 @@ public class SemanticPredicateParserTest {
         if (head.equals("Rule") || head.startsWith("UBNF:")) {
             // A generated rule class: LazyChoice for several alternatives, LazyChain otherwise.
             String body = head.equals("Rule") ? name.substring(open + 1, name.length() - 1) : name.substring(5);
+            if (body.indexOf('[') < 0) {
+                // 1 要素の本体（Rule[MO] など）は、その要素だけの LazyChain。
+                var single = new org.unlaxer.parser.Parsers(shape(body));
+                return new LazyChain() {
+                    private static final long serialVersionUID = 1L;
+                    @Override public org.unlaxer.parser.Parsers getLazyParsers() { return single; }
+                };
+            }
             var parsers = children(body);
             if (body.startsWith("Choice[")) {
                 return new LazyChoice() {
@@ -269,6 +321,16 @@ public class SemanticPredicateParserTest {
             case "Opt": return new Optional(parsers.get(0));
             default: throw new IllegalArgumentException(name);
         }
+    }
+    /** One virtual token over the input-backed empty source at the cursor. */
+    private static Parser virtualInput() {
+        return new org.unlaxer.parser.elementary.EmptyParser() {
+            private static final long serialVersionUID = 1L;
+            @Override public org.unlaxer.Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+                return new org.unlaxer.Parsed(new Token(TokenKind.virtualTokenConsumed,
+                    context.peek(context.getConsumedPosition(), new org.unlaxer.CodePointLength(0)), this));
+            }
+        };
     }
     private static org.unlaxer.parser.Parsers children(String name) {
         var children = new java.util.ArrayList<Parser>();
@@ -367,6 +429,96 @@ public class SemanticPredicateParserTest {
                     assertEquals(label, java.util.Set.of(expected), seen);
                     assertEquals(label, expected.text().equals("c") == wantsC, accepted);
                 }
+            }
+          }
+        }
+    }
+
+    /**
+     * Virtual kind and provenance are independent: an input-backed empty virtual token is a candidate in
+     * every caller kind, directly and through a Choice, while a virtual collector that keeps it returns
+     * generated "" (both are empty at offset 0 after an empty prefix). Shared oracle with Rust,
+     * conformance/semantic-predicate-source/virtual-input.tsv.
+     */
+    @Test public void virtualInputCandidatesFollowTheReturnedSource() throws java.io.IOException {
+        var rows = rows("virtual-input.tsv");
+        assertEquals(348, rows.size());
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String[] row : rows) for (boolean verdict : List.of(true, false)) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            String prefix = prefixes.get(row[1]);
+            int before = Integer.parseInt(row[1]);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                var seen = new java.util.LinkedHashSet<String>();
+                int[] calls = {0};
+                SemanticPredicateBindings.install(context, Map.of("valid", candidate -> {
+                    calls[0]++;
+                    seen.add((candidate.text().isEmpty() ? "~" : candidate.text()) + "@" + candidate.start());
+                    return verdict;
+                }));
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                var parsed = gate(shape(row[2])).parse(context, TokenKind.valueOf(row[0]), false);
+                String label = String.join(" ", row) + " verdict=" + verdict + " " + memo + "/" + diagnostics;
+                String failure = SemanticPredicateBindings.failure(context).map(f -> f.kind() + "@" + f.start()).orElse("-");
+                assertEquals(label, row[3], seen.isEmpty() ? "-" : String.join(",", seen));
+                assertEquals(label, row[6], failure);
+                // 由来の失敗だけが callback を呼ばない。
+                assertEquals(label, row[3].equals("-"), calls[0] == 0);
+                boolean kept = false == row[3].equals("-") && verdict;
+                assertEquals(label, kept, parsed.isSucceeded());
+                assertEquals(label, kept ? Integer.parseInt(row[4]) : before, context.getConsumedPosition().value());
+                assertEquals(label, kept ? Integer.parseInt(row[5]) : before, context.getMatchedPosition().value());
+            }
+          }
+        }
+    }
+
+    /**
+     * A virtual-kind Choice returns its selected child's Parsed, so an input-backed child stays input for an
+     * input capture boundary (Rust virtual_choice_keeps_the_selected_input_child_for_capture_boundaries).
+     */
+    @Test public void virtualChoiceKeepsTheSelectedInputChildForCaptureBoundaries() {
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String name : List.of("Choice[MO]", "Choice[leaf]", "Choice[Choice[leaf]]", "Choice[z,leaf]",
+                "Choice[leaf,c]", "Choice[&c]", "Choice[!z]")) {
+          for (TokenKind kind : List.of(TokenKind.virtualTokenMatchOnly, TokenKind.virtualTokenConsumed)) {
+            for (var entry : prefixes.entrySet()) {
+              for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+                try (var context = ParseContext.withOptions(StringSource.createRootSource(entry.getValue() + "c"),
+                        ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                    if (false == entry.getValue().isEmpty()) assertTrue(new WordParser(entry.getValue()).parse(context).isSucceeded());
+                    String label = name + " " + kind + " " + entry.getKey() + " " + memo + "/" + diagnostics;
+                    assertTrue(label, CaptureBoundaryParser.input(CaptureBoundaryParser.Kind.VALUE, shape(name))
+                        .parse(context, kind, false).isSucceeded());
+                }
+              }
+            }
+          }
+        }
+    }
+
+    /**
+     * A virtual-kind rule (LazyChain) that collected nothing returns generated "": NamedCapture records it
+     * at the cursor (Rust owned_capture_of_an_empty_virtual_rule_is_generated_at_the_cursor).
+     */
+    @Test public void namedCaptureOfAnEmptyVirtualRuleIsGeneratedAtTheCursor() {
+        Map<String, String> prefixes = Map.of("1", "p", "3", PREFIX);
+        for (String name : List.of("Rule[leaf]", "Rule[Chain[leaf]]", "Rule[MO]", "Rule[Chain[MO]]", "Rule[&c]", "Rule[gen0:]")) {
+          for (TokenKind kind : List.of(TokenKind.virtualTokenMatchOnly, TokenKind.virtualTokenConsumed)) {
+            for (var entry : prefixes.entrySet()) {
+              for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+                try (var context = ParseContext.withOptions(StringSource.createRootSource(entry.getValue() + "c"),
+                        ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                    assertTrue(new WordParser(entry.getValue()).parse(context).isSucceeded());
+                    String label = name + " " + kind + " " + entry.getKey() + " " + memo + "/" + diagnostics;
+                    assertTrue(label, new NamedCapture("v", shape(name)).parse(context, kind, false).isSucceeded());
+                    var value = context.captured("v").orElseThrow();
+                    int at = Integer.parseInt(entry.getKey());
+                    assertEquals(label, "GENERATED@" + at + "-" + at + "''",
+                        value.provenance() + "@" + value.start() + "-" + value.end() + "'" + value.text() + "'");
+                }
+              }
             }
           }
         }

@@ -475,9 +475,10 @@ fn projected<const EMPTY: bool>(context: &mut ParseContext<'_>) -> ParseResult {
     })
 }
 
-/// Java cannot build a projected token, so this is Rust-only. A returned projection fails at its
-/// logical start when nonempty and at the child's start when empty, on the full-input and the
-/// Classic entry alike (never at an anchor the host chose for empty text).
+/// A returned projection fails at its logical start when nonempty and at the child's start when
+/// empty, on the full-input and the Classic entry alike (never at an anchor the host chose for empty
+/// text). Java's returnedProjectionIsAnExplicitEntryFailureAtTheSameOffsetAsRust checks the same
+/// offsets with a host sub-source, directly, through a Choice and collected by a Chain.
 #[test]
 fn returned_projection_fails_at_the_same_offset_on_every_entry() {
     type Host = fn(&mut ParseContext<'_>) -> ParseResult;
@@ -534,7 +535,9 @@ fn returned_projection_fails_at_the_same_offset_on_every_entry() {
 
 /// A Chain is a collector: what it returns for a projected child is the same value capture_owned
 /// stores at that entry. The full-input entry's Sequence keeps no source of a host token (owned
-/// capture records input "" at the cursor), while a Classic Chain collects the projection.
+/// capture records input "" at the cursor), while a Classic Chain collects the projection. Java's
+/// Chain collects it as the Classic one does (predicate_source at 0); the full-input Sequence is the
+/// existing collector difference of #1023, which this test pins until that issue changes both sides.
 #[test]
 fn chain_of_a_projection_sees_what_capture_owned_stores_at_each_entry() {
     let chain = || Expr::sequence([Expr::Custom(projected::<false>)]);
