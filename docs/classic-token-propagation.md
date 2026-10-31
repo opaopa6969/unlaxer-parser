@@ -32,7 +32,46 @@ call ordinary `context.parse(&child)` to inherit the arguments. An `Expr` graph
 containing one of the new wrappers also activates normal Classic arguments at
 its entry; earlier ordinary terminals in that same graph remain observable.
 Opaque custom callbacks must use the explicit entry when their outer boundary
-needs Classic token collection.
+needs Classic token collection. The full-input entries never switch the root to
+Classic (a `.stop_consume()` root does, as Java's `DoConsumePropagationStopper`),
+but their native collectors (including a rule whose body is not a Choice, a Java
+`LazyChain`) return the same source as Java's consumed collectors
+([#1023](https://github.com/opaopa6969/unlaxer-parser/issues/1023)): a Classic
+child of another kind contributes nothing and a host projection is collected,
+so for the shapes those shared tables check, owned captures, predicates and `@f`
+see one value on every entry (`conformance/collector-source/full.tsv`). An input-backed token of another kind
+that a native custom publishes (`add_token_node` with a virtual or match-only
+kind over `TokenSource::Input`) is collected by that kind as a Classic child of
+the kind is: native collectors exclude it and a rule boundary leaves it out of
+the CST, as Java's commit filter does; a native Choice that selects such a child
+still returns it, while its own collection is "" at the consumed cursor
+(`conformance/collector-source/virtual-input.tsv`). A native
+`repeat_java_until` is a consumed collector of its bodies and its committed
+terminator, as Java's `Occurs` (`conformance/collector-source/terminated.tsv`).
+A Java collector returns a token of the consumed kind even when it is empty, so
+a collection that a later child starts begins at it; so does a lexical leaf that
+matched nothing (`Lexing.LiteralParser("")`, a `LexicalTokenParser`; Rust
+`JavaEmptyLiteral`, `Expr::Lexical`). A PEG assertion returns none, and
+NamedCapture / CaptureScope / Commit / Label / InvertMatchPropagationStopper /
+SemanticPredicateParser / SemanticPredicateScope / NameResolutionScope (none of
+them a CollectingParser) return what their child returned. A native Sequence or
+NonOrdered tells them apart by the earlier children's expressions, only when the
+collection starts after children that consumed nothing. A host returns what it
+returned: the consumed tokens over the input among the CST roots the earlier
+children returned (an empty Java `Token(consumed, peek(cursor, 0))`, or input
+the host did not consume) are collected in order at their own positions, after
+an earlier collector's token at the cursor, while a host that returns no token
+leaves "" at the consumed cursor. A
+native rule commits what a one-child consumed collector collects from its body,
+including plain input without CST nodes
+(`conformance/collector-source/empty-token.tsv`, `returned-token.tsv`,
+`lexical-token.tsv` and their `-boundary.tsv` tables).
+These tables bound what is verified. Differences that remain open in #1023
+include a host Input token at a position other than the cursor, a lone host
+token where no collection starts (`hx`, `hc`, `Chain[hc,c]`), the node span of a
+value boundary around a projection, the Classic-entry rows whose Java
+counterpart is still unconfirmed, and generated anchors/text (D); they are not
+treated as language-specific exceptions.
 
 | Kind | Cursor used to recognize a leaf | Cursor movement after nonempty recognition |
 |---|---|---|

@@ -3653,7 +3653,15 @@ impl<'a> ParseContext<'a> {
                         )))
             })
             .map(|source| Box::new(source.clone()));
-        let fragment = self.collect_classic_fragment(fragment, self.token_mode().kind);
+        if self.token_mode.is_none()
+            && self
+                .rule_result_source
+                .as_deref()
+                .is_some_and(token::other_kind_classic)
+        {
+            self.collect_native_rule_result(id);
+        }
+        let fragment = self.collect_rule_fragment(fragment, start);
         let classic = fragment
             .source
             .as_deref()
@@ -3672,6 +3680,60 @@ impl<'a> ParseContext<'a> {
             self.mark_classic_node(node_id, &source);
         }
         node_id
+    }
+
+    /// The rule's collected fragment: the Classic collection under a token mode. A non-Classic
+    /// rule whose body returned a Classic source is a Java consumed collector of its body
+    /// (LazyChain, LazyChoice), so its committed token is what
+    /// a one-child collector collects from that body (`collect_native_child`): the body's
+    /// collection, including plain input that has no CST node. Only the CST keeps the Classic
+    /// contract: nodes of another kind leave the rule node as before.
+    #[inline(never)]
+    fn collect_rule_fragment(&self, mut fragment: Fragment, start: usize) -> Fragment {
+        if self.token_mode.is_some()
+            || !fragment
+                .source
+                .as_deref()
+                .is_some_and(|source| source.classic)
+        {
+            return self.collect_classic_fragment(fragment, self.token_mode().kind);
+        }
+        // Without the nodes, the collection moves no Vec.
+        let mut body = Fragment {
+            source: fragment.source.take(),
+            ..Fragment::default()
+        };
+        self.collect_native_child(&mut body, start);
+        fragment.source = body.source;
+        self.retain_kind_nodes(&mut fragment, token::TokenKind::Consumed);
+        fragment
+    }
+
+    /// A non-Choice rule is a Java LazyChain, a consumed collector: a Classic child of another
+    /// kind (a low-level MatchOnly) contributes nothing, so the non-Classic rule returns "" at
+    /// the consumed cursor as a Sequence of that child does (#1023 A).
+    #[inline(never)]
+    fn collect_native_rule_result(&mut self, id: usize) {
+        if matches!(
+            self.rules[id].expression,
+            Expr::Choice(_)
+                | Expr::LongestChoice(_)
+                | Expr::UniqueLongestChoice(_)
+                | Expr::PredictiveChoice { .. }
+        ) {
+            return;
+        }
+        let at = self.code_point(self.position);
+        if let Some(source) = self.rule_result_source.as_deref_mut() {
+            *source = FragmentSource {
+                parsed_source: None,
+                span: Span { start: at, end: at },
+                kind: token::TokenKind::Consumed,
+                classic: true,
+                generated: false,
+                text: None,
+            };
+        }
     }
 
     fn expression(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
@@ -3936,13 +3998,19 @@ impl<'a> ParseContext<'a> {
                         expression,
                         Expr::Optional(_) | Expr::JavaOptional(_) | Expr::Recovery { .. }
                     )
-                    && fragment
-                        .source
-                        .as_deref()
-                        .is_some_and(|source| !source.classic)
                 {
-                    // consumed の collector は先読みの Parsed 原文を引き継がない。
-                    fragment.source = None;
+                    // consumed の collector は先読みの Parsed 原文を引き継がず、投影は集める。
+                    self.collect_native_child(&mut fragment, checkpoint.position);
+                } else if self.token_mode.is_none()
+                    && matches!(
+                        expression,
+                        Expr::Choice(_)
+                            | Expr::LongestChoice(_)
+                            | Expr::UniqueLongestChoice(_)
+                            | Expr::PredictiveChoice { .. }
+                    )
+                {
+                    self.collect_native_choice(&mut fragment);
                 }
                 fragment
             })
@@ -4096,6 +4164,7 @@ impl<'a> ParseContext<'a> {
     #[inline(never)]
     fn sequence(&mut self, elements: &[Expr], depth: usize) -> Option<Fragment> {
         let mut result = Fragment::default();
+        let mut collection = None;
         let owner_start = self.position;
         self.sequence_trivia(&mut result, owner_start, depth)?;
         for element in elements {
@@ -4104,14 +4173,20 @@ impl<'a> ParseContext<'a> {
             }
             let child_start = self.position;
             let fragment = self.expression(element, depth)?;
-            self.append_classic_fragment(
+            if self.append_fragment(
                 &mut result,
                 fragment,
                 self.span(child_start),
                 self.code_point(owner_start),
-            );
+                &mut collection,
+            ) {
+                Self::anchor_sequence(&mut collection, elements, element);
+            }
             self.sequence_trivia(&mut result, owner_start, depth)?;
         }
+        self.finish_native_collection(&mut result, collection, |context| {
+            context.code_point(owner_start)
+        });
         Some(result)
     }
 
@@ -4119,6 +4194,7 @@ impl<'a> ParseContext<'a> {
     fn non_ordered(&mut self, children: &[Expr], depth: usize) -> Option<Fragment> {
         let mut selected = vec![false; children.len()];
         let mut result = Fragment::default();
+        let mut collection = None;
         let owner_start = self.position();
         for _ in 0..children.len() {
             let mut found = false;
@@ -4135,12 +4211,15 @@ impl<'a> ParseContext<'a> {
                 if let Some(fragment) = self.expression(child, depth) {
                     self.finish_classic_candidate(checkpoint, true);
                     selected[index] = true;
-                    self.append_classic_fragment(
+                    if self.append_fragment(
                         &mut result,
                         fragment,
                         self.span(child_start),
                         owner_start,
-                    );
+                        &mut collection,
+                    ) {
+                        Self::anchor_non_ordered(&mut collection, children, &selected, child);
+                    }
                     found = true;
                     break;
                 }
@@ -4155,6 +4234,7 @@ impl<'a> ParseContext<'a> {
                 return None;
             }
         }
+        self.finish_native_collection(&mut result, collection, move |_| owner_start);
         Some(result)
     }
 
@@ -4578,7 +4658,15 @@ impl<'a> ParseContext<'a> {
                         .nodes
                         .first()
                         .and_then(|index| self.tokens.values.get(index));
+                    // An input-backed token of another kind (a host's virtual or match-only token)
+                    // is what a Classic child of that kind returns: the virtual kind is independent
+                    // of its source, so a native collector excludes it by kind as it does `vc`.
+                    let other_kind_input = info.is_some_and(|info| {
+                        info.kind != token::TokenKind::Consumed
+                            && matches!(info.source, token::TokenSource::Input(_))
+                    });
                     let classic = self.token_mode.is_some()
+                        || other_kind_input
                         || matched.nodes.iter().any(|index| {
                             self.tokens
                                 .values
@@ -4886,6 +4974,7 @@ impl<'a> ParseContext<'a> {
             return None;
         }
         let mut result = Fragment::default();
+        let mut collection = None;
         let owner_start = self.position();
         let mut iterations = 0;
         while (probe && iterations == 0) || max.is_none_or(|max| iterations < max) {
@@ -4916,11 +5005,12 @@ impl<'a> ParseContext<'a> {
                         return None;
                     }
                     iterations += 1;
-                    self.append_classic_fragment(
+                    self.append_fragment(
                         &mut result,
                         fragment,
                         self.span(start),
                         owner_start,
+                        &mut collection,
                     );
                     if java
                         && (if self.token_mode.is_some() {
@@ -4953,6 +5043,9 @@ impl<'a> ParseContext<'a> {
         let accepted = iterations >= min && max.is_none_or(|max| iterations <= max);
         if !accepted && self.token_mode.is_some() {
             self.fail_at(self.byte_offsets[owner_start], "repetition bounds");
+        }
+        if accepted {
+            self.finish_native_collection(&mut result, collection, move |_| owner_start);
         }
         accepted.then_some(result)
     }
@@ -5008,6 +5101,7 @@ impl<'a> ParseContext<'a> {
         }
         Some(Box::new(TerminatedRepeat {
             result: Fragment::default(),
+            collection: None,
             owner_start: self.position(),
             iterations: 0,
             terminated: Terminator::Absent,
@@ -5081,11 +5175,22 @@ impl<'a> ParseContext<'a> {
             }
             _ => fragment,
         };
-        let fallback = Span {
-            start: self.position(),
-            end: self.position(),
+        // A native Occurs collects its committed terminator as a consumed collector's child.
+        let fallback = if mode.is_none() {
+            self.span(state.progress_start)
+        } else {
+            Span {
+                start: self.position(),
+                end: self.position(),
+            }
         };
-        self.append_classic_fragment(&mut state.result, fragment, fallback, state.owner_start);
+        self.append_fragment(
+            &mut state.result,
+            fragment,
+            fallback,
+            state.owner_start,
+            &mut state.collection,
+        );
         state.terminated = Terminator::Committed;
         Some(false)
     }
@@ -5101,11 +5206,12 @@ impl<'a> ParseContext<'a> {
         match attempt {
             Some(fragment) => {
                 state.iterations += 1;
-                self.append_classic_fragment(
+                self.append_fragment(
                     &mut state.result,
                     fragment,
                     self.span(state.start),
                     state.owner_start,
+                    &mut state.collection,
                 );
                 let progress_end = if self.token_mode.is_some() {
                     self.mode_cursor()
@@ -5134,7 +5240,8 @@ impl<'a> ParseContext<'a> {
         max: Option<usize>,
     ) -> Option<Fragment> {
         let TerminatedRepeat {
-            result,
+            mut result,
+            collection,
             owner_start,
             iterations,
             terminated,
@@ -5150,6 +5257,9 @@ impl<'a> ParseContext<'a> {
         let accepted = iterations >= min && max.is_none_or(|max| iterations <= max);
         if !accepted && self.token_mode.is_some() {
             self.fail_at(self.byte_offsets[owner_start], "repetition bounds");
+        }
+        if accepted {
+            self.finish_native_collection(&mut result, collection, move |_| owner_start);
         }
         accepted.then_some(result)
     }
@@ -5282,14 +5392,20 @@ impl<'a> ParseContext<'a> {
         } else {
             fragment.source.as_deref()
         };
-        let span = source.filter(|source| source.classic || owned).map_or_else(
-            || Span {
-                start: self.code_point(start),
-                // Java と同じ子の Parsed の root 原文を保存する。
-                end: self.code_point(self.position),
-            },
-            |source| source.span,
-        );
+        // A non-Classic @f is a consumed collector too: a Classic child of another kind (a
+        // direct MatchOnly) contributes nothing, so the field is "" at the consumed cursor.
+        let excluded =
+            !owned && self.token_mode.is_none() && source.is_some_and(token::other_kind_classic);
+        let span = source
+            .filter(|source| (source.classic || owned) && !excluded)
+            .map_or_else(
+                || Span {
+                    start: self.code_point(if excluded { self.position } else { start }),
+                    // Java と同じ子の Parsed の root 原文を保存する。
+                    end: self.code_point(self.position),
+                },
+                |source| source.span,
+            );
         if !owned {
             // Keep the existing AST field contract and its input-only metadata.
             self.captures.push(name, span);
@@ -5456,6 +5572,8 @@ impl<'a> ParseContext<'a> {
                 if self.track_owned_source {
                     fragment.clear_parsed_source();
                 }
+                // Java の CaptureBoundaryParser は Chain なので、consumed の収集値を境界にする。
+                self.collect_native_child(&mut fragment, start);
                 // AST 境界の node/span は従来の consumed 契約を保つ。
                 if fragment
                     .source
@@ -7938,6 +8056,8 @@ struct TerminatorFrame {
 /// Loop state of a Java Occurs with a terminator, boxed out of the recursive frame.
 struct TerminatedRepeat {
     result: Fragment,
+    /// The native consumed collection of the body and terminator results (see `append_fragment`).
+    collection: Option<Box<token::NativeCollection>>,
     owner_start: usize,
     iterations: usize,
     terminated: Terminator,
