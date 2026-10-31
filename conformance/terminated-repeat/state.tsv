@@ -1,0 +1,26 @@
+# Owned state around a capturing, state-mutating ';' terminator (Java NamedCapture / Rust capture_owned). Every context starts with state=7.
+# scenario	inputHex	kind	success	consumedCP	matchedCP	state	capture(startCP:UTF8hex)	terminatorCalls	failureCP
+plain	613b62	consumed	true	2	2	99	1:3b	2	0
+plain	613b62	matchOnly	true	0	1	7	~	2	1
+plain	6162	consumed	true	1	1	7	~	2	1
+plain	6162	matchOnly	true	0	1	7	~	2	1
+plain	613b	consumed	true	2	2	99	1:3b	2	0
+plain	613b	matchOnly	true	0	1	7	~	2	1
+chain-partial	613b79	consumed	true	1	1	7	~	2	2
+chain-partial	613b79	matchOnly	true	0	1	7	~	2	1
+chain-partial	613b78	consumed	true	3	3	99	1:3b	2	0
+chain-partial	613b78	matchOnly	true	0	1	7	~	2	1
+outer-fail	613b79	consumed	false	0	0	7	~	2	2
+outer-fail	613b79	matchOnly	false	0	0	7	~	2	1
+outer-fail	613b7a	consumed	true	3	3	99	1:3b	2	0
+outer-fail	613b7a	matchOnly	false	0	0	7	~	2	1
+retry	613b79	consumed	true	3	3	99	1:3b	4	2
+retry	613b79	matchOnly	false	0	0	7	~	4	1
+retry	613b78	consumed	true	3	3	99	1:3b	2	0
+retry	613b78	matchOnly	false	0	0	7	~	4	1
+lookahead	613b62	consumed	true	0	1	7	~	2	1
+lookahead	613b62	matchOnly	true	0	1	7	~	2	1
+reuse	613b613b	consumed	true	4	4	99	3:3b	4	2
+reuse	613b613b	matchOnly	true	0	1	7	~	3	1
+reuse	613b62	consumed	true	2	2	99	1:3b	3	2
+reuse	613b62	matchOnly	true	0	1	7	~	3	1

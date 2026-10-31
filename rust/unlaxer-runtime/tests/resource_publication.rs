@@ -30,6 +30,8 @@ fn wrapped(name: &str) -> Expr {
         "capture" => child.capture_owned("inside"),
         "scope" => child.capture_scope(),
         "repeat" => child.repeat_java(0, None),
+        "terminator" => Expr::Literal("q").repeat_java_until(child, 0, None),
+        "terminated-body" => child.repeat_java_until(Expr::Literal("q"), 0, None),
         _ => panic!("{name}"),
     }
 }
