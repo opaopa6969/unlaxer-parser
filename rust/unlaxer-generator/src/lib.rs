@@ -22,6 +22,7 @@ pub mod portability;
 mod preferred;
 mod preferred_plan;
 mod raising;
+mod semantic_predicates;
 pub mod semantic_rules;
 pub mod simple_annotations;
 mod token_stream;

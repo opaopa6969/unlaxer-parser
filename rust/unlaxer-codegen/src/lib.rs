@@ -160,7 +160,9 @@ fn contains_recovery(expression: &Expression) -> bool {
         Recovery { .. } | CustomToken(_) => true,
         RuleEffects { child, .. }
         | NamePredicate { child, .. }
+        | SemanticPredicate { child, .. }
         | NameResolutionScope { child, .. }
+        | SemanticPredicateScope { child, .. }
         | CaptureEquality { child, .. }
         | TriviaScope { child, .. }
         | LexicalContextScope { child, .. }
@@ -403,6 +405,31 @@ fn parser(ir: &GrammarIr) -> String {
 "#,
         );
     }
+    if matches!(
+        &ir.rules[ir.root].body,
+        Expression::SemanticPredicateScope { .. }
+    ) {
+        out.push_str("\n/// Full-input parsing with caller-registered pure predicates; retries reuse the same registry.\npub fn parse_tree_detailed_with_semantic_predicates(source: &str, predicates: &unlaxer_runtime::semantic_predicates::Bindings, options: ParseOptions) -> Result<Tree, ParseDiagnostic> {\n    let tree = unlaxer_runtime::parse_detailed_shared_with_semantic_predicates(grammar(), ");
+        write!(
+            out,
+            "{}, {}, source, options, predicates)",
+            ir.root, ir.java_whitespace
+        )
+        .unwrap();
+        out.push_str(
+            r#"?;
+    if let Some(first) = tree.recoveries().first() {
+        return Err(ParseDiagnostic {
+            kind: "recovery", offset: first.span.start,
+            expected: vec![first.message.to_owned()],
+            farthest: unlaxer_runtime::ParseError { offset: first.span.end, expected: vec![] },
+        });
+    }
+    Ok(tree)
+}
+"#,
+        );
+    }
     out.push_str("\n/// Bounded editor-only EOF repair; synthetic syntax never becomes a normal AST value.\npub fn parse_editor_cst(source: &str, completions: &[&str], options: unlaxer_runtime::editor_cst::Options) -> Result<unlaxer_runtime::editor_cst::EditorCst, &'static str> {\n    unlaxer_runtime::editor_cst::parse(grammar(), ");
     writeln!(
         out,
@@ -506,7 +533,9 @@ fn expression(expr: &Expression) -> String {
         | LexicalTriviaScope { child, .. }
         | LexicalContextScope { child, .. }
         | NamePredicate { child, .. }
-        | NameResolutionScope { child, .. } => {
+        | SemanticPredicate { child, .. }
+        | NameResolutionScope { child, .. }
+        | SemanticPredicateScope { child, .. } => {
             let child = expression(child);
             format_expression(expr, &child, "")
         }
@@ -578,6 +607,8 @@ fn format_expression(expr: &Expression, rendered: &str, other: &str) -> String {
             format!("{}.rule_effects(unlaxer_runtime::RuleEffects {{ scope_mode: {scope}, declares: {declares}, backref: {} }})", rendered, option_text(effects.backref.as_deref()))
         }
         NamePredicate { child: _, snapshot, version, capture, kind } => format!("Expr::NamePredicate {{ child: Box::new({}), snapshot: {}, version: {}, capture: {}, kind: {} }}", rendered, quote(snapshot), quote(version), quote(capture), quote(kind)),
+        SemanticPredicate { child: _, name } => format!("Expr::SemanticPredicate {{ child: Box::new({}), name: {} }}", rendered, quote(name)),
+        SemanticPredicateScope { child: _, requirements } => format!("Expr::SemanticPredicateScope {{ child: Box::new({}), requirements: vec![{}] }}", rendered, requirements.iter().map(|name| quote(name)).collect::<Vec<_>>().join(", ")),
         NameResolutionScope { child: _, requirements } => format!("Expr::NameResolutionScope {{ child: Box::new({}), requirements: vec![{}] }}", rendered, requirements.iter().map(|(id,version)|format!("unlaxer_runtime::names::Requirement::new({}, {}).expect(\"validated name requirement\")",quote(id),quote(version))).collect::<Vec<_>>().join(", ")),
         CaptureEquality { child: _, name } => {
             format!(
@@ -779,7 +810,9 @@ fn grapheme_capture(ir: &GrammarIr, body: &Expression, name: &str) -> bool {
             | RuleEffects { child, .. }
             | CaptureEquality { child, .. }
             | NamePredicate { child, .. }
+            | SemanticPredicate { child, .. }
             | NameResolutionScope { child, .. }
+            | SemanticPredicateScope { child, .. }
             | Recovery { child, .. }
             | LexicalTriviaScope { child, .. }
             | LexicalContextScope { child, .. } => pending.push((child, captured)),

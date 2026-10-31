@@ -18,5 +18,10 @@
     "name": "bare-name-predicate",
     "note": "@namePredicate は ( なしでも Simple annotation にならず構文エラー",
     "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @namePredicate\n  Item ::= 'n' ;\n}\n"
+  },
+  {
+    "name": "bare-predicate",
+    "note": "@predicate は ( なしでも Simple annotation にならず構文エラー (#1006)",
+    "grammar": "// 😀 positions are code points\ngrammar Calc {\n  @package: org.example.calc\n  @root  @mapping(Root, params=[value])\n  Start ::= Sum @value ;\n  @leftAssoc  @precedence(level=1)\n  @mapping(Sum, params=[left, op, right])\n  Sum ::= Item @left { '+' @op Item @right } ;\n  @predicate\n  Item ::= 'n' ;\n}\n"
   }
 ]

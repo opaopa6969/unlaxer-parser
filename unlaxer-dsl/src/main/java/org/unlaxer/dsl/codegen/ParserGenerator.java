@@ -69,6 +69,8 @@ public class ParserGenerator implements CodeGenerator {
         final boolean adapterShadowsWordParser;
         final boolean tokenStream;
         final String spaceParserClass;
+        /** rule name -> generated {@code @predicate} wrapper class, fixed before any emission. */
+        final Map<String, String> semanticPredicateWrappers;
 
         GenContext(GrammarDecl grammar) {
             this.grammar = grammar;
@@ -77,6 +79,8 @@ public class ParserGenerator implements CodeGenerator {
             GlobalComment.requireValid(grammar);
             LexicalContexts.requireValid(grammar);
             NamePredicates.requireValid(grammar);
+            SemanticPredicates.requireValid(grammar);
+            this.semanticPredicateWrappers = SemanticPredicates.wrapperClassNames(grammar);
             this.tokenStream = TokenStreamGrammar.enabled(grammar) || LexicalContexts.enabled(grammar);
             this.grammarName = grammar.name();
             TokenAdapterRegistry adapters = TokenAdapterRegistry.requireValid(grammar);
@@ -315,6 +319,7 @@ public class ParserGenerator implements CodeGenerator {
             }
             sb.append(ParserRuleEmitter.generateRuleClass(ctx, rule));
             if(NamePredicates.annotation(rule).isPresent()) sb.append(NamePredicates.wrapper(ctx,rule));
+            if(SemanticPredicates.annotation(rule).isPresent()) sb.append(SemanticPredicates.wrapper(ctx,rule));
             // @recovery: generate recovery wrapper class after the rule class
             ParserRuleEmitter.findRecoveryAnnotation(rule)
                 .ifPresent(ra -> sb.append(ParserRuleEmitter.generateRecoveryWrapper(ctx, rule, ra)));
@@ -322,7 +327,13 @@ public class ParserGenerator implements CodeGenerator {
 
         // ファクトリメソッド
         String rootRuleName = findRootRuleName(grammar);
-        if (NamePredicates.enabled(grammar)) {
+        if (SemanticPredicates.enabled(grammar)) {
+            sb.append("    public static Parser getRootSyntaxParser() {\n        return Parser.get(").append(rootRuleName)
+                .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class").append(");\n    }\n");
+            sb.append("    public static Parser getRootParser() {\n        return new org.unlaxer.parser.combinator.SemanticPredicateScope(Parser.get(")
+                .append(ParserRuleEmitter.resolveParserClass(ctx, rootRuleName)).append("), ")
+                .append(SemanticPredicates.javaRequirements(grammar)).append(");\n    }\n");
+        } else if (NamePredicates.enabled(grammar)) {
             sb.append("    public static Parser getRootSyntaxParser() {\n        return Parser.get(").append(rootRuleName)
                 .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class").append(");\n    }\n");
             sb.append("    public static Parser getRootParser() {\n        return new org.unlaxer.parser.combinator.NameResolutionScope(Parser.get(")
