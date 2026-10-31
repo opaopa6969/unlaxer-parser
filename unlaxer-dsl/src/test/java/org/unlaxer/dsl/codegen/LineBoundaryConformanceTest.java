@@ -71,7 +71,7 @@ public class LineBoundaryConformanceTest {
         var failures = new ArrayList<String>();
         for (String row : rows) {
             String[] c = row.split("\t", -1);
-            assertEquals(17, c.length);
+            assertEquals(16, c.length);
             assertEquals("direct", c[8]);
             Class<? extends Parser> type = type(c[2]);
             Supplier<Parser> supplier = () -> Parser.newInstance(type);
@@ -118,7 +118,9 @@ public class LineBoundaryConformanceTest {
                             var expected = new ArrayList<>(List.of(c).subList(9, 16));
                             // 末尾列は Java の既知欠陥 #861（FIRST 除外が reset 前の cursor を読む）の現状値。
                             // Rust はこの列を使わない。#861 の修正時に列を除き、主の期待値へ戻す。
-                            if (diagnostics == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) { expected.set(3, "0"); expected.set(4, "false"); if (!c[16].equals("~")) expected = new ArrayList<>(List.of(c[16].split("\\|", -1))); }
+                            if (diagnostics == ParseOptions.Diagnostics.DETAILED_ON_FAILURE) {
+                                expected.set(3, "0"); expected.set(4, "false");
+                            }
                             if (!expected.equals(actual)) failures.add(label + "\nexpected " + expected + "\nactual   " + actual);
                             assertEquals(label, 9, state.value);
                             assertTrue(context.captured("site").isEmpty());

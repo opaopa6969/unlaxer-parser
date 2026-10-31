@@ -55,23 +55,24 @@ Java `LexicalTokenParser` と Rust `Expr::Lexical` の BOL / BOF / EOL を実行
 語彙 token は零幅 token を作るが、Classic の StartOfLine/StartOfSource は作らないため adapter で分ける。
 新規 UBNF 生成経路は追加せず、既存の declarative-tokens / contextual-lexing conformance も関連検証として実行する。
 
-## 遅延診断モードと Java の既知欠陥 #861
+## 候補の開始位置と診断モード（#861）
 
 直接 context を呼ぶ AUTO は DETAILED に解決される。DETAILED_ON_FAILURE の直接呼出しは再解析せず、診断を記録しない
-（両版とも farthest=0、expected なし）。
+（両版とも farthest=0、expected なし）。受理・両cursor・元CST・選択した候補は全診断policyで同じである。
 
-Java Choice の FIRST 候補除外は、候補の transaction を `begin` する**前**の cursor で lookahead を取る。
-親の `resetMatchedWithConsumed=true` では `begin` が matched を consumed に戻すので、実際に読む位置と除外に使う位置がずれる。
-その結果、DETAILED_ON_FAILURE のときだけ成功するはずの候補が除かれ、受理が変わる。
-例: `"x\n"`、consumed=1 / matched=2 / reset=true / kind=matchOnly は、DETAILED では LF で成功し、DETAILED_ON_FAILURE では失敗する。
-これは「成功時の結果を変えない」という除外の前提（`ChoiceInterface` / `ParseContext` のコメント）に反する Java の欠陥で、#861 で追跡する。
-`-Dunlaxer.parser.firstSetExclusion.disabled=true` では DETAILED_ON_FAILURE も成功する。
+Java Choice / PredictiveChoice は、候補の transaction を `begin` した後に実際に読む位置で FIRST を判定する。
+親の `resetMatchedWithConsumed=true` のときは consumed、それ以外では呼出しの token kind の cursor を参照する。
+候補除外のためだけに transaction を開いたり、実 parser に渡す token kind を変更したりしない。
+例: `"x\n"`、consumed=1 / matched=2 / reset=true / kind=matchOnly は、全policyで LF に成功する。
+以前は reset 前の EOF を参照して DETAILED_ON_FAILURE だけ失敗したため、#861 で修正した。
 
-- `cases.tsv` の末尾列 `java-deferred-defect`（30行）は、この欠陥の Java 現状値。Java のテストだけが DETAILED_ON_FAILURE でこの列を使う。
-  #861 を直したら列を除き、Java も主の期待値に戻す。
-- Rust の Classic Choice は token mode で除外を行わない。Rust は欠陥を移植せず、全モードで主の期待値（Java DETAILED と同じ結果）に照合する。
-  利用者が書く経路は `line_end()` の Choice そのままで、診断モードで分岐する adapter は置かない。
-- ledger では `java-first-exclusion-reset` を未修正の差として記録する。
+- `cases.tsv` は全1088行で主の期待値だけを使う。旧 `java-deferred-defect` 列30行の例外は削除した。
+- Rust Classic Choice は token mode で FIRST 除外をしない。Java の欠陥を移植せず、従来どおり主の期待値に照合する。
+- PredictiveChoice の literal 候補が誤って除かれ、後続の nullable / Any 候補が先に成功する形も
+  [choice-cursor の共通回帰](../choice-cursor/README.md)で固定する。
+- Chain は reset=false を設定して自分の transaction を開いてから要素を判定する。
+  Occurs は終端がなく consumed=matched のときだけ除外する。LongestChoice / UniqueLongestChoice / NonOrdered は
+  この FIRST 除外をしない。TinyExpression 内の旧 ChoiceInterface コピーには FIRST 除外がなく、本修正の対象外である。
 
 ## EmptyLine / WildCardLine の未完了範囲
 
