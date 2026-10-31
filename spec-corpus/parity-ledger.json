@@ -2380,7 +2380,7 @@
         983,
         996
       ],
-      "observation": "Java参照でCHAR_RANGEのv1 BMP境界/順序・v2 escape/scalar境界/range・宣言的字句range・@eval重複引数を最初の値診断として保留する。全体構文（後続grammarと末尾を含む）が成功してからJava mapper順で報告し、旧REGEX/旧adapterとの順序を保つ。宣言的字句repeatのoverflow/逆転/入れ子上限はJavaでも構文検証なので維持し、不正recovery modeも構文に分類する。正常入力に追加走査/診断用確保を増やさず、仮ASTは外へ返さない。79形×入口/local import×LF/CRLFで両実CLI2528観測とfrontend158入力を固定期待値へ照合。check JSON全文、Playground stderr、generate/deps inspectの失敗段階/位置/終了3、出力/staging不在と入力不変を検証。Java製品・公開3.3.0は不変。native固有の規則本体入れ子上限後の構文走査は#996に分離し、#983全体は未完了。",
+      "observation": "Java参照でCHAR_RANGEのv1 BMP境界/順序・v2 escape/scalar境界/range・宣言的字句range・@eval重複引数を最初の値診断として保留する。全体構文（後続grammarと末尾を含む）が成功してからJava mapper順で報告し、旧REGEX/旧adapterとの順序を保つ。宣言的字句repeatのoverflow/逆転/入れ子上限はJavaでも構文検証なので維持し、不正recovery modeも構文に分類する。正常入力に追加走査/診断用確保を増やさず、仮ASTは外へ返さない。79形×入口/local import×LF/CRLFで両実CLI2528観測とfrontend158入力を固定期待値へ照合。check JSON全文、Playground stderr、generate/deps inspectの失敗段階/位置/終了3、出力/staging不在と入力不変を検証。Java製品・公開3.3.0は不変。native固有の規則本体入れ子上限後の構文走査は#996の明示stack認識で対応。Java frame上限後の残差は別契約として保持する。",
       "evidence": [
         "docs/regex-retirement.md",
         "rust/unlaxer-ubnf/src/parser.rs",
@@ -2529,18 +2529,24 @@
     },
     {
       "id": "frontend-nesting-stops-syntax",
-      "category": "unresolved",
-      "title": "native の規則本体入れ子上限が後続構文不正を隠す",
+      "category": "contract",
+      "title": "native の AST 入れ子上限後の構文認識と Java frame 境界",
       "hosts": "Java CodegenMain / native Rust unlaxer",
       "issues": [
         983,
-        996
+        996,
+        741
       ],
-      "observation": "旧REGEX→group128〜168段→S ::= ;はJavaのP-SYNTAXに対しnativeが上限で停止し先行移行診断を返す。構文正常時の#985の診断優先と2MiB stack/再帰AST破棄の保証を維持する必要があり、単純に上限を増やさず#996で安全な継続を設計する。",
+      "observation": "本体128段のAST構築/破棄上限を維持し、上限到達時だけVec<Task>の反復認識へ切り替える。全体構文/後続grammar/末尾を読み切ってからJava mapper順の値/移行診断を返し、構文不正を優先する。認識器はASTを作らずO(入力長)時間/補助空間で、16形10,000段もRust1.85 debug/2MiBで有限応答する。Javaの製品とframe1024は不変。group/optional/repeat/builtin/引数付き規則168段、左選択126、右選択167、separator側112のJava最終/次段を実測して通常/snapshot APIの例外型/code/limit/offsetを固定した。次段のJava ParseLimitException（check/generateの未捕捉終了1、Playground終了4・inspect終了3）とnativeのSyntax/mapper/NestingLimitの差は#741の既存資源モデル契約として残し、通常P-SYNTAXと混同しない。regex suiteを107形追加し計127形×入口/local import×LF/CRLFでCLI4064観測/frontend254入力を独立oracleへ比較し、入力不変/出力とstaging不在も固定する。正常入力に追加走査/認識stack確保はない。",
       "evidence": [
         "docs/regex-retirement.md",
         "docs/java-parser-limits.md",
-        "rust/unlaxer-ubnf/src/parser.rs"
+        "rust/unlaxer-ubnf/src/parser.rs",
+        "rust/unlaxer-ubnf/src/parser/recognition.rs",
+        "rust/unlaxer-ubnf/tests/diagnostic_priority.rs",
+        "spec-corpus/cli-stderr.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustUbnfFrontendConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java"
       ]
     },
     {
@@ -2588,10 +2594,11 @@
         "rust": 11,
         "nativeSyntax": 5,
         "nativeExpected": 3,
-        "nativeByEnding": 228,
-        "javaError": 222,
-        "native": 234,
-        "javaAst": 12
+        "nativeByEnding": 442,
+        "javaError": 406,
+        "native": 448,
+        "javaAst": 12,
+        "javaLimit": 30
       },
       "entries": [
         "cli-stderr-presentation",
@@ -2603,7 +2610,8 @@
         "qualified-reference-prefix-trivia",
         "local-rule-module-error-path",
         "frontend-value-validation-before-syntax",
-        "module-rejection-target-context"
+        "module-rejection-target-context",
+        "frontend-nesting-stops-syntax"
       ]
     },
     {
