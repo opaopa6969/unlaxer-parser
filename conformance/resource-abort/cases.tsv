@@ -13,3 +13,7 @@ repeat	false	1	2	1	2	7	p	before
 repeat	true	2	2	2	3	11	a	outer
 input-boundary	false	1	2	1	2	7	p	before
 input-boundary	true	2	2	2	3	11	a	outer
+terminator	false	1	2	1	2	7	p	before
+terminator	true	2	2	2	3	11	a	outer
+terminated-body	false	1	2	1	2	7	p	before
+terminated-body	true	2	2	2	3	11	a	outer

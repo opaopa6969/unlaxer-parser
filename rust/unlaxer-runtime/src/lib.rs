@@ -229,6 +229,16 @@ pub enum Expr {
         min: usize,
         max: Option<usize>,
     },
+    /// Java Occurs with a terminator (`ChildOccursWithTerminator`, `LazyOccurs`). Before
+    /// every body attempt the terminator runs in its own transaction with default Classic
+    /// arguments (consumed, not inverted). A match ends the repetition and is committed
+    /// only under a consuming parent kind; otherwise the terminator is rolled back.
+    JavaTerminatedRepeat {
+        child: Box<Expr>,
+        terminator: Box<Expr>,
+        min: usize,
+        max: Option<usize>,
+    },
     Lookahead {
         child: Box<Expr>,
         positive: bool,
@@ -423,6 +433,17 @@ impl Expr {
     pub fn repeat_java(self, min: usize, max: Option<usize>) -> Self {
         Self::JavaRepeat {
             child: Box::new(self),
+            min,
+            max,
+        }
+    }
+    /// Java `Repeat#newWithTerminator` / `ZeroOrMore(inner, terminator)`: consult
+    /// `terminator` before each body attempt, see [`Expr::JavaTerminatedRepeat`].
+    /// `WildCardStringTerminatorParser(t)` is `Expr::Any.repeat_java_until(t.match_only(), 0, None)`.
+    pub fn repeat_java_until(self, terminator: Self, min: usize, max: Option<usize>) -> Self {
+        Self::JavaTerminatedRepeat {
+            child: Box::new(self),
+            terminator: Box::new(terminator),
             min,
             max,
         }
@@ -3676,6 +3697,7 @@ impl<'a> ParseContext<'a> {
                 | Expr::JavaUntil(_)
                 | Expr::JavaOptional(_)
                 | Expr::JavaRepeat { .. }
+                | Expr::JavaTerminatedRepeat { .. }
                 | Expr::ZeroMatch(_)
                 | Expr::Choice(_)
                 | Expr::LongestChoice(_)
@@ -3689,7 +3711,9 @@ impl<'a> ParseContext<'a> {
                 | Expr::SemanticPredicate { .. }
         );
         let no_repeat_attempt = matches!(expression,
-            Expr::Repeat { min, max: Some(max), .. } | Expr::JavaRepeat { min, max: Some(max), .. }
+            Expr::Repeat { min, max: Some(max), .. }
+            | Expr::JavaRepeat { min, max: Some(max), .. }
+            | Expr::JavaTerminatedRepeat { min, max: Some(max), .. }
                 if *max == 0 || *max < *min);
         if java_transaction {
             // Transaction.begin resets every Java frame, including ordinary calls (#829).
@@ -3782,6 +3806,9 @@ impl<'a> ParseContext<'a> {
             }
             Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => {
                 self.expression_repeat(expression, depth)
+            }
+            Expr::JavaTerminatedRepeat { .. } => {
+                self.expression_terminated_repeat(expression, depth)
             }
             Expr::Lookahead { .. } => self.expression_lookahead(expression, depth),
             Expr::Capture(_, _) | Expr::OwnedCapture(_, _) => {
@@ -4301,7 +4328,10 @@ impl<'a> ParseContext<'a> {
             Expr::Optional(_) | Expr::JavaOptional(_) => {
                 unreachable!("recursive expression dispatched by expression")
             }
-            Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => {
+            Expr::Repeat { .. }
+            | Expr::JavaRepeat { .. }
+            | Expr::JavaTerminatedRepeat { .. }
+            | Expr::ZeroMatch(_) => {
                 unreachable!("recursive expression dispatched by expression")
             }
             Expr::Lookahead { .. } => unreachable!("recursive expression dispatched by expression"),
@@ -4899,6 +4929,203 @@ impl<'a> ParseContext<'a> {
             }
         }
         if java && iterations == 0 && min == 0 {
+            if self.token_mode.is_some() {
+                return Some(Fragment::default());
+            }
+            self.trace_empty("ZeroOrMore");
+        }
+        let accepted = iterations >= min && max.is_none_or(|max| iterations <= max);
+        if !accepted && self.token_mode.is_some() {
+            self.fail_at(self.byte_offsets[owner_start], "repetition bounds");
+        }
+        accepted.then_some(result)
+    }
+
+    /// Java Occurs with a terminator: the JavaRepeat loop, consulting the terminator
+    /// before every body attempt. The recursive frame keeps only the two child results;
+    /// everything else lives in boxed state, so nesting through the body or the
+    /// terminator fails safely on a standard stack like ordinary repetition.
+    #[inline(never)]
+    fn expression_terminated_repeat(
+        &mut self,
+        expression: &Expr,
+        depth: usize,
+    ) -> Option<Fragment> {
+        let Expr::JavaTerminatedRepeat {
+            child,
+            terminator,
+            min,
+            max,
+        } = expression
+        else {
+            unreachable!("terminated repetition dispatched by variant")
+        };
+        let mut state = self.begin_terminated_repeat(*min, *max)?;
+        while max.is_none_or(|max| state.iterations < max) {
+            let frame = self.begin_java_terminator(&mut state);
+            let parsed = self.expression(terminator, depth);
+            // A committed or labeled terminator failure fails the repetition (#700).
+            if !self.finish_java_terminator(frame, terminator, parsed, &mut state)? {
+                break;
+            }
+            // Java consults the terminator before the body, so it never skips the body.
+            let attempt = self.expression(child, depth);
+            if !self.finish_terminated_body(child, attempt, &mut state)? {
+                break;
+            }
+        }
+        self.finish_terminated_repeat(state, *min, *max)
+    }
+
+    #[inline(never)]
+    fn begin_terminated_repeat(
+        &mut self,
+        min: usize,
+        max: Option<usize>,
+    ) -> Option<Box<TerminatedRepeat>> {
+        if max.is_some_and(|max| max < min) {
+            self.fail_at(
+                self.position.max(self.matched_position),
+                "valid repetition bounds",
+            );
+            return None;
+        }
+        Some(Box::new(TerminatedRepeat {
+            result: Fragment::default(),
+            owner_start: self.position(),
+            iterations: 0,
+            terminated: Terminator::Absent,
+            progress_start: 0,
+            start: 0,
+            count: 0,
+        }))
+    }
+
+    /// Java Occurs begins a transaction of its own for the terminator, which it parses
+    /// with `parse(context)`: consumed and not inverted, whatever the caller's arguments.
+    #[inline(never)]
+    fn begin_java_terminator(&mut self, state: &mut TerminatedRepeat) -> Box<TerminatorFrame> {
+        state.progress_start = if self.token_mode.is_some() {
+            self.mode_cursor()
+        } else {
+            self.position
+        };
+        let frame = Box::new(TerminatorFrame {
+            checkpoint: self.checkpoint(),
+            policy: self.match_cursor_policy,
+            mode: self.token_mode,
+        });
+        // Transaction.begin resets the matched cursor of every Java frame (#829).
+        if frame.policy.reset {
+            self.matched_position = self.position;
+        }
+        if frame.mode.is_some() {
+            self.token_mode = Some(token::ParseMode::default());
+        }
+        frame
+    }
+
+    /// A match ends the repetition and is committed only under a consuming caller kind.
+    /// `Some(true)` continues with the body; `None` reports a raised (#700) or resource
+    /// failure, which fails the repetition.
+    // The box keeps the checkpoint out of the recursive caller frame.
+    #[allow(clippy::boxed_local)]
+    #[inline(never)]
+    fn finish_java_terminator(
+        &mut self,
+        frame: Box<TerminatorFrame>,
+        terminator: &Expr,
+        parsed: Option<Fragment>,
+        state: &mut TerminatedRepeat,
+    ) -> Option<bool> {
+        let TerminatorFrame {
+            checkpoint,
+            policy,
+            mode,
+        } = *frame;
+        self.token_mode = mode;
+        let Some(fragment) = parsed.filter(|_| self.resource_failure.is_none()) else {
+            self.restore(checkpoint);
+            state.start = self.position;
+            state.count = self.nodes.len();
+            return (self.raised.is_none() && self.resource_failure.is_none()).then_some(true);
+        };
+        if mode.is_some_and(|mode| !mode.kind.is_consumed()) {
+            self.restore(checkpoint);
+            state.terminated = Terminator::RolledBack;
+            return Some(false);
+        }
+        self.commit_checkpoint(checkpoint);
+        // The terminator's frame and its cursor policy end with the commit.
+        self.match_cursor_policy = policy;
+        let fragment = match java_collector_label(terminator) {
+            // Transaction.commit(terminator, consumed) collects a CollectingParser once more.
+            Some(label) if mode.is_some() => {
+                self.classic_meta_node(fragment, token::TokenKind::Consumed, label)
+            }
+            _ => fragment,
+        };
+        let fallback = Span {
+            start: self.position(),
+            end: self.position(),
+        };
+        self.append_classic_fragment(&mut state.result, fragment, fallback, state.owner_start);
+        state.terminated = Terminator::Committed;
+        Some(false)
+    }
+
+    /// The JavaRepeat body step: count a success, stop without progress or on failure.
+    #[inline(never)]
+    fn finish_terminated_body(
+        &mut self,
+        child: &Expr,
+        attempt: Option<Fragment>,
+        state: &mut TerminatedRepeat,
+    ) -> Option<bool> {
+        match attempt {
+            Some(fragment) => {
+                state.iterations += 1;
+                self.append_classic_fragment(
+                    &mut state.result,
+                    fragment,
+                    self.span(state.start),
+                    state.owner_start,
+                );
+                let progress_end = if self.token_mode.is_some() {
+                    self.mode_cursor()
+                } else {
+                    self.position
+                };
+                Some(progress_end != state.progress_start)
+            }
+            // A committed or labeled failure is not the end of a repetition (#700).
+            None if self.raised.is_some() => None,
+            None => {
+                self.position = state.start;
+                self.nodes.truncate(state.count);
+                self.java_failed_atom(child);
+                Some(false)
+            }
+        }
+    }
+
+    #[allow(clippy::boxed_local)]
+    #[inline(never)]
+    fn finish_terminated_repeat(
+        &mut self,
+        state: Box<TerminatedRepeat>,
+        min: usize,
+        max: Option<usize>,
+    ) -> Option<Fragment> {
+        let TerminatedRepeat {
+            result,
+            owner_start,
+            iterations,
+            terminated,
+            ..
+        } = *state;
+        // A committed terminator is part of this repetition's result even without a body.
+        if iterations == 0 && min == 0 && terminated != Terminator::Committed {
             if self.token_mode.is_some() {
                 return Some(Fragment::default());
             }
@@ -5975,6 +6202,12 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
             expression_allows_deferred_diagnostics(child)
                 && expression_allows_deferred_diagnostics(alternative)
         }
+        Expr::JavaTerminatedRepeat {
+            child, terminator, ..
+        } => {
+            expression_allows_deferred_diagnostics(child)
+                && expression_allows_deferred_diagnostics(terminator)
+        }
         Expr::Lexical(_, _)
         | Expr::Literal(_)
         | Expr::JavaLiteral(_)
@@ -6113,9 +6346,16 @@ fn expression_needs_owned_source(expression: &Expr) -> bool {
             | Expr::Commit { child, .. }
             | Expr::Label { child, .. } => Some(child.as_ref()),
             Expr::CatchLabels {
-                child, alternative, ..
+                child,
+                alternative: other,
+                ..
+            }
+            | Expr::JavaTerminatedRepeat {
+                child,
+                terminator: other,
+                ..
             } => {
-                scan.defer(std::slice::from_ref(alternative.as_ref()));
+                scan.defer(std::slice::from_ref(other.as_ref()));
                 Some(child.as_ref())
             }
             Expr::Lexical(_, _)
@@ -6207,6 +6447,9 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::NameResolutionScope { .. }
         | Expr::SemanticPredicateScope { .. }
         | Expr::Recovery { .. } => false,
+        // No memo safety review (#184) covers the terminator transaction and its
+        // rollback under match-only callers, so rules containing it are never cached.
+        Expr::JavaTerminatedRepeat { .. } => false,
         Expr::Rule(id) => {
             references.push(*id);
             true
@@ -7637,14 +7880,23 @@ fn classic_collector_label(expression: &Expr) -> Option<&'static str> {
         }
         | Expr::JavaRepeat {
             min: 0, max: None, ..
+        }
+        | Expr::JavaTerminatedRepeat {
+            min: 0, max: None, ..
         } => Some("ZeroOrMore"),
         Expr::Repeat {
             min: 1, max: None, ..
         }
         | Expr::JavaRepeat {
             min: 1, max: None, ..
+        }
+        | Expr::JavaTerminatedRepeat {
+            min: 1, max: None, ..
         } => Some("OneOrMore"),
-        Expr::Repeat { .. } | Expr::JavaRepeat { .. } | Expr::ZeroMatch(_) => Some("Occurs"),
+        Expr::Repeat { .. }
+        | Expr::JavaRepeat { .. }
+        | Expr::JavaTerminatedRepeat { .. }
+        | Expr::ZeroMatch(_) => Some("Occurs"),
         Expr::CodeStart => Some("CodeStartParser"),
         Expr::CodeEnd => Some("CodeEndParser"),
         Expr::Number => Some("NumberParser"),
@@ -7653,6 +7905,58 @@ fn classic_collector_label(expression: &Expr) -> Option<&'static str> {
         Expr::Quoted('"') => Some("DoubleQuotedParser"),
         _ => None,
     }
+}
+
+/// The caller state a Java Occurs terminator transaction restores or keeps.
+struct TerminatorFrame {
+    checkpoint: Checkpoint,
+    policy: MatchCursorPolicy,
+    mode: Option<token::ParseMode>,
+}
+
+/// Loop state of a Java Occurs with a terminator, boxed out of the recursive frame.
+struct TerminatedRepeat {
+    result: Fragment,
+    owner_start: usize,
+    iterations: usize,
+    terminated: Terminator,
+    /// Mode cursor before the terminator; a body that leaves it unchanged stops the loop.
+    progress_start: usize,
+    /// Consumed cursor and node count before the body, restored when it fails.
+    start: usize,
+    count: usize,
+}
+
+/// How a Java Occurs terminator attempt ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Terminator {
+    Absent,
+    /// Matched under a match-only caller kind, so its transaction was rolled back.
+    RolledBack,
+    Committed,
+}
+
+/// Classic collectors whose Java parsers are `CollectingParser`s: committing such a
+/// terminator wraps its token once more. Word, captures and name scopes only append.
+fn java_collector_label(expression: &Expr) -> Option<&'static str> {
+    classic_collector_label(expression).or(match expression {
+        Expr::JavaUntil(_) => Some("WildCardStringTerminatorParser"),
+        Expr::Eof => Some("EndOfSourceParser"),
+        Expr::JavaEmpty => Some("EmptyParser"),
+        // Every ConstructedSingleChildParser is a CollectingParser: Commit/Label and the
+        // propagation wrappers, Not (`!'x'`) and PegLookahead. `&'x'` is a MatchOnly whose
+        // match-only token the consumed collection filters out.
+        Expr::Commit { .. } => Some("Commit"),
+        Expr::Label { .. } => Some("Label"),
+        Expr::StopConsume(_) => Some("DoConsumePropagationStopper"),
+        Expr::StopInvert(_) => Some("InvertMatchPropagationStopper"),
+        Expr::InvertMatch(_) => Some("NotPropagatableSource"),
+        Expr::JavaLookahead {
+            positive: false, ..
+        } => Some("Not"),
+        Expr::Lookahead { .. } => Some("PegLookahead"),
+        _ => None,
+    })
 }
 
 /// Small inline work lists keep ordinary parser entries allocation-free. Very
@@ -7779,9 +8083,16 @@ fn requires_classic_mode<'a>(expression: &'a Expr, rules: &'a [Rule]) -> bool {
             // Both operands in the same iterative scan: a fresh recursive scan of the
             // alternative never terminated on a rule cycle through it (#720).
             Expr::CatchLabels {
-                child, alternative, ..
+                child,
+                alternative: other,
+                ..
+            }
+            | Expr::JavaTerminatedRepeat {
+                child,
+                terminator: other,
+                ..
             } => {
-                scan.defer(std::slice::from_ref(alternative.as_ref()));
+                scan.defer(std::slice::from_ref(other.as_ref()));
                 Some(child.as_ref())
             }
             _ => None,
