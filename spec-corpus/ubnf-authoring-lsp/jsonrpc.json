@@ -917,5 +917,439 @@
         }
       ]
     }
-  ]
+  ],
+  "reader": {
+    "javaRevision": "384fcf3eb1c0ce3e207ac580cec5fcac4b478b34",
+    "silenceSeconds": 1.0,
+    "oracles": {
+      "parse": {
+        "error": {
+          "code": -32700,
+          "message": "Message could not be parsed."
+        }
+      },
+      "internal": {
+        "error": {
+          "code": -32603,
+          "message": "Internal error."
+        }
+      },
+      "early": {
+        "error": {
+          "code": -32002,
+          "message": "Server not initialized"
+        }
+      },
+      "already": {
+        "error": {
+          "code": -32600,
+          "message": "Server already initialized"
+        }
+      }
+    },
+    "orders": [
+      "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"method\":\"$METHOD\",\"params\":$PARAMS}",
+      "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"params\":$PARAMS,\"method\":\"$METHOD\"}",
+      "{\"jsonrpc\":\"2.0\",\"method\":\"$METHOD\",\"id\":$ID,\"params\":$PARAMS}",
+      "{\"jsonrpc\":\"2.0\",\"method\":\"$METHOD\",\"params\":$PARAMS,\"id\":$ID}",
+      "{\"jsonrpc\":\"2.0\",\"params\":$PARAMS,\"id\":$ID,\"method\":\"$METHOD\"}",
+      "{\"jsonrpc\":\"2.0\",\"params\":$PARAMS,\"method\":\"$METHOD\",\"id\":$ID}"
+    ],
+    "orderParams": [
+      {
+        "id": "object",
+        "raw": "{\"capabilities\":{},$OPTIONS}",
+        "java": [
+          "success",
+          "success",
+          "success",
+          "success",
+          "success",
+          "success"
+        ],
+        "rust": [
+          "success",
+          "success",
+          "success",
+          "success",
+          "success",
+          "success"
+        ]
+      },
+      {
+        "id": "zero",
+        "raw": "[]",
+        "java": [
+          "parse",
+          "parse",
+          "parse",
+          "silent",
+          "parse",
+          "parse"
+        ],
+        "rust": [
+          "parse",
+          "parse",
+          "parse",
+          "parse",
+          "parse",
+          "parse"
+        ]
+      },
+      {
+        "id": "one",
+        "raw": "[{\"capabilities\":{},$OPTIONS}]",
+        "java": [
+          "success",
+          "parse",
+          "success",
+          "success",
+          "parse",
+          "parse"
+        ],
+        "rust": [
+          "success",
+          "parse",
+          "success",
+          "success",
+          "parse",
+          "parse"
+        ]
+      },
+      {
+        "id": "one-null",
+        "raw": "[null]",
+        "java": [
+          "internal",
+          "parse",
+          "internal",
+          "internal",
+          "parse",
+          "parse"
+        ],
+        "rust": [
+          "internal",
+          "parse",
+          "internal",
+          "internal",
+          "parse",
+          "parse"
+        ]
+      },
+      {
+        "id": "two",
+        "raw": "[{},{}]",
+        "java": [
+          "silent",
+          "parse",
+          "silent",
+          "silent",
+          "parse",
+          "parse"
+        ],
+        "rust": [
+          "parse",
+          "parse",
+          "parse",
+          "parse",
+          "parse",
+          "parse"
+        ]
+      },
+      {
+        "id": "cap-null",
+        "raw": "{\"capabilities\":null,$OPTIONS}",
+        "java": [
+          "silent",
+          "silent",
+          "silent",
+          "silent",
+          "silent",
+          "silent"
+        ],
+        "rust": [
+          "success",
+          "success",
+          "success",
+          "success",
+          "success",
+          "success"
+        ]
+      },
+      {
+        "id": "token-object",
+        "raw": "{\"workDoneToken\":{},$OPTIONS}",
+        "java": [
+          "silent",
+          "silent",
+          "silent",
+          "silent",
+          "silent",
+          "silent"
+        ],
+        "rust": [
+          "success",
+          "success",
+          "success",
+          "success",
+          "success",
+          "success"
+        ]
+      },
+      {
+        "id": "positional-cap-null",
+        "raw": "[{\"capabilities\":null,$OPTIONS}]",
+        "java": [
+          "silent",
+          "parse",
+          "silent",
+          "silent",
+          "parse",
+          "parse"
+        ],
+        "rust": [
+          "success",
+          "parse",
+          "success",
+          "success",
+          "parse",
+          "parse"
+        ]
+      },
+      {
+        "id": "token-array",
+        "raw": "{\"workDoneToken\":[],$OPTIONS}",
+        "java": [
+          "silent",
+          "silent",
+          "silent",
+          "silent",
+          "silent",
+          "silent"
+        ],
+        "rust": [
+          "success",
+          "success",
+          "success",
+          "success",
+          "success",
+          "success"
+        ]
+      },
+      {
+        "id": "token-bool",
+        "raw": "{\"workDoneToken\":true,$OPTIONS}",
+        "java": [
+          "silent",
+          "silent",
+          "silent",
+          "silent",
+          "silent",
+          "silent"
+        ],
+        "rust": [
+          "success",
+          "success",
+          "success",
+          "success",
+          "success",
+          "success"
+        ]
+      }
+    ],
+    "dtoInvalid": [
+      "{\"processId\":\"abc\"}",
+      "{\"processId\":1.5}",
+      "{\"rootUri\":{}}",
+      "{\"rootPath\":[]}",
+      "{\"workspaceFolders\":\"x\"}",
+      "{\"workspaceFolders\":[7]}",
+      "{\"workspaceFolders\":[{\"uri\":{}}]}",
+      "{\"clientInfo\":\"x\"}",
+      "{\"clientInfo\":{\"name\":[]}}",
+      "{\"clientInfo\":{\"version\":{}}}",
+      "{\"trace\":{}}",
+      "{\"locale\":[]}",
+      "{\"capabilities\":{\"textDocument\":7}}",
+      "{\"capabilities\":{\"workspace\":[]}}",
+      "{\"capabilities\":{\"notebookDocument\":false}}",
+      "{\"capabilities\":{\"window\":\"x\"}}",
+      "{\"capabilities\":{\"general\":[]}}",
+      "{\"capabilities\":{\"textDocument\":{\"hover\":7}}}",
+      "{\"capabilities\":{\"textDocument\":{\"completion\":{\"completionItem\":{\"snippetSupport\":{}}}}}}",
+      "{\"capabilities\":{\"workspace\":{\"workspaceEdit\":[]}}}",
+      "{\"capabilities\":{\"window\":{\"workDoneProgress\":{}}}}",
+      "{\"workDoneToken\":1.5}"
+    ],
+    "dtoAccepted": [
+      "{\"processId\":\"1\",\"rootUri\":1,\"rootPath\":true,\"initializationOptions\":7,\"unknown\":{\"private\":\"params method\"}}",
+      "{\"processId\":null,\"rootUri\":null,\"rootPath\":null,\"clientInfo\":null,\"locale\":null,\"trace\":null,\"workspaceFolders\":null,\"workDoneToken\":null}",
+      "{\"workspaceFolders\":[null,{\"uri\":1,\"name\":true}],\"clientInfo\":{\"name\":7,\"version\":false},\"locale\":1,\"trace\":true,\"workDoneToken\":\"s\"}",
+      "{\"capabilities\":{\"textDocument\":{\"hover\":{\"contentFormat\":7}},\"general\":{\"positionEncodings\":7},\"experimental\":7}}"
+    ],
+    "duplicates": [
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":0,\"id\":$ID,\"method\":\"unknown\",\"method\":\"$/foo\",\"params\":{},\"params\":{}}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"method\":\"unlaxer/configure\",\"params\":{},\"params\":[]}",
+        "oracle": "parse"
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"method\":\"unlaxer/configure\",\"params\":[],\"params\":{}}",
+        "oracle": "parse"
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"params\":{},\"params\":[],\"method\":\"unlaxer/configure\"}",
+        "oracle": "parse"
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"method\":\"$/foo\",\"params\":{\"id\":99,\"method\":\"unknown\",\"params\":[]}}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"m\\u0065thod\":\"unlaxer/configure\",\"par\\u0061ms\":[]}",
+        "oracle": "parse"
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"method\":\"unknown\",\"params\":[{}],\"method\":\"unlaxer/configure\"}",
+        "oracle": "parse"
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":\"first-id\",\"method\":\"unlaxer/configure\",\"params\":[],\"id\":$ID}",
+        "oracle": "parse",
+        "responseId": "first-id"
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":\"first-id\",\"params\":[],\"method\":\"unlaxer/configure\",\"id\":$ID}",
+        "oracle": "parse"
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"method\":\"unlaxer/configure\",\"params\":{\"processId\":\"abc\",\"processId\":1}}",
+        "oracle": "parse"
+      },
+      {
+        "raw": "{\"jsonrpc\":\"2.0\",\"id\":$ID,\"method\":\"initialize\",\"params\":{\"processId\":\"abc\",\"processId\":1}}",
+        "oracle": "parse"
+      }
+    ],
+    "nullIdMethods": [
+      "$/foo",
+      "unknown",
+      "textDocument/formatting"
+    ],
+    "typedMethods": [
+      "completionItem/resolve",
+      "textDocument/declaration",
+      "textDocument/typeDefinition",
+      "textDocument/implementation",
+      "textDocument/documentHighlight",
+      "codeAction/resolve",
+      "textDocument/codeLens",
+      "codeLens/resolve",
+      "textDocument/formatting",
+      "textDocument/rangeFormatting",
+      "textDocument/onTypeFormatting",
+      "textDocument/willSaveWaitUntil",
+      "textDocument/documentLink",
+      "documentLink/resolve",
+      "textDocument/documentColor",
+      "textDocument/colorPresentation",
+      "textDocument/prepareRename",
+      "textDocument/prepareTypeHierarchy",
+      "typeHierarchy/supertypes",
+      "typeHierarchy/subtypes",
+      "textDocument/prepareCallHierarchy",
+      "callHierarchy/incomingCalls",
+      "callHierarchy/outgoingCalls",
+      "textDocument/selectionRange",
+      "textDocument/semanticTokens/full/delta",
+      "textDocument/semanticTokens/range",
+      "textDocument/moniker",
+      "textDocument/inlayHint",
+      "inlayHint/resolve",
+      "textDocument/inlineValue",
+      "textDocument/diagnostic",
+      "workspace/executeCommand",
+      "workspace/symbol",
+      "workspaceSymbol/resolve",
+      "workspace/willCreateFiles",
+      "workspace/willRenameFiles",
+      "workspace/willDeleteFiles",
+      "workspace/diagnostic",
+      "textDocument/hover",
+      "textDocument/completion",
+      "textDocument/definition",
+      "textDocument/references",
+      "textDocument/rename",
+      "textDocument/documentSymbol",
+      "textDocument/foldingRange",
+      "textDocument/linkedEditingRange",
+      "textDocument/codeAction",
+      "textDocument/signatureHelp",
+      "textDocument/semanticTokens/full",
+      "ubnf/packageSource"
+    ],
+    "typedInvalid": [
+      "7",
+      "[]",
+      "\"x\"",
+      "false"
+    ],
+    "typedNested": [
+      "{\"textDocument\":7}",
+      "{\"textDocument\":{\"uri\":\"file:///none\"},\"position\":{\"line\":[],\"character\":0}}",
+      "{\"textDocument\":{\"uri\":\"file:///none\"},\"position\":{\"line\":1e400,\"character\":0}}"
+    ],
+    "overflowNotification": "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":{\"textDocument\":{\"uri\":$URI,\"version\":1e400},\"contentChanges\":[{\"text\":$SOURCE}]}}",
+    "droppedChanges": [
+      "[{\"range\":{\"start\":{\"line\":1e400,\"character\":0},\"end\":{\"line\":0,\"character\":0}},\"text\":$SOURCE}]",
+      "[{\"range\":{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":0,\"character\":-1e400}},\"text\":$SOURCE}]",
+      "[{\"rangeLength\":1e400,\"text\":$SOURCE}]",
+      "[{\"range\":7,\"text\":$SOURCE}]",
+      "[{\"range\":{\"start\":\"x\",\"end\":null},\"text\":$SOURCE}]",
+      "[{\"rangeLength\":\"x\",\"text\":$SOURCE}]",
+      "[{\"text\":$SOURCE},{\"text\":[]}]",
+      "[{\"text\":$SOURCE},{\"range\":{\"start\":{\"line\":1.5}}}]"
+    ],
+    "acceptedChanges": [
+      "[{\"range\":{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":\"0\",\"character\":1e-400}},\"rangeLength\":\"1\",\"text\":$SOURCE}]",
+      "[{\"range\":null,\"rangeLength\":null,\"text\":$SOURCE}]",
+      "[{\"range\":{\"start\":null,\"end\":{}},\"text\":$SOURCE}]"
+    ],
+    "typedPositional": [
+      {
+        "method": "textDocument/hover",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/documentSymbol",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/formatting",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "ubnf/packageSource",
+        "expected": {
+          "result": null
+        }
+      }
+    ]
+  }
 }
