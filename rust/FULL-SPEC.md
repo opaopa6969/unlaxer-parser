@@ -211,6 +211,12 @@ Classicのparser生成は`Expr`combinator定義を生成し、共通runtimeで�
 - [#158](https://github.com/opaopa6969/unlaxer-parser/issues/158): target-neutralなtoken adapter契約（上記範囲を実装）。
 - [#159](https://github.com/opaopa6969/unlaxer-parser/issues/159): 文法進化に伴う生成API影響レポート（上記範囲を実装）。
 
+### UBNF authoring syntax / module の限定対応 (#894)
+
+Java固定参照 `d8af6d9be6ad45cdad5eddf0a040cd5ce80d0602` の診断生成を[欄別に棚卸し](../docs/ubnf-authoring-lsp.md#syntax-failure-の固定棚卸し894)した。nativeは失敗時だけ完了grammar prefixを再認識し、fallback hoverにUTF-16の消費長を返す。根のkeyword失敗はdataを含む全JSON、moduleのURI/最終link失敗は全文・先頭range・集約を揃える。共通69ケース中60は全JSON、9はhoverのみ。`incomplete-annotation`のhost別hover期待値を共通へ移した。
+
+通常frontend/Java製品/validator意味解析/公開3.3.0は変更しない。安全なresolverのlock/hash/依存/境界とlocal buffer overlayを維持する。深い構文失敗の最遠位置・期待集合・deepest/stack/data/relatedInformation、import先parse本文、mapper値エラー・parameterized stateを含む厳密なsyntax認識は#1024で継続する。URI全域/platformは#902、DTO型変換は#1005のまま。#894と親issueは未完了。
+
 ### UBNF authoring JSON-RPC (#994)
 
 Java 固定 revision `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34` を参照に、native の

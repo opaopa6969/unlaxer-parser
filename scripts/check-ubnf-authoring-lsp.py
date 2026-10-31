@@ -448,7 +448,7 @@ def main():
     parser.add_argument('--classpath', required=True)
     parser.add_argument('--rust', required=True)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents', 'package-artifacts', 'package-artifact-utf8', 'package-grammar-paths', 'package-json', 'configuration', 'jsonrpc'], default='baseline')
+    parser.add_argument('--suite', choices=['baseline', 'navigation', 'local-imports', 'package-documents', 'package-artifacts', 'package-artifact-utf8', 'package-grammar-paths', 'package-json', 'configuration', 'jsonrpc', 'syntax-status'], default='baseline')
     args = parser.parse_args()
     # The 64 MiB boundary needs more than 4 GiB; bound each test JVM instead of
     # letting host-wide ergonomics reserve ~22 GiB per concurrently live JVM.
@@ -457,7 +457,10 @@ def main():
     native = Client([args.rust], native=True)
     try:
         with tempfile.TemporaryDirectory(prefix='ubnf-authoring-', dir=os.environ.get('TMPDIR')) as directory:
-            if args.suite == 'jsonrpc':
+            if args.suite == 'syntax-status':
+                from ubnf_authoring_syntax_status import run_syntax_status
+                evidence = run_syntax_status([java, native], Path(directory))
+            elif args.suite == 'jsonrpc':
                 from ubnf_authoring_jsonrpc import run_jsonrpc
                 evidence = run_jsonrpc([java, native], Path(directory), OMIT_PARAMS)
             elif args.suite == 'configuration':
