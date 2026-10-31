@@ -695,6 +695,10 @@
       "state": "OPEN",
       "title": "feat(ubnf): 名前付き汎用 semantic predicate を Java/Rust の生成 parser に接続する"
     },
+    "1009": {
+      "state": "OPEN",
+      "title": "test(sample): 名前付き parser の入れ子クラスを公開し Usage001 を通常回帰へ接続する"
+    },
     "1023": {
       "state": "OPEN",
       "title": "parity: owned capture・@f と非 Classic collector の返却 source を Java NamedCapture / Chain と揃える"
@@ -2592,6 +2596,22 @@
         "rust/unlaxer-runtime/tests/semantic_predicate_source.rs",
         "rust/unlaxer-runtime/tests/semantic_predicate_virtual_input.rs",
         "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/SemanticPredicateParserTest.java"
+      ]
+    },
+    {
+      "id": "named-concrete-sample",
+      "category": "contract",
+      "title": "名前付き具象parserのreflection構築サンプル",
+      "hosts": "Java LazyChain/LazyOneOrMore / Rust public named rule composition",
+      "issues": [
+        1009
+      ],
+      "observation": "Java Usage001のclass参照で使うOperatorAndOperandParserをpublicにし、既定surefireが実行するNamedConcreteSampleTestへ接続する。製品factoryの非公開constructor制約は変えない。8入力の独立prefix成否/consumed/matched CPをJava/Rust双方でmemo2×診断3に照合し、空・不正・末尾演算子・未消費入力も固定する。サンプルの修正はruntimeホットパス・公開3.3.0を変更しない。",
+      "evidence": [
+        "conformance/samples/named-concrete.tsv",
+        "unlaxer-common/src/test/java/sample/Usage001_createParserAndParseWithNamedConcrete.java",
+        "unlaxer-common/src/test/java/sample/NamedConcreteSampleTest.java",
+        "rust/unlaxer-runtime/tests/named_concrete_sample.rs"
       ]
     }
   ],
