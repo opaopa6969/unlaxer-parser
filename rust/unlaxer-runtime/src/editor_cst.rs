@@ -343,6 +343,12 @@ pub fn literal_completions(grammar: &SharedGrammar) -> Vec<&'static str> {
             | SemanticPredicate { child, .. }
             | SemanticPredicateScope { child, .. }
             | Recovery { child, .. } => visit(child, result),
+            JavaTerminatedRepeat {
+                child, terminator, ..
+            } => {
+                visit(child, result);
+                visit(terminator, result);
+            }
             _ => {}
         }
     }

@@ -86,6 +86,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Rust UBNF authoring に Java の AST binding に基づく定義/参照・rename・outline/folding・linked editing と検証済み package source 表示を追加。共通実 stdio 39件と両 backend の packaged VSIX で位置・拒否・readonly 境界を検証する（#886 第一単位、残る編集支援 #901・入力域/platform #902）。
 - Rust UBNF authoring の initialize options・`unlaxer/configure`・experimental profile / languageQueryConsumer metadata を Java 基準へ揃えた。失敗時の設定保持、診断 gate、文書保持、同一/減少 version・range 付き Full change、未オープン URI への Full change、document version の型、package snapshot の寿命を実 stdio 共通62件で検証する (#895)。
 - Java / Rust（native・Java-host）の既知差・未対応・条件付き skip を issue へ結ぶ [台帳](docs/parity-ledger.md) と JSON、host 別 corpus（JSON・JSON Lines・TSV・CSV・YAML、host 列の行）とテスト内の無条件 skip・差分表・除外集合の登録漏れ、文書の不一致を検出する既存 CI の検査を追加 (#771)。
+- Rust に Java の任意 terminator 付き反復（`ChildOccursWithTerminator`・`Lazy*`・`Optional` / `ZeroOrOne` / `Repeat#newWithTerminator`・`WildCardStringTerminatorParser` の全 overload）に対応する `Expr::repeat_java_until(terminator, min, max)` を追加 (#846)。terminator を body より前に consumed・非反転で試し、consumed 系の親でだけ commit・matchOnly 系では rollback する。Java で CollectingParser になる terminator（Chain / Choice / Occurs 系に加え Commit・Label・伝播 wrapper・Not・PegLookahead）は Java と同じく commit でもう一度包む。4 token kind・invert・両 cursor・原 token と CST・失敗位置・raised failure・token trace の葉・capture / user state・資源失敗の復元を独立 corpus で両言語比較する。ParserWrapper / ParserHolder / MappedSingleCharacterParserHolder は既存の公開 API（既定形は `p.stop_consume().stop_invert()`）で写せることを、Java の実クラスと共通 fixture で確かめた。新しい式は memo / snapshot cache の対象にしない。[移植表と契約](conformance/terminated-repeat/README.md)。
 
 ### Fixed
 
@@ -94,6 +95,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Rust の低水準 Classic 入口（`parse_with_token_mode`）の `capture_owned` が、token 種別と空 span から生成を推定せず、子が返した token の由来を記録するよう修正した。入力由来の空 virtual token と token を返さない PEG 成功（それを選んだ `Choice` / 生成規則を含む）は、Java `NamedCapture` と同じ子の後の cursor 位置の入力になる。Java 実測の共通表 516 行を両言語で照合する（#1023 の C の owned 部分。virtual 規則越しの入力 capture 境界と生成 anchor の差は #1023 に残る）。
 - 名前付き parser の Usage001 サンプルで class 参照する型を公開し、Java/Rust 共通の prefix 回帰を通常テストへ追加する（#1009）。
 - Java `MatchedTokenParser` の空の slice/effect（偶数語の空 pivot、1文字語の空の前半）を入力位置の幅0一致に戻し（反転時は失敗、`WordParser("")` の不一致は維持）、context 全体に残って rollback 済み・前回の候補を使い続けていた候補 cache を撤去した。Usage003 Palindrome の5 recipe を既定 surefire と Rust の owned capture adapter から共通 fixture（再利用・外側失敗後の再試行・非BMP拒否を含む）で検証する（#1017）。
+- XML tag の Usage002_02/03/04 サンプルで class 参照する型を公開し、元 sample と Java/Rust 共通の 70 入力 fixture（02 の名前非比較・03/04 の既出名照合・owned replay 版）を通常テストへ追加する。03/04 の Rust adapter は Java MatchedTokenParser の候補順（transaction stack 順、空要素名を含む）を close のたびに現在の capture から組み直し、#1017 の修正後の Java と同じく古い候補一覧を再利用しない。完了した要素の token が現在の stack に残っていれば候補に含め、rollback された選択肢の token は含めない。前方一致する名前の入れ子 close も共通期待値で照合し、候補の取り直しは 15 入力の共通 fixture（retry と同じ instance の連続使用）で固定する（#1016）。
 - Java の Choice / PredictiveChoice は候補の開始時に適用される matched cursor の reset を先読み判定にも反映する。診断方針による受理差と nullable 候補の誤選択を修正し、Java/Rust の共通入力で検証した (#861)。
 - Rust native の名前述語を宣言・body lowering より先に検証し、対象の宣言不正と重なる共通61入力（rootあり/なし）で Java validator / Java-host と同じ名前述語コードを先頭に返すことを確認。一般の profile / schema 検証フェーズの差は #917 で継続する。capture / kind の検証を全規則で終えてから snapshot version の整合性を調べる (#858)。
 
@@ -183,6 +185,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Rust の正の先読みから成功時の診断到達位置を記録し、nested mixed grammar と後続 MatchOnly の診断を Java に揃える (#826)。Classic capture の失敗 frame と、先読みの後の native UNTIL の失敗した終端候補も記録し、成功時の到達位置より実際の失敗候補を優先する。成否・両 cursor・reset・memo hit は維持する。先読みのない通常呼出への拡張は次項の #872 / #876 を参照。
 - Rust の生成 Java 互換経路で、先読みが先行しない通常呼出の成功時診断 CP を Java に揃える (#872、#876)。UNTIL の失敗した終端試行を優先し、実失敗がなければ成功 frame の到達位置を返す。診断 OFF・走査ループ・native PEG 式入口の契約と成否・両 cursor・reset・memo hit は維持する。記録点は成功した transaction frame で、その外の Chain / literal の最終消費は次項の #878 で補う。
 - Rust の生成 Java 互換経路で、transaction frame の外の Chain / literal の最終消費を外部入口の成功時に記録し、AUTO / DETAILED の診断 CP を Java に揃える (#878)。入口ごとに診断設定の分岐1つが増えるが、ノードごとの走査・照合・transaction と Java runtime は変更しない。Classic・native PEG・DETAILED_ON_FAILURE の結果と成否・両 cursor・reset・memo hit は維持する。入口が戻る前の custom parser による途中診断は #881 の制限として分離する。
+- Rust Classic の `Expr::JavaUntil`（UBNF `UNTIL(...)`）の CST を Java の `WildCardStringTerminatorParser` に揃え、終端 `Choice(MatchOnly(word))` とその commit の2段を残す (#846)。受理・cursor・leaf は変わらないが、Classic token tree の段数を固定した利用側は期待値を見直す。
 
 - Java frontend の annotation 名の prefix 誤認、`@eval` の名前付き引数と `@commonField` の comma 後 trivia の解析を修正 (PR #540)。左再帰の診断順と `@eval` パラメータの表示順も決定的にした (PR #726)。
 - Java の token stream / lexical context 内の literal capture と、左結合の同じ parser class を使う literal の取得箇所を修正 (PR #672、#677)。[token stream](docs/token-stream.md)、[結合演算子](docs/associative-projection.md)。
