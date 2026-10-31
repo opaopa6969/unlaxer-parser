@@ -81,6 +81,11 @@ Java の `Parser.get(Class)` / `Parser.get(Supplier)` / `newInstance`、lazy chi
   付け足す前か後の list を最後まで見る。`createParser()` の中から自分の `getChildren()`・
   `getRoot()`・名前検索は呼べるが、自分の `getParser()` を呼ぶと従来どおり再帰する。
   `createParserAndThen` は作成後の一度ではなく、`getParser()` の呼び出しごとに走る（従来どおり）。
+  初回の `createParser()` は所有 parser の monitor 内で動く。別 parser の初期化を相互に呼ぶ場合は、
+  複数 thread で初回構築を始めると lock の循環が起こり得るため、共有前に単一 thread で構築を終える。
+  利用者の `createParserAndThen` も並行して呼ばれるため、共有 graph を変更せず thread ごとの状態を使う。
+  `Parsers.list()`・`subList()`・`listIterator()` など、接続前に取り出した view は以前の list を指し、
+  後から付いた子を反映しない。通常の graph の変更と view の併用は単一 thread の契約のままである。
 - 委譲先の部分木にある名前は、委譲先を作るまで検索に見えない。名前参照は miss を cache しないが、
   `ReferenceParser` は miss を cache するので、凍結して共有する graph は、構築を終えたあと共有する前に、
   委譲型の parser それぞれで `getParser()` を呼んで委譲先を作っておく（下の例）。`parse` を
