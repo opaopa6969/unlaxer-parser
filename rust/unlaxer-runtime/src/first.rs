@@ -13,12 +13,18 @@
 //! The sets are only used to skip candidates whose evaluation is certain to fail. Anything that
 //! is not modelled (custom parsers, backreferences, `Until` / `JavaUntil`, and lookaheads over
 //! such children) is `unknown` and therefore never skipped.
+//!
+//! [`FirstSets::of`] is the read-only counterpart of Java `FirstSets.of(Parser)` (#853): it runs
+//! the same fixed point into a snapshot owned by the caller. The parser never reads it, so a
+//! query cannot change a later parse, and nothing is computed unless it is called. Unlike the
+//! parser's table, a query is bounded in depth, nodes and rounds and answers `unknown` beyond.
+use std::fmt;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use crate::{Expr, Rule};
 
 /// Whether a sequence at the start of an expression may consume trivia first.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Trivia {
     /// No trivia can be consumed before the first code point.
     #[default]
@@ -29,8 +35,17 @@ pub(crate) enum Trivia {
     Always,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(crate) struct FirstSet {
+/// The code points a successful match can start with, plus whether it can succeed consuming
+/// nothing (Java `FirstSet`). A conservative over-approximation: the `may_start*` queries may
+/// answer `true` for a start the expression rejects, never `false` for one it could accept.
+///
+/// ASCII is exact; every other scalar shares one "may start with non-ASCII" flag. `unknown`
+/// marks a start the analysis does not model and answers `true` everywhere. Unlike Java, a
+/// sequence records that the runtime may skip trivia before its first element, see
+/// [`skips_trivia`](Self::skips_trivia). Values are plain copies, so changing one never reaches
+/// a parser.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct FirstSet {
     ascii: u128,
     non_ascii: bool,
     nullable: bool,
@@ -39,18 +54,21 @@ pub(crate) struct FirstSet {
 }
 
 impl FirstSet {
-    const EMPTY: Self = Self {
+    /// Matches nothing and cannot succeed on the empty input; the identity of [`union`](Self::union).
+    pub const EMPTY: Self = Self {
         ascii: 0,
         non_ascii: false,
         nullable: false,
         unknown: false,
         trivia: Trivia::None,
     };
-    const NULLABLE: Self = Self {
+    /// Succeeds consuming nothing, so it must be tried at every position.
+    pub const EPSILON: Self = Self {
         nullable: true,
         ..Self::EMPTY
     };
-    const UNKNOWN: Self = Self {
+    /// Never excludes anything. Used for every construct the analysis does not model.
+    pub const UNKNOWN: Self = Self {
         ascii: u128::MAX,
         non_ascii: true,
         nullable: true,
@@ -63,6 +81,95 @@ impl FirstSet {
         ..Self::EMPTY
     };
 
+    /// A set holding exactly `code_points`, none of them starting an empty match (Java
+    /// `FirstSet.ofCodePoints`). `char` excludes the negative and surrogate values Java accepts.
+    pub fn of_code_points(code_points: impl IntoIterator<Item = char>) -> Self {
+        let mut set = Self::EMPTY;
+        for c in code_points {
+            set.add_char(c);
+        }
+        set
+    }
+
+    /// The same set, additionally able to succeed without consuming anything.
+    #[must_use]
+    pub const fn as_nullable(self) -> Self {
+        Self {
+            nullable: true,
+            ..self
+        }
+    }
+
+    /// The same set, additionally able to start with any non-ASCII scalar.
+    #[must_use]
+    pub const fn with_non_ascii(self) -> Self {
+        Self {
+            non_ascii: true,
+            ..self
+        }
+    }
+
+    /// Both start sets, nullable if either is; [`UNKNOWN`](Self::UNKNOWN) if either is unknown.
+    #[must_use]
+    pub fn union(self, other: Self) -> Self {
+        if self.unknown || other.unknown {
+            return Self::UNKNOWN;
+        }
+        self.join(other)
+    }
+
+    /// Adds `other`'s start set but not its ability to match the empty input.
+    #[must_use]
+    pub fn union_starts(mut self, other: Self) -> Self {
+        if self.unknown || other.unknown {
+            return Self::UNKNOWN;
+        }
+        self.join_starts(other);
+        self
+    }
+
+    /// Whether the analysis could not model this start; such a set excludes nothing.
+    pub const fn is_unknown(self) -> bool {
+        self.unknown
+    }
+
+    /// Whether a match can succeed consuming nothing; such a set excludes nothing.
+    pub const fn is_nullable(self) -> bool {
+        self.nullable
+    }
+
+    /// Whether the runtime may skip trivia (whitespace, `//` and `/* */` comments) before the
+    /// first element when the parse's trivia policy is `whitespace`. Java has no implicit trivia.
+    pub const fn skips_trivia(self, whitespace: bool) -> bool {
+        match self.trivia {
+            Trivia::None => false,
+            Trivia::Dynamic => whitespace,
+            Trivia::Always => true,
+        }
+    }
+
+    /// Whether a match can start with `next` (Java `mayStartWith`); `None` is the end of input.
+    /// When [`skips_trivia`](Self::skips_trivia) holds, trivia whitespace and `/` (a possible
+    /// comment) are accepted as well. `whitespace` is the parse's trivia policy.
+    pub fn may_start_with(self, next: Option<char>, whitespace: bool) -> bool {
+        if self.unknown || self.nullable {
+            return true;
+        }
+        let Some(c) = next else {
+            return false;
+        };
+        if self.skips_trivia(whitespace)
+            && matches!(c, ' ' | '\t' | '\n' | '\r' | '\u{b}' | '\u{c}' | '/')
+        {
+            return true;
+        }
+        if c.is_ascii() {
+            self.ascii & (1 << (c as u32)) != 0
+        } else {
+            self.non_ascii
+        }
+    }
+
     fn of_char(c: char) -> Self {
         let mut set = Self::EMPTY;
         set.add_char(c);
@@ -70,11 +177,7 @@ impl FirstSet {
     }
 
     fn of_chars(chars: &str) -> Self {
-        let mut set = Self::EMPTY;
-        for c in chars.chars() {
-            set.add_char(c);
-        }
-        set
+        Self::of_code_points(chars.chars())
     }
 
     fn add_char(&mut self, c: char) {
@@ -86,21 +189,22 @@ impl FirstSet {
     }
 
     /// Union of the start sets; `nullable` is left to the caller.
-    fn union_starts(&mut self, other: Self) {
+    fn join_starts(&mut self, other: Self) {
         self.ascii |= other.ascii;
         self.non_ascii |= other.non_ascii;
         self.unknown |= other.unknown;
         self.trivia = self.trivia.max(other.trivia);
     }
 
-    fn union(mut self, other: Self) -> Self {
-        self.union_starts(other);
+    fn join(mut self, other: Self) -> Self {
+        self.join_starts(other);
         self.nullable |= other.nullable;
         self
     }
 
-    /// Whether a match may start at `rest`. `false` proves that the expression fails there.
-    pub(crate) fn may_start(self, rest: &str, whitespace: bool) -> bool {
+    /// Whether a match may start at `rest`, the input from the candidate position; this is the
+    /// check the parser itself runs. `false` proves that the expression fails there.
+    pub fn may_start(self, rest: &str, whitespace: bool) -> bool {
         if self.unknown || self.nullable {
             return true;
         }
@@ -128,6 +232,225 @@ impl FirstSet {
     }
 }
 
+/// Java `FirstSet.toString`: `FirstSet[unknown]`, or `FirstSet[` + `nullable ` + the ASCII
+/// starts (printable as is, others as `\uXXXX`) + `+nonAscii` + `]`. Trivia is not shown.
+impl fmt::Display for FirstSet {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.unknown {
+            return formatter.write_str("FirstSet[unknown]");
+        }
+        formatter.write_str("FirstSet[")?;
+        if self.nullable {
+            formatter.write_str("nullable ")?;
+        }
+        for code_point in 0..128u8 {
+            if self.ascii & (1 << code_point) != 0 {
+                if (33..127).contains(&code_point) {
+                    write!(formatter, "{}", char::from(code_point))?;
+                } else {
+                    write!(formatter, "\\u{code_point:04x}")?;
+                }
+            }
+        }
+        if self.non_ascii {
+            formatter.write_str("+nonAscii")?;
+        }
+        formatter.write_str("]")
+    }
+}
+
+/// FIRST sets of every rule of a grammar, computed by the same fixed point the parser uses for
+/// candidate exclusion (Java `FirstSets.of(Parser)` for each rule). An owned snapshot: building
+/// it never runs a custom parser or predicate, and the parser neither reads nor caches it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FirstSets {
+    rules: Box<[FirstSet]>,
+}
+
+impl FirstSets {
+    /// Analyses `grammar` once. A `Rule(id)` reference outside `grammar` is
+    /// [`FirstSet::UNKNOWN`], as in the parser.
+    ///
+    /// The query is bounded like Java `FirstSets`: a grammar whose expressions nest deeper than
+    /// the parser's 1,024 active expression frames, that has more than 100,000 expression
+    /// nodes, or whose fixed point takes more than 1,000 rounds, gets
+    /// [`FirstSet::UNKNOWN`] for every rule (still one per rule) instead of exhausting the stack
+    /// or running unbounded.
+    pub fn of(grammar: &[Rule]) -> Self {
+        let rules = within_query_budget(grammar.iter().map(|rule| &rule.expression))
+            .then(|| bounded_compute(grammar))
+            .flatten()
+            .unwrap_or_else(|| vec![FirstSet::UNKNOWN; grammar.len()]);
+        Self {
+            rules: rules.into_boxed_slice(),
+        }
+    }
+
+    /// The set of rule `id`, or `None` when `grammar` has no such rule.
+    pub fn rule(&self, id: usize) -> Option<FirstSet> {
+        self.rules.get(id).copied()
+    }
+
+    /// The set of an inline expression whose `Rule(id)` references this grammar;
+    /// [`FirstSet::UNKNOWN`] when `expression` exceeds the depth or node bound of [`of`](Self::of).
+    pub fn expression(&self, expression: &Expr) -> FirstSet {
+        if within_query_budget([expression]) {
+            of(expression, &self.rules)
+        } else {
+            FirstSet::UNKNOWN
+        }
+    }
+
+    /// Every rule's set, indexed by rule id.
+    pub fn rules(&self) -> &[FirstSet] {
+        &self.rules
+    }
+}
+
+/// Nested `of` frames a public query may run: the parser's own budget of active expression
+/// frames ("expression nesting below 1024" in `ParseContext::expression`), so every expression
+/// the parser can evaluate down to its deepest element is analysed exactly.
+const MAX_QUERY_DEPTH: usize = 1024;
+/// Expression nodes a public query may analyse (Java `FirstSets.MAX_NODES`).
+const MAX_QUERY_NODES: usize = 100_000;
+/// Fixed-point rounds a public query may run (Java `FirstSets.MAX_ROUNDS`). The lattice is
+/// finite, but a rule chain that refers forward only moves one rule per round.
+const MAX_QUERY_ROUNDS: usize = 1_000;
+
+/// Whether `of` over `expressions` stays within the query depth and node bounds. Walks with an
+/// explicit stack, so measuring an arbitrarily deep or wide graph cannot exhaust the thread
+/// stack. Visits exactly the children `of` may recurse into (more when a sequence stops early).
+fn within_query_budget<'a>(expressions: impl IntoIterator<Item = &'a Expr>) -> bool {
+    let mut pending: Vec<(&Expr, usize)> = Vec::new();
+    let mut nodes = 0;
+    let mut push = |pending: &mut Vec<(&'a Expr, usize)>, expression: &'a Expr, depth: usize| {
+        nodes += 1;
+        pending.push((expression, depth));
+        depth <= MAX_QUERY_DEPTH && nodes <= MAX_QUERY_NODES
+    };
+    for expression in expressions {
+        if !push(&mut pending, expression, 1) {
+            return false;
+        }
+        while let Some((expression, depth)) = pending.pop() {
+            let children: &[Expr] = match expression {
+                Expr::Sequence(children)
+                | Expr::Choice(children)
+                | Expr::LongestChoice(children)
+                | Expr::UniqueLongestChoice(children)
+                | Expr::PredictiveChoice {
+                    alternatives: children,
+                    ..
+                } => children,
+                Expr::JavaTerminatedRepeat {
+                    child, terminator, ..
+                } => {
+                    if !push(&mut pending, terminator, depth + 1) {
+                        return false;
+                    }
+                    std::slice::from_ref(&**child)
+                }
+                Expr::OwnedCapture(_, child)
+                | Expr::CaptureScope(child)
+                | Expr::Capture(_, child)
+                | Expr::MetadataCapture(_, child)
+                | Expr::TextValue(child)
+                | Expr::CaptureBoundary(_, child)
+                | Expr::InputCaptureBoundary(_, child)
+                | Expr::ValueBoundary(child)
+                | Expr::RuleEffects { child, .. }
+                | Expr::CaptureEquality { child, .. }
+                | Expr::TriviaScope {
+                    child,
+                    line_comments: false,
+                    ..
+                }
+                | Expr::Optional(child)
+                | Expr::JavaOptional(child)
+                | Expr::Repeat { child, .. }
+                | Expr::JavaRepeat { child, .. }
+                | Expr::Lookahead { child, .. } => std::slice::from_ref(&**child),
+                // `of` answers these without looking at any child. Listed without a wildcard so
+                // that a new variant must decide whether `of` recurses into it.
+                Expr::Lexical(..)
+                | Expr::Literal(_)
+                | Expr::JavaLiteral(_)
+                | Expr::CaseInsensitive(_)
+                | Expr::Number
+                | Expr::Identifier
+                | Expr::Grapheme
+                | Expr::CodeStart
+                | Expr::CodeEnd
+                | Expr::LongCodeBlock
+                | Expr::Quoted(_)
+                | Expr::Rule(_)
+                | Expr::NonOrdered(_)
+                | Expr::Replay(_)
+                | Expr::MatchOnly(_)
+                | Expr::InvertMatch(_)
+                | Expr::StopInvert(_)
+                | Expr::StopConsume(_)
+                | Expr::NamePredicate { .. }
+                | Expr::NameResolutionScope { .. }
+                | Expr::SemanticPredicate { .. }
+                | Expr::SemanticPredicateScope { .. }
+                | Expr::LexicalTriviaScope { .. }
+                | Expr::LexicalContextScope { .. }
+                | Expr::TriviaScope {
+                    line_comments: true,
+                    ..
+                }
+                | Expr::ZeroMatch(_)
+                | Expr::Any
+                | Expr::Eof
+                | Expr::Empty
+                | Expr::CharRange(..)
+                | Expr::Character { .. }
+                | Expr::Except(_)
+                | Expr::Until(_)
+                | Expr::JavaLookahead { .. }
+                | Expr::JavaEmpty
+                | Expr::JavaEmptyWord
+                | Expr::JavaEmptyLiteral
+                | Expr::JavaUntil(_)
+                | Expr::Error(_)
+                | Expr::Recovery { .. }
+                | Expr::Commit { .. }
+                | Expr::Label { .. }
+                | Expr::CatchLabels { .. }
+                | Expr::Custom(_)
+                | Expr::CustomWith { .. }
+                | Expr::Backreference(_) => &[],
+            };
+            for child in children {
+                if !push(&mut pending, child, depth + 1) {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+/// [`compute`] with Java's round bound; `None` when the fixed point is not reached in time.
+fn bounded_compute(rules: &[Rule]) -> Option<Vec<FirstSet>> {
+    let mut table = vec![FirstSet::EMPTY; rules.len()];
+    for _ in 0..=MAX_QUERY_ROUNDS {
+        let mut changed = false;
+        for (id, rule) in rules.iter().enumerate() {
+            let set = of(&rule.expression, &table).join(table[id]);
+            if set != table[id] {
+                table[id] = set;
+                changed = true;
+            }
+        }
+        if !changed {
+            return Some(table);
+        }
+    }
+    None
+}
+
 /// The FIRST set of an expression; `Rule(id)` is looked up in `rules` (the fixed-point table).
 pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
     match expression {
@@ -147,7 +470,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             ..
         } if *max == 0 || *max < *min => {
             if *min == 0 && *max == 0 {
-                FirstSet::NULLABLE
+                FirstSet::EPSILON
             } else {
                 FirstSet::EMPTY
             }
@@ -155,7 +478,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         Expr::Literal(text) | Expr::JavaLiteral(text) => text
             .chars()
             .next()
-            .map_or(FirstSet::NULLABLE, FirstSet::of_char),
+            .map_or(FirstSet::EPSILON, FirstSet::of_char),
         // Case-equivalent starting scalars may be outside the forward upper/lower pair.
         Expr::CaseInsensitive(text) => {
             if text.is_empty() {
@@ -184,7 +507,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
                 if element.unknown {
                     return FirstSet::UNKNOWN;
                 }
-                set.union_starts(element);
+                set.join_starts(element);
                 if !element.nullable {
                     set.nullable = false;
                     break;
@@ -197,12 +520,12 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::UniqueLongestChoice(alternatives) => alternatives
             .iter()
             .fold(FirstSet::EMPTY, |set, alternative| {
-                set.union(of(alternative, rules))
+                set.join(of(alternative, rules))
             }),
         Expr::PredictiveChoice { alternatives, .. } => alternatives
             .iter()
             .fold(FirstSet::EMPTY, |set, alternative| {
-                set.union(of(alternative, rules))
+                set.join(of(alternative, rules))
             }),
         Expr::OwnedCapture(_, child)
         | Expr::CaptureScope(child)
@@ -247,7 +570,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             min,
             ..
         } => {
-            let mut set = of(child, rules).union(of(terminator, rules));
+            let mut set = of(child, rules).join(of(terminator, rules));
             set.nullable |= *min == 0;
             set
         }
@@ -256,7 +579,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             if of(child, rules).unknown {
                 FirstSet::UNKNOWN
             } else {
-                FirstSet::NULLABLE
+                FirstSet::EPSILON
             }
         }
         Expr::Grapheme | Expr::Any => FirstSet::ANY,
@@ -281,7 +604,7 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::Empty
         | Expr::JavaEmpty
         | Expr::JavaEmptyLiteral
-        | Expr::JavaLookahead { .. } => FirstSet::NULLABLE,
+        | Expr::JavaLookahead { .. } => FirstSet::EPSILON,
         Expr::Error(_) | Expr::JavaEmptyWord => FirstSet::EMPTY,
         Expr::Character { .. }
         | Expr::MatchOnly(_)
@@ -316,7 +639,7 @@ pub(crate) fn compute(rules: &[Rule]) -> Vec<FirstSet> {
     loop {
         let mut changed = false;
         for (id, rule) in rules.iter().enumerate() {
-            let set = of(&rule.expression, &table).union(table[id]);
+            let set = of(&rule.expression, &table).join(table[id]);
             if set != table[id] {
                 table[id] = set;
                 changed = true;
@@ -440,6 +763,47 @@ mod tests {
         let table = compute(&rules);
         assert!(table[0].nullable);
         assert_eq!(table[0].ascii, (1 << b'x') | (1 << b','));
+    }
+
+    #[test]
+    fn the_bounded_query_reaches_the_parser_fixed_point() {
+        let grammars = [
+            vec![
+                rule(
+                    "declaration",
+                    Expr::sequence([Expr::Rule(1).zero_or_more(), Expr::Identifier]),
+                ),
+                rule(
+                    "annotation",
+                    Expr::sequence([Expr::literal("@"), Expr::Rule(2)]),
+                ),
+                rule("name", Expr::Identifier),
+            ],
+            vec![rule(
+                "list",
+                Expr::choice([
+                    Expr::sequence([Expr::Rule(0), Expr::literal(",")]),
+                    Expr::literal("x").optional(),
+                ]),
+            )],
+            vec![rule("dangling", Expr::Rule(3))],
+            vec![],
+        ];
+        for rules in grammars {
+            assert_eq!(bounded_compute(&rules), Some(compute(&rules)));
+        }
+        // Rule i refers to rule i + 1: n rules take n + 1 rounds, the last one unchanged.
+        let chain = |count: usize| -> Vec<Rule> {
+            (0..count)
+                .map(|id| match id + 1 {
+                    next if next < count => rule("chain", Expr::Rule(next)),
+                    _ => rule("chain", Expr::literal("a")),
+                })
+                .collect()
+        };
+        let longest = chain(MAX_QUERY_ROUNDS);
+        assert_eq!(bounded_compute(&longest), Some(compute(&longest)));
+        assert_eq!(bounded_compute(&chain(MAX_QUERY_ROUNDS + 1)), None);
     }
 
     #[test]

@@ -2294,6 +2294,24 @@
       ]
     },
     {
+      "id": "first-set-query",
+      "category": "contract",
+      "title": "公開FIRST照会（FirstSets.of / FirstSets::of）の精度差",
+      "hosts": "Java FirstSets・FirstSet / Rust runtime FirstSets・FirstSet（公開照会）",
+      "issues": [
+        853,
+        716
+      ],
+      "observation": "Java FirstSets.of(Parser) と Rust FirstSets::of(&grammar).rule(id)/expression(&expr) は同じ保守的契約（may_start が false なら成功しない、unknown/nullable は全位置で true、ASCII は正確・非 ASCII は1 flag、unknown を含む union は UNKNOWN、照会は parse/callback を実行しない）を共有し、first-sets corpus の Java実測 toString・flag・全ASCII/入力末尾/非BMPを含む非ASCIIの may_start で照合する。各行の Java parser と Rust 式は生成器の対応か同じ意味の公開 API の組で、accepts.tsv の21 id について両版が root parse の受理・消費 code point 数を8入力で実測照合する（EOF assertion の EndOfSourceParser↔Eof と残りを消費する ZeroOrMore(WildCard)↔Any.repeat_java を分け、Classic Not↔JavaLookahead{positive:false}、PegLookahead↔not_ahead、WordParser(\"\")↔JavaEmptyWord、生成形の文字範囲 SingleCharacterParser↔CharRange、UnicodeIgnoreCaseWordParser↔CaseInsensitive）。意図した差は同じ primitive の精度だけで、両方とも健全（may_start が false の位置でその primitive は成功しない）: Java は EOF assertion（zero-match check）の body 集合を nullable の下に残し後続へ流す（Rust Eof は EPSILON）、Java WordParser(\"\") は EPSILON（Rust JavaEmptyWord は EMPTY、どちらも常に失敗）、Java SingleCharacterParser は isMatch を ASCII で読み非ASCIIを常に可能とし（Rust CharRange は上限で判定、Rust Character の predicate は呼ばず unknown）、Java Not・PegLookahead・UnicodeIgnoreCaseWordParser・子のない Chain/Choice は unknown（Rust は否定先読み2種が EPSILON、CaseInsensitive は非nullableの全 code point、空 Sequence は EPSILON、空 Choice は EMPTY）。幅0成功の空 literal（Java Lexing.LiteralParser(\"\")）は unlaxer-dsl にあり共通行はない。Rust の Eq/Hash は trivia も比べる。Rust の sequence は trivia 方針を skips_trivia で別に報告し、共通照合は Java と同じ trivia なし。照会の資源上限は超えた側を UNKNOWN にする: Java は 100,000 parser 超と 1,000 round 超、Rust は入れ子の深さ 1,024（parser の expression nesting 上限）超・式 node 100,000 超・1,000 round 超で全 rule を UNKNOWN（rule 数と None の境界は不変、Java は深さ上限なし）。数え方が違うので境界の位置は一致しない。Serializable は Rust になく Copy 値。",
+      "evidence": [
+        "conformance/first-sets/README.md",
+        "conformance/first-sets/cases.tsv",
+        "conformance/first-sets/accepts.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/FirstSetParityTest.java",
+        "rust/unlaxer-runtime/tests/first_sets.rs"
+      ]
+    },
+    {
       "id": "line-boundary-classic-adapters",
       "category": "contract",
       "title": "Classic行境界と語彙BOL/BOF/EOLの移植境界",
@@ -3313,6 +3331,16 @@
       },
       "entries": [
         "plain-success-diagnostics"
+      ]
+    },
+    {
+      "path": "conformance/first-sets/cases.tsv",
+      "fields": {
+        "host=java": 10,
+        "host=rust": 10
+      },
+      "entries": [
+        "first-set-query"
       ]
     },
     {

@@ -1,0 +1,50 @@
+# 公開 FIRST 照会の共通 oracle (#853)。README.md 参照。値は Java FirstSets.of / FirstSet の実測。
+# id	host	ascii	non_ascii	nullable	unknown	trivia	display	note
+literal	both	61	no	no	no	none	FirstSet[a]	先頭 code point だけを持つ
+empty-word	java	none	no	yes	no	-	FirstSet[nullable ]	Java WordParser("") は常に失敗する（非 match・反転でも失敗）が、FirstSets は空の語を EPSILON とみなす。成功しない parser への過大近似なので健全
+empty-word	rust	none	no	no	no	none	FirstSet[]	Rust Expr::JavaEmptyWord（UBNF の通常文法の空 literal）は常に失敗する EMPTY。PEG の Expr::literal("") の成功とは別 primitive で、ここでは比べない
+non-bmp-literal	both	none	yes	no	no	none	FirstSet[+nonAscii]	U+1F600 から始まる語。Java は先頭 code point、Rust は先頭 char で判定する
+choice	both	61-62	no	no	no	none	FirstSet[ab]	選択肢の和
+sequence	both	61-62	no	no	no	policy	FirstSet[ab]	nullable な先頭の後ろまで和をとる
+sequence-nullable	both	61-62	no	yes	no	policy	FirstSet[nullable ab]	全要素が nullable でも開始集合は残る（Java case 37）
+optional	both	61	no	yes	no	none	FirstSet[nullable a]	本体の開始集合を残して nullable
+zero-or-more	both	61	no	yes	no	none	FirstSet[nullable a]	min=0 の反復は nullable
+one-or-more	both	61	no	no	no	none	FirstSet[a]	min=1 の反復は本体と同じ
+repeat-zero	both	none	no	yes	no	none	FirstSet[nullable ]	max=0 は body を見ない EPSILON
+repeat-invalid	both	none	no	no	no	none	FirstSet[]	max<min は必ず失敗する EMPTY
+eof	java	all	yes	yes	no	-	FirstSet[nullable \u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u0009\u000a\u000b\u000c\u000d\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f\u0020!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u007f+nonAscii]	Java EndOfSourceParser は zero-match check（LazyZero、{0,0}）で、WildCard が一致しないとき＝入力末尾でだけ消費 0 で成功する EOF assertion。FirstSets は body の開始集合を nullable の下に残す
+eof	rust	none	no	yes	no	none	FirstSet[nullable ]	Rust Expr::Eof は Java EndOfSourceParser と同じ EOF assertion（生成器の対応も同じ）。開始集合を持たない EPSILON。nullable なので may_start は Java と全位置で同じ
+eof-then-literal	java	all	yes	no	no	-	FirstSet[\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u0009\u000a\u000b\u000c\u000d\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f\u0020!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u007f+nonAscii]	Java は EOF assertion の body 集合を後続へ流すので全 code point。Rust より保守的
+eof-then-literal	rust	61	no	no	no	policy	FirstSet[a]	Rust は EOF が開始集合を持たない。EOF の後の a はどちらの言語でも成功しないので、除外しても健全
+zero-or-more-any	both	all	yes	yes	no	none	FirstSet[nullable \u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u0009\u000a\u000b\u000c\u000d\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f\u0020!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u007f+nonAscii]	残りをすべて消費する反復（Java ZeroOrMore(WildCardCharacterParser) / Rust Expr::Any.repeat_java(0, None)）。EOF assertion とは別 primitive
+custom	both	all	yes	yes	yes	always	FirstSet[unknown]	独自 parser は解析しない。照会で parse/callback を呼ばない
+literal-then-custom	both	61	no	no	no	policy	FirstSet[a]	消費する先頭の後ろの unknown は開始集合を広げない
+custom-then-literal	both	all	yes	yes	yes	always	FirstSet[unknown]	消費する前の unknown は全体を unknown にする
+choice-with-custom	both	all	yes	yes	yes	always	FirstSet[unknown]	unknown の選択肢があれば全体が unknown
+recursive-left	both	2c,78	no	yes	no	policy	FirstSet[nullable ,x]	list = list "," | "x"? の左再帰。最小不動点
+recursive-mutual	both	61,78-79	no	no	no	policy	FirstSet[axy]	a = b "a" | "x"; b = a "b" | "y"? の相互再帰。root は a
+char-range	java	61-63	yes	no	no	-	FirstSet[abc+nonAscii]	Java の UBNF 文字範囲は生成 class（SingleCharacterParser の isMatch(char) が範囲判定）。FirstSets は ASCII だけ isMatch で読み、非 ASCII は常に可能とする
+char-range	rust	61-63	no	no	no	none	FirstSet[abc]	Rust CharRange は上限が ASCII なら非 ASCII を持たない（Rust の方が精密）
+character-predicate	java	61	yes	no	no	-	FirstSet[a+nonAscii]	Java は SingleCharacterParser.isMatch を純粋述語として ASCII 範囲で呼ぶ
+character-predicate	rust	all	yes	yes	yes	always	FirstSet[unknown]	Rust Expr::Character の predicate は外部状態を読み得るので呼ばず unknown にする
+not-lookahead	java	all	yes	yes	yes	-	FirstSet[unknown]	Java Classic Not(WordParser) は解析しない（OPAQUE）。UBNF の否定先読みの生成形
+not-lookahead	rust	none	no	yes	no	none	FirstSet[nullable ]	Rust Expr::JavaLookahead { positive: false }（Java Not(WordParser) の生成対応）は消費しない EPSILON
+peg-not-lookahead	java	all	yes	yes	yes	-	FirstSet[unknown]	Java PegLookahead(WordParser, false) は解析しない（OPAQUE）
+peg-not-lookahead	rust	none	no	yes	no	none	FirstSet[nullable ]	Rust PEG の否定先読み（not_ahead）は子が unknown でなければ消費しない EPSILON
+case-insensitive	java	all	yes	yes	yes	-	FirstSet[unknown]	Java UnicodeIgnoreCaseWordParser（UBNF の ignoreCase 語の生成形）は逆写像の同値文字を数えないため unknown
+case-insensitive	rust	all	yes	no	no	none	FirstSet[\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008\u0009\u000a\u000b\u000c\u000d\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f\u0020!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u007f+nonAscii]	Rust CaseInsensitive は任意の先頭 scalar だが空でない語は必ず消費するので EOF では試さない
+empty-chain	java	all	yes	yes	yes	-	FirstSet[unknown]	Java は子を持たない Chain を解析しない
+empty-chain	rust	none	no	yes	no	policy	FirstSet[nullable ]	Rust の空 Sequence は何も消費せず成功する
+empty-choice	java	all	yes	yes	yes	-	FirstSet[unknown]	Java は子を持たない Choice を解析しない
+empty-choice	rust	none	no	no	no	none	FirstSet[]	Rust の空 Choice は必ず失敗する
+of-code-points	both	5a,61	yes	no	no	none	FirstSet[Za+nonAscii]	ofCodePoints(a, Z, U+1F600)
+control	both	00,20,7e-7f	no	no	no	none	FirstSet[\u0000\u0020~\u007f]	印字不能と空白は \uXXXX で表示
+union	both	61	no	yes	no	none	FirstSet[nullable a]	{a} union EPSILON
+union-starts-into-nullable	both	62	no	yes	no	none	FirstSet[nullable b]	EPSILON unionStarts {b}
+union-starts-drops-nullable	both	61	no	no	no	none	FirstSet[a]	{a} unionStarts EPSILON
+unknown-union	both	all	yes	yes	yes	always	FirstSet[unknown]	{a} union UNKNOWN
+unknown-union-starts	both	all	yes	yes	yes	always	FirstSet[unknown]	{a} unionStarts UNKNOWN
+nullable-non-ascii	both	61	yes	yes	no	none	FirstSet[nullable a+nonAscii]	{a} asNullable withNonAscii
+empty	both	none	no	no	no	none	FirstSet[]	EMPTY
+epsilon	both	none	no	yes	no	none	FirstSet[nullable ]	EPSILON
+unknown	both	all	yes	yes	yes	always	FirstSet[unknown]	UNKNOWN
