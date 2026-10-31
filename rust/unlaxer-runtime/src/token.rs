@@ -1250,7 +1250,7 @@ impl ParseContext<'_> {
         );
         Some(())
     }
-    fn token_kind_at(&self, index: usize) -> TokenKind {
+    pub(crate) fn token_kind_at(&self, index: usize) -> TokenKind {
         self.tokens
             .values
             .get(&index)
