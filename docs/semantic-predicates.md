@@ -99,6 +99,7 @@ sticky 失敗の後でも、同じ context に別の registry を `install` す�
 
 ## 制限と残り
 
+- 既存の profile / schema / `@typeof` などの不正を重ねた場合の一般的な先頭診断の順序は [#917](https://github.com/opaopa6969/unlaxer-parser/issues/917) で継続する。ここで検証した24拒否ケースを、全検証フェーズの一致の根拠にはしない。`@predicate` のない名前述語文法に対する native authoring 検証の不足は [#893](https://github.com/opaopa6969/unlaxer-parser/issues/893) の範囲である。
 - 性能は #197 の凍結に従い未測定。述語を使わない grammar の生成物は変わらず、通常経路に field/分岐を足していないが、速度の合格は主張しない。Rust の述語 entry は解析と診断 retry のたびに registry（名前の表）を複製し、root への再帰参照のたびに scope に入り直す。観測結果は Java と一致し、述語を使う grammar だけの費用である（改善は凍結解除後）。
 - Rust の editor 補完候補（`editor_cst::literal_completions`）は `SemanticPredicate` / `SemanticPredicateScope` の子を走査する。`@namePredicate` の式は従来どおり走査しない（既存の簡易走査の範囲）。
 - Rust の低水準 `ParseContext::new` など registry を install していない context では、scope は sticky 失敗を残さずに本体を解析せず失敗する（`semantic_predicate_failure()` は `None`）。Java の低水準 `SemanticPredicateBindings.failure(context)` は `predicate_missing` を返す。生成 API と full-input API は両言語とも `predicate_missing` で一致する。

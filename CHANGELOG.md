@@ -89,7 +89,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
-- Rust native の名前述語を宣言・body lowering より先に検証し、複数の不正を含む文法でも Java validator / Java-host と同じ名前述語コードを先頭に返す。capture / kind の検証を全規則で終えてから snapshot version の整合性を調べる (#858)。
+- Rust native の名前述語を宣言・body lowering より先に検証し、対象の宣言不正と重なる共通61入力（rootあり/なし）で Java validator / Java-host と同じ名前述語コードを先頭に返すことを確認。一般の profile / schema 検証フェーズの差は #917 で継続する。capture / kind の検証を全規則で終えてから snapshot version の整合性を調べる (#858)。
 
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
 - Java / Rust の local import を通常ファイル・64 MiB以下に制限し、stat後の増大も上限＋1バイトで打ち切る。デバイス・FIFO・socket・directory・過大ファイルは同じ `E-MODULE` で拒否し、両 authoring stdio server の後続応答と CLI を共通fixtureで検証 (#890)。
