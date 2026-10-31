@@ -14,7 +14,7 @@ fn rows(name: &str) -> Vec<Value> {
 #[test]
 fn invalid_grammars_are_refused_with_the_java_code_before_generation() {
     let invalid = rows("invalid.json");
-    assert_eq!(16, invalid.len(), "all invalid grammars execute");
+    assert_eq!(19, invalid.len(), "all invalid grammars execute");
     for row in invalid {
         let name = row["name"].as_str().unwrap();
         for separator in ["\n", "\r\n"] {

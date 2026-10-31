@@ -147,10 +147,10 @@ pub fn collect(grammar: &GrammarDecl) -> Vec<Issue> {
             "Select non-nullable declarative tokens and nonempty unique literals.",
         );
     }
-    // Java reports a name-predicate problem before the @predicate refusal. Only lowering
-    // checks name predicates natively, so consult it for a grammar with both annotations.
+    // Java reports a name-predicate problem before the @predicate refusal. Share source
+    // preflight with lowering so unrelated body errors cannot hide it (#858, #1006).
     if crate::semantic_predicates::waits_for_name_predicates(grammar) {
-        if let Err(message) = crate::lowering::lower(grammar) {
+        if let Err(message) = crate::lowering::validate_name_predicates(grammar) {
             if message.starts_with("E-NAME-PREDICATE-") {
                 let code = message.split(':').next().unwrap().to_owned();
                 add(

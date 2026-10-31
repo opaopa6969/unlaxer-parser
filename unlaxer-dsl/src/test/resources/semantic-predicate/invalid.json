@@ -94,5 +94,23 @@
     "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token GT ::= '>';\n  token END = EOF\n  @root @mapping(Value, params=[value])\n  @lexicalContext(tokens=['MISSING'])\n  Root ::= Item @value END;\n  @predicate('p') @mapping(ItemValue, params=[gt])\n  Item ::= GT @gt;\n}\n",
     "code": "E-LEXICAL-CONTEXT-TOKEN",
     "nativeMessage": "E-LEXICAL-CONTEXT-TOKEN: MISSING"
+  },
+  {
+    "name": "invalid-name-predicate-before-undefined-reference",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @whitespace: javaStyle\n  token ID ::= CHAR_RANGE('A','Z')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Declaration @value | Item @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='missingCapture', kind='type')\n  @mapping(Declaration, params=[name])\n  Declaration ::= Missing @name ';';\n  @predicate('p') @mapping(ItemValue, params=[name])\n  Item ::= ID @name;\n}\n",
+    "code": "E-NAME-PREDICATE-CAPTURE",
+    "nativeMessage": "E-NAME-PREDICATE-CAPTURE: Declaration"
+  },
+  {
+    "name": "predicate-combination-before-undefined-reference",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  @whitespace: javaStyle\n  token ID ::= CHAR_RANGE('A','Z')+;\n  @root @mapping(Result, params=[value])\n  Start ::= Declaration @value | Item @value;\n  @namePredicate(snapshot='cxx23', version='v1', name='name', kind='type')\n  @mapping(Declaration, params=[name])\n  Declaration ::= ID @name ';';\n  @predicate('p') @mapping(ItemValue, params=[name])\n  Item ::= ID @name;\n  Unused ::= Missing;\n}\n",
+    "code": "E-PREDICATE-COMBINATION",
+    "nativeMessage": "E-PREDICATE-COMBINATION: @namePredicate"
+  },
+  {
+    "name": "invalid-lexical-context-before-invalid-name-and-predicate",
+    "grammar": "grammar Bad {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token GT ::= '>';\n  token END = EOF\n  @root @mapping(Value, params=[value])\n  @lexicalContext(tokens=['MISSING'])\n  @namePredicate(snapshot='scope', version='v1', name='missing', kind='type')\n  Root ::= Item @value END;\n  @predicate('p') @mapping(ItemValue, params=[gt])\n  Item ::= GT @gt;\n}\n",
+    "code": "E-LEXICAL-CONTEXT-TOKEN",
+    "nativeMessage": "E-LEXICAL-CONTEXT-TOKEN: MISSING"
   }
 ]

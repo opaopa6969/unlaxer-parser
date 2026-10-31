@@ -208,7 +208,7 @@ public class SemanticPredicateConformanceTest {
             assertTrue(name + ": " + nativeResult.output(), nativeResult.output().contains(row.get("nativeMessage").getAsString()));
             report.add("invalid\t" + name + "\t\t" + row.get("code") + "\t" + nativeResult.output().strip().replace('\n', ' '));
         }
-        assertEquals("invalid grammars", 16, invalid.size());
+        assertEquals("invalid grammars", 19, invalid.size());
 
         Path target = Path.of("target");
         Files.createDirectories(target);

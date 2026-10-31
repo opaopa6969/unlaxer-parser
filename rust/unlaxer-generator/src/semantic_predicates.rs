@@ -20,8 +20,8 @@ fn name_predicates(grammar: &GrammarDecl) -> bool {
     })
 }
 
-/// Java validates name predicates first. Native lowering checks them on lowered bodies,
-/// so it validates `@predicate` there when a grammar has both annotations.
+/// Java validates name predicates first. When both annotations occur, defer the semantic
+/// refusal until native lowering has checked name predicates against the source syntax.
 pub fn waits_for_name_predicates(grammar: &GrammarDecl) -> bool {
     enabled(grammar) && name_predicates(grammar)
 }
