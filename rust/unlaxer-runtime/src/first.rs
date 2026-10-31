@@ -140,6 +140,11 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
             min,
             max: Some(max),
             ..
+        }
+        | Expr::JavaTerminatedRepeat {
+            min,
+            max: Some(max),
+            ..
         } if *max == 0 || *max < *min => {
             if *min == 0 && *max == 0 {
                 FirstSet::NULLABLE
@@ -232,6 +237,17 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         },
         Expr::Repeat { child, min, .. } | Expr::JavaRepeat { child, min, .. } => {
             let mut set = of(child, rules);
+            set.nullable |= *min == 0;
+            set
+        }
+        // Java FirstSets: the body, then the terminator, which may also end the repetition.
+        Expr::JavaTerminatedRepeat {
+            child,
+            terminator,
+            min,
+            ..
+        } => {
+            let mut set = of(child, rules).union(of(terminator, rules));
             set.nullable |= *min == 0;
             set
         }
