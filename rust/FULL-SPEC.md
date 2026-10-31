@@ -228,7 +228,7 @@ requestの元id付きparse error / 通知破棄へ揃える。Javaのid読取り
 決定的応答を維持する。全6キー順・重複・失敗後の設定/文書保持と再試行を両実stdioで確認する。
 #901のJava3機能を維持し、全DTO parityの完了とは扱わない。
 Integer外・非scalarのidはJava無応答・nativeは同じ値を返す恒久差。position受理域と他methodのDTOは #1005 で次の範囲を追加した。
-#1005: 同じ必須 jsonrpc suite を885件へ拡張。version/position の Gson Integer 変換を共有し、
+#1005: 同じ必須 jsonrpc suite を916件へ拡張。version/position の Gson Integer 変換を共有し、
 負の character は hover/completion の Internal error と navigation の0丸めを区別する。
 11標準 authoring request の入れ子 DTO と packageSource uri、38標準 request の workDoneToken 数値を
 Java の id 付き -32700 に揃え、失敗前の設定・文書を保持する。ClientCapabilities と11 request は

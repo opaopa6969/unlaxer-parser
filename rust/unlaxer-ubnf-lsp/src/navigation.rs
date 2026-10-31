@@ -66,7 +66,7 @@ pub fn rename(
     uri: &str,
     index: &Index,
     offset: usize,
-    name: &str,
+    name: Option<&str>,
 ) -> Result<Value, Error> {
     let Some((scope, u)) = at(index, offset) else {
         return Err(rename_error());
@@ -74,8 +74,14 @@ pub fn rename(
     let Some(symbol) = scope.unique(&u.0) else {
         return Err(rename_error());
     };
-    if !editable(index, uri, symbol)
-        || !text::identifier(name)
+    if !editable(index, uri, symbol) {
+        return Err(rename_error());
+    }
+    // Java checks editability before dereferencing a null newName.
+    let Some(name) = name else {
+        return Err(crate::rpc::internal());
+    };
+    if !text::identifier(name)
         || features::keywords().iter().any(|k| k == name)
         || scope.symbols.iter().any(|(key, _)| key == name)
     {

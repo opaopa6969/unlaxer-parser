@@ -192,10 +192,16 @@ impl Server {
                     Ok(Value::Null)
                 }
                 "textDocument/hover" | "textDocument/completion" if request => {
-                    let uri = rpc::gson_string(&params["textDocument"]["uri"])
-                        .ok_or_else(|| invalid("document URI required"))?;
-                    let uri = uri.as_str();
-                    let Some(doc) = self.documents.get(uri) else {
+                    // Java dereferences textDocument first. A null/missing uri is
+                    // an unopened document there, not a params error (#1005).
+                    if params["textDocument"].is_null() {
+                        return Err(rpc::internal());
+                    }
+                    let uri = rpc::gson_string(&params["textDocument"]["uri"]);
+                    let Some((uri, doc)) = uri
+                        .as_deref()
+                        .and_then(|uri| self.documents.get(uri).map(|doc| (uri, doc)))
+                    else {
                         return Ok(if method.ends_with("completion") {
                             json!([])
                         } else {
@@ -241,10 +247,14 @@ impl Server {
                 | "textDocument/foldingRange"
                     if request =>
                 {
-                    let uri = rpc::gson_string(&params["textDocument"]["uri"])
-                        .ok_or_else(|| invalid("document URI required"))?;
-                    let uri = uri.as_str();
-                    let Some(source) = self.documents.get(uri).map(|d| d.source.clone()) else {
+                    if params["textDocument"].is_null() {
+                        return Err(rpc::internal());
+                    }
+                    let uri = rpc::gson_string(&params["textDocument"]["uri"]);
+                    let Some((uri, source)) = uri
+                        .as_deref()
+                        .and_then(|uri| self.documents.get(uri).map(|d| (uri, d.source.clone())))
+                    else {
                         return Ok(match method {
                             "textDocument/rename" => json!({"changes":{}}),
                             "textDocument/linkedEditingRange" => Value::Null,
@@ -265,22 +275,27 @@ impl Server {
                         .ok_or_else(|| invalid("invalid UTF-16 position"))?;
                     match method {
                         "textDocument/definition" => Ok(navigation::definition(&index, offset)),
-                        "textDocument/references" => Ok(navigation::reference_locations(
-                            &source,
-                            uri,
-                            &index,
-                            offset,
-                            params["context"]["includeDeclaration"]
-                                .as_bool()
-                                .unwrap_or(false),
-                        )),
+                        "textDocument/references" => {
+                            let context = &params["context"];
+                            let locations = |include| {
+                                navigation::reference_locations(
+                                    &source, uri, &index, offset, include,
+                                )
+                            };
+                            // Gson coerces the primitive boolean like validation does.
+                            // Java reads a null context only at a declaration reference.
+                            let include = rpc::gson_boolean(&context["includeDeclaration"]);
+                            if context.is_null() && locations(true) != locations(false) {
+                                return Err(rpc::internal());
+                            }
+                            Ok(locations(include))
+                        }
                         "textDocument/rename" => navigation::rename(
                             &source,
                             uri,
                             &index,
                             offset,
-                            &rpc::gson_string(&params["newName"])
-                                .ok_or_else(|| invalid("newName required"))?,
+                            rpc::gson_string(&params["newName"]).as_deref(),
                         ),
                         _ => Ok(navigation::linked(&source, uri, &index, offset)),
                     }

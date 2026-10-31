@@ -25,6 +25,14 @@ pub(crate) fn gson_string(value: &Value) -> Option<String> {
         _ => None,
     }
 }
+// Gson's primitive boolean adapter parses strings with Boolean.parseBoolean.
+pub(crate) fn gson_boolean(value: &Value) -> bool {
+    match value {
+        Value::Bool(b) => *b,
+        Value::String(s) => s.eq_ignore_ascii_case("true"),
+        _ => false,
+    }
+}
 fn string(value: &Value) -> bool {
     value.is_null() || gson_string(value).is_some()
 }

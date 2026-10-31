@@ -1568,6 +1568,307 @@
         "code": -32603,
         "message": "Internal error."
       }
-    }
+    },
+    "nullSource": "grammar N { @root S ::= T ; T ::= 'a' ; }",
+    "nullCases": [
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24},\"context\":{\"includeDeclaration\":\"TRUE\"}}",
+        "expected": {
+          "result": [
+            {
+              "uri": "$URI",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 28
+                },
+                "end": {
+                  "line": 0,
+                  "character": 29
+                }
+              }
+            },
+            {
+              "uri": "$URI",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 24
+                },
+                "end": {
+                  "line": 0,
+                  "character": 25
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24},\"context\":{\"includeDeclaration\":\"yes\"}}",
+        "expected": {
+          "result": [
+            {
+              "uri": "$URI",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 24
+                },
+                "end": {
+                  "line": 0,
+                  "character": 25
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24},\"context\":null}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24}}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":0},\"context\":null}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24},\"newName\":null}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":0}}",
+        "expected": {
+          "error": {
+            "code": -32602,
+            "message": "安全に名前変更できません。完成した文法のローカル宣言を選び、重複・予約語を避けてください。外部 module の token / import alias / capture は一括 rename の対象外です。"
+          }
+        }
+      },
+      {
+        "method": "textDocument/hover",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/hover",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/hover",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/completion",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/completion",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/completion",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/definition",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/definition",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/definition",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": {
+            "changes": {}
+          }
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": {
+            "changes": {}
+          }
+        }
+      },
+      {
+        "method": "textDocument/linkedEditingRange",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/linkedEditingRange",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/linkedEditingRange",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/documentSymbol",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/documentSymbol",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/documentSymbol",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/foldingRange",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/foldingRange",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/foldingRange",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      }
+    ]
   }
 }

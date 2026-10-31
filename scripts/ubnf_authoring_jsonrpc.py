@@ -283,6 +283,19 @@ def run_jsonrpc(clients, directory, omit_params):
             response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 0}}, dto['hover'])
             assert not client.pending and client.messages.empty(), client.fixture
         evidence.append({'case': 'dto-scalar-text-' + str(index)})
+    # Null DTO fields reach the method like Gson leaves them: Java dereferences
+    # textDocument/context/newName where it uses them, and a null uri is unopened.
+    for _, client in hosts:
+        uri = (directory / 'dto-null.ubnf').as_uri()
+        client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'version': 1, 'text': dto['nullSource']}})
+        diagnostic(client, uri, [])
+    for index, case in enumerate(dto['nullCases']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/dto/null-{index}'
+            uri = json.dumps((directory / 'dto-null.ubnf').as_uri())
+            expected = json.loads(json.dumps(case['expected']).replace('"$URI"', uri))
+            raw_dto(client, case['method'], case['raw'].replace('$URI', uri), expected)
+        evidence.append({'case': f'dto-null-{index}'})
     evidence.append({'case': 'dto-timing', 'elapsedSeconds': round(time.monotonic() - dto_started, 3)})
 
     # A later successful configure restores validation without replacing buffers.
