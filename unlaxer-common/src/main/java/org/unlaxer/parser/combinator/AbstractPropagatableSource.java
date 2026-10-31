@@ -22,6 +22,14 @@ public abstract class AbstractPropagatableSource extends ConstructedSingleChildP
 		super(child);
 	}
 
+	/**
+	 * The merged invert value of the latest {@link #parse} call on this instance, in any context or
+	 * thread. Parsing passes the value to the child as an argument; no parser of this library reads
+	 * the field. Only {@link org.unlaxer.parser.PropagatableDestination#getInvertMatchFromParent()},
+	 * the TokenPrinter "(inverted)" marker, does, so that marker reports the last call rather than
+	 * the printed token: another context on a shared graph, or a later call in the same parse, may
+	 * have overwritten it. Tokens and parse results do not depend on it (#1007).
+	 */
 	public Optional<Boolean> computedInvertMatch = Optional.empty();
 	
 	@Override
