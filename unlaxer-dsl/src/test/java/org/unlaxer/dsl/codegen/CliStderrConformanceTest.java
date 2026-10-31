@@ -33,7 +33,7 @@ public class CliStderrConformanceTest {
     @Test(timeout=120000) public void syntaxKeepsDocumentedNativeLocations() throws Exception { check("syntax"); }
 
     @Test(timeout=120000) public void playgroundBlankOptionsMatchJavaWhitespace() throws Exception { check("blank"); }
-    @Test(timeout=120000) public void regexSyntaxPriorityMatchesJavaBeforeOutput() throws Exception { check("regex"); }
+    @Test(timeout=300000) public void regexSyntaxPriorityMatchesJavaBeforeOutput() throws Exception { check("regex"); }
 
     @Test(timeout=240000) public void qualifiedReferenceSyntaxMatchesJavaBeforeOutput() throws Exception { check("qualified"); }
 
@@ -71,7 +71,7 @@ public class CliStderrConformanceTest {
             assertEquals("CI must exercise chmod(000/555/444): " + excluded, 0, excluded.size());
         int observations = switch (suite) {
             case "replacement" -> 60;
-            case "regex" -> 640;
+            case "regex" -> 4064;
             case "qualified" -> 992;
             case "value" -> 2528;
             case "blank" -> 350;
