@@ -349,7 +349,7 @@ public class MapperGenerator implements CodeGenerator {
 
             """);
         if(NamePredicates.enabled(grammar)) sb.append(nameSnapshotEntryPoints(astClass,rootClassName,parsersClass,mayRecover));
-        if(SemanticPredicates.enabled(grammar)) sb.append(predicateEntryPoints(astClass,rootClassName,parsersClass));
+        if(SemanticPredicates.enabled(grammar)) sb.append(predicateEntryPoints(astClass,rootClassName,parsersClass,mayRecover));
         sb.append("    /** Selected parse-tree token and its generated AST mapping. */\n");
         sb.append("    public record MappedAst(Token token, ").append(astClass).append(" ast) {}\n\n");
         sb.append("    /** Immutable identity-based source map; offsets are code points, end exclusive. */\n");
@@ -621,9 +621,9 @@ public class MapperGenerator implements CodeGenerator {
     }
 
 
-    private static String predicateEntryPoints(String astClass, String rootClassName, String parsersClass) {
+    private static String predicateEntryPoints(String astClass, String rootClassName, String parsersClass, boolean mayRecover) {
         return """
-                /** Pure named postconditions; the registry snapshot is reused by diagnostic retries. */
+                /** Pure named postconditions; every diagnostic retry uses the same registry snapshot. */
                 public static synchronized Optional<ParseDiagnostic> diagnoseWithPredicates(String source,
                         java.util.Map<String, java.util.function.Predicate<org.unlaxer.context.SemanticPredicateBindings.Candidate>> predicates,
                         ParseOptions options) {
@@ -633,7 +633,10 @@ public class MapperGenerator implements CodeGenerator {
                         try (ParseContext context = ParseContext.withOptions(createRootSourceCompat(source), options)) {
                             org.unlaxer.context.SemanticPredicateBindings.install(context, snapshot);
                             Parsed parsed = %s.getRootParser().parse(context);
-                            if (parsed.isSucceeded() && consumedLengthCompat(parsed.getConsumed()) == source.length()) return Optional.empty();
+                            if (parsed.isSucceeded() && consumedLengthCompat(parsed.getConsumed()) == source.length()) {
+                                %s
+                                return Optional.empty();
+                            }
                             if (org.unlaxer.context.SemanticPredicateBindings.failure(context).isPresent()
                                     || options.diagnostics() == ParseOptions.Diagnostics.DETAILED)
                                 return Optional.of(failureDiagnostic(source, context, parsed));
@@ -671,7 +674,14 @@ public class MapperGenerator implements CodeGenerator {
                     }
                 }
 
-            """.formatted(parsersClass, rootClassName, rootClassName, astClass, parsersClass, parsersClass);
+            """.formatted(parsersClass, mayRecover ? """
+                    var recoveries = org.unlaxer.parser.combinator.RecoveryDiagnostic.from(context);
+                    if (!recoveries.isEmpty()) {
+                        var first = recoveries.get(0);
+                        return Optional.of(new ParseDiagnostic("recovery", first.start(),
+                            List.of(first.message()), first.end(), List.of()));
+                    }
+                    """ : "", rootClassName, rootClassName, astClass, parsersClass, parsersClass);
     }
 
     private static String nameSnapshotEntryPoints(String astClass, String rootClassName, String parsersClass, boolean mayRecover) {

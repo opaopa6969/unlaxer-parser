@@ -447,6 +447,7 @@ pub fn lower(grammar: &ast::GrammarDecl) -> Result<GrammarIr> {
     }
     crate::nested_captures::validate(grammar)?;
     crate::raising::validate(grammar)?;
+    crate::semantic_predicates::validate(grammar)?;
     // Match Java RustGrammarLowering: schema failures precede enum/eval/embedding
     // and ordinary lowering failures, but not bounded/precedence/nested failures.
     crate::common_fields::families(grammar)?;
@@ -899,7 +900,7 @@ impl Lowering<'_> {
             let mut comparison = None;
             for annotation in &rule.annotations {
                 match &annotation.kind {
-                    AnnotationKind::NamePredicate { .. } => {}
+                    AnnotationKind::NamePredicate { .. } | AnnotationKind::Predicate { .. } => {}
                     AnnotationKind::Root => {
                         if root.replace(i).is_some() {
                             return Err("multiple @root annotations".into());
@@ -1595,6 +1596,20 @@ impl Lowering<'_> {
             rules[root].body = Expression::NameResolutionScope {
                 child: Box::new(rules[root].body.clone()),
                 requirements: name_versions,
+            };
+        }
+        for (i, rule) in rules.iter_mut().enumerate() {
+            if let Some(name) = crate::semantic_predicates::annotation(&self.grammar.rules[i]) {
+                rule.body = Expression::SemanticPredicate {
+                    child: Box::new(rule.body.clone()),
+                    name: name.to_owned(),
+                };
+            }
+        }
+        if crate::semantic_predicates::enabled(self.grammar) {
+            rules[root].body = Expression::SemanticPredicateScope {
+                child: Box::new(rules[root].body.clone()),
+                requirements: crate::semantic_predicates::requirements(self.grammar),
             };
         }
         let ir = GrammarIr {

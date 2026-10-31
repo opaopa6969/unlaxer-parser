@@ -327,11 +327,8 @@ public class ParserGenerator implements CodeGenerator {
         if (SemanticPredicates.enabled(grammar)) {
             sb.append("    public static Parser getRootSyntaxParser() {\n        return Parser.get(").append(rootRuleName)
                 .append(ctx.recoveryRules.containsKey(rootRuleName) ? "RecoveryParser.class" : "Parser.class").append(");\n    }\n");
-            sb.append("    public static Parser getRootParser() {\n        Parser root = Parser.get(")
-                .append(ParserRuleEmitter.resolveParserClass(ctx, rootRuleName)).append(");\n");
-            if (NamePredicates.enabled(grammar)) sb.append("        root = new org.unlaxer.parser.combinator.NameResolutionScope(root, ")
-                .append(NamePredicates.javaRequirements(grammar)).append(");\n");
-            sb.append("        return new org.unlaxer.parser.combinator.SemanticPredicateScope(root, ")
+            sb.append("    public static Parser getRootParser() {\n        return new org.unlaxer.parser.combinator.SemanticPredicateScope(Parser.get(")
+                .append(ParserRuleEmitter.resolveParserClass(ctx, rootRuleName)).append("), ")
                 .append(SemanticPredicates.javaRequirements(grammar)).append(");\n    }\n");
         } else if (NamePredicates.enabled(grammar)) {
             sb.append("    public static Parser getRootSyntaxParser() {\n        return Parser.get(").append(rootRuleName)

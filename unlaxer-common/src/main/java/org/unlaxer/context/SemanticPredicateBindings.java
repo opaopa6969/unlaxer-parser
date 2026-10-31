@@ -6,14 +6,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
+import org.unlaxer.CapturedValue;
 import org.unlaxer.Name;
+import org.unlaxer.Source;
 
 /** Parse-local named, pure conditions. Callbacks receive values, never a mutable parse context. */
 public final class SemanticPredicateBindings {
     private SemanticPredicateBindings() {}
     private static final Name KEY = Name.of(SemanticPredicateBindings.class, "bindings");
 
-    /** Original matched text and its code point range, end exclusive. */
+    /** Original matched text and its code point range, end exclusive; not a CST object (#851). */
     public record Candidate(String text, int start, int end) {}
     public record Failure(String kind, int start, int end, String expected) {}
     public static final class Frame {
@@ -67,12 +69,27 @@ public final class SemanticPredicateBindings {
         return frame;
     }
 
-    public static boolean test(ParseContext context, String name, Candidate candidate) {
+    /**
+     * Evaluates {@code name} over a successful child's matched source. Only input-backed text has an
+     * original span: projected or generated text is the sticky {@code predicate_source} failure.
+     */
+    public static boolean test(ParseContext context, String name, Source matched, int emptyAt) {
         State state = state(context);
+        int at = matched.codePointLength().value() == 0 ? emptyAt : matched.offsetFromRoot().value();
         if (state.frames.isEmpty()) {
-            reject(context, "predicate_scope_missing", candidate.start(), candidate.end(), "semantic predicate entry scope");
+            reject(context, "predicate_scope_missing", at, at, "semantic predicate entry scope");
             return false;
         }
+        if (matched.codePointLength().value() == 0) return test(state, context, name, new Candidate("", at, at));
+        if (CapturedValue.provenanceOf(matched, context.source) != CapturedValue.Provenance.INPUT) {
+            reject(context, "predicate_source", at, at, "input-backed candidate for predicate " + name);
+            return false;
+        }
+        String text = matched.sourceAsString();
+        return test(state, context, name, new Candidate(text, at, at + text.codePointCount(0, text.length())));
+    }
+
+    private static boolean test(State state, ParseContext context, String name, Candidate candidate) {
         Predicate<Candidate> predicate = state.predicates.get(name);
         if (predicate == null) {
             reject(context, "predicate_missing", candidate.start(), candidate.end(), "registered predicate " + name);

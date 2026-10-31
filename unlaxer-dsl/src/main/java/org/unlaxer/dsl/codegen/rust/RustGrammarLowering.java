@@ -154,6 +154,7 @@ public final class RustGrammarLowering {
         if (!grammar.imports().isEmpty()) throw unsupported("imports");
         org.unlaxer.dsl.codegen.LexicalContexts.requireValid(grammar);
         org.unlaxer.dsl.codegen.NamePredicates.requireValid(grammar);
+        org.unlaxer.dsl.codegen.SemanticPredicates.requireValid(grammar);
         var lexical = org.unlaxer.dsl.bootstrap.LexicalCompiler.compile(grammar);
         org.unlaxer.dsl.codegen.TokenStreamGrammar.requireValid(grammar);
         org.unlaxer.dsl.codegen.GlobalComment.requireValid(grammar);
@@ -249,7 +250,7 @@ public final class RustGrammarLowering {
                         throw unsupported("mapping method collision " + previous + " / " + value.className());
                     }
                     mapping = new MappingAnnotation(CommonFieldSchema.rustName(value.className()), value.paramNames());
-                } else if (annotation instanceof NamePredicateAnnotation) {
+                } else if (annotation instanceof NamePredicateAnnotation || annotation instanceof PredicateAnnotation) {
                     // Applied around this rule body after structural lowering.
                 } else if (annotation instanceof LexicalContextAnnotation) {
                     // Applied around this rule body after structural lowering.
@@ -502,6 +503,10 @@ public final class RustGrammarLowering {
             }
             if(i==root && org.unlaxer.dsl.codegen.NamePredicates.enabled(grammar)) expression=new NameResolutionScope(expression,
                 org.unlaxer.dsl.codegen.NamePredicates.requirements(grammar).stream().map(value->new NameRequirement(value.id(),value.version())).toList());
+            var semanticPredicate = org.unlaxer.dsl.codegen.SemanticPredicates.annotation(grammar.rules().get(i));
+            if (semanticPredicate.isPresent()) expression = new SemanticPredicate(expression, semanticPredicate.get().name());
+            if (i == root && org.unlaxer.dsl.codegen.SemanticPredicates.enabled(grammar)) expression = new SemanticPredicateScope(
+                expression, org.unlaxer.dsl.codegen.SemanticPredicates.requirements(grammar));
             var sourceRule = grammar.rules().get(i);
             var effectiveMapping = mapping;
             rewritten.add(new Rule(rule.name(), expression, mapping, rule.operator(), rule.catalog(), rule.skip(), rule.documentation(),rule.enumLiterals(), rule.typeConstraints().stream().map(value ->

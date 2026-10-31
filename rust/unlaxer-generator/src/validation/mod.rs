@@ -147,6 +147,15 @@ pub fn collect(grammar: &GrammarDecl) -> Vec<Issue> {
             "Select non-nullable declarative tokens and nonempty unique literals.",
         );
     }
+    if let Err(message) = crate::semantic_predicates::validate(grammar) {
+        let code = message.split(':').next().unwrap().to_owned();
+        add(
+            &mut out,
+            &code,
+            message,
+            "Use one @predicate('registeredName') per rule beside only @root/@mapping/@doc, at most 64 distinct names, without @namePredicate or token-stream grammars.",
+        );
+    }
     failure(
         &mut out,
         crate::embedded::validate(grammar),

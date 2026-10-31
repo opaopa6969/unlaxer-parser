@@ -163,7 +163,7 @@ public final class GrammarValidator {
         catch (IllegalArgumentException error) {
             String message = error.getMessage();
             errors.add(new ValidationIssue(message.split(":", 2)[0], message,
-                "Use one @predicate('registeredName') per rule and at most 64 distinct names."));
+                "Use one @predicate('registeredName') per rule beside only @root/@mapping/@doc, at most 64 distinct names, without @namePredicate or token-stream grammars."));
         }
         try { NamePredicates.requireValid(grammar); }
         catch (IllegalArgumentException error) {

@@ -156,6 +156,16 @@ pub enum Expression {
         child: Box<Expression>,
         requirements: Vec<(String, String)>,
     },
+    /// Caller-registered pure postcondition over this rule's original matched text (#1006).
+    SemanticPredicate {
+        child: Box<Expression>,
+        name: String,
+    },
+    /// Entry boundary validating every declared predicate before the body runs.
+    SemanticPredicateScope {
+        child: Box<Expression>,
+        requirements: Vec<String>,
+    },
     LexicalContextScope {
         child: Box<Expression>,
         terminals: Vec<(String, bool, crate::lexical::LexicalExpression)>,

@@ -283,7 +283,9 @@ pub(crate) fn of(expression: &Expr, rules: &[FirstSet]) -> FirstSet {
         | Expr::ZeroMatch(_)
         | Expr::Backreference(_)
         | Expr::NamePredicate { .. }
-        | Expr::NameResolutionScope { .. } => FirstSet::UNKNOWN,
+        | Expr::SemanticPredicate { .. }
+        | Expr::NameResolutionScope { .. }
+        | Expr::SemanticPredicateScope { .. } => FirstSet::UNKNOWN,
         // A raising operator turns a failure at any code point into a committed or labeled
         // failure, so skipping it from its child's FIRST set would change the result (#700).
         Expr::Commit { .. } | Expr::Label { .. } | Expr::CatchLabels { .. } => FirstSet::UNKNOWN,

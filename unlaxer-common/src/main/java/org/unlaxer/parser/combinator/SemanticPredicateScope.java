@@ -3,6 +3,7 @@ package org.unlaxer.parser.combinator;
 import java.util.List;
 import org.unlaxer.Parsed;
 import org.unlaxer.TokenKind;
+import org.unlaxer.context.DiagnosticsAgnostic;
 import org.unlaxer.context.ParseContext;
 import org.unlaxer.context.SemanticPredicateBindings;
 import org.unlaxer.parser.ChildOccurs;
@@ -12,7 +13,7 @@ import org.unlaxer.parser.Parser;
 import org.unlaxer.parser.Parsers;
 
 /** Validate the entry's immutable registry before alternatives can hide missing bindings. */
-public final class SemanticPredicateScope extends ConstructedAbstractParser implements HasChildrenParser {
+public final class SemanticPredicateScope extends ConstructedAbstractParser implements HasChildrenParser, DiagnosticsAgnostic {
     private static final long serialVersionUID = 1L;
     private final List<String> requirements;
     public SemanticPredicateScope(Parser child, List<String> requirements) {
