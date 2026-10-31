@@ -88,6 +88,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 
 ### Fixed
 
+- 名前付き parser の Usage001 サンプルで class 参照する型を公開し、Java/Rust 共通の prefix 回帰を通常テストへ追加する（#1009）。
 - Java の Choice / PredictiveChoice は候補の開始時に適用される matched cursor の reset を先読み判定にも反映する。診断方針による受理差と nullable 候補の誤選択を修正し、Java/Rust の共通入力で検証した (#861)。
 - Rust native の名前述語を宣言・body lowering より先に検証し、複数の不正を含む文法でも Java validator / Java-host と同じ名前述語コードを先頭に返す。capture / kind の検証を全規則で終えてから snapshot version の整合性を調べる (#858)。
 

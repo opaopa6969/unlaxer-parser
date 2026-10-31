@@ -83,7 +83,8 @@ public class Usage001_createParserAndParseWithNamedConcrete extends Usage001_cre
 		}
 	}
 	
-	static class OperatorAndOperandParser extends LazyChain{
+	// Class-based combinators construct this type through the public parser factory.
+	public static class OperatorAndOperandParser extends LazyChain{
 
 		private static final long serialVersionUID = -4010004059839314592L;
 
