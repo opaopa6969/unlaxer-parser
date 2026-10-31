@@ -131,7 +131,7 @@
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13", "anchor": "public class MatchedChoiceParser extends NoneChildParser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7", "anchor": "public class ChoiceCommitAction implements AdditionalPreCommitAction"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5463", "anchor": "fn ordered_choice<'b>("}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5468", "anchor": "fn ordered_choice<'b>("}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedChoiceParserTest.java"
@@ -569,7 +569,7 @@
       "route": "`Expr::sequence/choice/longest_choice/unique_longest_choice/predictive_choice/zero_match`。Lazy版は構築済み Rule参照へ移す。min/max反復の terminator は別行。",
       "code": [
         {"location": "rust/unlaxer-runtime/src/lib.rs#L363", "anchor": "pub fn sequence(elements: impl IntoIterator<Item = Self>) -> Self"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5463", "anchor": "fn ordered_choice<'b>("},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5468", "anchor": "fn ordered_choice<'b>("},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11", "anchor": "public interface ChainInterface extends Parser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14", "anchor": "public interface ChoiceInterface extends Parser"}
       ],

@@ -5024,6 +5024,16 @@ impl<'a> ParseContext<'a> {
                 fragment = self.collect_classic_fragment(fragment, kind);
             }
         }
+        // As Java NamedCapture, a Classic success that returned no token (a PEG assertion, or a
+        // Choice that selected one) records the empty input at the cursor, whatever its kind.
+        if owned && self.classic_returned_no_token(&fragment.nodes) {
+            let at = self.code_point(self.mode_cursor());
+            let span = Span { start: at, end: at };
+            self.owned_captures
+                .push(name, token::TokenSource::Input(span));
+            self.mark_memoization_state_changed();
+            return Some(fragment);
+        }
         let source = if owned {
             fragment.parsed_source()
         } else {
@@ -5074,12 +5084,7 @@ impl<'a> ParseContext<'a> {
                 span,
                 text: Arc::clone(source.text.as_ref().unwrap()),
             },
-            Some(source) if source.kind.is_virtual() && span.start == span.end => {
-                token::TokenSource::Generated {
-                    anchor,
-                    text: String::new(),
-                }
-            }
+            // A returned token keeps its own origin: an input-backed empty virtual token is input.
             _ => token::TokenSource::Input(span),
         };
         self.owned_captures.push(name, source);

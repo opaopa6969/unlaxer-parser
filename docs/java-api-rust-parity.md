@@ -165,7 +165,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: 明示 Choice ID と選択 branch ID の transaction 管理、および branch 再呼出しの API/例が必要。既存 `Expr::Choice` と `ParseContext::state` は部品であり完成した対応ではない。
 
-実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7)、[rust/unlaxer-runtime/src/lib.rs#L5463](../rust/unlaxer-runtime/src/lib.rs#L5463)
+実装: [unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13](../unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7)、[rust/unlaxer-runtime/src/lib.rs#L5468](../rust/unlaxer-runtime/src/lib.rs#L5468)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedChoiceParserTest.java](../unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedChoiceParserTest.java)
 
@@ -461,7 +461,7 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 
 利用経路: `Expr::sequence/choice/longest_choice/unique_longest_choice/predictive_choice/zero_match`。Lazy版は構築済み Rule参照へ移す。min/max反復の terminator は別行。
 
-実装: [rust/unlaxer-runtime/src/lib.rs#L363](../rust/unlaxer-runtime/src/lib.rs#L363)、[rust/unlaxer-runtime/src/lib.rs#L5463](../rust/unlaxer-runtime/src/lib.rs#L5463)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14)
+実装: [rust/unlaxer-runtime/src/lib.rs#L363](../rust/unlaxer-runtime/src/lib.rs#L363)、[rust/unlaxer-runtime/src/lib.rs#L5468](../rust/unlaxer-runtime/src/lib.rs#L5468)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11)、[unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14](../unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14)
 
 テスト: [unlaxer-common/src/test/java/org/unlaxer/parser/combinator/LongestChoiceTest.java](../unlaxer-common/src/test/java/org/unlaxer/parser/combinator/LongestChoiceTest.java)、[unlaxer-common/src/test/java/org/unlaxer/parser/combinator/UniqueLongestChoiceTest.java](../unlaxer-common/src/test/java/org/unlaxer/parser/combinator/UniqueLongestChoiceTest.java)、[unlaxer-common/src/test/java/org/unlaxer/parser/combinator/PredictiveChoiceTest.java](../unlaxer-common/src/test/java/org/unlaxer/parser/combinator/PredictiveChoiceTest.java)、[rust/unlaxer-runtime/tests/longest_choice.rs](../rust/unlaxer-runtime/tests/longest_choice.rs)、[rust/unlaxer-runtime/tests/unique_longest.rs](../rust/unlaxer-runtime/tests/unique_longest.rs)、[rust/unlaxer-runtime/tests/zero_repeat.rs](../rust/unlaxer-runtime/tests/zero_repeat.rs)
 
