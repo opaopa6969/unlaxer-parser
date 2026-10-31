@@ -2098,7 +2098,7 @@ fn parse_detailed_stacked<P: semantic_predicates::Entry>(
     parser.whitespace = whitespace;
     parser.grammar_frontier = true;
     if parser.first_sets.is_some() {
-        parser.first_sets = Some(first::table(&parser.rules));
+        parser.first_sets = Some(first::table(&parser.rules, parser.first_budget()));
     }
     if options.memoization == Memoization::SafeFailures {
         parser.memo_safe_rules = memo_safe_rules(&parser.rules);
@@ -2758,7 +2758,11 @@ impl<'a> ParseContext<'a> {
         };
         let previous_safe_rules = std::mem::replace(&mut self.memo_safe_rules, safe_rules);
         let previous_success_safe_rules = std::mem::take(&mut self.success_memo_safe_rules);
-        let first_sets = self.first_sets.as_ref().map(|_| first::table(grammar));
+        let first_budget = self.first_budget();
+        let first_sets = self
+            .first_sets
+            .as_ref()
+            .map(|_| first::table(grammar, first_budget));
         let previous_first_sets = std::mem::replace(&mut self.first_sets, first_sets);
         let previous_failure_memo = std::mem::take(&mut self.failure_memo);
         let previous_success_memo = std::mem::take(&mut self.success_memo);
@@ -3664,7 +3668,7 @@ impl<'a> ParseContext<'a> {
         if self.resource_failure.is_some() {
             return None;
         }
-        if self.expression_depth >= 1024 {
+        if self.expression_depth >= first::EXPRESSION_NESTING {
             self.resource_error("expression nesting below 1024");
             return None;
         }
@@ -5781,7 +5785,9 @@ impl<'a> ParseContext<'a> {
         if self.token_mode.is_some() || self.lexical_trivia.is_some() || self.line_comments {
             return false;
         }
-        if first::of(candidate, table).may_start(&self.input[self.position..], self.whitespace) {
+        if first::of(candidate, table, self.first_budget())
+            .may_start(&self.input[self.position..], self.whitespace)
+        {
             return false;
         }
         if self.exclusion_audit {
@@ -5797,6 +5803,12 @@ impl<'a> ParseContext<'a> {
             );
         }
         true
+    }
+
+    /// Expression levels a candidate evaluated here may still nest (#1027): the FIRST walk
+    /// stops where `expression` would report its resource failure.
+    fn first_budget(&self) -> usize {
+        first::EXPRESSION_NESTING.saturating_sub(self.expression_depth)
     }
 
     fn prediction_after_trivia<'b>(&self, raw: &'b str) -> &'b str {
