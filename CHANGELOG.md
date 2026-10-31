@@ -64,7 +64,7 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - DETAILED 診断の最終エラーに、外側からの規則名・開始 CP を保持する rule stack を追加 (PR #723、issue #703)。Java/Rust runtime API と両 LSP の `relatedInformation` / `data.ruleStack` で取得できる。[契約](docs/rule-stack-diagnostics.md)。
 - seed 付き文法・入力生成、差分比較、失敗例の縮小と corpus 化による property-based テストを追加 (PR #709、issue #705)。Java/Rust の受理・cursor・CST・AST・診断と設定間の不変条件、両 host の Rust 生成物を検証する。[seed の再現手順](docs/property-based-testing.md)。
 - Java 公開 parser API の基準 revision 付き [全API対応表](docs/java-api-rust-parity.md)、JDK 構文木による型・static API の列挙と更新漏れ検査、Rust の利用経路・共通検証の不足を追跡する子 issue を追加 (#716)。runtime の挙動は変更しない。
-- 行頭・source先頭・行終端の4公開parserとRust公開API移植例を独立corpusで共通検証し、Classic token kind・invert・両cursor・CST・診断・rollbackを固定。EmptyLine / WildCardLine の反復合成に残る差は #846 依存として明記 (#848)。Java の DETAILED_ON_FAILURE だけで受理が変わる FIRST 除外の欠陥は Rust へ移植せず #861 に分離。既存runtimeの挙動は変更しない。
+- 行頭・source先頭・行終端の4公開parserとRust公開API移植例を独立corpusで共通検証し、Classic token kind・invert・両cursor・CST・診断・rollbackを固定。EmptyLine / WildCardLine の反復合成に残る差は #846 依存として明記 (#848)。Java の FIRST 除外の欠陥は #861 で修正し、全診断モードを共通期待値で検証する。
 - 全API対応表の行を指す根拠に anchor（行頭の宣言文字列、必要なら宣言 scope）を持たせ、参照先の行の挿入・削除・宣言の改名でずれた根拠を検査で拒否する (#859)。`--remap` は anchor が一意に決まる行へ行番号だけを付け替え、見つからない・曖昧・形式不正の根拠があるか、付け替え後の検査（schema・公開 API の一致を含む）が一つでも失敗すれば JSON も Markdown も書き換えない。441 宣言の判定と根拠は変えない。
 - Rust token DAP で detached generated token の本文を保持し、原文のゼロ幅 anchor で停止・breakpoint・変数表示できるようにした (#863)。Java は既存表示を維持し、原文 CP 範囲を明示する `tokenSourceSpan` hook を追加。Rust `Step` の手組みは `generated_text: None` を追加し、生成 DAP は両 host とも再生成する。[契約と共通 fixture](docs/token-trace.md#generated-token-の本文と原文-anchor863)。
 - Rust token DAP が連結 source（`Projected`）の consumed terminal を保持した本文と論理 CP 範囲で表示するようにした (#889)。Java の既存表示・位置・停止順を共通 stdio fixture で固定し、custom terminal 用の明示 `add_traced_token_node` を追加。手組み `Step` は `projected_text: None` を追加し、生成 DAP は両 host とも再生成する。[契約](docs/token-trace.md#projected-token-の本文と論理-cp-範囲889)。
@@ -87,6 +87,10 @@ Versions are published to Maven Central (`org.unlaxer:unlaxer-common`, `org.unla
 - Java / Rust（native・Java-host）の既知差・未対応・条件付き skip を issue へ結ぶ [台帳](docs/parity-ledger.md) と JSON、host 別 corpus（JSON・JSON Lines・TSV・CSV・YAML、host 列の行）とテスト内の無条件 skip・差分表・除外集合の登録漏れ、文書の不一致を検出する既存 CI の検査を追加 (#771)。
 
 ### Fixed
+
+- 名前付き parser の Usage001 サンプルで class 参照する型を公開し、Java/Rust 共通の prefix 回帰を通常テストへ追加する（#1009）。
+- Java の Choice / PredictiveChoice は候補の開始時に適用される matched cursor の reset を先読み判定にも反映する。診断方針による受理差と nullable 候補の誤選択を修正し、Java/Rust の共通入力で検証した (#861)。
+- Rust native の名前述語を宣言・body lowering より先に検証し、複数の不正を含む文法でも Java validator / Java-host と同じ名前述語コードを先頭に返す。capture / kind の検証を全規則で終えてから snapshot version の整合性を調べる (#858)。
 
 - Rust の `@f` が Java の LazyChain と同じく子の評価前に matched cursor の reset を解除し、`@f` が失敗して rollback したあともその解除を残すよう修正し、MatchOnly + reset=true の繰り返しを包む CAPTURE の受理・cursor・原文を Java に揃えた (#762)。
 - Java / Rust の local import を通常ファイル・64 MiB以下に制限し、stat後の増大も上限＋1バイトで打ち切る。デバイス・FIFO・socket・directory・過大ファイルは同じ `E-MODULE` で拒否し、両 authoring stdio server の後続応答と CLI を共通fixtureで検証 (#890)。
