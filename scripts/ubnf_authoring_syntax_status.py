@@ -42,8 +42,8 @@ def hover(client, uri, source, expected):
 
 def run_syntax_status(clients, directory):
     fixture = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/syntax-status.json').read_text())
-    assert len(fixture['rootFailures']) == 10 and len(fixture['hoverOnly']) == 9
-    assert len(fixture['modules']) == 24
+    assert len(fixture['rootFailures']) == 14 and len(fixture['hoverOnly']) == 9
+    assert len(fixture['modules']) == 30
     config = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/configuration.json').read_text())
     evidence = []
     for host, client in zip(('java', 'rust'), clients):

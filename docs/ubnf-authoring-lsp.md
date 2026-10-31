@@ -24,6 +24,10 @@ UBNFMapper.parseWithSource は全入力と mapper 値検査も要求するため
 rule の写像は `UBNFFileParser → UBNFFile`、`GrammarDeclParser → GrammarDecl`、
 `AnnotationParser → Annotation`、`RuleBodyParser → RuleBody` として ubnf.ubnf に合わせる。
 根のkeyword失敗の最深 terminal は `WordParser` で、これは Java が data に返す class 名を保つ。
+ただし grammar を1つも消費せず、入力全体が trivia で末尾が改行のない `//` コメントの場合は、
+CPPComment の LineTerminator が EOF で失敗するため、最深は `WildCardCharacterParser`、期待集合は改行3種を含む7個になる。
+syntax 診断の range と data.line/character は DocumentSnapshot の規則（CR・LF・CRLF をそれぞれ1改行）で数え、
+LF だけを数える module 回復 range とは別に扱う。
 
 この棚卸しはsyntax全JSON一致の達成を意味しない。期待集合と失敗stackの再現には、
 Java combinator の投機的失敗も再現する専用recognizerが必要で、通常frontendへの計測追加は

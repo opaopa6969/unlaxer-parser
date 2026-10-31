@@ -29,6 +29,21 @@ fn trivia(source: &str, mut at: usize) -> usize {
     }
 }
 
+/// ParseResult positions use DocumentSnapshot, where CR, LF and CRLF each end
+/// a line. Module recovery ranges keep the LF-only text::position instead.
+fn position(source: &str, at: usize) -> Value {
+    let (mut line, mut character, mut previous) = (0, 0, '\0');
+    for c in source[..at].chars() {
+        match c {
+            '\n' if previous == '\r' => {}
+            '\r' | '\n' => (line, character) = (line + 1, 0),
+            _ => character += c.len_utf16(),
+        }
+        previous = c;
+    }
+    json!({"line": line, "character": character})
+}
+
 /// Find a grammar's closing brace without treating quoted/comment text as syntax.
 /// This scan does not authorize a prefix: the ordinary frontend checks it below.
 fn grammar_end(source: &str, start: usize) -> Option<usize> {
@@ -91,19 +106,37 @@ pub fn replay(source: &str) -> Replay {
     // their native diagnostic instead of guessing/normalizing a farthest offset.
     let root_diagnostic = (!complete && !source[at..].starts_with("grammar")).then(|| {
         let end = at + source[at..].chars().next().map_or(0, char::len_utf8);
-        let pos = text::position(source, at);
+        let pos = position(source, at);
         // Failed Chain parents roll back before recording their own cursor.
         // With leading trivia their depth-two brace hints are behind the
         // keyword failure. A new attempt after a successful grammar starts at
         // the consumed cursor, because the preceding grammar owns its trivia.
-        let expected = if at == consumed {
-            vec!["' '", "'//'", "'grammar'", "'{'", "'}'"]
+        // CPPComment is '//' plus a wildcard that requires a line terminator.
+        // A whole-trivia input ending in such a comment fails at EOF inside it.
+        let tail = &source[source.rfind(['\r', '\n']).map_or(0, |i| i + 1)..];
+        let open_comment = consumed == 0
+            && at == source.len()
+            && tail.trim_start_matches(text::regex_space).starts_with("//");
+        let (expected, deepest) = if open_comment {
+            let wildcard = "WildCardCharacterParser";
+            let line_ends = vec![
+                "'\n'",
+                "'\r\n'",
+                "'\r'",
+                "' '",
+                "'//'",
+                "'grammar'",
+                wildcard,
+            ];
+            (line_ends, wildcard)
+        } else if at == consumed {
+            (vec!["' '", "'//'", "'grammar'", "'{'", "'}'"], "WordParser")
         } else {
-            vec!["' '", "'//'", "'grammar'"]
+            (vec!["' '", "'//'", "'grammar'"], "WordParser")
         };
-        let message = format!("Expected {} (in WordParser)", expected.join(" or "));
+        let message = format!("Expected {} (in {deepest})", expected.join(" or "));
         json!({
-            "range": text::range(source, at, end), "severity": 1,
+            "range": {"start": pos, "end": position(source, end)}, "severity": 1,
             "code": "ULX-PARSE-001", "source": "unlaxer",
             "message": message,
             "data": {
@@ -113,7 +146,7 @@ pub fn replay(source: &str) -> Replay {
                 "consumedLength": source[..consumed].encode_utf16().count(),
                 "totalLength": source.encode_utf16().count(),
                 "expectedTokens": expected, "expectedHints": expected,
-                "expectedParsers": expected, "deepestMatchedRule": "WordParser"
+                "expectedParsers": expected, "deepestMatchedRule": deepest
             }
         })
     });

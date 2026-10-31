@@ -116,9 +116,22 @@ pub fn file_path(uri: &str) -> Result<PathBuf, String> {
             uri[..at].encode_utf16().count()
         )
     };
+    // URI's component scan: brackets are legal only after '?'/'#', and a
+    // second '#' is illegal inside the fragment.
+    let mut component = "path";
     for (at, c) in uri.char_indices() {
-        if c.is_ascii_control() || " <>\"{}|\\^`".contains(c) {
-            return Err(syntax_error("Illegal character in path", at));
+        match (component, c) {
+            ("path", '?') => component = "query",
+            ("path" | "query", '#') => component = "fragment",
+            _ if c.is_ascii_control()
+                || " <>\"{}|\\^`".contains(c)
+                || component == "path" && "[]".contains(c)
+                || component == "fragment" && c == '#' =>
+            {
+                let reason = format!("Illegal character in {component}");
+                return Err(syntax_error(&reason, at));
+            }
+            _ => {}
         }
         if c == '%'
             && !uri
@@ -148,7 +161,11 @@ pub fn file_path(uri: &str) -> Result<PathBuf, String> {
         return Err("URI is not hierarchical".into());
     }
     let path = if let Some(path) = rest.strip_prefix("//") {
-        if !path.starts_with('/') {
+        if path.is_empty() {
+            return Err(syntax_error("Expected authority", uri.len()));
+        }
+        // An empty authority before a query/fragment is accepted by URI.
+        if !path.starts_with(['/', '?', '#']) {
             return Err("URI has an authority component".into());
         }
         path
@@ -174,10 +191,11 @@ pub fn file_path(uri: &str) -> Result<PathBuf, String> {
             i += 1;
         }
     }
-    let text = String::from_utf8(decoded).map_err(|_| "URI must be UTF-8")?;
-    if text.contains('\0') {
-        return Err(format!("Nul character not allowed: {text}"));
+    // UnixUriUtils rejects a decoded NUL octet before any charset decoding.
+    if decoded.contains(&0) {
+        return Err("Nul character not allowed".into());
     }
+    let text = String::from_utf8(decoded).map_err(|_| "URI must be UTF-8")?;
     Ok(PathBuf::from(text))
 }
 /// Java `UnixPath.toUri()` (UnixUriUtils): RFC 2396 path characters, i.e. unreserved

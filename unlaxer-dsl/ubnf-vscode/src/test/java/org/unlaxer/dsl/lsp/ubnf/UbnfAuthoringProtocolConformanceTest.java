@@ -85,7 +85,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=120000) public void nativeAndJavaServersShareSyntaxStatusAndModuleFixtures() throws Exception {
-        runProtocol("syntax-status", 69);
+        runProtocol("syntax-status", 85);
     }
 
     private void runProtocol(String suite, int count) throws Exception {
