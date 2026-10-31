@@ -1,0 +1,67 @@
+# XML tag samples Usage002_02/03/04: Java class factory recipes / Rust public rule composition.
+# Hand oracle from the sample grammars, not from either implementation.
+# input escapes: \r \n \t \\; empty first column = empty input.
+# Recipe cells: N = success, consumed CP = matched CP = N, parsed source = first N CP;
+#   - = failure, consumed CP = matched CP = 0.
+# 02: no name comparison. paired: Usage002_03 and Usage002_04 (MatchedTokenParser over earlier names).
+#   A close tag matches the first earlier tag name in the current parse path that prefixes the input.
+#   Rows here never depend on the order of those candidates below the root (see xml-tags-history.tsv).
+# scoped: owned capture + capture scope + replay of the innermost open name (not a sample class).
+# input	02	paired	scoped	note
+<a/>	4	4	4	empty element
+<a />	5	5	5	empty element, space before slash
+<a/ >	5	5	5	empty element, space before close
+<é/>	4	4	4	BMP non-ASCII name
+<a></a>	7	7	7	open/close, same name
+< a ></ a >	11	11	11	spaces around names
+<a>< /a>	8	8	8	space between < and /
+<test></test2>	14	-	-	02 does not compare names (sample comment)
+<a></b>	7	-	-	name mismatch
+<ab></a>	8	-	-	close name is a strict prefix
+<a></ab>	8	-	-	close name extends the open name
+<test></test>	13	13	13	original sample
+<test/>	7	7	7	original sample
+<test><word></word></test>	26	26	26	original sample, one child
+<test><word><contents></contents></word></test>	47	47	47	original sample, two levels
+<test><word/></test>	20	20	20	original sample
+<test><word><contents/></word></test>	37	37	37	original sample
+<test><word></test>	-	-	-	original sample, unclosed child
+<test><word/><contetns></contents/></test>	-	-	-	original sample, siblings unsupported
+<a><a></a></a>	14	14	14	same name nested
+<a><a><a><a></a></a></a></a>	28	28	28	one-child recursion depth 4
+<a><b></b></a>	14	14	14	one child
+<a><b/></a>	11	11	11	empty child
+<ab><a></a></ab>	16	16	16	outer name first in history, no prefix clash
+<a><b></a></b>	14	14	-	history: any earlier open name closes (MatchedTokenParser)
+<a><b><c></a></b></c>	21	21	-	history: crossed three levels
+<a><ab></ab></ab>	17	-	-	root close tries earlier names in order: a wins the prefix, then > fails, no retry
+<ab><a></a></a>	15	15	-	history: root closed by its child's name
+<a><b></c></a>	14	-	-	inner close name unknown
+<a><b></b></c>	14	-	-	outer close name unknown
+<a><b></a>	-	-	-	inner closes, outer close missing
+<a><b/><c/></a>	-	-	-	siblings unsupported
+<a>x</a>	-	-	-	mixed content unsupported
+	-	-	-	empty input
+<	-	-	-	EOF after <
+<a	-	-	-	EOF in name
+<a>	-	-	-	EOF after open tag
+<a/	-	-	-	EOF before >
+<a></a	-	-	-	EOF before final >
+<a><b></b>	-	-	-	EOF before outer close
+<>	-	-	-	missing name
+</a>	-	-	-	close tag alone
+<a-b/>	-	-	-	- is punctuation: name ends, / expected
+<a></a>tail	7	7	7	prefix: trailing text
+<a/></a>	4	4	4	prefix: empty element first
+<a></a><b/>	7	7	7	prefix: sibling root not consumed
+<a><b></b></a></a>	14	14	14	prefix: extra close
+<a>\r\n</a>	-	-	-	CRLF content is mixed content
+\r\n<a></a>	-	-	-	no leading space
+<\r\na></a>	9	9	9	CRLF after < is space
+<a></\r\na>	9	9	9	CRLF after / is space
+<a\r\n></a>	9	-	-	CRLF after a name letter is part of the name
+<a\r\n></a\r\n>	11	11	11	same CRLF-bearing name
+<a\t></a>	8	-	-	TAB after a name letter is part of the name
+<😀></😀>	7	7	7	non-BMP name
+<😀></😁>	7	-	-	non-BMP name mismatch
+<a😀></a>	8	-	-	non-BMP suffix is part of the name
