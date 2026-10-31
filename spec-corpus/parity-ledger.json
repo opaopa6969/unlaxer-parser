@@ -695,6 +695,10 @@
       "state": "OPEN",
       "title": "test(sample): 名前付き parser の入れ子クラスを公開し Usage001 を通常回帰へ接続する"
     },
+    "1016": {
+      "state": "OPEN",
+      "title": "fix(sample): XML 3 使用例の反射アクセスを修正して通常回帰へ接続する"
+    },
     "1017": {
       "state": "OPEN",
       "title": "fix(sample): Palindrome の MatchOnly と source slice/reverse を実入力で回復する"
@@ -2604,6 +2608,27 @@
         "unlaxer-common/src/test/java/sample/Usage003_01_Palindrome.java",
         "unlaxer-common/src/test/java/sample/PalindromeSampleTest.java",
         "rust/unlaxer-runtime/tests/palindrome_sample.rs"
+      ]
+    },
+    {
+      "id": "xml-tag-samples",
+      "category": "contract",
+      "title": "XML tag 使用例のreflection構築サンプル",
+      "hosts": "Java LazyChain/LazyChoice/MatchedTokenParser・NamedCapture/CaptureScope/ReplayParser / Rust public rule composition・capture_owned/capture_scope/Replay・CustomWith adapter",
+      "issues": [
+        1016
+      ],
+      "observation": "Java Usage002_02/03/04 のclass参照で使う NoMixedContentsXmlElements(Paired) をpublicにし、既定surefireが実行するXmlTagSampleTest（元sample4クラス＋共通fixture）へ接続する。製品factoryの非公開constructor制約は変えない。70入力の手書きoracleで、02（名前を比較しない教材段階、<test></test2>受理）、03/04（MatchedTokenParserによる既出名の照合）、scoped（owned capture＋capture scope＋最内名のreplay）の成否/consumed/matched CP/原文をJava/Rust双方でmemo2×診断3に照合する。空要素・入れ子・EOF/不完全・名前一致/不一致・CRLF/TAB/非BMP・prefix cursorを含み、siblings/mixed contentは拒否のまま。03/04が交差した名前（<a><b></a></b>）を受理する旧仕様も保持する。03/04の候補はJava transaction stack順（閉じる要素の名前と完了した子の名前、続いて外側の開き名を内から外）のTagIdentifier名で、空要素の名前も含む。最初に前方一致した候補を消費し、後続候補は再試行しない。#1017のJava修正に合わせ、候補はcloseのたびに現在のtoken stackから取り直し、以前のcloseや同じinstanceの以前の使用で得た一覧を再利用しない。完了した要素のtokenが現在のstackに残っていれば候補に含め、rollbackされた選択肢のtokenは含めない。前方一致する名前の入れ子close（<a><ab></ab></a>の受理、<x><a><ab></ab></ab></x>の拒否、<x><ab><a></a></ab></x>の受理など）も共通期待値とする。Rustの03/04は公開CustomWith adapterで、closeのたびにcapture_sourcesの開き名・空要素名・要素終端の履歴からJavaの候補順を再構成し、履歴は解析とともにrollbackされる。adapterは入力とcaptureだけを読むためreplayableと宣言し、user stateを使わない。照合後の消費は公開parseで行う。xml-tags-current-candidates.tsvの15入力では、class factory instanceをrootにした場合、Choice(Chain(shared,\"!\"),Chain(\"<a><ab/></a>\",shared))で失敗した第1候補の名前が第2候補に残らないこと、同じinstanceを続けて使うChain(shared,shared)で前のrootの名前が開き名の後の候補になり以前のcloseの一覧を使わないことを両言語で照合する。解析中ずっと一覧を持つ旧Javaの挙動へ戻すと、Java・Rustとも両fixtureで失敗する。MatchedTokenParserのslice/effect/reverseと一般の捕捉API移植は#852の範囲で、ここでは完了扱いにしない。sample修正はruntimeホットパス・公開3.3.0を変更しない。",
+      "evidence": [
+        "conformance/samples/xml-tags.tsv",
+        "conformance/samples/xml-tags-current-candidates.tsv",
+        "unlaxer-common/src/test/java/sample/Usage002_02_SimpleXmlTagOpenAndClose.java",
+        "unlaxer-common/src/test/java/sample/Usage002_03_SimpleXmlTagPaired.java",
+        "unlaxer-common/src/test/java/sample/Usage002_04_SimpleXmlTagPaired_alternative.java",
+        "unlaxer-common/src/test/java/sample/XmlTagSampleTest.java",
+        "unlaxer-common/src/test/java/sample/XmlTagSampleContract.java",
+        "rust/unlaxer-runtime/tests/xml_tag_sample.rs",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java"
       ]
     },
     {
