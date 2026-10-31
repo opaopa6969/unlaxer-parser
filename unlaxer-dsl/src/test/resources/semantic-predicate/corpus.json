@@ -1392,5 +1392,91 @@
         }
       }
     ]
+  },
+  {
+    "name": "returned-choice-lookahead-after-astral-prefix",
+    "grammar": "grammar Returned {\n  @ubnf: v2\n  @package: org.example.semanticpredicate\n  token WORD ::= (CHAR_RANGE('a','b') | '😀' | '𠮷')+;\n  token SEP ::= ':';\n  token C_AHEAD = LOOKAHEAD('c')\n  @root @mapping(Result, params=[head, value])\n  Start ::= WORD @head SEP Checked @value 'c' | WORD @head SEP Fallback @value;\n  @predicate('ahead') @mapping(CheckedValue, params=[mark])\n  Checked ::= C_AHEAD | 'z' @mark;\n  @mapping(FallbackValue, params=[text])\n  Fallback ::= 'c' @text;\n}\n",
+    "cases": [
+      {
+        "id": "choice-returned-lookahead-text-keeps-checked",
+        "input": "😀𠮷:c",
+        "bindings": {
+          "ahead": "oneOf:c"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "candidates": [
+          [
+            "c",
+            3,
+            4
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "CheckedValue",
+              "span": [
+                3,
+                3
+              ],
+              "fields": {
+                "mark": null
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "choice-returned-lookahead-text-rejects-empty-only-callback",
+        "input": "😀𠮷:c",
+        "bindings": {
+          "ahead": "oneOf:"
+        },
+        "accepted": true,
+        "prefix": [
+          true,
+          4,
+          4
+        ],
+        "candidates": [
+          [
+            "c",
+            3,
+            4
+          ]
+        ],
+        "ast": {
+          "type": "Result",
+          "span": [
+            0,
+            4
+          ],
+          "fields": {
+            "head": "😀𠮷",
+            "value": {
+              "type": "FallbackValue",
+              "span": [
+                3,
+                4
+              ],
+              "fields": {
+                "text": "c"
+              }
+            }
+          }
+        }
+      }
+    ]
   }
 ]

@@ -183,7 +183,7 @@ public class SemanticPredicateConformanceTest {
             assertPredicateRemovalIsDetected(name, source, cases);
         }
         assertTrue(String.join("\n", mismatches), mismatches.isEmpty());
-        assertEquals("executed corpus cases", 36, executedCases);
+        assertEquals("executed corpus cases", 38, executedCases);
 
         JsonArray invalid = JsonParser.parseString(Files.readString(fixtures.resolve("invalid.json"))).getAsJsonArray();
         for (var element : invalid) {

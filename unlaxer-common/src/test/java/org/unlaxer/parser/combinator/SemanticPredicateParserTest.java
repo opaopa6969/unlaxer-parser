@@ -229,4 +229,146 @@ public class SemanticPredicateParserTest {
             }
         }
     }
+
+    private static final String PREFIX = "😀\r\n";
+
+    /** Builds a shape of conformance/semantic-predicate-source, as Rust builds the same name. */
+    private static Parser shape(String name) {
+        int open = name.indexOf('[');
+        if (open < 0) {
+            switch (name) {
+                case "MO": case "LA": return new MatchOnly(new WordParser("c"));
+                case "&c": return new PegLookahead(new WordParser("c"), true);
+                case "!z": return new PegLookahead(new WordParser("z"), false);
+                case "Empty": return new org.unlaxer.parser.elementary.EmptyParser();
+                case "gen:g": return generated("g");
+                case "gen:": return generated("");
+                default: return new WordParser(name);
+            }
+        }
+        String head = name.substring(0, open);
+        if (head.equals("Rule") || head.startsWith("UBNF:")) {
+            // A generated rule class: LazyChoice for several alternatives, LazyChain otherwise.
+            String body = head.equals("Rule") ? name.substring(open + 1, name.length() - 1) : name.substring(5);
+            var parsers = children(body);
+            if (body.startsWith("Choice[")) {
+                return new LazyChoice() {
+                    private static final long serialVersionUID = 1L;
+                    @Override public org.unlaxer.parser.Parsers getLazyParsers() { return parsers; }
+                };
+            }
+            return new LazyChain() {
+                private static final long serialVersionUID = 1L;
+                @Override public org.unlaxer.parser.Parsers getLazyParsers() { return parsers; }
+            };
+        }
+        var parsers = children(name);
+        switch (head) {
+            case "Choice": return new Choice(parsers);
+            case "Chain": return new Chain(parsers);
+            case "Opt": return new Optional(parsers.get(0));
+            default: throw new IllegalArgumentException(name);
+        }
+    }
+    private static org.unlaxer.parser.Parsers children(String name) {
+        var children = new java.util.ArrayList<Parser>();
+        int depth = 0;
+        int start = name.indexOf('[') + 1;
+        for (int index = start; index < name.length() - 1; index++) {
+            char c = name.charAt(index);
+            if (c == '[') depth++;
+            if (c == ']') depth--;
+            if (c == ',' && depth == 0) {
+                children.add(shape(name.substring(start, index)));
+                start = index + 1;
+            }
+        }
+        children.add(shape(name.substring(start, name.length() - 1)));
+        return new org.unlaxer.parser.Parsers(children.toArray(Parser[]::new));
+    }
+    private static Candidate candidate(String cell) {
+        if (cell.equals("-")) return null;
+        String text = cell.substring(0, cell.indexOf('@')).replace("~", "");
+        int start = Integer.parseInt(cell.substring(cell.indexOf('@') + 1));
+        return new Candidate(text, start, start + text.codePointCount(0, text.length()));
+    }
+    private static List<String[]> rows(String file) throws java.io.IOException {
+        var rows = new java.util.ArrayList<String[]>();
+        for (String row : java.nio.file.Files.readAllLines(java.nio.file.Path.of("../conformance/semantic-predicate-source/" + file))) {
+            if (false == row.startsWith("#")) rows.add(row.split("\t"));
+        }
+        return rows;
+    }
+
+    /**
+     * A Choice and a LazyChoice return the selected child's Parsed and a MatchOnly token its own source,
+     * so the callback decides the parse from that text; collectors and generated text follow the token
+     * kind (shared oracle with Rust, conformance/semantic-predicate-source/classic.tsv).
+     */
+    @Test public void returnedSourceDecidesTheParseInEveryTokenKind() throws java.io.IOException {
+        var rows = rows("classic.tsv");
+        assertEquals(108, rows.size());
+        for (String[] row : rows) for (boolean wantsC : List.of(true, false)) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(PREFIX + "c"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                var seen = new java.util.LinkedHashSet<Candidate>();
+                SemanticPredicateBindings.install(context, Map.of("valid", candidate -> {
+                    seen.add(candidate);
+                    return candidate.text().equals("c") == wantsC;
+                }));
+                assertTrue(new WordParser(PREFIX).parse(context).isSucceeded());
+                var parsed = gate(shape(row[1])).parse(context, TokenKind.valueOf(row[0]), false);
+                String label = String.join(" ", row) + " wantsC=" + wantsC + " " + memo + "/" + diagnostics;
+                Candidate expected = candidate(row[2]);
+                if (expected == null) {
+                    var failure = SemanticPredicateBindings.failure(context).orElseThrow();
+                    assertEquals(label, row[5], failure.kind() + "@" + failure.start());
+                    assertTrue("origin-less text never reaches the callback: " + label, seen.isEmpty());
+                    assertTrue(label, parsed.isFailed());
+                } else {
+                    assertEquals(label, java.util.Set.of(expected), seen);
+                    boolean accepted = expected.text().equals("c") == wantsC;
+                    assertEquals(label, accepted, parsed.isSucceeded());
+                    assertTrue(label, SemanticPredicateBindings.failure(context).isEmpty());
+                }
+                boolean kept = expected != null && expected.text().equals("c") == wantsC;
+                assertEquals(label, kept ? Integer.parseInt(row[3]) : 3, context.getConsumedPosition().value());
+                assertEquals(label, kept ? Integer.parseInt(row[4]) : 3, context.getMatchedPosition().value());
+            }
+          }
+        }
+    }
+
+    /** The same contract decides a whole parse (shared oracle, conformance/semantic-predicate-source/full.tsv). */
+    @Test public void returnedSourceDecidesTheWholeParse() throws java.io.IOException {
+        var rows = rows("full.tsv");
+        assertEquals(21, rows.size());
+        for (String[] row : rows) for (boolean wantsC : List.of(true, false)) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(PREFIX + "c"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                var seen = new java.util.LinkedHashSet<Candidate>();
+                SemanticPredicateBindings.install(context, Map.of("valid", candidate -> {
+                    seen.add(candidate);
+                    return candidate.text().equals("c") == wantsC;
+                }));
+                var parsed = new SemanticPredicateScope(new Chain(new WordParser(PREFIX),
+                    new SemanticPredicateParser(shape(row[0]), "valid"), new WordParser("c")), List.of("valid")).parse(context);
+                boolean accepted = parsed.isSucceeded() && context.getConsumedPosition().value() == 4;
+                String label = String.join(" ", row) + " wantsC=" + wantsC + " " + memo + "/" + diagnostics;
+                Candidate expected = candidate(row[1]);
+                if (expected == null) {
+                    var failure = SemanticPredicateBindings.failure(context).orElseThrow();
+                    assertEquals(label, row[2], failure.kind() + "@" + failure.start());
+                    assertTrue(label, seen.isEmpty());
+                    assertFalse(label, accepted);
+                } else {
+                    assertEquals(label, java.util.Set.of(expected), seen);
+                    assertEquals(label, expected.text().equals("c") == wantsC, accepted);
+                }
+            }
+          }
+        }
+    }
 }

@@ -27,7 +27,8 @@ public abstract class ContainerParser<T> extends NoneChildParser {
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-		// An empty input view, as for WordParser(""): Token.empty has no root for a root context.
+		// A zero-length view of the input at the consumed cursor. Token.empty cannot be used here:
+		// in a root context its "" belongs to a new root, not the input, so it reads as generated.
 		Token token = new Token(
 				tokenKind,
 				parseContext.peek(parseContext.getConsumedPosition(), new CodePointLength(0)),

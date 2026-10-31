@@ -375,15 +375,28 @@ impl<'a> ParseContext<'a> {
             }
         };
         let start = self.mode_cursor();
-        let fragment = self.expression(child, depth)?;
-        let source = fragment.source.as_deref().filter(|source| source.classic);
-        // As for @f, inspect the Parsed source a Classic Choice/rule returned, not its collection.
-        if fragment
+        // Like capture_owned, read the Parsed root a Choice/rule returned, not its collection.
+        // Only this subtree records input-backed returned sources; memo keys keep them apart.
+        let tracked = std::mem::replace(&mut self.track_owned_source, true);
+        let fragment = self.expression(child, depth);
+        self.track_owned_source = tracked;
+        let fragment = fragment?;
+        // As Java, a success that returned no token (a PEG assertion, or a Choice that selected
+        // one) is the cursor span of the input. Otherwise a virtual collector that kept nothing
+        // is generated "", as its CST token and capture_owned already are.
+        let source = fragment
             .parsed_source()
-            .is_some_and(|source| source.generated || source.text.is_some())
-        {
-            // Projected or generated text has no original input span to report.
-            let at = source.map_or_else(|| self.code_point(start), |source| source.span.start);
+            .filter(|_| !self.classic_returned_no_token(&fragment.nodes));
+        if source.is_some_and(|source| {
+            source.generated
+                || source.text.is_some()
+                || source.kind.is_virtual() && source.span.start == source.span.end
+        }) {
+            // Projected or generated text has no original input span to report. As Java's
+            // emptyAt, generated or empty text anchors at the child's start, never a host anchor.
+            let at = source
+                .filter(|source| !source.generated && source.span.start != source.span.end)
+                .map_or_else(|| self.code_point(start), |source| source.span.start);
             session.reject(
                 "predicate_source",
                 Span { start: at, end: at },
@@ -770,6 +783,105 @@ mod tests {
                     &["registered predicate valid".to_owned()][..]
                 )
             );
+        }
+    }
+
+    fn deep(context: &mut ParseContext<'_>) -> crate::ParseResult {
+        context.parse(&Expr::Custom(deep))
+    }
+
+    #[test]
+    fn returned_source_tracking_is_scoped_to_the_predicate_child() {
+        let choice = || Expr::choice([Expr::literal("c").match_only(), Expr::Literal("z")]);
+        for options in all_options() {
+            // Ordinary true/false, a sticky predicate_source and a resource failure all restore it.
+            for (child, verdict) in [
+                (choice(), true),
+                (choice(), false),
+                (Expr::Custom(generated), true),
+                (Expr::Custom(deep), true),
+            ] {
+                let mut context =
+                    ParseContext::with_semantic_predicates("c", &always(verdict), options);
+                let _ = context.parse(&scope(gate(child)));
+                assert!(!context.track_owned_source, "{options:?}");
+            }
+            // A reused context still reads the returned "c" and keeps ordinary parses untracked.
+            let seen = Arc::new(std::sync::Mutex::new(vec![]));
+            let record = Arc::clone(&seen);
+            let bindings = Bindings::new()
+                .with("valid", move |candidate| {
+                    record.lock().unwrap().push(candidate.text.to_owned());
+                    candidate.text == "c"
+                })
+                .unwrap();
+            let mut context = ParseContext::with_semantic_predicates("c", &bindings, options);
+            for _ in 0..2 {
+                assert!(context.parse(&scope(gate(choice()))).is_ok());
+                assert!(!context.track_owned_source);
+                assert!(context.parse(&choice()).is_ok());
+            }
+            assert_eq!(*seen.lock().unwrap(), ["c", "c"]);
+        }
+    }
+
+    #[test]
+    fn rule_memo_keeps_tracked_and_untracked_results_apart() {
+        // R is evaluated twice at the same cursor, outside and inside the predicate in both
+        // orders and twice inside, for the UBNF LOOKAHEAD and the Classic MatchOnly.
+        for ahead in [
+            Expr::JavaLookahead {
+                pattern: "c",
+                positive: true,
+            },
+            Expr::literal("c").match_only(),
+        ] {
+            let rule = Rule {
+                name: "r",
+                expression: Expr::choice([ahead.clone(), Expr::Literal("z")]),
+            };
+            let pairs = [
+                (Expr::Rule(1), gate(Expr::Rule(1))),
+                (gate(Expr::Rule(1)), Expr::Rule(1)),
+                (gate(Expr::Rule(1)), gate(Expr::Rule(1))),
+            ];
+            for (pair, (first, second)) in pairs.into_iter().enumerate() {
+                let start = Rule {
+                    name: "start",
+                    expression: scope(Expr::choice([
+                        Expr::sequence([first, Expr::Literal("z")]),
+                        Expr::sequence([second, Expr::Literal("c")]),
+                    ])),
+                };
+                for wants_c in [true, false] {
+                    let mut outcomes = vec![];
+                    for options in all_options() {
+                        let seen = Arc::new(std::sync::Mutex::new(vec![]));
+                        let record = Arc::clone(&seen);
+                        let bindings = Bindings::new()
+                            .with("valid", move |candidate| {
+                                record.lock().unwrap().push(candidate.text.to_owned());
+                                (candidate.text == "c") == wants_c
+                            })
+                            .unwrap();
+                        let mut context =
+                            ParseContext::with_semantic_predicates("c", &bindings, options);
+                        let result =
+                            context.parse_grammar(vec![start.clone(), rule.clone()], 0, false);
+                        let seen = seen.lock().unwrap().clone();
+                        assert!(!seen.is_empty() && seen.iter().all(|text| text == "c"));
+                        assert!(!context.track_owned_source);
+                        // Twice inside, the second evaluation replays the tracked entry.
+                        if pair == 2 && options.memoization == Memoization::SafeFailures {
+                            assert!(context.memoized_success_hits() > 0 || !wants_c);
+                        }
+                        outcomes.push(format!("{result:?} {}", context.position()));
+                    }
+                    // A memo hit must not change the result or the cursor of a diagnostic mode.
+                    let (off, safe) = outcomes.split_at(outcomes.len() / 2);
+                    assert_eq!(off, safe);
+                }
+            }
         }
     }
 

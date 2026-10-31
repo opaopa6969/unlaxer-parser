@@ -1511,6 +1511,30 @@ impl ParseContext<'_> {
         }
         fragment
     }
+    /// Whether a Classic result returned no token, as a Java Parsed that is neither collected nor
+    /// has original tokens: a node-less success, or a Choice that selected one (its `original`),
+    /// also through the rule node of such a Choice (a Java LazyChoice returns that Parsed).
+    pub(crate) fn classic_returned_no_token(&self, nodes: &[usize]) -> bool {
+        let selected_no_token = |index: usize| {
+            self.tokens.values.get(&index).is_some_and(|info| {
+                matches!(
+                    info.parser,
+                    Some("Choice" | "LongestChoice" | "UniqueLongestChoice")
+                ) && info.original.as_deref() == Some(&[][..])
+            })
+        };
+        self.token_mode.is_some()
+            && match nodes {
+                [] => true,
+                &[index] => {
+                    selected_no_token(index)
+                        || matches!(&self.nodes[index], node
+                            if node.rule < self.rules.len()
+                                && matches!(node.children[..], [child] if selected_no_token(child)))
+                }
+                _ => false,
+            }
+    }
     pub(crate) fn mark_classic_node(&mut self, index: usize, source: &FragmentSource) {
         let id = self.token_node_id(index).expect("new node");
         let value = Rc::make_mut(&mut self.tokens)
