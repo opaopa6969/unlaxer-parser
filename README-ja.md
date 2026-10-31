@@ -159,6 +159,8 @@ MulOp ::= '*' | '/' ;
 
 開発ブランチでは、3.3.0公開後の追加として [`CI('word')` のUnicode固定比較](docs/case-insensitive-tokens.md)をJava/Rust両方に実装しています。JDKのUnicode版による差とJavaの誤った枝刈りを解消します。この追加は公開済み3.3.0には含まれません。
 
+同じく未公開の追加として、規則注釈 [`@predicate('name')`](docs/semantic-predicates.md) で、呼出し側が名前で登録した純粋な条件を規則の候補（原文と code point 範囲）に適用できます。`false` は候補を巻き戻して次の候補へ進み、未登録や callback の失敗は `predicate_missing` / `predicate_error` の明示診断になります。Java 生成 parser（`parseWithPredicates`）、Java host の Rust 生成物、native Rust 生成物（`parse_tree_detailed_with_semantic_predicates`）を同じ手書き期待値で検証しています。性能は未測定です。
+
 残る境界は [full-spec 対応表](rust/FULL-SPEC.md) と [IDE 棚卸し](docs/lsp-dap-ide-gap-inventory.md) を参照してください。Rust の増分解析、LSP cancellation / semantic tokens / rename・format transport、一部の token・annotation は未対応です。DAP の AST/token ステップは実装済みですが、live evaluator の停止・再開ではありません。数値 capture の型・変換や一部の診断にも Java/Rust 差があり、全 Java 文法の互換性は保証しません。
 
 下流の `tinyexpression-rs` と `rustcodeblock` AOT は実在しますが、別 engine の **ubnfc** による実装です。その成果を Classic Rust の全面互換性や本番実績の証拠とは扱いません。[engine の選び方](docs/engine-selection-guide-ja.md)と[固定 revision の監査](rust/FULL-SPEC.md#下流tinyexpressionの現状監査2026-09-30)を参照してください。

@@ -76,6 +76,12 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
     public record NameResolutionScope(Expression child, List<NameRequirement> requirements) implements Expression {
         public NameResolutionScope { requirements=List.copyOf(requirements); }
     }
+    /** Caller-registered pure postcondition over this rule's original matched text (#1006). */
+    public record SemanticPredicate(Expression child, String name) implements Expression {}
+    /** Entry boundary validating every declared predicate before the body runs. */
+    public record SemanticPredicateScope(Expression child, List<String> requirements) implements Expression {
+        public SemanticPredicateScope { requirements = List.copyOf(requirements); }
+    }
     public enum RecoveryMode { SYNC, BEFORE_SYNC, SKIP }
     /** Rule-level transactional recovery; a recovered tree must not be mapped as a normal AST. */
     public record Recovery(Expression child, RecoveryMode mode, List<String> tokens, String message)
@@ -92,7 +98,7 @@ public record GrammarIR(List<Rule> rules, int root, boolean javaWhitespace) {
         CaptureBoundary, OptionalExpr, Repeat, Separated, AnyToken, EofToken, EmptyToken, CaseInsensitiveToken, ErrorExpected, CharRangeToken,
         ExceptToken, UntilToken, LookaheadToken, Delimited, IdentifierToken, GraphemeToken, QuotedToken,
         CodeStartToken, CodeEndToken, LongCodeBlockToken, CustomToken, TextValue, ValueBoundary, TriviaScope, RuleEffects,
-        CaptureEquality, NamePredicate, NameResolutionScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope, GeneralBody, Replay, CatchLabels {}
+        CaptureEquality, NamePredicate, NameResolutionScope, SemanticPredicate, SemanticPredicateScope, Recovery, LexicalToken, LexicalTriviaScope, LexicalContextScope, GeneralBody, Replay, CatchLabels {}
     public record LexicalContextScope(Expression child, List<org.unlaxer.dsl.runtime.Lexing.Terminal> terminals) implements Expression {
         public LexicalContextScope { terminals = List.copyOf(terminals); }
     }

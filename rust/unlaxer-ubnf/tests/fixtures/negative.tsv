@@ -25,6 +25,13 @@ lexical-context-wrong-order	grammar G { @lexicalContext(literals=['x'], tokens=[
 name-predicate-bare	grammar G { @namePredicate R ::= 'x'; }
 name-predicate-order	grammar G { @namePredicate(version='v1',snapshot='s',name='n',kind='type') R ::= 'x'; }
 name-predicate-missing-kind	grammar G { @namePredicate(snapshot='s',version='v1',name='n') R ::= 'x'; }
+predicate-bare	grammar G { @predicate R ::= 'x'; }
+predicate-unquoted	grammar G { @predicate(valid) R ::= 'x'; }
+predicate-two-arguments	grammar G { @predicate('x','y') R ::= 'x'; }
+predicate-named-argument	grammar G { @predicate(name='x') R ::= 'x'; }
+predicate-spaced-at-arguments	grammar G { @ predicate('x') R ::= 'x'; }
+predicate-double-quoted	grammar G { @predicate("x") R ::= 'x'; }
+predicate-plural-arguments	grammar G { @predicates('x') R ::= 'x'; }
 eval-duplicate-kind	grammar G { @eval(kind='literal', kind='literal') R ::= 'x'; }
 eval-duplicate-strategy	grammar G { @eval(kind='literal', strategy='manual',strategy='default') R ::= 'x'; }
 eval-duplicate-param	grammar G { @eval(kind='literal', x='a',x='b') R ::= 'x'; }

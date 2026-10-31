@@ -693,6 +693,10 @@
       "state": "OPEN",
       "title": "parity(lsp): JSON-RPC reader のキー順・positional arity・capabilities null による id 回復と無応答を照合する"
     },
+    "1006": {
+      "state": "OPEN",
+      "title": "feat(ubnf): 名前付き汎用 semantic predicate を Java/Rust の生成 parser に接続する"
+    },
     "1007": {
       "state": "OPEN",
       "title": "fix(parser): Java 共有 parser graph の遅延cacheを並行解析へ安全に公開する"
@@ -700,6 +704,18 @@
     "1009": {
       "state": "OPEN",
       "title": "test(sample): 名前付き parser の入れ子クラスを公開し Usage001 を通常回帰へ接続する"
+    },
+    "1016": {
+      "state": "OPEN",
+      "title": "fix(sample): XML 3 使用例の反射アクセスを修正して通常回帰へ接続する"
+    },
+    "1017": {
+      "state": "OPEN",
+      "title": "fix(sample): Palindrome の MatchOnly と source slice/reverse を実入力で回復する"
+    },
+    "1023": {
+      "state": "OPEN",
+      "title": "parity: owned capture・@f と非 Classic collector の返却 source を Java NamedCapture / Chain と揃える"
     }
   },
   "entries": [
@@ -1021,6 +1037,7 @@
         "spec-corpus/family-projection/invalid-cases.json",
         "unlaxer-dsl/src/test/resources/unique-longest/invalid.json",
         "unlaxer-dsl/src/test/resources/name-predicate/invalid.json",
+        "unlaxer-dsl/src/test/resources/semantic-predicate/invalid.json",
         "unlaxer-dsl/src/test/resources/ambiguity-boundaries/invalid.json",
         "rust/unlaxer-generator/tests/fixtures/portability/structure-priority.json",
         "rust/unlaxer-generator/tests/portability.rs",
@@ -2386,7 +2403,7 @@
         983,
         996
       ],
-      "observation": "Java参照でCHAR_RANGEのv1 BMP境界/順序・v2 escape/scalar境界/range・宣言的字句range・@eval重複引数を最初の値診断として保留する。全体構文（後続grammarと末尾を含む）が成功してからJava mapper順で報告し、旧REGEX/旧adapterとの順序を保つ。宣言的字句repeatのoverflow/逆転/入れ子上限はJavaでも構文検証なので維持し、不正recovery modeも構文に分類する。正常入力に追加走査/診断用確保を増やさず、仮ASTは外へ返さない。79形×入口/local import×LF/CRLFで両実CLI2528観測とfrontend158入力を固定期待値へ照合。check JSON全文、Playground stderr、generate/deps inspectの失敗段階/位置/終了3、出力/staging不在と入力不変を検証。Java製品・公開3.3.0は不変。native固有の規則本体入れ子上限後の構文走査は#996に分離し、#983全体は未完了。",
+      "observation": "Java参照でCHAR_RANGEのv1 BMP境界/順序・v2 escape/scalar境界/range・宣言的字句range・@eval重複引数を最初の値診断として保留する。全体構文（後続grammarと末尾を含む）が成功してからJava mapper順で報告し、旧REGEX/旧adapterとの順序を保つ。宣言的字句repeatのoverflow/逆転/入れ子上限はJavaでも構文検証なので維持し、不正recovery modeも構文に分類する。正常入力に追加走査/診断用確保を増やさず、仮ASTは外へ返さない。79形×入口/local import×LF/CRLFで両実CLI2528観測とfrontend158入力を固定期待値へ照合。check JSON全文、Playground stderr、generate/deps inspectの失敗段階/位置/終了3、出力/staging不在と入力不変を検証。Java製品・公開3.3.0は不変。native固有の規則本体入れ子上限後の構文走査は#996の明示stack認識で対応。Java frame上限後の残差は別契約として保持する。",
       "evidence": [
         "docs/regex-retirement.md",
         "rust/unlaxer-ubnf/src/parser.rs",
@@ -2535,18 +2552,24 @@
     },
     {
       "id": "frontend-nesting-stops-syntax",
-      "category": "unresolved",
-      "title": "native の規則本体入れ子上限が後続構文不正を隠す",
+      "category": "contract",
+      "title": "native の AST 入れ子上限後の構文認識と Java frame 境界",
       "hosts": "Java CodegenMain / native Rust unlaxer",
       "issues": [
         983,
-        996
+        996,
+        741
       ],
-      "observation": "旧REGEX→group128〜168段→S ::= ;はJavaのP-SYNTAXに対しnativeが上限で停止し先行移行診断を返す。構文正常時の#985の診断優先と2MiB stack/再帰AST破棄の保証を維持する必要があり、単純に上限を増やさず#996で安全な継続を設計する。",
+      "observation": "本体128段のAST構築/破棄上限を維持し、上限到達時だけVec<Task>の反復認識へ切り替える。全体構文/後続grammar/末尾を読み切ってからJava mapper順の値/移行診断を返し、構文不正を優先する。認識器はASTを作らずO(入力長)時間/補助空間で、16形10,000段もRust1.85 debug/2MiBで有限応答する。Javaの製品とframe1024は不変。group/optional/repeat/builtin/引数付き規則168段、左選択126、右選択167、separator側112のJava最終/次段を実測して通常/snapshot APIの例外型/code/limit/offsetを固定した。次段のJava ParseLimitException（check/generateの未捕捉終了1、Playground終了4・inspect終了3）とnativeのSyntax/mapper/NestingLimitの差は#741の既存資源モデル契約として残し、通常P-SYNTAXと混同しない。regex suiteを107形追加し計127形×入口/local import×LF/CRLFでCLI4064観測/frontend254入力を独立oracleへ比較し、入力不変/出力とstaging不在も固定する。正常入力に追加走査/認識stack確保はない。",
       "evidence": [
         "docs/regex-retirement.md",
         "docs/java-parser-limits.md",
-        "rust/unlaxer-ubnf/src/parser.rs"
+        "rust/unlaxer-ubnf/src/parser.rs",
+        "rust/unlaxer-ubnf/src/parser/recognition.rs",
+        "rust/unlaxer-ubnf/tests/diagnostic_priority.rs",
+        "spec-corpus/cli-stderr.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/RustUbnfFrontendConformanceTest.java",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/CliStderrConformanceTest.java"
       ]
     },
     {
@@ -2603,6 +2626,92 @@
         "unlaxer-common/src/test/java/sample/NamedConcreteSampleTest.java",
         "rust/unlaxer-runtime/tests/named_concrete_sample.rs"
       ]
+    },
+    {
+      "id": "terminated-repeat",
+      "category": "contract",
+      "title": "任意terminator付き反復の Rust 表現",
+      "hosts": "Java Classic / Rust runtime（Classic・通常入口）",
+      "issues": [
+        846,
+        716
+      ],
+      "observation": "Java の ChildOccursWithTerminator / Lazy* / Optional / ZeroOrOne / Repeat#newWithTerminator / WildCardStringTerminatorParser は Rust `Expr::repeat_java_until(terminator, min, max)` へ移し、terminated-repeat corpus（732行・所有状態24行）で受理・両cursor・原tokenとkind別CST・失敗CP・capture/user state・rollbackを両言語で比較する。wrappers（2342行・23 scenario）で Commit/Label/伝播 wrapper/Not/PegLookahead など CollectingParser の terminator の二重収集、cut/label 後の失敗と Choice/MatchOnly 越しの raise、生成形 rule、token trace の葉を、raised-state（112行）で cut/label/CatchLabels 下の state rollback を、resource-abort の4行で資源失敗の復元を比べる。意図した差は表現だけ: Class/Supplier/Lazy・Name・ASTNodeKind は Expr 値と Rule 名（#845）、Rust には token stack がなく常に1、Classic label は比較しない。生成形（LazyChain/LazyChoice）の rule terminator は Java の二重収集と Rust の Rule node の段数が一致し、手書きの非 collecting rule class が1段深いのは terminator 以外と同じ既存の #845 境界。ParserWrapper/ParserHolder/MappedSingleCharacterParserHolder は holders（900行・9 scenario）で、Java の全 constructor と Rust の既存公開 API recipe（既定形は `p.stop_consume().stop_invert()`、matchOnly 固定は `p.match_only()`、matchOnly+invert 固定は `p.invert_match().match_only()`、ParserHolder(MatchOnly) は `p.match_only().stop_consume().stop_invert()`）を terminator・body・Chain 要素の位置で比べる。consumed+invert 固定（CST が1段深い）・virtual kind 固定・createMetaToken=false・custom parser 経路は #853 / meta-function の境界として未検証。Java だけ DETAILED_ON_FAILURE で受理が変わる1行は #861 で、Java テストに既知差として明示し、#862 の merge 後に外す。新しい式は memo 不安全・snapshot cache 非承認（#184）。既存 JavaUntil の Classic CST で終端 Choice が1段浅かった差はこの変更で解消した。",
+      "evidence": [
+        "conformance/terminated-repeat/README.md",
+        "conformance/terminated-repeat/cases.tsv",
+        "conformance/terminated-repeat/state.tsv",
+        "conformance/terminated-repeat/wrappers.tsv",
+        "conformance/terminated-repeat/holders.tsv",
+        "conformance/terminated-repeat/raised-state.tsv",
+        "conformance/resource-abort/cases.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/TerminatedRepeatParityTest.java",
+        "rust/unlaxer-runtime/tests/terminated_repeat.rs"
+      ]
+    },
+    {
+      "id": "palindrome-sample",
+      "category": "contract",
+      "title": "MatchOnly + MatchedTokenParser の slice/reverse/effect 回文サンプル",
+      "hosts": "Java MatchOnly/MatchedTokenParser / Rust owned capture + Custom adapter",
+      "issues": [
+        1017
+      ],
+      "observation": "Java Usage003の5 recipe（sliceWithWord・sliceWithSlicer・effectReverse・sliceReverse・pythonian）を既定surefireのPalindromeSampleTestから実sampleのまま実行する。Javaの欠陥2点を修正: 空の投影（偶数語の空pivot・1文字語の空の前半）が2.xのSource移行以降つねに失敗していたものを入力に紐づく幅0 tokenの成功へ戻し（反転時は失敗、WordParser(\"\")＝UBNF ''の不一致契約は維持）、context全体に残りrollback済み・前回の候補を使い続けるmatchedToken cacheを撤去して毎回現在のtoken stackから候補を取る。26行（奇数/偶数/1文字/空/非回文/非BMPとéの拒否/CRLF/同一instanceの再利用/外側Choice失敗後の再試行）の成否・consumed/matched CP・各stepの入力span（空pivotは幅0）を手書きの独立期待値でJava（memo2×診断3、CSTのWordParser tokenが入力由来subSource）とRust（同、最新owned bindingを選びJava Slicer同等のCP投影を照合し入力由来の消費leafを公開するCustom adapter、capture_scopeで寿命を限定）に照合する。RustにMatchedTokenParser相当の公開APIはなく、adapterは移植例（#852は継続）。Classic反転は空投影の単体検査のみ、MatchOnlyで包んだ回文全体は内側MatchOnlyがmatch-only cursorを語末へ進めるため修正前後とも不成立で対象外。性能は#197凍結中で未測定、公開3.3.0は変更しない。",
+      "evidence": [
+        "conformance/samples/palindrome.tsv",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java",
+        "unlaxer-common/src/test/java/sample/Usage003_01_Palindrome.java",
+        "unlaxer-common/src/test/java/sample/PalindromeSampleTest.java",
+        "rust/unlaxer-runtime/tests/palindrome_sample.rs"
+      ]
+    },
+    {
+      "id": "xml-tag-samples",
+      "category": "contract",
+      "title": "XML tag 使用例のreflection構築サンプル",
+      "hosts": "Java LazyChain/LazyChoice/MatchedTokenParser・NamedCapture/CaptureScope/ReplayParser / Rust public rule composition・capture_owned/capture_scope/Replay・CustomWith adapter",
+      "issues": [
+        1016
+      ],
+      "observation": "Java Usage002_02/03/04 のclass参照で使う NoMixedContentsXmlElements(Paired) をpublicにし、既定surefireが実行するXmlTagSampleTest（元sample4クラス＋共通fixture）へ接続する。製品factoryの非公開constructor制約は変えない。70入力の手書きoracleで、02（名前を比較しない教材段階、<test></test2>受理）、03/04（MatchedTokenParserによる既出名の照合）、scoped（owned capture＋capture scope＋最内名のreplay）の成否/consumed/matched CP/原文をJava/Rust双方でmemo2×診断3に照合する。空要素・入れ子・EOF/不完全・名前一致/不一致・CRLF/TAB/非BMP・prefix cursorを含み、siblings/mixed contentは拒否のまま。03/04が交差した名前（<a><b></a></b>）を受理する旧仕様も保持する。03/04の候補はJava transaction stack順（閉じる要素の名前と完了した子の名前、続いて外側の開き名を内から外）のTagIdentifier名で、空要素の名前も含む。最初に前方一致した候補を消費し、後続候補は再試行しない。#1017のJava修正に合わせ、候補はcloseのたびに現在のtoken stackから取り直し、以前のcloseや同じinstanceの以前の使用で得た一覧を再利用しない。完了した要素のtokenが現在のstackに残っていれば候補に含め、rollbackされた選択肢のtokenは含めない。前方一致する名前の入れ子close（<a><ab></ab></a>の受理、<x><a><ab></ab></ab></x>の拒否、<x><ab><a></a></ab></x>の受理など）も共通期待値とする。Rustの03/04は公開CustomWith adapterで、closeのたびにcapture_sourcesの開き名・空要素名・要素終端の履歴からJavaの候補順を再構成し、履歴は解析とともにrollbackされる。adapterは入力とcaptureだけを読むためreplayableと宣言し、user stateを使わない。照合後の消費は公開parseで行う。xml-tags-current-candidates.tsvの15入力では、class factory instanceをrootにした場合、Choice(Chain(shared,\"!\"),Chain(\"<a><ab/></a>\",shared))で失敗した第1候補の名前が第2候補に残らないこと、同じinstanceを続けて使うChain(shared,shared)で前のrootの名前が開き名の後の候補になり以前のcloseの一覧を使わないことを両言語で照合する。解析中ずっと一覧を持つ旧Javaの挙動へ戻すと、Java・Rustとも両fixtureで失敗する。MatchedTokenParserのslice/effect/reverseと一般の捕捉API移植は#852の範囲で、ここでは完了扱いにしない。sample修正はruntimeホットパス・公開3.3.0を変更しない。",
+      "evidence": [
+        "conformance/samples/xml-tags.tsv",
+        "conformance/samples/xml-tags-current-candidates.tsv",
+        "unlaxer-common/src/test/java/sample/Usage002_02_SimpleXmlTagOpenAndClose.java",
+        "unlaxer-common/src/test/java/sample/Usage002_03_SimpleXmlTagPaired.java",
+        "unlaxer-common/src/test/java/sample/Usage002_04_SimpleXmlTagPaired_alternative.java",
+        "unlaxer-common/src/test/java/sample/XmlTagSampleTest.java",
+        "unlaxer-common/src/test/java/sample/XmlTagSampleContract.java",
+        "rust/unlaxer-runtime/tests/xml_tag_sample.rs",
+        "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedTokenParser.java"
+      ]
+    },
+    {
+      "id": "semantic-predicate",
+      "category": "contract",
+      "title": "UBNF @predicate の名前付き純粋条件と entry 診断",
+      "hosts": "Java / Rust（Java-host・native）",
+      "issues": [
+        1006,
+        851,
+        1023
+      ],
+      "observation": "#1006: `@predicate('name')` は Java 生成 parser・Java-host Rust・native Rust の3 consumer を別々に compile・実行し、semantic-predicate/corpus.json の手書き期待値（8文法38ケース。wrapper class 名が規則・token class と重なる文法、astral・家族絵文字・CRLF の後ろで start が 0 でない候補、CP 3 の LOOKAHEAD / NEGATIVE_LOOKAHEAD / nullable 規則の true・false fallback・syntax 失敗、CP 3 の複数代替規則 `Checked ::= LOOKAHEAD('c') | 'z'` が返す \"c\" で callback が代替を選ぶ2ケースを含む）で prefix cursor・候補 text/CP span 集合・AST 全field/node span・診断 kind/offset/期待名を診断 mode 3種と memo OFF/ON で照合する。候補は rule-local trivia を含む原文で AST source span と同じ範囲、nullable は空 span。false は通常失敗、未登録（未到達 rule 分を含む）・callback 例外/Err/unwind panic・投影/生成 source（空 text を含む）は sticky の predicate_missing / predicate_error / predicate_source。token を返さない成功（PegLookahead / node なし match）は cursor 区間、Java ContainerParser の空 token は入力上の幅0 view で評価し、Java Choice / 生成規則の LazyChoice と Rust Classic Choice/rule は返した Parsed 原文を候補にし（Rust は述語の子の評価中だけ返却 source を記録）、virtual 種別で何も収集しない collector は生成 source として predicate_source、生成・空 text の位置は子の開始、空でない投影は論理開始とすることを、両 runtime が同じ手書き表 conformance/semantic-predicate-source/{classic,full}.tsv（4 token 種別×27形の108行、full-input 21形）と Java 実測の virtual-input.tsv（prefix 0/1/3×4 token 種別×29形の348行）で照合する。token 種別と由来は独立で、入力由来の空 virtual token は直接・Choice 越しに全種別で候補になり、それを収集した virtual collector だけが生成 \"\"（Rust は種別と span から推定せず collector が公開した token の由来で判定）。UBNF lowering は PEG assertion・生成 token・container・virtual 種別に届かないため、これらは corpus 外。収集 wrapper 内の生成 token は wrapper の収集 source に寄与しない両言語共通の限界を契約文書に記す。invalid.json の24件は両 frontend が生成前に拒否し、Java validator と native validation の最初の error code、および Java 生成器・Java-host・native 生成の文言（nativeMessage を含む）が一致する。@embedding/@embedded との併用も E-PREDICATE-COMBINATION、不正な @namePredicate / @lexicalContext が並ぶ文法はそれぞれの code を先に出す。Java の wrapper class 名は文法だけから衝突しない名前（_1 等の接尾辞）を決め、拒否しない。意図した差: Rust 低水準 ParseContext に registry を install しない場合、scope は sticky 失敗を残さず失敗し semantic_predicate_failure() は None（Java の SemanticPredicateBindings.failure は predicate_missing）。生成 API と full-input API は両言語とも predicate_missing で一致する。Rust は panic=abort では callback panic を捕捉できない。Java の規則 class・getRootSyntaxParser() の直接利用は述語を通らない（Rust は失敗する）低水準の差で、生成 mapper の解析入口は両言語とも述語を通る。Rust full-input 入口（root 非 Classic）で低水準の Classic MatchOnly を Optional が包む形は Rust が \"c\"・Java が \"\" で、同じ差が既存の capture_owned + Replay でも master から出る（述語固有でなく、UBNF からは届かない。#1023）。Java も解析中に投影 source を作れ、Java の Chain と Rust の Classic Chain は投影を収集して predicate_source（論理開始、空は子の開始）になる。Rust full-input 入口の非 Classic Sequence だけが host の投影 token を収集せず入力 \"\" で callback を呼ぶ（capture_owned と同じ値。collector 一般の既存差として #1023 で追跡、UBNF からは届かない）。virtual 種別の PEG assertion・入力由来の空 virtual token を capture_owned が Generated にする差も #1023。任意 CST predicate は #851 の範囲で、この text API で完了扱いにしない。性能は未測定（#197 凍結）。",
+      "evidence": [
+        "docs/semantic-predicates.md",
+        "unlaxer-dsl/src/test/resources/semantic-predicate/corpus.json",
+        "unlaxer-dsl/src/test/resources/semantic-predicate/invalid.json",
+        "unlaxer-dsl/src/test/java/org/unlaxer/dsl/codegen/SemanticPredicateConformanceTest.java",
+        "conformance/semantic-predicate-source/classic.tsv",
+        "conformance/semantic-predicate-source/full.tsv",
+        "conformance/semantic-predicate-source/virtual-input.tsv",
+        "rust/unlaxer-runtime/src/semantic_predicates.rs",
+        "rust/unlaxer-generator/tests/semantic_predicate.rs",
+        "rust/unlaxer-runtime/tests/semantic_predicate_source.rs",
+        "rust/unlaxer-runtime/tests/semantic_predicate_virtual_input.rs",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/SemanticPredicateParserTest.java"
+      ]
     }
   ],
   "corpora": [
@@ -2613,10 +2722,11 @@
         "rust": 11,
         "nativeSyntax": 5,
         "nativeExpected": 3,
-        "nativeByEnding": 228,
-        "javaError": 222,
-        "native": 234,
-        "javaAst": 12
+        "nativeByEnding": 442,
+        "javaError": 406,
+        "native": 448,
+        "javaAst": 12,
+        "javaLimit": 30
       },
       "entries": [
         "cli-stderr-presentation",
@@ -2628,7 +2738,8 @@
         "qualified-reference-prefix-trivia",
         "local-rule-module-error-path",
         "frontend-value-validation-before-syntax",
-        "module-rejection-target-context"
+        "module-rejection-target-context",
+        "frontend-nesting-stops-syntax"
       ]
     },
     {
@@ -3290,6 +3401,16 @@
       },
       "entries": [
         "parser-construction-boundary"
+      ]
+    },
+    {
+      "path": "unlaxer-dsl/src/test/resources/semantic-predicate/invalid.json",
+      "fields": {
+        "nativeMessage": 24
+      },
+      "entries": [
+        "semantic-predicate",
+        "generator-diagnostics"
       ]
     }
   ],

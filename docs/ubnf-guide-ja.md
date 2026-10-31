@@ -524,6 +524,7 @@ grammar ExtendedCalc {
 | `@leftAssoc` / `@rightAssoc` | アノテーション | 安定 |
 | `@longestChoice` | アノテーション | 安定 (v3.0.15+) |
 | `@predictiveChoice` | アノテーション | 開発版 |
+| `@predicate('name')` | アノテーション | 開発版（[semantic predicate](semantic-predicates.md)） |
 | `@whitespace` | グローバル設定 | 安定 |
 | `@comment` | グローバル設定 | 安定 |
 | `@enum` | アノテーション | 安定 (v3.0+) |

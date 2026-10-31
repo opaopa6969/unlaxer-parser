@@ -165,6 +165,7 @@ fn generate_resolved(
     runtime!("names.rs");
     runtime!("semantic.rs");
     runtime!("semantic_rules.rs");
+    runtime!("semantic_predicates.rs");
     runtime!("editor.rs");
     runtime!("editor_cst.rs");
     runtime!("editor_queries.rs");

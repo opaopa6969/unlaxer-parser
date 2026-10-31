@@ -28,6 +28,8 @@ fn collect(expression: &Expression, keywords: &mut Vec<String>) {
         }
         RuleEffects { child, .. }
         | CaptureEquality { child, .. }
+        | SemanticPredicate { child, .. }
+        | SemanticPredicateScope { child, .. }
         | Recovery { child, .. }
         | OptionalExpr(child)
         | Repeat { child, .. }
