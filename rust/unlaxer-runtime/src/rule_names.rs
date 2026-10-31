@@ -202,6 +202,13 @@ fn first_out_of_range(expression: &Expr, rules: usize) -> Option<usize> {
                 pending.push(alternative);
                 pending.push(child);
             }
+            // The terminator runs before each body attempt, so it is checked first.
+            Expr::JavaTerminatedRepeat {
+                child, terminator, ..
+            } => {
+                pending.push(child);
+                pending.push(terminator);
+            }
             Expr::Lexical(..)
             | Expr::Literal(_)
             | Expr::JavaLiteral(_)
@@ -279,5 +286,10 @@ mod tests {
             labels: vec!["l"],
         };
         assert_eq!(first_out_of_range(&catch, 2), Some(7));
+        // Both the body and the terminator of a Java terminated repetition are checked.
+        for (child, terminator, missing) in [(0, 8, Some(8)), (9, 1, Some(9)), (0, 1, None)] {
+            let terminated = Expr::Rule(child).repeat_java_until(Expr::Rule(terminator), 0, None);
+            assert_eq!(first_out_of_range(&terminated, 2), missing);
+        }
     }
 }
