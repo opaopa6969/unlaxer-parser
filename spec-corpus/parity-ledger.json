@@ -25,7 +25,10 @@
     "2026-10-27 #878: 外部入口の成功時に transaction frame 外の最終消費を記録し、Java 実測の nested-boundary 47経路1128行を追加。#197 は入口ごとの比較1つを指示役が許可し、ノードごとの処理は不変。入口が戻る前の custom parser の途中診断は #881 に分離する。#826/#872/#876 の CLOSED を確認。個別修正であり台帳全体の監査日・revision は更新しない。",
     "2026-10-28 #881: 途中成功診断は記録済み frame/入れ子入口と実失敗による Java 以下の下限、外部入口復帰後は一致する観測時点の契約と決定。手組み公開 grammar の共通384行・読み取りなし対照・最終値完全一致・mutationで検証する。runtime実行コードは不変、#197に従いノード処理追加と性能再計測はしない。#878はCLOSED、#881はPRのmerge待ち。個別の契約判断であり台帳全体の監査revisionは更新しない。",
     "2026-10-27 #861: Choice/PredictiveChoiceのFIRST判定を候補beginによるmatched reset後と同じ位置へ揃え、Java専用deferred例外30行を削除。公開runtimeの共通cursor/capture回帰を追加。機能や全体の対応宣言は増やさず、CI/mergeまでissueはOPENのまま維持する。",
-    "2026-10-31 #866: Rust の Classic collector が後で除く leaf（consumed 親の match-only・virtual 親の stop_consume 終端など）を trace 予算に数えず、最終 trace に残る leaf だけで Limit を判定する。Java には予算 API が無いので、conformance/token-trace/budget.tsv の Java 実 leaf・cursor を保持 trace の基準にし、Rust は n-1/n/n+1 を検証する。AST value node 直下の custom callback の leaf は value node の kind が決まった時点で判定し、除かれる区間の leaf だけで生じた Limit を戻す。callback が認識したが返さない terminal の leaf は collector が除くまで数える Rust 側の保守的な境界（docs/token-trace.md）。issue は本PRのmerge待ちでOPEN。"
+    "2026-10-31 #866: Rust の Classic collector が後で除く leaf（consumed 親の match-only・virtual 親の stop_consume 終端など）を trace 予算に数えず、最終 trace に残る leaf だけで Limit を判定する。Java には予算 API が無いので、conformance/token-trace/budget.tsv の Java 実 leaf・cursor を保持 trace の基準にし、Rust は n-1/n/n+1 を検証する。AST value node 直下の custom callback の leaf は value node の kind が決まった時点で判定し、除かれる区間の leaf だけで生じた Limit を戻す。callback が認識したが返さない terminal の leaf は collector が除くまで数える Rust 側の保守的な境界（docs/token-trace.md）。issue は本PRのmerge待ちでOPEN。",
+    "2026-10-27 #845: parser構築・名前参照・identity の移植境界を conformance/parser-construction に固定した。Java 6経路（ReferenceByName・ReferenceParser名前/predicate・Class/Supplier factory・newInstance）と Rust 5経路（Rule index・RuleNames・構築時predicate・OnceLock・都度構築）が同じ cases.tsv を全memo/diagnosticsで実行する。台帳全体の再監査ではない。",
+    "2026-10-31 #1007: 凍結した共有 parser graph を別 context で並行解析する契約を conformance/parser-construction/shared-graph.tsv と cases.tsv の N thread × M round 実行で固定した。台帳全体の再監査ではない。",
+    "2026-10-31 #1014: supplier で作る lazy 子の list が supplier の失敗後に途中までの子を公開する欠陥を直し、失敗後の再構築・Error・空・null・再入・同一性・並行 first-use を conformance/parser-construction で Java/Rust 共通に固定した。台帳全体の再監査ではない。"
   ],
   "issues": {
     "111": {
@@ -700,9 +703,17 @@
       "state": "OPEN",
       "title": "feat(ubnf): 名前付き汎用 semantic predicate を Java/Rust の生成 parser に接続する"
     },
+    "1007": {
+      "state": "OPEN",
+      "title": "fix(parser): Java 共有 parser graph の遅延cacheを並行解析へ安全に公開する"
+    },
     "1009": {
       "state": "OPEN",
       "title": "test(sample): 名前付き parser の入れ子クラスを公開し Usage001 を通常回帰へ接続する"
+    },
+    "1014": {
+      "state": "OPEN",
+      "title": "fix(parser): lazy child supplier の失敗後に部分 graph を公開しない"
     },
     "1016": {
       "state": "OPEN",
@@ -2762,6 +2773,26 @@
         "rust/unlaxer-ubnf-lsp/Cargo.toml",
         "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java"
       ]
+    },
+    {
+      "id": "parser-construction-boundary",
+      "category": "contract",
+      "title": "parser構築・名前参照・identity の言語別表現",
+      "hosts": "Java runtime / Rust runtime",
+      "issues": [
+        845,
+        1007,
+        1014
+      ],
+      "observation": "construction.tsv の java/rust 列は各言語の構築観測。同じ契約の行は同値を共有し、`-` と値の違いは意図した差: Java は parser instance・親pointer・反射名・PseudoRoot・共有sourceの反転状態を持ち、Rust は構築時に名前を Rule index へ解決（RuleNames の重複/未登録/順序不一致は構築エラー）し、反転は context の token_mode に置く。左再帰は両方とも資源上限（Java ParseLimitException 1024、Rust rule nesting 256）。RootParserIndicator の範囲は、Java は親走査、Rust は scope ごとの grammar と RuleNames で表し、受理と RuleStack は一致する。名前参照の hit と root は Java では instance に cache され、Rust の共有済み grammar も Rule ID を変えない。parse 結果（cursor・根と葉の CST・失敗位置・RuleStack）は cases.tsv で差を許さない。中間 node は言語間で比べず、各言語で構築経路間の一致を検査する。凍結した共有 graph の別 context 並行解析は shared-graph.tsv・cases.tsv・scope を両言語で N thread × M round 照合する（#1007、Java は遅延 cache を不変 Optional と ConcurrentHashMap で公開、Rust は不変 Arc grammar）。AbstractParser.parse を継承する利用者 parser の委譲先（createParser）は、親の monitor の下で一度だけ作って親を設定し、子の list を差し替えて足してから volatile で公開する。Rust は委譲先を grammar の外の OnceLock に置く。両言語で first-use と凍結済みを 8 thread × 2 context × 40 round 照合し、作成 1 回と作成中の待機を park fixture で検査する。委譲先の部分木の名前は作るまで検索に見えないので、凍結する graph は共有前に getParser() を呼ぶ。同じ context の同時利用・解析中の graph 変更は対象外、computedInvertMatch は表示だけが読む直前の呼び出しの値。supplier で作る子の list は全 supplier が返ってから一度だけ公開し、例外・Error の後は何も公開せず次のアクセスで全件を作り直す（#1014、修正前は途中までの子を完成として返した）。supplier からの同じ list への再入は IllegalStateException、null の子は従来どおり公開する。Rust はローカル Vec を OnceLock に入れ、Err・panic で Vec を捨てる。construction.tsv の lazy-children-* と shared-graph.tsv の lazy-children first use（失敗ちょうど 1 回、supplier 呼び出し 2/2/1）で両言語を照合する。",
+      "evidence": [
+        "conformance/parser-construction/cases.tsv",
+        "conformance/parser-construction/construction.tsv",
+        "conformance/parser-construction/shared-graph.tsv",
+        "unlaxer-common/src/test/java/org/unlaxer/parser/ParserConstructionParityTest.java",
+        "rust/unlaxer-runtime/tests/parser_construction.rs",
+        "docs/java-api-rust-parity.md"
+      ]
     }
   ],
   "corpora": [
@@ -3480,6 +3511,16 @@
       },
       "entries": [
         "ubnf-authoring-jsonrpc-reader"
+      ]
+    },
+    {
+      "path": "conformance/parser-construction/construction.tsv",
+      "fields": {
+        "java": 1,
+        "rust": 1
+      },
+      "entries": [
+        "parser-construction-boundary"
       ]
     }
   ],
