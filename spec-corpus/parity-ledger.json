@@ -742,6 +742,10 @@
     "1033": {
       "state": "OPEN",
       "title": "UBNF authoring LSP: didOpen の scalar text/uri と completion の int overflow の残差（#1005 レビュー由来）"
+    },
+    "1052": {
+      "state": "OPEN",
+      "title": "UBNF authoring LSP: params-before-method の通常 Integer DTO 変換を Java に揃える"
     }
   },
   "entries": [
@@ -2791,9 +2795,10 @@
         1001,
         1005,
         1031,
-        1033
+        1033,
+        1052
       ],
-      "observation": "固定Java revision 384fcf3eb1c0ce3e207ac580cec5fcac4b478b34。method→params→idでの空配列、stream positional arity>1、capabilities null、不正Either workDoneToken、Integer外・非scalarのidはJava readerが失敗して応答しない（数値idはnativeが同じ値を返す）。clientを固める欠陥を互換のために移植せず、nativeはid付きparse errorまたは既存の成功応答でJSON-RPCを完結する恒久差とする。他のキー順でJavaが決定的エラーを返す場合は揃える。全6キー順・重複・arity・null・overflowの独立raw oracleを両実stdioへ送り、1秒deadlineの無応答・後続request・initialize再試行・configure旧設定/文書保持を916件の既存必須suiteで確認する。host別fieldはこの恒久差のoracleと固定revision metadataであり無条件skipではない。JVM/Gson固有error.dataは存在/型を確認して内容を除外し、id/code/messageと他のキーは比較する。後述 #1005 の生成型表へ範囲を拡張した。ClientCapabilities enumの非整数によるJava reader無応答は #1031 で追跡する。 #1033で既存jsonrpc suiteを951件へ拡張。didOpen scalar textと通知4種のscalar uriを共有gson_stringで受理し、数値原表記をraw frameから保持する。totalLengthで1.50/1.5を区別し、別表記URI文書の保持とdidSaveのimporter refreshも全JSON比較する。UTF-16 start + characterの32 bit wrappingと負offset後のscope/use不一致・字句状態判定をJavaへ揃える。completion40/42件・hover/navigation4 methodをLF/CRLF/非BMP・未終端token規則・MAX_VALUE直前/一致/直後・1行目/2行目以降で両JDKの実stdioへ送り、独立oracleで検証。行末へ丸めたoffsetは半開区間のuseに入らないため、navigationとhoverのuse判定ではwrapと丸めを区別できず回帰確認に留まる。決定的応答なので恒久差にしない。",
+      "observation": "固定Java revision 384fcf3eb1c0ce3e207ac580cec5fcac4b478b34。method→params→idでの空配列、stream positional arity>1、capabilities null、不正Either workDoneToken、Integer外・非scalarのidはJava readerが失敗して応答しない（数値idはnativeが同じ値を返す）。clientを固める欠陥を互換のために移植せず、nativeはid付きparse errorまたは既存の成功応答でJSON-RPCを完結する恒久差とする。他のキー順でJavaが決定的エラーを返す場合は揃える。全6キー順・重複・arity・null・overflowの独立raw oracleを両実stdioへ送り、1秒deadlineの無応答・後続request・initialize再試行・configure旧設定/文書保持を916件の既存必須suiteで確認する。host別fieldはこの恒久差のoracleと固定revision metadataであり無条件skipではない。JVM/Gson固有error.dataは存在/型を確認して内容を除外し、id/code/messageと他のキーは比較する。後述 #1005 の生成型表へ範囲を拡張した。ClientCapabilities enumの非整数によるJava reader無応答は #1031 で追跡する。 #1033で既存jsonrpc suiteを951件へ拡張。didOpen scalar textと通知4種のscalar uriを共有gson_stringで受理し、数値原表記をraw frameから保持する。totalLengthで1.50/1.5を区別し、別表記URI文書の保持とdidSaveのimporter refreshも全JSON比較する。UTF-16 start + characterの32 bit wrappingと負offset後のscope/use不一致・字句状態判定をJavaへ揃える。completion40/42件・hover/navigation4 methodをLF/CRLF/非BMP・未終端token規則・MAX_VALUE直前/一致/直後・1行目/2行目以降で両JDKの実stdioへ送り、独立oracleで検証。行末へ丸めたoffsetは半開区間のuseに入らないため、navigationとhoverのuse判定ではwrapと丸めを区別できず回帰確認に留まる。決定的応答なので恒久差にしない。 #1031で既存jsonrpc suiteは3851件。ClientCapabilities全21欄（整数10/文字列11）×18値×全6キー順の独立raw oracle、collection単一要素/null/空配列、Gson scale境界を両JDK実stdioへ送る。整数enumの1.0/範囲外整数/未知文字列を受理し、params-before-methodの遅延変換では小数/巨大数もJavaへ揃えて受理する。method先行の非整数/int外数値、Gson NumberLimitsを超える遅延数値、id回復不能のJava無応答は恒久差でnativeのid付き-32700を維持。初期化再試行・後続request・configure失敗後の旧設定/文書/新入力と1秒deadlineを確認する。生成型表はsourcesのenum宣言/String定数クラスと欄Javadoc linkからreader/定数を生成し、実測/fixtureから生成しない。enum以外のInteger DTO遅延変換は受け入れ条件付き#1052に分離する。",
       "evidence": [
         "docs/ubnf-authoring-lsp.md",
         "spec-corpus/ubnf-authoring-lsp/jsonrpc.json",
@@ -2802,7 +2807,8 @@
         "rust/unlaxer-ubnf-lsp/Cargo.toml",
         "unlaxer-dsl/ubnf-vscode/src/test/java/org/unlaxer/dsl/lsp/ubnf/UbnfAuthoringProtocolConformanceTest.java",
         "rust/unlaxer-ubnf-lsp/src/lsp4j-dto-schema.json",
-        "scripts/generate-lsp4j-dto-schema.py"
+        "scripts/generate-lsp4j-dto-schema.py",
+        "scripts/tests/test_lsp4j_dto_schema.py"
       ]
     },
     {
@@ -3528,7 +3534,7 @@
       "path": "spec-corpus/ubnf-authoring-lsp/jsonrpc.json",
       "fields": {
         "java": 10,
-        "javaRevision": 1,
+        "javaRevision": 2,
         "rust": 10
       },
       "entries": [

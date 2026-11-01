@@ -251,3 +251,12 @@ index offset の `start + character` は UTF-16 の32 bit wrapping。行内 pref
 1行目・2行目以降・MAX_VALUE直前/一致/直後・非BMP/CRLF・未終端 token 規則を両JDK実stdioで検証する。
 決定的な応答なので恒久差にはせず Java に揃える。
 [固定対応表と検証境界](../docs/ubnf-authoring-lsp.md#json-rpc-層の固定契約994) を参照。
+
+#1031: ClientCapabilities enum 全21欄（整数10・文字列11）の18入力と全6キー順を既存 jsonrpc
+suite 3851件で検証する。sources JAR 宣言と欄の Javadoc link から20 enum domain の reader/定数を
+機械生成し、整数 enum と開いた String 定数クラスを区別する。1.0・未知定数/文字列/null は受理。
+params-before-method の整数 enum は JsonTreeReader の遅延変換に合わせ、小数/巨大数も受理する。
+Gson NumberLimits は保つ。stream の非整数/int外数値、遅延変換のscale外、id回復不能の
+Java無応答は恒久差とし、native は元id付き -32700 を返す。失敗initialize後の再試行、
+configure失敗後の旧設定/文書/新入力と後続request、barrier＋1秒deadlineを両JDK実stdioで確認する。
+enum以外の Integer DTO の遅延変換は #1052 に残す。Java製品・3.3.0・parserのhot pathは変えない。

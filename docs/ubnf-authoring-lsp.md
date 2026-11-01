@@ -522,7 +522,7 @@ Gson/lsp4jのscalar変換・単一要素collection・tokenによるEither分岐�
 この型グラフの成功を全raw frame（入れ子の重複キーを含む）/全DTO adapterの同等性とはしない。
 追加調査で completionItemKind.valueSet の `1.5` は Java EnumTypeAdapter が無応答になることを
 両JDKで確認し、受け入れ条件付き [#1031](https://github.com/opaopa6969/unlaxer-parser/issues/1031) に分離した。
-native は決定的parse errorを返す。#1005 の指定の決定的parse errorと混同しない。
+native は決定的parse errorを返す。調査・分類と受理域の修正は下記 #1031 を参照。#1005 の指定の決定的parse errorと混同しない。
 レビューで分離した didOpen の scalar text/uri と int overflow は、下記 #1033 で対応する。
 error.data の比較範囲と親 #885/#864/#111、#893/#894/#901/#902 の継続は従来どおり。
 
@@ -597,3 +597,92 @@ Javaのkeyword prefix受理、parameterized syntax state、mapper値エラー時
 prefix再認識でも一般には同じにならない。この変更で全入力域のhover一致を主張しない。
 URIの任意Unicode/percent-decoding/platformと特殊非file bufferの既存差は#902、DTO受理域は#1005。
 #893のvalidator意味解析・#901のcapabilityには手を入れず、#894/#885/#864/#111は閉じない。
+
+### ClientCapabilities enum reader の追補（#1031）
+
+参照は固定 Java `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34`、LSP4J 0.23.1 / Gson 2.13.2。
+Java 製品と公開済み3.3.0は変更しない。ClientCapabilities 以下の全 enum 欄（整数10か所、
+String 定数クラスに対応する文字列11か所）へ、手書き raw frame で18入力を個別に送った。
+JDK17 / JDK21 とも initialize は **受理276 / 決定的エラー62 / 無応答40**。
+`id → method → params` での境界は次のとおり。collection 欄は**要素**の入力を示す。
+
+| raw 値 | 整数 enum: Java 17 / 21 | 文字列 enum: Java 17 / 21 | native の判断と理由 |
+| --- | --- | --- | --- |
+| `1` / `"1"` / `1.0` | 受理 | 受理 | 同じ。整数値の小数を過剰拒否しない |
+| `1.5` | 無応答 | 受理 | 整数 enum だけ元id付き `-32700 Message could not be parsed.`。reader の NumberFormatException を移植しない恒久差 |
+| `0` / `999` / `-1` | 受理（未知定数は null） | 受理（Gson String） | 同じ受理。定数の allowlist で拒否しない |
+| `2147483648` / `999999999999999999999999999999999` / `1e400` | 無応答 | 受理 | 整数 enum だけ上記と同じ恒久差 |
+| 正しい名前・文字列定数 | 受理 | 受理 | 同じ |
+| `"unknown"` / `"1.5"` | 受理（名前照合も失敗すれば null） | 受理（文字列を保持） | 同じ。数値**文字列**へ nextInt の制約をかけない |
+| `null` | 受理 | 受理 | 同じ |
+| `[]` / `{}` | id付き `-32700` | id付き `-32700` | 同じ code/message/id。Gson 固有 error.data は存在・型だけ確認 |
+| `true` / `false` | id付き `-32700` | 受理（Gson String） | 同じ。整数/文字列 enum を区別する |
+
+全欄の個別実測（各18入力、両JDKの結果が一致）:
+
+| capabilities 以下の欄 | 種類 | JDK17 / JDK21: 受理 / エラー / 無応答 |
+| --- | --- | --- |
+| `textDocument.completion.completionItemKind.valueSet[]` | integer | 10 / 4 / 4 |
+| `textDocument.completion.completionItem.insertTextModeSupport.valueSet[]` | integer | 10 / 4 / 4 |
+| `textDocument.completion.insertTextMode` | integer | 10 / 4 / 4 |
+| `textDocument.completion.completionItem.tagSupport.valueSet[]` | integer | 10 / 4 / 4 |
+| `textDocument.documentSymbol.symbolKind.valueSet[]` | integer | 10 / 4 / 4 |
+| `workspace.symbol.symbolKind.valueSet[]` | integer | 10 / 4 / 4 |
+| `textDocument.documentSymbol.tagSupport.valueSet[]` | integer | 10 / 4 / 4 |
+| `workspace.symbol.tagSupport.valueSet[]` | integer | 10 / 4 / 4 |
+| `textDocument.publishDiagnostics.tagSupport.valueSet[]` | integer | 10 / 4 / 4 |
+| `textDocument.rename.prepareSupportDefaultBehavior` | integer | 10 / 4 / 4 |
+| `textDocument.completion.completionItem.documentationFormat[]` | string | 16 / 2 / 0 |
+| `textDocument.hover.contentFormat[]` | string | 16 / 2 / 0 |
+| `textDocument.signatureHelp.signatureInformation.documentationFormat[]` | string | 16 / 2 / 0 |
+| `textDocument.foldingRange.foldingRangeKind.valueSet[]` | string | 16 / 2 / 0 |
+| `textDocument.codeAction.codeActionLiteralSupport.codeActionKind.valueSet[]` | string | 16 / 2 / 0 |
+| `textDocument.semanticTokens.formats[]` | string | 16 / 2 / 0 |
+| `textDocument.semanticTokens.tokenTypes[]` | string | 16 / 2 / 0 |
+| `textDocument.semanticTokens.tokenModifiers[]` | string | 16 / 2 / 0 |
+| `workspace.workspaceEdit.resourceOperations[]` | string | 16 / 2 / 0 |
+| `workspace.workspaceEdit.failureHandling` | string | 16 / 2 / 0 |
+| `general.positionEncodings[]` | string | 16 / 2 / 0 |
+
+全6キー順も独立 oracle で区別する。`params` が `method` より先の3順では、Java は
+JsonTreeReader / LazilyParsedNumber による遅延変換を使い、整数 enum の `1.5`（切捨て）や
+巨大数（int への折返し、未知定数は null）も受理する。native が拒否していたこの成功経路を
+互換化した。Ext はこれらの client enum 値を消費しないため、観測するのは受理・応答と設定・文書の状態。
+Gson NumberLimits の長さ10000文字以下・scaleの絶対値10000未満を維持し、
+`1e9999` / `1e-9999` は受理、`1e10000` / `1e-10000` の無応答には native の決定的エラーを返す。
+`method → params → id` では token 型違いの parse error も id が回復できず無応答となる。
+これも #1001 / Either と同じ恒久差であり、native は最終id付きの決定的エラーを維持する。
+
+| 経路 | Java | native / 判断 |
+| --- | --- | --- |
+| method が先、整数 enum の非整数・int外数値 | 無応答 | 元id付き `-32700` を維持する恒久差。client を停止させない |
+| params が先、整数 enum の通常の非整数・巨大数 | 受理 | 遅延変換の受理へ修正。Java の成功を過剰拒否しない |
+| params が先、Gson NumberLimits を超える数値 | 無応答 | 決定的 `-32700` の恒久差 |
+| token 型違い、id を読取り済み / 遅延変換 | id付き `-32700` | code/message/id が同じ |
+| token 型違い、method→params→id | 無応答 | id 回復不能を移植しない恒久差 |
+
+型表は同じ sources JAR の宣言と**各欄自身の Javadoc link**から enum の種類・定数を生成する。
+106 DTO / 299欄は維持し、全体20 enum domain（ClientCapabilities は16 domain）を記録する。
+整数 enum と String 定数クラスを区別し、未知値を閉じた集合として検査しない。
+実測や fixture から型表を生成せず、手書きの欄名リストは製品 reader / 生成スクリプトに置かない。
+独立 fixture の21欄と生成型グラフの全到達欄を照合し、継承・文字列定数 discovery もテストする。
+
+既存必須 jsonrpc suite は **951→3851ケース**。全21欄×18入力×6キー順、
+Gson scale 境界、scalar/空配列/null の collection、配列要素の container を検証する。
+失敗 initialize は未初期化の同じ server で繰り返し、後続 request と initialize 再試行を確認する。
+成功 initialize は全欄を同時に含む13セッションで別途確認する。configure の失敗には既定 profile
+への変更を試み、旧 profile の VALIDATE gate・旧文書の全 hover/documentSymbol・新規文書の解析を
+確認する。無応答は後続 barrier と共有1秒 deadline で遅延応答も拒否する。
+Java server の `-Xmx8g`、runner の既定timeout20秒、self-hosted runs-on を維持する。
+子プロセスは #1046 の TestProcesses.builder を使い、同じ helper source を test source の symlink で共有する。
+
+通常の position 等の **enum 以外の Integer** の遅延変換にも差を実測したが、今回の受理域は広げない。
+受け入れ条件付き [#1052](https://github.com/opaopa6969/unlaxer-parser/issues/1052) に分離した。
+全raw frame・全DTO adapterのparity完了、親 #885/#864/#111 の完了とはしない。
+
+直接stdioの最終3851件は JDK21 **85.819秒** / JDK17 **68.816秒**。
+追加 enum 区間は **44.441秒 / 45.294秒**で、追加CI時間1分未満の目標内。
+同じ固定Javaを使った変更前951件の JDK21 は42.091秒、suite全体の差は43.728秒だった。
+隔離m2の関係テストは両JDK各43件（failure/error/skip 0）、Rust workspaceは817件、
+Pythonは222件＋585 subtestsが成功した。遅延enumの検査を従来の整数検査に戻す隔離mutationは
+`jsonrpc/1031/initialize/limits/1e-10000/1` で誤ってinitializeを成功させ、独立oracleが検出した。

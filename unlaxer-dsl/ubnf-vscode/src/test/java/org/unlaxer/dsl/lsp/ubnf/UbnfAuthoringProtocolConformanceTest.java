@@ -81,7 +81,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=120000) public void nativeAndJavaServersShareJsonRpcFixtures() throws Exception {
-        runProtocol("jsonrpc", 951);
+        runProtocol("jsonrpc", 3851);
     }
 
     @Test(timeout=120000) public void nativeAndJavaServersShareSyntaxStatusAndModuleFixtures() throws Exception {
@@ -91,11 +91,11 @@ public class UbnfAuthoringProtocolConformanceTest {
     private void runProtocol(String suite, int count) throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] rustConformance=true is required for native authoring stdio");
         Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
-        var build = new ProcessBuilder("cargo", "build", "--locked", "-p", "unlaxer-ubnf-lsp", "-p", "unlaxer-generator").directory(root().resolve("rust").toFile()).redirectErrorStream(true).redirectOutput(Path.of("target/ubnf-authoring-build.log").toFile()).start();
+        var build = org.unlaxer.dsl.TestProcesses.builder("cargo", "build", "--locked", "-p", "unlaxer-ubnf-lsp", "-p", "unlaxer-generator").directory(root().resolve("rust").toFile()).redirectErrorStream(true).redirectOutput(Path.of("target/ubnf-authoring-build.log").toFile()).start();
         try { assertTrue("cargo build timeout", build.waitFor(120, TimeUnit.SECONDS)); assertEquals(0, build.exitValue()); }
         finally { build.descendants().forEach(child -> child.destroyForcibly()); build.destroyForcibly(); System.out.print(Files.readString(Path.of("target/ubnf-authoring-build.log"))); }
         var output = Path.of("target/ubnf-authoring-" + suite + "-protocol.json").toAbsolutePath();
-        var process = new ProcessBuilder("python3", root().resolve("scripts/check-ubnf-authoring-lsp.py").toString(),
+        var process = org.unlaxer.dsl.TestProcesses.builder("python3", root().resolve("scripts/check-ubnf-authoring-lsp.py").toString(),
             "--java", Path.of(System.getProperty("java.home"), "bin/java").toString(),
             "--classpath", System.getProperty("java.class.path"),
             "--rust", root().resolve("rust/target/debug/ubnf-language-server").toString(), "--suite", suite, "--output", output.toString()).redirectErrorStream(true).redirectOutput(Path.of("target/ubnf-authoring-" + suite + "-wire.log").toFile()).start();

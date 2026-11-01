@@ -47,6 +47,33 @@ pub(crate) fn gson_integer(value: &Value) -> Option<i32> {
 fn integer(value: &Value) -> bool {
     value.is_null() || gson_integer(value).is_some()
 }
+
+// Deferred EnumTypeAdapter uses JsonTreeReader.nextInt -> LazilyParsedNumber.
+// It truncates/wraps through BigDecimal.intValue instead of doing an exact int
+// round trip. Only validate acceptance: Ext does not consume client enum values.
+// Preserve Gson 2.13.2 NumberLimits rather than accepting unbounded exponents.
+fn tree_enum_integer(value: &Value) -> bool {
+    let Some(number) = value.as_number() else {
+        return false;
+    };
+    let raw = number.to_string();
+    if raw.parse::<i64>().is_ok() {
+        return true;
+    }
+    if raw.len() > 10000 {
+        return false;
+    }
+    let (mantissa, exponent) = raw.split_once(['e', 'E']).unwrap_or((&raw, "0"));
+    let Ok(exponent) = exponent.parse::<i64>() else {
+        return false;
+    };
+    let fraction = mantissa
+        .split_once('.')
+        .map_or(0, |(_, digits)| digits.len());
+    (fraction as i64)
+        .checked_sub(exponent)
+        .is_some_and(|scale| (-9999..=9999).contains(&scale))
+}
 fn boolean(value: &Value) -> bool {
     value.is_null() || value.is_boolean() || value.is_string()
 }
@@ -58,23 +85,53 @@ fn schema() -> &'static Value {
 
 // lsp4j's collection adapter also accepts a single element. Either selects by
 // token before coercion. Unknown fields and Object/experimental stay untyped.
-fn dto(value: &Value, kind: &Value) -> bool {
+fn dto(value: &Value, kind: &Value, stream_enums: bool) -> bool {
     if value.is_null() {
         return true;
     }
     if let Some(parts) = kind.as_array() {
         return match parts[0].as_str().unwrap() {
             "list" => value.as_array().map_or_else(
-                || dto(value, &parts[1]),
-                |items| items.iter().all(|item| dto(item, &parts[1])),
+                || dto(value, &parts[1], stream_enums),
+                |items| items.iter().all(|item| dto(item, &parts[1], stream_enums)),
             ),
             "tuple" => value.as_array().is_some_and(|items| {
                 items.len() == parts.len() - 1
-                    && items.iter().zip(&parts[1..]).all(|(v, t)| dto(v, t))
+                    && items
+                        .iter()
+                        .zip(&parts[1..])
+                        .all(|(v, t)| dto(v, t, stream_enums))
             }),
             "either" => parts[1..]
                 .iter()
-                .any(|t| token_matches(value, t) && dto(value, t)),
+                .any(|t| token_matches(value, t) && dto(value, t, stream_enums)),
+            "enum" => match schema()["enums"][parts[1].as_str().unwrap()]["reader"]
+                .as_str()
+                .unwrap()
+            {
+                // EnumTypeAdapter.nextInt only for NUMBER tokens. STRING uses
+                // parseInt then name lookup: even unknown/overflow strings are
+                // accepted (as null), rather than validated as Gson Integer.
+                // Unknown numeric constants are also null. Ext does not consume
+                // these client values, so retain their acceptance without an
+                // allowlist. With params before method, JsonTreeReader.getAsInt
+                // also accepts fractional/large numeric tokens. These values
+                // are unused by Ext; do not over-reject that successful path.
+                // Stream reader hangs become deterministic native errors.
+                "integer" => {
+                    value.is_string()
+                        || if stream_enums {
+                            value.is_number() && integer(value)
+                        } else {
+                            tree_enum_integer(value)
+                        }
+                }
+                // The LSP string-constant classes use Gson String, including
+                // booleans/numbers and unknown strings. Their constants are not
+                // a closed acceptance set.
+                "string" => string(value),
+                _ => unreachable!("generated enum reader"),
+            },
             _ => unreachable!("generated DTO type"),
         };
     }
@@ -83,13 +140,6 @@ fn dto(value: &Value, kind: &Value) -> bool {
         "string" => string(value),
         "integer" => integer(value),
         "boolean" => boolean(value),
-        "enum" => {
-            if value.is_number() {
-                integer(value)
-            } else {
-                value.is_string()
-            }
-        }
         // Container/bool token failures leave Java's reader without a response.
         // Keep deterministic native dispatch, as in #1001 (permanent difference).
         "workDoneToken" => !value.is_number() || integer(value),
@@ -99,7 +149,7 @@ fn dto(value: &Value, kind: &Value) -> bool {
                     .as_object()
                     .unwrap()
                     .iter()
-                    .all(|(key, ty)| dto(&value[key], ty))
+                    .all(|(key, ty)| dto(&value[key], ty, stream_enums))
         }
     }
 }
@@ -107,12 +157,19 @@ fn token_matches(value: &Value, kind: &Value) -> bool {
     if let Some(parts) = kind.as_array() {
         return match parts[0].as_str().unwrap() {
             "either" => parts[1..].iter().any(|t| token_matches(value, t)),
+            "enum" => {
+                if schema()["enums"][parts[1].as_str().unwrap()]["reader"] == "string" {
+                    value.is_string()
+                } else {
+                    value.is_number()
+                }
+            }
             _ => value.is_array(),
         };
     }
     match kind.as_str().unwrap() {
         "string" => value.is_string(),
-        "integer" | "enum" => value.is_number(),
+        "integer" => value.is_number(),
         "boolean" => value.is_boolean(),
         _ => value.is_object(),
     }
@@ -128,7 +185,7 @@ fn strings(value: &Value, fields: &[&str]) -> bool {
 
 // InitializeParams uses the #1001 boundary plus the generated complete
 // ClientCapabilities field graph (#1005). Untyped options stay untyped.
-fn initialize_dto(params: &Value) -> bool {
+fn initialize_dto(params: &Value, stream_enums: bool) -> bool {
     let caps = &params["capabilities"];
     let folders = &params["workspaceFolders"];
     integer(&params["processId"])
@@ -139,7 +196,11 @@ fn initialize_dto(params: &Value) -> bool {
             || folders.as_array().is_some_and(|folders| {
                 folders.iter().all(|f| object(f) && strings(f, &["uri", "name"]))
             }))
-        && dto(caps, &Value::String("ClientCapabilities".into()))
+        && dto(
+            caps,
+            &Value::String("ClientCapabilities".into()),
+            stream_enums,
+        )
         // Invalid container/bool workDoneToken makes Java's Either adapter
         // stop without a response. Keep native's deterministic acceptance.
         && (!params["workDoneToken"].is_number() || integer(&params["workDoneToken"]))
@@ -180,11 +241,11 @@ pub(crate) fn params_shape(method: &str, params: &Value) -> Result<(), Error> {
             || !params["workDoneToken"].is_number()
             || integer(&params["workDoneToken"]))
         && if matches!(method, "initialize" | "unlaxer/configure") {
-            initialize_dto(params)
+            initialize_dto(params, false)
         } else if method == "ubnf/packageSource" {
             string(&params["uri"])
         } else if let Some(kind) = schema()["requests"].get(method) {
-            dto(params, kind)
+            dto(params, kind, true)
         } else {
             true
         };
@@ -224,7 +285,7 @@ fn initialize_stream_shape(raw: &[u8]) -> Result<Option<Error>, serde_json::Erro
     while rest[0] != b'}' {
         let (key, value, _) = next_field(&mut rest)?;
         let one_field = Value::Object([(key, value)].into_iter().collect());
-        if !initialize_dto(&one_field) {
+        if !initialize_dto(&one_field, true) {
             return Ok(Some(parse_error()));
         }
     }
