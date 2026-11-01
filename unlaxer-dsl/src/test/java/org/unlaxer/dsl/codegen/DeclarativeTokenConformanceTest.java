@@ -8,6 +8,7 @@ import java.io.StringWriter;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -599,6 +600,33 @@ public class DeclarativeTokenConformanceTest {
                 .replace("EMIT_OFFSETS", Boolean.toString(emitOffsets));
     }
 
+    // #1034: cold build-learning measured 44.73 s; allow for shared-runner load.
+    // Applies to native Rust builds/probes and browser WASM builds/probes alike.
+    private static final String PROCESS_TIMEOUT_PROPERTY = "unlaxer.conformance.processTimeoutSeconds";
+    private static final long DEFAULT_PROCESS_TIMEOUT_SECONDS = 300;
+    private static final int LOG_TAIL_BYTES = 8192;
+
+    private void waitForProcess(Process process, List<String> command, Path log) throws Exception {
+        long seconds = Long.parseLong(System.getProperty(PROCESS_TIMEOUT_PROPERTY,
+            Long.toString(DEFAULT_PROCESS_TIMEOUT_SECONDS)));
+        if (seconds <= 0) throw new IllegalArgumentException(PROCESS_TIMEOUT_PROPERTY + " must be positive");
+        if (!process.waitFor(seconds, TimeUnit.SECONDS)) {
+            // stdout and stderr already share a file, so pipes cannot fill while waiting.
+            // Read only the tail, even when a compiler has produced a very large log.
+            try (var channel = Files.newByteChannel(log)) {
+                long size = channel.size();
+                channel.position(Math.max(0, size - LOG_TAIL_BYTES));
+                ByteBuffer tail = ByteBuffer.allocate((int) Math.min(size, LOG_TAIL_BYTES));
+                while (tail.hasRemaining() && channel.read(tail) != -1) { /* read the snapshot */ }
+                tail.flip();
+                fail("process timeout after " + seconds + " s: " + command
+                    + "\nOverride with -D" + PROCESS_TIMEOUT_PROPERTY + "=<seconds>"
+                    + "\nstdout/stderr tail (last " + tail.remaining() + " of " + size + " bytes):\n"
+                    + StandardCharsets.UTF_8.decode(tail));
+            }
+        }
+    }
+
     private record Run(int code, String output) {}
     private Run run(List<String> command, String input, boolean noJava) throws Exception {
         Path log = temporary.newFile().toPath();
@@ -607,10 +635,16 @@ public class DeclarativeTokenConformanceTest {
         Process process = builder.start();
         try {
             try (var stdin = process.getOutputStream()) { stdin.write(input.getBytes(StandardCharsets.UTF_8)); }
-            assertTrue("process timeout: " + command, process.waitFor(60, TimeUnit.SECONDS));
+            waitForProcess(process, command, log);
             return new Run(process.exitValue(), Files.readString(log));
         } finally {
-            if (process.isAlive()) process.destroyForcibly();
+            if (process.isAlive()) {
+                // A timed-out Node build may still own cargo/rustc children.
+                var descendants = process.descendants().toList();
+                process.destroyForcibly();
+                descendants.forEach(ProcessHandle::destroyForcibly);
+                process.waitFor(5, TimeUnit.SECONDS);
+            }
         }
     }
     private void success(Run result) { assertEquals(result.output(), 0, result.code()); }
