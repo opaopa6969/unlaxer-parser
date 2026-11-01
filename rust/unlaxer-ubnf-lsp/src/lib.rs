@@ -144,18 +144,15 @@ impl Server {
                     if !request =>
                 {
                     let doc = &params["textDocument"];
-                    let uri = doc["uri"]
-                        .as_str()
+                    let uri = rpc::gson_string(&doc["uri"])
                         .ok_or_else(|| invalid("document URI required"))?;
                     match method {
                         "textDocument/didOpen" => {
-                            let source = doc["text"]
-                                .as_str()
-                                .ok_or_else(|| invalid("document text required"))?
-                                .to_owned();
+                            let source = rpc::gson_string(&doc["text"])
+                                .ok_or_else(|| invalid("document text required"))?;
                             rpc::notified_version(doc)?;
-                            self.documents.insert(uri.into(), Document { source });
-                            self.publish(uri, &mut out);
+                            self.documents.insert(uri.clone(), Document { source });
+                            self.publish(&uri, &mut out);
                         }
                         "textDocument/didChange" => {
                             rpc::change_shape(params)?;
@@ -168,11 +165,11 @@ impl Server {
                                 .ok_or_else(|| invalid("change text required"))?;
                             rpc::notified_version(doc)?;
                             // Java Ext parseDocument also opens a URI that was never opened.
-                            self.documents.insert(uri.into(), Document { source });
-                            self.publish(uri, &mut out);
+                            self.documents.insert(uri.clone(), Document { source });
+                            self.publish(&uri, &mut out);
                         }
                         "textDocument/didClose" => {
-                            self.documents.remove(uri);
+                            self.documents.remove(&uri);
                         }
                         _ => {}
                     }
@@ -183,7 +180,7 @@ impl Server {
                         .documents
                         .iter()
                         .filter(|(other, doc)| {
-                            other.as_str() != uri && doc.source.contains("@import")
+                            other.as_str() != uri.as_str() && doc.source.contains("@import")
                         })
                         .map(|(other, _)| other.clone())
                         .collect();
@@ -219,14 +216,17 @@ impl Server {
                     }
                     let offset = text::offset(&doc.source, &params["position"])
                         .ok_or_else(|| invalid("invalid UTF-16 position"))?;
+                    let index_offset = text::index_offset(&doc.source, &params["position"])
+                        .and_then(|n| usize::try_from(n).ok())
+                        .map(|_| offset);
                     let source = doc.source.clone();
                     let index = self.index(uri).unwrap();
                     let empty_line = rpc::gson_integer(&params["position"]["line"])
                         .is_some_and(|n| n < 0 || n as usize >= source.split('\n').count());
                     Ok(if method.ends_with("completion") {
-                        features::completion(&source, &index, offset, empty_line)
+                        features::completion(&source, &index, offset, empty_line, index_offset)
                     } else {
-                        features::hover(&source, &index, offset, empty_line)
+                        features::hover(&source, &index, offset, empty_line, index_offset)
                     })
                 }
                 "ubnf/packageSource" if request => {
@@ -272,8 +272,9 @@ impl Server {
                     if params["position"].is_null() {
                         return Err(rpc::internal());
                     }
-                    let offset = text::binding_offset(&source, &params["position"])
-                        .ok_or_else(|| invalid("invalid UTF-16 position"))?;
+                    let offset = text::index_offset(&source, &params["position"])
+                        .and_then(|n| usize::try_from(n).ok())
+                        .and_then(|_| text::binding_offset(&source, &params["position"]));
                     match method {
                         "textDocument/definition" => Ok(navigation::definition(&index, offset)),
                         "textDocument/references" => {

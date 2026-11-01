@@ -243,4 +243,11 @@ null/未知欄/untyped値・collection の単一要素受理を保つ。workDone
 #1001 と同じ恒久差とし、native の決定的応答を維持する。didChange の数値/真偽値 text は
 Gson String に変換し、指数・負の0の原表記を保持する。全changeの検査を通るまで適用しない。
 ClientCapabilities enum の非整数で Java が無応答となる残差は #1031 で追跡する。
+#1033: 既存 jsonrpc suite は951件。didOpen の scalar text と didOpen/didChange/didSave/didClose の
+scalar uri を共有 Gson String 変換で受理し、数値は原表記を保持する（request の uri lookup も同じ）。
+文書診断の totalLength で `1.50` / `1.5` を区別し、別表記 URI の文書を混同しない。
+index offset の `start + character` は UTF-16 の32 bit wrapping。行内 prefix/word の丸めとは分離し、
+負の index offset は scope/use に一致せず、completion の字句状態（`::=` の後方探索）も行わない。completion の40/42件、hover と navigation 4 method、
+1行目・2行目以降・MAX_VALUE直前/一致/直後・非BMP/CRLF・未終端 token 規則を両JDK実stdioで検証する。
+決定的な応答なので恒久差にはせず Java に揃える。
 [固定対応表と検証境界](../docs/ubnf-authoring-lsp.md#json-rpc-層の固定契約994) を参照。
