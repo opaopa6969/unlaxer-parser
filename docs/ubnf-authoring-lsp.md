@@ -562,6 +562,7 @@ Java server の `-Xmx8g`・runner既定timeout 20秒・self-hosted runs-on・既
 
 固定 revision の実生成 server と native の949ケースは JDK21 **26.505秒**、JDK17 **43.091秒**。
 今回の追加部はそれぞれ **0.400秒 / 0.720秒**（suite内の計測区間）で、追加CI時間1分未満の目標内。
+レビューで字句判定の2件を足した951ケースは JDK21 **24.738秒**、JDK17 **26.539秒**（追加部 0.408秒 / 0.351秒）。
 両JDKの関係するSurefireテストは各43件、failure/error/skip 0。JDK17は同じJava sourceを
 `--release 17` で別領域へ再コンパイルし、17版common/dslと同じSurefireから実行する。
 didOpen text変換・通知uri変換・text原表記・uri原表記・wrapping加算・didSaveのscalar uri受理を
