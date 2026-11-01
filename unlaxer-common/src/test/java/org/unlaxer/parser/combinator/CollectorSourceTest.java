@@ -166,6 +166,26 @@ public class CollectorSourceTest {
         };
     }
 
+    /** hxc: a host that consumes 'c' at the consumed cursor and returns an empty consumed token over the input at 0. */
+    private static Parser hostAtZeroConsuming() {
+        return new EmptyParser() {
+            private static final long serialVersionUID = 1L;
+            @Override public Parsed parse(ParseContext context, TokenKind kind, boolean invert) {
+                CodePointIndex at = context.getConsumedPosition();
+                if (at.value() + 1 > context.source.codePointLength().value()) {
+                    return Parsed.FAILED;
+                }
+                if (false == context.peek(at, new CodePointLength(1)).sourceAsString().equals("c")) {
+                    return Parsed.FAILED;
+                }
+                Token empty = new Token(TokenKind.consumed, context.peek(new CodePointIndex(0), new CodePointLength(0)), this);
+                context.getCurrent().addToken(empty, TokenKind.consumed);
+                context.consume(new CodePointLength(1));
+                return new Parsed(empty);
+            }
+        };
+    }
+
     private Parser observe() {
         return new EmptyParser() {
             private static final long serialVersionUID = 1L;
@@ -220,6 +240,8 @@ public class CollectorSourceTest {
                     return hostC(false);
                 case "h1":
                     return hostC(true);
+                case "hxc":
+                    return hostAtZeroConsuming();
                 default:
                     return new WordParser(name);
             }
@@ -385,6 +407,20 @@ public class CollectorSourceTest {
     /** The capture-less origins of the shapes of returned-token.tsv (#1023). */
     @Test public void wrappersAndHostsReturnTheCaptureLessOrigins() throws java.io.IOException {
         checkBoundaryTable("returned-token-boundary.tsv", 915, true);
+    }
+
+    /**
+     * A host returns its Token, whose source is the input it peeked: hx at 0, hc over 'c' it did not consume, hxc at 0
+     * after consuming 'c'. NamedCapture, a predicate and CaptureBoundaryParser.input read it, and a collector collects
+     * it in order (#1023).
+     */
+    @Test public void hostsReturnTheSourceOfTheirToken() throws java.io.IOException {
+        checkTable("host-token.tsv", 1065, true);
+    }
+
+    /** The capture-less origins of the shapes of host-token.tsv (#1023). */
+    @Test public void hostsReturnTheCaptureLessOriginsOfTheirToken() throws java.io.IOException {
+        checkBoundaryTable("host-token-boundary.tsv", 1062, true);
     }
 
     /** Under a root SemanticPredicateScope(["t"]) when {@code scoped}, whose predicate t always holds. */

@@ -1438,8 +1438,9 @@ impl ParseContext<'_> {
     /// An earlier child of a collection that [`Self::append_fragment`] left unanchored returned
     /// an empty token of the consumed kind (see [`java_returns_token`]): as in Java, the
     /// collection starts with it at the owner's start, instead of "" at the consumed cursor. It
-    /// precedes a host's token (see [`Self::collect_returned_input`]), which only differs from
-    /// Java when that host token is away from the cursor and came first.
+    /// precedes a host's token (see [`Self::collect_returned_input`]); a host token over other
+    /// input than the host consumed starts the collection itself, as a Classic child's collection
+    /// does, so one that came first keeps its own position.
     fn anchor_native_collection(collection: &mut Option<Box<NativeCollection>>) {
         if let Some(collection) = collection.as_deref_mut() {
             let start = collection.start;
@@ -1885,7 +1886,8 @@ pub(crate) fn other_kind_classic(source: &FragmentSource) -> bool {
 /// CaptureScope, Commit, Label, InvertMatchPropagationStopper, SemanticPredicateParser,
 /// SemanticPredicateScope and NameResolutionScope (none of them a CollectingParser) return what
 /// their child returned. What a host returned only its CST says (see
-/// `ParseContext::collect_returned_input`); other expressions are not known to return one.
+/// `ParseContext::collect_returned_input`, and `ParseContext::expression_custom` for a token over
+/// other input than the host consumed); other expressions are not known to return one.
 /// Asked only when a collection starts after children that consumed nothing (see
 /// [`ParseContext::append_fragment`]).
 pub(crate) fn java_returns_token(mut expression: &Expr) -> bool {

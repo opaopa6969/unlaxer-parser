@@ -11,10 +11,11 @@
 # kind, excluded by its kind as vc is; hc returns a consumed token of the input 'c' without consuming it, which is
 # collected; h1 returns a consumed token of 'c' and consumes it; hx returns an empty consumed token of the input at 0, away
 # from the cursor, where the collection then starts unless an earlier child returned a token first
-# (Chain[Opt[z],hx,vc] starts at the cursor). Not here, where Rust differs from Java as before #1023 A/B: hx and hc alone
-# and Chain[hc,c] (no collection starts), hx before an empty collector (Chain[hx,Opt[z],vc], Chain[hx,E,vci],
-# Ord[hx,Opt[z],vci]) and the value boundaries over a host projection after a host (Chain[h0,proj], Chain[hn,proj],
-# Chain[hn,proj0]). Other shapes as full.tsv / empty-token.tsv, whose shapes are not repeated here.
+# (Chain[Opt[z],hx,vc] starts at the cursor). hx and hc alone, Chain[hc,c] and hx before an empty collector
+# (Chain[hx,Opt[z],vc], Chain[hx,E,vci], Ord[hx,Opt[z],vci]) are in host-token.tsv / host-token-lexical.tsv. Not here,
+# where Rust differs from Java as before #1023 A/B: the value boundaries over a host projection after a host
+# (Chain[h0,proj], Chain[hn,proj], Chain[hn,proj0]). Other shapes as full.tsv / empty-token.tsv, whose shapes are not
+# repeated here.
 # prefix	shape	capture	cursor	replay	candidate	failure	acceptC	acceptNotC	field
 0	Chain[Chain[Opt[z]],vci]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
 1	Chain[Chain[Opt[z]],vci]	INPUT@1-1''	2/2	true	~@1	-	false	false	1-1
