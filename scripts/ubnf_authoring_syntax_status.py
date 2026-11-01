@@ -1,4 +1,4 @@
-"""#894: full root/module JSON and consumed-prefix hover; deeper syntax is #1024.
+"""#894/#1024: full root/header/module JSON; body syntax remains explicitly pending.
 
 The oracle is authored from the fixed Java source, never from observed replies.
 Only URI/path substitution and LF/CRLF coordinate conversion are mechanical.
@@ -44,19 +44,22 @@ def run_syntax_status(clients, directory):
     fixture = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/syntax-status.json').read_text())
     assert len(fixture['rootFailures']) == 14 and len(fixture['hoverOnly']) == 9
     assert len(fixture['modules']) == 30
+    assert len(fixture['headerFailures']) == 24
     config = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/configuration.json').read_text())
     evidence = []
     for host, client in zip(('java', 'rust'), clients):
         assert client.result('initialize', {'capabilities': {}}) == config['expected']['default'][host]
         client.send('initialized')
-    for case in fixture['rootFailures']:
+    for case in fixture['rootFailures'] + fixture['headerFailures']:
         uri = (directory / (case['id'] + '.ubnf')).as_uri()
         for client in clients:
             client.fixture = 'syntax-root/' + case['id']
             opened(client, uri, case['source'], case['diagnostics'])
-            hover(client, uri, case['source'], case['hover'])
+            if 'hover' in case:
+                hover(client, uri, case['source'], case['hover'])
             client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
-        evidence.append({'case': case['id'], 'contract': 'root-full-json-and-hover'})
+        evidence.append({'case': case['id'], 'contract': 'header-full-diagnostic-json'
+                         if case in fixture['headerFailures'] else 'root-full-json-and-hover'})
     for case in fixture['hoverOnly']:
         uri = (directory / (case['id'] + '.ubnf')).as_uri()
         for client in clients:

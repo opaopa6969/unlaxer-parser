@@ -1313,5 +1313,1201 @@
       ],
       "globalError": "Illegal character in fragment at index 19: file:///main.ubnf#a#b"
     }
+  ],
+  "headerFailures": [
+    {
+      "id": "keyword-eof",
+      "source": "grammar",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 7
+            },
+            "end": {
+              "line": 0,
+              "character": 7
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 7,
+            "line": 0,
+            "character": 7,
+            "consumedLength": 0,
+            "totalLength": 7,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "name-eof",
+      "source": "grammar ",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 8
+            },
+            "end": {
+              "line": 0,
+              "character": 8
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 8,
+            "line": 0,
+            "character": 8,
+            "consumedLength": 0,
+            "totalLength": 8,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "digit-name",
+      "source": "grammar 9",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 8
+            },
+            "end": {
+              "line": 0,
+              "character": 9
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 8,
+            "line": 0,
+            "character": 8,
+            "consumedLength": 0,
+            "totalLength": 9,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "non-bmp-name",
+      "source": "grammar 😀",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 8
+            },
+            "end": {
+              "line": 0,
+              "character": 10
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 8,
+            "line": 0,
+            "character": 8,
+            "consumedLength": 0,
+            "totalLength": 10,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "non-ascii-name",
+      "source": "grammar 名",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 8
+            },
+            "end": {
+              "line": 0,
+              "character": 9
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 8,
+            "line": 0,
+            "character": 8,
+            "consumedLength": 0,
+            "totalLength": 9,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "punctuation-name",
+      "source": "grammar !",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 8
+            },
+            "end": {
+              "line": 0,
+              "character": 9
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 8,
+            "line": 0,
+            "character": 8,
+            "consumedLength": 0,
+            "totalLength": 9,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "identifier-suffix-eof",
+      "source": "grammar Main",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 12
+            },
+            "end": {
+              "line": 0,
+              "character": 12
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' or AlphabetNumericUnderScoreParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 12,
+            "line": 0,
+            "character": 12,
+            "consumedLength": 0,
+            "totalLength": 12,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "missing-brace",
+      "source": "grammar Main ",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 13
+            },
+            "end": {
+              "line": 0,
+              "character": 13
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 13,
+            "line": 0,
+            "character": 13,
+            "consumedLength": 0,
+            "totalLength": 13,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "wrong-brace",
+      "source": "grammar Main }",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 13
+            },
+            "end": {
+              "line": 0,
+              "character": 14
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 13,
+            "line": 0,
+            "character": 13,
+            "consumedLength": 0,
+            "totalLength": 14,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "non-bmp-brace",
+      "source": "grammar Main 😀",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 13
+            },
+            "end": {
+              "line": 0,
+              "character": 15
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 13,
+            "line": 0,
+            "character": 13,
+            "consumedLength": 0,
+            "totalLength": 15,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "split-name",
+      "source": "grammar M ain {}",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 10
+            },
+            "end": {
+              "line": 0,
+              "character": 11
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 10,
+            "line": 0,
+            "character": 10,
+            "consumedLength": 0,
+            "totalLength": 16,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "keyword-prefix",
+      "source": "grammars B {}",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 9
+            },
+            "end": {
+              "line": 0,
+              "character": 10
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 9,
+            "line": 0,
+            "character": 9,
+            "consumedLength": 0,
+            "totalLength": 13,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "adjacent-name-suffix",
+      "source": "grammarMain!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 11
+            },
+            "end": {
+              "line": 0,
+              "character": 12
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' or AlphabetNumericUnderScoreParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 11,
+            "line": 0,
+            "character": 11,
+            "consumedLength": 0,
+            "totalLength": 12,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "underscore-name",
+      "source": "grammar _0 ",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 11
+            },
+            "end": {
+              "line": 0,
+              "character": 11
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 11,
+            "line": 0,
+            "character": 11,
+            "consumedLength": 0,
+            "totalLength": 11,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "lf-name",
+      "source": "grammar\n",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 0
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 8,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 8,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cr-name",
+      "source": "grammar\r",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 0
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 8,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 8,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crlf-name",
+      "source": "grammar\r\n😀",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 2
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 9,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 11,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "leading-crlf",
+      "source": "\r\ngrammar A\r\n!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 0
+            },
+            "end": {
+              "line": 2,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 13,
+            "line": 2,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 14,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ascii-trivia",
+      "source": "\tgrammar\u000bA\f!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 11
+            },
+            "end": {
+              "line": 0,
+              "character": 12
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 11,
+            "line": 0,
+            "character": 11,
+            "consumedLength": 0,
+            "totalLength": 12,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "comment-name",
+      "source": "grammar // 😀\n!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 14,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 15,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "comment-brace",
+      "source": "grammar A // 😀\r\n!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 17,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 18,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "second-header",
+      "source": "grammar A {}\ngrammar B ",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 10
+            },
+            "end": {
+              "line": 1,
+              "character": 10
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 23,
+            "line": 1,
+            "character": 10,
+            "consumedLength": 13,
+            "totalLength": 23,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "third-header",
+      "source": "grammar A {} grammar B {} grammar C",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 35
+            },
+            "end": {
+              "line": 0,
+              "character": 35
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' or AlphabetNumericUnderScoreParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 35,
+            "line": 0,
+            "character": 35,
+            "consumedLength": 26,
+            "totalLength": 35,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "non-bmp-prefix-header",
+      "source": "grammar A { @root R ::= '😀'; }\r\ngrammar 9",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 8
+            },
+            "end": {
+              "line": 1,
+              "character": 9
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 41,
+            "line": 1,
+            "character": 8,
+            "consumedLength": 33,
+            "totalLength": 42,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    }
   ]
 }

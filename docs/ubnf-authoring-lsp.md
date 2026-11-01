@@ -12,14 +12,14 @@ UBNFMapper.parseWithSource は全入力と mapper 値検査も要求するため
 | 欄 | 固定 Java の情報源・変換 | native frontend の現状 / 今回の扱い |
 |---|---|---|
 | code / severity / source | ULX-PARSE-001 / Error / unlaxer | 既存値は同じ。これだけで完全一致とはしない |
-| schemaVersion / kind / data.code | publishDiagnostics が 1 / syntax / ULX-PARSE-001 を組立てる | 根のkeyword失敗は同じdataを組立てる。深い失敗はnative Diagnosticにdataがなく#1024 |
-| offset / range / line / character | failed frame の最遠 CP、部分成功なら consumed との最大。UTF-16 へ変換し、range は1 CP、CRLFを分断しない | native span は最初のエラーの byte/CP 範囲。根のkeyword失敗は専用経路で一致。深い失敗を最遠へ位置置換せず#1024 |
-| consumedLength / totalLength | root の成功 token 全文の UTF-16 長。root 失敗は0、複数 grammar の部分成功は成功 prefix。total は String.length | native は全入力成功か最初のエラーのみ。LSP失敗時だけ完了 grammar prefix を再認識し hover の消費長を得る。根のsyntax dataは同じ。深い失敗のdataは#1024 |
-| expectedTokens / expectedHints / expectedParsers | 最遠で失敗した各 frame の子を深さ2まで展開し TerminalSymbol の hint を収集。innermost terminal も追加。各配列を distinct/sorted/limit(20) | 予測型再帰下降の Diagnostic.message は単一の期待で、代替候補・試行失敗を保持しない。文字列からの推測はしない。後続 |
-| deepestMatchedRule | trial recording がなければ最遠失敗 stack の最深 parser class 名 | native は当該 stack を持たない。ubnf.ubnf の Annotation / RuleBody / GrammarDecl 等の rule に対応づける失敗専用 recognizer が必要。後続 |
+| schemaVersion / kind / data.code | publishDiagnostics が 1 / syntax / ULX-PARSE-001 を組立てる | 根とgrammarヘッダーは同じdataを組立てる。本文のdataは#1048 |
+| offset / range / line / character | failed frame の最遠 CP、部分成功なら consumed との最大。UTF-16 へ変換し、range は1 CP、CRLFを分断しない | native span は最初のエラーの byte/CP 範囲。根とgrammarヘッダーは専用経路で一致。本文を最遠へ位置置換せず#1048 |
+| consumedLength / totalLength | root の成功 token 全文の UTF-16 長。root 失敗は0、複数 grammar の部分成功は成功 prefix。total は String.length | native は全入力成功か最初のエラーのみ。LSP失敗時だけ完了 grammar prefix を再認識し hover の消費長を得る。根とgrammarヘッダーのsyntax dataは同じ。本文のdataは#1048、hoverの一般化は#1050 |
+| expectedTokens / expectedHints / expectedParsers | 最遠で失敗した各 frame の子を深さ2まで展開し TerminalSymbol の hint を収集。innermost terminal も追加。各配列を distinct/sorted/limit(20) | 通常frontendは単一期待のみ。ヘッダーは専用recognizerで試行を再現し、本文は#1048。文字列から推測しない |
+| deepestMatchedRule | trial recording がなければ最遠失敗 stack の最深 parser class 名 | ヘッダーはUBNFFile/GrammarDecl/Identifierに写像し、最遠frameのclass名を再現する。Annotation/RuleBody等は#1048 |
 | ruleStack / ruleStackOmitted / relatedInformation | GrammarRule の失敗で最遠に達した stack（frame数最大、同数は先着）。成功 prefix の残入力 stack は別 API。offset一致時だけ公開し frame 開始を CP→UTF16 変換 | bootstrap UBNF parser は GrammarRule 非実装のため参照の通常syntaxでは欄自体が不在。存在しない stack を空配列として捏造しない。native 一般 runtime の stack はこの frontend とは別 |
 | fallback hover | Ext は base DocumentState の consumedLength を表示。editor snapshot の成功/失敗とは別 | 最初の frontend error offset を表示していた。失敗時の prefix 再認識へ分離 |
-| module/package | 個別 import の失敗は宣言 range で順に集約。URI変換/最終link失敗は文書先頭で説明prefix付き。既存 resolver が lock/hash/依存/境界を検証 | 個別解決は既存 Resolver を継続使用。最終link/URIのLSP envelopeを合わせる。import先のsyntax本文は上記provenanceと一緒に後続 |
+| module/package | 個別 import の失敗は宣言 range で順に集約。URI変換/最終link失敗は文書先頭で説明prefix付き。既存 resolver が lock/hash/依存/境界を検証 | 個別解決は既存 Resolver を継続使用。最終link/URIのLSP envelopeを合わせる。import先のsyntax本文は#1049で継続 |
 
 rule の写像は `UBNFFileParser → UBNFFile`、`GrammarDeclParser → GrammarDecl`、
 `AnnotationParser → Annotation`、`RuleBodyParser → RuleBody` として ubnf.ubnf に合わせる。
@@ -540,8 +540,8 @@ error.data の比較範囲と親 #885/#864/#111、#893/#894/#901/#902 の継続�
 ### syntax / module 診断の限定対応（#894）
 
 #894 の限定対応は共通 [syntax-status.json](../spec-corpus/ubnf-authoring-lsp/syntax-status.json) /
-[stdio runner](../scripts/ubnf_authoring_syntax_status.py) の69ケースで検証する。
-10根失敗は空文書・無効入力・非BMP・trivia・LF/CRLF・成功prefix・複数grammarを全JSONで照合する。
+[stdio runner](../scripts/ubnf_authoring_syntax_status.py) の109ケースで検証する（全JSON100件、hoverのみ9件）。
+14根失敗は空文書・無効入力・非BMP・trivia・LF/CRLF・成功prefix・複数grammarを全JSONで照合する。
 JavaのChainはrollback後の自身のcursorで失敗候補を登録するため、根の前にtriviaがあると
 parentのbrace候補は最遠へ届かず、期待集合は空文書の5候補ではなく3候補になる。
 通常のbootstrap UBNFにはGrammarRuleがないためstack関連欄・relatedInformationは不在が正しい。
@@ -550,7 +550,7 @@ parentのbrace候補は最遠へ届かず、期待集合は空文書の5候補�
 そのsyntax診断のcode存在は確認するが、message/range/dataの一致は未完了と証跡へ明示する。
 この9ケースをsyntax完全一致として数えない。第一段のincomplete-annotationのhost別hover期待値は削除した。
 
-24 module/package形をLF/CRLFの48ケースで検証する。欠落・複数失敗・循環、alias衝突、未解決token、
+30 module/package形をLF/CRLFの60ケースで検証する。欠落・複数失敗・循環、alias衝突、未解決token、
 network拒否、非file/相対/opaque/authority/query/fragment/escape/space URI、
 missing/stale lock・raw hash・依存未宣言・artifact依存/identity不一致を含む。
 URI失敗はimportごとの推測位置へ変換せず、Javaの外側catchの全文と文書先頭rangeにする。
@@ -566,3 +566,33 @@ Javaのkeyword prefix受理、parameterized syntax state、mapper値エラー時
 prefix再認識でも一般には同じにならない。この変更で全入力域のhover一致を主張しない。
 URIの任意Unicode/percent-decoding/platformと特殊非file bufferの既存差は#902、DTO受理域は#1005。
 #893のvalidator意味解析・#901のcapabilityには手を入れず、#894/#885/#864/#111は閉じない。
+
+### grammar ヘッダーの失敗 provenance（#1024 の段階実装）
+
+固定 Java `d8af6d9be6ad45cdad5eddf0a040cd5ce80d0602` の
+`UBNFFileParser → GrammarDeclParser → IdentifierParser` を、ubnf.ubnf の
+`UBNFFile → GrammarDecl → Identifier` へ対応付けた失敗時専用 recognizer を追加した。
+対象は `grammar` / identifier / 開き brace より前の失敗。本文へ進んだ場合と
+ヘッダー内の改行なし `//` コメントは認識を中断し、従来の native 診断を維持する。
+未対応を最遠位置の置換や期待文面の推測で埋めない。
+
+各 terminal の失敗だけでなく、identifier の成功末尾で失敗した反復の子、trivia の Choice / CPPComment、
+rollback 後の Chain と root の失敗を記録する。ParseContext と同じく失敗 parser の子を深さ2まで展開し、
+表示hintがないときはparser class名へfallbackし、innermost terminal のhintも追加する。
+最遠位置が進むと期待集合を捨て、同位置では集合を併合し、最も深いframe（同数は先着）のclass名を選ぶ。
+LSPの各候補配列はdistinct/sorted/limit20。全data欄とキー有無、message/rangeを独立期待値で照合し、
+bootstrapにはGrammarRuleがないため `ruleStack` / `ruleStackOmitted` / `relatedInformation` は付けない。
+
+手書き24件を既存syntax-status runnerと必須JUnitメソッドへ追加した。EOF、不正identifier/brace、
+Javaがword境界を要求しないkeyword prefix、identifier末尾の失敗、終端ありコメント、
+LF/CR/CRLF/VT/FF/非BMPと成功prefix後の2個目・3個目のgrammarを含む。
+期待値は固定ソースから記し、実server応答から生成しない。追加24件は診断params全JSONだけを契約とし、
+語彙hoverとfallbackの一般化をここで合格扱いにしない。
+20件を超える候補の切捨てとinnermost terminalはsynthetic graphのunit testで検証し、
+この入力域で20件を超える候補を実stdioで検査したとは主張しない。
+
+未完了は [#1048](https://github.com/opaopa6969/unlaxer-parser/issues/1048)（本文診断・EOF comment）、
+[#1049](https://github.com/opaopa6969/unlaxer-parser/issues/1049)（import先parse本文）、
+[#1050](https://github.com/opaopa6969/unlaxer-parser/issues/1050)（hover構文認識）。
+#1024/#894/#885/#864/#111 は閉じない。Java製品、通常parser、公開3.3.0、新crate、
+resolverのネットワーク/lock/実行境界に変更はない。

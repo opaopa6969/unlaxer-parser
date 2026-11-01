@@ -108,7 +108,7 @@ Java 公開 parser の宣言単位の棚卸しは [全API対応表](../docs/java
 | memo key・resource・Classic mode | matched reset policy、rollback可能なstate version、grammar owner、純Classic modeと深さ制限を再利用に反映（#621/#629/#632/#634） | [reset policy](../docs/memo-reset-policy.md)、[stateful failure](../docs/stateful-failure-memo.md)、[Classic memo](../docs/classic-memo.md)。同入力のOFF/ON、実hit、失敗後状態、生成consumerを比較。既定OFF、任意custom/stateful成功を無条件cacheしない |
 | pure success memo | Rustにowned snapshotの安全な成功再利用を追加し、Javaのコピー隔離と比較（#624） | [契約](../docs/pure-success-memo.md)。状態rollback・生成consumer・diagnostic hint・Classic cursorを検証。保持件数/単体/合計chargeとJavaのコピー前判定・非再帰copyは [成功memo予算](../docs/success-memo-budget.md)（#652）。共通600構成/言語で検証、共有外部graphやRSS全体の上限ではない |
 | bounded failure memo | Java/Rustとも件数・単体/合計payloadの予算を設け、満杯時は通常解析へ戻る（#644） | [契約](../docs/failure-memo-budget.md)。600構成/言語で診断・実hit・状態epoch・Unicode・保持窓を検証。構造的chargeでありプロセスRSS上限ではない。成功memoの予算は [別契約](../docs/success-memo-budget.md)（#652）、実Tiny性能は#197。有限failure予算の飽和と再探索を[#663の対照profile](../benchmarks/tiny-classic/profiles/README.md)で再現し、#670で有限合計既定を両版32 MiBへ揃えた。欠省・不正値等25設定/言語と実Tiny全13入力×3consumer×3phaseを新既定で検証したが、最終性能deadlineの合格を意味しない。検証harnessは[#657の契約](../benchmarks/tiny-classic/README.md) |
-| UBNF authoring LSP | JVM 不要 `ubnf-language-server` と VSIX の Rust 明示選択。Java 既定を維持 | [固定 capability/request 表・共通実stdio 127＋39＋62件](../docs/ubnf-authoring-lsp.md)。起動/Full sync、completion/hover、生成警告、validator76文法、AST definition/references・rename・outline/folding・linked editing、readonly package source の元位置・hash・失敗/cache境界、initialize/configure・profile metadata・session（#895）。残る validator #893、syntax/module #894、FQN quick fix/signature/semantic tokens #901、入力域/platform #902（親 #885/#886/#864）。一般生成 LSP の成功で完了としない |
+| UBNF authoring LSP | JVM 不要 `ubnf-language-server` と VSIX の Rust 明示選択。Java 既定を維持 | [固定 capability/request 表・共通実stdio 127＋39＋62件](../docs/ubnf-authoring-lsp.md)。起動/Full sync、completion/hover、生成警告、validator76文法、AST definition/references・rename・outline/folding・linked editing、readonly package source の元位置・hash・失敗/cache境界、initialize/configure・profile metadata・session（#895）。grammarヘッダーの最遠失敗と全dataは#1024の段階実装（既存syntax/module suiteは109件中全JSON100件・hoverのみ9件）。本文診断#1048/import先本文#1049/hover一般化#1050と、残る validator #893、syntax/module #894、FQN quick fix/signature/semantic tokens #901、入力域/platform #902（親 #885/#886/#864）。一般生成 LSP の成功で完了としない |
 | LSP/DAP | Classic Rust stdio LSP と両host opt-in `--lsp` 生成を実装（#451）。full sync、profile、syntax diagnostics、keyword/typed/provider completion、provider hover/definition、full semantic-token provider（#535、3.3.0公開後）。[契約と共通 oracle](../docs/classic-rust-lsp.md) | Java/Rust生成serverの実framed通信18位置fixture、実provider6fixture、stale/invalid/update/closeを検証。full semantic tokens は独立30-case corpusと両言語各7modeで検証。既定dataは空、legend/provider hookを利用者が実装。LSP cancellation、両言語のsemanticTokens range/delta・rename/format/code-action transport は未対応。下流Java VSIX起動はRust protocolの証拠にしない。DAPのAST/token inspectionは次行、live evaluator制御は別範囲 |
 | LSP初期化・再設定 | 両生成serverでinitialize前のrequest/通知、重複initialize、通知methodへのrequestを実行前に拒否（#549）。再設定は明示`unlaxer/configure` | [契約・移行と59-step実通信oracle](../docs/classic-lsp-lifecycle.md)。callback回数・文書/version保持・失敗設定復元・shutdown/exitを比較。通常clientへの動的能力登録は行わない |
 | VS Code起動・停止 | TinyCalcと生成拡張でJava/Rustのstdio実行ファイルを明示選択（#548、3.3.0公開後）。Java既定を維持し、standalone Java LSP mainと配布依存も修正 | [利用法と実VSIX試験](../docs/rust-vscode-launch.md)。Linux x86_64 / VS Code 1.96.4で両backendのLSP/DAP・設定不正・異常終了/再起動・子process終了を検証。全OS配布やlive evaluator制御の保証ではない |
@@ -215,7 +215,7 @@ Classicのparser生成は`Expr`combinator定義を生成し、共通runtimeで�
 
 ### UBNF authoring syntax / module の限定対応 (#894)
 
-Java固定参照 `d8af6d9be6ad45cdad5eddf0a040cd5ce80d0602` の診断生成を[欄別に棚卸し](../docs/ubnf-authoring-lsp.md#syntax-failure-の固定棚卸し894)した。nativeは失敗時だけ完了grammar prefixを再認識し、fallback hoverにUTF-16の消費長を返す。根のkeyword失敗はdataを含む全JSON、moduleのURI/最終link失敗は全文・先頭range・集約を揃える。共通85ケース中76は全JSON、9はhoverのみ。`incomplete-annotation`のhost別hover期待値を共通へ移した。
+Java固定参照 `d8af6d9be6ad45cdad5eddf0a040cd5ce80d0602` の診断生成を[欄別に棚卸し](../docs/ubnf-authoring-lsp.md#syntax-failure-の固定棚卸し894)した。nativeは失敗時だけ完了grammar prefixを再認識し、fallback hoverにUTF-16の消費長を返す。根のkeyword失敗はdataを含む全JSON、moduleのURI/最終link失敗は全文・先頭range・集約を揃える。共通109ケース中100は全JSON、9はhoverのみ（#1024のヘッダー24件を含む）。`incomplete-annotation`のhost別hover期待値を共通へ移した。
 
 通常frontend/Java製品/validator意味解析/公開3.3.0は変更しない。安全なresolverのlock/hash/依存/境界とlocal buffer overlayを維持する。深い構文失敗の最遠位置・期待集合・deepest/stack/data/relatedInformation、import先parse本文、mapper値エラー・parameterized stateを含む厳密なsyntax認識は#1024で継続する。URI全域/platformは#902、DTO型変換は#1005のまま。#894と親issueは未完了。
 
@@ -244,3 +244,15 @@ null/未知欄/untyped値・collection の単一要素受理を保つ。workDone
 Gson String に変換し、指数・負の0の原表記を保持する。全changeの検査を通るまで適用しない。
 ClientCapabilities enum の非整数で Java が無応答となる残差は #1031 で追跡する。
 [固定対応表と検証境界](../docs/ubnf-authoring-lsp.md#json-rpc-層の固定契約994) を参照。
+
+### UBNF authoring ヘッダーの syntax provenance（#1024 の段階実装）
+
+`failure/header.rs` は `UBNFFile → GrammarDecl → Identifier` の固定 Java parser graph を
+失敗時だけ認識する。通常frontendのエラー位置を利用せず、成功した子・rollbackした親・
+triviaの失敗を記録し、深さ2の候補展開とinnermost terminal、同じ最遠位置での最大深度・先着を再現する。
+候補はdistinct/sorted/limit20、全dataとstack関連キー/relatedInformationの不在を検査する。
+24件はEOF・不正identifier/brace・keyword prefix・連続identifier・コメント・各改行・非BMP・
+複数grammarを含む。候補が20件を超える場合とinnermost terminalはrecognizerの独立unit testでも検査する。
+本文またはヘッダー内の改行なしコメントへ達したら未対応を返し、元のnative診断を保持する。
+本文の全provenanceは #1048、import先parse本文は #1049、hover構文認識の一般化は #1050。
+これらを完了扱いせず、#1024/#894と親issueは開いたままにする。
