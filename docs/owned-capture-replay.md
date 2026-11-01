@@ -113,6 +113,30 @@ UBNF の `[AHEAD]` は内部に Chain があるため、その例だけでは Op
 通常の `ParseContext::parse` / `parse_grammar` には既存の `requires_classic_mode` による
 自動選択があり、CAPTURE / SAME_AS 以外の Classic ラッパーにも適用される。
 
+非 Classic の collector（Sequence／NonOrdered／JavaRepeat／Optional／JavaOptional／Recovery、
+`@f`、TextValue／ValueBoundary／CaptureBoundary、本体が Choice 系でない規則）は、Java の
+consumed collector（規則は生成規則の LazyChain）と同じ規則で
+返却 source を作る（#1023 A/B）。低水準の Classic `MatchOnly` など種別の違う Classic の子は
+寄与せず、入力は消費した区間、host の投影（現在の種別の Projected）は出現順に連結する。
+consumed 種別の Classic の子が消費区間と違う収集（virtual の子を落とした後の cursor の `""`）を
+返したときは、その収集を集める。
+`capture_owned(Optional(MatchOnly('c')))` + `Replay` は入力 `pc` で `""` を保存して拒否し、
+`Chain[投影 "Z"]` は投影 `"Z"`（論理開始）を保存する。値境界の node はその収集値の span と
+consumed 種別になる。Classic の collector も、空の投影だけを集めたときは入力の幅0でなく
+投影の `""` を返す（Java の sub-source と同じ）。本体が `MatchOnly('c')` の規則と、それを
+参照するだけの規則も `""`（consumed cursor）を保存し、本体が Choice の規則（Java LazyChoice）は
+選んだ子の `"c"` を保存する。投影や Classic の子を持たない collector は従来どおり source を
+持たず、割当ても増えない。Java 実測の共通表
+`conformance/collector-source/full.tsv` で、Java と Rust の 4 入口（full-input、
+`.stop_consume()` の root、`ParseContext::parse`、明示 Classic）を照合する。
+native の custom が返す入力由来の別種別の token（virtual / match-only）も、その種別の
+Classic の子と同じく寄与せず（`virtual-input.tsv`）、任意 terminator 付き反復は body と
+commit した terminator を収集する（`terminated.tsv`）。どちらも同じ 4 入口で照合する。
+何も消費しなかった子の後で収集が始まるときは、Java と同じく、空でも token を返す子
+（collector・規則・値境界・EmptyParser）があればその位置から収集し、PEG assertion だけなら
+cursor の `""` になる（`capture_owned(Chain[Optional('z'), vci])` は `p` 位置の `""`）。
+native の規則は本体の収集を返し、node を持たない入力も含む（`empty-token.tsv`）。
+
 続く consumed の `SAME_AS(w)` は保存した値を consumed cursor から照合・消費する。
 空の束縛も定義済みの値であり、再照合は幅0で成功する。
 Classic の match-only の再照合は matched cursor だけを進める。

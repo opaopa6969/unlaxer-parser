@@ -1,0 +1,84 @@
+# #1023 (lexical leaves EL / LX, Java unlaxer-dsl LexicalCollectorSourceTest) shared oracle for a host's returned token over other input than the host consumed, measured with Java
+# (NamedCapture / SemanticPredicateParser / CaptureBoundaryParser.input), columns as full.tsv, every column under a root
+# SemanticPredicateScope(["t"]) as returned-token.tsv. A Java host returns its Token, whose source is the input it peeked:
+# hx returns Token(consumed, peek(0, 0)) and consumes nothing, hc returns Token(consumed, peek(cursor, 1)) over 'c' and
+# consumes nothing, hxc consumes 'c' and returns Token(consumed, peek(0, 0)). NamedCapture, a predicate, @f and
+# CaptureBoundaryParser.input read that source (hc alone captures 'c' at the cursor, which Replay then consumes), a
+# collector collects it in order (Chain[hc,c] collects 'c' twice, the projection "cc"), and its position comes first
+# (Chain[hx,Opt[z],vc] is "" at 0). Rust Custom returns the same source: the TokenInfo source of its one root token of the
+# consumed kind when that differs from its ParseMatch span. Only the shapes Rust got wrong before; h0 / hn / h1 / proj /
+# proj0 / MO / vc / vci as returned-token.tsv / full.tsv. Not here: MatchOnly over a host (Rust differs from Java as
+# before only on a value boundary under MatchOnly at ParseContext::parse, for MatchOnly over 'c' too).
+# prefix	shape	capture	cursor	replay	candidate	failure	acceptC	acceptNotC	field
+0	Chain[hx,EL]	INPUT@0-0''	0/0	false	~@0	-	false	true	0-0
+1	Chain[hx,EL]	INPUT@0-0''	1/1	false	~@1	-	false	true	0-0
+3	Chain[hx,EL]	INPUT@0-0''	3/3	false	~@3	-	false	true	0-0
+0	Ord[hx,EL]	INPUT@0-0''	0/0	false	~@0	-	false	true	0-0
+1	Ord[hx,EL]	INPUT@0-0''	1/1	false	~@1	-	false	true	0-0
+3	Ord[hx,EL]	INPUT@0-0''	3/3	false	~@3	-	false	true	0-0
+0	Chain[hx,EL,vc]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Chain[hx,EL,vc]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Chain[hx,EL,vc]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0
+0	Ord[hx,EL,vc]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Ord[hx,EL,vc]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Ord[hx,EL,vc]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0
+0	Chain[hx,EL,vci]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Chain[hx,EL,vci]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Chain[hx,EL,vci]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0
+0	Ord[hx,EL,vci]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Ord[hx,EL,vci]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Ord[hx,EL,vci]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0
+0	Chain[hx,LX,vc]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Chain[hx,LX,vc]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Chain[hx,LX,vc]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0
+0	Ord[hx,LX,vc]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Ord[hx,LX,vc]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Ord[hx,LX,vc]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0
+0	Chain[hx,LX,vci]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Chain[hx,LX,vci]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Chain[hx,LX,vci]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0
+0	Ord[hx,LX,vci]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Ord[hx,LX,vci]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Ord[hx,LX,vci]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0
+0	Chain[hc,EL]	INPUT@0-1'c'	0/0	true	c@0	-	true	false	0-1
+1	Chain[hc,EL]	INPUT@1-2'c'	1/1	true	c@1	-	true	false	1-2
+3	Chain[hc,EL]	INPUT@3-4'c'	3/3	true	c@3	-	true	false	3-4
+0	Chain[EL,hc]	INPUT@0-1'c'	0/0	true	c@0	-	true	false	0-1
+1	Chain[EL,hc]	INPUT@1-2'c'	1/1	true	c@1	-	true	false	1-2
+3	Chain[EL,hc]	INPUT@3-4'c'	3/3	true	c@3	-	true	false	3-4
+0	Ord[hc,EL]	INPUT@0-1'c'	0/0	true	c@0	-	true	false	0-1
+1	Ord[hc,EL]	INPUT@1-2'c'	1/1	true	c@1	-	true	false	1-2
+3	Ord[hc,EL]	INPUT@3-4'c'	3/3	true	c@3	-	true	false	3-4
+0	Chain[hc,EL,c]	PROJECTED@0-2'cc'	1/1	false	-	predicate_source@0	false	false	fail
+1	Chain[hc,EL,c]	PROJECTED@1-3'cc'	2/2	false	-	predicate_source@1	false	false	fail
+3	Chain[hc,EL,c]	PROJECTED@3-5'cc'	4/4	false	-	predicate_source@3	false	false	fail
+0	Chain[EL,hc,c]	PROJECTED@0-2'cc'	1/1	false	-	predicate_source@0	false	false	fail
+1	Chain[EL,hc,c]	PROJECTED@1-3'cc'	2/2	false	-	predicate_source@1	false	false	fail
+3	Chain[EL,hc,c]	PROJECTED@3-5'cc'	4/4	false	-	predicate_source@3	false	false	fail
+0	Ord[hc,EL,c]	PROJECTED@0-2'cc'	1/1	false	-	predicate_source@0	false	false	fail
+1	Ord[hc,EL,c]	PROJECTED@1-3'cc'	2/2	false	-	predicate_source@1	false	false	fail
+3	Ord[hc,EL,c]	PROJECTED@3-5'cc'	4/4	false	-	predicate_source@3	false	false	fail
+0	Ord[EL,hc,c]	PROJECTED@0-2'cc'	1/1	false	-	predicate_source@0	false	false	fail
+1	Ord[EL,hc,c]	PROJECTED@1-3'cc'	2/2	false	-	predicate_source@1	false	false	fail
+3	Ord[EL,hc,c]	PROJECTED@3-5'cc'	4/4	false	-	predicate_source@3	false	false	fail
+0	Chain[hc,LX,c]	PROJECTED@0-2'cc'	1/1	false	-	predicate_source@0	false	false	fail
+1	Chain[hc,LX,c]	PROJECTED@1-3'cc'	2/2	false	-	predicate_source@1	false	false	fail
+3	Chain[hc,LX,c]	PROJECTED@3-5'cc'	4/4	false	-	predicate_source@3	false	false	fail
+0	Chain[LX,hc,c]	PROJECTED@0-2'cc'	1/1	false	-	predicate_source@0	false	false	fail
+1	Chain[LX,hc,c]	PROJECTED@1-3'cc'	2/2	false	-	predicate_source@1	false	false	fail
+3	Chain[LX,hc,c]	PROJECTED@3-5'cc'	4/4	false	-	predicate_source@3	false	false	fail
+0	Ord[hc,LX,c]	PROJECTED@0-2'cc'	1/1	false	-	predicate_source@0	false	false	fail
+1	Ord[hc,LX,c]	PROJECTED@1-3'cc'	2/2	false	-	predicate_source@1	false	false	fail
+3	Ord[hc,LX,c]	PROJECTED@3-5'cc'	4/4	false	-	predicate_source@3	false	false	fail
+0	Ord[LX,hc,c]	PROJECTED@0-2'cc'	1/1	false	-	predicate_source@0	false	false	fail
+1	Ord[LX,hc,c]	PROJECTED@1-3'cc'	2/2	false	-	predicate_source@1	false	false	fail
+3	Ord[LX,hc,c]	PROJECTED@3-5'cc'	4/4	false	-	predicate_source@3	false	false	fail
+0	Chain[hxc,EL]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Chain[hxc,EL]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Chain[hxc,EL]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0
+0	Chain[EL,hxc]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Chain[EL,hxc]	INPUT@1-1''	2/2	true	~@1	-	false	false	1-1
+3	Chain[EL,hxc]	INPUT@3-3''	4/4	true	~@3	-	false	false	3-3
+0	Ord[hxc,EL]	INPUT@0-0''	1/1	true	~@0	-	false	false	0-0
+1	Ord[hxc,EL]	INPUT@0-0''	2/2	true	~@1	-	false	false	0-0
+3	Ord[hxc,EL]	INPUT@0-0''	4/4	true	~@3	-	false	false	0-0

@@ -4,6 +4,10 @@
 # single element to a one-element Chain; Java emits LazyChoice / LazyChain). The callback reads the text,
 # so a wrong candidate flips acceptance: with oneOf:c the parse succeeds exactly when the candidate is "c",
 # with its complement exactly when it is not. Same contract as classic.tsv for the consumed kind.
+# Collectors (Opt, Rep = ZeroOrMore / repeat_java, Rec = recovery with sync ";") return their consumed
+# collection (#1023): a MatchOnly child contributes nothing, and a host projection (proj = "Z" / proj0 = ""
+# whose logical start is 0) is collected, so the predicate fails with predicate_source instead of reading
+# the input at the cursor. Rows from Opt[MO] on are Java measured.
 # shape	candidate	failure
 LA	c@3	-
 MO	c@3	-
@@ -26,3 +30,19 @@ gen:	-	predicate_source@3
 Choice[gen:g]	-	predicate_source@3
 Chain[gen:g]	~@3	-
 Chain[gen:]	~@3	-
+Opt[MO]	~@3	-
+Opt[Choice[MO]]	~@3	-
+Choice[Opt[MO]]	~@3	-
+Opt[Opt[MO]]	~@3	-
+Rep[MO]	~@3	-
+Rec[MO]	~@3	-
+proj	-	predicate_source@0
+proj0	-	predicate_source@3
+Chain[proj]	-	predicate_source@0
+Chain[proj0]	-	predicate_source@3
+Choice[proj]	-	predicate_source@0
+Opt[proj]	-	predicate_source@0
+Rep[proj]	-	predicate_source@0
+Rec[proj]	-	predicate_source@0
+Chain[MO,proj]	-	predicate_source@0
+Chain[proj,MO]	-	predicate_source@0
