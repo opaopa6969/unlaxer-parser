@@ -283,10 +283,12 @@ public class SemanticPredicateParserTest {
                 case "&c": return new PegLookahead(new WordParser("c"), true);
                 case "!z": return new PegLookahead(new WordParser("z"), false);
                 case "Empty": return new org.unlaxer.parser.elementary.EmptyParser();
-                case "gen:g": case "genc:g": return generated("g");
+                case "gen:g": case "gen0:g": case "genc:g": return generated("g");
                 // Java の生成 source は anchor を持たない。Rust の anchor 0 / cursor を同じ値で照合する。
                 case "gen:": case "gen0:": case "genc:": return generated("");
                 case "leaf": return virtualInput();
+                case "proj": return projected("Z");
+                case "proj0": return projected("");
                 default: return new WordParser(name);
             }
         }
@@ -294,8 +296,8 @@ public class SemanticPredicateParserTest {
         if (head.equals("Rule") || head.startsWith("UBNF:")) {
             // A generated rule class: LazyChoice for several alternatives, LazyChain otherwise.
             String body = head.equals("Rule") ? name.substring(open + 1, name.length() - 1) : name.substring(5);
-            if (body.indexOf('[') < 0) {
-                // 1 要素の本体（Rule[MO] など）は、その要素だけの LazyChain。
+            if (body.indexOf('[') < 0 || body.startsWith("Rule[")) {
+                // 1 要素の本体（Rule[MO]、規則参照だけの Rule[Rule[..]] など）は、その要素だけの LazyChain。
                 var single = new org.unlaxer.parser.Parsers(shape(body));
                 return new LazyChain() {
                     private static final long serialVersionUID = 1L;
@@ -319,6 +321,8 @@ public class SemanticPredicateParserTest {
             case "Choice": return new Choice(parsers);
             case "Chain": return new Chain(parsers);
             case "Opt": return new Optional(parsers.get(0));
+            case "Rep": return new ZeroOrMore(parsers.get(0));
+            case "Rec": return new SyncPointRecoveryParser(parsers.get(0), ";");
             default: throw new IllegalArgumentException(name);
         }
     }
@@ -405,7 +409,7 @@ public class SemanticPredicateParserTest {
     /** The same contract decides a whole parse (shared oracle, conformance/semantic-predicate-source/full.tsv). */
     @Test public void returnedSourceDecidesTheWholeParse() throws java.io.IOException {
         var rows = rows("full.tsv");
-        assertEquals(21, rows.size());
+        assertEquals(37, rows.size());
         for (String[] row : rows) for (boolean wantsC : List.of(true, false)) {
           for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
             try (var context = ParseContext.withOptions(StringSource.createRootSource(PREFIX + "c"),
@@ -499,6 +503,106 @@ public class SemanticPredicateParserTest {
     }
 
     /**
+     * CaptureBoundaryParser.input checks the source of the Parsed its child returns, also through a LazyChoice
+     * rule: in the virtual kinds Rule[Choice[leaf,z]] etc. return the selected input child although a virtual
+     * collector that kept nothing is generated "" (#1023 C). A LazyChain whose only element is such a rule
+     * (Rule[Rule[..]]) returns its own collection instead. Shared oracle with Rust,
+     * conformance/input-capture-virtual/classic.tsv.
+     */
+    @Test public void inputCaptureBoundaryFollowsTheReturnedSourceInEveryCallerKind() throws java.io.IOException {
+        var rows = new java.util.ArrayList<String[]>();
+        for (String row : java.nio.file.Files.readAllLines(java.nio.file.Path.of("../conformance/input-capture-virtual/classic.tsv"))) {
+            if (false == row.startsWith("#")) rows.add(row.split("\t"));
+        }
+        assertEquals(624, rows.size());
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String[] row : rows) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            String prefix = prefixes.get(row[1]);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                String label = String.join(" ", row) + " " + memo + "/" + diagnostics;
+                assertEquals(label, Boolean.parseBoolean(row[3]), CaptureBoundaryParser.input(CaptureBoundaryParser.Kind.VALUE,
+                    shape(row[2])).parse(context, TokenKind.valueOf(row[0]), false).isSucceeded());
+            }
+          }
+        }
+    }
+
+    /** The generated UBNF @f site: the body of ParserGenerator's __CaptureSite, without its bindings. */
+    private static final class FieldCaptureSite extends LazyChain implements org.unlaxer.context.DiagnosticsAgnostic {
+        private static final long serialVersionUID = 1L;
+        private final Parser child;
+        FieldCaptureSite(Parser child) { this.child = child; }
+        @Override public org.unlaxer.parser.Parsers getLazyParsers() { return new org.unlaxer.parser.Parsers(child); }
+        @Override public org.unlaxer.Parsed parseChainElement(Parser child, ParseContext context, TokenKind kind, boolean invert) {
+            org.unlaxer.Parsed parsed = child.parse(context, kind, invert);
+            if (parsed.isSucceeded() && (parsed.getTokenOptional().isPresent() || false == parsed.getOriginalTokens().isEmpty())) {
+                if (org.unlaxer.CapturedValue.provenanceOf(parsed.getRootToken().source, context.getSource())
+                        != org.unlaxer.CapturedValue.Provenance.INPUT) {
+                    return org.unlaxer.parser.ErrorMessageParser.expected(
+                        "AST field capture requires original input source; use CAPTURE/SAME_AS for general replay")
+                        .parse(context, kind, invert);
+                }
+            }
+            return parsed;
+        }
+        @Override public java.util.Optional<org.unlaxer.RecursiveMode> getNotAstNodeSpecifier() {
+            return java.util.Optional.empty();
+        }
+    }
+    private static void fieldSites(Token token, List<Token> sites) {
+        if (token.parser instanceof FieldCaptureSite) sites.add(token);
+        for (Token child : token.filteredChildren) fieldSites(child, sites);
+    }
+
+    /**
+     * The generated @f site checks the source of the Parsed its child returns, so a LazyChoice rule is accepted
+     * in the virtual kinds too (#1023 C). Its field is the site token the mapper reads: generated "" at raw 0-0
+     * when the virtual site collected nothing. A rejection leaves the cursor at the prefix and no site token.
+     * Shared oracle with Rust Expr::Capture, conformance/input-capture-virtual/field.tsv.
+     */
+    @Test public void fieldCaptureSiteFollowsTheReturnedSourceInEveryCallerKind() throws java.io.IOException {
+        var rows = new java.util.ArrayList<String[]>();
+        for (String row : java.nio.file.Files.readAllLines(java.nio.file.Path.of("../conformance/input-capture-virtual/field.tsv"))) {
+            if (false == row.startsWith("#")) rows.add(row.split("\t"));
+        }
+        assertEquals(432, rows.size());
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String[] row : rows) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            String prefix = prefixes.get(row[1]);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                String label = String.join(" ", row) + " " + memo + "/" + diagnostics;
+                int before = context.getCurrent().getTokens().size();
+                var parsed = new FieldCaptureSite(shape(row[2])).parse(context, TokenKind.valueOf(row[0]), false);
+                var sites = new java.util.ArrayList<Token>();
+                var tokens = context.getCurrent().getTokens();
+                for (int index = before; index < tokens.size(); index++) fieldSites(tokens.get(index), sites);
+                String field = "-";
+                if (parsed.isSucceeded()) {
+                    Token site = parsed.getTokenOptional().orElseThrow();
+                    assertEquals(label, List.of(site), sites);
+                    int start = site.source.offsetFromRoot().value();
+                    String text = site.source.sourceAsString();
+                    field = org.unlaxer.CapturedValue.provenanceOf(site.source, context.getSource()) + " " + start + " "
+                        + (start + site.source.codePointLength().value()) + " " + (text.isEmpty() ? "~" : text);
+                } else {
+                    assertEquals(label, List.of(), sites);
+                }
+                assertEquals(label, row[3], String.valueOf(parsed.isSucceeded()));
+                assertEquals(label, parsed.isSucceeded() ? String.join(" ", row[4], row[5], row[6], row[7]) : row[5], field);
+                assertEquals(label, row[8] + "/" + row[9],
+                    context.getConsumedPosition().value() + "/" + context.getMatchedPosition().value());
+            }
+          }
+        }
+    }
+
+    /**
      * A virtual-kind rule (LazyChain) that collected nothing returns generated "": NamedCapture records it
      * at the cursor (Rust owned_capture_of_an_empty_virtual_rule_is_generated_at_the_cursor).
      */
@@ -519,6 +623,107 @@ public class SemanticPredicateParserTest {
                         value.provenance() + "@" + value.start() + "-" + value.end() + "'" + value.text() + "'");
                 }
               }
+            }
+          }
+        }
+    }
+
+    /**
+     * NamedCapture records the source of the Parsed its child returns, not a guess from the token kind: an
+     * input-backed empty virtual token and a PEG assertion that returned no token are input at the cursor in
+     * every caller kind (#1023 C). Shared oracle with Rust, conformance/owned-capture-virtual/classic.tsv.
+     */
+    @Test public void namedCaptureFollowsTheReturnedSourceInEveryCallerKind() throws java.io.IOException {
+        var rows = new java.util.ArrayList<String[]>();
+        for (String row : java.nio.file.Files.readAllLines(java.nio.file.Path.of("../conformance/owned-capture-virtual/classic.tsv"))) {
+            if (false == row.startsWith("#")) rows.add(row.split("\t"));
+        }
+        assertEquals(516, rows.size());
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String[] row : rows) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            String prefix = prefixes.get(row[1]);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                String label = String.join(" ", row) + " " + memo + "/" + diagnostics;
+                assertTrue(label, new NamedCapture("v", shape(row[2])).parse(context, TokenKind.valueOf(row[0]), false).isSucceeded());
+                var value = context.captured("v").orElseThrow();
+                assertEquals(label, row[3] + "@" + row[4] + "-" + row[5] + "'" + row[6].replace("~", "") + "'",
+                    value.provenance() + "@" + value.start() + "-" + value.end() + "'" + value.text() + "'");
+            }
+          }
+        }
+    }
+
+    /**
+     * A rule whose body is only a rule reference is a single-element LazyChain: NamedCapture, the predicate,
+     * CaptureBoundaryParser.input and the generated @f site read its own collection, not the source its inner
+     * rule returned (#1023). A Choice of a rule reference still returns the selected child. Shared oracle with
+     * Rust, conformance/owned-capture-virtual/rule-reference.tsv (Java is the expected side; its rust column is
+     * Rust's).
+     */
+    @Test public void ruleReferenceBodyReturnsItsOwnCollectionInEveryCallerKind() throws java.io.IOException {
+        var rows = new java.util.ArrayList<String[]>();
+        for (String row : java.nio.file.Files.readAllLines(java.nio.file.Path.of("../conformance/owned-capture-virtual/rule-reference.tsv"))) {
+            if (false == row.startsWith("#")) rows.add(row.split("\t"));
+        }
+        assertEquals(420, rows.size());
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String[] row : rows) {
+          String prefix = prefixes.get(row[1]);
+          String expected = row[3] + "@" + row[4] + "-" + row[5] + "'" + row[6].replace("~", "") + "'";
+          String cursor = row[7] + "/" + row[8];
+          boolean accepted = Boolean.parseBoolean(row[9]);
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            var options = ParseOptions.withMemoization(memo).withDiagnostics(diagnostics);
+            String label = String.join(" ", row) + " " + memo + "/" + diagnostics;
+            TokenKind kind = TokenKind.valueOf(row[0]);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"), options)) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                assertTrue(label, new NamedCapture("v", shape(row[2])).parse(context, kind, false).isSucceeded());
+                var value = context.captured("v").orElseThrow();
+                assertEquals(label, expected, value.provenance() + "@" + value.start() + "-" + value.end() + "'" + value.text() + "'");
+                assertEquals(label, cursor, context.getConsumedPosition().value() + "/" + context.getMatchedPosition().value());
+            }
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"), options)) {
+                var seen = new java.util.TreeSet<String>();
+                SemanticPredicateBindings.install(context, Map.of("valid", candidate -> {
+                    seen.add("INPUT@" + candidate.start() + "-" + candidate.end() + "'" + candidate.text() + "'");
+                    return true;
+                }));
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                boolean input = row[3].equals("INPUT");
+                assertEquals(label, input, gate(shape(row[2])).parse(context, kind, false).isSucceeded());
+                assertEquals(label, input ? List.of(expected) : List.of(), List.copyOf(seen));
+                assertEquals(label, input ? null : "predicate_source",
+                    SemanticPredicateBindings.failure(context).map(failure -> failure.kind()).orElse(null));
+            }
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"), options)) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                assertEquals(label, accepted, CaptureBoundaryParser.input(CaptureBoundaryParser.Kind.VALUE, shape(row[2]))
+                    .parse(context, kind, false).isSucceeded());
+            }
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"), options)) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                int before = context.getCurrent().getTokens().size();
+                var parsed = new FieldCaptureSite(shape(row[2])).parse(context, kind, false);
+                var sites = new java.util.ArrayList<Token>();
+                var tokens = context.getCurrent().getTokens();
+                for (int index = before; index < tokens.size(); index++) fieldSites(tokens.get(index), sites);
+                assertEquals(label, accepted, parsed.isSucceeded());
+                if (accepted) {
+                    Token site = parsed.getTokenOptional().orElseThrow();
+                    assertEquals(label, List.of(site), sites);
+                    int start = site.source.offsetFromRoot().value();
+                    String text = site.source.sourceAsString();
+                    assertEquals(label, row[10] + " " + row[11] + " " + row[12],
+                        start + " " + (start + site.source.codePointLength().value()) + " " + (text.isEmpty() ? "~" : text));
+                    assertEquals(label, cursor, context.getConsumedPosition().value() + "/" + context.getMatchedPosition().value());
+                } else {
+                    assertEquals(label, List.of(), sites);
+                    assertEquals(label, row[1] + "/" + row[1], context.getConsumedPosition().value() + "/" + context.getMatchedPosition().value());
+                }
             }
           }
         }

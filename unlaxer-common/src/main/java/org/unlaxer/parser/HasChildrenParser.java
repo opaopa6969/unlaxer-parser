@@ -35,22 +35,8 @@ public interface HasChildrenParser extends Parser{
 			return Optional.empty();
 		}
 		if(target instanceof HasChildrenParser){
-			HasChildrenParser hasChildParser = ((HasChildrenParser) target);
-			@SuppressWarnings("unchecked")
-			List<Parser> children = (List<Parser>) hasChildParser.getChildren().stream()
-				.map(childParser->{
-					if(cutFilter.test(target)){
-						return Optional.empty();
-					}
-					if(childParser instanceof HasChildrenParser){
-						return Optional.of(((HasChildrenParser)childParser).newWithoutRecursive(cutFilter));
-					}
-					return Optional.of(target);
-				})
-				.filter(Optional::isPresent)
-				.map(Optional::get)
-				.collect(Collectors.toList());
-			return Optional.of(createWith(Parsers.of(children)));
+			// Each nested combinator keeps its own type and drops matching descendants (#845).
+			return Optional.of(((HasChildrenParser) target).newWithoutRecursive(cutFilter));
 		}
 		return Optional.of(target);
 	}
