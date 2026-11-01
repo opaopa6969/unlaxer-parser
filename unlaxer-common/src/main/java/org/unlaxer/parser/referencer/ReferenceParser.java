@@ -16,8 +16,12 @@ public class ReferenceParser extends AbstractParser{
 
 	private static final long serialVersionUID = 9076824441322103190L;
 	
-	boolean predicated = false;
-	
+	/**
+	 * The predicate result, {@code null} until resolved. One field instead of a flag and a value:
+	 * a thread that reads a non-null Optional sees its contents (final field semantics, JLS 17.5),
+	 * so a shared frozen graph never observes "resolved" without the parser (#1007). Threads that
+	 * race on the first use may each evaluate the predicate and publish an equal result.
+	 */
 	Optional<Parser> matchedParser;
 	
 	Predicate<Parser> predicate;
@@ -66,11 +70,12 @@ public class ReferenceParser extends AbstractParser{
 	}
 	
 	public Optional<Parser> getMatchedParser(){
-		if(false == predicated){
-			matchedParser = findFirstFromRoot(predicate);
-			predicated = true;
+		Optional<Parser> resolved = matchedParser;
+		if(resolved == null){
+			resolved = findFirstFromRoot(predicate);
+			matchedParser = resolved;
 		}
-		return matchedParser;
+		return resolved;
 	}
 
 

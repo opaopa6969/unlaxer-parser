@@ -26,6 +26,7 @@ pub mod names;
 pub mod pipeline;
 pub mod provider_process;
 pub mod provider_protocol;
+pub mod rule_names;
 mod rule_stack;
 mod scope;
 pub mod semantic;
@@ -46,6 +47,7 @@ mod unicode_grapheme_data;
 mod unicode_xid;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
+pub use rule_names::{RuleNameError, RuleNames};
 pub use rule_stack::{RuleFrame, RuleStack, RuleStackDiagnostic, RULE_STACK_LIMIT};
 pub use scope::{
     Declaration, ReferenceInfo, RuleEffects, ScopeMode, ScopeStore, Severity, SymbolDiagnostic,
