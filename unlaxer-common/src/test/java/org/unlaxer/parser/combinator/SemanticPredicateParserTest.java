@@ -523,4 +523,32 @@ public class SemanticPredicateParserTest {
           }
         }
     }
+
+    /**
+     * NamedCapture records the source of the Parsed its child returns, not a guess from the token kind: an
+     * input-backed empty virtual token and a PEG assertion that returned no token are input at the cursor in
+     * every caller kind (#1023 C). Shared oracle with Rust, conformance/owned-capture-virtual/classic.tsv.
+     */
+    @Test public void namedCaptureFollowsTheReturnedSourceInEveryCallerKind() throws java.io.IOException {
+        var rows = new java.util.ArrayList<String[]>();
+        for (String row : java.nio.file.Files.readAllLines(java.nio.file.Path.of("../conformance/owned-capture-virtual/classic.tsv"))) {
+            if (false == row.startsWith("#")) rows.add(row.split("\t"));
+        }
+        assertEquals(516, rows.size());
+        Map<String, String> prefixes = Map.of("0", "", "1", "p", "3", PREFIX);
+        for (String[] row : rows) {
+          for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
+            String prefix = prefixes.get(row[1]);
+            try (var context = ParseContext.withOptions(StringSource.createRootSource(prefix + "c"),
+                    ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
+                if (false == prefix.isEmpty()) assertTrue(new WordParser(prefix).parse(context).isSucceeded());
+                String label = String.join(" ", row) + " " + memo + "/" + diagnostics;
+                assertTrue(label, new NamedCapture("v", shape(row[2])).parse(context, TokenKind.valueOf(row[0]), false).isSucceeded());
+                var value = context.captured("v").orElseThrow();
+                assertEquals(label, row[3] + "@" + row[4] + "-" + row[5] + "'" + row[6].replace("~", "") + "'",
+                    value.provenance() + "@" + value.start() + "-" + value.end() + "'" + value.text() + "'");
+            }
+          }
+        }
+    }
 }

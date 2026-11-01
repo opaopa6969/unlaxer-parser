@@ -126,7 +126,7 @@
         {"location": "rust/unlaxer-runtime/src/lib.rs#L4972", "anchor": "fn expression_terminated_repeat("},
         {"location": "rust/unlaxer-runtime/src/lib.rs#L5030", "anchor": "fn begin_java_terminator(&mut self, state: &mut TerminatedRepeat) -> Box<TerminatorFrame>"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/context/Transaction.java#L131", "anchor": "if (parser instanceof CollectingParser && outputCollected)"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L7964", "anchor": "fn java_collector_label(expression: &Expr) -> Option<&'static str>"}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L7969", "anchor": "fn java_collector_label(expression: &Expr) -> Option<&'static str>"}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/parser/combinator/TerminatedRepeatParityTest.java",
@@ -179,7 +179,7 @@
       "code": [
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/referencer/MatchedChoiceParser.java#L13", "anchor": "public class MatchedChoiceParser extends NoneChildParser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceCommitAction.java#L7", "anchor": "public class ChoiceCommitAction implements AdditionalPreCommitAction"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5713", "anchor": "fn ordered_choice<'b>("}
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5718", "anchor": "fn ordered_choice<'b>("}
       ],
       "tests": [
         "unlaxer-common/src/test/java/org/unlaxer/referencer/MatchedChoiceParserTest.java"
@@ -629,7 +629,7 @@
       "route": "`Expr::sequence/choice/longest_choice/unique_longest_choice/predictive_choice/zero_match`。Lazy版は構築済み Rule参照へ移す。min/max反復の terminator は別行。",
       "code": [
         {"location": "rust/unlaxer-runtime/src/lib.rs#L375", "anchor": "pub fn sequence(elements: impl IntoIterator<Item = Self>) -> Self"},
-        {"location": "rust/unlaxer-runtime/src/lib.rs#L5713", "anchor": "fn ordered_choice<'b>("},
+        {"location": "rust/unlaxer-runtime/src/lib.rs#L5718", "anchor": "fn ordered_choice<'b>("},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChainInterface.java#L11", "anchor": "public interface ChainInterface extends Parser"},
         {"location": "unlaxer-common/src/main/java/org/unlaxer/parser/combinator/ChoiceInterface.java#L14", "anchor": "public interface ChoiceInterface extends Parser"}
       ],

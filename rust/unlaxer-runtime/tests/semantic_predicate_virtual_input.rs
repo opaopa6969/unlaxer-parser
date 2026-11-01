@@ -379,3 +379,101 @@ fn owned_capture_of_an_empty_virtual_rule_is_generated_at_the_cursor() {
         }
     }
 }
+
+/// capture_owned records the source of the Parsed its child returns, not a guess from the token
+/// kind: an input-backed empty virtual token and a PEG assertion that returned no token are input at
+/// the cursor in every caller kind (#1023 C), and a predicate sees the same value. Shared oracle,
+/// measured with Java NamedCapture: conformance/owned-capture-virtual/classic.tsv.
+#[test]
+fn owned_capture_follows_the_returned_source_in_every_caller_kind() {
+    fn owned(expression: Expr) -> Expr {
+        expression.capture_owned("v")
+    }
+    let rows: Vec<Vec<&str>> =
+        include_str!("../../../conformance/owned-capture-virtual/classic.tsv")
+            .lines()
+            .filter(|row| !row.starts_with('#'))
+            .map(|row| row.split('\t').collect())
+            .collect();
+    assert_eq!(rows.len(), 516);
+    let mut failures = vec![];
+    for row in &rows {
+        for options in all_options() {
+            let label = format!("{row:?} {options:?}");
+            let input = format!("{}c", prefix(row[1]));
+            let mut context = ParseContext::with_options(&input, options);
+            if row[1] != "0" {
+                context.parse(&Expr::literal(prefix(row[1]))).unwrap();
+            }
+            if context
+                .parse_with_token_mode(&entry(row[2], owned), kind(row[0]), false)
+                .is_err()
+            {
+                failures.push(format!("{label}: failed"));
+                continue;
+            }
+            let actual = match context.captured_source("v") {
+                Some(TokenSource::Input(span)) => format!(
+                    "INPUT@{}-{}'{}'",
+                    span.start,
+                    span.end,
+                    context.text(*span).unwrap()
+                ),
+                Some(TokenSource::Projected { span, text }) => {
+                    format!("PROJECTED@{}-{}'{text}'", span.start, span.end)
+                }
+                Some(TokenSource::Generated { anchor, text }) => {
+                    format!("GENERATED@{anchor}-{anchor}'{text}'")
+                }
+                None => "-".to_owned(),
+            };
+            let expected = format!(
+                "{}@{}-{}'{}'",
+                row[3],
+                row[4],
+                row[5],
+                row[6].replace('~', "")
+            );
+            if actual != expected {
+                failures.push(format!("{label}: actual {actual}, expected {expected}"));
+                continue;
+            }
+            // The predicate at the same entry reads the same returned source.
+            // Candidates as a set: the callback may be retried, its call count is not contract.
+            let seen = Arc::new(Mutex::new(std::collections::BTreeSet::<String>::new()));
+            let record = Arc::clone(&seen);
+            let bindings = Bindings::new()
+                .with("valid", move |candidate| {
+                    record.lock().unwrap().insert(format!(
+                        "INPUT@{}-{}'{}'",
+                        candidate.span.start, candidate.span.end, candidate.text
+                    ));
+                    true
+                })
+                .unwrap();
+            let mut gate = ParseContext::with_semantic_predicates(&input, &bindings, options);
+            if row[1] != "0" {
+                gate.parse(&Expr::literal(prefix(row[1]))).unwrap();
+            }
+            let accepted = gate
+                .parse_with_token_mode(&entry(row[2], gated), kind(row[0]), false)
+                .is_ok();
+            let failure = gate
+                .semantic_predicate_failure()
+                .map(|failure| failure.kind);
+            let seen = seen.lock().unwrap().iter().cloned().collect::<Vec<_>>();
+            let predicate = (accepted, seen.join(","), failure);
+            let agreed = if row[3] == "INPUT" {
+                (true, expected.clone(), None)
+            } else {
+                (false, String::new(), Some("predicate_source"))
+            };
+            if predicate != agreed {
+                failures.push(format!(
+                    "{label}: predicate {predicate:?}, expected {agreed:?}"
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
