@@ -1,5 +1,7 @@
 //! LSP-only replay, called after the ordinary frontend has failed. It never
 //! changes that frontend's first-error contract or adds work to successful parses.
+mod header;
+
 use crate::text;
 use serde_json::{json, Value};
 use unlaxer_ubnf::{parse, DiagnosticKind};
@@ -102,11 +104,9 @@ pub fn replay(source: &str) -> Replay {
     let complete = consumed > 0 && consumed == source.len();
     // This is the exact bootstrap UBNFFile -> GrammarDecl -> WordParser
     // failure, including the depth-two hints of failed parent combinators.
-    // Failures inside GrammarDecl need speculative provenance (#1024); retain
-    // their native diagnostic instead of guessing/normalizing a farthest offset.
+    // Grammar headers are replayed below; body/unterminated-comment failures
+    // retain their native diagnostic until the remaining #1024 work is done.
     let root_diagnostic = (!complete && !source[at..].starts_with("grammar")).then(|| {
-        let end = at + source[at..].chars().next().map_or(0, char::len_utf8);
-        let pos = position(source, at);
         // Failed Chain parents roll back before recording their own cursor.
         // With leading trivia their depth-two brace hints are behind the
         // keyword failure. A new attempt after a successful grammar starts at
@@ -134,25 +134,53 @@ pub fn replay(source: &str) -> Replay {
         } else {
             (vec!["' '", "'//'", "'grammar'"], "WordParser")
         };
-        let message = format!("Expected {} (in {deepest})", expected.join(" or "));
-        json!({
-            "range": {"start": pos, "end": position(source, end)}, "severity": 1,
-            "code": "ULX-PARSE-001", "source": "unlaxer",
-            "message": message,
-            "data": {
-                "schemaVersion": 1, "code": "ULX-PARSE-001", "kind": "syntax",
-                "offset": source[..at].encode_utf16().count(),
-                "line": pos["line"], "character": pos["character"],
-                "consumedLength": source[..consumed].encode_utf16().count(),
-                "totalLength": source.encode_utf16().count(),
-                "expectedTokens": expected, "expectedHints": expected,
-                "expectedParsers": expected, "deepestMatchedRule": deepest
-            }
-        })
+        diagnostic(source, at, consumed, &expected, deepest)
+    });
+    let root_diagnostic = root_diagnostic.or_else(|| {
+        if complete {
+            None
+        } else {
+            header::replay(source, consumed, consumed)
+        }
     });
     Replay {
         consumed: source[..consumed].encode_utf16().count(),
         complete,
         root_diagnostic,
     }
+}
+
+/// Bootstrap parsers do not implement GrammarRule: ruleStack,
+/// ruleStackOmitted and relatedInformation are absent, not empty arrays.
+fn diagnostic(
+    source: &str,
+    at: usize,
+    consumed: usize,
+    expected: &[impl AsRef<str>],
+    deepest: &str,
+) -> Value {
+    let expected = expected.iter().map(AsRef::as_ref).collect::<Vec<_>>();
+    let end = at + source[at..].chars().next().map_or(0, char::len_utf8);
+    let pos = position(source, at);
+    let message = format!(
+        "Expected {} (in {deepest})",
+        expected
+            .iter()
+            .map(AsRef::as_ref)
+            .collect::<Vec<_>>()
+            .join(" or ")
+    );
+    json!({
+        "range": {"start": pos, "end": position(source, end)}, "severity": 1,
+        "code": "ULX-PARSE-001", "source": "unlaxer", "message": message,
+        "data": {
+            "schemaVersion": 1, "code": "ULX-PARSE-001", "kind": "syntax",
+            "offset": source[..at].encode_utf16().count(),
+            "line": pos["line"], "character": pos["character"],
+            "consumedLength": source[..consumed].encode_utf16().count(),
+            "totalLength": source.encode_utf16().count(),
+            "expectedTokens": expected, "expectedHints": expected,
+            "expectedParsers": expected, "deepestMatchedRule": deepest
+        }
+    })
 }

@@ -85,18 +85,18 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=120000) public void nativeAndJavaServersShareSyntaxStatusAndModuleFixtures() throws Exception {
-        runProtocol("syntax-status", 85);
+        runProtocol("syntax-status", 114);
     }
 
     private void runProtocol(String suite, int count) throws Exception {
         if (!Boolean.getBoolean("rustConformance")) System.out.println("[assumption] rustConformance=true is required for native authoring stdio");
         Assume.assumeTrue(Boolean.getBoolean("rustConformance"));
-        var build = new ProcessBuilder("cargo", "build", "--locked", "-p", "unlaxer-ubnf-lsp", "-p", "unlaxer-generator").directory(root().resolve("rust").toFile()).redirectErrorStream(true).redirectOutput(Path.of("target/ubnf-authoring-build.log").toFile()).start();
+        var build = TestProcesses.builder("cargo", "build", "--locked", "-p", "unlaxer-ubnf-lsp", "-p", "unlaxer-generator").directory(root().resolve("rust").toFile()).redirectErrorStream(true).redirectOutput(Path.of("target/ubnf-authoring-build.log").toFile()).start();
         try { assertTrue("cargo build timeout", build.waitFor(120, TimeUnit.SECONDS)); assertEquals(0, build.exitValue()); }
         finally { build.descendants().forEach(child -> child.destroyForcibly()); build.destroyForcibly(); System.out.print(Files.readString(Path.of("target/ubnf-authoring-build.log"))); }
         var output = Path.of("target/ubnf-authoring-" + suite + "-protocol.json").toAbsolutePath();
-        var process = new ProcessBuilder("python3", root().resolve("scripts/check-ubnf-authoring-lsp.py").toString(),
-            "--java", Path.of(System.getProperty("java.home"), "bin/java").toString(),
+        var process = TestProcesses.builder("python3", root().resolve("scripts/check-ubnf-authoring-lsp.py").toString(),
+            "--java", TestProcesses.javaLauncher(root()),
             "--classpath", System.getProperty("java.class.path"),
             "--rust", root().resolve("rust/target/debug/ubnf-language-server").toString(), "--suite", suite, "--output", output.toString()).redirectErrorStream(true).redirectOutput(Path.of("target/ubnf-authoring-" + suite + "-wire.log").toFile()).start();
         try { assertTrue("protocol timeout", process.waitFor(suite.equals("local-imports") ? 900 : suite.equals("package-json") ? 800 : suite.equals("package-artifacts") ? 600 : (suite.equals("package-documents") || suite.equals("package-artifact-utf8")) ? 240 : 100, TimeUnit.SECONDS)); assertEquals(0, process.exitValue()); }
