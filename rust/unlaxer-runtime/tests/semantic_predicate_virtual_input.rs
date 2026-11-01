@@ -49,11 +49,17 @@ fn generated<const AT_CURSOR: bool, const EMPTY: bool>(
     })
 }
 
-/// The names of conformance/semantic-predicate-source, plus `leaf`, `gen0:` and `genc:g`.
-/// `Rule[X]` is rule 1 with body X: a Java LazyChain, or a LazyChoice for a Choice body.
-fn shape(name: &str) -> (Expr, Option<Expr>) {
+/// The names of conformance/semantic-predicate-source, plus `leaf`, `gen0:`, `gen0:g` and `genc:g`.
+/// `Rule[X]` is a rule with body X: a Java LazyChain, or a LazyChoice for a Choice body. The rule
+/// bodies are returned in order as rules 1, 2, ... (`Rule[Rule[X]]` is rule 1 whose body is rule 2).
+fn shape(name: &str) -> (Expr, Vec<Expr>) {
+    let mut rules = vec![];
+    let expression = shape_into(name, &mut rules);
+    (expression, rules)
+}
+fn shape_into(name: &str, rules: &mut Vec<Expr>) -> Expr {
     let Some(open) = name.find('[') else {
-        let atom = match name {
+        return match name {
             "leaf" => Expr::Custom(leaf),
             "MO" => Expr::literal("c").match_only(),
             "&c" | "!z" => Expr::Lookahead {
@@ -62,15 +68,18 @@ fn shape(name: &str) -> (Expr, Option<Expr>) {
             },
             "Empty" => Expr::JavaEmpty,
             "gen0:" => Expr::Custom(generated::<false, true>),
+            "gen0:g" => Expr::Custom(generated::<false, false>),
             "genc:" => Expr::Custom(generated::<true, true>),
             "genc:g" => Expr::Custom(generated::<true, false>),
             _ => Expr::literal(Box::leak(name.to_owned().into_boxed_str())),
         };
-        return (atom, None);
     };
     let inner = &name[open + 1..name.len() - 1];
     if &name[..open] == "Rule" {
-        return (Expr::Rule(1), Some(shape(inner).0));
+        let index = rules.len();
+        rules.push(Expr::JavaEmpty);
+        rules[index] = shape_into(inner, rules);
+        return Expr::Rule(index + 1);
     }
     let mut children = vec![];
     let (mut depth, mut start) = (0, 0);
@@ -79,17 +88,17 @@ fn shape(name: &str) -> (Expr, Option<Expr>) {
             '[' => depth += 1,
             ']' => depth -= 1,
             ',' if depth == 0 => {
-                children.push(shape(&inner[start..index]).0);
+                children.push(shape_into(&inner[start..index], rules));
                 start = index + 1;
             }
             _ => {}
         }
     }
-    children.push(shape(&inner[start..]).0);
+    children.push(shape_into(&inner[start..], rules));
     match &name[..open] {
-        "Choice" => (Expr::choice(children), None),
-        "Chain" => (Expr::sequence(children), None),
-        "Opt" => (children.remove(0).optional_java(), None),
+        "Choice" => Expr::choice(children),
+        "Chain" => Expr::sequence(children),
+        "Opt" => children.remove(0).optional_java(),
         _ => panic!("{name}"),
     }
 }
@@ -101,26 +110,26 @@ fn enter_rules(context: &mut ParseContext<'_>) -> ParseResult {
     let grammar = RULES.with(|rules| rules.borrow().clone()).expect("rules");
     context.parse_shared_grammar(&grammar, 0, false)
 }
-/// `wrap` applied to the shape, inside rule 0 when the shape has a rule body.
+/// `wrap` applied to the shape, inside rule 0 when the shape has rule bodies.
 fn entry(name: &str, wrap: fn(Expr) -> Expr) -> Expr {
-    let (expression, rule) = shape(name);
-    match rule {
-        Some(body) => {
-            let grammar = share_grammar(vec![
-                Rule {
-                    name: "start",
-                    expression: wrap(expression),
-                },
-                Rule {
-                    name: "r",
-                    expression: body,
-                },
-            ]);
-            RULES.with(|rules| *rules.borrow_mut() = Some(grammar));
-            Expr::Custom(enter_rules)
-        }
-        None => wrap(expression),
+    let (expression, bodies) = shape(name);
+    if bodies.is_empty() {
+        return wrap(expression);
     }
+    assert!(bodies.len() <= 3, "{name}");
+    let mut rules = vec![Rule {
+        name: "start",
+        expression: wrap(expression),
+    }];
+    for (body, name) in bodies.into_iter().zip(["r", "s", "t"]) {
+        rules.push(Rule {
+            name,
+            expression: body,
+        });
+    }
+    let grammar = share_grammar(rules);
+    RULES.with(|rules| *rules.borrow_mut() = Some(grammar));
+    Expr::Custom(enter_rules)
 }
 fn gated(child: Expr) -> Expr {
     Expr::SemanticPredicateScope {
@@ -340,6 +349,111 @@ fn virtual_choice_keeps_the_selected_input_child_for_capture_boundaries() {
     }
 }
 
+/// InputCaptureBoundary checks the source of the Parsed its child returns, also through a rule whose
+/// body is a Choice: in the virtual kinds, `Rule[Choice[leaf,z]]` etc. return the selected input child
+/// although the rule's own collection is generated "" (#1023 C). A body that is only a rule reference
+/// (`Rule[Rule[..]]`, a Java single-element LazyChain) returns its own collection instead. Shared oracle,
+/// measured with Java CaptureBoundaryParser.input: conformance/input-capture-virtual/classic.tsv.
+#[test]
+fn input_capture_boundary_follows_the_returned_source_in_every_caller_kind() {
+    fn input(expression: Expr) -> Expr {
+        Expr::InputCaptureBoundary(
+            unlaxer_runtime::capture_tree::Kind::Value,
+            Box::new(expression),
+        )
+    }
+    let rows: Vec<Vec<&str>> =
+        include_str!("../../../conformance/input-capture-virtual/classic.tsv")
+            .lines()
+            .filter(|row| !row.starts_with('#'))
+            .map(|row| row.split('\t').collect())
+            .collect();
+    assert_eq!(rows.len(), 624);
+    let mut failures = vec![];
+    for row in &rows {
+        for options in all_options() {
+            let input_text = format!("{}c", prefix(row[1]));
+            let mut context = ParseContext::with_options(&input_text, options);
+            if row[1] != "0" {
+                context.parse(&Expr::literal(prefix(row[1]))).unwrap();
+            }
+            let accepted = context
+                .parse_with_token_mode(&entry(row[2], input), kind(row[0]), false)
+                .is_ok();
+            if accepted.to_string() != row[3] {
+                failures.push(format!("{row:?} {options:?}: accepted {accepted}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// An AST field capture (`@f`) checks the returned source as InputCaptureBoundary does, so the rules
+/// with a Choice body are accepted in the virtual kinds too (#1023 C). Its span is the raw extent of
+/// the token the Java site publishes: generated "" at 0-0 when the virtual site collected nothing.
+/// A rejection leaves the cursor at the prefix and no capture. Shared oracle, measured with the
+/// generated Java __CaptureSite: conformance/input-capture-virtual/field.tsv.
+#[test]
+fn field_capture_follows_the_java_capture_site_in_every_caller_kind() {
+    fn field(expression: Expr) -> Expr {
+        expression.capture("f")
+    }
+    let rows: Vec<Vec<&str>> = include_str!("../../../conformance/input-capture-virtual/field.tsv")
+        .lines()
+        .filter(|row| !row.starts_with('#'))
+        .map(|row| row.split('\t').collect())
+        .collect();
+    assert_eq!(rows.len(), 432);
+    let mut failures = vec![];
+    for row in &rows {
+        // The rust column names a known difference from Java, else Rust reads the Java field.
+        let expected_field = match row[10] {
+            "=" if row[3] == "false" => String::new(),
+            "=" => format!("{}-{}'{}'", row[5], row[6], row[7].replace('~', "")),
+            known => known.replace('~', ""),
+        };
+        let expected = (
+            row[3] == "true",
+            expected_field,
+            (row[8].parse().unwrap(), row[9].parse().unwrap()),
+        );
+        for options in all_options() {
+            let input = format!("{}c", prefix(row[1]));
+            let mut context = ParseContext::with_options(&input, options);
+            if row[1] != "0" {
+                context.parse(&Expr::literal(prefix(row[1]))).unwrap();
+            }
+            let accepted = context
+                .parse_with_token_mode(&entry(row[2], field), kind(row[0]), false)
+                .is_ok();
+            let spans = context
+                .capture_spans("f")
+                .iter()
+                .map(|span| {
+                    format!(
+                        "{}-{}'{}'",
+                        span.start,
+                        span.end,
+                        context.text(*span).unwrap()
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            let actual = (
+                accepted,
+                spans,
+                (context.position(), context.matched_position()),
+            );
+            if actual != expected {
+                failures.push(format!(
+                    "{row:?} {options:?}: actual {actual:?}, expected {expected:?}"
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
 /// A virtual-kind rule that collected nothing publishes generated "": capture_owned records it at
 /// the capture position, as Java's NamedCapture over the LazyChain records GENERATED there
 /// (namedCaptureOfAnEmptyVirtualRuleIsGeneratedAtTheCursor). Not at the rule's own anchor 0.
@@ -471,6 +585,158 @@ fn owned_capture_follows_the_returned_source_in_every_caller_kind() {
             if predicate != agreed {
                 failures.push(format!(
                     "{label}: predicate {predicate:?}, expected {agreed:?}"
+                ));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// A rule whose body is only a rule reference (`Rule[Rule[X]]`, a Java single-element LazyChain)
+/// returns its own collection, as `Rule[Chain[Rule[X]]]` does, not the source its inner rule
+/// returned: capture_owned, the predicate, InputCaptureBoundary and `@f` all read it (#1023). A
+/// Choice of a rule reference still returns the selected child. Shared oracle, measured with Java
+/// NamedCapture, CaptureBoundaryParser.input and the generated @f site:
+/// conformance/owned-capture-virtual/rule-reference.tsv.
+#[test]
+fn rule_reference_body_returns_its_own_collection_in_every_caller_kind() {
+    fn owned(expression: Expr) -> Expr {
+        expression.capture_owned("v")
+    }
+    fn input(expression: Expr) -> Expr {
+        Expr::InputCaptureBoundary(
+            unlaxer_runtime::capture_tree::Kind::Value,
+            Box::new(expression),
+        )
+    }
+    fn field(expression: Expr) -> Expr {
+        expression.capture("f")
+    }
+    let rows: Vec<Vec<&str>> =
+        include_str!("../../../conformance/owned-capture-virtual/rule-reference.tsv")
+            .lines()
+            .filter(|row| !row.starts_with('#'))
+            .map(|row| row.split('\t').collect())
+            .collect();
+    assert_eq!(rows.len(), 420);
+    let mut failures = vec![];
+    for row in &rows {
+        let before: usize = row[1].parse().unwrap();
+        let cursor: (usize, usize) = (row[7].parse().unwrap(), row[8].parse().unwrap());
+        // The rust column names a known #1023 D difference from Java, else Rust reads the Java value.
+        let expected = match row[13] {
+            "=" => format!(
+                "{}@{}-{}'{}'",
+                row[3],
+                row[4],
+                row[5],
+                row[6].replace('~', "")
+            ),
+            known => known.replace('~', ""),
+        };
+        let accepted = row[9] == "true";
+        for options in all_options() {
+            let label = format!("{row:?} {options:?}");
+            let input_text = format!("{}c", prefix(row[1]));
+            let fresh = |context: &mut ParseContext<'_>| {
+                if before > 0 {
+                    context.parse(&Expr::literal(prefix(row[1]))).unwrap();
+                }
+            };
+            let mut context = ParseContext::with_options(&input_text, options);
+            fresh(&mut context);
+            if context
+                .parse_with_token_mode(&entry(row[2], owned), kind(row[0]), false)
+                .is_err()
+            {
+                failures.push(format!("{label}: failed"));
+                continue;
+            }
+            let actual = match context.captured_source("v") {
+                Some(TokenSource::Input(span)) => format!(
+                    "INPUT@{}-{}'{}'",
+                    span.start,
+                    span.end,
+                    context.text(*span).unwrap()
+                ),
+                Some(TokenSource::Projected { span, text }) => {
+                    format!("PROJECTED@{}-{}'{text}'", span.start, span.end)
+                }
+                Some(TokenSource::Generated { anchor, text }) => {
+                    format!("GENERATED@{anchor}-{anchor}'{text}'")
+                }
+                None => "-".to_owned(),
+            };
+            let actual_cursor = (context.position(), context.matched_position());
+            if (&actual, actual_cursor) != (&expected, cursor) {
+                failures.push(format!(
+                    "{label}: owned {actual} {actual_cursor:?}, expected {expected} {cursor:?}"
+                ));
+            }
+            // The predicate at the same entry reads the same returned source.
+            let seen = Arc::new(Mutex::new(std::collections::BTreeSet::<String>::new()));
+            let record = Arc::clone(&seen);
+            let bindings = Bindings::new()
+                .with("valid", move |candidate| {
+                    record.lock().unwrap().insert(format!(
+                        "INPUT@{}-{}'{}'",
+                        candidate.span.start, candidate.span.end, candidate.text
+                    ));
+                    true
+                })
+                .unwrap();
+            let mut gate = ParseContext::with_semantic_predicates(&input_text, &bindings, options);
+            fresh(&mut gate);
+            let gated_ok = gate
+                .parse_with_token_mode(&entry(row[2], gated), kind(row[0]), false)
+                .is_ok();
+            let failure = gate
+                .semantic_predicate_failure()
+                .map(|failure| failure.kind);
+            let seen = seen.lock().unwrap().iter().cloned().collect::<Vec<_>>();
+            let predicate = (gated_ok, seen.join(","), failure);
+            let agreed = if expected.starts_with("INPUT@") {
+                (true, expected.clone(), None)
+            } else {
+                (false, String::new(), Some("predicate_source"))
+            };
+            if predicate != agreed {
+                failures.push(format!(
+                    "{label}: predicate {predicate:?}, expected {agreed:?}"
+                ));
+            }
+            let mut boundary = ParseContext::with_options(&input_text, options);
+            fresh(&mut boundary);
+            let boundary_ok = boundary
+                .parse_with_token_mode(&entry(row[2], input), kind(row[0]), false)
+                .is_ok();
+            if boundary_ok != accepted {
+                failures.push(format!("{label}: input accepted {boundary_ok}"));
+            }
+            let mut site = ParseContext::with_options(&input_text, options);
+            fresh(&mut site);
+            let site_ok = site
+                .parse_with_token_mode(&entry(row[2], field), kind(row[0]), false)
+                .is_ok();
+            let spans = site
+                .capture_spans("f")
+                .iter()
+                .map(|span| format!("{}-{}'{}'", span.start, span.end, site.text(*span).unwrap()))
+                .collect::<Vec<_>>()
+                .join(",");
+            let actual_field = (site_ok, spans, (site.position(), site.matched_position()));
+            let expected_field = if accepted {
+                (
+                    true,
+                    format!("{}-{}'{}'", row[10], row[11], row[12].replace('~', "")),
+                    cursor,
+                )
+            } else {
+                (false, String::new(), (before, before))
+            };
+            if actual_field != expected_field {
+                failures.push(format!(
+                    "{label}: field {actual_field:?}, expected {expected_field:?}"
                 ));
             }
         }
