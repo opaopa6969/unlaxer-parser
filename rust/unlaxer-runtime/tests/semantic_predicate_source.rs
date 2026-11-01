@@ -224,6 +224,8 @@ fn shape(name: &str) -> (Expr, Option<Expr>) {
             "Empty" => Expr::JavaEmpty,
             "gen:g" => Expr::Custom(generated_at_zero::<false>),
             "gen:" => Expr::Custom(generated_at_zero::<true>),
+            "proj" => Expr::Custom(projected::<false>),
+            "proj0" => Expr::Custom(projected::<true>),
             _ => Expr::literal(Box::leak(name.to_owned().into_boxed_str())),
         };
         return (atom, None);
@@ -258,6 +260,10 @@ fn shape(name: &str) -> (Expr, Option<Expr>) {
         "Choice" => Expr::choice(children),
         "Chain" => Expr::sequence(children),
         "Opt" => children.remove(0).optional_java(),
+        "Rep" => children.remove(0).repeat_java(0, None),
+        "Rec" => children
+            .remove(0)
+            .recover(unlaxer_runtime::RecoveryMode::Sync, [";"], "m"),
         _ => panic!("{name}"),
     };
     (expression, None)
@@ -397,7 +403,7 @@ fn returned_source_decides_the_whole_parse() {
     let rows = rows(include_str!(
         "../../../conformance/semantic-predicate-source/full.tsv"
     ));
-    assert_eq!(rows.len(), 21);
+    assert_eq!(rows.len(), 37);
     for row in rows {
         let (expression, rule) = shape(row[0]);
         let middle = if row[0].starts_with("UBNF:") {
@@ -533,64 +539,105 @@ fn returned_projection_fails_at_the_same_offset_on_every_entry() {
     }
 }
 
+thread_local! {
+    static STORED: std::cell::RefCell<Option<TokenSource>> = const { std::cell::RefCell::new(None) };
+}
+fn store_capture(context: &mut ParseContext<'_>) -> ParseResult {
+    let stored = context.captured_source("w").cloned();
+    STORED.with(|value| *value.borrow_mut() = stored);
+    let at = context.position();
+    Ok(ParseMatch::empty(Span { start: at, end: at }))
+}
+
 /// A Chain is a collector: what it returns for a projected child is the same value capture_owned
-/// stores at that entry. The full-input entry's Sequence keeps no source of a host token (owned
-/// capture records input "" at the cursor), while a Classic Chain collects the projection. Java's
-/// Chain collects it as the Classic one does (predicate_source at 0); the full-input Sequence is the
-/// existing collector difference of #1023, which this test pins until that issue changes both sides.
+/// stores at that entry. As Java's Chain, every entry collects the projection (#1023 B): the
+/// full-input entry (whose root is not Classic), the same entry with a `.stop_consume()` root,
+/// `ParseContext::parse` of a predicate-only graph (not Classic either) and the explicit Classic
+/// entry. The predicate fails with predicate_source at the projection's logical start without a
+/// callback, and capture_owned stores the projection, which Replay cannot match at the cursor.
 #[test]
 fn chain_of_a_projection_sees_what_capture_owned_stores_at_each_entry() {
     let chain = || Expr::sequence([Expr::Custom(projected::<false>)]);
+    let stored = TokenSource::Projected {
+        span: Span { start: 0, end: 1 },
+        text: "Z".into(),
+    };
     for options in all_options() {
-        // Full-input entry (its root is not Classic): an input candidate, and Replay of "".
-        let (bindings, seen) = recording(false);
-        let gated = unlaxer_runtime::share_grammar(vec![unlaxer_runtime::Rule {
-            name: "start",
-            expression: scope(Expr::sequence([Expr::literal(PREFIX), gate(chain())])),
-        }]);
-        assert!(
-            unlaxer_runtime::parse_detailed_shared_with_semantic_predicates(
-                &gated, 0, false, PREFIX, options, &bindings
+        for stop_consume in [false, true] {
+            let root = |expression: Expr| {
+                if stop_consume {
+                    expression.stop_consume()
+                } else {
+                    expression
+                }
+            };
+            let label = format!("stop_consume={stop_consume} {options:?}");
+            let (bindings, seen) = recording(false);
+            let gated = unlaxer_runtime::share_grammar(vec![unlaxer_runtime::Rule {
+                name: "start",
+                expression: root(scope(Expr::sequence([
+                    Expr::literal(PREFIX),
+                    gate(chain()),
+                ]))),
+            }]);
+            let error = unlaxer_runtime::parse_detailed_shared_with_semantic_predicates(
+                &gated, 0, false, PREFIX, options, &bindings,
             )
-            .is_ok()
-        );
-        assert_eq!(
-            *seen.lock().unwrap(),
-            [(String::new(), Span { start: 3, end: 3 })]
-        );
-        let captured = [unlaxer_runtime::Rule {
-            name: "start",
-            expression: Expr::sequence([
-                Expr::literal(PREFIX),
-                chain().capture_owned("w"),
-                Expr::Replay("w"),
-            ]),
-        }];
-        assert!(
-            unlaxer_runtime::parse_detailed_with_options(&captured, 0, false, PREFIX, options)
-                .is_ok()
-        );
-        // Classic entry: the projected source, exactly as capture_owned stores it.
-        let (bindings, seen) = recording(false);
-        let mut context = ParseContext::with_semantic_predicates(PREFIX, &bindings, options);
-        context.parse(&Expr::literal(PREFIX)).unwrap();
-        assert!(context
-            .parse_with_token_mode(&scope(gate(chain())), TokenKind::Consumed, false)
-            .is_err());
-        let failure = context.semantic_predicate_failure().unwrap();
-        assert_eq!((failure.kind, failure.span.start), ("predicate_source", 0));
-        assert!(seen.lock().unwrap().is_empty());
-        let mut context = ParseContext::with_options(PREFIX, options);
-        context.parse(&Expr::literal(PREFIX)).unwrap();
-        context
-            .parse_with_token_mode(&chain().capture_owned("w"), TokenKind::Consumed, false)
-            .unwrap();
-        assert_eq!(
-            context.captured_source("w"),
-            Some(&TokenSource::Projected {
-                span: Span { start: 0, end: 1 },
-                text: "Z".into()
-            })
-        );
+            .unwrap_err();
+            assert_eq!(
+                (error.kind, error.offset),
+                ("predicate_source", 0),
+                "{label}"
+            );
+            assert!(seen.lock().unwrap().is_empty(), "{label}");
+            STORED.with(|value| *value.borrow_mut() = None);
+            let captured = [unlaxer_runtime::Rule {
+                name: "start",
+                expression: root(Expr::sequence([
+                    Expr::literal(PREFIX),
+                    chain().capture_owned("w"),
+                    Expr::Custom(store_capture),
+                    Expr::Replay("w"),
+                ])),
+            }];
+            assert!(
+                unlaxer_runtime::parse_detailed_with_options(&captured, 0, false, PREFIX, options)
+                    .is_err(),
+                "{label}"
+            );
+            assert_eq!(
+                STORED.with(|value| value.borrow().clone()),
+                Some(stored.clone()),
+                "{label}"
+            );
+        }
+        for classic in [false, true] {
+            let label = format!("classic={classic} {options:?}");
+            let parse = |context: &mut ParseContext<'_>, expression: &Expr| {
+                if classic {
+                    context.parse_with_token_mode(expression, TokenKind::Consumed, false)
+                } else {
+                    context.parse(expression)
+                }
+            };
+            let (bindings, seen) = recording(false);
+            let mut context = ParseContext::with_semantic_predicates(PREFIX, &bindings, options);
+            context.parse(&Expr::literal(PREFIX)).unwrap();
+            assert!(
+                parse(&mut context, &scope(gate(chain()))).is_err(),
+                "{label}"
+            );
+            let failure = context.semantic_predicate_failure().unwrap();
+            assert_eq!(
+                (failure.kind, failure.span.start),
+                ("predicate_source", 0),
+                "{label}"
+            );
+            assert!(seen.lock().unwrap().is_empty(), "{label}");
+            let mut context = ParseContext::with_options(PREFIX, options);
+            context.parse(&Expr::literal(PREFIX)).unwrap();
+            parse(&mut context, &chain().capture_owned("w")).unwrap();
+            assert_eq!(context.captured_source("w"), Some(&stored), "{label}");
+        }
     }
 }

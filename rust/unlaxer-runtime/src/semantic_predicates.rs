@@ -401,7 +401,13 @@ impl<'a> ParseContext<'a> {
             return None;
         }
         let span = match source {
-            Some(source) => source.span,
+            Some(source) if source.span.start != source.span.end => source.span,
+            // As Java's emptyAt, an empty returned source is "" at the child's start, not at the
+            // cursor a collector anchors it at after a dropped token of another kind.
+            Some(_) => {
+                let at = self.code_point(start);
+                Span { start: at, end: at }
+            }
             None => Span {
                 start: self.code_point(start),
                 end: self.code_point(self.mode_cursor()),
