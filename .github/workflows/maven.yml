@@ -41,7 +41,9 @@ jobs:
       RUSTUP_TOOLCHAIN: '1.85.0'
     # #954: measured class groups, two workers at most on the shared host.
     # Each shard builds locally; do not cancel its evidence when its peer fails.
-    timeout-minutes: 50
+    # #1035: successful master jobs take up to 40 min; both shards were
+    # cut off at 50 min under shared-host load. Keep 1.5x that observed bound.
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       max-parallel: 2

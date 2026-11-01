@@ -51,7 +51,22 @@ verifier が失敗しても証跡はアップロードし、Maven 未実行・�
 XML は `optin-cross-language-core` / `optin-cross-language-cli`、生成証跡は
 `rust-conformance-core` / `rust-conformance-cli` artifact の和で確認する。
 両 shard は独立した Maven repository と Cargo build を使用し、ハーネスの並列度は増やさない。
-matrix は `max-parallel: 2` / `fail-fast: false`、各 job の timeout は50分。
+matrix は `max-parallel: 2` / `fail-fast: false`、各 job の timeout は75分（#1035）。
+2026-10-31 の直近5件の master 成功 run（41163126651、41182366451、41198835881、
+41228434097、41233307704）は core 32.9〜35.7分、cli 37.3〜39.8分だった。
+高負荷時の run 41229276882 / 41234848629 の attempt 1 では、それぞれ core / cli が
+50分で打ち切られた。同時期の cli は49.22分、core の再実行は47.65分で完了しており、
+75分はこれら完了実測の1.5倍以上にもなる。打ち切り値は完了時間ではなく下限として扱う。
+既存2 shard の配分と self-hosted runner を保ち、`PackageJsonAcceptanceConformanceTest` の
+Java CLI 1732呼出しを既存 `CodegenBatchHost` の1 JVMに集約する。Rust CLI 1319呼出しと
+全481 fixture の検査は維持し、両言語を直列に実行する。
+Java の credentials は1つのテスト専用ファイルの全内容をケースごとに置き換え、各呼出しで
+製品の resolver に読み直させる。入力・出力ディレクトリはケースごとに分離する。resolve は既存 snapshot の
+有無ごと・各 host の直前に lock/cache を復元する。終了コード・診断・生成 bytes・通信回数・失敗時の不変性は集約前と同じ
+独立期待値で照合する。`scripts/ubnf_package_json.py --unbatched` で従来のプロセス単位でも比較でき、
+`target/package-json-cli.json` の各操作の `seconds` / `execution` とケース全体の `seconds` で計測する。
+テスト内の上限は1操作30秒・スクリプト全体1000秒・native build 180秒を維持し、
+計測でそれぞれ実測の3倍以上の余裕があることを確認する。
 集約 job `rust` は元の check 名 `Rust backend and Java conformance` を保ち、
 どちらかが失敗・cancel・skip なら成功にしない。branch protection の設定は変更しない。
 

@@ -368,7 +368,8 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(worker['strategy']['max-parallel'], 2)
         self.assertIs(worker['strategy']['fail-fast'], False)
         self.assertEqual({row['shard'] for row in worker['strategy']['matrix']['include']}, {'core', 'cli'})
-        self.assertLessEqual(worker['timeout-minutes'], 60)
+        # #1035: both workers reached the former 50-minute limit under load.
+        self.assertEqual(worker['timeout-minutes'], 75)
         self.assertEqual(aggregate['name'], 'Rust backend and Java conformance')
         self.assertEqual(aggregate['needs'], 'rust-conformance')
         self.assertEqual(aggregate['if'], 'always()')
