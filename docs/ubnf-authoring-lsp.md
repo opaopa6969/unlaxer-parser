@@ -540,7 +540,7 @@ error.data の比較範囲と親 #885/#864/#111、#893/#894/#901/#902 の継続�
 ### syntax / module 診断の限定対応（#894）
 
 #894 の限定対応は共通 [syntax-status.json](../spec-corpus/ubnf-authoring-lsp/syntax-status.json) /
-[stdio runner](../scripts/ubnf_authoring_syntax_status.py) の109ケースで検証する（全JSON100件、hoverのみ9件）。
+[stdio runner](../scripts/ubnf_authoring_syntax_status.py) の114ケースで検証する（全JSON105件、hoverのみ9件）。
 14根失敗は空文書・無効入力・非BMP・trivia・LF/CRLF・成功prefix・複数grammarを全JSONで照合する。
 JavaのChainはrollback後の自身のcursorで失敗候補を登録するため、根の前にtriviaがあると
 parentのbrace候補は最遠へ届かず、期待集合は空文書の5候補ではなく3候補になる。
@@ -583,10 +583,10 @@ rollback 後の Chain と root の失敗を記録する。ParseContext と同じ
 LSPの各候補配列はdistinct/sorted/limit20。全data欄とキー有無、message/rangeを独立期待値で照合し、
 bootstrapにはGrammarRuleがないため `ruleStack` / `ruleStackOmitted` / `relatedInformation` は付けない。
 
-手書き24件を既存syntax-status runnerと必須JUnitメソッドへ追加した。EOF、不正identifier/brace、
-Javaがword境界を要求しないkeyword prefix、identifier末尾の失敗、終端ありコメント、
+手書き29件を既存syntax-status runnerと必須JUnitメソッドへ追加した。EOF、不正identifier/brace、
+Javaがword境界を要求しないkeyword prefix、identifier末尾の失敗（非ASCII文字を含む）、終端ありコメント（CR単独終端を含む）、単独の `/`、NBSP、
 LF/CR/CRLF/VT/FF/非BMPと成功prefix後の2個目・3個目のgrammarを含む。
-期待値は固定ソースから記し、実server応答から生成しない。追加24件は診断params全JSONだけを契約とし、
+期待値は固定ソースから記し、実server応答から生成しない。追加29件は診断params全JSONだけを契約とし、
 語彙hoverとfallbackの一般化をここで合格扱いにしない。
 20件を超える候補の切捨てとinnermost terminalはsynthetic graphのunit testで検証し、
 この入力域で20件を超える候補を実stdioで検査したとは主張しない。

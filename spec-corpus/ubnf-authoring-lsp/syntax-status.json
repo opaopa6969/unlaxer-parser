@@ -2508,6 +2508,258 @@
           }
         }
       ]
+    },
+    {
+      "id": "suffix-non-ascii",
+      "source": "grammar A名",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 9
+            },
+            "end": {
+              "line": 0,
+              "character": 10
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' or AlphabetNumericUnderScoreParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 9,
+            "line": 0,
+            "character": 9,
+            "consumedLength": 0,
+            "totalLength": 10,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'",
+              "AlphabetNumericUnderScoreParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "lone-cr-comment",
+      "source": "grammar // c\r9",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 13,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 14,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "lone-cr-comment-non-bmp",
+      "source": "grammar // 😀\r😀",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 2
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 14,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 16,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "single-slash",
+      "source": "grammar A /x",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 10
+            },
+            "end": {
+              "line": 0,
+              "character": 11
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or '{' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 10,
+            "line": 0,
+            "character": 10,
+            "consumedLength": 0,
+            "totalLength": 12,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'{'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "nbsp-name",
+      "source": "grammar A",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 7
+            },
+            "end": {
+              "line": 0,
+              "character": 8
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or AlphabetUnderScoreParser or IdentifierParser (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 7,
+            "line": 0,
+            "character": 7,
+            "consumedLength": 0,
+            "totalLength": 9,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "AlphabetUnderScoreParser",
+              "IdentifierParser"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ]
     }
   ]
 }
