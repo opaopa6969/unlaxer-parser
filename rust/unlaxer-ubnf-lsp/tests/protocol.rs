@@ -1,6 +1,50 @@
 use serde_json::{json, Value};
 use unlaxer_ubnf_lsp::Server;
 
+#[test]
+fn authored_root_failure_json_and_consumed_prefix_hover() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../../spec-corpus/ubnf-authoring-lsp/syntax-status.json"
+    ))
+    .unwrap();
+    for case in fixture["rootFailures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(fixture["hoverOnly"].as_array().unwrap())
+    {
+        let mut server = Server::default();
+        request(&mut server, "initialize", json!({"capabilities": {}}));
+        let uri = "file:///failure.ubnf";
+        let out = notify(
+            &mut server,
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {"uri": uri, "text": case["source"]}
+            }),
+        );
+        if let Some(expected) = case.get("diagnostics") {
+            assert_eq!(
+                out,
+                vec![
+                    json!({"jsonrpc": "2.0", "method": "textDocument/publishDiagnostics",
+                "params": {"uri": uri, "version": 0, "diagnostics": expected}})
+                ],
+                "{}",
+                case["id"]
+            );
+        }
+        let hover = request(
+            &mut server,
+            "textDocument/hover",
+            json!({
+                "textDocument": {"uri": uri}, "position": {"line": 999, "character": 999}
+            }),
+        );
+        assert_eq!(hover["result"], case["hover"], "{}", case["id"]);
+    }
+}
+
 fn request(server: &mut Server, method: &str, params: Value) -> Value {
     server
         .handle(json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}))

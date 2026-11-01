@@ -1,0 +1,1317 @@
+{
+  "referenceRevision": "d8af6d9be6ad45cdad5eddf0a040cd5ce80d0602",
+  "rootFailures": [
+    {
+      "id": "empty",
+      "source": "",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 0
+            },
+            "end": {
+              "line": 0,
+              "character": 0
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 0,
+            "line": 0,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 0,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    },
+    {
+      "id": "invalid",
+      "source": "!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 0
+            },
+            "end": {
+              "line": 0,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 0,
+            "line": 0,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 1,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    },
+    {
+      "id": "non-bmp",
+      "source": "😀",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 0
+            },
+            "end": {
+              "line": 0,
+              "character": 2
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 0,
+            "line": 0,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 2,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    },
+    {
+      "id": "space",
+      "source": " \t!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 2
+            },
+            "end": {
+              "line": 0,
+              "character": 3
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 2,
+            "line": 0,
+            "character": 2,
+            "consumedLength": 0,
+            "totalLength": 3,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    },
+    {
+      "id": "comment",
+      "source": "// 😀\n!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 6,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 7,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    },
+    {
+      "id": "crlf",
+      "source": "// 😀\r\n!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 7,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 8,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    },
+    {
+      "id": "partial",
+      "source": "grammar A {}\n!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 13,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 13,
+            "totalLength": 14,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 13"
+        }
+      }
+    },
+    {
+      "id": "partial-crlf",
+      "source": "grammar A {}\r\n😀",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 2
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 14,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 14,
+            "totalLength": 16,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 14"
+        }
+      }
+    },
+    {
+      "id": "multiple",
+      "source": "grammar A {} grammar B {} !",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 26
+            },
+            "end": {
+              "line": 0,
+              "character": 27
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 26,
+            "line": 0,
+            "character": 26,
+            "consumedLength": 26,
+            "totalLength": 27,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 26"
+        }
+      }
+    },
+    {
+      "id": "trailing-comment",
+      "source": "grammar A {} // 😀\n!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 19,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 19,
+            "totalLength": 20,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 19"
+        }
+      }
+    },
+    {
+      "id": "lone-cr",
+      "source": "grammar A {}\r!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 0
+            },
+            "end": {
+              "line": 1,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 13,
+            "line": 1,
+            "character": 0,
+            "consumedLength": 13,
+            "totalLength": 14,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'",
+              "'{'",
+              "'}'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 13"
+        }
+      }
+    },
+    {
+      "id": "cr-lf-cr",
+      "source": "\r\n\r!",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 0
+            },
+            "end": {
+              "line": 2,
+              "character": 1
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected ' ' or '//' or 'grammar' (in WordParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 3,
+            "line": 2,
+            "character": 0,
+            "consumedLength": 0,
+            "totalLength": 4,
+            "expectedTokens": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "expectedHints": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "expectedParsers": [
+              "' '",
+              "'//'",
+              "'grammar'"
+            ],
+            "deepestMatchedRule": "WordParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    },
+    {
+      "id": "open-comment",
+      "source": "// 😀",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 0,
+              "character": 5
+            },
+            "end": {
+              "line": 0,
+              "character": 5
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected '\n' or '\r\n' or '\r' or ' ' or '//' or 'grammar' or WildCardCharacterParser (in WildCardCharacterParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 5,
+            "line": 0,
+            "character": 5,
+            "consumedLength": 0,
+            "totalLength": 5,
+            "expectedTokens": [
+              "'\n'",
+              "'\r\n'",
+              "'\r'",
+              "' '",
+              "'//'",
+              "'grammar'",
+              "WildCardCharacterParser"
+            ],
+            "expectedHints": [
+              "'\n'",
+              "'\r\n'",
+              "'\r'",
+              "' '",
+              "'//'",
+              "'grammar'",
+              "WildCardCharacterParser"
+            ],
+            "expectedParsers": [
+              "'\n'",
+              "'\r\n'",
+              "'\r'",
+              "' '",
+              "'//'",
+              "'grammar'",
+              "WildCardCharacterParser"
+            ],
+            "deepestMatchedRule": "WildCardCharacterParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    },
+    {
+      "id": "open-comment-lines",
+      "source": "// a\r\n  // 😀",
+      "diagnostics": [
+        {
+          "range": {
+            "start": {
+              "line": 1,
+              "character": 7
+            },
+            "end": {
+              "line": 1,
+              "character": 7
+            }
+          },
+          "severity": 1,
+          "code": "ULX-PARSE-001",
+          "source": "unlaxer",
+          "message": "Expected '\n' or '\r\n' or '\r' or ' ' or '//' or 'grammar' or WildCardCharacterParser (in WildCardCharacterParser)",
+          "data": {
+            "schemaVersion": 1,
+            "code": "ULX-PARSE-001",
+            "kind": "syntax",
+            "offset": 13,
+            "line": 1,
+            "character": 7,
+            "consumedLength": 0,
+            "totalLength": 13,
+            "expectedTokens": [
+              "'\n'",
+              "'\r\n'",
+              "'\r'",
+              "' '",
+              "'//'",
+              "'grammar'",
+              "WildCardCharacterParser"
+            ],
+            "expectedHints": [
+              "'\n'",
+              "'\r\n'",
+              "'\r'",
+              "' '",
+              "'//'",
+              "'grammar'",
+              "WildCardCharacterParser"
+            ],
+            "expectedParsers": [
+              "'\n'",
+              "'\r\n'",
+              "'\r'",
+              "' '",
+              "'//'",
+              "'grammar'",
+              "WildCardCharacterParser"
+            ],
+            "deepestMatchedRule": "WildCardCharacterParser"
+          }
+        }
+      ],
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    }
+  ],
+  "hoverOnly": [
+    {
+      "id": "annotation",
+      "source": "grammar Main {\n @ro",
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      },
+      "diagnosticContract": "pending-1024"
+    },
+    {
+      "id": "fqn",
+      "source": "grammar Main { token N = org.",
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      },
+      "diagnosticContract": "pending-1024"
+    },
+    {
+      "id": "group",
+      "source": "grammar Main { @root A ::= ('a'",
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      },
+      "diagnosticContract": "pending-1024"
+    },
+    {
+      "id": "invalid-body",
+      "source": "grammar Main { @root A ::= 😀; }",
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      },
+      "diagnosticContract": "pending-1024"
+    },
+    {
+      "id": "two-incomplete",
+      "source": "grammar A {}\ngrammar B { @ro",
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 13"
+        }
+      },
+      "diagnosticContract": "pending-1024"
+    },
+    {
+      "id": "two-complete-tail",
+      "source": "grammar A {} grammar B {} grammar C {",
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 26"
+        }
+      },
+      "diagnosticContract": "pending-1024"
+    },
+    {
+      "id": "quoted-braces",
+      "source": "grammar A { @root R ::= '}'; }\ngrammar B {",
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 31"
+        }
+      },
+      "diagnosticContract": "pending-1024"
+    },
+    {
+      "id": "non-bmp-prefix",
+      "source": "grammar A { @root R ::= '😀'; }\ngrammar B {",
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 32"
+        }
+      },
+      "diagnosticContract": "pending-1024"
+    },
+    {
+      "id": "crlf-prefix",
+      "source": "grammar A {}\r\ngrammar B {",
+      "hover": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 14"
+        }
+      },
+      "diagnosticContract": "pending-1024"
+    }
+  ],
+  "modules": [
+    {
+      "id": "missing",
+      "imports": [
+        [
+          "m",
+          "missing.ubnf"
+        ]
+      ],
+      "errors": [
+        "import m: $DIR/missing.ubnf"
+      ]
+    },
+    {
+      "id": "multiple-missing",
+      "imports": [
+        [
+          "a",
+          "a.ubnf"
+        ],
+        [
+          "b",
+          "b.ubnf"
+        ]
+      ],
+      "errors": [
+        "import a: $DIR/a.ubnf",
+        "import b: $DIR/b.ubnf"
+      ]
+    },
+    {
+      "id": "cycle",
+      "imports": [
+        [
+          "a",
+          "a.ubnf"
+        ]
+      ],
+      "files": {
+        "a.ubnf": "grammar A { @import b from 'b.ubnf' @ubnf: v2 token A ::= 'a'; }",
+        "b.ubnf": "grammar B { @import a from 'a.ubnf' @ubnf: v2 token B ::= 'b'; }"
+      },
+      "errors": [
+        "import a: E-MODULE: cyclic import: $DIR/a.ubnf"
+      ]
+    },
+    {
+      "id": "alias-collision",
+      "imports": [
+        [
+          "a",
+          "tokens.ubnf"
+        ],
+        [
+          "a",
+          "tokens.ubnf"
+        ]
+      ],
+      "files": {
+        "tokens.ubnf": "grammar T { @ubnf: v2 token A ::= 'a'; }"
+      },
+      "globalError": "E-MODULE: duplicate import alias: a"
+    },
+    {
+      "id": "unresolved",
+      "imports": [
+        [
+          "a",
+          "tokens.ubnf"
+        ]
+      ],
+      "files": {
+        "tokens.ubnf": "grammar T { @ubnf: v2 token A ::= 'a'; }"
+      },
+      "body": "a.Missing",
+      "globalError": "E-MODULE: undefined imported token: a.Missing"
+    },
+    {
+      "id": "network",
+      "imports": [
+        [
+          "a",
+          "https://127.0.0.1:9/module.ubnf"
+        ]
+      ],
+      "errors": [
+        "import a: E-MODULE: network imports are unsupported: https://127.0.0.1:9/module.ubnf"
+      ]
+    },
+    {
+      "id": "non-file",
+      "uri": "https://example.invalid/main.ubnf",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "Provider \"https\" not installed"
+    },
+    {
+      "id": "relative",
+      "uri": "relative.ubnf",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "Missing scheme"
+    },
+    {
+      "id": "opaque",
+      "uri": "file:main.ubnf",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "URI is not hierarchical"
+    },
+    {
+      "id": "authority",
+      "uri": "file://host/main.ubnf",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "URI has an authority component"
+    },
+    {
+      "id": "query",
+      "uri": "file:///main.ubnf?q",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "URI has a query component"
+    },
+    {
+      "id": "fragment",
+      "uri": "file:///main.ubnf#f",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "URI has a fragment component"
+    },
+    {
+      "id": "escape",
+      "uri": "file:///main%G0.ubnf",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "Malformed escape pair at index 12: file:///main%G0.ubnf"
+    },
+    {
+      "id": "space-uri",
+      "uri": "file:///main space.ubnf",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "Illegal character in path at index 12: file:///main space.ubnf"
+    },
+    {
+      "id": "package-missing-lock",
+      "package": "missing-lock",
+      "imports": [
+        [
+          "p",
+          "pkg:team/test"
+        ]
+      ],
+      "errors": [
+        "import p: E-PACKAGE: missing lock; run unlaxer deps resolve --manifest ubnf.json"
+      ]
+    },
+    {
+      "id": "package-stale-lock",
+      "package": "stale-lock",
+      "imports": [
+        [
+          "p",
+          "pkg:team/test"
+        ]
+      ],
+      "errors": [
+        "import p: E-PACKAGE: stale lock; run unlaxer deps resolve --manifest ubnf.json"
+      ]
+    },
+    {
+      "id": "package-hash",
+      "package": "hash",
+      "imports": [
+        [
+          "p",
+          "pkg:team/test"
+        ]
+      ],
+      "errors": [
+        "import p: E-PACKAGE: artifact hash mismatch: team/test"
+      ]
+    },
+    {
+      "id": "package-undeclared",
+      "package": "undeclared",
+      "imports": [
+        [
+          "p",
+          "pkg:team/other"
+        ]
+      ],
+      "errors": [
+        "import p: E-PACKAGE: undeclared package dependency: team/other"
+      ]
+    },
+    {
+      "id": "package-dependencies",
+      "package": "dependencies",
+      "imports": [
+        [
+          "p",
+          "pkg:team/test"
+        ]
+      ],
+      "errors": [
+        "import p: E-PACKAGE: artifact dependencies differ from lock"
+      ]
+    },
+    {
+      "id": "package-identity",
+      "package": "identity",
+      "imports": [
+        [
+          "p",
+          "pkg:team/test"
+        ]
+      ],
+      "errors": [
+        "import p: E-PACKAGE: artifact identity differs from lock: team/test"
+      ]
+    },
+    {
+      "id": "recovered-non-bmp",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "recovered": true,
+      "source": "😀 @import a from 'missing.ubnf'",
+      "errors": [
+        "import a: $DIR/missing.ubnf"
+      ]
+    },
+    {
+      "id": "recovered-non-file",
+      "uri": "https://example.invalid/recovery.ubnf",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "recovered": true,
+      "source": "😀 @import a from 'missing.ubnf'",
+      "globalError": "Provider \"https\" not installed"
+    },
+    {
+      "id": "multiple-grammar-alias",
+      "prelude": "grammar First { @root R ::= 'y'; }\n",
+      "imports": [
+        [
+          "a",
+          "tokens.ubnf"
+        ],
+        [
+          "a",
+          "tokens.ubnf"
+        ]
+      ],
+      "body": "'x'",
+      "files": {
+        "tokens.ubnf": "grammar T { @ubnf: v2 token A ::= 'a'; }"
+      },
+      "globalError": "E-MODULE: duplicate import alias: a"
+    },
+    {
+      "id": "multiple-grammar-unresolved",
+      "prelude": "grammar First { @root R ::= 'y'; }\n",
+      "imports": [
+        [
+          "a",
+          "tokens.ubnf"
+        ]
+      ],
+      "body": "a.Missing",
+      "files": {
+        "tokens.ubnf": "grammar T { @ubnf: v2 token A ::= 'a'; }"
+      },
+      "globalError": "E-MODULE: undefined imported token: a.Missing"
+    },
+    {
+      "id": "nul-uri",
+      "uri": "file:///main%00.ubnf",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "Nul character not allowed"
+    },
+    {
+      "id": "empty-authority",
+      "uri": "file://",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "Expected authority at index 7: file://"
+    },
+    {
+      "id": "bracket-uri",
+      "uri": "file:///a[b].ubnf",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "Illegal character in path at index 9: file:///a[b].ubnf"
+    },
+    {
+      "id": "bracket-query",
+      "uri": "file:///main.ubnf?[",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "URI has a query component"
+    },
+    {
+      "id": "query-space",
+      "uri": "file:///main.ubnf?a b",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "Illegal character in query at index 19: file:///main.ubnf?a b"
+    },
+    {
+      "id": "fragment-hash",
+      "uri": "file:///main.ubnf#a#b",
+      "imports": [
+        [
+          "a",
+          "missing.ubnf"
+        ]
+      ],
+      "globalError": "Illegal character in fragment at index 19: file:///main.ubnf#a#b"
+    }
+  ]
+}

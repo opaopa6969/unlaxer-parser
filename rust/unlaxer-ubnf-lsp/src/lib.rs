@@ -1,6 +1,7 @@
 //! JVM-free UBNF authoring server. Capability scope is recorded in
 //! docs/ubnf-authoring-lsp.md; generated-language LSPs keep their own backend.
 mod configuration;
+mod failure;
 mod features;
 mod index;
 mod navigation;
