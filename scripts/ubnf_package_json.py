@@ -1,6 +1,6 @@
 """#914/#926: raw package JSON through the reference/native CLI and stdio hosts."""
 import argparse
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 import copy
 import time
 import hashlib
@@ -172,13 +172,20 @@ def expected(case, host, operation):
     return case.get('rust' + key[0].upper() + key[1:], case.get(key)) if host == 'rust' else case.get(key)
 
 
+def batch_diagnostic(stdout, stderr, code):
+    stdout, stderr = stdout.decode(), stderr.decode()
+    return {'exit': code, 'stdout': stdout, 'stderr': stderr,
+            'lastError': (stderr.strip().splitlines() or [''])[-1]}
+
+
 def run(command, options, native):
-    env = dict(os.environ)
-    if native:
-        env.update(PATH='', JAVA_HOME='/nonexistent-java')
-    result = subprocess.run(command + options, capture_output=True, text=True, timeout=30, env=env)
-    record = {'exit': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr,
-              'lastError': (result.stderr.strip().splitlines() or [''])[-1]}
+    started = time.monotonic()
+    if callable(command):
+        record = command(options)
+    else:
+        record = run_process(command, options, native)
+    record['seconds'] = round(time.monotonic() - started, 6)
+    record['execution'] = 'batch' if callable(command) else 'process'
     if '--output' in options:
         output = Path(options[options.index('--output') + 1])
         record['generatedHashes'] = {str(p.relative_to(output)): digest(p.read_bytes())
@@ -186,7 +193,15 @@ def run(command, options, native):
     return record
 
 
-def check_cli(directory, commands, evidence, cases=None):
+def run_process(command, options, native):
+    env = dict(os.environ)
+    if native:
+        env.update(PATH='', JAVA_HOME='/nonexistent-java')
+    result = subprocess.run(command + options, capture_output=True, text=True, timeout=30, env=env)
+    return batch_diagnostic(result.stdout.encode(), result.stderr.encode(), result.returncode)
+
+
+def check_cli(directory, commands, evidence, cases=None, *, unbatched=False):
     from ubnf_package_credentials import local_tls
     cases = fixtures() if cases is None else cases
     tls = directory / 'tls'
@@ -195,8 +210,20 @@ def check_cli(directory, commands, evidence, cases=None):
     context = local_tls(tls, standard) if any(c.get('tls') for c in cases) else nullcontext(('https://localhost:1', None, []))
     previous = os.environ.get('UBNF_CREDENTIALS_FILE')
     try:
-        with context as connection:
-            _check_cli(directory, commands, evidence, cases, connection)
+        with context as connection, ExitStack() as stack:
+            from ubnf_credentials_home import batch_cli
+            java_credentials = None if unbatched else directory / 'java-credentials.json'
+            active = []
+            for host, command in commands:
+                if host == 'java' and not unbatched:
+                    # The environment stays fixed; the resolver re-reads this file on
+                    # every call. Replace its complete contents before each case.
+                    env = dict(os.environ, UBNF_CREDENTIALS_FILE=str(java_credentials))
+                    command = stack.enter_context(batch_cli(
+                        command[:-1] + ['-Xmx512m', 'org.unlaxer.dsl.CodegenBatchHost'],
+                        env, directory, batch_diagnostic))
+                active.append((host, command))
+            _check_cli(directory, active, evidence, cases, connection, java_credentials)
     finally:
         if previous is None:
             os.environ.pop('UBNF_CREDENTIALS_FILE', None)
@@ -204,7 +231,40 @@ def check_cli(directory, commands, evidence, cases=None):
             os.environ['UBNF_CREDENTIALS_FILE'] = previous
 
 
-def _check_cli(directory, commands, evidence, cases, connection):
+# #1035: the batch host calls CodegenMain.run, so launcher-only behaviour (main's
+# System.exit, per-process UBNF_CREDENTIALS_FILE and cwd) is outside it. These
+# cases also start a JVM per Java call; each category must stay represented.
+PROCESS_SAMPLE = {
+    'manifest-bom-one': 'generation and resolve succeed (exit 0)',
+    'manifest-bom-two': 'load and resolve fail (exit 3)',
+    'surrogate-body-literal-used-high': 'Java partial output (exit 4)',
+    'surrogate-https-direct-path-pair': 'HTTPS resolve and request count',
+    'surrogate-https-credentials-invalid-json': 'per-process credentials file rejected',
+}
+
+
+def check_process_sample(directory, commands, evidence, sample):
+    """Repeat PROCESS_SAMPLE as real processes and require the batch records."""
+    cases = [case for case in fixtures() if case['id'] in PROCESS_SAMPLE]
+    assert len(cases) == len(PROCESS_SAMPLE), 'process sample cases disappeared'
+    directory.mkdir()
+    check_cli(directory, commands, sample, cases, unbatched=True)
+    batched = {record['case']: record for record in evidence}
+    for record in sample:
+        runs = batched[record['case']]['runs']
+        assert len(record['runs']) == len(runs), (record['case'], 'process sample run count')
+        for process, batch in zip(record['runs'], runs):
+            assert process['execution'] == 'process', (record['case'], process['host'])
+            assert batch['execution'] == ('batch' if batch['host'] == 'java' else 'process'), (record['case'], batch['host'])
+            for key in ['host', 'operation', 'exit', 'generatedHashes']:
+                assert process.get(key) == batch.get(key), (record['case'], process['host'], key, process.get(key), batch.get(key))
+            # Only the case folder differs; every other stderr byte must match.
+            for key in ['lastError', 'stderr']:
+                assert process[key].replace(str(directory), str(directory.parent)) == batch[key], (
+                    record['case'], process['host'], process['operation'], key, 'differs from batch')
+
+
+def _check_cli(directory, commands, evidence, cases, connection, java_credentials=None):
     origin, ca, received = connection
     for case in cases:
         print('package JSON CLI:', case['id'], flush=True)
@@ -214,6 +274,8 @@ def _check_cli(directory, commands, evidence, cases, connection):
         credentials.write_bytes(case.get('credentials', '{"$ORIGIN":{"caCertificate":"$CA"}}')
                                 .replace('$ORIGIN', origin).replace('$CA', str(ca))
                                 .replace('$MISSING', str(folder / 'missing.pem')).encode())
+        if java_credentials is not None:
+            java_credentials.write_bytes(credentials.read_bytes())
         os.environ['UBNF_CREDENTIALS_FILE'] = str(credentials)
         before = snapshot(folder)
         record = {'case': case['id'], 'gap': case.get('gap', False), 'runs': []}
@@ -254,6 +316,7 @@ def _check_cli(directory, commands, evidence, cases, connection):
         if len(generated) == 2:
             assert generated[0] == generated[1], (case['id'], 'generated bytes differ')
         if case['subject'] == 'lock' and not case.get('resolveLock'):
+            record['seconds'] = round(time.monotonic() - started, 3)
             continue
         for existing in [False, True]:
             initial = before if existing else {}
@@ -382,16 +445,23 @@ def main():
     parser.add_argument('--rust')
     parser.add_argument('--output', required=True)
     parser.add_argument('--only-939', action='store_true')
+    parser.add_argument('--unbatched', action='store_true', help='start a JVM per operation for comparison')
     args = parser.parse_args()
     commands = [('java', [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'])]
     if args.rust:
         commands.append(('rust', [args.rust]))
-    evidence = []
+    evidence, sample = [], []
     try:
         with tempfile.TemporaryDirectory(prefix='package-json-', dir=os.environ.get('TMPDIR')) as temporary:
-            check_cli(Path(temporary), commands, evidence, [c for c in fixtures() if c.get('surrogate939')] if args.only_939 else None)
+            check_cli(Path(temporary), commands, evidence, [c for c in fixtures() if c.get('surrogate939')] if args.only_939 else None,
+                      unbatched=args.unbatched)
+            if not args.unbatched and not args.only_939:
+                check_process_sample(Path(temporary) / 'process-sample', commands, evidence, sample)
     finally:
         Path(args.output).write_text(json.dumps(evidence, ensure_ascii=True, indent=2) + '\n')
+        output = Path(args.output)
+        output.with_name(output.stem + '-process' + output.suffix).write_text(
+            json.dumps(sample, ensure_ascii=True, indent=2) + '\n')
 
 
 if __name__ == '__main__':

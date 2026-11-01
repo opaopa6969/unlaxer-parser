@@ -82,6 +82,9 @@ public class PackageJsonAcceptanceConformanceTest {
             "--output", output.toString()), Path.of("target/package-json-cli.log"), 1000);
         assertEquals("all raw JSON cases executed", 481,
             JsonParser.parseString(Files.readString(output)).getAsJsonArray().size());
+        // #1035: representative cases also start a JVM per Java CLI call.
+        assertEquals("real-process sample executed", 5, JsonParser.parseString(
+            Files.readString(output.resolveSibling("package-json-cli-process.json"))).getAsJsonArray().size());
     }
 
     private static void run(List<String> command, Path log, int seconds) throws Exception {
