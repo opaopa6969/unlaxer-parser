@@ -17,8 +17,7 @@ public class MatchedNonOrderedParser extends NoneChildParser{
 
 	private static final long serialVersionUID = -7305620477370104733L;
 
-	boolean predicated = false;
-	
+	/** The predicate result, {@code null} until resolved; published as in ReferenceParser (#1007). */
 	Optional<Parser> matchedParser;
 	
 	Predicate<Parser> predicate;
@@ -35,12 +34,13 @@ public class MatchedNonOrderedParser extends NoneChildParser{
 
 	@Override
 	public Parsed parse(ParseContext parseContext, TokenKind tokenKind, boolean invertMatch) {
-		if(false == predicated){
-			matchedParser = findFirstFromRoot(predicate);
-			predicated = true;
+		Optional<Parser> resolved = matchedParser;
+		if(resolved == null){
+			resolved = findFirstFromRoot(predicate);
+			matchedParser = resolved;
 		}
 		return 
-			matchedParser.map(parser->{
+			resolved.map(parser->{
 				
 					if(false == parser instanceof NonOrdered){
 						throw new IllegalArgumentException("you must specify reference to Choice instance");
