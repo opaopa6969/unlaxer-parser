@@ -33,7 +33,7 @@ public class PlaygroundQueryConformanceTest {
         run(List.of("node",fixtures.resolve("probe.mjs").toString(),output.resolve("public/language.wasm").toString(),output.resolve("public/worker.js").toString()));
     }
     private void run(List<String> args) throws Exception {
-        Path log=temporary.newFile().toPath();var builder=new ProcessBuilder(args).redirectErrorStream(true).redirectOutput(log.toFile());builder.environment().put("CARGO_INCREMENTAL","0");
+        Path log=temporary.newFile().toPath();var builder=org.unlaxer.dsl.TestProcesses.builder(args).redirectErrorStream(true).redirectOutput(log.toFile());builder.environment().put("CARGO_INCREMENTAL","0");
         var process=builder.start();if(!process.waitFor(120,TimeUnit.SECONDS)){process.destroyForcibly();fail("timeout: "+args);}
         assertEquals(args+"\n"+Files.readString(log),0,process.exitValue());
     }

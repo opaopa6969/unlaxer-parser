@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# An executable boundary for native fixtures that accept a Java launcher path.
+set -euo pipefail
+# Surefire derives JAVA_HOME from its jvm path; PATH still selects setup-java's JDK.
+java_command=$(readlink -f "$(command -v java)")
+export JAVA_HOME
+JAVA_HOME=$(dirname "$(dirname "$java_command")")
+options=()
+if [ -n "${TMPDIR:-}" ]; then
+  options+=("-Djava.io.tmpdir=$TMPDIR")
+fi
+exec "$java_command" "${options[@]}" "$@"

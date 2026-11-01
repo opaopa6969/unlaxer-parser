@@ -27,7 +27,7 @@ public class HttpsPackageConformanceTest {
     }
     private Run run(List<String> command, Path credentials, int seconds) throws Exception {
         Path log = temporary.newFile().toPath();
-        ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
+        ProcessBuilder builder = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         if (credentials != null) builder.environment().put("UBNF_CREDENTIALS_FILE", credentials.toString());
         Process process = builder.start();
         if (!process.waitFor(seconds, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("HTTPS fixture process timed out"); }
@@ -48,7 +48,7 @@ public class HttpsPackageConformanceTest {
     }
     private void openssl(Path directory, String... args) throws Exception {
         List<String> command = new ArrayList<>(List.of("openssl")); command.addAll(List.of(args));
-        Process process = new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(directory.resolve("openssl.log").toFile()).start();
+        Process process = org.unlaxer.dsl.TestProcesses.builder(command).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(directory.resolve("openssl.log").toFile()).start();
         assertTrue(process.waitFor(30, TimeUnit.SECONDS)); assertEquals(Files.readString(directory.resolve("openssl.log")), 0, process.exitValue());
     }
 

@@ -53,7 +53,7 @@ public class LocalImportReaderTest {
     @Test(timeout=15000) public void openedReplacementRejectsWriterFifoSocketAndOversizedFile() throws Exception {
         Path file = temporary.newFile().toPath();
         Path pipe = temporary.getRoot().toPath().resolve("pipe");
-        Process make = new ProcessBuilder("mkfifo", pipe.toString()).start();
+        Process make = org.unlaxer.dsl.TestProcesses.builder("mkfifo", pipe.toString()).start();
         assertTrue(make.waitFor(5, java.util.concurrent.TimeUnit.SECONDS));
         assertEquals(0, make.exitValue());
         var executor = java.util.concurrent.Executors.newSingleThreadExecutor(task -> {

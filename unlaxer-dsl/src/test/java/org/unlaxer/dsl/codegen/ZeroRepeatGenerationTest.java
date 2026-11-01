@@ -49,7 +49,7 @@ public class ZeroRepeatGenerationTest {
     private record Result(int status, String output) {}
     private Result run(List<String> command) throws Exception {
         Path log = temporary.newFile().toPath();
-        var process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        var process = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         if (!process.waitFor(180, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("timeout " + command); }
         return new Result(process.exitValue(), Files.readString(log));
     }

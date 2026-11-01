@@ -83,7 +83,7 @@ public class EvaluationConformanceTest {
             for(String obligation:List.of("convert_value", "eval_manual", "eval_unknown", "evaluate_literal")) {
                 String incomplete=Files.readString(FIXTURES.resolve(probeFile)).replaceAll("(?m)^    fn "+obligation+".*\\n", "");Files.writeString(dir.resolve("main.rs"),incomplete);
                 Path log=temporary.newFile().toPath();
-                var process=new ProcessBuilder("cargo","check","--quiet","--manifest-path",dir.resolve("Cargo.toml").toString(),"--target-dir",repo.resolve("rust/target/evaluation-probe").toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+                var process=org.unlaxer.dsl.TestProcesses.builder("cargo","check","--quiet","--manifest-path",dir.resolve("Cargo.toml").toString(),"--target-dir",repo.resolve("rust/target/evaluation-probe").toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
                 try{assertTrue(process.waitFor(60,java.util.concurrent.TimeUnit.SECONDS));assertNotEquals(Files.readString(log),0,process.exitValue());assertTrue(Files.readString(log),Files.readString(log).contains("E0046")&&Files.readString(log).contains(obligation));}finally{if(process.isAlive())process.destroyForcibly();}
             }
         }
@@ -98,11 +98,11 @@ public class EvaluationConformanceTest {
             var javaError=assertThrows(IllegalArgumentException.class,()->new EvaluatorGenerator().generate(grammar));assertTrue(javaError.toString(),javaError.getMessage().contains(row.get("code").getAsString()));
             assertThrows(IllegalArgumentException.class,()->new org.unlaxer.dsl.codegen.rust.RustBackend().generate(grammar));
             if(rust){Path file=dir.resolve("invalid.ubnf"),out=dir.resolve(row.get("name").getAsString()),log=temporary.newFile().toPath();Files.writeString(file,text);
-                var process=new ProcessBuilder(repo.resolve("rust/target/debug/unlaxer").toString(),"generate","--target","rust","--grammar",file.toString(),"--output",out.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+                var process=org.unlaxer.dsl.TestProcesses.builder(repo.resolve("rust/target/debug/unlaxer").toString(),"generate","--target","rust","--grammar",file.toString(),"--output",out.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
                 try{assertTrue(process.waitFor(30,java.util.concurrent.TimeUnit.SECONDS));assertNotEquals(Files.readString(log),0,process.exitValue());assertTrue(Files.readString(log),Files.readString(log).contains(row.get("code").getAsString()));assertFalse(Files.exists(out));}finally{if(process.isAlive())process.destroyForcibly();}
             }
         }
     }
-    private String run(List<String> args,Path directory)throws Exception{Path log=temporary.newFile().toPath();var process=new ProcessBuilder(args).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start();try{assertTrue("timeout "+args,process.waitFor(120,java.util.concurrent.TimeUnit.SECONDS));assertEquals(args+"\n"+Files.readString(log),0,process.exitValue());return Files.readString(log);}finally{if(process.isAlive())process.destroyForcibly();}}
+    private String run(List<String> args,Path directory)throws Exception{Path log=temporary.newFile().toPath();var process=org.unlaxer.dsl.TestProcesses.builder(args).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start();try{assertTrue("timeout "+args,process.waitFor(120,java.util.concurrent.TimeUnit.SECONDS));assertEquals(args+"\n"+Files.readString(log),0,process.exitValue());return Files.readString(log);}finally{if(process.isAlive())process.destroyForcibly();}}
     private static JavaFileObject source(String name,String text){return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignored){return text;}};}
 }

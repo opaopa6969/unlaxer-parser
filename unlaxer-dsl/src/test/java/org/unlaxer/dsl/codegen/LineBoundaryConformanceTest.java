@@ -304,7 +304,7 @@ public class LineBoundaryConformanceTest {
     }
     private String run(List<String> command) throws Exception {
         Path log = temporary.newFile().toPath();
-        var process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        var process = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         if (!process.waitFor(180, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("timeout " + command); }
         String output = Files.readString(log);
         assertEquals(command + "\n" + output, 0, process.exitValue());

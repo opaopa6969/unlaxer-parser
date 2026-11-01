@@ -11,6 +11,12 @@ import shutil
 import subprocess
 import tempfile
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 ROOT = Path(__file__).resolve().parents[1]
 COUNT = 481
 
@@ -447,7 +453,7 @@ def main():
     parser.add_argument('--only-939', action='store_true')
     parser.add_argument('--unbatched', action='store_true', help='start a JVM per operation for comparison')
     args = parser.parse_args()
-    commands = [('java', [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'])]
+    commands = [('java', java_command(args.java) + ['--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'])]
     if args.rust:
         commands.append(('rust', [args.rust]))
     evidence, sample = [], []

@@ -831,7 +831,7 @@ final class ParityHarness {
         Path stdin = Files.createTempFile(work, "command", ".stdin");
         try {
             Files.writeString(stdin, input, StandardCharsets.UTF_8);
-            var process = new ProcessBuilder(command).redirectErrorStream(true)
+            var process = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true)
                     .redirectInput(stdin.toFile()).redirectOutput(log.toFile()).start();
             try {
                 if (!process.waitFor(seconds, TimeUnit.SECONDS)) {

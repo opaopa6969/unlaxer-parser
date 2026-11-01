@@ -14,6 +14,12 @@ import time
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 from ubnf_credentials_home import compile_passwd_shim, isolated_env, protect_real_credentials
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 ROOT = Path(__file__).resolve().parents[1]
 COUNT = 65
 TOKEN = 'credentials-fixture-only-token'
@@ -178,7 +184,7 @@ def check(directory, args, evidence, excluded):
             env.pop('UBNF_CREDENTIALS_FILE', None)
             if not case.get('defaultPath'):
                 env['UBNF_CREDENTIALS_FILE'] = str(credentials)
-            java = [args.java, '--enable-preview', '-Duser.home=' + str(home),
+            java = java_command(args.java) + ['--enable-preview', '-Duser.home=' + str(home),
                     '-Djava.io.tmpdir=' + str(directory), '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']
             commands = [('java', java, env)]
             if args.rust:

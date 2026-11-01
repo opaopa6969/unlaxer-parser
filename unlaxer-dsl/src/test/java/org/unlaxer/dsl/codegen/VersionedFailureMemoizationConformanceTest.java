@@ -249,7 +249,7 @@ public class VersionedFailureMemoizationConformanceTest {
     private String run(List<String> command) throws Exception {
         Path log = Files.createTempFile("stateful-memo-command", ".log");
         Process p =
-                new ProcessBuilder(command)
+                org.unlaxer.dsl.TestProcesses.builder(command)
                         .redirectErrorStream(true)
                         .redirectOutput(log.toFile())
                         .start();

@@ -315,7 +315,7 @@ public class TinyClassicModeConformanceTest {
 
     private void run(List<String> args, Path log) throws Exception {
         var process =
-                new ProcessBuilder(args)
+                org.unlaxer.dsl.TestProcesses.builder(args)
                         .redirectErrorStream(true)
                         .redirectOutput(log.toFile())
                         .start();

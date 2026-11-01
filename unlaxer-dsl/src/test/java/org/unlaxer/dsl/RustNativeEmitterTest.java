@@ -59,7 +59,7 @@ public class RustNativeEmitterTest {
     private void compare(String fixture, String source) throws Exception {
         Path output = temporary.newFolder(fixture).toPath();
         Path log = output.resolve("cargo.log");
-        var builder = new ProcessBuilder("cargo", "run", "--offline", "--quiet", "-p", "unlaxer-codegen",
+        var builder = org.unlaxer.dsl.TestProcesses.builder("cargo", "run", "--offline", "--quiet", "-p", "unlaxer-codegen",
             "--example", "parity_fixture", "--", fixture, output.toString())
             .directory(Path.of("../rust").toFile()).redirectErrorStream(true).redirectOutput(log.toFile());
         var process = builder.start();
@@ -88,7 +88,7 @@ public class RustNativeEmitterTest {
         Files.writeString(input, source);
         Path fullOutput = temporary.newFolder(fixture + "-source").toPath();
         Path fullLog = temporary.newFile(fixture + "-source.log").toPath();
-        var nativeProcess = new ProcessBuilder("cargo", "run", "--offline", "--quiet", "-p", "unlaxer-generator",
+        var nativeProcess = org.unlaxer.dsl.TestProcesses.builder("cargo", "run", "--offline", "--quiet", "-p", "unlaxer-generator",
             "--", "generate", "--grammar", input.toString(), "--output", fullOutput.toString())
             .directory(Path.of("../rust").toFile()).redirectErrorStream(true).redirectOutput(fullLog.toFile()).start();
         boolean generated = nativeProcess.waitFor(90, TimeUnit.SECONDS);

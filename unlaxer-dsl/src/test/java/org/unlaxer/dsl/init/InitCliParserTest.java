@@ -31,7 +31,7 @@ public class InitCliParserTest {
             "--package", "com.acme.mylang",
             "--group-id", "com.acme",
             "--extension", ".ml",
-            "--output-dir", "/tmp/out",
+            "--output-dir", "build/test-output",
             "--from", "g.ubnf",
             "--with-dap",
             "--force"
@@ -40,7 +40,7 @@ public class InitCliParserTest {
         assertEquals("com.acme.mylang", opts.packageName());
         assertEquals("com.acme", opts.groupId());
         assertEquals(".ml", opts.extension());
-        assertEquals("/tmp/out", opts.outputDir());
+        assertEquals("build/test-output", opts.outputDir());
         assertEquals("g.ubnf", opts.fromGrammar());
         assertTrue(opts.withDap());
         assertTrue(opts.force());

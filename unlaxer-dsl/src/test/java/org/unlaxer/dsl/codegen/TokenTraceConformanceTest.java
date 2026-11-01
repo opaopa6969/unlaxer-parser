@@ -151,7 +151,7 @@ public class TokenTraceConformanceTest {
         }
         org.junit.Assume.assumeTrue("[assumption] token trace Rust conformance requires -DrustConformance=true",Boolean.getBoolean("rustConformance"));
         Path log=Files.createTempFile("token-trace-rust-", ".log");
-        var process=new ProcessBuilder("cargo","test","--locked","--manifest-path","rust/Cargo.toml","-p","unlaxer-runtime","--test","token_trace","--","--nocapture","--test-threads=1").directory(Path.of("..").toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        var process=org.unlaxer.dsl.TestProcesses.builder("cargo","test","--locked","--manifest-path","rust/Cargo.toml","-p","unlaxer-runtime","--test","token_trace","--","--nocapture","--test-threads=1").directory(Path.of("..").toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {assertTrue("Rust timeout",process.waitFor(120,TimeUnit.SECONDS));assertEquals(Files.readString(log),0,process.exitValue());}finally {if(process.isAlive())process.destroyForcibly();}
         var rust=Files.readAllLines(log).stream().filter(s->s.contains("TRACE\t")).map(s->s.substring(s.indexOf("TRACE\t")+6)).toList();assertEquals(80,rust.size());evidence.addAll(rust);
         // Rust's ample-budget trace equals the Java run above; its n-1/n/n+1 checks ran in cargo.

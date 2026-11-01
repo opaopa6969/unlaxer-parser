@@ -373,7 +373,8 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(aggregate['name'], 'Rust backend and Java conformance')
         self.assertEqual(aggregate['needs'], 'rust-conformance')
         self.assertEqual(aggregate['if'], 'always()')
-        step, = aggregate['steps']
+        setup, step = aggregate['steps']
+        self.assertEqual(setup['name'], 'Select job temporary directory (#1045)')
         self.assertEqual(step['env']['RESULT'], '${{ needs.rust-conformance.result }}')
         for status in ['success', 'failure', 'cancelled', 'skipped', '']:
             result = subprocess.run(['bash', '-eu', '-c', step['run']], env={'RESULT': status})

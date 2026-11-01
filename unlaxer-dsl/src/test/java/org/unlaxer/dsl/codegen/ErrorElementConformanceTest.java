@@ -344,7 +344,7 @@ public class ErrorElementConformanceTest {
     private record ProcessResult(int code, String output) {}
     private ProcessResult run(List<String> command, String input, boolean withoutJava) throws Exception {
         Path log = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         if (withoutJava) {
             builder.environment().put("PATH", "");
             builder.environment().put("JAVA_HOME", "/nonexistent-unlaxer-java");

@@ -91,7 +91,7 @@ public class PackageArtifactReaderTest {
     @Test(timeout=20000) public void artifactReplacementRejectsWriterFifoBeforeReading() throws Exception {
         Path file = temporary.newFile().toPath();
         Path pipe = temporary.getRoot().toPath().resolve("pipe");
-        Process make = new ProcessBuilder("mkfifo", pipe.toString()).start();
+        Process make = org.unlaxer.dsl.TestProcesses.builder("mkfifo", pipe.toString()).start();
         try {
             assertTrue(make.waitFor(5, java.util.concurrent.TimeUnit.SECONDS));
             assertEquals(0, make.exitValue());

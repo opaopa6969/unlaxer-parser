@@ -125,7 +125,7 @@ public class LanguageProfileConformanceTest {
         Files.write(officialDirectory.resolve("expected.tsv"), nativeOfficial);
         Path officialProbe = directory.resolve("official-probe");
         run(List.of(rustc, "--edition=2021", "--extern", "unlaxer_runtime=" + runtime, repo.resolve("docs/fixtures/language-profiles/official_probe.rs").toString(), "-o", officialProbe.toString()));
-        assertEquals(nativeOfficial, run(List.of(officialProbe.toString(), officialDirectory.toString(), repo.toString(), Path.of(System.getProperty("java.home"), "bin", "java").toString(), System.getProperty("java.class.path"), repo.resolve("unlaxer-dsl/ubnf-vscode/node_modules/typescript/lib/typescript.js").toString(), rustc)).lines().toList());
+        assertEquals(nativeOfficial, run(List.of(officialProbe.toString(), officialDirectory.toString(), repo.toString(), repo.resolve("scripts/ci/java-tmpdir/bin/java").toString(), System.getProperty("java.class.path"), repo.resolve("unlaxer-dsl/ubnf-vscode/node_modules/typescript/lib/typescript.js").toString(), rustc)).lines().toList());
         Files.write(Path.of("target/language-profile-official-positions.tsv"), nativeOfficial);
         Files.write(Path.of("target/language-profile-conformance.tsv"), observations);
         Files.write(Path.of("target/language-profile-official.tsv"), officialObservations);
@@ -135,7 +135,7 @@ public class LanguageProfileConformanceTest {
         String provider = language.equals("java") ? "javac" : language.equals("rust") ? "rustc" : "typescript";
         String version = language.equals("java") ? "21.0.9" : language.equals("rust") ? "1.85.0" : "5.9.3";
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        List<String> command = language.equals("java") ? List.of(java, "-cp", System.getProperty("java.class.path"), "org.unlaxer.dsl.provider.JavacProvider")
+        List<String> command = language.equals("java") ? List.of(java, "-Djava.io.tmpdir=" + System.getProperty("java.io.tmpdir"), "-cp", System.getProperty("java.class.path"), "org.unlaxer.dsl.provider.JavacProvider")
             : List.of("python3", repo.resolve("scripts/language-providers/provider.py").toString(), language, language.equals("rust") ? rustc : repo.resolve("unlaxer-dsl/ubnf-vscode/node_modules/typescript/lib/typescript.js").toString());
         var snapshot = new DocumentSnapshot("file:///Main." + (language.equals("java") ? "java" : language.equals("rust") ? "rs" : "ts"), 7, source);
         var project = new LanguageQueries.Project("profile-corpus", 1, Map.of(), Map.of());
@@ -165,7 +165,7 @@ public class LanguageProfileConformanceTest {
     }
     private String run(List<String> command) throws Exception {
         Path log = temporary.newFile().toPath();
-        Process process = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.INHERIT).redirectOutput(log.toFile()).start();
+        Process process = org.unlaxer.dsl.TestProcesses.builder(command).redirectError(ProcessBuilder.Redirect.INHERIT).redirectOutput(log.toFile()).start();
         assertTrue("timeout " + command, process.waitFor(120, TimeUnit.SECONDS));
         String output = Files.readString(log);
         assertEquals(command + "\n" + output, 0, process.exitValue()); return output;

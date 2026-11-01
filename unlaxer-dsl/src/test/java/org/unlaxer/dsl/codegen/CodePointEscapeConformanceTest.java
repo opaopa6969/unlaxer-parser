@@ -88,7 +88,7 @@ public class CodePointEscapeConformanceTest {
 
     private String run(List<String> command) throws Exception {
         Path log = temporary.newFile().toPath();
-        Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        Process process = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         assertTrue(command.toString(), process.waitFor(60, TimeUnit.SECONDS));
         String output = Files.readString(log);
         assertEquals(output, 0, process.exitValue());

@@ -12,6 +12,12 @@ import subprocess
 import sys
 import time
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / 'benchmarks/tiny-classic'
 VERSION = '3.3.1-benchmark-SNAPSHOT'
@@ -124,9 +130,9 @@ def prepare(args, manifest, grammar, output):
     classpath += os.pathsep + (output / 'tiny-classpath').read_text().strip()
     helper = output / 'helper'
     helper.mkdir(exist_ok=True)
-    command(['javac', '--release', '21', '-cp', classpath, '-d', helper,
+    command(java_command('javac') + ['--release', '21', '-cp', classpath, '-d', helper,
              FIXTURES / 'consumers/Prepare.java'], ROOT, logs / 'helper-compile.log')
-    command(['java', '-cp', str(helper) + os.pathsep + classpath, 'Prepare', grammar, output],
+    command(java_command('java') + ['-cp', str(helper) + os.pathsep + classpath, 'Prepare', grammar, output],
             ROOT, logs / 'java-generate.log')
     command(['cargo', 'build', '--locked', '--release', '--manifest-path', ROOT / 'rust/Cargo.toml',
              '-p', 'unlaxer-generator'], ROOT, logs / 'generator-build.log')
@@ -142,7 +148,7 @@ def prepare(args, manifest, grammar, output):
         raise ValueError('expected all five generated Rust modules')
     java = output / 'java'
     java.mkdir(exist_ok=True)
-    command(['javac', '--release', '21', '-cp', classpath, '-d', java,
+    command(java_command('javac') + ['--release', '21', '-cp', classpath, '-d', java,
              *sorted((output / 'java-src').rglob('*.java')), FIXTURES / 'consumers/JavaConsumer.java'],
             ROOT, logs / 'java-consumer-compile.log')
     runtime = output / 'libunlaxer_runtime.rlib'
@@ -156,7 +162,7 @@ def prepare(args, manifest, grammar, output):
                  '--extern', 'unlaxer_runtime=' + str(runtime), '-o', directory / 'consumer'],
                 ROOT, logs / ('rust-' + host + '-compile.log'))
     versions = {}
-    for tool, arguments in [('java', ['java', '-version']), ('javac', ['javac', '-version']),
+    for tool, arguments in [('java', java_command('java') + ['-version']), ('javac', java_command('javac') + ['-version']),
                             ('rustc', ['rustc', '-vV'])]:
         path = logs / (tool + '-version.log')
         command(arguments, ROOT, path)
@@ -269,7 +275,7 @@ def execute(args, manifest, output):
                 for diagnostic in diagnostics:
                     for language in ['java', 'rust-java', 'rust-native']:
                         stem = '-'.join([case['id'], memo, diagnostic, language])
-                        cmd = ['java', '-cp', str(output / 'java') + os.pathsep + build['classpath'], 'JavaConsumer'] if language == 'java' else [output / language / 'consumer']
+                        cmd = java_command('java') + ['-cp', str(output / 'java') + os.pathsep + build['classpath'], 'JavaConsumer'] if language == 'java' else [output / language / 'consumer']
                         entry = args.entry_override or case['entry']
                         cmd += [FIXTURES / case['file'], memo, diagnostic, metadata['warmups'], metadata['iterations'], entry]
                         log = samples / (stem + '.jsonl')

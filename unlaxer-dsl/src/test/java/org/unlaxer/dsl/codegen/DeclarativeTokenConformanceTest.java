@@ -602,7 +602,7 @@ public class DeclarativeTokenConformanceTest {
     private record Run(int code, String output) {}
     private Run run(List<String> command, String input, boolean noJava) throws Exception {
         Path log = temporary.newFile().toPath();
-        ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
+        ProcessBuilder builder = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         if (noJava) { builder.environment().put("PATH", ""); builder.environment().put("JAVA_HOME", "/missing-java"); }
         Process process = builder.start();
         try {

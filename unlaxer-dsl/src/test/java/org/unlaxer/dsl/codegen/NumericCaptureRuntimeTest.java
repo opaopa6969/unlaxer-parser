@@ -101,7 +101,7 @@ public class NumericCaptureRuntimeTest {
 
     private String run(List<String> command, String input) throws Exception {
         Path log = temporary.newFile().toPath();
-        Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        Process process = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {
             try (var stdin = process.getOutputStream()) { stdin.write(input.getBytes(StandardCharsets.UTF_8)); }
             assertTrue(command.toString(), process.waitFor(45, TimeUnit.SECONDS));

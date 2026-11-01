@@ -18,6 +18,12 @@ from ubnf_credentials_home import compile_passwd_shim, isolated_env, protect_rea
 from ubnf_package_credentials import ROOT, local_tls_context, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 LIMIT = 8 * 1024 * 1024
 COUNT = 231
 URI_COUNT = 150
@@ -264,7 +270,7 @@ def invoke(command, options, env, deadline=28):
 def java_host(args, env, directory):
     """One JVM runs every sequential Java `deps resolve` (CodegenBatchHost); it re-reads
     the credentials override per call, so each case only rewrites that file."""
-    process = subprocess.Popen([args.java, '--enable-preview', '-Djava.io.tmpdir=' + str(directory),
+    process = subprocess.Popen(java_command(args.java) + ['--enable-preview', '-Djava.io.tmpdir=' + str(directory),
                                 '-cp', args.classpath, 'org.unlaxer.dsl.CodegenBatchHost'],
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
     lines = queue.Queue()
@@ -393,14 +399,14 @@ def check(directory, args, records):
     home = directory / 'java-host'
     home.mkdir()
     host_env = dict(isolated_env(library, home, home), UBNF_CREDENTIALS_FILE=str(home / 'credentials.json'))
-    java = [args.java, '--enable-preview', '-Djava.io.tmpdir=' + str(directory),
+    java = java_command(args.java) + ['--enable-preview', '-Djava.io.tmpdir=' + str(directory),
             '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']
-    version = subprocess.check_output([args.java, '--version'], timeout=10).decode('ascii')
+    version = subprocess.check_output(java_command(args.java) + ['--version'], timeout=10).decode('ascii')
     java17 = re.search(r'\b17\.', version) is not None
     # The header budget was backported after Oracle 17.0.12. Keep NFC's major
     # version oracle separate from the actual HTTP parser's header accounting.
     header_limit = subprocess.check_output(
-        [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenBatchHost',
+        java_command(args.java) + ['--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenBatchHost',
          '--http-header-limit'], timeout=10).decode('ascii').strip()
     assert header_limit in ['limited', 'unlimited'], 'unknown Java HTTP header accounting'
     args.header_accounting = header_limit

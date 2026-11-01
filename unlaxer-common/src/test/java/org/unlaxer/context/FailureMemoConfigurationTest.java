@@ -24,6 +24,7 @@ public class FailureMemoConfigurationTest {
             assertEquals(line, 5, row.length);
             List<String> command = new ArrayList<>();
             command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
+            command.add("-Djava.io.tmpdir=" + System.getProperty("java.io.tmpdir"));
             if (!row[1].equals("-")) {
                 String value = new String(HexFormat.of().parseHex(row[1]), StandardCharsets.UTF_8);
                 for (String property : List.of("maxEntries", "maxBytes", "maxEntryBytes"))

@@ -15,6 +15,9 @@ import subprocess
 import sys
 from oracle import oracle
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+from java_tmp import java_command
+
 ROOT = Path(__file__).resolve().parents[2]
 FIX = ROOT / 'docs/fixtures/engine-reuse'
 EX = Path(__file__).resolve().parent
@@ -48,9 +51,9 @@ def compile_probes(private):
     classes = OUT/'classes'
     for name in ['Classic'] + (['Ubnfc'] if private else []):
         generated = OUT/('classic-java' if name == 'Classic' else 'ubnfc-java')
-        run(['javac', '-cp', cp+os.pathsep+str(classes), '-d', classes,
+        run(java_command('javac') + ['-cp', cp+os.pathsep+str(classes), '-d', classes,
              *sorted(generated.rglob('*.java')), EX/'Canonical.java', EX/(name+'Probe.java')])
-    run(['javac', '-d', classes, EX/'Policy.java'])
+    run(java_command('javac') + ['-d', classes, EX/'Policy.java'])
     run(rust('rustc', '--edition=2021', '-A', 'warnings', '--crate-name=unlaxer_runtime',
              '--crate-type=rlib', ROOT/'rust/unlaxer-runtime/src/lib.rs', '-o', OUT/'libunlaxer_runtime.rlib'))
     for name in ['classic']+(['ubnfc'] if private else []):
@@ -60,11 +63,11 @@ def compile_probes(private):
     for name in ['driver', 'policy']:
         run(rust('rustc', '--edition=2021', '-A', 'warnings', EX/(name+'.rs'), '-o', OUT/name))
     commands = {
-        'classic-java': wrapper('classic-java-probe', ['java', '-Xmx256m', '-cp', str(classes)+os.pathsep+cp, 'ClassicProbe']),
+        'classic-java': wrapper('classic-java-probe', java_command('java') + ['-Xmx256m', '-cp', str(classes)+os.pathsep+cp, 'ClassicProbe']),
         'classic-rust': OUT/'classic-rust-probe'
     }
     if private:
-        commands['ubnfc-java'] = wrapper('ubnfc-java-probe', ['java', '-Xmx256m', '-cp', classes, 'UbnfcProbe'])
+        commands['ubnfc-java'] = wrapper('ubnfc-java-probe', java_command('java') + ['-Xmx256m', '-cp', classes, 'UbnfcProbe'])
         commands['ubnfc-rust'] = OUT/'ubnfc-rust-probe'
     return commands
 
@@ -76,7 +79,7 @@ def build(private):
          'dependency:build-classpath', '-Dmdep.outputFile='+str(OUT/'classpath')], timeout=600)
     cp = os.pathsep.join([str(ROOT/'unlaxer-common/target/classes'), str(ROOT/'unlaxer-dsl/target/classes'), (OUT/'classpath').read_text().strip()])
     (OUT/'classpath').write_text(cp)
-    run(['java', '-cp', cp, 'org.unlaxer.dsl.CodegenMain', '--grammar', FIX/'Reuse.ubnf',
+    run(java_command('java') + ['-cp', cp, 'org.unlaxer.dsl.CodegenMain', '--grammar', FIX/'Reuse.ubnf',
          '--output', OUT/'classic-java', '--generators', 'AST,Parser,Mapper'])
     run(rust('cargo', 'build', '--locked', '--manifest-path', ROOT/'rust/Cargo.toml', '-p', 'unlaxer-generator', '--target-dir', OUT/'cargo'), timeout=600)
     if (OUT/'classic-rust').exists(): shutil.rmtree(OUT/'classic-rust')
@@ -86,7 +89,7 @@ def build(private):
         ENV['UBNFC_RUST_BIN']=str(private/'target/debug/ubnfc-rust')
         ENV['UBNFC_JAVA_JAR']=str(private/'ubnfc-java/target/ubnfc-java-0.1.0-SNAPSHOT.jar')
         run(['mvn', '-B', '-f', private/'ubnfc-java/pom.xml', '-DskipTests', 'package'], private, timeout=600)
-        for language in ['java','rust']:
+        for language in ['java', 'rust']:
             directory = OUT/('ubnfc-'+language)
             if directory.exists(): shutil.rmtree(directory)
             run([private/'target/debug/ubnfc', 'gen', '--grammar', FIX/'Reuse.ubnf', '--target', language, '--out', directory], private)
@@ -97,7 +100,7 @@ def contract_checks():
     for kind, filename, expected_columns in [('proof','proofs.tsv',[0,2,3]), ('capability','capabilities.tsv',[0,5,6])]:
         rows = [line.split('\t') for line in (FIX/filename).read_text().splitlines() if line and not line.startswith('#')]
         expected = ''.join('\t'.join(p[i] for i in expected_columns)+'\n' for p in rows)
-        for language, command in [('java',['java','-cp',OUT/'classes','Policy']),('rust',[OUT/'policy'])]:
+        for language, command in [('java',java_command('java') + ['-cp',OUT/'classes','Policy']),('rust',[OUT/'policy'])]:
             actual=run([*command,kind,FIX/filename])
             (OUT/f'{kind}-{language}.tsv').write_text(actual)
             if actual!=expected: raise AssertionError(f'{kind} {language}\n{actual}\nEXPECTED\n{expected}')
@@ -136,7 +139,7 @@ def driver_checks(commands, grammar):
         rows.append(name+'\t'+actual)
         return actual
     # Native failure routing and native AST projection, not mocked engines.
-    for language in ['java','rust']:
+    for language in ['java', 'rust']:
         lean=commands.get('ubnfc-'+language,commands['classic-'+language]); rich=commands['classic-'+language]
         for case in json.loads((FIX/'cases.json').read_text()):
             actual=execute('native-'+language+'-'+case['id'],case['source'],lean,rich)

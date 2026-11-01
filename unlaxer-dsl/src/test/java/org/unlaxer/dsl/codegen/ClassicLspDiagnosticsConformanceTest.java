@@ -46,7 +46,7 @@ public class ClassicLspDiagnosticsConformanceTest {
             assertTrue(errors.toString(), compiled);
         }
         String javaExecutable = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        try (var wire = new Wire(new ProcessBuilder(javaExecutable, "-cp",
+        try (var wire = new Wire(org.unlaxer.dsl.TestProcesses.builder(javaExecutable, "-cp",
                 classes + File.pathSeparator + System.getProperty("java.class.path"),
                 "org.unlaxer.tinycalc.generated.DiagnosticMain")
                 .redirectError(temporary.newFile("java-stderr.log")).start())) {
@@ -81,7 +81,7 @@ public class ClassicLspDiagnosticsConformanceTest {
         Files.writeString(project.resolve("src/main.rs"),
             "mod generated; fn main() { std::process::exit(generated::lsp::serve_stdio_status().unwrap()); }\n");
         run(List.of("cargo", "build", "--quiet", "--offline", "--manifest-path", project.resolve("Cargo.toml").toString()));
-        try (var wire = new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/classic-lsp-diagnostic-fixture").toString())
+        try (var wire = new Wire(org.unlaxer.dsl.TestProcesses.builder(ROOT.resolve("rust/target/debug/classic-lsp-diagnostic-fixture").toString())
                 .redirectError(temporary.newFile("rust-stderr.log")).start())) {
             exercise(wire, "Rust");
         }
@@ -133,7 +133,7 @@ public class ClassicLspDiagnosticsConformanceTest {
         assertEquals(backend, 0, wire.process.exitValue());
     }
     private void run(List<String> command) throws Exception {
-        var builder = new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true);
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).directory(ROOT.toFile()).redirectErrorStream(true);
         builder.environment().put("CARGO_INCREMENTAL", "0");
         builder.environment().put("CARGO_TARGET_DIR", ROOT.resolve("rust/target").toString());
         Path log = temporary.newFile().toPath();

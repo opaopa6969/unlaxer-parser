@@ -94,7 +94,7 @@ public class CliStderrConformanceTest {
     }
 
     private static void run(List<String> command, Path log, int seconds) throws Exception {
-        Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        Process process = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {
             assertTrue("process timeout: " + command, process.waitFor(seconds, TimeUnit.SECONDS));
             assertEquals(Files.readString(log), 0, process.exitValue());

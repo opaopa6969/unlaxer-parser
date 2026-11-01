@@ -68,7 +68,7 @@ public class DapLauncherLifecycleConformanceTest {
         Path buildLog = temporary.newFile("cargo.log").toPath();
         Path target = ROOT.resolve("rust/target");
         var builder =
-                new ProcessBuilder(
+                org.unlaxer.dsl.TestProcesses.builder(
                                 "cargo",
                                 "build",
                                 "--offline",
@@ -152,7 +152,7 @@ public class DapLauncherLifecycleConformanceTest {
                 """;
         List<String> command = javaCommand("wire.lifecycle.Caller", harness);
         Path errors = temporary.newFile("caller-stderr.log").toPath();
-        var process = new ProcessBuilder(command).redirectError(errors.toFile()).start();
+        var process = org.unlaxer.dsl.TestProcesses.builder(command).redirectError(errors.toFile()).start();
         try {
             assertTrue("library session worker leak", process.waitFor(10, TimeUnit.SECONDS));
             assertEquals(Files.readString(errors), 0, process.exitValue());
@@ -222,7 +222,7 @@ public class DapLauncherLifecycleConformanceTest {
                 }
                 """;
         var process =
-                new ProcessBuilder(javaCommand("wire.lifecycle.Failures", harness))
+                org.unlaxer.dsl.TestProcesses.builder(javaCommand("wire.lifecycle.Failures", harness))
                         .redirectError(temporary.newFile("failure-stderr.log"))
                         .start();
         try {
@@ -274,7 +274,7 @@ public class DapLauncherLifecycleConformanceTest {
                 """;
         Path errors = temporary.newFile("half-open-stderr.log").toPath();
         var process =
-                new ProcessBuilder(javaCommand("wire.lifecycle.HalfOpen", harness))
+                org.unlaxer.dsl.TestProcesses.builder(javaCommand("wire.lifecycle.HalfOpen", harness))
                         .redirectError(errors.toFile())
                         .start();
         try {
@@ -316,7 +316,7 @@ public class DapLauncherLifecycleConformanceTest {
         Path errors = temporary.newFile("reverse-stderr.log").toPath();
         try (var wire =
                 new Wire(
-                        new ProcessBuilder(javaCommand("wire.lifecycle.Reverse", harness))
+                        org.unlaxer.dsl.TestProcesses.builder(javaCommand("wire.lifecycle.Reverse", harness))
                                 .redirectError(errors.toFile())
                                 .start())) {
             int initialize = wire.sendRequest("initialize", "{}");
@@ -350,7 +350,7 @@ public class DapLauncherLifecycleConformanceTest {
         Path errors = temporary.newFile("broken-stdout-stderr.log").toPath();
         try (var wire =
                 new Wire(
-                        new ProcessBuilder(javaCommand("wire.lifecycle.LifecycleDapLauncher", null))
+                        org.unlaxer.dsl.TestProcesses.builder(javaCommand("wire.lifecycle.LifecycleDapLauncher", null))
                                 .redirectError(errors.toFile())
                                 .start())) {
             wire.input.close();
@@ -416,7 +416,7 @@ public class DapLauncherLifecycleConformanceTest {
         for (String mode : List.of("uninitialized", "ast", "token")) {
             Path errors = temporary.newFile().toPath();
             try (var wire =
-                    new Wire(new ProcessBuilder(command).redirectError(errors.toFile()).start())) {
+                    new Wire(org.unlaxer.dsl.TestProcesses.builder(command).redirectError(errors.toFile()).start())) {
                 if (!mode.equals("uninitialized")) {
                     assertTrue(
                             wire.request("initialize", "{\"adapterID\":\"lifecycle\"}")
@@ -463,7 +463,7 @@ public class DapLauncherLifecycleConformanceTest {
         for (boolean initialize : List.of(false, true)) {
             Path errors = temporary.newFile().toPath();
             try (var wire =
-                    new Wire(new ProcessBuilder(command).redirectError(errors.toFile()).start())) {
+                    new Wire(org.unlaxer.dsl.TestProcesses.builder(command).redirectError(errors.toFile()).start())) {
                 if (initialize)
                     assertTrue(
                             wire.request("initialize", "{\"adapterID\":\"eof\"}")
@@ -481,7 +481,7 @@ public class DapLauncherLifecycleConformanceTest {
         if (backend.equals("rust")) {
             Path errors = temporary.newFile().toPath();
             try (var wire =
-                    new Wire(new ProcessBuilder(command).redirectError(errors.toFile()).start())) {
+                    new Wire(org.unlaxer.dsl.TestProcesses.builder(command).redirectError(errors.toFile()).start())) {
                 wire.input.close();
                 wire.sendRequest("initialize", "{}");
                 assertTrue(

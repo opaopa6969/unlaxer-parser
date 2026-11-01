@@ -44,7 +44,7 @@ public class ClassicTokenDapProtocolConformanceTest {
    }
    """));
   Path classes=temporary.newFolder("classes").toPath();var errors=new StringWriter();assertTrue(errors.toString(),ToolProvider.getSystemJavaCompiler().getTask(errors,null,null,List.of("-classpath",System.getProperty("java.class.path"),"-d",classes.toString()),null,sources).call());
-  String java=Path.of(System.getProperty("java.home"),"bin/java").toString();try(var wire=new Wire(new ProcessBuilder(java,"-cp",classes+File.pathSeparator+System.getProperty("java.class.path"),"wire.tokens.Main").redirectError(temporary.newFile("java-stderr.log")).start())){exercise(wire,"java");}
+  String java=Path.of(System.getProperty("java.home"),"bin/java").toString();try(var wire=new Wire(org.unlaxer.dsl.TestProcesses.builder(java,"-cp",classes+File.pathSeparator+System.getProperty("java.class.path"),"wire.tokens.Main").redirectError(temporary.newFile("java-stderr.log")).start())){exercise(wire,"java");}
   Assume.assumeTrue("[assumption] token DAP Rust conformance requires -DrustConformance=true",Boolean.getBoolean("rustConformance"));
   Path project=temporary.newFolder("rust").toPath(),modules=project.resolve("src/generated");Files.createDirectories(modules);Path nativeOutput=project.resolve("native");
   run(List.of("cargo","run","--quiet","--locked","--manifest-path",ROOT.resolve("rust/Cargo.toml").toString(),"-p","unlaxer-generator","--bin","unlaxer","--","generate","--target","rust","--grammar",grammarFile.toString(),"--output",nativeOutput.toString(),"--dap"));
@@ -76,7 +76,7 @@ public class ClassicTokenDapProtocolConformanceTest {
   for(String host:List.of("rust","rust-native")){
    if(host.equals("rust-native"))for(var file:new RustBackend().generateWithProtocols(grammar,false,true))Files.copy(nativeOutput.resolve(file.relativePath()),modules.resolve(file.relativePath()),StandardCopyOption.REPLACE_EXISTING);
    run(List.of("cargo","build","--quiet","--offline","--manifest-path",project.resolve("Cargo.toml").toString()));
-   try(var wire=new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/classic-token-dap-fixture").toString()).redirectError(temporary.newFile(host+"-stderr.log")).start())){exercise(wire,host);}
+   try(var wire=new Wire(org.unlaxer.dsl.TestProcesses.builder(ROOT.resolve("rust/target/debug/classic-token-dap-fixture").toString()).redirectError(temporary.newFile(host+"-stderr.log")).start())){exercise(wire,host);}
   }
   Files.createDirectories(Path.of("target"));Files.write(Path.of("target/classic-token-dap-protocol.tsv"),evidence);
  }
@@ -112,6 +112,6 @@ public class ClassicTokenDapProtocolConformanceTest {
   DapArgumentConformance.check(wire, "classic-token", backend, temporary.getRoot().toPath());
   wire.request("disconnect",Map.of());
  }
- private void run(List<String> command)throws Exception{Path log=temporary.newFile().toPath();var b=new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true).redirectOutput(log.toFile());b.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());b.environment().put("CARGO_INCREMENTAL","0");var p=b.start();try{assertTrue("timeout "+command,p.waitFor(180,TimeUnit.SECONDS));assertEquals(command+"\n"+Files.readString(log),0,p.exitValue());}finally{if(p.isAlive())p.destroyForcibly();}}
+ private void run(List<String> command)throws Exception{Path log=temporary.newFile().toPath();var b=org.unlaxer.dsl.TestProcesses.builder(command).directory(ROOT.toFile()).redirectErrorStream(true).redirectOutput(log.toFile());b.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());b.environment().put("CARGO_INCREMENTAL","0");var p=b.start();try{assertTrue("timeout "+command,p.waitFor(180,TimeUnit.SECONDS));assertEquals(command+"\n"+Files.readString(log),0,p.exitValue());}finally{if(p.isAlive())p.destroyForcibly();}}
  private static JavaFileObject source(String name,String body){return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignore){return body;}};}
 }

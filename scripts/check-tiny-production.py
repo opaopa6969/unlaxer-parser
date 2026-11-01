@@ -3,6 +3,13 @@
 import argparse, os, pathlib, subprocess, difflib, re, json, signal
 from contextlib import contextmanager
 import xml.etree.ElementTree as ET
+
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 PIN='f86ce8a5ab0ab7d23fdba2cd477187df8aa7607c'
 root=pathlib.Path(__file__).resolve().parents[1]
 env=dict(os.environ,CARGO_INCREMENTAL='0')
@@ -45,6 +52,8 @@ def verify_compatibility(label, module, tests, expected_count):
         for file in report_paths(directory,name): file.unlink()
     command=['-Dgpg.skip=true','-Dtinyexpression.skipRailroad=true','-Dtest='+tests,
         'install' if label=='tiny' else 'test']
+    if os.environ.get('TMPDIR'):
+        command += ['-Djvm='+str(root/'scripts/ci/java-tmpdir/bin/java')]
     run(mvn+command,module,600)
     reports=[]
     for name in names:
@@ -108,25 +117,25 @@ def main():
             'compatibility_tests':0 if args.skip_build else 164,'skip_build':args.skip_build},indent=2)+'\n')
         run(mvn+['dependency:build-classpath','-Dmdep.includeScope=test','-Dmdep.outputFile='+str(out/'tiny-classpath')],tiny)
         cp=os.pathsep.join(map(str,[root/'unlaxer-common/target/classes',root/'unlaxer-dsl/target/classes',tiny/'target/classes']))+os.pathsep+(out/'tiny-classpath').read_text().strip()
-        run(['javac','-cp',cp,'-d',out,*sorted((root/'examples/tinyexpression-production').glob('*.java'))])
+        run(java_command('javac') + ['-cp',cp,'-d',out,*sorted((root/'examples/tinyexpression-production').glob('*.java'))])
         run(['rustup','run','1.85.0','rustc','--edition=2021','-C','opt-level=1','--crate-name=unlaxer_runtime','--crate-type=rlib',root/'rust/unlaxer-runtime/src/lib.rs','-o',out/'libunlaxer_runtime.rlib'])
         env['CARGO_PKG_VERSION']='2.0.0' # Rust package version at the same source pin; Java POM is 2.0.1.
         run(['rustup','run','1.85.0','rustc','--edition=2021','-C','opt-level=1','--crate-name=tinyexpression_rs','--crate-type=rlib',tiny/'rust/tinyexpression-rs/src/lib.rs','-o',out/'libtinyexpression_rs.rlib'])
         run(['rustup','run','1.85.0','rustc','--edition=2021','--extern','unlaxer_runtime='+str(out/'libunlaxer_runtime.rlib'),'--extern','tinyexpression_rs='+str(out/'libtinyexpression_rs.rlib'),root/'examples/tinyexpression-production/probe.rs','-o',out/'probe'])
         expected=(fixture/'expected.tsv').read_text()
-        for language,command in [('java',['java','-cp',str(out)+os.pathsep+cp,'Probe']),('rust',[out/'probe'])]:
-            actual=run(command+[fixture,pathlib.Path(os.environ.get('JAVA_HOME','/usr')).joinpath('bin/java'),cp],timeout=180)
+        for language,command in [('java',java_command('java') + ['-cp',str(out)+os.pathsep+cp,'Probe']),('rust',[out/'probe'])]:
+            actual=run(command+[fixture,root/'scripts/ci/java-tmpdir/bin/java',cp],timeout=180)
             (out/(language+'.tsv')).write_text(actual)
             if actual!=expected:
                 print(''.join(difflib.unified_diff(expected.splitlines(True),actual.splitlines(True),fromfile='independent expected',tofile=language)));raise SystemExit(1)
         run(['rustup','run','1.85.0','rustc','--edition=2021','--extern','unlaxer_runtime='+str(out/'libunlaxer_runtime.rlib'),'--extern','tinyexpression_rs='+str(out/'libtinyexpression_rs.rlib'),root/'examples/tinyexpression-production/partial_probe.rs','-o',out/'partial-probe'])
         partial_expected=(fixture/'partial/expected.tsv').read_text()
-        for language,command in [('java',['java','-cp',str(out)+os.pathsep+cp,'PartialProbe']),('rust',[out/'partial-probe'])]:
-            actual=run(command+[fixture,pathlib.Path(os.environ.get('JAVA_HOME','/usr')).joinpath('bin/java'),cp],timeout=180)
+        for language,command in [('java',java_command('java') + ['-cp',str(out)+os.pathsep+cp,'PartialProbe']),('rust',[out/'partial-probe'])]:
+            actual=run(command+[fixture,root/'scripts/ci/java-tmpdir/bin/java',cp],timeout=180)
             (out/('partial-'+language+'.tsv')).write_text(actual)
             if actual!=partial_expected:
                 print(''.join(difflib.unified_diff(partial_expected.splitlines(True),actual.splitlines(True),fromfile='independent partial expected',tofile=language)));raise SystemExit(1)
-        compat=run(['java','-cp',str(out)+os.pathsep+cp,'Compatibility',fixture/'original.txt'])
+        compat=run(java_command('java') + ['-cp',str(out)+os.pathsep+cp,'Compatibility',fixture/'original.txt'])
         if compat!='UBNFC\t10\tPASS\nCLASSIC\t10\tPASS\n':raise SystemExit('public P4 facade mismatch: '+compat)
         (out/'compatibility.tsv').write_text(compat)
         print('PASS: current unlaxer '+version+('; bridge-only, compatibility tests skipped' if args.skip_build else '; 164 current-version compatibility tests')+'; pinned production parsers, both hosts, independent regions / diagnostics / queries / edits / snapshot guards; '+str(len(expected.splitlines()))+' observations per host')
