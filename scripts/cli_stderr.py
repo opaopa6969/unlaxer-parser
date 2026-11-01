@@ -19,6 +19,12 @@ import tempfile
 
 from cli_input_errors import permissions_apply, run, setup, snapshot
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -403,7 +409,7 @@ def blank_java_host(java, classpath, work):
     """Test-only batch host delegates every vector to the real CodegenMain.run."""
     env = dict(os.environ, LC_ALL='C.UTF-8')
     with tempfile.TemporaryFile() as errors:
-        process = subprocess.Popen([java, '-Djava.io.tmpdir=' + str(work), '-cp', classpath,
+        process = subprocess.Popen(java_command(java) + ['-Djava.io.tmpdir=' + str(work), '-cp', classpath,
                                     'org.unlaxer.dsl.CodegenBatchHost'], cwd=work, env=env,
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errors)
         lines = queue.Queue()
@@ -465,7 +471,7 @@ def main():
                                       [('java', host), ('rust', [args.rust])], evidence, corpus['trees'])
                 work.rmdir()
                 replacement_cases(direct_cases, Path(directory), [
-                    ('java', [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
+                    ('java', java_command(args.java) + ['-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
                     ('rust', [args.rust])], evidence, corpus['trees'])
             elif args.suite == 'blank':
                 work = Path(directory) / 'blank-argv'
@@ -475,10 +481,10 @@ def main():
             elif args.suite in ('regex', 'qualified', 'value'):
                 with blank_java_host(args.java, args.classpath, Path(directory)) as host:
                     exercise(cases, Path(directory), [('java', host), ('rust', [args.rust])], evidence, corpus.get('trees'),
-                             [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'])
+                             java_command(args.java) + ['-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'])
             else:
                 exercise(cases, Path(directory), [
-                    ('java', [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
+                    ('java', java_command(args.java) + ['-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
                     ('rust', [args.rust])], evidence, corpus.get('trees'))
         excluded = {entry['case'] for entry in evidence['excluded']}
         assert len(evidence['observations']) == sum(len(c['operations']) * (2 if args.suite == 'blank' else 4) for c in cases

@@ -126,7 +126,7 @@ public class NullableRepeatConformanceTest {
     }
     private String run(List<String> command,int expected) throws Exception {
         Path log=temporary.newFile().toPath();
-        var process=new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        var process=org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         if(!process.waitFor(180,TimeUnit.SECONDS)) {process.destroyForcibly();fail("timeout "+command);}
         String output=Files.readString(log);
         if(expected==0) assertEquals(command+"\n"+output,0,process.exitValue());

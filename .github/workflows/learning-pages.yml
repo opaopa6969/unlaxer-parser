@@ -31,6 +31,15 @@ jobs:
       RUSTUP_TOOLCHAIN: '1.85.0'
       CARGO_INCREMENTAL: '0'
     steps:
+      - name: Select job temporary directory (#1045)
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
+          MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+        run: |
+          printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -70,6 +79,15 @@ jobs:
     # fail, the second one decides the job. Both are safe to repeat: configure-pages only reads
     # the site, and deploy-pages can only publish the artifact this run uploaded.
     steps:
+      - name: Select job temporary directory (#1045)
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
+          MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+        run: |
+          printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
       - uses: actions/configure-pages@v5
         id: configure
         continue-on-error: true

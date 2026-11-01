@@ -10,6 +10,12 @@ import re
 import subprocess
 import sys
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 ROOT = Path(__file__).resolve().parents[1]
 DATA = "docs/java-api-rust-parity.json"
 DOCUMENT = "docs/java-api-rust-parity.md"
@@ -41,7 +47,7 @@ def source_paths(root):
 def inventory(root, paths=None):
     java_home = os.environ.get("JAVA_HOME")
     java = str(Path(java_home) / "bin/java") if java_home else "java"
-    result = subprocess.run([java, str(ROOT / "scripts/JavaParserApiInventory.java"),
+    result = subprocess.run(java_command(java) + [str(ROOT / "scripts/JavaParserApiInventory.java"),
                              *map(str, source_paths(root) if paths is None else paths)],
                             capture_output=True, text=True, timeout=90)
     if result.returncode:

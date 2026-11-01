@@ -333,7 +333,7 @@ public class NestedAutoEvalConformanceTest {
     private String run(List<String> args) throws Exception {
         Path log = temporary.newFile("command-" + command++ + ".log").toPath();
         var process =
-                new ProcessBuilder(args)
+                org.unlaxer.dsl.TestProcesses.builder(args)
                         .directory(repo.toFile())
                         .redirectErrorStream(true)
                         .redirectOutput(log.toFile())

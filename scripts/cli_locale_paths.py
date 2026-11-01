@@ -15,6 +15,12 @@ from ubnf_credentials_home import batch_cli, compile_passwd_shim, isolated_env, 
 from ubnf_package_credentials import TOKEN, local_tls
 from ubnf_package_json import encode
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / 'spec-corpus/cli-locale-paths.json'
 LOCALES = (None, 'C', 'C.UTF-8')
@@ -174,7 +180,7 @@ def batch(stack, java, env, cwd, unbatched):
 def check(directory, args, evidence):
     shim = compile_passwd_shim(directory)
     cases, trees = fixtures()
-    java = [args.java, '-Djava.io.tmpdir=' + str(directory), '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']
+    java = java_command(args.java) + ['-Djava.io.tmpdir=' + str(directory), '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']
     # The TLS response is raw UTF-8 text too: the raw cache must keep its bytes.
     with local_tls(directory, ARTIFACT) as (origin, ca, received):
         for lc_all in LOCALES:

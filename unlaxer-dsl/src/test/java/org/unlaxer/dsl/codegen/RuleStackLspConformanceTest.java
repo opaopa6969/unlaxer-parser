@@ -86,7 +86,7 @@ public class RuleStackLspConformanceTest {
             assertTrue(errors.toString(), compiled);
         }
         String javaExecutable = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        return new Wire(new ProcessBuilder(javaExecutable, "-cp",
+        return new Wire(org.unlaxer.dsl.TestProcesses.builder(javaExecutable, "-cp",
                 classes + File.pathSeparator + System.getProperty("java.class.path"),
                 packageName + ".DiagnosticMain")
                 .redirectError(temporary.newFile("java-stderr-" + fixture.name() + ".log")).start());
@@ -122,7 +122,7 @@ public class RuleStackLspConformanceTest {
         Files.writeString(project.resolve("src/main.rs"),
             "mod generated; fn main() { std::process::exit(generated::lsp::serve_stdio_status().unwrap()); }\n");
         run(List.of("cargo", "build", "--quiet", "--offline", "--manifest-path", project.resolve("Cargo.toml").toString()));
-        return new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/" + crate).toString())
+        return new Wire(org.unlaxer.dsl.TestProcesses.builder(ROOT.resolve("rust/target/debug/" + crate).toString())
                 .redirectError(temporary.newFile("rust-stderr-" + fixture.name() + ".log")).start());
     }
 
@@ -194,7 +194,7 @@ public class RuleStackLspConformanceTest {
     }
 
     private void run(List<String> command) throws Exception {
-        var builder = new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true);
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).directory(ROOT.toFile()).redirectErrorStream(true);
         builder.environment().put("CARGO_INCREMENTAL", "0");
         builder.environment().put("CARGO_TARGET_DIR", ROOT.resolve("rust/target").toString());
         Path log = temporary.newFile().toPath();

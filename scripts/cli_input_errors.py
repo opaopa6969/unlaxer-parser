@@ -9,6 +9,12 @@ import stat
 import subprocess
 import tempfile
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 ROOT = Path(__file__).resolve().parents[1]
 OPERATIONS = ('inspect', 'check', 'generate', 'playground')
 MODULE_REPORT = ('{"schemaVersion":1,"target":"rust","portable":false,"structure":"blocked",'
@@ -184,7 +190,7 @@ def main():
     try:
         with tempfile.TemporaryDirectory(prefix='cli-input-', dir=os.environ.get('TMPDIR')) as directory:
             exercise(cases, Path(directory), [
-                ('java', [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
+                ('java', java_command(args.java) + ['-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']),
                 ('rust', [args.rust])], evidence)
         assert len(evidence['observations']) == sum(len(c.get('operations', OPERATIONS)) * 4 for c in cases) - len(evidence['excluded']) * 16
     finally:

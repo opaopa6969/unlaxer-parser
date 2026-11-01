@@ -14,6 +14,15 @@ jobs:
       RUSTUP_TOOLCHAIN: '1.85.0'
       CARGO_INCREMENTAL: '0'
     steps:
+      - name: Select job temporary directory (#1045)
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
+          MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+        run: |
+          printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:

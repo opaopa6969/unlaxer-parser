@@ -287,7 +287,7 @@ public class SuccessMemoBudgetConformanceTest {
                 "\n$ " + String.join(" ", command) + "\n",
                 java.nio.file.StandardOpenOption.CREATE,
                 java.nio.file.StandardOpenOption.APPEND);
-        var builder = new ProcessBuilder(command);
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command);
         builder.environment().remove("UNLAXER_TEST_FAILURE_BUDGET_EVIDENCE");
         builder.environment().remove("UNLAXER_TEST_SUCCESS_BUDGET_EVIDENCE");
         builder.environment().putAll(environment);

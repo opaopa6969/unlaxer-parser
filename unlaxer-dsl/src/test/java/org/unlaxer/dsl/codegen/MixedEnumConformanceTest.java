@@ -592,7 +592,7 @@ public class MixedEnumConformanceTest {
     private String run(List<String> command, String input) throws Exception {
         Path output = temporary.newFile().toPath();
         var process =
-                new ProcessBuilder(command)
+                org.unlaxer.dsl.TestProcesses.builder(command)
                         .redirectErrorStream(true)
                         .redirectOutput(output.toFile())
                         .start();

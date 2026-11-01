@@ -231,7 +231,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
-                    <argLine>--enable-preview</argLine>
+                    <argLine>--enable-preview ${unlaxer.test.jvmArgs}</argLine>
                 </configuration>
             </plugin>
 

@@ -98,7 +98,7 @@ public class SemanticModelConformanceTest {
     }
     static String run(List<String> command,Path cwd) throws Exception {
         var output=Files.createTempFile(cwd,"output-",".txt");
-        var process=new ProcessBuilder(command).directory(cwd.toFile()).redirectErrorStream(true).redirectOutput(output.toFile()).start();
+        var process=org.unlaxer.dsl.TestProcesses.builder(command).directory(cwd.toFile()).redirectErrorStream(true).redirectOutput(output.toFile()).start();
         if(!process.waitFor(120,TimeUnit.SECONDS)) { process.destroyForcibly(); fail("timeout: "+command); }
         String result=Files.readString(output);assertEquals(command+"\n"+result,0,process.exitValue());return result;
     }

@@ -9,6 +9,9 @@ import subprocess
 import tempfile
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+from java_tmp import java_command
+
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 TARGET = HERE / "target"
@@ -29,9 +32,9 @@ def build():
     classes = TARGET / "classes"
     classes.mkdir(exist_ok=True)
     generated = TARGET / "generated-java"
-    command(["javac", "--release", "17", "-cp", cp, "-d", classes, HERE / "java/Generate.java"])
-    command(["java", "-cp", os.pathsep.join([str(classes), cp]), "Generate", HERE / "address.ubnf", generated])
-    command(["javac", "--release", "17", "-cp", cp, "-d", classes,
+    command(java_command('javac') + ["--release", "17", "-cp", cp, "-d", classes, HERE / "java/Generate.java"])
+    command(java_command('java') + ["-cp", os.pathsep.join([str(classes), cp]), "Generate", HERE / "address.ubnf", generated])
+    command(java_command('javac') + ["--release", "17", "-cp", cp, "-d", classes,
              *sorted(generated.glob("*.java")), *sorted(p for p in (HERE / "java").glob("*.java") if p.name != "Generate.java")])
     (TARGET / "classpath.txt").write_text(os.pathsep.join([str(classes), cp]))
     command(["cargo", "run", "--quiet", "--locked", "--manifest-path", REPO / "rust/Cargo.toml", "-p", "unlaxer-generator", "--",
@@ -41,7 +44,7 @@ def build():
 
 def executable(host):
     if host == "java":
-        return ["java", "-cp", (TARGET / "classpath.txt").read_text(), "example.resolvers.Main"]
+        return java_command('java') + ["-cp", (TARGET / "classpath.txt").read_text(), "example.resolvers.Main"]
     return [str(HERE / "rust/target/debug/resolver-tutorial")]
 
 
@@ -70,7 +73,7 @@ def check():
                 assert actual == case["expected"], (case["name"], host, case["expected"], actual)
                 report.append("\t".join([case["name"], host, str(result.returncode),
                                          json.dumps(case["expected"], ensure_ascii=False), json.dumps(actual, ensure_ascii=False)]))
-    command(["java", "-cp", (TARGET / "classpath.txt").read_text(), "example.resolvers.SnapshotCheck"])
+    command(java_command('java') + ["-cp", (TARGET / "classpath.txt").read_text(), "example.resolvers.SnapshotCheck"])
     command(["cargo", "test", "--quiet", "--locked", "--manifest-path", HERE / "rust/Cargo.toml"])
     (TARGET / "conformance.tsv").write_text("\n".join(report) + "\n", encoding="utf-8")
     print(f"{len(fixtures)} cases × Java / Rust: OK")

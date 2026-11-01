@@ -474,7 +474,7 @@ public class RustNativeGeneratorTest {
     private record Result(int code, String output) {}
     private Result command(List<String> args, boolean withoutJava) throws Exception {
         Path log = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(args).redirectErrorStream(true).redirectOutput(log.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(args).redirectErrorStream(true).redirectOutput(log.toFile());
         if (withoutJava) {
             builder.environment().put("PATH", "");
             builder.environment().put("JAVA_HOME", "/nonexistent-unlaxer-java");

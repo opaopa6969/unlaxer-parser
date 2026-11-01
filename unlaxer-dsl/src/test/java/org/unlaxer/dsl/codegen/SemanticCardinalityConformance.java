@@ -264,7 +264,7 @@ final class SemanticCardinalityConformance {
     private record Result(int code, String output) {}
     private Result run(List<String> command, String input) throws Exception {
         Path log = Files.createTempFile(root, "process", ".log");
-        Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        Process process = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {
             try (var stdin = process.getOutputStream()) { stdin.write(input.getBytes(StandardCharsets.UTF_8)); }
             assertTrue(command.toString(), process.waitFor(60, TimeUnit.SECONDS));

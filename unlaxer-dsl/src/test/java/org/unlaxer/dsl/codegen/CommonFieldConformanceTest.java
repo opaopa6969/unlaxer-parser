@@ -377,7 +377,7 @@ public class CommonFieldConformanceTest {
             throws Exception {
         Path log = temporary.newFile().toPath();
         var builder =
-                new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
+                org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         if (withoutJava) {
             builder.environment().put("PATH", "");
             builder.environment().put("JAVA_HOME", "/missing-java");

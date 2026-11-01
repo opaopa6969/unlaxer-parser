@@ -12,6 +12,12 @@ from ubnf_credentials_home import batch_cli, compile_passwd_shim, isolated_env, 
 from ubnf_package_credentials import ROOT, TLS_ERROR, local_tls, receipt
 from ubnf_package_json import digest, encode, lock_bytes, reset, snapshot
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 COUNT = 41
 # Only dummy values; never include these in errors, receipts or logs.
 TOKENS = {label: 'location-fixture-only-' + label for label in
@@ -62,7 +68,7 @@ def check(directory, args, records):
     probe.write_text('public class HomeProbe { public static void main(String[] a) { '
                      'System.out.println(System.getProperty("java.specification.version")); '
                      'System.out.print(System.getProperty("user.home")); } }\n')
-    result = subprocess.run([str(Path(args.java).with_name('javac')), str(probe)],
+    result = subprocess.run(java_command(str(Path(args.java).with_name('javac'))) + [str(probe)],
                             capture_output=True, timeout=30)
     assert result.returncode == 0, 'home oracle compilation failed'
     artifact = (ROOT / 'unlaxer-dsl/src/main/resources/ubnf-packages/std-layout-1.0.0.json').read_bytes()
@@ -111,7 +117,7 @@ def check(directory, args, records):
             property_value = case.get('property')
             property_path = '' if property_value == 'empty' else str(homes['property'])
             properties = [] if property_value is None else ['-Duser.home=' + property_path]
-            probe_result = subprocess.run([args.java] + properties + ['-cp', str(directory), 'HomeProbe'],
+            probe_result = subprocess.run(java_command(args.java) + properties + ['-cp', str(directory), 'HomeProbe'],
                                           env=env, cwd=folder, capture_output=True, timeout=15)
             assert probe_result.returncode == 0, 'Java home oracle failed'
             jdk, actual_home = probe_result.stdout.decode().split('\n', 1)
@@ -136,7 +142,7 @@ def check(directory, args, records):
             grammar = project / 'main.ubnf'
             grammar.write_text("grammar Main { @import layout from 'pkg:std/layout' @ubnf: v2 "
                                "@root @mapping(Value) Start ::= 'a'; }\n")
-            java = [args.java, '--enable-preview'] + properties + [
+            java = java_command(args.java) + ['--enable-preview'] + properties + [
                 '-Djava.io.tmpdir=' + str(directory), '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain']
             commands = [('java', java, env)]
             if args.rust:

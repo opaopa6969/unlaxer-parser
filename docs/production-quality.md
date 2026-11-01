@@ -262,3 +262,34 @@ DAPはAST/token inspectionであり、live evaluatorの停止・再開ではな�
 監査で再現したJavaのFIRST誤判定（`k`と`K`が診断policyによって不一致になる）も修正する。
 この追加は上記3.3.0配布記録の検証対象には含まれず、公開済み3.3.0には入っていない。
 新しい共通fixture、Java17/21の生成parser検証、Unicode表の再生成checkを継続CIへ追加する。
+
+### CI の一時領域（#1045）
+
+全 workflow は各 job の最初の step で `TMPDIR` / `TMP` / `TEMP` を `${{ runner.temp }}` に向け、
+`GITHUB_ENV` で後続 action / step へ引き継ぐ（runner context は job env では使えない）。
+checkout・toolchain setup・Python `tempfile`・shell `mktemp`・cargo/rustc・Node の
+`os.tmpdir()` も runner の work disk を使う。build 成果物の `target/`、npm/cargo の
+依存 cache、job 専用 Maven repository の既存の配置はそのままとする。
+Maven 本体には `MAVEN_OPTS` で `java.io.tmpdir` と `unlaxer.test.tmpdir` を渡し、親 POM の
+opt-in profile が Surefire の `argLine` へ起動前に渡す。JDK が一時パスを早期に cache
+するため `systemPropertyVariables` だけでは不十分。既存の preview 引数は維持し、
+追加の `unlaxer.test.jvmArgs` を連結する（既存の JaCoCo / `@{argLine}` 設定はない）。
+property 未指定のローカル実行では OS 既定値を維持する。
+
+JVM property は子 JVM に自動継承されないため、DSL のテストは `TestProcesses.builder` で
+`java` / `javac` へ明示的に渡す。Python の Java 起動には `java_tmp.java_command` を使い、
+さらに起動する provider のテスト用 command にも渡す。native fixture が実行ファイルパスだけを
+受け取る箇所は、`unlaxer.test.tmpdir`（Python は `TMPDIR`）があるときだけ
+`scripts/ci/java-tmpdir/bin/java` を渡し、未指定のローカル実行では実行中の JDK の `java` のままとする。
+wrapper は `UNLAXER_TEST_JAVA`（`TestProcesses.builder` が実行中の JDK を設定）を優先し、無ければ PATH の `java` を使う。`JAVA_TOOL_OPTIONS` / `_JAVA_OPTIONS` /
+`JDK_JAVA_OPTIONS` は stderr の launcher notice が conformance を壊すため使わない。
+downstream の固定 POM は変更せず、Surefire の `jvm` に同 launcher を指定して既存の
+`argLine`（preview / add-opens）を維持する。
+静的解析の forked javac は `-J-Djava.io.tmpdir`、SpotBugs は `jvmArgs` で Maven の一時領域を引き継ぐ。
+Javadoc は `MAVEN_OPTS` の `additionalJOption` から `-J-Djava.io.tmpdir` を渡すため、
+親 POM を継承しない固定 downstream の package / install も対象になる。
+fixture が意図的に指定する `java.io.tmpdir` は後置し、その失敗条件を優先する。
+
+検証は JDK17/21 の関係 conformance と `CiTempDirectoryTest`、Python tests、各プロセスの
+`mkdir` syscall 記録で行う。共有 `/tmp` の全体差分は他 job の作成を誤検知するため gate に
+しない。merge 後の master CI 3連続成功を確認するまで #1045 は close しない。

@@ -422,7 +422,7 @@ public class MultiGrammarConformanceTest {
     }
     private Run command(List<String> args, boolean noJava) throws Exception {
         Path log = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(args).redirectErrorStream(true).redirectOutput(log.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(args).redirectErrorStream(true).redirectOutput(log.toFile());
         builder.environment().put("CARGO_INCREMENTAL", "0");
         if (noJava) { builder.environment().put("PATH", ""); builder.environment().put("JAVA_HOME", "/no-java"); }
         var process = builder.start();
