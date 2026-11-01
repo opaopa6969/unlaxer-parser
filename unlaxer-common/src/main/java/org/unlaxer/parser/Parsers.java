@@ -14,7 +14,9 @@ public class Parsers implements List<Parser>  , Serializable{
 	
 	List<Parser> parsers;
 	List<Supplier<? extends Parser>> parserSuppliers;
-	
+	/** Set while {@link #supply} runs the suppliers, so a supplier reading this list fails (#1014). */
+	private transient boolean supplying;
+
 	public Parsers(List<Class<? extends Parser>> parsers) {
 		super();
 		parserSuppliers = new ArrayList<Supplier<? extends Parser>>();
@@ -65,12 +67,33 @@ public class Parsers implements List<Parser>  , Serializable{
 		if(parsers != null) {
 			return parsers;
 		}
-		parsers = new ArrayList<Parser>();
-		for (Supplier<? extends Parser> supplier : parserSuppliers) {
-			Parser parser = supplier.get();
-			this.parsers.add(parser);
+		return supply();
+	}
+
+	/**
+	 * Runs every supplier in declaration order into a local list and publishes it only when all of
+	 * them returned (#1014). A supplier that throws publishes nothing, so the next access runs every
+	 * supplier again instead of returning the children built so far. A supplier that reads this list
+	 * while it is being supplied gets an IllegalStateException: before #1014 it saw the children built
+	 * so far. Without the check the read would run every supplier again inside the first run, whose
+	 * list then replaces the nested one (each supplier called twice), or recurse without bound when
+	 * every call reads.
+	 */
+	private List<Parser> supply(){
+		if(supplying) {
+			throw new IllegalStateException("a supplier of these Parsers read them before they were supplied");
 		}
-		return parsers;
+		supplying = true;
+		try {
+			List<Parser> supplied = new ArrayList<Parser>();
+			for (Supplier<? extends Parser> supplier : parserSuppliers) {
+				supplied.add(supplier.get());
+			}
+			parsers = supplied;
+			return supplied;
+		} finally {
+			supplying = false;
+		}
 	}
 	
 	/**

@@ -711,7 +711,8 @@ impl LazyBody {
     }
 }
 
-/// List's body in the graph whose LazyBody the context carries.
+/// The lazily built expression of the graph whose LazyBody the context carries: List's body, or
+/// Elem's alternatives in a supplied graph (#1014).
 fn lazy_list_body(context: &mut ParseContext<'_>) -> ParseResult {
     let body = Arc::clone(
         context
@@ -923,6 +924,190 @@ fn delegate_prefix(grammar: &SharedGrammar, body: &Arc<LazyBody>, input: &str) -
     context.set_state(LAZY_BODY, Arc::clone(body));
     let parsed = context.parse_shared_grammar(grammar, LIST, false);
     format!("{}/{}", parsed.is_ok(), context.position())
+}
+
+// ---- lazy children supplied into one list (#1014)
+
+const FIRST_SUPPLY_FAILS: &str = "first supply fails";
+
+/// The calls of Java's counted suppliers. A Rust grammar is immutable: the suppliers run into a
+/// local Vec that is published into a OnceLock only when every one of them returned, so a failure
+/// drops the children built so far instead of publishing them.
+struct Supplied {
+    calls: Vec<AtomicUsize>,
+}
+
+impl Supplied {
+    fn new(count: usize) -> Arc<Self> {
+        Arc::new(Supplied {
+            calls: (0..count).map(|_| AtomicUsize::new(0)).collect(),
+        })
+    }
+
+    /// Counts one call of supplier `index`; whether it is the second supplier's first call.
+    fn first_of_second(&self, index: usize) -> bool {
+        self.calls[index].fetch_add(1, Ordering::SeqCst) == 0 && index == 1
+    }
+
+    fn calls(&self) -> String {
+        self.calls
+            .iter()
+            .map(|calls| calls.load(Ordering::SeqCst).to_string())
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+}
+
+/// Java's children A ::= 'a', B ::= 'b', C ::= 'c' in declaration order.
+fn abc(index: usize) -> Expr {
+    w(["a", "b", "c"][index])
+}
+
+fn children(expression: &Expr) -> &[Expr] {
+    match expression {
+        Expr::Sequence(children) | Expr::Choice(children) => children,
+        other => panic!("not a child list: {other:?}"),
+    }
+}
+
+fn same<T>(first: &T, second: &T) -> &'static str {
+    if std::ptr::eq(first, second) {
+        "same"
+    } else {
+        "distinct"
+    }
+}
+
+/// shared-graph.tsv's grammar with Elem's alternatives supplied into a LazyBody: the second
+/// supplier ('é') fails on its first call without a panic message (resume_unwind).
+fn supplied_graph(variant: &str) -> (SharedGrammar, Arc<LazyBody>, Arc<Supplied>) {
+    let rules = |reference: &dyn Fn(&str) -> Expr| {
+        vec![
+            rule("List", seq([reference("Elem").repeat_java(0, None)])),
+            rule("Elem", Expr::Custom(lazy_list_body)),
+            rule("Top", seq([reference("List"), w("!")])),
+        ]
+    };
+    let (grammar, list): (SharedGrammar, fn() -> Expr) = match variant {
+        "rule-names" => {
+            let names = RuleNames::new(LIST_NAMES).unwrap();
+            let grammar = names
+                .share(rules(&|name| names.reference_or_never(name)))
+                .unwrap();
+            (grammar, || {
+                RuleNames::new(LIST_NAMES)
+                    .unwrap()
+                    .reference_or_never("List")
+            })
+        }
+        "predicate-position" => (share_grammar(rules(&list_position)), || {
+            list_position("List")
+        }),
+        _ => unreachable!("{variant}"),
+    };
+    let supplied = Supplied::new(3);
+    let counted = Arc::clone(&supplied);
+    let body = LazyBody::new(move |_| {
+        Expr::choice((0..3).map(|index| {
+            if counted.first_of_second(index) {
+                std::panic::resume_unwind(Box::new(FIRST_SUPPLY_FAILS));
+            }
+            match index {
+                0 => seq([w("("), list(), w(")")]),
+                1 => w("é"),
+                _ => w("😀"),
+            }
+        }))
+    });
+    (grammar, body, supplied)
+}
+
+/// lazy-children first use in shared-graph.tsv (#1014): THREADS threads, each parsing every row in
+/// two contexts, start together on a graph nobody used yet whose Elem alternatives are supplied on
+/// first use; the second supplier fails on its first call. Exactly one parse gets that failure,
+/// every other parse matches its row, and the published list holds all three alternatives.
+#[test]
+fn concurrent_first_uses_of_lazy_children_publish_only_the_complete_list() {
+    let graph_rows = rows(
+        include_str!("../../../conformance/parser-construction/shared-graph.tsv"),
+        8,
+    );
+    const CONTEXTS: usize = 2;
+    const VARIANTS: [&str; 2] = ["rule-names", "predicate-position"];
+    let failures = Mutex::new(Vec::new());
+    let parses = AtomicUsize::new(0);
+    for round in 0..ROUNDS {
+        let graphs: Vec<_> = VARIANTS
+            .iter()
+            .map(|variant| (*variant, supplied_graph(variant), AtomicUsize::new(0)))
+            .collect();
+        let barrier = Barrier::new(THREADS);
+        std::thread::scope(|scope| {
+            for thread in 0..THREADS {
+                let (graph_rows, graphs) = (&graph_rows, &graphs);
+                let (barrier, failures, parses) = (&barrier, &failures, &parses);
+                scope.spawn(move || {
+                    barrier.wait();
+                    let shift = if thread % 2 == 0 { 0 } else { thread };
+                    let mut mode = thread + round;
+                    let mut local = Vec::new();
+                    for (label, (grammar, body, _), supply_failures) in graphs {
+                        for row in 0..graph_rows.len() {
+                            let c = &graph_rows[(row + shift) % graph_rows.len()];
+                            for context in 0..CONTEXTS {
+                                let (memo, diagnostics) = MODES[mode % MODES.len()];
+                                mode += 1;
+                                let label = format!(
+                                    "{}/{label}/{memo:?}/{diagnostics:?}/thread{thread}/context{context}/round{round}",
+                                    c[0]
+                                );
+                                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                    graph_observation(grammar, Some(body), c, memo, diagnostics)
+                                })) {
+                                    Ok(None) => {}
+                                    Ok(Some(mismatch)) => local.push(format!("{label}{mismatch}")),
+                                    Err(payload) => {
+                                        if payload.downcast_ref::<&str>() == Some(&FIRST_SUPPLY_FAILS) {
+                                            supply_failures.fetch_add(1, Ordering::SeqCst);
+                                        } else {
+                                            local.push(format!("{label}: panicked"));
+                                        }
+                                    }
+                                }
+                                parses.fetch_add(1, Ordering::SeqCst);
+                            }
+                        }
+                    }
+                    failures.lock().unwrap().extend(local);
+                });
+            }
+        });
+        for (label, (_, body, supplied), supply_failures) in &graphs {
+            let actual = format!(
+                "{};{};{}",
+                supply_failures.load(Ordering::SeqCst),
+                supplied.calls(),
+                body.cell.get().map_or(0, |built| children(built).len())
+            );
+            if actual != "1;2/2/1;3" {
+                failures
+                    .lock()
+                    .unwrap()
+                    .push(format!("{label}/round{round} properties: {actual}"));
+            }
+        }
+    }
+    let failures = failures.into_inner().unwrap();
+    assert!(
+        failures.is_empty(),
+        "{} failures\n{}",
+        failures.len(),
+        failures[..failures.len().min(20)].join("\n")
+    );
+    assert_eq!(
+        parses.load(Ordering::SeqCst),
+        THREADS * ROUNDS * VARIANTS.len() * graph_rows.len() * CONTEXTS
+    );
 }
 
 // ---- construction and identity observations
@@ -1267,6 +1452,91 @@ fn observe(id: &str) -> String {
                 assert_eq!(prefix(lazy(), 0, "a"), "true/1");
             }
             LAZY_BUILDS.load(Ordering::SeqCst).to_string()
+        }
+        "lazy-children-failure-retried" => {
+            let supplied = Supplied::new(3);
+            let cell = OnceLock::new();
+            let get = || -> Result<&Expr, &'static str> {
+                if let Some(children) = cell.get() {
+                    return Ok(children);
+                }
+                let children = (0..3)
+                    .map(|index| {
+                        if supplied.first_of_second(index) {
+                            Err(FIRST_SUPPLY_FAILS)
+                        } else {
+                            Ok(abc(index))
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(cell.get_or_init(|| Expr::sequence(children)))
+            };
+            let first = match get() {
+                Ok(built) => expression_prefix(built, "abc"),
+                Err(_) => "error".into(),
+            };
+            let built = get().unwrap();
+            format!(
+                "{first};{};{};{}",
+                expression_prefix(built, "abc"),
+                children(built).len(),
+                supplied.calls()
+            )
+        }
+        "lazy-children-error-retried" => {
+            let supplied = Supplied::new(3);
+            let cell = OnceLock::new();
+            let get = || {
+                cell.get_or_init(|| {
+                    Expr::sequence((0..3).map(|index| {
+                        if supplied.first_of_second(index) {
+                            std::panic::resume_unwind(Box::new(FIRST_SUPPLY_FAILS));
+                        }
+                        abc(index)
+                    }))
+                })
+            };
+            let first = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                expression_prefix(get(), "abc")
+            }));
+            let first = first.unwrap_or_else(|_| "error".into());
+            format!(
+                "{first};{};{};{}",
+                expression_prefix(get(), "abc"),
+                children(get()).len(),
+                supplied.calls()
+            )
+        }
+        "lazy-children-empty" => {
+            let cell = OnceLock::new();
+            let built = cell.get_or_init(|| Expr::sequence([]));
+            format!(
+                "{};{};{}",
+                expression_prefix(built, ""),
+                children(built).len(),
+                same(cell.get().unwrap(), cell.get().unwrap())
+            )
+        }
+        "lazy-children-published-once" => {
+            let supplied = Supplied::new(3);
+            let cell = OnceLock::new();
+            let get = || {
+                cell.get_or_init(|| {
+                    Expr::sequence((0..3).map(|index| {
+                        supplied.first_of_second(index);
+                        abc(index)
+                    }))
+                })
+            };
+            for _ in 0..3 {
+                assert_eq!(expression_prefix(get(), "abc"), "true/3");
+            }
+            format!(
+                "{};{};{}",
+                supplied.calls(),
+                same(get(), get()),
+                same(&children(get())[1], &children(get())[1])
+            )
         }
         "shared-graph-independent-contexts" => {
             let grammar = shared();
@@ -1662,7 +1932,7 @@ fn construction_and_identity_observations_match_the_shared_table() {
         include_str!("../../../conformance/parser-construction/construction.tsv"),
         4,
     );
-    assert_eq!(rows.len(), 65);
+    assert_eq!(rows.len(), 72);
     let ids: HashSet<_> = rows.iter().map(|row| row[0]).collect();
     assert_eq!(ids.len(), rows.len());
     let mut failures = Vec::new();

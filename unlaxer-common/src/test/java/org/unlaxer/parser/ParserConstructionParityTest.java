@@ -757,6 +757,201 @@ public class ParserConstructionParityTest {
     });
   }
 
+  // ---- lazy children supplied into one retained Parsers (#1014)
+
+  /** Runs before a supplier's build with the supplier's index and its number of earlier calls. */
+  private interface SupplyHook {
+    void before(int index, int earlierCalls);
+  }
+
+  /**
+   * One Parsers of counted suppliers that a lazy parser keeps and returns from getLazyParsers, so
+   * every first use prepares the same instance (Rust: a OnceLock beside the grammar).
+   */
+  private static final class Supplied {
+    final List<AtomicInteger> calls = new ArrayList<>();
+    final Parsers parsers;
+
+    @SuppressWarnings("unchecked")
+    Supplied(List<Supplier<Parser>> builds, SupplyHook hook) {
+      Supplier<Parser>[] suppliers = new Supplier[builds.size()];
+      for (int index = 0; index < builds.size(); index++) {
+        int supplier = index;
+        AtomicInteger counter = new AtomicInteger();
+        calls.add(counter);
+        suppliers[index] = () -> {
+          hook.before(supplier, counter.getAndIncrement());
+          return builds.get(supplier).get();
+        };
+      }
+      parsers = new Parsers(suppliers);
+    }
+
+    String calls() {
+      return calls.stream().map(String::valueOf).collect(Collectors.joining("/"));
+    }
+  }
+
+  /** Children A ::= 'a', B ::= 'b', C ::= 'c' in declaration order. */
+  private static Supplied abc(SupplyHook hook) {
+    return new Supplied(List.of(() -> new NamedChain("A", w("a")), () -> new NamedChain("B", w("b")),
+        () -> new NamedChain("C", w("c"))), hook);
+  }
+
+  /** abc's second supplier fails on its first call; the owner parses abc twice. */
+  private static String suppliedFailureRetried(Runnable failure) {
+    Supplied supplied = abc((index, earlierCalls) -> {
+      if (index == 1 && earlierCalls == 0) {
+        failure.run();
+      }
+    });
+    Parser owner = new SupplierChain("Abc", () -> supplied.parsers);
+    String first;
+    try {
+      first = parse(owner, "abc");
+    } catch (IllegalStateException | AssertionError expected) {
+      first = "error";
+    }
+    return first + ";" + parse(owner, "abc") + ";" + owner.getChildren().size() + ";" + supplied.calls();
+  }
+
+  private static final String FIRST_SUPPLY_FAILS = "first supply fails";
+
+  /** A named lazy choice that returns one retained Parsers, found by name and by predicate. */
+  static final class RetainedChoice extends LazyChoice implements GrammarRule {
+    private static final long serialVersionUID = 1L;
+    private final String ruleName;
+    private final transient Parsers children;
+
+    RetainedChoice(String ruleName, Parsers children) {
+      super(Name.of(ruleName));
+      this.ruleName = ruleName;
+      this.children = children;
+    }
+
+    @Override
+    public Parsers getLazyParsers() {
+      return children;
+    }
+
+    @Override
+    public String grammarRuleName() {
+      return ruleName;
+    }
+  }
+
+  /**
+   * The shared-graph.tsv grammar whose Elem alternatives come from one retained Parsers. Lazy
+   * children get no parent, and a new Chain holding the List instance would become List's parent
+   * (shared-parent-last-writer), so the first supplier returns one Chain built with the graph,
+   * whose parent is Elem and whose reference to List takes the reference route.
+   */
+  private static final class SuppliedGraph {
+    final Supplied supplied;
+    final Map<String, Parser> rules = new LinkedHashMap<>();
+
+    SuppliedGraph(Function<String, Parser> reference) {
+      Parser parenthesized = new Chain(w("("), reference.apply("List"), w(")"));
+      supplied = new Supplied(List.of(() -> parenthesized, () -> w("é"), () -> w("😀")),
+          (index, earlierCalls) -> {
+            if (index == 1 && earlierCalls == 0) {
+              throw new IllegalStateException(FIRST_SUPPLY_FAILS);
+            }
+          });
+      Parser list = new NamedChain("List", new ZeroOrMore(reference.apply("Elem")));
+      Parser elem = new RetainedChoice("Elem", supplied.parsers);
+      parenthesized.setParent(elem);
+      Parser top = new NamedChain("Top", reference.apply("List"), w("!"));
+      new PseudoRootParser(new Parsers(list, elem, top));
+      rules.put("List", list);
+      rules.put("Elem", elem);
+      rules.put("Top", top);
+    }
+  }
+
+  private static final String SUPPLIED_ONCE = "1;2/2/1;3";
+
+  /**
+   * lazy-children first use in shared-graph.tsv (#1014): THREADS threads, each parsing every row in
+   * two contexts, start together on a graph nobody used yet whose Elem alternatives come from one
+   * retained Parsers; its second supplier throws on its first call. Exactly one parse gets that
+   * failure, every other parse matches its row, and the list holds all three alternatives.
+   */
+  @Test
+  public void concurrentFirstUsesOfLazyChildrenPublishOnlyTheCompleteList() throws Exception {
+    List<String[]> graphRows = rows("shared-graph.tsv", 8);
+    Memoization[] memos = Memoization.values();
+    ParseOptions.Diagnostics[] diagnostics = ParseOptions.Diagnostics.values();
+    int modes = memos.length * diagnostics.length;
+    int contexts = 2;
+    List<String> failures = java.util.Collections.synchronizedList(new ArrayList<>());
+    AtomicInteger parses = new AtomicInteger();
+    ExecutorService pool = Executors.newFixedThreadPool(THREADS);
+    try {
+      for (int round = 0; round < ROUNDS; round++) {
+        Map<String, SuppliedGraph> graphs = new LinkedHashMap<>();
+        Map<String, AtomicInteger> supplyFailures = new LinkedHashMap<>();
+        for (String variantName : REFERENCE_VARIANTS) {
+          graphs.put(variantName, new SuppliedGraph(reference(variantName)));
+          supplyFailures.put(variantName, new AtomicInteger());
+        }
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> threads = new ArrayList<>();
+        for (int thread = 0; thread < THREADS; thread++) {
+          int threadIndex = thread;
+          int roundIndex = round;
+          threads.add(pool.submit(() -> {
+            start.await();
+            int shift = threadIndex % 2 == 0 ? 0 : threadIndex;
+            int mode = threadIndex + roundIndex;
+            for (Map.Entry<String, SuppliedGraph> graph : graphs.entrySet()) {
+              for (int row = 0; row < graphRows.size(); row++) {
+                String[] c = graphRows.get((row + shift) % graphRows.size());
+                for (int context = 0; context < contexts; context++) {
+                  int index = mode++ % modes;
+                  Memoization memo = memos[index / diagnostics.length];
+                  ParseOptions.Diagnostics diagnostic = diagnostics[index % diagnostics.length];
+                  String label = c[0] + "/" + graph.getKey() + "/" + memo + "/" + diagnostic + "/thread"
+                      + threadIndex + "/context" + context + "/round" + roundIndex;
+                  try {
+                    graphObservation(label, graph.getValue().rules.get(c[1]), c, memo, diagnostic);
+                  } catch (IllegalStateException failure) {
+                    if (FIRST_SUPPLY_FAILS.equals(failure.getMessage())) {
+                      supplyFailures.get(graph.getKey()).incrementAndGet();
+                    } else {
+                      failures.add(label + ": " + failure);
+                    }
+                  } catch (AssertionError | RuntimeException failure) {
+                    failures.add(label + ": " + failure);
+                  }
+                  parses.incrementAndGet();
+                }
+              }
+            }
+            return null;
+          }));
+        }
+        start.countDown();
+        for (Future<?> thread : threads) {
+          thread.get(120, TimeUnit.SECONDS);
+        }
+        for (Map.Entry<String, SuppliedGraph> graph : graphs.entrySet()) {
+          SuppliedGraph value = graph.getValue();
+          String actual = supplyFailures.get(graph.getKey()).get() + ";" + value.supplied.calls() + ";"
+              + value.rules.get("Elem").getChildren().size();
+          if (false == actual.equals(SUPPLIED_ONCE)) {
+            failures.add(graph.getKey() + "/round" + round + " properties: " + actual);
+          }
+        }
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+    assertTrue(failures.size() + " failures\n" + String.join("\n", failures.subList(0, Math.min(20, failures.size()))),
+        failures.isEmpty());
+    assertEquals(THREADS * ROUNDS * REFERENCE_VARIANTS.size() * graphRows.size() * contexts, parses.get());
+  }
+
   /**
    * lazy-delegate first use in shared-graph.tsv: 8 threads, each parsing every row in two contexts,
    * start together on graphs whose delegate nobody used yet (first-use) and on graphs whose
@@ -1231,6 +1426,60 @@ public class ParserConstructionParityTest {
         }
         return String.valueOf(calls.get());
       }
+      case "lazy-children-failure-retried":
+        return suppliedFailureRetried(() -> {
+          throw new IllegalStateException(FIRST_SUPPLY_FAILS);
+        });
+      case "lazy-children-error-retried":
+        return suppliedFailureRetried(() -> {
+          throw new AssertionError(FIRST_SUPPLY_FAILS);
+        });
+      case "lazy-children-lookup-after-failure": {
+        Supplied supplied = abc((index, earlierCalls) -> {
+          if (index == 1 && earlierCalls == 0) {
+            throw new IllegalStateException(FIRST_SUPPLY_FAILS);
+          }
+        });
+        Parser owner = new SupplierChain("Abc", () -> supplied.parsers);
+        String first = failure(() -> owner.getParser(Name.of("B")));
+        Optional<Parser> found = owner.getParser(Name.of("B"));
+        Parser second = supplied.parsers.size() > 1 ? supplied.parsers.get(1) : null;
+        return first + ";" + (found.isPresent() ? "present" : "absent") + ";" + identity(found.orElse(null), second);
+      }
+      case "lazy-children-empty": {
+        Supplied supplied = new Supplied(List.of(), (index, earlierCalls) -> {
+        });
+        Parser owner = new SupplierChain("Empty", () -> supplied.parsers);
+        return parse(owner, "") + ";" + owner.getChildren().size() + ";"
+            + identity(supplied.parsers.list(), supplied.parsers.list());
+      }
+      case "lazy-children-published-once": {
+        Supplied supplied = abc((index, earlierCalls) -> {
+        });
+        Parser owner = new SupplierChain("Abc", () -> supplied.parsers);
+        for (int index = 0; index < 3; index++) {
+          assertEquals("true/3", parse(owner, "abc"));
+        }
+        return supplied.calls() + ";" + identity(supplied.parsers.list(), supplied.parsers.list()) + ";"
+            + identity(supplied.parsers.get(1), owner.getChildren().get(1));
+      }
+      case "lazy-children-null": {
+        Supplied supplied = new Supplied(List.of(() -> w("a"), () -> null), (index, earlierCalls) -> {
+        });
+        Parser owner = new SupplierChain("Null", () -> supplied.parsers);
+        return supplied.parsers.size() + ";" + supplied.parsers.get(1) + ";" + failure(() -> parse(owner, "a"));
+      }
+      case "lazy-children-reentrant": {
+        Parsers[] own = new Parsers[1];
+        Supplied supplied = abc((index, earlierCalls) -> {
+          if (index == 1 && earlierCalls == 0) {
+            own[0].size();
+          }
+        });
+        own[0] = supplied.parsers;
+        String first = failure(() -> supplied.parsers.size());
+        return first + ";" + supplied.parsers.size() + ";" + supplied.calls();
+      }
       case "shared-graph-independent-contexts": {
         Parser root = Parser.get(RootParser.class);
         return parse(root, "x!") + ";" + parse(root, "y") + ";" + parse(root, "x?");
@@ -1500,7 +1749,7 @@ public class ParserConstructionParityTest {
   @Test
   public void constructionAndIdentityObservationsMatchTheSharedTable() throws Exception {
     List<String[]> rows = rows("construction.tsv", 4);
-    assertEquals(65, rows.size());
+    assertEquals(72, rows.size());
     Set<String> ids = rows.stream().map(row -> row[0]).collect(Collectors.toSet());
     assertEquals(rows.size(), ids.size());
     List<String> failures = new ArrayList<>();

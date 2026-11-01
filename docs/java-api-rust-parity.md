@@ -1018,8 +1018,8 @@ memo 安全宣言は既存 [#184](https://github.com/opaopa6969/unlaxer-parser/i
 | [`parser.ParserPrinter`](../unlaxer-common/src/main/java/org/unlaxer/parser/ParserPrinter.java#L5) | type | 対応済み（記載した共通契約） | [rule-diagnostics](#rule-diagnostics) |
 | [`parser.ParserPrinter#get(Parser,OutputLevel)`](../unlaxer-common/src/main/java/org/unlaxer/parser/ParserPrinter.java#L7) | static | 対応済み（記載した共通契約） | [rule-diagnostics](#rule-diagnostics) |
 | [`parser.Parsers`](../unlaxer-common/src/main/java/org/unlaxer/parser/Parsers.java#L11) | type | 対応済み（記載した共通契約） | [construction](#construction) |
-| [`parser.Parsers#of(List<Parser>)`](../unlaxer-common/src/main/java/org/unlaxer/parser/Parsers.java#L87) | static | 対応済み（記載した共通契約） | [construction](#construction) |
-| [`parser.Parsers#of(Parser[])`](../unlaxer-common/src/main/java/org/unlaxer/parser/Parsers.java#L93) | static | 対応済み（記載した共通契約） | [construction](#construction) |
+| [`parser.Parsers#of(List<Parser>)`](../unlaxer-common/src/main/java/org/unlaxer/parser/Parsers.java#L110) | static | 対応済み（記載した共通契約） | [construction](#construction) |
+| [`parser.Parsers#of(Parser[])`](../unlaxer-common/src/main/java/org/unlaxer/parser/Parsers.java#L116) | static | 対応済み（記載した共通契約） | [construction](#construction) |
 | [`parser.ParsersSpecifier`](../unlaxer-common/src/main/java/org/unlaxer/parser/ParsersSpecifier.java#L8) | type | 対応済み（記載した共通契約） | [construction](#construction) |
 | [`parser.PositionedElements`](../unlaxer-common/src/main/java/org/unlaxer/parser/PositionedElements.java#L7) | type | 対応あり・全API共通検証なし | [context-results](#context-results) |
 | [`parser.PropagatableDestination`](../unlaxer-common/src/main/java/org/unlaxer/parser/PropagatableDestination.java#L9) | type | 対応済み（記載した共通契約） | [propagation-markers](#propagation-markers) |

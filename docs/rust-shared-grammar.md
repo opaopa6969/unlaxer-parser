@@ -103,6 +103,24 @@ Java の `Parser.get(Class)` / `Parser.get(Supplier)` / `newInstance`、lazy chi
   context が user state で共有する（`Expr::Custom` が初回に作る）。両言語とも shared-graph.tsv の行を
   first-use と凍結済みの両方で 8 thread × 各行 2 context × 40 round 照合し、作成が 1 回であること、
   作成中に止めた thread を別 context が待つことを検査する。
+- supplier で作る子の list（`new Parsers(Supplier...)`・`new Parsers(Class...)`）は、初めて読まれたときに
+  supplier を宣言順にすべて呼ぶ。#1014 から、結果はローカルの list に集め、全部が返ってから一度だけ公開する。
+  supplier が例外（`Error` を含む）を投げたら何も公開しないので、次に読むときは全 supplier をもう一度呼ぶ
+  （失敗より前の supplier も呼ばれる）。修正前は、失敗の前までに作った子を完成した list として返し、
+  grammar が黙って変わっていた。library と生成器は `getLazyParsers()` のたびに新しい `Parsers` を返すので、
+  この欠陥に当たるのは、利用者が同じ `Parsers` を持ち続けて返す場合（lazy 子の cache、同じ `Parsers` を
+  2 つのコンストラクタに渡す場合）である。supplier の中から同じ `Parsers` を読むと
+  `IllegalStateException` になる。修正前は作りかけの子が見えていた。公開を完成後に限ったまま再入を許すと、
+  再入した読み出しが全 supplier をもう一度呼び、その list を外側の list が置き換える（各 supplier が 2 回呼ばれる）。
+  毎回読む supplier なら際限なく再帰する。どちらも黙って成功させないため、明示的に失敗させる。null を返す supplier は、従来どおり
+  null の子として公開する（解析で `NullPointerException`）。初回の同時アクセスは従来どおり `Parsers` の
+  monitor で一つずつ進み、全部が返った list だけが見える。Rust の grammar は不変で、子の list は
+  ローカルの `Vec` に集めてから `OnceLock` に入れる。途中で `Err` を返したり panic したりすると、
+  その `Vec` は捨てられ、cell は空のまま残る。Rust の runtime は lazy 子の API を持たないので、両言語の比較は
+  利用者側のこの形（`OnceLock` と `Expr::Custom`）で行う。`OnceLock::get_or_init` の中から同じ cell を
+  再初期化しないこと（上記）が、Java の再入の失敗に当たる。construction.tsv の `lazy-children-*` と、
+  shared-graph.tsv の lazy-children first use（8 thread × 各行 2 context × 40 round、失敗はちょうど 1 回）で
+  照合する。
 - 並行 fixture の Rust 側は、Java の `parser.parse(context)` に合わせて最も外側を `ParseContext::parse`
   にし、その中で Classic の consumed mode に入る。最も外側を `parse_with_token_mode` にすると、成功した
   解析でも `rule_stack()` が投機的な失敗の stack を返す（#856 の残差。この迂回は共通 API の完了を
