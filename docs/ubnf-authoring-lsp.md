@@ -523,9 +523,7 @@ Gson/lsp4jのscalar変換・単一要素collection・tokenによるEither分岐�
 追加調査で completionItemKind.valueSet の `1.5` は Java EnumTypeAdapter が無応答になることを
 両JDKで確認し、受け入れ条件付き [#1031](https://github.com/opaopa6969/unlaxer-parser/issues/1031) に分離した。
 native は決定的parse errorを返す。#1005 の指定の決定的parse errorと混同しない。
-レビューで見つけた didOpen の scalar text/uri（Java は Gson String に変換、native は破棄）と、
-completion の `character` が Java の `start + character` で int overflow する差は #1005 より前からの差で、
-受け入れ条件付き [#1033](https://github.com/opaopa6969/unlaxer-parser/issues/1033) に分離した。
+レビューで分離した didOpen の scalar text/uri と int overflow は、下記 #1033 で対応する。
 error.data の比較範囲と親 #885/#864/#111、#893/#894/#901/#902 の継続は従来どおり。
 
 直接stdioの885件は共有ホスト上で JDK21 **31.461秒** / JDK17 **34.664秒**、
@@ -536,6 +534,33 @@ error.data の比較範囲と親 #885/#864/#111、#893/#894/#901/#902 の継続�
 生成表の106 DTO/299欄と38 workDone methodは、JARのreflectionによる別実装でも照合した。
 `workspace.applyEdit` のboolean検査だけを無効化した隔離コピーは、今回追加の不正initializeを
 成功させてしまい、独立oracleとの比較で検出された。正常コードは同じ入力を拒否する。
+
+### scalar 通知と int overflow の追補（#1033）
+
+参照は固定 Java `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34`（LSP4J 0.23.1 / Gson 2.13.2）。
+Java 製品コードは変更せず、既存の必須 jsonrpc suite を916→949件へ拡張する。
+
+| 境界 / 判断 | 固定 Java | native の選択と理由 |
+|---|---|---|
+| didOpen の scalar text | 数値・真偽値を Gson String へ変換し、文書を開く。数値は `1.50` / `0E5` / `-0` / `1e400` の原表記 | #1032 の `gson_string` を共有して受理。raw object の decoded key を走査する共通の原表記保持を didChange と共有し、String 変換を重複実装しない。独立の診断全JSON（`data.totalLength` が4/3）で `1.50` と `1.5` を区別する |
+| didOpen / didChange / didSave / didClose の scalar uri | 同じ Gson String 変換。open はそのキーへ作成、change は先頭snapshotを置換、save は importer をrefresh、close はその文書を削除 | 4通知とも共有変換と数値原表記を使う。request の scalar uri lookup も同じ文字列へ変換する。別表記 URI の文書を同時に置き、対象の更新・削除と別文書保持を比較。save は空の文書検査だけで済ませず、生きた importer の再通知で検証する |
+| `start + character` が `Integer.MAX_VALUE` と一致 / 直後 | UTF-16 start と非負 character を Java int で加算してから行末との最小値を選ぶ。2行目以降では負へwrapし、scope/useに一致しない。通常補完は40件、wrapしない行末はローカル規則込み42件 | **同じ**。明示的 `i32::wrapping_add` を使い、負の index offset は lookup 対象なしとして扱う。行内 prefix/word の丸めは独立に保持。決定的な応答で client 停止はないので、reader 無応答の恒久差と同列にしない |
+| hover / definition / references / rename / linkedEditingRange | 同じ offset を共有。負値では hover は既存fallback、definition/referencesは空、renameは既存の安全なrename拒否、linkedEditingRangeはnull | 全て同じ signed offset 判定を共有。hover の keyword/annotation help は Java と同じく index lookup より先。型の正しいoverflowを parse error にしない。documentSymbol/foldingRange はpositionを使わない |
+
+手書き raw frame と静的な独立全JSON oracleを同じ実 stdio suiteへ追加した。
+completion の40候補は文法・help catalog・snippet契約から転記し、server実測値から生成しない。
+LF文書のUTF-16 startは0/12/35/50、非BMPコメント＋CRLF文書では7/20/44/60。
+1行目（加算overflowなし）、MAX_VALUE直前/一致/直後、最大character、存在しない行を確認する。
+Java server の `-Xmx8g`・runner既定timeout 20秒・self-hosted runs-on・既存test class/jobを維持する。
+通常parserのホットパス、公開3.3.0、editor parseのnetwork/lock/実行境界、新規crateは変更しない。
+全DTO/全raw frameや親 #885/#864/#111 の完了は主張しない。
+
+固定 revision の実生成 server と native の949ケースは JDK21 **26.505秒**、JDK17 **43.091秒**。
+今回の追加部はそれぞれ **0.400秒 / 0.720秒**（suite内の計測区間）で、追加CI時間1分未満の目標内。
+両JDKの関係するSurefireテストは各43件、failure/error/skip 0。JDK17は同じJava sourceを
+`--release 17` で別領域へ再コンパイルし、17版common/dslと同じSurefireから実行する。
+didOpen text変換・通知uri変換・text原表記・uri原表記・wrapping加算・didSaveのscalar uri受理を
+個別に外すmutationは、いずれも追加oracleで検出する。
 
 ### syntax / module 診断の限定対応（#894）
 

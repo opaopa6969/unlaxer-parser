@@ -298,6 +298,95 @@ def run_jsonrpc(clients, directory, omit_params):
         evidence.append({'case': f'dto-null-{index}'})
     evidence.append({'case': 'dto-timing', 'elapsedSeconds': round(time.monotonic() - dto_started, 3)})
 
+    residual_started = time.monotonic()
+    residual = fixture['residual1033']
+
+    def notify_raw(client, kind, uri, text=None):
+        frame = residual[kind + 'Raw'].replace('$URI', uri)
+        if text is not None:
+            frame = frame.replace('$TEXT', text)
+        client.send_raw(frame)
+
+    # Full diagnostic data.totalLength distinguishes 1.50 from 1.5. Checking
+    # only fallback hover would allow a numeric-spelling regression to pass.
+    for _, client in hosts:
+        configure(client, 'default')
+    for case in residual['scalarTexts']:
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1033/open-text/' + case['raw']
+            uri = (directory / 'open-scalar.ubnf').as_uri()
+            notify_raw(client, 'open', json.dumps(uri), case['raw'])
+            expected = json.loads(json.dumps(residual['syntaxDiagnostic']).replace('"$LENGTH"', str(case['length'])))
+            diagnostic(client, uri, [expected])
+            response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 0}}, dto['hover'])
+            notify_raw(client, 'close', json.dumps(uri))
+        evidence.append({'case': '1033-open-text-' + case['raw']})
+    for _, client in hosts:
+        configure(client, 'restricted')
+
+    # A live importer makes didSave's refresh observable. VALIDATE is disabled,
+    # so its independently expected publishDiagnostics params have an empty list.
+    importer = (directory / 'scalar-uri-importer.ubnf').as_uri()
+    for _, client in hosts:
+        notify_raw(client, 'open', json.dumps(importer), '"@import"')
+        diagnostic(client, importer, [])
+    for case in residual['scalarUris']:
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1033/uri/' + case['raw']
+            uri = case['spelling']
+            other = case['other']
+            # The alternate spelling remains a distinct document throughout.
+            notify_raw(client, 'open', json.dumps(other), json.dumps(fixture['oldDocument']['source']))
+            diagnostic(client, other, [])
+            diagnostic(client, importer, [])
+            notify_raw(client, 'open', case['raw'], json.dumps(kept['source']))
+            diagnostic(client, uri, [])
+            diagnostic(client, importer, [])
+            for lookup in (case['raw'], json.dumps(uri)):
+                raw_dto(client, 'textDocument/documentSymbol', '{"textDocument":{"uri":' + lookup + '}}', {'result': fixture['keptSymbols']})
+            notify_raw(client, 'change', case['raw'], json.dumps(fixture['oldDocument']['source']))
+            diagnostic(client, uri, [])
+            diagnostic(client, importer, [])
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': fixture['oldDocument']['symbols']})
+            notify_raw(client, 'save', case['raw'])
+            diagnostic(client, importer, [])
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': fixture['oldDocument']['symbols']})
+            notify_raw(client, 'close', case['raw'])
+            diagnostic(client, importer, [])
+            response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 0}}, {'result': None})
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': other}}, {'result': fixture['oldDocument']['symbols']})
+            notify_raw(client, 'close', json.dumps(other))
+            diagnostic(client, importer, [])
+            assert not client.pending and client.messages.empty(), client.fixture
+        evidence.append({'case': '1033-uri-' + case['raw']})
+    for _, client in hosts:
+        notify_raw(client, 'close', json.dumps(importer))
+
+    for document in residual['overflowDocuments']:
+        # Boundaries are authored from start UTF-16 units (0, 12, 35, 50), not
+        # sampled server output. Each boundary runs all six shared-offset methods.
+        for _, client in hosts:
+            uri = (directory / ('int-overflow-' + document['id'] + '.ubnf')).as_uri()
+            notify_raw(client, 'open', json.dumps(uri), json.dumps(document['source']))
+            diagnostic(client, uri, [])
+        for case in document['positions']:
+            line, character = case['line'], case['character']
+            for _, client in hosts:
+                client.fixture = f"jsonrpc/1033/overflow/{document['id']}/{line}/{character}"
+                uri = (directory / ('int-overflow-' + document['id'] + '.ubnf')).as_uri()
+                end = {'line': line, 'character': len(document['source'].split('\n')[line])} if line < len(document['source'].split('\n')) else {'line': 3, 'character': 1}
+                expected = json.loads(json.dumps(residual['coreCompletion']))
+                if case['scoped']:
+                    for symbol in residual['localSymbols']:
+                        symbol = json.loads(json.dumps(symbol).replace('$URI', uri))
+                        expected.append({**symbol, 'textEdit': {'range': {'start': end, 'end': end}, 'newText': symbol['label']}})
+                params = '{"textDocument":{"uri":' + json.dumps(uri) + '},"position":{"line":' + str(line) + ',"character":' + str(character) + '},"context":{"includeDeclaration":true},"newName":"Renamed_2"}'
+                raw_dto(client, 'textDocument/completion', params, {'result': expected})
+                for method, oracle in residual['navigationOracles'].items():
+                    raw_dto(client, 'textDocument/' + method, params, oracle)
+            evidence.append({'case': f"1033-overflow-{document['id']}-{line}-{character}"})
+    evidence.append({'case': '1033-timing', 'elapsedSeconds': round(time.monotonic() - residual_started, 3)})
+
     # A later successful configure restores validation without replacing buffers.
     for _, client in hosts:
         client.fixture = 'jsonrpc/recover-configure'

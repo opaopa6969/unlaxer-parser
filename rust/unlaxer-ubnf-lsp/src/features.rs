@@ -87,7 +87,13 @@ fn atom_words(atom: &AtomicElement, out: &mut Vec<String>) {
         _ => {}
     }
 }
-pub fn completion(source: &str, index: &Index, offset: usize, empty_line: bool) -> Value {
+pub fn completion(
+    source: &str,
+    index: &Index,
+    offset: usize,
+    empty_line: bool,
+    index_offset: Option<usize>,
+) -> Value {
     let line_start = source[..offset].rfind('\n').map_or(0, |i| i + 1);
     let prefix = if empty_line {
         ""
@@ -135,7 +141,7 @@ pub fn completion(source: &str, index: &Index, offset: usize, empty_line: bool) 
             let first = run.find(|c: char| c.is_ascii_alphabetic() || c == '_')?;
             Some(format!("{}.", &run[first..]))
         });
-    let lex = text::scan(&source[..offset]);
+    let lex = text::scan(&source[..index_offset.unwrap_or(0)]);
     let lexical = lex.iter().rposition(|t| t.text == "::=").is_some_and(|i| {
         i >= 2 && lex[i - 2].text == "token" && !lex[i + 1..].iter().any(|t| t.text == ";")
     });
@@ -177,7 +183,7 @@ pub fn completion(source: &str, index: &Index, offset: usize, empty_line: bool) 
             }
         }
     }
-    if let Some(scope) = index.scope(offset) {
+    if let Some(scope) = index_offset.and_then(|offset| index.scope(offset)) {
         for (name, symbol) in &scope.symbols {
             if scope.unique(name).is_none()
                 || ((lexical || whitespace) && symbol.kind != "token")
@@ -197,7 +203,13 @@ pub fn completion(source: &str, index: &Index, offset: usize, empty_line: bool) 
     }
     Value::Array(items)
 }
-pub fn hover(source: &str, index: &Index, offset: usize, empty_line: bool) -> Value {
+pub fn hover(
+    source: &str,
+    index: &Index,
+    offset: usize,
+    empty_line: bool,
+    index_offset: Option<usize>,
+) -> Value {
     let mut start = offset;
     let mut end = offset;
     while let Some((i, c)) = source[..start].char_indices().next_back() {
@@ -231,7 +243,7 @@ pub fn hover(source: &str, index: &Index, offset: usize, empty_line: bool) -> Va
             return json!({"contents":markdown(format!("**{}**\n\n{}",string(a,"signature"),string(a,"doc")))});
         }
     }
-    if let Some(scope) = index.scope(offset) {
+    if let Some(scope) = index_offset.and_then(|offset| index.scope(offset)) {
         if let Some((name, _, _)) = scope
             .uses
             .iter()

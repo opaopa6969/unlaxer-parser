@@ -1870,5 +1870,482 @@
         }
       }
     ]
+  },
+  "residual1033": {
+    "oracleBasis": "Hand-authored wire tokens/lengths and int boundaries; completion keyword/help/snippet contract transcribed from grammar and catalog, not observed server output.",
+    "scalarTexts": [
+      {
+        "raw": "7",
+        "length": 1
+      },
+      {
+        "raw": "true",
+        "length": 4
+      },
+      {
+        "raw": "false",
+        "length": 5
+      },
+      {
+        "raw": "1.50",
+        "length": 4
+      },
+      {
+        "raw": "1.5",
+        "length": 3
+      },
+      {
+        "raw": "0E5",
+        "length": 3
+      },
+      {
+        "raw": "1e-3",
+        "length": 4
+      },
+      {
+        "raw": "-0",
+        "length": 2
+      },
+      {
+        "raw": "1e400",
+        "length": 5
+      }
+    ],
+    "scalarUris": [
+      {
+        "raw": "7",
+        "spelling": "7",
+        "other": "7.0"
+      },
+      {
+        "raw": "true",
+        "spelling": "true",
+        "other": "TRUE"
+      },
+      {
+        "raw": "false",
+        "spelling": "false",
+        "other": "FALSE"
+      },
+      {
+        "raw": "1.50",
+        "spelling": "1.50",
+        "other": "1.5"
+      },
+      {
+        "raw": "0E5",
+        "spelling": "0E5",
+        "other": "0e+5"
+      },
+      {
+        "raw": "1e-3",
+        "spelling": "1e-3",
+        "other": "1e-03"
+      },
+      {
+        "raw": "-0",
+        "spelling": "-0",
+        "other": "0"
+      }
+    ],
+    "openRaw": "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didOpen\",\"params\":{\"textDocument\":{\"uri\":$URI,\"version\":1,\"text\":$TEXT}}}",
+    "changeRaw": "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\"params\":{\"textDocument\":{\"uri\":$URI,\"version\":2},\"contentChanges\":[{\"text\":$TEXT}]}}",
+    "saveRaw": "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didSave\",\"params\":{\"textDocument\":{\"uri\":$URI}}}",
+    "closeRaw": "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didClose\",\"params\":{\"textDocument\":{\"uri\":$URI}}}",
+    "syntaxDiagnostic": {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 0,
+          "character": 1
+        }
+      },
+      "severity": 1,
+      "code": "ULX-PARSE-001",
+      "source": "unlaxer",
+      "message": "Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",
+      "data": {
+        "schemaVersion": 1,
+        "code": "ULX-PARSE-001",
+        "kind": "syntax",
+        "offset": 0,
+        "line": 0,
+        "character": 0,
+        "consumedLength": 0,
+        "totalLength": "$LENGTH",
+        "expectedTokens": [
+          "' '",
+          "'//'",
+          "'grammar'",
+          "'{'",
+          "'}'"
+        ],
+        "expectedHints": [
+          "' '",
+          "'//'",
+          "'grammar'",
+          "'{'",
+          "'}'"
+        ],
+        "expectedParsers": [
+          "' '",
+          "'//'",
+          "'grammar'",
+          "'{'",
+          "'}'"
+        ],
+        "deepestMatchedRule": "WordParser"
+      }
+    },
+    "coreCompletion": [
+      {
+        "label": "from",
+        "kind": 14
+      },
+      {
+        "label": "grammar",
+        "kind": 14,
+        "documentation": {
+          "kind": "markdown",
+          "value": "grammar — 文法の入れ物\n\nimport → 設定 → token → ルールの順に書きます。\n\n```ubnf\ngrammar Name { … }\n```\n\n1 つのファイルに複数の grammar を記述できますが、言語ごとの生成経路には 1 文法のみを要求するものがあります。\n\n名前は識別子です。最初は半角英字、以降は英数字を使うと分かりやすくなります。"
+        }
+      },
+      {
+        "label": "token",
+        "kind": 14,
+        "documentation": {
+          "kind": "markdown",
+          "value": "token — 文字のまとまり\n\n字句の認識仕様を書きます。既存の Java parser を指定する必要はありません。\n\n```ubnf\ntoken DIGIT ::= CHAR_RANGE('0', '9');\n```\n\ntoken 内では空白を自動的に読み飛ばしません。\n\n宣言的 token は ; で終わります。旧形式の token NAME = JavaClass は互換用途です。新しい文法では ::= を使います。"
+        }
+      },
+      {
+        "label": "LOOKAHEAD",
+        "kind": 14,
+        "documentation": {
+          "kind": "markdown",
+          "value": "先読み — 読まずに条件を確認\n\n前者は一致するなら、後者は一致しないなら成功。どちらも入力を消費しません。\n\n```ubnf\nLOOKAHEAD('end') / NEGATIVE_LOOKAHEAD('end')\n```\n\n宣言的 token の中で字句式を渡せます。単独で無制限反復すると前へ進まないため禁止されます。"
+        }
+      },
+      {
+        "label": "NEGATIVE_LOOKAHEAD",
+        "kind": 14
+      },
+      {
+        "label": "CAPTURE",
+        "kind": 14,
+        "documentation": {
+          "kind": "markdown",
+          "value": "CAPTURE / SAME_AS — 同じ文字列を再利用\n\n同じ token の実行内で、読み取った区切りを保存して再利用します。\n\n```ubnf\nCAPTURE(mark, '~'+) … SAME_AS(mark)\n```\n\n選択肢が失敗すると、その選択肢の capture は巻き戻されます。別の試験入力に状態が漏れません。\n\nSAME_AS は名前が未設定なら失敗します。Java の任意の ParseContext メソッド呼び出しではありません。"
+        }
+      },
+      {
+        "label": "SAME_AS",
+        "kind": 14
+      },
+      {
+        "label": "CHAR_RANGE",
+        "kind": 14,
+        "documentation": {
+          "kind": "markdown",
+          "value": "CHAR_RANGE — 1 文字の範囲\n\n両端を含む範囲の 1 文字に一致します。\n\n```ubnf\nCHAR_RANGE('0', '9')\n```\n\n数字が何桁でもよければ + を付けます。正規表現 [0-9] と同様の情報を明示します。"
+        }
+      },
+      {
+        "label": "NEGATION",
+        "kind": 14,
+        "documentation": {
+          "kind": "markdown",
+          "value": "NEGATION — 指定文字以外\n\n列挙した文字のいずれでもない 1 文字に一致します。\n\n```ubnf\nNEGATION('\"\\\\\\n\\r')\n```\n\n繰り返すなら { NEGATION(…) } や NEGATION(…)+ を使います。文字列全体の否定ではありません。"
+        }
+      },
+      {
+        "label": "XID_IDENTIFIER",
+        "kind": 14
+      },
+      {
+        "label": "UNTIL",
+        "kind": 14
+      },
+      {
+        "label": "CI",
+        "kind": 14
+      },
+      {
+        "label": "ADAPTER",
+        "kind": 14
+      },
+      {
+        "label": "version",
+        "kind": 14
+      },
+      {
+        "label": "ANY",
+        "kind": 14,
+        "documentation": {
+          "kind": "markdown",
+          "value": "ANY — 任意の 1 文字\n\nUnicode の 1 コードポイントを読みます。入力末尾では失敗します。\n\n```ubnf\nANY\n```\n\n改行も対象になります。何でも許す必要がある場所だけで使いましょう。"
+        }
+      },
+      {
+        "label": "EOF",
+        "kind": 14
+      },
+      {
+        "label": "EMPTY",
+        "kind": 14
+      },
+      {
+        "label": "params",
+        "kind": 14
+      },
+      {
+        "label": "tokens",
+        "kind": 14
+      },
+      {
+        "label": "literals",
+        "kind": 14
+      },
+      {
+        "label": "profile",
+        "kind": 14
+      },
+      {
+        "label": "name",
+        "kind": 14
+      },
+      {
+        "label": "mode",
+        "kind": 14
+      },
+      {
+        "label": "symbol",
+        "kind": 14
+      },
+      {
+        "label": "description",
+        "kind": 14
+      },
+      {
+        "label": "context",
+        "kind": 14
+      },
+      {
+        "label": "snapshot",
+        "kind": 14
+      },
+      {
+        "label": "kind",
+        "kind": 14
+      },
+      {
+        "label": "level",
+        "kind": 14
+      },
+      {
+        "label": "sync",
+        "kind": 14
+      },
+      {
+        "label": "ERROR",
+        "kind": 14
+      },
+      {
+        "label": "BOF",
+        "kind": 14
+      },
+      {
+        "label": "BOL",
+        "kind": 14
+      },
+      {
+        "label": "EOL",
+        "kind": 14
+      },
+      {
+        "label": "grammar",
+        "kind": 15,
+        "detail": "grammar block skeleton",
+        "insertTextFormat": 2,
+        "insertText": "grammar ${1:Name} {\n  @ubnf: v2\n  @package: ${2:org.example}\n\n  token ${3:NUMBER} ::= CHAR_RANGE('0', '9')+;\n\n  @root\n  @mapping(Value, params=[text])\n  @doc('数字を入力してください。')\n  ${4:Start} ::= ${3:NUMBER} @text;\n}$0"
+      },
+      {
+        "label": "token",
+        "kind": 15,
+        "detail": "token declaration",
+        "insertTextFormat": 2,
+        "insertText": "token ${1:NAME} ::= ${2:CHAR_RANGE('0', '9')+};$0"
+      },
+      {
+        "label": "rule",
+        "kind": 15,
+        "detail": "plain rule",
+        "insertTextFormat": 2,
+        "insertText": "${1:RuleName} ::= ${2:body} ;$0"
+      },
+      {
+        "label": "mapped-rule",
+        "kind": 15,
+        "detail": "rule with @mapping record",
+        "insertTextFormat": 2,
+        "insertText": "@mapping(${1:TypeName}, params=[${2:left}, ${3:right}])\n${4:RuleName} ::= ${5:Element} @${2:left} ${6:Element} @${3:right} ;$0"
+      },
+      {
+        "label": "enum-rule",
+        "kind": 15,
+        "detail": "@enum rule from literals",
+        "insertTextFormat": 2,
+        "insertText": "@enum\n${1:Kind} ::= '${2:a}' | '${3:b}' ;$0"
+      },
+      {
+        "label": "binary-rule",
+        "kind": 15,
+        "detail": "left-assoc binary expression rule",
+        "insertTextFormat": 2,
+        "insertText": "@mapping(${1:BinaryExpr}, params=[left, op, right])\n@leftAssoc\n${2:Expression} ::= ${3:Term} @left { ${4:Op} @op ${3:Term} @right } ;$0"
+      }
+    ],
+    "localSymbols": [
+      {
+        "label": "Start",
+        "detail": "rule · $URI",
+        "kind": 7,
+        "documentation": {
+          "kind": "markdown",
+          "value": "```ubnf\n@root Start ::= Item;\n```"
+        }
+      },
+      {
+        "label": "Item",
+        "detail": "rule · $URI",
+        "kind": 7,
+        "documentation": {
+          "kind": "markdown",
+          "value": "```ubnf\nItem ::= 'x';\n```"
+        }
+      }
+    ],
+    "navigationOracles": {
+      "hover": {
+        "result": {
+          "contents": {
+            "kind": "markdown",
+            "value": "Valid UBNF"
+          }
+        }
+      },
+      "definition": {
+        "result": []
+      },
+      "references": {
+        "result": []
+      },
+      "rename": {
+        "error": {
+          "code": -32602,
+          "message": "安全に名前変更できません。完成した文法のローカル宣言を選び、重複・予約語を避けてください。外部 module の token / import alias / capture は一括 rename の対象外です。"
+        }
+      },
+      "linkedEditingRange": {
+        "result": null
+      }
+    },
+    "overflowDocuments": [
+      {
+        "id": "lf",
+        "source": "grammar G {\n @root Start ::= Item;\n Item ::= 'x';\n}",
+        "positions": [
+          {
+            "line": 0,
+            "character": 2147483646,
+            "scoped": true
+          },
+          {
+            "line": 0,
+            "character": 2147483647,
+            "scoped": true
+          },
+          {
+            "line": 1,
+            "character": 2147483634,
+            "scoped": true
+          },
+          {
+            "line": 1,
+            "character": 2147483635,
+            "scoped": true
+          },
+          {
+            "line": 1,
+            "character": 2147483636,
+            "scoped": false
+          },
+          {
+            "line": 1,
+            "character": 2147483647,
+            "scoped": false
+          },
+          {
+            "line": 2,
+            "character": 2147483612,
+            "scoped": true
+          },
+          {
+            "line": 2,
+            "character": 2147483613,
+            "scoped": false
+          },
+          {
+            "line": 3,
+            "character": 2147483647,
+            "scoped": false
+          },
+          {
+            "line": 99,
+            "character": 2147483647,
+            "scoped": true
+          }
+        ]
+      },
+      {
+        "id": "utf16-crlf",
+        "source": "// 😀\r\ngrammar G {\r\n @root Start ::= Item;\r\n Item ::= 'x';\r\n}",
+        "positions": [
+          {
+            "line": 1,
+            "character": 2147483640,
+            "scoped": true
+          },
+          {
+            "line": 1,
+            "character": 2147483641,
+            "scoped": false
+          },
+          {
+            "line": 2,
+            "character": 2147483627,
+            "scoped": true
+          },
+          {
+            "line": 2,
+            "character": 2147483628,
+            "scoped": false
+          },
+          {
+            "line": 3,
+            "character": 2147483603,
+            "scoped": true
+          },
+          {
+            "line": 3,
+            "character": 2147483604,
+            "scoped": false
+          }
+        ]
+      }
+    ]
   }
 }

@@ -7,7 +7,8 @@ use crate::{
 use serde_json::{json, Value};
 
 type Use = (String, usize, usize);
-fn at(index: &Index, offset: usize) -> Option<(&Scope, &Use)> {
+fn at(index: &Index, offset: Option<usize>) -> Option<(&Scope, &Use)> {
+    let offset = offset?;
     index.scopes.iter().find_map(|scope| {
         scope
             .uses
@@ -16,7 +17,7 @@ fn at(index: &Index, offset: usize) -> Option<(&Scope, &Use)> {
             .map(|u| (scope, u))
     })
 }
-fn target(index: &Index, offset: usize) -> Option<&Symbol> {
+fn target(index: &Index, offset: Option<usize>) -> Option<&Symbol> {
     let (scope, u) = at(index, offset)?;
     scope.unique(&u.0)
 }
@@ -39,14 +40,14 @@ fn editable(index: &Index, uri: &str, symbol: &Symbol) -> bool {
 fn location(symbol: &Symbol) -> Value {
     json!({"uri":symbol.uri,"range":text::range(&symbol.source,symbol.start,symbol.end)})
 }
-pub fn definition(index: &Index, offset: usize) -> Value {
+pub fn definition(index: &Index, offset: Option<usize>) -> Value {
     target(index, offset).map_or_else(|| json!([]), |s| json!([location(s)]))
 }
 pub fn reference_locations(
     source: &str,
     uri: &str,
     index: &Index,
-    offset: usize,
+    offset: Option<usize>,
     include: bool,
 ) -> Value {
     let Some(symbol) = target(index, offset) else {
@@ -65,7 +66,7 @@ pub fn rename(
     source: &str,
     uri: &str,
     index: &Index,
-    offset: usize,
+    offset: Option<usize>,
     name: Option<&str>,
 ) -> Result<Value, Error> {
     let Some((scope, u)) = at(index, offset) else {
@@ -95,7 +96,7 @@ pub fn rename(
 fn rename_error() -> Error {
     (-32602, "安全に名前変更できません。完成した文法のローカル宣言を選び、重複・予約語を避けてください。外部 module の token / import alias / capture は一括 rename の対象外です。".into())
 }
-pub fn linked(source: &str, uri: &str, index: &Index, offset: usize) -> Value {
+pub fn linked(source: &str, uri: &str, index: &Index, offset: Option<usize>) -> Value {
     let Some(symbol) = target(index, offset).filter(|s| editable(index, uri, s)) else {
         return Value::Null;
     };
