@@ -82,9 +82,21 @@ def run_jsonrpc(clients, directory, omit_params):
                     if index == 3 and outcome == 'parse':
                         outcome = 'silent'
                     yield field['id'] + '/' + value + '/' + str(index), field['raw'].replace('$VALUE', value), outcome, index
+        # Gson reader limits differ between the stream path (method first) and
+        # deferred JsonTreeReader conversion; check both paths on list/scalar.
         for case in enums['deferredLimits']:
-            for index in (1, 4, 5):
-                yield 'limits/' + case['raw'] + '/' + str(index), enums['fields'][0]['raw'].replace('$VALUE', case['raw']), case['outcome'], index
+            value, name = case['raw'], case['raw'] + case.get('exponent', '')
+            if 'padTo' in case:
+                exponent = case.get('exponent', '')
+                value += '0' * (case['padTo'] - len(value) - len(exponent)) + exponent
+                assert len(value) == case['padTo']
+                name += '/len' + str(case['padTo'])
+            for field in enums['fields']:
+                if field['id'] not in enums['limitFields']:
+                    continue
+                for index in range(len(reader['orders'])):
+                    outcome = case['deferred' if index in (1, 4, 5) else 'stream']
+                    yield 'limits/' + field['id'] + '/' + name + '/' + str(index), field['raw'].replace('$VALUE', value), outcome, index
 
     def enum_response(client, method, caps, outcome, profile, order=0):
         options = {} if profile == 'default' else {'languageProfile': {'entry': 'UBNFFile', 'tsv': configuration['profiles'][profile]}}
@@ -353,6 +365,26 @@ def run_jsonrpc(clients, directory, omit_params):
         response(client, '$/reader-barrier', {}, {'result': None})
         quiet(client)
     evidence.append({'case': 'dto-silent-token'})
+
+    # Request DTO enums use the same EnumTypeAdapter stream/deferred paths (#1031).
+    for field in enums['requestFields']:
+        uri = (directory / 'dto-position.ubnf').as_uri()
+        for token in enums['tokens']:
+            value = token['raw'].replace('"$KNOWN"', field['known'])
+            for index, order in enumerate(reader['orders']):
+                outcome = token['deferredInteger'] if field['reader'] == 'integer' and index in (1, 4, 5) else token[field['reader']]
+                if index == 3 and outcome == 'parse':
+                    outcome = 'silent'
+                params = field['raw'].replace('$URI', json.dumps(uri)).replace('$VALUE', value)
+                for _, client in hosts:
+                    client.fixture = 'jsonrpc/1031/request/' + field['id'] + '/' + value + '/' + str(index)
+                    expected = (dto[field['oracle']] if outcome == 'accepted'
+                                else None if outcome == 'silent' and client.backend == 'java' else reader['oracles']['parse'])
+                    raw(client, order.replace('$METHOD', field['method']).replace('$PARAMS', params), expected)
+                evidence.append({'case': '1031-request-' + field['id'] + '/' + value + '/' + str(index)})
+    for _, client in hosts:
+        response(client, '$/reader-barrier', {}, {'result': None})
+        quiet(client)
 
     for index, scalar in enumerate(dto['scalarTexts']):
         for _, client in hosts:

@@ -51,6 +51,18 @@ class DtoSchemaTest(unittest.TestCase):
         self.assertEqual(expected, actual)
         self.assertEqual((10, 11), (list(actual.values()).count('integer'), list(actual.values()).count('string')))
 
+    def test_request_enum_fragments_reach_generated_enum_fields(self):
+        schema = json.loads((ROOT / 'rust/unlaxer-ubnf-lsp/src/lsp4j-dto-schema.json').read_text())
+        fixture = json.loads((ROOT / 'spec-corpus/ubnf-authoring-lsp/jsonrpc.json').read_text())['enumReader']
+        for field in fixture['requestFields']:
+            value = json.loads(field['raw'].replace('$URI', '"file:///x"').replace('$VALUE', '"$VALUE"'))
+            kind = schema['requests'][field['method']]
+            while not (isinstance(value, str) and value == '$VALUE'):
+                (key, value), = [(k, v) for k, v in value.items() if '$VALUE' in json.dumps(v)]
+                kind = schema['types'][kind][key]
+            self.assertEqual(['enum', field['id']], kind)
+            self.assertEqual(field['reader'], schema['enums'][field['id']]['reader'])
+
     def test_source_declarations_drive_enum_types_and_inherited_fields(self):
         # Synthetic source JAR exercises discovery, not server/fixture replay.
         sources = {

@@ -2674,24 +2674,85 @@
         "orders": [
           1
         ]
+      },
+      {
+        "raw": "1e-10000",
+        "orders": [
+          0
+        ]
       }
     ],
     "deferredLimits": [
       {
         "raw": "1e9999",
-        "outcome": "accepted"
+        "stream": "silent",
+        "deferred": "accepted"
       },
       {
         "raw": "1e10000",
-        "outcome": "silent"
+        "stream": "silent",
+        "deferred": "silent"
       },
       {
         "raw": "1e-9999",
-        "outcome": "accepted"
+        "stream": "accepted",
+        "deferred": "accepted"
       },
       {
         "raw": "1e-10000",
-        "outcome": "silent"
+        "stream": "accepted",
+        "deferred": "silent"
+      },
+      {
+        "raw": "0e10000",
+        "stream": "accepted",
+        "deferred": "silent"
+      },
+      {
+        "raw": "1.5",
+        "padTo": 1023,
+        "stream": "silent",
+        "deferred": "accepted"
+      },
+      {
+        "raw": "1.5",
+        "padTo": 1024,
+        "stream": "accepted",
+        "deferred": "accepted"
+      },
+      {
+        "raw": "-9",
+        "padTo": 1024,
+        "stream": "accepted",
+        "deferred": "accepted"
+      },
+      {
+        "raw": "1.",
+        "padTo": 1023,
+        "exponent": "e-10000",
+        "stream": "accepted",
+        "deferred": "silent"
+      },
+      {
+        "raw": "1.",
+        "padTo": 1024,
+        "exponent": "e-10000",
+        "stream": "accepted",
+        "deferred": "accepted"
+      }
+    ],
+    "limitFields": [
+      "CompletionItemKind",
+      "InsertTextMode.scalar"
+    ],
+    "requestFields": [
+      {
+        "id": "CompletionTriggerKind",
+        "reader": "integer",
+        "method": "textDocument/completion",
+        "known": "\"Invoked\"",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":2},\"context\":{\"triggerKind\":$VALUE}}",
+        "oracle": "completion"
       }
     ]
   }

@@ -648,8 +648,15 @@ JDK17 / JDK21 とも initialize は **受理276 / 決定的エラー62 / 無応�
 JsonTreeReader / LazilyParsedNumber による遅延変換を使い、整数 enum の `1.5`（切捨て）や
 巨大数（int への折返し、未知定数は null）も受理する。native が拒否していたこの成功経路を
 互換化した。Ext はこれらの client enum 値を消費しないため、観測するのは受理・応答と設定・文書の状態。
-Gson NumberLimits の長さ10000文字以下・scaleの絶対値10000未満を維持し、
-`1e9999` / `1e-9999` は受理、`1e10000` / `1e-10000` の無応答には native の決定的エラーを返す。
+遅延変換では Gson NumberLimits の scale の絶対値10000未満を維持し、
+`1e9999` / `1e-9999` は受理、`1e10000` / `1e-10000` / `0e10000` の無応答には native の決定的エラーを返す。
+この scale 検査は遅延変換だけのもので、`method` が先の stream 経路（JsonReader.nextInt の double 往復）では
+`1e-10000` / `0e10000` / `1e-9999` は 0 として受理し、`1e9999` は Infinity で無応答となる。
+レビューで、PR 初版が遅延変換の検査を stream 経路にも掛け、Java が受理するこれらを過剰拒否していたことを
+両JDKの実stdioで確認して修正した。また Gson の lenient JsonReader は1024字の buffer を埋める数値 token を
+unquoted STRING として返すため、1024字以上の数値は両経路で名前照合（未知は null）となり受理される。
+NumberLimits の長さ10000字の上限はこの規則より先に到達しないので検査しない（1023字の `1.5000…` は
+stream で無応答・遅延で受理、1024字は両経路で受理）。
 `method → params → id` では token 型違いの parse error も id が回復できず無応答となる。
 これも #1001 / Either と同じ恒久差であり、native は最終id付きの決定的エラーを維持する。
 
@@ -658,6 +665,9 @@ Gson NumberLimits の長さ10000文字以下・scaleの絶対値10000未満を�
 | method が先、整数 enum の非整数・int外数値 | 無応答 | 元id付き `-32700` を維持する恒久差。client を停止させない |
 | params が先、整数 enum の通常の非整数・巨大数 | 受理 | 遅延変換の受理へ修正。Java の成功を過剰拒否しない |
 | params が先、Gson NumberLimits を超える数値 | 無応答 | 決定的 `-32700` の恒久差 |
+| method が先、double で厳密な整数になる `1e-10000` / `0e10000` | 受理 | 受理（遅延変換の scale 検査を stream 経路へ掛けない） |
+| 1024字以上の数値 token（両経路） | 受理（unquoted STRING） | 受理 |
+| request DTO の整数 enum（completion の `context.triggerKind` 等） | 上と同じ stream / 遅延の規則 | 同じ経路判定で揃える。codeAction / signatureHelp の native 未対応は #901 |
 | token 型違い、id を読取り済み / 遅延変換 | id付き `-32700` | code/message/id が同じ |
 | token 型違い、method→params→id | 無応答 | id 回復不能を移植しない恒久差 |
 
@@ -667,22 +677,31 @@ Gson NumberLimits の長さ10000文字以下・scaleの絶対値10000未満を�
 実測や fixture から型表を生成せず、手書きの欄名リストは製品 reader / 生成スクリプトに置かない。
 独立 fixture の21欄と生成型グラフの全到達欄を照合し、継承・文字列定数 discovery もテストする。
 
-既存必須 jsonrpc suite は **951→3851ケース**。全21欄×18入力×6キー順、
-Gson scale 境界、scalar/空配列/null の collection、配列要素の container を検証する。
+既存必須 jsonrpc suite は **951→4104ケース**。全21欄×18入力×6キー順、
+Gson scale 境界と1023/1024字の数値 token を list・scalar の2欄×全6キー順（stream / 遅延で別 oracle）、
+completion の `context.triggerKind` の18入力×全6キー順、scalar/空配列/null の collection、
+配列要素の container を検証する。
 失敗 initialize は未初期化の同じ server で繰り返し、後続 request と initialize 再試行を確認する。
-成功 initialize は全欄を同時に含む13セッションで別途確認する。configure の失敗には既定 profile
+成功 initialize は全欄を同時に含む14セッションで別途確認する。configure の失敗には既定 profile
 への変更を試み、旧 profile の VALIDATE gate・旧文書の全 hover/documentSymbol・新規文書の解析を
 確認する。無応答は後続 barrier と共有1秒 deadline で遅延応答も拒否する。
 Java server の `-Xmx8g`、runner の既定timeout20秒、self-hosted runs-on を維持する。
 子プロセスは #1046 の TestProcesses.builder を使い、同じ helper source を test source の symlink で共有する。
 
-通常の position 等の **enum 以外の Integer** の遅延変換にも差を実測したが、今回の受理域は広げない。
+通常の position 等の **enum 以外の Integer** の遅延変換にも差を実測したが、今回の受理域は広げない
+（Gson Integer adapter は NumberFormatException を決定的エラーにするため、遅延の scale 外は Java が `-32700`、native は受理する差も含む）。
 受け入れ条件付き [#1052](https://github.com/opaopa6969/unlaxer-parser/issues/1052) に分離した。
 全raw frame・全DTO adapterのparity完了、親 #885/#864/#111 の完了とはしない。
 
-直接stdioの最終3851件は JDK21 **85.819秒** / JDK17 **68.816秒**。
+PR初版の直接stdio 3851件は JDK21 **85.819秒** / JDK17 **68.816秒**。
 追加 enum 区間は **44.441秒 / 45.294秒**で、追加CI時間1分未満の目標内。
 同じ固定Javaを使った変更前951件の JDK21 は42.091秒、suite全体の差は43.728秒だった。
+レビュー後の4104件は、同じ固定Java（JDK21）・同じ時間帯（load average 約20）で直列に測り、
+変更前951件 **26.85秒**、PR初版3851件 **72.16秒**、最終4104件 **79.66秒**（差 +52.8秒）。
+JUnit の jsonrpc 待機は他の長い suite と同じ240秒（test timeout 300秒）に広げ、負荷時の誤失敗を避ける。
 隔離m2の関係テストは両JDK各43件（failure/error/skip 0）、Rust workspaceは817件、
 Pythonは222件＋585 subtestsが成功した。遅延enumの検査を従来の整数検査に戻す隔離mutationは
-`jsonrpc/1031/initialize/limits/1e-10000/1` で誤ってinitializeを成功させ、独立oracleが検出した。
+`jsonrpc/1031/initialize/limits/CompletionItemKind/1e-10000/1` で誤ってinitializeを成功させ、独立oracleが検出した。
+レビューで追加した mutation（stream 経路に遅延検査を戻す・1024字規則を外す・request DTO を常に stream 扱い）は
+それぞれ `accepted-initialize/1e-10000/0`、`configure/limits/CompletionItemKind/1.5/len1024/0`、
+`request/CompletionTriggerKind/1.5/1` で検出された。
