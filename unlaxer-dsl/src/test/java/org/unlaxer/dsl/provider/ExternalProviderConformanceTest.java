@@ -20,12 +20,12 @@ public class ExternalProviderConformanceTest {
     private final Path repo = Path.of("..").toAbsolutePath().normalize();
     private final Path fixture = repo.resolve("docs/fixtures/language-providers");
     private static final Set<Operation> OPERATIONS = Set.of(Operation.PARSE, Operation.VALIDATE, Operation.HOVER, Operation.DEFINITION, Operation.COMPLETION, Operation.FORMAT);
-    private String java() { return System.getenv("TMPDIR") != null ? Path.of("../scripts/ci/java-tmpdir/bin/java").toAbsolutePath().normalize().toString() : Path.of(System.getProperty("java.home"), "bin", "java").toString(); }
+    private String java() { return org.unlaxer.dsl.TestProcesses.javaLauncher(repo); }
     private String classpath() { return System.getProperty("java.class.path"); }
     private String typescript() { return repo.resolve("unlaxer-dsl/ubnf-vscode/node_modules/typescript/lib/typescript.js").toString(); }
     private List<String> command(String provider, String rustc) {
         return switch (provider) {
-            case "javac" -> List.of(java(), "-Djava.io.tmpdir=" + System.getProperty("java.io.tmpdir"), "-cp", classpath(), "org.unlaxer.dsl.provider.JavacProvider");
+            case "javac" -> List.of(org.unlaxer.dsl.TestProcesses.javaExecutable(), "-Djava.io.tmpdir=" + System.getProperty("java.io.tmpdir"), "-cp", classpath(), "org.unlaxer.dsl.provider.JavacProvider");
             case "typescript" -> List.of("python3", repo.resolve("scripts/language-providers/provider.py").toString(), "typescript", typescript());
             case "rustc" -> List.of("python3", repo.resolve("scripts/language-providers/provider.py").toString(), "rust", rustc);
             default -> throw new IllegalArgumentException(provider);

@@ -103,7 +103,7 @@ public class LSPDiagnosticConformanceTest {
                 int start=line==1?23:24;assertEquals(start,range.getAsJsonObject("start").get("character").getAsInt());assertEquals(start+1,range.getAsJsonObject("end").get("character").getAsInt());assertTrue(diagnostic.getAsJsonObject("data").get("exact").getAsBoolean());}
         }assertEquals(event.toString(),event.get("expected"),counts);assertEquals(event.has("warnings")?event.get("warnings").getAsInt():0,warnings);
     }
-    private static String java(){return System.getenv("TMPDIR") != null ? Path.of("../scripts/ci/java-tmpdir/bin/java").toAbsolutePath().normalize().toString() : Path.of(System.getProperty("java.home"),"bin","java").toString();}
+    private static String java(){return Path.of(System.getProperty("java.home"),"bin","java").toString();}
     private String run(List<String> command)throws Exception{Path log=temporary.newFile().toPath();var builder=org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());builder.environment().put("CARGO_INCREMENTAL","0");var process=builder.start();if(!process.waitFor(120,TimeUnit.SECONDS)){process.destroyForcibly();fail("timeout "+command);}String output=Files.readString(log);assertEquals(output,0,process.exitValue());return output;}
     private static JavaFileObject source(String name,String text){return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignored){return text;}};}
 }

@@ -48,6 +48,24 @@ class TempProbe {
                     self.assertEqual('', result.stderr)
                     self.assertEqual(str(root), result.stdout)
 
+    def test_native_fixture_launcher_prefers_the_test_jdk_and_tolerates_no_tmpdir(self):
+        with tempfile.TemporaryDirectory(prefix='ci launcher ') as directory:
+            fake = Path(directory) / 'fake-java'
+            fake.write_text('#!/usr/bin/env bash\nprintf "%s|" "$JAVA_HOME" "$@"\n')
+            fake.chmod(0o755)
+            wrapper = str(ROOT / 'scripts/ci/java-tmpdir/bin/java')
+            for temporary, expected in [(directory, ['-Djava.io.tmpdir=' + directory, 'x']), (None, ['x'])]:
+                environment = {key: value for key, value in os.environ.items() if key != 'TMPDIR'}
+                environment['UNLAXER_TEST_JAVA'] = str(fake)
+                if temporary:
+                    environment['TMPDIR'] = temporary
+                result = subprocess.run(['bash', wrapper, 'x'], env=environment,
+                                        capture_output=True, text=True, timeout=20)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual('', result.stderr)
+                self.assertEqual([str(Path(directory).resolve().parent)] + expected,
+                                 result.stdout.split('|')[:-1])
+
 
 if __name__ == '__main__':
     unittest.main()

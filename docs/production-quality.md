@@ -279,7 +279,9 @@ property 未指定のローカル実行では OS 既定値を維持する。
 JVM property は子 JVM に自動継承されないため、DSL のテストは `TestProcesses.builder` で
 `java` / `javac` へ明示的に渡す。Python の Java 起動には `java_tmp.java_command` を使い、
 さらに起動する provider のテスト用 command にも渡す。native fixture が実行ファイルパスだけを
-受け取る箇所は `scripts/ci/java-tmpdir/bin/java` を渡す。`JAVA_TOOL_OPTIONS` / `_JAVA_OPTIONS` /
+受け取る箇所は、`unlaxer.test.tmpdir`（Python は `TMPDIR`）があるときだけ
+`scripts/ci/java-tmpdir/bin/java` を渡し、未指定のローカル実行では実行中の JDK の `java` のままとする。
+wrapper は `UNLAXER_TEST_JAVA`（`TestProcesses.builder` が実行中の JDK を設定）を優先し、無ければ PATH の `java` を使う。`JAVA_TOOL_OPTIONS` / `_JAVA_OPTIONS` /
 `JDK_JAVA_OPTIONS` は stderr の launcher notice が conformance を壊すため使わない。
 downstream の固定 POM は変更せず、Surefire の `jvm` に同 launcher を指定して既存の
 `argLine`（preview / add-opens）を維持する。

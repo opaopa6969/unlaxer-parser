@@ -2,11 +2,12 @@
 # An executable boundary for native fixtures that accept a Java launcher path.
 set -euo pipefail
 # Surefire derives JAVA_HOME from its jvm path; PATH still selects setup-java's JDK.
-java_command=$(readlink -f "$(command -v java)")
+# Java tests pass their own JDK in UNLAXER_TEST_JAVA so a JDK17 fork never runs PATH's JDK.
+java_command=$(readlink -f "${UNLAXER_TEST_JAVA:-$(command -v java)}")
 export JAVA_HOME
 JAVA_HOME=$(dirname "$(dirname "$java_command")")
 options=()
 if [ -n "${TMPDIR:-}" ]; then
   options+=("-Djava.io.tmpdir=$TMPDIR")
 fi
-exec "$java_command" "${options[@]}" "$@"
+exec "$java_command" ${options[@]+"${options[@]}"} "$@"

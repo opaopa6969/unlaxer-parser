@@ -122,16 +122,18 @@ def main():
         env['CARGO_PKG_VERSION']='2.0.0' # Rust package version at the same source pin; Java POM is 2.0.1.
         run(['rustup','run','1.85.0','rustc','--edition=2021','-C','opt-level=1','--crate-name=tinyexpression_rs','--crate-type=rlib',tiny/'rust/tinyexpression-rs/src/lib.rs','-o',out/'libtinyexpression_rs.rlib'])
         run(['rustup','run','1.85.0','rustc','--edition=2021','--extern','unlaxer_runtime='+str(out/'libunlaxer_runtime.rlib'),'--extern','tinyexpression_rs='+str(out/'libtinyexpression_rs.rlib'),root/'examples/tinyexpression-production/probe.rs','-o',out/'probe'])
+        # Without TMPDIR the probes keep launching JAVA_HOME's java; CI adds java.io.tmpdir (#1045).
+        fixture_java=root/'scripts/ci/java-tmpdir/bin/java' if os.environ.get('TMPDIR') else pathlib.Path(os.environ.get('JAVA_HOME','/usr')).joinpath('bin/java')
         expected=(fixture/'expected.tsv').read_text()
         for language,command in [('java',java_command('java') + ['-cp',str(out)+os.pathsep+cp,'Probe']),('rust',[out/'probe'])]:
-            actual=run(command+[fixture,root/'scripts/ci/java-tmpdir/bin/java',cp],timeout=180)
+            actual=run(command+[fixture,fixture_java,cp],timeout=180)
             (out/(language+'.tsv')).write_text(actual)
             if actual!=expected:
                 print(''.join(difflib.unified_diff(expected.splitlines(True),actual.splitlines(True),fromfile='independent expected',tofile=language)));raise SystemExit(1)
         run(['rustup','run','1.85.0','rustc','--edition=2021','--extern','unlaxer_runtime='+str(out/'libunlaxer_runtime.rlib'),'--extern','tinyexpression_rs='+str(out/'libtinyexpression_rs.rlib'),root/'examples/tinyexpression-production/partial_probe.rs','-o',out/'partial-probe'])
         partial_expected=(fixture/'partial/expected.tsv').read_text()
         for language,command in [('java',java_command('java') + ['-cp',str(out)+os.pathsep+cp,'PartialProbe']),('rust',[out/'partial-probe'])]:
-            actual=run(command+[fixture,root/'scripts/ci/java-tmpdir/bin/java',cp],timeout=180)
+            actual=run(command+[fixture,fixture_java,cp],timeout=180)
             (out/('partial-'+language+'.tsv')).write_text(actual)
             if actual!=partial_expected:
                 print(''.join(difflib.unified_diff(partial_expected.splitlines(True),actual.splitlines(True),fromfile='independent partial expected',tofile=language)));raise SystemExit(1)

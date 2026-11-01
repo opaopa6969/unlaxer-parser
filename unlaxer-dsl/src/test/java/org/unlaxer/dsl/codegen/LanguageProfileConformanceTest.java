@@ -125,7 +125,7 @@ public class LanguageProfileConformanceTest {
         Files.write(officialDirectory.resolve("expected.tsv"), nativeOfficial);
         Path officialProbe = directory.resolve("official-probe");
         run(List.of(rustc, "--edition=2021", "--extern", "unlaxer_runtime=" + runtime, repo.resolve("docs/fixtures/language-profiles/official_probe.rs").toString(), "-o", officialProbe.toString()));
-        assertEquals(nativeOfficial, run(List.of(officialProbe.toString(), officialDirectory.toString(), repo.toString(), repo.resolve("scripts/ci/java-tmpdir/bin/java").toString(), System.getProperty("java.class.path"), repo.resolve("unlaxer-dsl/ubnf-vscode/node_modules/typescript/lib/typescript.js").toString(), rustc)).lines().toList());
+        assertEquals(nativeOfficial, run(List.of(officialProbe.toString(), officialDirectory.toString(), repo.toString(), org.unlaxer.dsl.TestProcesses.javaLauncher(repo), System.getProperty("java.class.path"), repo.resolve("unlaxer-dsl/ubnf-vscode/node_modules/typescript/lib/typescript.js").toString(), rustc)).lines().toList());
         Files.write(Path.of("target/language-profile-official-positions.tsv"), nativeOfficial);
         Files.write(Path.of("target/language-profile-conformance.tsv"), observations);
         Files.write(Path.of("target/language-profile-official.tsv"), officialObservations);
