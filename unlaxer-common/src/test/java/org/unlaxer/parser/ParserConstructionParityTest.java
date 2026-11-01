@@ -14,6 +14,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -275,19 +282,29 @@ public class ParserConstructionParityTest {
   private static final Map<String, Supplier<Parser>> RULE_SUPPLIERS = Map.of(
       "Root", ROOT, "Item", ITEM, "Leaf", LEAF, "Probe", PROBE, "NotProbe", NOT_PROBE, "StopProbe", STOP_PROBE);
 
+  private static final List<String> REFERENCE_VARIANTS = List.of("by-name", "predicate-name", "predicate-rule");
+
+  /** How the reference routes of {@link #VARIANTS} build a reference to a rule. */
+  private static Function<String, Parser> reference(String name) {
+    switch (name) {
+      case "by-name":
+        return target -> new ReferenceByNameParser(Name.of(target));
+      case "predicate-name":
+        return target -> ReferenceParser.of(Name.of(target));
+      case "predicate-rule":
+        return target -> new ReferenceParser(
+            parser -> parser instanceof GrammarRule && GrammarRule.nameOf(parser).equals(target));
+      default:
+        throw new IllegalArgumentException(name);
+    }
+  }
+
   private static Function<String, Parser> variant(String name) {
     switch (name) {
-      case "by-name": {
-        Map<String, Parser> rules = referenceGraph(target -> new ReferenceByNameParser(Name.of(target)));
-        return rules::get;
-      }
-      case "predicate-name": {
-        Map<String, Parser> rules = referenceGraph(target -> ReferenceParser.of(Name.of(target)));
-        return rules::get;
-      }
+      case "by-name":
+      case "predicate-name":
       case "predicate-rule": {
-        Map<String, Parser> rules = referenceGraph(target -> new ReferenceParser(
-            parser -> parser instanceof GrammarRule && GrammarRule.nameOf(parser).equals(target)));
+        Map<String, Parser> rules = referenceGraph(reference(name));
         return rules::get;
       }
       case "factory-class":
@@ -358,6 +375,44 @@ public class ParserConstructionParityTest {
     return rows;
   }
 
+  private static ParseContext context(String inputHex, Memoization memo, ParseOptions.Diagnostics diagnostics) {
+    return ParseContext.withOptions(StringSource.createRootSource(decode(inputHex)),
+        ParseOptions.withMemoization(memo).withDiagnostics(diagnostics));
+  }
+
+  /**
+   * Parses one cases.tsv row in a fresh context and checks it against the row; returns the whole
+   * original CST so the caller can compare it across construction routes.
+   */
+  private static String caseObservation(String label, Parser parser, String[] c, Memoization memo,
+      ParseOptions.Diagnostics diagnostics) {
+    try (ParseContext context = context(c[2], memo, diagnostics)) {
+      Parsed parsed = parser.parse(context, TokenKind.valueOf(c[3]), Boolean.parseBoolean(c[4]));
+      boolean detailed = context.getOptions().diagnostics() == ParseOptions.Diagnostics.DETAILED;
+      List<Token> leaves = new ArrayList<>();
+      for (Token token : context.getCurrent().getTokens()) {
+        leaves(token, leaves);
+      }
+      String actual = String.join("\t",
+          String.valueOf(parsed.isSucceeded()),
+          String.valueOf(context.getConsumedPosition().value()),
+          String.valueOf(context.getMatchedPosition().value()),
+          String.valueOf(context.getParseFailureDiagnostics().getFarthestOffset()),
+          signatures(parsed.getOriginalTokens()),
+          signatures(context.getCurrent().getTokens()),
+          signatures(leaves),
+          render(context.getRuleStack()));
+      String expected = String.join("\t",
+          c[5], c[6], c[7], detailed || diagnostics == ParseOptions.Diagnostics.AUTO ? c[8] : "0",
+          c[9], c[10], c[11], detailed ? c[12] : "~");
+      assertEquals(label, expected, actual);
+      assertEquals(label, 1, context.getTokenStack().size());
+      return context.getCurrent().getTokens().stream()
+          .map(ParserConstructionParityTest::shape)
+          .collect(Collectors.joining(";"));
+    }
+  }
+
   @Test
   public void everyConstructionRouteReproducesTheSharedParseOracle() throws Exception {
     List<String[]> rows = rows("cases.tsv", 13);
@@ -371,31 +426,8 @@ public class ParserConstructionParityTest {
         for (ParseOptions.Diagnostics diagnostics : ParseOptions.Diagnostics.values()) {
           for (String[] c : rows) {
             String label = c[0] + "/" + variantName + "/" + memo + "/" + diagnostics;
-            try (ParseContext context = ParseContext.withOptions(StringSource.createRootSource(decode(c[2])),
-                ParseOptions.withMemoization(memo).withDiagnostics(diagnostics))) {
-              Parsed parsed = rules.apply(c[1]).parse(context, TokenKind.valueOf(c[3]), Boolean.parseBoolean(c[4]));
-              boolean detailed = context.getOptions().diagnostics() == ParseOptions.Diagnostics.DETAILED;
-              List<Token> leaves = new ArrayList<>();
-              for (Token token : context.getCurrent().getTokens()) {
-                leaves(token, leaves);
-              }
-              String actual = String.join("\t",
-                  String.valueOf(parsed.isSucceeded()),
-                  String.valueOf(context.getConsumedPosition().value()),
-                  String.valueOf(context.getMatchedPosition().value()),
-                  String.valueOf(context.getParseFailureDiagnostics().getFarthestOffset()),
-                  signatures(parsed.getOriginalTokens()),
-                  signatures(context.getCurrent().getTokens()),
-                  signatures(leaves),
-                  render(context.getRuleStack()));
-              String expected = String.join("\t",
-                  c[5], c[6], c[7], detailed || diagnostics == ParseOptions.Diagnostics.AUTO ? c[8] : "0",
-                  c[9], c[10], c[11], detailed ? c[12] : "~");
-              assertEquals(label, expected, actual);
-              assertEquals(label, 1, context.getTokenStack().size());
-              String tree = context.getCurrent().getTokens().stream()
-                  .map(ParserConstructionParityTest::shape)
-                  .collect(Collectors.joining(";"));
+            try {
+              String tree = caseObservation(label, rules.apply(c[1]), c, memo, diagnostics);
               String first = shapes.putIfAbsent(c[0] + "/" + memo + "/" + diagnostics, tree);
               assertEquals(label + " intermediate CST differs from " + VARIANTS.get(0), first == null ? tree : first, tree);
             } catch (AssertionError failure) {
@@ -406,6 +438,489 @@ public class ParserConstructionParityTest {
       }
     }
     assertTrue(String.join("\n", failures), failures.isEmpty());
+  }
+
+  // ---- concurrent parses of one frozen shared graph (#1007)
+
+  private static final int THREADS = 8;
+  private static final int ROUNDS = 40;
+
+  /**
+   * The shared-graph.tsv grammar: List ::= Elem*; Elem ::= '(' List ')' | 'é' | '😀';
+   * Top ::= List '!'. {@code elemList} is Elem's reference to List.
+   */
+  private static Map<String, Parser> listGraph(Function<String, Parser> reference, Parser elemList) {
+    Parser list = new NamedChain("List", new ZeroOrMore(reference.apply("Elem")));
+    Parser elem = new NamedChoice("Elem", new Chain(w("("), elemList, w(")")), w("é"), w("😀"));
+    Parser top = new NamedChain("Top", reference.apply("List"), w("!"));
+    new PseudoRootParser(new Parsers(list, elem, top));
+    Map<String, Parser> rules = new LinkedHashMap<>();
+    rules.put("List", list);
+    rules.put("Elem", elem);
+    rules.put("Top", top);
+    return rules;
+  }
+
+  /** Parses one shared-graph.tsv row in a fresh context and checks it against the row. */
+  private static void graphObservation(String label, Parser parser, String[] c, Memoization memo,
+      ParseOptions.Diagnostics diagnostics) {
+    try (ParseContext context = context(c[2], memo, diagnostics)) {
+      Parsed parsed = parser.parse(context);
+      boolean detailed = context.getOptions().diagnostics() == ParseOptions.Diagnostics.DETAILED;
+      List<Token> leaves = new ArrayList<>();
+      for (Token token : context.getCurrent().getTokens()) {
+        leaves(token, leaves);
+      }
+      String actual = String.join("\t",
+          String.valueOf(parsed.isSucceeded()),
+          String.valueOf(context.getConsumedPosition().value()),
+          String.valueOf(context.getParseFailureDiagnostics().getFarthestOffset()),
+          signatures(leaves),
+          render(context.getRuleStack()));
+      String expected = String.join("\t",
+          c[3], c[4], detailed || diagnostics == ParseOptions.Diagnostics.AUTO ? c[5] : "0",
+          c[6], detailed ? c[7] : "~");
+      assertEquals(label, expected, actual);
+    }
+  }
+
+  /** The prefix observation of {@link #scopeObservation} in one rotated mode per input. */
+  private static String scopePrefixes(Parser scoped, Parser control, Memoization[] memos,
+      ParseOptions.Diagnostics[] diagnostics, int mode) {
+    List<String> observed = new ArrayList<>();
+    String[][] calls = {{"a", "s"}, {"(x)", "s"}, {"a", "c"}};
+    for (String[] call : calls) {
+      int index = mode++ % (memos.length * diagnostics.length);
+      try (ParseContext context = ParseContext.withOptions(StringSource.createRootSource(call[0]),
+          ParseOptions.withMemoization(memos[index / diagnostics.length])
+              .withDiagnostics(diagnostics[index % diagnostics.length]))) {
+        observed.add(prefix(call[1].equals("s") ? scoped : control, context));
+      }
+    }
+    return String.join(";", observed);
+  }
+
+  /** The graphs of one round, built on the test thread before the parsing threads start. */
+  private static final class Round {
+    final Map<String, Map<String, Parser>> cases = new LinkedHashMap<>();
+    final Map<String, Map<String, Parser>> lists = new LinkedHashMap<>();
+    final Map<String, Parser[]> scopes = new LinkedHashMap<>();
+
+    Round() {
+      for (String variantName : VARIANTS) {
+        Function<String, Parser> rules = variant(variantName);
+        Map<String, Parser> resolved = new LinkedHashMap<>();
+        for (String rule : RULE_CLASSES.keySet()) {
+          // Resolved once, so new-instance shares its instances like every other route.
+          resolved.put(rule, rules.apply(rule));
+        }
+        cases.put(variantName, resolved);
+      }
+      for (String variantName : REFERENCE_VARIANTS) {
+        Function<String, Parser> reference = reference(variantName);
+        lists.put(variantName, listGraph(reference, reference.apply("List")));
+      }
+      for (String variantName : List.of("by-name", "predicate-name")) {
+        Function<String, Parser> reference = reference(variantName);
+        scopes.put(variantName, new Parser[] {scopeGraph(true, reference), scopeGraph(false, reference)});
+      }
+    }
+  }
+
+  @Test
+  public void aFrozenSharedGraphParsesConcurrentlyLikeTheSharedOracle() throws Exception {
+    List<String[]> cases = rows("cases.tsv", 13);
+    List<String[]> graphRows = rows("shared-graph.tsv", 8);
+    assertEquals(6, graphRows.size());
+    Map<String, String> scopeExpected = new LinkedHashMap<>();
+    for (String[] row : rows("construction.tsv", 4)) {
+      if (row[0].startsWith("root-indicator-scope-")) {
+        scopeExpected.put(row[0].equals("root-indicator-scope-by-name") ? "by-name" : "predicate-name", row[1]);
+      }
+    }
+    assertEquals(2, scopeExpected.size());
+    Memoization[] memos = Memoization.values();
+    ParseOptions.Diagnostics[] diagnostics = ParseOptions.Diagnostics.values();
+    int modes = memos.length * diagnostics.length;
+    List<String> failures = java.util.Collections.synchronizedList(new ArrayList<>());
+    Map<String, String> shapes = new ConcurrentHashMap<>();
+    AtomicInteger parses = new AtomicInteger();
+    ExecutorService pool = Executors.newFixedThreadPool(THREADS);
+    try {
+      for (int round = 0; round < ROUNDS; round++) {
+        Round graphs = new Round();
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> threads = new ArrayList<>();
+        for (int thread = 0; thread < THREADS; thread++) {
+          int threadIndex = thread;
+          int roundIndex = round;
+          // Submitting publishes the graphs built above to the parsing thread.
+          threads.add(pool.submit(() -> {
+            start.await();
+            // Even threads share one order and so race on the same first uses; odd ones rotate.
+            int shift = threadIndex % 2 == 0 ? 0 : threadIndex;
+            int mode = threadIndex + roundIndex;
+            for (String variantName : VARIANTS) {
+              Map<String, Parser> rules = graphs.cases.get(variantName);
+              for (int row = 0; row < cases.size(); row++) {
+                String[] c = cases.get((row + shift) % cases.size());
+                int index = mode++ % modes;
+                Memoization memo = memos[index / diagnostics.length];
+                ParseOptions.Diagnostics diagnostic = diagnostics[index % diagnostics.length];
+                String label = c[0] + "/" + variantName + "/" + memo + "/" + diagnostic + "/thread" + threadIndex
+                    + "/round" + roundIndex;
+                try {
+                  String tree = caseObservation(label, rules.get(c[1]), c, memo, diagnostic);
+                  String first = shapes.putIfAbsent(c[0] + "/" + memo + "/" + diagnostic, tree);
+                  assertEquals(label + " intermediate CST", first == null ? tree : first, tree);
+                } catch (AssertionError | RuntimeException failure) {
+                  failures.add(label + ": " + failure);
+                }
+                parses.incrementAndGet();
+              }
+            }
+            for (String variantName : REFERENCE_VARIANTS) {
+              Map<String, Parser> rules = graphs.lists.get(variantName);
+              for (int row = 0; row < graphRows.size(); row++) {
+                String[] c = graphRows.get((row + shift) % graphRows.size());
+                int index = mode++ % modes;
+                Memoization memo = memos[index / diagnostics.length];
+                ParseOptions.Diagnostics diagnostic = diagnostics[index % diagnostics.length];
+                String label = c[0] + "/" + variantName + "/" + memo + "/" + diagnostic + "/thread" + threadIndex
+                    + "/round" + roundIndex;
+                try {
+                  graphObservation(label, rules.get(c[1]), c, memo, diagnostic);
+                } catch (AssertionError | RuntimeException failure) {
+                  failures.add(label + ": " + failure);
+                }
+                parses.incrementAndGet();
+              }
+            }
+            for (Map.Entry<String, Parser[]> scope : graphs.scopes.entrySet()) {
+              String label = "scope/" + scope.getKey() + "/thread" + threadIndex + "/round" + roundIndex;
+              try {
+                assertEquals(label, scopeExpected.get(scope.getKey()),
+                    scopePrefixes(scope.getValue()[0], scope.getValue()[1], memos, diagnostics, mode));
+              } catch (AssertionError | RuntimeException failure) {
+                failures.add(label + ": " + failure);
+              }
+              mode += 3;
+              parses.addAndGet(3);
+            }
+            return null;
+          }));
+        }
+        start.countDown();
+        for (Future<?> thread : threads) {
+          thread.get(120, TimeUnit.SECONDS);
+        }
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+    assertTrue(failures.size() + " failures\n" + String.join("\n", failures.subList(0, Math.min(20, failures.size()))),
+        failures.isEmpty());
+    int perThread = VARIANTS.size() * cases.size() + REFERENCE_VARIANTS.size() * graphRows.size() + 2 * 3;
+    assertEquals(THREADS * ROUNDS * perThread, parses.get());
+  }
+
+  /**
+   * first-use-parked in shared-graph.tsv: a thread stopped inside the first resolution of a
+   * ReferenceParser leaves the cache unpublished, holds no lock, and another context on the same
+   * graph resolves and finishes on its own; both match the row.
+   */
+  @Test
+  public void aThreadParkedInAFirstResolutionDoesNotBlockOrCorruptAnother() throws Exception {
+    String[] row = rows("shared-graph.tsv", 8).stream()
+        .filter(c -> c[0].equals("list-nested"))
+        .findFirst()
+        .orElseThrow();
+    CountDownLatch parked = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicBoolean first = new AtomicBoolean(true);
+    Parser elemList = new ReferenceParser(parser -> {
+      if (first.compareAndSet(true, false)) {
+        parked.countDown();
+        try {
+          release.await();
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new IllegalStateException(interrupted);
+        }
+      }
+      return parser instanceof GrammarRule && GrammarRule.nameOf(parser).equals("List");
+    });
+    Parser list = listGraph(reference("predicate-rule"), elemList).get("List");
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> stopped = pool.submit(() -> {
+        graphObservation("parked", list, row, Memoization.OFF, ParseOptions.Diagnostics.DETAILED);
+        return null;
+      });
+      assertTrue("the first resolution was reached", parked.await(60, TimeUnit.SECONDS));
+      Future<?> other = pool.submit(() -> {
+        graphObservation("other", list, row, Memoization.OFF, ParseOptions.Diagnostics.DETAILED);
+        return null;
+      });
+      other.get(60, TimeUnit.SECONDS);
+      assertFalse("still parked while the other context finished", stopped.isDone());
+      release.countDown();
+      stopped.get(60, TimeUnit.SECONDS);
+    } finally {
+      release.countDown();
+      pool.shutdownNow();
+    }
+  }
+
+  // ---- lazy delegates of user parsers that inherit AbstractParser.parse (#1007)
+
+  /**
+   * A user parser whose inherited parse runs the body that createParser builds. The body is new on
+   * every call and is not a child yet, so the first use attaches it: a graph change.
+   */
+  static final class LazyDelegate extends LazyAbstractParser {
+    private static final long serialVersionUID = 1L;
+    final transient Function<LazyDelegate, Parser> body;
+    final AtomicInteger creations = new AtomicInteger();
+    final AtomicInteger hooks = new AtomicInteger();
+
+    LazyDelegate(Function<LazyDelegate, Parser> body) {
+      this.body = body;
+    }
+
+    @Override
+    public Parser createParser() {
+      creations.incrementAndGet();
+      return body.apply(this);
+    }
+
+    @Override
+    public void createParserAndThen(Parser createdParser) {
+      hooks.incrementAndGet();
+    }
+
+    @Override
+    public void prepareChildren(Parsers childrenContainer) {
+    }
+
+    @Override
+    public ChildOccurs getChildOccurs() {
+      return ChildOccurs.single;
+    }
+  }
+
+  /** The shared-graph.tsv grammar with List's body {@code Elem*} built by a lazy delegate. */
+  private static final class DelegateGraph {
+    final LazyDelegate delegate;
+    final Parser root;
+    final Map<String, Parser> rules = new LinkedHashMap<>();
+
+    DelegateGraph(Function<String, Parser> reference, Function<LazyDelegate, Parser> body) {
+      delegate = new LazyDelegate(body);
+      Parser list = new NamedChain("List", delegate);
+      Parser elem = new NamedChoice("Elem", new Chain(w("("), reference.apply("List"), w(")")), w("é"), w("😀"));
+      Parser top = new NamedChain("Top", reference.apply("List"), w("!"));
+      root = new PseudoRootParser(new Parsers(list, elem, top));
+      rules.put("List", list);
+      rules.put("Elem", elem);
+      rules.put("Top", top);
+    }
+  }
+
+  private static Function<LazyDelegate, Parser> listBody(Function<String, Parser> reference) {
+    return owner -> new ZeroOrMore(Name.of("ListBody"), reference.apply("Elem"));
+  }
+
+  /**
+   * The graph after its first uses: one body, attached once below the delegate, inside the root's
+   * scope, and found by a name lookup from another rule.
+   */
+  private static String delegateProperties(DelegateGraph graph) {
+    Parser body = graph.delegate.getParser();
+    return graph.delegate.creations.get() + ";" + graph.delegate.getChildren().size() + ";"
+        + identity(graph.delegate.getChildren().get(0), body) + ";"
+        + identity(body.getParent().orElse(null), graph.delegate) + ";"
+        + identity(body.getChildren().get(0).getRoot(), graph.root) + ";"
+        + identity(graph.rules.get("Elem").getParser(Name.of("ListBody")).orElse(null), body);
+  }
+
+  private static final String ATTACHED_ONCE = "1;1;same;same;same;same";
+
+  /** A by-name graph whose delegate's first createParser call throws. */
+  private static DelegateGraph flakyDelegateGraph() {
+    Function<String, Parser> reference = reference("by-name");
+    return new DelegateGraph(reference, owner -> {
+      if (owner.creations.get() == 1) {
+        throw new IllegalStateException("first creation fails");
+      }
+      return new ZeroOrMore(Name.of("ListBody"), reference.apply("Elem"));
+    });
+  }
+
+  /**
+   * lazy-delegate first use in shared-graph.tsv: 8 threads, each parsing every row in two contexts,
+   * start together on graphs whose delegate nobody used yet (first-use) and on graphs whose
+   * delegate was materialized before sharing (materialized). Every parse matches its row; afterwards
+   * the delegate created and attached one body.
+   */
+  @Test
+  public void concurrentFirstUsesOfALazyDelegateCreateAndAttachOneBody() throws Exception {
+    List<String[]> graphRows = rows("shared-graph.tsv", 8);
+    Memoization[] memos = Memoization.values();
+    ParseOptions.Diagnostics[] diagnostics = ParseOptions.Diagnostics.values();
+    int modes = memos.length * diagnostics.length;
+    int contexts = 2;
+    List<String> failures = java.util.Collections.synchronizedList(new ArrayList<>());
+    AtomicInteger parses = new AtomicInteger();
+    int graphCount = 0;
+    ExecutorService pool = Executors.newFixedThreadPool(THREADS);
+    try {
+      for (int round = 0; round < ROUNDS; round++) {
+        Map<String, DelegateGraph> graphs = new LinkedHashMap<>();
+        for (String variantName : REFERENCE_VARIANTS) {
+          for (String state : List.of("first-use", "materialized")) {
+            DelegateGraph graph = new DelegateGraph(reference(variantName), listBody(reference(variantName)));
+            if (state.equals("materialized")) {
+              // The freeze step: build complete, then create the delegate's body before sharing.
+              graph.delegate.getParser();
+            }
+            graphs.put(variantName + "/" + state, graph);
+          }
+        }
+        graphCount = graphs.size();
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> threads = new ArrayList<>();
+        for (int thread = 0; thread < THREADS; thread++) {
+          int threadIndex = thread;
+          int roundIndex = round;
+          threads.add(pool.submit(() -> {
+            start.await();
+            int shift = threadIndex % 2 == 0 ? 0 : threadIndex;
+            int mode = threadIndex + roundIndex;
+            for (Map.Entry<String, DelegateGraph> graph : graphs.entrySet()) {
+              for (int row = 0; row < graphRows.size(); row++) {
+                String[] c = graphRows.get((row + shift) % graphRows.size());
+                for (int context = 0; context < contexts; context++) {
+                  int index = mode++ % modes;
+                  Memoization memo = memos[index / diagnostics.length];
+                  ParseOptions.Diagnostics diagnostic = diagnostics[index % diagnostics.length];
+                  String label = c[0] + "/" + graph.getKey() + "/" + memo + "/" + diagnostic + "/thread"
+                      + threadIndex + "/context" + context + "/round" + roundIndex;
+                  try {
+                    graphObservation(label, graph.getValue().rules.get(c[1]), c, memo, diagnostic);
+                  } catch (AssertionError | RuntimeException failure) {
+                    failures.add(label + ": " + failure);
+                  }
+                  parses.incrementAndGet();
+                }
+              }
+            }
+            return null;
+          }));
+        }
+        start.countDown();
+        for (Future<?> thread : threads) {
+          thread.get(120, TimeUnit.SECONDS);
+        }
+        for (Map.Entry<String, DelegateGraph> graph : graphs.entrySet()) {
+          String actual = delegateProperties(graph.getValue());
+          if (false == actual.equals(ATTACHED_ONCE)) {
+            failures.add(graph.getKey() + "/round" + round + " properties: " + actual);
+          }
+        }
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+    assertTrue(failures.size() + " failures\n" + String.join("\n", failures.subList(0, Math.min(20, failures.size()))),
+        failures.isEmpty());
+    assertEquals(THREADS * ROUNDS * graphCount * graphRows.size() * contexts, parses.get());
+  }
+
+  /** Stops the first caller until the test releases it; later callers pass. */
+  private static void parkOnce(AtomicBoolean first, CountDownLatch parked, CountDownLatch release) {
+    if (first.compareAndSet(true, false)) {
+      parked.countDown();
+      try {
+        release.await();
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException(interrupted);
+      }
+    }
+  }
+
+  /**
+   * lazy-delegate-parked in shared-graph.tsv: creating and attaching the body is a graph change, so
+   * it runs once under the delegate's monitor. A thread stopped inside createParser, or inside the
+   * attachment (the body's setParent), holds it; another context's first use waits on that monitor
+   * instead of creating a second body or parsing a body that is not attached yet, then both match
+   * the row. (Reference resolution holds no lock; see the first-use-parked test.)
+   */
+  @Test
+  public void aFirstUseParkedInTheCreationMakesTheOtherFirstUseWaitForTheOneBody() throws Exception {
+    String[] row = rows("shared-graph.tsv", 8).stream()
+        .filter(c -> c[0].equals("list-nested"))
+        .findFirst()
+        .orElseThrow();
+    for (String parkedIn : List.of("createParser", "attachment")) {
+      CountDownLatch parked = new CountDownLatch(1);
+      CountDownLatch release = new CountDownLatch(1);
+      AtomicBoolean first = new AtomicBoolean(true);
+      Function<String, Parser> reference = reference("by-name");
+      DelegateGraph graph = new DelegateGraph(reference, owner -> {
+        if (parkedIn.equals("createParser")) {
+          parkOnce(first, parked, release);
+          return new ZeroOrMore(Name.of("ListBody"), reference.apply("Elem"));
+        }
+        return new ZeroOrMore(Name.of("ListBody"), reference.apply("Elem")) {
+          private static final long serialVersionUID = 1L;
+
+          @Override
+          public void setParent(Parser parent) {
+            parkOnce(first, parked, release);
+            super.setParent(parent);
+          }
+        };
+      });
+      Parser list = graph.rules.get("List");
+      List<Throwable> errors = java.util.Collections.synchronizedList(new ArrayList<>());
+      Function<String, Thread> observer = label -> new Thread(() -> {
+        try {
+          graphObservation(label, list, row, Memoization.OFF, ParseOptions.Diagnostics.DETAILED);
+        } catch (Throwable failure) {
+          errors.add(failure);
+        }
+      }, parkedIn + "/" + label);
+      Thread stopped = observer.apply("parked");
+      Thread other = observer.apply("other");
+      try {
+        stopped.start();
+        assertTrue(parkedIn + " was reached", parked.await(60, TimeUnit.SECONDS));
+        other.start();
+        java.lang.management.ThreadMXBean threads = java.lang.management.ManagementFactory.getThreadMXBean();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        java.lang.management.LockInfo waitedOn = null;
+        while (other.isAlive() && System.nanoTime() < deadline) {
+          java.lang.management.ThreadInfo info = threads.getThreadInfo(other.getId());
+          if (info != null && info.getThreadState() == Thread.State.BLOCKED) {
+            waitedOn = info.getLockInfo();
+            break;
+          }
+          Thread.sleep(1);
+        }
+        assertTrue(parkedIn + ": the other first use waits for the parked one: " + errors,
+            waitedOn != null && waitedOn.getIdentityHashCode() == System.identityHashCode(graph.delegate));
+        release.countDown();
+        stopped.join(60_000);
+        other.join(60_000);
+        assertFalse(parkedIn, stopped.isAlive() || other.isAlive());
+        assertTrue(parkedIn + ": " + errors, errors.isEmpty());
+        assertEquals(parkedIn, ATTACHED_ONCE, delegateProperties(graph));
+      } finally {
+        release.countDown();
+      }
+    }
   }
 
   // ---- construction and identity observations
@@ -622,6 +1137,84 @@ public class ParserConstructionParityTest {
         }
       case "lazy-construction-cycle":
         return parse(Parser.get(ItemParser.class), "((x))");
+      case "lazy-delegate-built-once": {
+        DelegateGraph graph = new DelegateGraph(reference("by-name"), listBody(reference("by-name")));
+        for (int parse = 0; parse < 3; parse++) {
+          assertEquals("true/1", parse(graph.rules.get("List"), "é"));
+        }
+        return String.valueOf(graph.delegate.creations.get());
+      }
+      case "lazy-delegate-failure-retried": {
+        DelegateGraph graph = flakyDelegateGraph();
+        String first = failure(() -> parse(graph.rules.get("List"), "é")).equals("ok") ? "ok" : "error";
+        return first + ";" + parse(graph.rules.get("List"), "é") + ";" + graph.delegate.creations.get();
+      }
+      case "lazy-delegate-hook-each-call": {
+        DelegateGraph graph = new DelegateGraph(reference("by-name"), listBody(reference("by-name")));
+        for (int parse = 0; parse < 3; parse++) {
+          assertEquals("true/1", parse(graph.rules.get("List"), "é"));
+        }
+        return graph.delegate.creations.get() + ";" + graph.delegate.hooks.get();
+      }
+      case "lazy-delegate-attach": {
+        DelegateGraph graph = flakyDelegateGraph();
+        List<Integer> sizes = new ArrayList<>();
+        sizes.add(graph.delegate.getChildren().size());
+        assertFalse(failure(() -> parse(graph.rules.get("List"), "é")).equals("ok"));
+        sizes.add(graph.delegate.getChildren().size());
+        for (int parse = 0; parse < 2; parse++) {
+          assertEquals("true/1", parse(graph.rules.get("List"), "é"));
+          sizes.add(graph.delegate.getChildren().size());
+        }
+        return sizes.stream().map(String::valueOf).collect(Collectors.joining(";")) + ";"
+            + identity(graph.delegate.getParser().getParent().orElse(null), graph.delegate);
+      }
+      case "lazy-delegate-walk-during-attach": {
+        DelegateGraph graph = new DelegateGraph(reference("by-name"), listBody(reference("by-name")));
+        java.util.Iterator<Parser> walk = graph.delegate.getChildren().iterator();
+        assertEquals("true/1", parse(graph.rules.get("List"), "é"));
+        int walked = 0;
+        while (walk.hasNext()) {
+          walk.next();
+          walked++;
+        }
+        return walked + ";" + graph.delegate.getChildren().size();
+      }
+      case "lazy-delegate-reentrant-getter": {
+        Function<String, Parser> reference = reference("by-name");
+        List<String> seen = new ArrayList<>();
+        DelegateGraph[] graph = new DelegateGraph[1];
+        graph[0] = new DelegateGraph(reference, owner -> {
+          seen.add(String.valueOf(owner.getChildren().size()));
+          seen.add(identity(owner.getRoot(), graph[0].root));
+          seen.add(owner.getParser(Name.of("Elem")).isPresent() ? "present" : "absent");
+          return new ZeroOrMore(Name.of("ListBody"), reference.apply("Elem"));
+        });
+        return parse(graph[0].rules.get("List"), "é") + ";" + String.join(";", seen);
+      }
+      case "lazy-delegate-self-reentry": {
+        DelegateGraph graph = new DelegateGraph(reference("by-name"), owner -> owner.getParser());
+        try {
+          return parse(graph.rules.get("List"), "é");
+        } catch (StackOverflowError expected) {
+          return "StackOverflowError";
+        }
+      }
+      case "lazy-delegate-detached-cache": {
+        DelegateGraph graph = new DelegateGraph(reference("by-name"), listBody(reference("by-name")));
+        String first = parse(graph.rules.get("List"), "é");
+        graph.delegate.getChildren().clear();
+        int cleared = graph.delegate.getChildren().size();
+        return first + ";" + cleared + ";" + parse(graph.rules.get("List"), "é") + ";"
+            + graph.delegate.getChildren().size() + ";" + graph.delegate.creations.get();
+      }
+      case "lazy-delegate-lookup-before-materialize": {
+        DelegateGraph graph = new DelegateGraph(reference("by-name"), listBody(reference("by-name")));
+        Parser elem = graph.rules.get("Elem");
+        String before = elem.getParser(Name.of("ListBody")).isPresent() ? "present" : "absent";
+        graph.delegate.getParser();
+        return before + ";" + (elem.getParser(Name.of("ListBody")).isPresent() ? "present" : "absent");
+      }
       case "lazy-children-once": {
         AtomicInteger calls = new AtomicInteger();
         Parser lazy = new LazyChain() {
@@ -907,7 +1500,7 @@ public class ParserConstructionParityTest {
   @Test
   public void constructionAndIdentityObservationsMatchTheSharedTable() throws Exception {
     List<String[]> rows = rows("construction.tsv", 4);
-    assertEquals(56, rows.size());
+    assertEquals(65, rows.size());
     Set<String> ids = rows.stream().map(row -> row[0]).collect(Collectors.toSet());
     assertEquals(rows.size(), ids.size());
     List<String> failures = new ArrayList<>();

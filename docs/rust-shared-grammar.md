@@ -59,10 +59,54 @@ Java の `Parser.get(Class)` / `Parser.get(Supplier)` / `newInstance`、lazy chi
   deadlock する）。循環は `Expr::Rule(id)` で書く。
 - capture・scope・user state は `ParseContext` が持ち、共有 grammar には残らない。新しい context は
   前の解析の state を引き継がない（Java の global scope map も同じ）。
-- Java の共有 graph には可変の状態がある（`AbstractParser.root`・`parserByName`、
-  `ReferenceParser` の cache、`AbstractPropagatableSource.computedInvertMatch`、
-  `ParserFactoryByClass` の初期化 map）。これらの並行時の動作は検証していないため、
-  不変の Rust grammar との並行時の同値は主張しない。
+- Java の共有 graph は、初回の解析で遅延 cache を埋める（`AbstractParser.root`・`parserByName`、
+  `ReferenceParser` などの参照先、lazy children、`ParserFactoryByClass` の初期化 map）。#1007 から、
+  これらは別々の context が同時に解析しても安全に公開される。参照先と root は不変の `Optional` を
+  1 本の field で公開し、名前の map は `ConcurrentHashMap`、lazy children は従来どおり同期する。
+  初回を同時に迎えた thread は、それぞれ同じ結果を計算して公開する。解決中に lock は持たない。
+  `shared-graph.tsv` と cases.tsv を、凍結した graph（Rust は不変の `Arc` grammar）上で
+  8 thread × 40 round 実行し、各行の期待値と照合する。対象外は二つある。
+  一つは同じ `ParseContext` の同時利用、もう一つは利用者が解析中に行う graph の変更（子の追加・付け替え）である。
+  後者は従来どおり一つの thread で行う契約で、次項の委譲先の初回の追加だけは library が並行時にも安全に行う。
+  `AbstractPropagatableSource.computedInvertMatch` は解析に使わない。読むのは TokenPrinter の
+  `(inverted)` 表示だけで、その値は直前の呼び出しのものであり、token の性質ではない
+  （別の context が上書きし得る）。Rust には対応する共有状態がない。
+- `AbstractParser.parse` を継承する利用者の parser は、`createParser()` が返す委譲先を初回に作る。
+  library と生成器の parser はどれも `parse` を override し、`createParser()` は `this` を返すので、
+  この経路を通らない。委譲先がまだ子でなければ、初回は委譲先を子に足す graph の変更になる。
+  そのため初回は、子を準備するのと同じ parser の monitor の下で一度だけ行い、委譲先の親を設定して
+  子に足してから field（volatile）に公開する。作成中の別 context は、2 つ目の委譲先を作らずに
+  monitor で待つ（Rust の `OnceLock::get_or_init` と同じ）。作成が例外で終われば何も公開せず、
+  次の呼び出しが作り直す。子の list は書き換えずに差し替えるので、走査中の別 thread は
+  付け足す前か後の list を最後まで見る。`createParser()` の中から自分の `getChildren()`・
+  `getRoot()`・名前検索は呼べるが、自分の `getParser()` を呼ぶと従来どおり再帰する。
+  `createParserAndThen` は作成後の一度ではなく、`getParser()` の呼び出しごとに走る（従来どおり）。
+  初回の `createParser()` は所有 parser の monitor 内で動く。別 parser の初期化を相互に呼ぶ場合は、
+  複数 thread で初回構築を始めると lock の循環が起こり得るため、共有前に単一 thread で構築を終える。
+  利用者の `createParserAndThen` も並行して呼ばれるため、共有 graph を変更せず thread ごとの状態を使う。
+  `Parsers.list()`・`subList()`・`listIterator()` など、接続前に取り出した view は以前の list を指し、
+  後から付いた子を反映しない。通常の graph の変更と view の併用は単一 thread の契約のままである。
+- 委譲先の部分木にある名前は、委譲先を作るまで検索に見えない。名前参照は miss を cache しないが、
+  `ReferenceParser` は miss を cache するので、凍結して共有する graph は、構築を終えたあと共有する前に、
+  委譲型の parser それぞれで `getParser()` を呼んで委譲先を作っておく（下の例）。`parse` を
+  override する parser（`LazyChain` など）で呼ぶと、使われない `createParser()` の結果を子に足して
+  しまうので、graph 全体へ一律には呼ばない。
+  ```java
+  LazyDelegate body = new LazyDelegate();          // AbstractParser.parse を継承する利用者 parser
+  Parser root = new PseudoRootParser(new Parsers(new NamedChain("List", body), elem, top));
+  body.getParser();                                 // 凍結: 共有する前に委譲先を作って子に足す
+  executor.submit(() -> root.parse(new ParseContext(source)));
+  ```
+  作らずに共有しても、解析の結果と委譲先の一意性は保たれる（`concurrentFirstUsesOfALazyDelegateCreateAndAttachOneBody`
+  の first-use）。凍結が要るのは、委譲先の部分木を対象にする検索の結果を、解析の順序に依らせないためである。
+  Rust の grammar は不変なので、委譲先は grammar の外の `OnceLock<Expr>` に置き、同じ graph を解析する
+  context が user state で共有する（`Expr::Custom` が初回に作る）。両言語とも shared-graph.tsv の行を
+  first-use と凍結済みの両方で 8 thread × 各行 2 context × 40 round 照合し、作成が 1 回であること、
+  作成中に止めた thread を別 context が待つことを検査する。
+- 並行 fixture の Rust 側は、Java の `parser.parse(context)` に合わせて最も外側を `ParseContext::parse`
+  にし、その中で Classic の consumed mode に入る。最も外側を `parse_with_token_mode` にすると、成功した
+  解析でも `rule_stack()` が投機的な失敗の stack を返す（#856 の残差。この迂回は共通 API の完了を
+  意味しない）。
 - Classic の反転は共有 graph ではなく `ParseContext::token_mode()` にある。利用者定義の
   `AbstractPropagatableSource` 相当は、`Expr::Custom` の中で mode を反転して子を
   `parse_with_token_mode` する。
