@@ -20,8 +20,15 @@ pub fn range(text: &str, start: usize, end: usize) -> Value {
 /// a line past the end is the document end and a character past the line end is the
 /// line end (before `\n`). A position inside a surrogate pair is rejected.
 pub fn offset(text: &str, pos: &Value) -> Option<usize> {
-    let line = pos["line"].as_u64()? as usize;
-    let column = pos["character"].as_u64()? as usize;
+    if !pos.is_object() {
+        return None;
+    }
+    let line = crate::rpc::gson_integer(&pos["line"])
+        .or_else(|| pos["line"].is_null().then_some(0))?
+        .max(0) as usize;
+    let column = crate::rpc::gson_integer(&pos["character"])
+        .or_else(|| pos["character"].is_null().then_some(0))?
+        .max(0) as usize;
     let start = if line == 0 {
         0
     } else {
@@ -279,8 +286,15 @@ pub fn package_uri(hash: &str, file: &str) -> String {
 /// Navigation uses ASCII binding spans. At an interior UTF-16 surrogate unit no
 /// binding can occur, so mapping to that scalar's start preserves Java useAt.
 pub fn binding_offset(text: &str, pos: &Value) -> Option<usize> {
-    let line = pos["line"].as_u64()? as usize;
-    let column = pos["character"].as_u64()? as usize;
+    if !pos.is_object() {
+        return None;
+    }
+    let line = crate::rpc::gson_integer(&pos["line"])
+        .or_else(|| pos["line"].is_null().then_some(0))?
+        .max(0) as usize;
+    let column = crate::rpc::gson_integer(&pos["character"])
+        .or_else(|| pos["character"].is_null().then_some(0))?
+        .max(0) as usize;
     let start = if line == 0 {
         0
     } else {

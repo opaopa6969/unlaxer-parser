@@ -1351,5 +1351,524 @@
         }
       }
     ]
+  },
+  "dto": {
+    "capabilitiesInvalid": [
+      "{\"textDocument\":{\"synchronization\":7}}",
+      "{\"workspace\":{\"applyEdit\":{}}}",
+      "{\"general\":{\"markdown\":7}}",
+      "{\"textDocument\":{\"hover\":{\"dynamicRegistration\":{}}}}",
+      "{\"window\":{\"showMessage\":7}}",
+      "{\"workspace\":{\"workspaceFolders\":{}}}",
+      "{\"notebookDocument\":{\"synchronization\":{\"executionSummarySupport\":[]}}}",
+      "{\"textDocument\":{\"completion\":{\"completionItem\":{\"resolveSupport\":{\"properties\":[{}]}}}}}",
+      "{\"workspace\":{\"workspaceEdit\":{\"changeAnnotationSupport\":{\"groupsOnLabel\":7}}}}",
+      "{\"general\":{\"markdown\":{\"parser\":[]}}}",
+      "{\"general\":{\"regularExpressions\":{\"version\":{}}}}",
+      "{\"window\":{\"showMessage\":{\"messageActionItem\":{\"additionalPropertiesSupport\":7}}}}",
+      "{\"textDocument\":{\"semanticTokens\":{\"requests\":{\"full\":{\"delta\":7}}}}}",
+      "{\"textDocument\":{\"codeAction\":{\"codeActionLiteralSupport\":{\"codeActionKind\":{\"valueSet\":[{}]}}}}}"
+    ],
+    "capabilitiesAccepted": [
+      "{\"textDocument\":{\"synchronization\":null,\"hover\":{\"dynamicRegistration\":\"true\",\"contentFormat\":7}},\"general\":{\"markdown\":{\"parser\":7,\"version\":false},\"positionEncodings\":7},\"workspace\":{\"applyEdit\":\"false\",\"workspaceFolders\":null},\"window\":{\"showMessage\":null},\"experimental\":{\"future\":[]}}",
+      "{\"textDocument\":{\"semanticTokens\":{\"requests\":{\"range\":true,\"full\":{\"delta\":true}},\"tokenTypes\":7,\"formats\":false}},\"future\":{\"unknown\":7}}"
+    ],
+    "nestedInvalid": [
+      {
+        "method": "textDocument/documentSymbol",
+        "raw": "{\"textDocument\":7}"
+      },
+      {
+        "method": "textDocument/documentSymbol",
+        "raw": "{\"textDocument\":{\"uri\":[]}}"
+      },
+      {
+        "method": "textDocument/foldingRange",
+        "raw": "{\"textDocument\":7}"
+      },
+      {
+        "method": "textDocument/foldingRange",
+        "raw": "{\"textDocument\":{\"uri\":[]}}"
+      },
+      {
+        "method": "textDocument/semanticTokens/full",
+        "raw": "{\"textDocument\":7}"
+      },
+      {
+        "method": "textDocument/semanticTokens/full",
+        "raw": "{\"textDocument\":{\"uri\":[]}}"
+      },
+      {
+        "method": "textDocument/completion",
+        "raw": "{\"position\":7}"
+      },
+      {
+        "method": "textDocument/definition",
+        "raw": "{\"position\":{\"line\":\"x\"}}"
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"context\":7}"
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"context\":{\"includeDeclaration\":7}}"
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"newName\":[]}"
+      },
+      {
+        "method": "textDocument/codeAction",
+        "raw": "{\"range\":7}"
+      },
+      {
+        "method": "textDocument/codeAction",
+        "raw": "{\"range\":{\"start\":{\"character\":true}}}"
+      },
+      {
+        "method": "textDocument/codeAction",
+        "raw": "{\"context\":{\"diagnostics\":[{\"range\":7}]}}"
+      },
+      {
+        "method": "textDocument/signatureHelp",
+        "raw": "{\"context\":7}"
+      },
+      {
+        "method": "textDocument/completion",
+        "raw": "{\"context\":{\"triggerCharacter\":{}}}"
+      },
+      {
+        "method": "textDocument/linkedEditingRange",
+        "raw": "{\"position\":{\"character\":{}}}"
+      },
+      {
+        "method": "ubnf/packageSource",
+        "raw": "{\"uri\":[]}"
+      }
+    ],
+    "zeroIntegers": [
+      "0",
+      "\"0\"",
+      "\" 0\"",
+      "0.0",
+      "0E5",
+      "1e-400",
+      "\"0e0\"",
+      "\"０\"",
+      "\"٠\"",
+      "\"0x0p0\"",
+      "null"
+    ],
+    "oneIntegers": [
+      "1",
+      "1.0",
+      "\"1e0\""
+    ],
+    "twoIntegers": [
+      "2",
+      "\"2\"",
+      "\" 2\"",
+      "2.0",
+      "2E0",
+      "\"2e0\"",
+      "\"２\"",
+      "\"0x1p1\""
+    ],
+    "invalidIntegers": [
+      "1.5",
+      "\"x\"",
+      "2147483648",
+      "-2147483649",
+      "1e400",
+      "-1e400",
+      "true",
+      "[]",
+      "{}"
+    ],
+    "workDoneMethods": [
+      "callHierarchy/incomingCalls",
+      "callHierarchy/outgoingCalls",
+      "textDocument/codeAction",
+      "textDocument/codeLens",
+      "textDocument/colorPresentation",
+      "textDocument/completion",
+      "textDocument/declaration",
+      "textDocument/definition",
+      "textDocument/diagnostic",
+      "textDocument/documentColor",
+      "textDocument/documentHighlight",
+      "textDocument/documentLink",
+      "textDocument/documentSymbol",
+      "textDocument/foldingRange",
+      "textDocument/formatting",
+      "textDocument/hover",
+      "textDocument/implementation",
+      "textDocument/inlayHint",
+      "textDocument/inlineValue",
+      "textDocument/linkedEditingRange",
+      "textDocument/moniker",
+      "textDocument/prepareCallHierarchy",
+      "textDocument/prepareRename",
+      "textDocument/prepareTypeHierarchy",
+      "textDocument/rangeFormatting",
+      "textDocument/references",
+      "textDocument/rename",
+      "textDocument/selectionRange",
+      "textDocument/semanticTokens/full",
+      "textDocument/semanticTokens/full/delta",
+      "textDocument/semanticTokens/range",
+      "textDocument/signatureHelp",
+      "textDocument/typeDefinition",
+      "typeHierarchy/subtypes",
+      "typeHierarchy/supertypes",
+      "workspace/diagnostic",
+      "workspace/executeCommand",
+      "workspace/symbol"
+    ],
+    "workDoneInvalid": [
+      "1.5",
+      "2147483648",
+      "1e400"
+    ],
+    "workDoneAccepted": [
+      "null",
+      "\"token\"",
+      "0",
+      "1.0",
+      "1e-400"
+    ],
+    "scalarTexts": [
+      "7",
+      "true",
+      "false",
+      "-1",
+      "1.50",
+      "0E5",
+      "1e400",
+      "\"7\""
+    ],
+    "positionSource": "z.\nz.",
+    "hover": {
+      "result": {
+        "contents": {
+          "kind": "markdown",
+          "value": "Parse error at offset 0"
+        }
+      }
+    },
+    "navigation": {
+      "result": []
+    },
+    "completion": {
+      "result": []
+    },
+    "negativeCharacter": {
+      "error": {
+        "code": -32603,
+        "message": "Internal error."
+      }
+    },
+    "nullSource": "grammar N { @root S ::= T ; T ::= 'a' ; }",
+    "nullCases": [
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24},\"context\":{\"includeDeclaration\":\"TRUE\"}}",
+        "expected": {
+          "result": [
+            {
+              "uri": "$URI",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 28
+                },
+                "end": {
+                  "line": 0,
+                  "character": 29
+                }
+              }
+            },
+            {
+              "uri": "$URI",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 24
+                },
+                "end": {
+                  "line": 0,
+                  "character": 25
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24},\"context\":{\"includeDeclaration\":\"yes\"}}",
+        "expected": {
+          "result": [
+            {
+              "uri": "$URI",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 24
+                },
+                "end": {
+                  "line": 0,
+                  "character": 25
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24},\"context\":null}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24}}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":0},\"context\":null}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":24},\"newName\":null}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":0}}",
+        "expected": {
+          "error": {
+            "code": -32602,
+            "message": "安全に名前変更できません。完成した文法のローカル宣言を選び、重複・予約語を避けてください。外部 module の token / import alias / capture は一括 rename の対象外です。"
+          }
+        }
+      },
+      {
+        "method": "textDocument/hover",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/hover",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/hover",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/completion",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/completion",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/completion",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/definition",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/definition",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/definition",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/references",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": {
+            "changes": {}
+          }
+        }
+      },
+      {
+        "method": "textDocument/rename",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": {
+            "changes": {}
+          }
+        }
+      },
+      {
+        "method": "textDocument/linkedEditingRange",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/linkedEditingRange",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/linkedEditingRange",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/documentSymbol",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/documentSymbol",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/documentSymbol",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/foldingRange",
+        "raw": "{\"textDocument\":null,\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "error": {
+            "code": -32603,
+            "message": "Internal error."
+          }
+        }
+      },
+      {
+        "method": "textDocument/foldingRange",
+        "raw": "{\"textDocument\":{},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      },
+      {
+        "method": "textDocument/foldingRange",
+        "raw": "{\"textDocument\":{\"uri\":null},\"position\":{\"line\":0,\"character\":24},\"newName\":\"U\"}",
+        "expected": {
+          "result": []
+        }
+      }
+    ]
   }
 }

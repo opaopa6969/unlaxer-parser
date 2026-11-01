@@ -454,7 +454,7 @@ id はその時点まで読めた値だけが Java の error 回復に使われ�
 | `workDoneToken:{}` / `[]` / `true` | Either adapter が reader を失敗させ、応答なし | **恒久差**: native は従来どおり未使用 token を無視して成功を返す。Java reader 欠陥の移植は client を停止させるため安全でない。JSON-RPC request への決定的応答を維持する。数値 `1.5` は両版 `-32700`、文字列/null は受理 |
 | InitializeParams の他欄・入れ子の型違い | id 付き `-32700 Message could not be parsed.`、initialize 未初期化 / configure 旧状態保持 | 同じ。対象の正確な範囲は下記。成功値の coercion と未知キー・untyped options は削らない |
 | 型付き request の params `7` / `[]` / `"x"` / `false` | 宣言済み50 methodで id 付き `-32700`（実装/default method の dispatch より先） | 同じ。hover/formatting/documentSymbol/packageSource の単一 positional 正常形も比較。#901 の既存 Java 3機能を削らず、不正DTOのparse errorだけをnativeへ追加する |
-| hover の `textDocument:7`、`position.line:[]` / 生 `1e400` | id 付き `-32700` | 同じ。position の Integer 検査は hover の実測範囲。他methodの全DTO schemaを移植したとは扱わない。position の Gson 受理域（`"0"`・`1.0`・`1e-400` 等を Java は受理、native は `-32602`）、hover 以外の入れ子 DTO、hover の `workDoneToken`、ClientCapabilities の他の入れ子欄は [#1005](https://github.com/opaopa6969/unlaxer-parser/issues/1005) で追跡する |
+| hover の `textDocument:7`、`position.line:[]` / 生 `1e400` | id 付き `-32700` | 同じ。#1001 時点の範囲。#1005 で受理域・他method・ClientCapabilities を下表の範囲へ拡張した |
 | 重複 id / method / params | 既知methodの params は出現ごとに検査。正常な重複 id/method は最後の値。不正paramsを後の正常paramsで上書きしても先のparse errorを返す | 同じ入力で比較する。nativeはstream失敗時点の既読idを回復し（未読の場合は最終id付き応答を維持）、先の不正DTOで生じたerrorを後のparamsで消さない。未知methodで保留したparamsは最終methodで変換する。InitializeParamsのtop-level欄も出現ごとに検査する。全ての異種method切替や不正idのreader回復を同等と主張しない |
 | `"id":null`（未知 / `$/foo` / formatting） | 通知として扱い、結果/errorを返さない | 同じ。無いidと同じ通知判定にする。readerの故障ではないため、通知をrequestに変える理由はない |
 | Integer に収まらない数値 id（`0.5`、`2147483648`、`10000000000`、生 `1e400` / `-1e400`）、bool / array / object の id | reader が id を読めず、応答なし | **恒久差**: native は数値 id をそのまま返す（bool / array / object は `id:null` の `-32600 Invalid Request`）。JSON-RPC は応答の id を request と同じ値にすることを求める。Java reader の無応答を移植すると client を固めるため、他の無応答と同じ理由で移植しない |
@@ -469,8 +469,7 @@ DTO の検査範囲は `processId`（Gson Integer）、`rootPath/rootUri/locale/
 `workspace.workspaceEdit`、`window.workDoneProgress`。null/省略は Java の受理域を保つ（capabilities null の恒久差は表のとおり）。
 `processId:"1"`、`rootUri:1`、`rootPath:true`、`initializationOptions:7`、未知キー、
 clientInfo/folder内の scalar→String、`hover.contentFormat:7` / `general.positionEncodings:7` の受理も固定する。
-ClientCapabilities 全体や全methodの内部DTOは移植しない。広大な将来互換schemaを重複させず、
-この実測範囲に境界を限定する最小・可逆な選択であり、全DTO parityの完了とはしない。
+以上は #1001 時点の検査範囲。#1005 では下記の生成型表へ拡張した。全methodの内部DTOや将来版のparity完了とはしない。
 
 fixture の `reader.orders` / `reader.orderParams` / `reader.duplicates` は手書きraw frameで、
 serializeし直さず両実serverへ同じ文字列を送る。生の数値 `1e400`・重複キー・escaped key・順序を保持する。
@@ -488,6 +487,55 @@ JDK21 **17.663秒**、JDK17 **21.043秒**（suiteの elapsedSeconds）だった�
 CIに新しいjobやlocal-importsの重複実行を足さず、self-hosted runs-onとJava serverの `-Xmx8g` を保つ。
 `processId` 型検査だけを外した隔離nativeコピーは、実stdioの不正initializeが成功を返して新suiteに検出された。
 正常コードでは同じfixtureが両JDKで成功する。変異はworktreeへ残さない。
+
+### Gson / DTO 受理域の追補（#1005）
+
+参照は同じ固定 Java `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34`。Java 製品コードは変更しない。
+指定 revision から別領域に構築した実生成 server と native へ、手書き raw frame と
+実測から作らない独立全 JSON oracle を JDK17/JDK21 で送る。同じ必須 jsonrpc suite を
+558→916件（358件追加）に拡張し、既存 test class/job、self-hosted runs-on、
+Java server の `-Xmx8g`、既定応答 timeout 20秒を維持する。
+
+| 境界 / 判断 | 固定 Java | native の選択と理由 |
+|---|---|---|
+| position の Integer | `"0"` / `" 0"` / `1.0` / `0E5` / `1e-400` / `"1e0"`、BMP数字、16進浮動文字列を Gson で変換。省略/null の primitive欄は0 | version と同じ `gson_integer` / `stream_int` を共有して受理。範囲外・非整数・container/bool は dispatch 前の元id付き `-32700 Message could not be parsed.` |
+| 負の位置 | hover/completion は負の character に `-32603 Internal error.`。navigation は line/character を0へ丸める。hover/completion の存在しない line の語/行prefixは空 | method 別に同じ結果/エラー。型が正しい負値を共通の InvalidParams に置換しない |
+| hover 以外の入れ子 DTO | `textDocument:7` / `uri:[]`、completion `position:7`、definition `line:"x"`、references `context:7`、rename `newName:[]`、codeAction `range:7`、packageSource `uri:[]` は元id付き `-32700` | 同じ。lifecycle/製品 dispatch 前に検査し、既存文書・設定を変更しない。#901 の既存 Java 機能を削らず不正DTOの拒否だけを追加 |
+| workDoneToken の数値 | 整数値（`1.0` / underflow の0を含む）は受理。非整数/範囲外に元id付き `-32700` | lsp4j の継承欄から機械列挙した38標準request、および initialize/configure で同じ Integer 検査。文字列/null は受理 |
+| workDoneToken の `{}` / `[]` / bool | Either reader の欠陥で無応答 | **恒久差**: #1001 と同じく未使用tokenを無視しnativeの決定的応答を維持。clientを停止させる欠陥を移植しない。hoverの `{}` を後続barrier＋1秒deadlineでも検証 |
+| ClientCapabilities | synchronization、applyEdit、markdown、hover.dynamicRegistration、window.showMessage、workspaceFolders の指定の型違いは元id付き `-32700` | 全ClientCapabilitiesの欄名/型グラフを単一生成表で検査。initialize は未初期化、configure は旧設定・文書・新入力のVALIDATE gateを保持。null/未知キー/experimental は維持 |
+| didChange text scalar | 数値/真偽値を String に変換して先頭changeをFull snapshotとして適用 | 同じ `gson_string` を検査と適用に共有。`7` / bool / 小数 / 指数 / 生 `1e400` を受理し、負の0や指数の原表記をraw frameから保持。後続changeの型違いも全体破棄し、元文書を保持 |
+| null DTO 欄（レビュー追補） | `textDocument` の null/省略は `-32603 Internal error.`。`uri` の null/省略は未オープン文書として各 method の空結果。references の `context` null は宣言の参照に達したときだけ `-32603`。rename の `newName` null は編集可能な対象でだけ `-32603`、それ以外は既存の rename error | 同じ順序で再現する。`-32602 document URI required` / `newName required` の独自エラーは返さない。手書き oracle 31件を同じ suite に追加 |
+| references `includeDeclaration` の文字列 | Gson の primitive boolean は文字列を `Boolean.parseBoolean`（大小無視の `true`）で変換 | 検査と同じ変換 `gson_boolean` で消費する。`"TRUE"` は宣言を含め、`"yes"` は含めない |
+| Either の token 不一致（container/bool/数値） | `partialResultToken:{}`、Diagnostic `code:{}`、ParameterInformation `label:{}`、`publishDiagnostics.tagSupport:7`、`semanticTokens.requests.full:7` などは Either adapter が token を読まずに失敗し無応答 | **恒久差**: workDoneToken 以外は native が元id付き `-32700` を返す（workDoneToken は上記のとおり受理）。client を固める欠陥を移植しない。#1031 の enum 無応答と同じ分類 |
+
+型表は `rust/unlaxer-ubnf-lsp/src/lsp4j-dto-schema.json` 一か所に置く。
+`scripts/generate-lsp4j-dto-schema.py <org.eclipse.lsp4j-0.23.1-sources.jar>` で再生成でき、
+元JARのSHA-256、version、requestとDTOの対応を記録する。継承欄を含む106 DTO / 299欄であり、
+ClientCapabilitiesの全到達欄と、hover/completion/definition/references/rename/documentSymbol/
+foldingRange/linkedEditingRange/codeAction/signatureHelp/semanticTokens full の11 requestを含む。
+packageSourceはJava独自recordのuri Stringを別途検査する。標準の未実装requestはtop-level paramsと
+該当するworkDoneTokenを検査するが、それら全methodの内部DTOを移植したとは主張しない。
+Gson/lsp4jのscalar変換・単一要素collection・tokenによるEither分岐を保ち、nullや未知キーを
+過剰拒否しない。型表はサーバーの実測結果やfixtureから生成しない。
+
+この型グラフの成功を全raw frame（入れ子の重複キーを含む）/全DTO adapterの同等性とはしない。
+追加調査で completionItemKind.valueSet の `1.5` は Java EnumTypeAdapter が無応答になることを
+両JDKで確認し、受け入れ条件付き [#1031](https://github.com/opaopa6969/unlaxer-parser/issues/1031) に分離した。
+native は決定的parse errorを返す。#1005 の指定の決定的parse errorと混同しない。
+レビューで見つけた didOpen の scalar text/uri（Java は Gson String に変換、native は破棄）と、
+completion の `character` が Java の `start + character` で int overflow する差は #1005 より前からの差で、
+受け入れ条件付き [#1033](https://github.com/opaopa6969/unlaxer-parser/issues/1033) に分離した。
+error.data の比較範囲と親 #885/#864/#111、#893/#894/#901/#902 の継続は従来どおり。
+
+直接stdioの885件は共有ホスト上で JDK21 **31.461秒** / JDK17 **34.664秒**、
+追加したrequest/position/scalar部の計測は **3.831秒 / 5.105秒**だった。
+従来558件の記録（17.663秒 / 21.043秒）に対する差は約14秒で、suite全体でも1分未満。
+新しいjobや重いsuiteの重複を足さず、追加CI時間1分未満の目標内に収める。
+レビュー追補の31件を加えた916件は、同じ共有ホストで直接stdio JDK21 **20.949秒** / JDK17 **21.437秒**（追加部 3.278秒 / 3.267秒）だった。
+生成表の106 DTO/299欄と38 workDone methodは、JARのreflectionによる別実装でも照合した。
+`workspace.applyEdit` のboolean検査だけを無効化した隔離コピーは、今回追加の不正initializeを
+成功させてしまい、独立oracleとの比較で検出された。正常コードは同じ入力を拒否する。
 
 ### syntax / module 診断の限定対応（#894）
 
