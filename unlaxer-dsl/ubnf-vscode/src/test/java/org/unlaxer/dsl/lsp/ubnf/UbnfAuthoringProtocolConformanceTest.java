@@ -81,7 +81,7 @@ public class UbnfAuthoringProtocolConformanceTest {
     }
 
     @Test(timeout=120000) public void nativeAndJavaServersShareJsonRpcFixtures() throws Exception {
-        runProtocol("jsonrpc", 916);
+        runProtocol("jsonrpc", 951);
     }
 
     @Test(timeout=120000) public void nativeAndJavaServersShareSyntaxStatusAndModuleFixtures() throws Exception {

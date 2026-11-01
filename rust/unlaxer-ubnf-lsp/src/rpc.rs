@@ -231,9 +231,58 @@ fn initialize_stream_shape(raw: &[u8]) -> Result<Option<Error>, serde_json::Erro
     Ok(None)
 }
 
-// serde_json normalizes exponent case/sign (0E5 -> 0e+5). Gson's String
-// adapter exposes the original token instead. Recover only numeric change text
-// from the validated raw notification; all DTO checks still run before mutation.
+// Gson String exposes the original numeric token, including exponent case/sign.
+// Use the validated raw object and decoded keys, never text searches.
+fn string_spellings(
+    raw: &[u8],
+    value: &mut Value,
+    fields: &[&str],
+) -> Result<(), serde_json::Error> {
+    let mut rest = raw.trim_ascii_start();
+    if rest[0] != b'{' || !value.is_object() {
+        return Ok(());
+    }
+    rest = rest[1..].trim_ascii_start();
+    while rest[0] != b'}' {
+        let (key, token, raw) = next_field(&mut rest)?;
+        if fields.contains(&key.as_str()) {
+            // Last duplicate wins, including a later non-number.
+            value[&key] = if token.is_number() {
+                Value::String(std::str::from_utf8(raw).unwrap().into())
+            } else {
+                token
+            };
+        }
+    }
+    Ok(())
+}
+fn document_string_spellings(
+    raw: &[u8],
+    params: &mut Value,
+    open: bool,
+) -> Result<(), serde_json::Error> {
+    let mut rest = raw.trim_ascii_start();
+    if rest[0] != b'{' {
+        return Ok(());
+    }
+    rest = rest[1..].trim_ascii_start();
+    let mut document = None;
+    while rest[0] != b'}' {
+        let (key, _, raw) = next_field(&mut rest)?;
+        if key == "textDocument" {
+            document = Some(raw);
+        }
+    }
+    if let Some(raw) = document {
+        string_spellings(
+            raw,
+            &mut params["textDocument"],
+            if open { &["uri", "text"] } else { &["uri"] },
+        )?;
+    }
+    Ok(())
+}
+// Recover change text after JSON/DTO validation, before state mutation.
 fn change_text_spelling(raw: &[u8], params: &mut Value) -> Result<(), serde_json::Error> {
     let mut rest = raw.trim_ascii_start();
     if rest[0] != b'{' {
@@ -255,23 +304,8 @@ fn change_text_spelling(raw: &[u8], params: &mut Value) -> Result<(), serde_json
             let value = values.next().expect("validated change")?;
             let length = values.byte_offset();
             if value.is_object() {
-                let mut fields = changes[1..length].trim_ascii_start();
-                let mut raw_text = None;
-                while fields[0] != b'}' {
-                    let (key, value, text) = next_field(&mut fields)?;
-                    if key == "text" {
-                        raw_text = value.is_number().then_some(text);
-                    }
-                }
-                if let Some(text) = raw_text {
-                    if let Some(target) = params["contentChanges"]
-                        .get_mut(index)
-                        .and_then(|change| change.get_mut("text"))
-                    {
-                        if target.is_number() {
-                            *target = Value::String(std::str::from_utf8(text).unwrap().into());
-                        }
-                    }
+                if let Some(target) = params["contentChanges"].get_mut(index) {
+                    string_spellings(&changes[..length], target, &["text"])?;
                 }
             }
             changes = changes[length..].trim_ascii_start();
@@ -337,6 +371,15 @@ pub(crate) fn read_message(bytes: &[u8]) -> Result<(Value, Option<Error>), serde
             error.get_or_insert_with(parse_error);
         } else if let Err(e) = params_shape(&method, &params) {
             error.get_or_insert(e);
+        }
+    }
+    if method.starts_with("textDocument/") {
+        if let Some(raw) = raw_params {
+            document_string_spellings(
+                raw,
+                &mut message["params"],
+                method == "textDocument/didOpen",
+            )?;
         }
     }
     if method == "textDocument/didChange" {
