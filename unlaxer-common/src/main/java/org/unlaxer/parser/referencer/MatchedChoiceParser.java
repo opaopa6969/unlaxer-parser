@@ -14,8 +14,7 @@ public class MatchedChoiceParser extends NoneChildParser{
 
 	private static final long serialVersionUID = -5984917954997243613L;
 
-	boolean predicated = false;
-	
+	/** The predicate result, {@code null} until resolved; published as in ReferenceParser (#1007). */
 	Optional<Parser> matchedParser;
 	
 	Predicate<Parser> predicate;
@@ -32,12 +31,13 @@ public class MatchedChoiceParser extends NoneChildParser{
 		
 			parseContext.startParse(this, parseContext, tokenKind, invertMatch);
 
-			if(false == predicated){
-				matchedParser = findFirstFromRoot(predicate);
-				predicated = true;
+			Optional<Parser> resolved = matchedParser;
+			if(resolved == null){
+				resolved = findFirstFromRoot(predicate);
+				matchedParser = resolved;
 			}
 			Parsed parsed =
-				matchedParser.map(parser->{
+				resolved.map(parser->{
 				
 						if(false == parser instanceof ChoiceInterface){
 							throw new IllegalArgumentException("you must specify reference to Choice instance");
