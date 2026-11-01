@@ -365,6 +365,8 @@ def run_jsonrpc(clients, directory, omit_params):
     for document in residual['overflowDocuments']:
         # Boundaries are authored from start UTF-16 units (0, 12, 35, 50), not
         # sampled server output. Each boundary runs all six shared-offset methods.
+        # The open `token T ::=` line proves the wrapped offset also drives the
+        # lexical lookback (Java lastIndexOf(..., negative) == -1: core items).
         for _, client in hosts:
             uri = (directory / ('int-overflow-' + document['id'] + '.ubnf')).as_uri()
             notify_raw(client, 'open', json.dumps(uri), json.dumps(document['source']))

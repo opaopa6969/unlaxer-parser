@@ -2345,6 +2345,22 @@
             "scoped": false
           }
         ]
+      },
+      {
+        "id": "lexical",
+        "source": "grammar G {\n token T ::=\n 'a';\n @root S ::= T;\n}",
+        "positions": [
+          {
+            "line": 1,
+            "character": 2147483636,
+            "scoped": false
+          },
+          {
+            "line": 1,
+            "character": 2147483647,
+            "scoped": false
+          }
+        ]
       }
     ]
   }

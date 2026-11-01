@@ -538,7 +538,7 @@ error.data の比較範囲と親 #885/#864/#111、#893/#894/#901/#902 の継続�
 ### scalar 通知と int overflow の追補（#1033）
 
 参照は固定 Java `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34`（LSP4J 0.23.1 / Gson 2.13.2）。
-Java 製品コードは変更せず、既存の必須 jsonrpc suite を916→949件へ拡張する。
+Java 製品コードは変更せず、既存の必須 jsonrpc suite を916→951件へ拡張する。
 
 | 境界 / 判断 | 固定 Java | native の選択と理由 |
 |---|---|---|
@@ -550,6 +550,11 @@ Java 製品コードは変更せず、既存の必須 jsonrpc suite を916→949
 手書き raw frame と静的な独立全JSON oracleを同じ実 stdio suiteへ追加した。
 completion の40候補は文法・help catalog・snippet契約から転記し、server実測値から生成しない。
 LF文書のUTF-16 startは0/12/35/50、非BMPコメント＋CRLF文書では7/20/44/60。
+未終端の `token T ::=` 行（start 12）では、wrap した offset で Java の `lastIndexOf("::=", offset)` が -1 になり、
+字句用ではなく通常の40候補になる。native が丸めた行末 offset で字句状態を判定すると字句用候補になり、この oracle で検出する。
+行末へ丸めた offset は半開区間 `[start, end)` の use に入らないため、navigation 4 method と hover の use 判定では
+wrap と丸めを観測上区別できない。これらは同じ signed offset を通す回帰確認で、wrap を検出するのは completion の
+scope（閉区間）と字句状態だけである（レビューで navigation 側の wrap を外す mutation が suite を通ることを確認した）。
 1行目（加算overflowなし）、MAX_VALUE直前/一致/直後、最大character、存在しない行を確認する。
 Java server の `-Xmx8g`・runner既定timeout 20秒・self-hosted runs-on・既存test class/jobを維持する。
 通常parserのホットパス、公開3.3.0、editor parseのnetwork/lock/実行境界、新規crateは変更しない。
