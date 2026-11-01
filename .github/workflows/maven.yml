@@ -872,7 +872,7 @@ jobs:
         bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
 
     - name: Test authoring transport failure diagnostics (#995)
-      run: python3 scripts/run-required-unittests.py scripts.tests.test_ubnf_authoring_lsp
+      run: python3 scripts/run-required-unittests.py scripts.tests.test_ubnf_authoring_lsp scripts.tests.test_lsp4j_dto_schema
 
     - name: Prepare required tests (ubnf-authoring)
       run: python3 scripts/verify-optin-tests.py ubnf-authoring --prepare

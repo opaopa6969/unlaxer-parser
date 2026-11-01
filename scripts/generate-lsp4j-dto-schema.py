@@ -35,14 +35,22 @@ def generate(jar):
     with zipfile.ZipFile(jar) as archive:
         sources = {Path(n).stem: archive.read(n).decode() for n in archive.namelist()
                    if n.startswith('org/eclipse/lsp4j/') and n.endswith('.java')}
-    types = {}
+    types, enums = {}, {}
+    # LSP string enums are final classes of String constants, not Java enums.
+    # The DTO field's own Javadoc links identify the domain without a field list.
+    string_enums = {
+        name: dict(re.findall(r'public static final String (\w+) = "([^"]*)";', source))
+        for name, source in sources.items()
+        if re.search(r'public final class ' + name + r'\b', source)
+    }
+    string_enums = {name: values for name, values in string_enums.items() if values}
 
-    def describe(raw):
+    def describe(raw, domain=None):
         raw = raw.strip().removeprefix('? extends ')
         if raw == 'Tuple.Two<Integer, Integer>':
             return ['tuple', 'integer', 'integer']
         if raw.startswith('List<'):
-            return ['list', describe(raw[5:-1])]
+            return ['list', describe(raw[5:-1], domain)]
         if raw.startswith('Either<'):
             # Split only the outer generic arguments.
             parts, depth, start = [], 0, 7
@@ -54,11 +62,19 @@ def generate(jar):
             return ['either', *parts, describe(raw[start:-1])]
         scalar = {'String': 'string', 'Boolean': 'boolean', 'boolean': 'boolean',
                   'Integer': 'integer', 'int': 'integer', 'Object': 'any'}
+        if raw == 'String' and domain:
+            enums[domain] = {'reader': 'string', 'unknown': 'preserve',
+                             'values': string_enums[domain]}
+            return ['enum', domain]
         if raw in scalar:
             return scalar[raw]
         source = sources[raw]
         if re.search(r'public enum ' + raw + r'\b', source):
-            return 'enum'
+            values = {name: int(value) for name, value in re.findall(
+                r'^\s*(\w+)\((-?\d+)\)[,;]', source, re.M)}
+            assert values and re.search(r'private final int value;', source), raw
+            enums[raw] = {'reader': 'integer', 'unknown': 'null', 'values': values}
+            return ['enum', raw]
         if raw not in types:
             types[raw] = {}  # recursion guard
             declaration = re.search(r'public (?:abstract )?class ' + raw + r'(?: extends (\w+))?', source)
@@ -66,8 +82,18 @@ def generate(jar):
             if declaration[1]:
                 describe(declaration[1])
                 types[raw].update(types[declaration[1]])
+            domains = {}
+            for doc, field_type, name in re.findall(
+                    r'(/\*\*(?:(?!\*/).)*\*/)\s*(?:@[^\n]+\s+)*private ([^;=\n]+?) (\w+);',
+                    source, re.S):
+                if field_type in ('String', 'List<String>'):
+                    links = set(re.findall(r'\{@link (\w+)', doc)) & string_enums.keys()
+                    assert len(links) <= 1, (raw, name, links)
+                    if links:
+                        domains[name] = links.pop()
             for field_type, name in re.findall(r'^  private ([^;=\n]+?) (\w+);', source, re.M):
-                types[raw][name] = 'workDoneToken' if name == 'workDoneToken' else describe(field_type)
+                types[raw][name] = ('workDoneToken' if name == 'workDoneToken'
+                                    else describe(field_type, domains.get(name)))
         return raw
 
     def has_work_done(name):
@@ -94,7 +120,8 @@ def generate(jar):
         describe(name)
     return {'lsp4jVersion': '0.23.1', 'sourcesSha256': digest,
             'requests': dict(sorted(REQUESTS.items())), 'workDoneMethods': sorted(work_done),
-            'types': {name: dict(sorted(fields.items())) for name, fields in sorted(types.items())}}
+            'types': {name: dict(sorted(fields.items())) for name, fields in sorted(types.items())},
+            'enums': dict(sorted(enums.items()))}
 
 
 if __name__ == '__main__':

@@ -73,9 +73,15 @@ impl Server {
         out.push(json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"version":0,"diagnostics":diagnostics}}));
     }
     pub fn handle(&mut self, message: Value) -> Vec<Value> {
-        self.handle_checked(message, None)
+        // A decoded Value has no wire key order: use lsp4j's stream path.
+        self.handle_checked(message, None, true)
     }
-    fn handle_checked(&mut self, message: Value, reader_error: Option<Error>) -> Vec<Value> {
+    fn handle_checked(
+        &mut self,
+        message: Value,
+        reader_error: Option<Error>,
+        stream: bool,
+    ) -> Vec<Value> {
         let mut out = Vec::new();
         // lsp4j treats an explicit null id exactly like an absent id.
         let request = message.get("id").is_some_and(|id| !id.is_null());
@@ -95,7 +101,7 @@ impl Server {
                 return Err(error);
             }
             // Gson deserializes typed params before the lifecycle endpoint runs.
-            rpc::params_shape(method, params)?;
+            rpc::params_shape(method, params, stream)?;
             let params = if rpc::typed_request(method) {
                 rpc::initialize_params(params)
             } else {
@@ -327,7 +333,7 @@ impl Server {
                 break;
             };
             let messages = match rpc::read_message(&bytes) {
-                Ok((value, error)) => self.handle_checked(value, error),
+                Ok((value, error, stream)) => self.handle_checked(value, error, stream),
                 Err(_) => vec![
                     json!({"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}),
                 ],

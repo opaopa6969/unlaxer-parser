@@ -2363,5 +2363,397 @@
         ]
       }
     ]
+  },
+  "enumReader": {
+    "javaRevision": "384fcf3eb1c0ce3e207ac580cec5fcac4b478b34",
+    "silenceSeconds": 1,
+    "fields": [
+      {
+        "id": "CompletionItemKind",
+        "reader": "integer",
+        "known": "\"Text\"",
+        "raw": "{\"textDocument\":{\"completion\":{\"completionItemKind\":{\"valueSet\":[$VALUE]}}}}"
+      },
+      {
+        "id": "InsertTextMode.set",
+        "reader": "integer",
+        "known": "\"AsIs\"",
+        "raw": "{\"textDocument\":{\"completion\":{\"completionItem\":{\"insertTextModeSupport\":{\"valueSet\":[$VALUE]}}}}}"
+      },
+      {
+        "id": "InsertTextMode.scalar",
+        "reader": "integer",
+        "known": "\"AsIs\"",
+        "raw": "{\"textDocument\":{\"completion\":{\"insertTextMode\":$VALUE}}}"
+      },
+      {
+        "id": "CompletionItemTag",
+        "reader": "integer",
+        "known": "\"Deprecated\"",
+        "raw": "{\"textDocument\":{\"completion\":{\"completionItem\":{\"tagSupport\":{\"valueSet\":[$VALUE]}}}}}"
+      },
+      {
+        "id": "SymbolKind.document",
+        "reader": "integer",
+        "known": "\"File\"",
+        "raw": "{\"textDocument\":{\"documentSymbol\":{\"symbolKind\":{\"valueSet\":[$VALUE]}}}}"
+      },
+      {
+        "id": "SymbolKind.workspace",
+        "reader": "integer",
+        "known": "\"File\"",
+        "raw": "{\"workspace\":{\"symbol\":{\"symbolKind\":{\"valueSet\":[$VALUE]}}}}"
+      },
+      {
+        "id": "SymbolTag.document",
+        "reader": "integer",
+        "known": "\"Deprecated\"",
+        "raw": "{\"textDocument\":{\"documentSymbol\":{\"tagSupport\":{\"valueSet\":[$VALUE]}}}}"
+      },
+      {
+        "id": "SymbolTag.workspace",
+        "reader": "integer",
+        "known": "\"Deprecated\"",
+        "raw": "{\"workspace\":{\"symbol\":{\"tagSupport\":{\"valueSet\":[$VALUE]}}}}"
+      },
+      {
+        "id": "DiagnosticTag",
+        "reader": "integer",
+        "known": "\"Unnecessary\"",
+        "raw": "{\"textDocument\":{\"publishDiagnostics\":{\"tagSupport\":{\"valueSet\":[$VALUE]}}}}"
+      },
+      {
+        "id": "PrepareSupportDefaultBehavior",
+        "reader": "integer",
+        "known": "\"Identifier\"",
+        "raw": "{\"textDocument\":{\"rename\":{\"prepareSupportDefaultBehavior\":$VALUE}}}"
+      },
+      {
+        "id": "MarkupKind.completion",
+        "reader": "string",
+        "known": "\"markdown\"",
+        "raw": "{\"textDocument\":{\"completion\":{\"completionItem\":{\"documentationFormat\":[$VALUE]}}}}"
+      },
+      {
+        "id": "MarkupKind.hover",
+        "reader": "string",
+        "known": "\"markdown\"",
+        "raw": "{\"textDocument\":{\"hover\":{\"contentFormat\":[$VALUE]}}}"
+      },
+      {
+        "id": "MarkupKind.signature",
+        "reader": "string",
+        "known": "\"markdown\"",
+        "raw": "{\"textDocument\":{\"signatureHelp\":{\"signatureInformation\":{\"documentationFormat\":[$VALUE]}}}}"
+      },
+      {
+        "id": "FoldingRangeKind",
+        "reader": "string",
+        "known": "\"comment\"",
+        "raw": "{\"textDocument\":{\"foldingRange\":{\"foldingRangeKind\":{\"valueSet\":[$VALUE]}}}}"
+      },
+      {
+        "id": "CodeActionKind",
+        "reader": "string",
+        "known": "\"quickfix\"",
+        "raw": "{\"textDocument\":{\"codeAction\":{\"codeActionLiteralSupport\":{\"codeActionKind\":{\"valueSet\":[$VALUE]}}}}}"
+      },
+      {
+        "id": "TokenFormat",
+        "reader": "string",
+        "known": "\"relative\"",
+        "raw": "{\"textDocument\":{\"semanticTokens\":{\"formats\":[$VALUE]}}}"
+      },
+      {
+        "id": "SemanticTokenTypes",
+        "reader": "string",
+        "known": "\"namespace\"",
+        "raw": "{\"textDocument\":{\"semanticTokens\":{\"tokenTypes\":[$VALUE]}}}"
+      },
+      {
+        "id": "SemanticTokenModifiers",
+        "reader": "string",
+        "known": "\"declaration\"",
+        "raw": "{\"textDocument\":{\"semanticTokens\":{\"tokenModifiers\":[$VALUE]}}}"
+      },
+      {
+        "id": "ResourceOperationKind",
+        "reader": "string",
+        "known": "\"create\"",
+        "raw": "{\"workspace\":{\"workspaceEdit\":{\"resourceOperations\":[$VALUE]}}}"
+      },
+      {
+        "id": "FailureHandlingKind",
+        "reader": "string",
+        "known": "\"abort\"",
+        "raw": "{\"workspace\":{\"workspaceEdit\":{\"failureHandling\":$VALUE}}}"
+      },
+      {
+        "id": "PositionEncodingKind",
+        "reader": "string",
+        "known": "\"utf-16\"",
+        "raw": "{\"general\":{\"positionEncodings\":[$VALUE]}}"
+      }
+    ],
+    "tokens": [
+      {
+        "raw": "1",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "\"1\"",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "1.0",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "1.5",
+        "integer": "silent",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "0",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "999",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "-1",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "2147483648",
+        "integer": "silent",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "999999999999999999999999999999999",
+        "integer": "silent",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "1e400",
+        "integer": "silent",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "\"$KNOWN\"",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "\"unknown\"",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "\"1.5\"",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "null",
+        "integer": "accepted",
+        "string": "accepted",
+        "deferredInteger": "accepted"
+      },
+      {
+        "raw": "[]",
+        "integer": "parse",
+        "string": "parse",
+        "deferredInteger": "parse"
+      },
+      {
+        "raw": "{}",
+        "integer": "parse",
+        "string": "parse",
+        "deferredInteger": "parse"
+      },
+      {
+        "raw": "true",
+        "integer": "parse",
+        "string": "accepted",
+        "deferredInteger": "parse"
+      },
+      {
+        "raw": "false",
+        "integer": "parse",
+        "string": "accepted",
+        "deferredInteger": "parse"
+      }
+    ],
+    "initializeAll": "{\"textDocument\":{\"completion\":{\"completionItemKind\":{\"valueSet\":[$VALUE]},\"completionItem\":{\"insertTextModeSupport\":{\"valueSet\":[$VALUE]},\"tagSupport\":{\"valueSet\":[$VALUE]},\"documentationFormat\":[$VALUE]},\"insertTextMode\":$VALUE},\"documentSymbol\":{\"symbolKind\":{\"valueSet\":[$VALUE]},\"tagSupport\":{\"valueSet\":[$VALUE]}},\"publishDiagnostics\":{\"tagSupport\":{\"valueSet\":[$VALUE]}},\"rename\":{\"prepareSupportDefaultBehavior\":$VALUE},\"hover\":{\"contentFormat\":[$VALUE]},\"signatureHelp\":{\"signatureInformation\":{\"documentationFormat\":[$VALUE]}},\"foldingRange\":{\"foldingRangeKind\":{\"valueSet\":[$VALUE]}},\"codeAction\":{\"codeActionLiteralSupport\":{\"codeActionKind\":{\"valueSet\":[$VALUE]}}},\"semanticTokens\":{\"formats\":[$VALUE],\"tokenTypes\":[$VALUE],\"tokenModifiers\":[$VALUE]}},\"workspace\":{\"symbol\":{\"symbolKind\":{\"valueSet\":[$VALUE]},\"tagSupport\":{\"valueSet\":[$VALUE]}},\"workspaceEdit\":{\"resourceOperations\":[$VALUE],\"failureHandling\":$VALUE}},\"general\":{\"positionEncodings\":[$VALUE]}}",
+    "collectionAccepted": [
+      "null",
+      "[]",
+      "1",
+      "\"unknown\""
+    ],
+    "collectionInvalid": [
+      "[[1]]",
+      "[{}]"
+    ],
+    "initializeAccepted": [
+      {
+        "raw": "1",
+        "orders": [
+          0
+        ]
+      },
+      {
+        "raw": "\"1\"",
+        "orders": [
+          0
+        ]
+      },
+      {
+        "raw": "1.0",
+        "orders": [
+          0
+        ]
+      },
+      {
+        "raw": "999",
+        "orders": [
+          0
+        ]
+      },
+      {
+        "raw": "\"1.5\"",
+        "orders": [
+          0
+        ]
+      },
+      {
+        "raw": "null",
+        "orders": [
+          0
+        ]
+      },
+      {
+        "raw": "1.5",
+        "orders": [
+          1,
+          4,
+          5
+        ]
+      },
+      {
+        "raw": "1e400",
+        "orders": [
+          1,
+          4,
+          5
+        ]
+      },
+      {
+        "raw": "1e9999",
+        "orders": [
+          1
+        ]
+      },
+      {
+        "raw": "1e-10000",
+        "orders": [
+          0
+        ]
+      }
+    ],
+    "deferredLimits": [
+      {
+        "raw": "1e9999",
+        "stream": "silent",
+        "deferred": "accepted"
+      },
+      {
+        "raw": "1e10000",
+        "stream": "silent",
+        "deferred": "silent"
+      },
+      {
+        "raw": "1e-9999",
+        "stream": "accepted",
+        "deferred": "accepted"
+      },
+      {
+        "raw": "1e-10000",
+        "stream": "accepted",
+        "deferred": "silent"
+      },
+      {
+        "raw": "0e10000",
+        "stream": "accepted",
+        "deferred": "silent"
+      },
+      {
+        "raw": "1.5",
+        "padTo": 1023,
+        "stream": "silent",
+        "deferred": "accepted"
+      },
+      {
+        "raw": "1.5",
+        "padTo": 1024,
+        "stream": "accepted",
+        "deferred": "accepted"
+      },
+      {
+        "raw": "-9",
+        "padTo": 1024,
+        "stream": "accepted",
+        "deferred": "accepted"
+      },
+      {
+        "raw": "1.",
+        "padTo": 1023,
+        "exponent": "e-10000",
+        "stream": "accepted",
+        "deferred": "silent"
+      },
+      {
+        "raw": "1.",
+        "padTo": 1024,
+        "exponent": "e-10000",
+        "stream": "accepted",
+        "deferred": "accepted"
+      }
+    ],
+    "limitFields": [
+      "CompletionItemKind",
+      "InsertTextMode.scalar"
+    ],
+    "requestFields": [
+      {
+        "id": "CompletionTriggerKind",
+        "reader": "integer",
+        "method": "textDocument/completion",
+        "known": "\"Invoked\"",
+        "raw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":0,\"character\":2},\"context\":{\"triggerKind\":$VALUE}}",
+        "oracle": "completion"
+      }
+    ]
   }
 }
