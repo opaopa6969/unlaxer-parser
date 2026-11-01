@@ -47,6 +47,7 @@ mod unicode_grapheme_data;
 mod unicode_xid;
 #[doc(hidden)]
 pub use first::{set_candidate_exclusion_for_current_thread, CandidateExclusion};
+pub use first::{FirstSet, FirstSets};
 pub use rule_names::{RuleNameError, RuleNames};
 pub use rule_stack::{RuleFrame, RuleStack, RuleStackDiagnostic, RULE_STACK_LIMIT};
 pub use scope::{
@@ -2100,7 +2101,7 @@ fn parse_detailed_stacked<P: semantic_predicates::Entry>(
     parser.whitespace = whitespace;
     parser.grammar_frontier = true;
     if parser.first_sets.is_some() {
-        parser.first_sets = Some(first::table(&parser.rules));
+        parser.first_sets = Some(first::table(&parser.rules, parser.first_budget()));
     }
     if options.memoization == Memoization::SafeFailures {
         parser.memo_safe_rules = memo_safe_rules(&parser.rules);
@@ -2760,7 +2761,11 @@ impl<'a> ParseContext<'a> {
         };
         let previous_safe_rules = std::mem::replace(&mut self.memo_safe_rules, safe_rules);
         let previous_success_safe_rules = std::mem::take(&mut self.success_memo_safe_rules);
-        let first_sets = self.first_sets.as_ref().map(|_| first::table(grammar));
+        let first_budget = self.first_budget();
+        let first_sets = self
+            .first_sets
+            .as_ref()
+            .map(|_| first::table(grammar, first_budget));
         let previous_first_sets = std::mem::replace(&mut self.first_sets, first_sets);
         let previous_failure_memo = std::mem::take(&mut self.failure_memo);
         let previous_success_memo = std::mem::take(&mut self.success_memo);
@@ -3753,7 +3758,7 @@ impl<'a> ParseContext<'a> {
         if self.resource_failure.is_some() {
             return None;
         }
-        if self.expression_depth >= 1024 {
+        if self.expression_depth >= first::EXPRESSION_NESTING {
             self.resource_error("expression nesting below 1024");
             return None;
         }
@@ -4993,6 +4998,31 @@ impl<'a> ParseContext<'a> {
 
     #[inline(never)]
     fn expression_repeat(&mut self, expression: &Expr, depth: usize) -> Option<Fragment> {
+        // The recursive frame keeps one inline state; the bookkeeping around each body
+        // attempt runs in frames of its own, so nesting does not carry it per level (#1028).
+        let mut state = Repetition::default();
+        let child = self.begin_repetition(expression, &mut state)?;
+        while self.next_repetition_attempt(&mut state) {
+            // A skipped body takes the failure branch, including Java's
+            // failed-atom cursor reset, exactly as an evaluated failure would.
+            let mut attempt = if self.excludes(child, depth) {
+                None
+            } else {
+                self.expression(child, depth)
+            };
+            if !self.finish_repetition_attempt(&mut state, child, &mut attempt)? {
+                break;
+            }
+        }
+        self.finish_repetition(&mut state)
+    }
+
+    #[inline(never)]
+    fn begin_repetition<'e>(
+        &mut self,
+        expression: &'e Expr,
+        state: &mut Repetition,
+    ) -> Option<&'e Expr> {
         let (child, min, max, java, probe) = match expression {
             Expr::Repeat { child, min, max } | Expr::JavaRepeat { child, min, max } => (
                 child.as_ref(),
@@ -5011,68 +5041,86 @@ impl<'a> ParseContext<'a> {
             );
             return None;
         }
-        let mut result = Fragment::default();
-        let mut collection = None;
-        let owner_start = self.position();
-        let mut iterations = 0;
-        while (probe && iterations == 0) || max.is_none_or(|max| iterations < max) {
-            let start = self.position;
-            let progress_start = if self.token_mode.is_some() {
-                self.mode_cursor()
-            } else {
-                start
-            };
-            let count = self.nodes.len();
-            // A skipped body takes the failure branch, including Java's
-            // failed-atom cursor reset, exactly as an evaluated failure would.
-            let attempt = if self.excludes(child, depth) {
-                None
-            } else {
-                self.expression(child, depth)
-            };
-            match attempt {
-                Some(fragment) => {
-                    let progress_end = if self.token_mode.is_some() {
-                        self.mode_cursor()
-                    } else {
-                        self.position
-                    };
-                    if progress_end == progress_start && max.is_none() && !java {
-                        self.nodes.truncate(count);
-                        self.fail("progress in unbounded repetition");
-                        return None;
-                    }
-                    iterations += 1;
-                    self.append_fragment(
-                        &mut result,
-                        fragment,
-                        self.span(start),
-                        owner_start,
-                        &mut collection,
-                    );
-                    if java
+        state.min = min;
+        state.max = max;
+        state.java = java;
+        state.probe = probe;
+        state.owner_start = self.position();
+        Some(child)
+    }
+
+    /// Whether the body is attempted again; records where that attempt starts.
+    #[inline(never)]
+    fn next_repetition_attempt(&mut self, state: &mut Repetition) -> bool {
+        if !((state.probe && state.iterations == 0)
+            || state.max.is_none_or(|max| state.iterations < max))
+        {
+            return false;
+        }
+        state.start = self.position;
+        state.progress_start = if self.token_mode.is_some() {
+            self.mode_cursor()
+        } else {
+            state.start
+        };
+        state.count = self.nodes.len();
+        true
+    }
+
+    /// `None` fails the repetition, `Some(false)` ends it and `Some(true)` continues.
+    #[inline(never)]
+    fn finish_repetition_attempt(
+        &mut self,
+        state: &mut Repetition,
+        child: &Expr,
+        attempt: &mut Option<Fragment>,
+    ) -> Option<bool> {
+        match attempt.take() {
+            Some(fragment) => {
+                let progress_end = if self.token_mode.is_some() {
+                    self.mode_cursor()
+                } else {
+                    self.position
+                };
+                if progress_end == state.progress_start && state.max.is_none() && !state.java {
+                    self.nodes.truncate(state.count);
+                    self.fail("progress in unbounded repetition");
+                    return None;
+                }
+                state.iterations += 1;
+                self.append_fragment(
+                    &mut state.result,
+                    fragment,
+                    self.span(state.start),
+                    state.owner_start,
+                    &mut state.collection,
+                );
+                Some(
+                    !(state.java
                         && (if self.token_mode.is_some() {
                             self.mode_cursor()
                         } else {
                             self.position
-                        }) == progress_start
-                    {
-                        break;
-                    }
+                        }) == state.progress_start),
+                )
+            }
+            // A committed or labeled failure is not the end of a repetition (#700).
+            None if self.raised.is_some() => None,
+            None => {
+                self.position = state.start;
+                self.nodes.truncate(state.count);
+                if state.java {
+                    self.java_failed_atom(child);
                 }
-                // A committed or labeled failure is not the end of a repetition (#700).
-                None if self.raised.is_some() => return None,
-                None => {
-                    self.position = start;
-                    self.nodes.truncate(count);
-                    if java {
-                        self.java_failed_atom(child);
-                    }
-                    break;
-                }
+                Some(false)
             }
         }
-        if java && iterations == 0 && min == 0 {
+    }
+
+    #[inline(never)]
+    fn finish_repetition(&mut self, state: &mut Repetition) -> Option<Fragment> {
+        let (iterations, min, max) = (state.iterations, state.min, state.max);
+        if state.java && iterations == 0 && min == 0 {
             if self.token_mode.is_some() {
                 return Some(Fragment::default());
             }
@@ -5080,12 +5128,14 @@ impl<'a> ParseContext<'a> {
         }
         let accepted = iterations >= min && max.is_none_or(|max| iterations <= max);
         if !accepted && self.token_mode.is_some() {
-            self.fail_at(self.byte_offsets[owner_start], "repetition bounds");
+            self.fail_at(self.byte_offsets[state.owner_start], "repetition bounds");
         }
         if accepted {
-            self.finish_native_collection(&mut result, collection, move |_| owner_start);
+            let owner_start = state.owner_start;
+            let collection = state.collection.take();
+            self.finish_native_collection(&mut state.result, collection, move |_| owner_start);
         }
-        accepted.then_some(result)
+        accepted.then(|| std::mem::take(&mut state.result))
     }
 
     /// Java Occurs with a terminator: the JavaRepeat loop, consulting the terminator
@@ -5771,7 +5821,9 @@ impl<'a> ParseContext<'a> {
         }
         let start = self.position;
         let node_start = self.nodes.len();
-        let mut winner: Option<ChoiceWinner> = None;
+        // The winner stays boxed across the remaining alternatives and the recording and
+        // selection run in their own frames, so nesting does not carry them per level (#1028).
+        let mut winner: Option<Box<ChoiceWinner>> = None;
         let mut ties = 0;
         for alternative in alternatives {
             if self.excludes(alternative, depth) {
@@ -5781,53 +5833,92 @@ impl<'a> ParseContext<'a> {
             if self.match_cursor_policy.reset {
                 self.matched_position = self.position;
             }
-            if let Some(fragment) = self.expression(alternative, depth) {
-                let consumed = self.position - start;
-                let replaces = winner
-                    .as_ref()
-                    .is_none_or(|current| consumed > current.position - start);
-                if winner
-                    .as_ref()
-                    .is_some_and(|current| current.position == self.position)
-                {
-                    ties += 1;
-                }
-                if replaces {
-                    ties = 1;
-                    winner = Some(ChoiceWinner {
-                        position: self.position,
-                        matched_position: self.matched_position,
+            let raised = match self.expression(alternative, depth) {
+                Some(fragment) => {
+                    self.record_longest_candidate(
+                        &mut winner,
+                        &mut ties,
+                        start,
                         node_start,
-                        nodes: self.nodes[node_start..].to_vec(),
-                        captures: {
-                            let mut captures = self.captures.clone();
-                            captures.commit_checkpoint();
-                            captures
-                        },
-                        owned_captures: {
-                            let mut captures = self.owned_captures.clone();
-                            captures.commit_checkpoint();
-                            captures
-                        },
-                        state: Rc::clone(&self.state),
-                        scopes: {
-                            let mut scopes = self.scopes.clone();
-                            scopes.commit_checkpoint();
-                            scopes
-                        },
-                        recoveries: self.recoveries.clone(),
-                        tokens: Rc::clone(&self.tokens),
-                        token_trace: self.token_trace.clone(),
                         fragment,
-                    });
+                    );
+                    false
                 }
-            } else if self.raised.is_some() {
-                // A committed or labeled failure aborts the whole choice (#700).
-                self.restore(checkpoint);
+                None => self.raised.is_some(),
+            };
+            self.restore(checkpoint);
+            // A committed or labeled failure aborts the whole choice (#700).
+            if raised {
                 return None;
             }
-            self.restore(checkpoint);
         }
+        self.select_longest_winner(winner, ties, start, unique)
+    }
+
+    #[inline(never)]
+    fn record_longest_candidate(
+        &mut self,
+        winner: &mut Option<Box<ChoiceWinner>>,
+        ties: &mut usize,
+        start: usize,
+        node_start: usize,
+        fragment: Fragment,
+    ) {
+        let consumed = self.position - start;
+        let replaces = winner
+            .as_ref()
+            .is_none_or(|current| consumed > current.position - start);
+        if winner
+            .as_ref()
+            .is_some_and(|current| current.position == self.position)
+        {
+            *ties += 1;
+        }
+        if !replaces {
+            return;
+        }
+        *ties = 1;
+        let candidate = ChoiceWinner {
+            position: self.position,
+            matched_position: self.matched_position,
+            node_start,
+            nodes: self.nodes[node_start..].to_vec(),
+            captures: {
+                let mut captures = self.captures.clone();
+                captures.commit_checkpoint();
+                captures
+            },
+            owned_captures: {
+                let mut captures = self.owned_captures.clone();
+                captures.commit_checkpoint();
+                captures
+            },
+            state: Rc::clone(&self.state),
+            scopes: {
+                let mut scopes = self.scopes.clone();
+                scopes.commit_checkpoint();
+                scopes
+            },
+            recoveries: self.recoveries.clone(),
+            tokens: Rc::clone(&self.tokens),
+            token_trace: self.token_trace.clone(),
+            fragment,
+        };
+        // A longer candidate reuses the box: at most one allocation per choice.
+        match winner {
+            Some(current) => **current = candidate,
+            None => *winner = Some(Box::new(candidate)),
+        }
+    }
+
+    #[inline(never)]
+    fn select_longest_winner(
+        &mut self,
+        winner: Option<Box<ChoiceWinner>>,
+        ties: usize,
+        start: usize,
+        unique: bool,
+    ) -> Option<Fragment> {
         if unique {
             if let Some(winner) = &winner {
                 if winner.position == start || ties > 1 {
@@ -5844,7 +5935,8 @@ impl<'a> ParseContext<'a> {
                 }
             }
         }
-        winner.map(|mut winner| {
+        winner.map(|winner| {
+            let mut winner = *winner;
             debug_assert_eq!(self.nodes.len(), winner.node_start);
             self.position = winner.position;
             self.matched_position = winner.matched_position;
@@ -5958,7 +6050,9 @@ impl<'a> ParseContext<'a> {
         if self.token_mode.is_some() || self.lexical_trivia.is_some() || self.line_comments {
             return false;
         }
-        if first::of(candidate, table).may_start(&self.input[self.position..], self.whitespace) {
+        if first::of(candidate, table, self.first_budget())
+            .may_start(&self.input[self.position..], self.whitespace)
+        {
             return false;
         }
         if self.exclusion_audit {
@@ -5974,6 +6068,12 @@ impl<'a> ParseContext<'a> {
             );
         }
         true
+    }
+
+    /// Expression levels a candidate evaluated here may still nest (#1027): the FIRST walk
+    /// stops where `expression` would report its resource failure.
+    fn first_budget(&self) -> usize {
+        first::EXPRESSION_NESTING.saturating_sub(self.expression_depth)
     }
 
     fn prediction_after_trivia<'b>(&self, raw: &'b str) -> &'b str {
@@ -6313,6 +6413,73 @@ const NUMBER_NAMES: [&str; 9] = [
     "negative lookahead",
 ];
 
+/// One expression as seen by a structural analysis: its own verdict, or the children whose
+/// verdicts all have to hold.
+enum Visit<'e> {
+    Leaf(bool),
+    Children(&'e [Expr]),
+    Child(&'e Expr),
+    Pair(&'e Expr, &'e Expr),
+}
+
+/// Nesting the structural analyses follow on the native stack; a subtree below it is
+/// walked with a heap stack, so arbitrarily deep grammars cannot overflow (#1028).
+/// Ordinary grammars stay within it and allocate nothing for the walk.
+const ANALYSIS_RECURSION: usize = 256;
+
+/// Whether `visit` holds for every expression of the tree. Visits in pre-order from left to
+/// right and stops at the first failure, exactly like nested `Iterator::all`.
+fn all_expressions<'e>(
+    expression: &'e Expr,
+    visit: &mut impl FnMut(&'e Expr) -> Visit<'e>,
+) -> bool {
+    all_expressions_within(expression, visit, ANALYSIS_RECURSION)
+}
+
+fn all_expressions_within<'e>(
+    expression: &'e Expr,
+    visit: &mut impl FnMut(&'e Expr) -> Visit<'e>,
+    budget: usize,
+) -> bool {
+    let Some(budget) = budget.checked_sub(1) else {
+        return all_expressions_on_heap(expression, visit);
+    };
+    match visit(expression) {
+        Visit::Leaf(holds) => holds,
+        Visit::Children(children) => {
+            for child in children {
+                if !all_expressions_within(child, visit, budget) {
+                    return false;
+                }
+            }
+            true
+        }
+        Visit::Child(child) => all_expressions_within(child, visit, budget),
+        Visit::Pair(first, second) => {
+            all_expressions_within(first, visit, budget)
+                && all_expressions_within(second, visit, budget)
+        }
+    }
+}
+
+#[inline(never)]
+fn all_expressions_on_heap<'e>(
+    expression: &'e Expr,
+    visit: &mut impl FnMut(&'e Expr) -> Visit<'e>,
+) -> bool {
+    let mut pending = vec![expression];
+    while let Some(expression) = pending.pop() {
+        match visit(expression) {
+            Visit::Leaf(true) => {}
+            Visit::Leaf(false) => return false,
+            Visit::Children(children) => pending.extend(children.iter().rev()),
+            Visit::Child(child) => pending.push(child),
+            Visit::Pair(first, second) => pending.extend([second, first]),
+        }
+    }
+    true
+}
+
 /// Whether every custom parser in the grammar permits deferred diagnostics.
 ///
 /// Visits all rule expressions, including unreachable rules and nested combinators,
@@ -6326,23 +6493,23 @@ pub fn grammar_allows_deferred_diagnostics(rules: &[Rule]) -> bool {
 }
 
 fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
+    all_expressions(expression, &mut deferred_diagnostics_visit)
+}
+
+fn deferred_diagnostics_visit(expression: &Expr) -> Visit<'_> {
     match expression {
-        Expr::Custom(_) | Expr::Character { .. } => false,
+        Expr::Custom(_) | Expr::Character { .. } => Visit::Leaf(false),
         Expr::CustomWith {
             reads_diagnostics,
             replayable,
             ..
-        } => !reads_diagnostics && *replayable,
+        } => Visit::Leaf(!reads_diagnostics && *replayable),
         Expr::Sequence(children)
         | Expr::NonOrdered(children)
         | Expr::Choice(children)
         | Expr::LongestChoice(children)
-        | Expr::UniqueLongestChoice(children) => {
-            children.iter().all(expression_allows_deferred_diagnostics)
-        }
-        Expr::PredictiveChoice { alternatives, .. } => alternatives
-            .iter()
-            .all(expression_allows_deferred_diagnostics),
+        | Expr::UniqueLongestChoice(children) => Visit::Children(children),
+        Expr::PredictiveChoice { alternatives, .. } => Visit::Children(alternatives),
         Expr::MatchOnly(child)
         | Expr::InvertMatch(child)
         | Expr::StopInvert(child)
@@ -6372,19 +6539,13 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::LexicalTriviaScope { child, .. }
         | Expr::LexicalContextScope { child, .. }
         | Expr::Commit { child, .. }
-        | Expr::Label { child, .. } => expression_allows_deferred_diagnostics(child),
+        | Expr::Label { child, .. } => Visit::Child(child),
         Expr::CatchLabels {
             child, alternative, ..
-        } => {
-            expression_allows_deferred_diagnostics(child)
-                && expression_allows_deferred_diagnostics(alternative)
-        }
+        } => Visit::Pair(child, alternative),
         Expr::JavaTerminatedRepeat {
             child, terminator, ..
-        } => {
-            expression_allows_deferred_diagnostics(child)
-                && expression_allows_deferred_diagnostics(terminator)
-        }
+        } => Visit::Pair(child, terminator),
         Expr::Lexical(_, _)
         | Expr::Literal(_)
         | Expr::JavaLiteral(_)
@@ -6410,7 +6571,7 @@ fn expression_allows_deferred_diagnostics(expression: &Expr) -> bool {
         | Expr::JavaUntil(_)
         | Expr::Error(_)
         | Expr::Replay(_)
-        | Expr::Backreference(_) => true,
+        | Expr::Backreference(_) => Visit::Leaf(true),
     }
 }
 
@@ -6607,11 +6768,21 @@ fn memo_safe_rules_for(rules: &[Rule], success: bool) -> Vec<bool> {
 }
 
 fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, success: bool) -> bool {
+    all_expressions(expression, &mut |expression| {
+        memo_safety_visit(expression, references, success)
+    })
+}
+
+fn memo_safety_visit<'e>(
+    expression: &'e Expr,
+    references: &mut Vec<usize>,
+    success: bool,
+) -> Visit<'e> {
     if success && matches!(expression, Expr::RuleEffects { .. }) {
-        return false; // Successful symbol/listener effects are not replayable.
+        return Visit::Leaf(false); // Successful symbol/listener effects are not replayable.
     }
     match expression {
-        Expr::Character { .. } => false,
+        Expr::Character { .. } => Visit::Leaf(false),
         Expr::Custom(_)
         | Expr::CustomWith { .. }
         | Expr::Replay(_)
@@ -6623,24 +6794,20 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::SemanticPredicate { .. }
         | Expr::NameResolutionScope { .. }
         | Expr::SemanticPredicateScope { .. }
-        | Expr::Recovery { .. } => false,
+        | Expr::Recovery { .. } => Visit::Leaf(false),
         // No memo safety review (#184) covers the terminator transaction and its
         // rollback under match-only callers, so rules containing it are never cached.
-        Expr::JavaTerminatedRepeat { .. } => false,
+        Expr::JavaTerminatedRepeat { .. } => Visit::Leaf(false),
         Expr::Rule(id) => {
             references.push(*id);
-            true
+            Visit::Leaf(true)
         }
         Expr::Sequence(children)
         | Expr::NonOrdered(children)
         | Expr::Choice(children)
         | Expr::LongestChoice(children)
-        | Expr::UniqueLongestChoice(children) => children
-            .iter()
-            .all(|child| expression_is_memo_safe(child, references, success)),
-        Expr::PredictiveChoice { alternatives, .. } => alternatives
-            .iter()
-            .all(|child| expression_is_memo_safe(child, references, success)),
+        | Expr::UniqueLongestChoice(children) => Visit::Children(children),
+        Expr::PredictiveChoice { alternatives, .. } => Visit::Children(alternatives),
         Expr::MatchOnly(child)
         | Expr::InvertMatch(child)
         | Expr::StopInvert(child)
@@ -6662,14 +6829,11 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::LexicalTriviaScope { child, .. }
         | Expr::LexicalContextScope { child, .. }
         | Expr::Commit { child, .. }
-        | Expr::Label { child, .. } => expression_is_memo_safe(child, references, success),
+        | Expr::Label { child, .. } => Visit::Child(child),
         // Failure entries record the raised failure, so these stay memo-safe (#700).
         Expr::CatchLabels {
             child, alternative, ..
-        } => {
-            expression_is_memo_safe(child, references, success)
-                && expression_is_memo_safe(alternative, references, success)
-        }
+        } => Visit::Pair(child, alternative),
         Expr::Lexical(_, _)
         | Expr::Literal(_)
         | Expr::JavaLiteral(_)
@@ -6692,7 +6856,7 @@ fn expression_is_memo_safe(expression: &Expr, references: &mut Vec<usize>, succe
         | Expr::JavaEmptyWord
         | Expr::JavaEmptyLiteral
         | Expr::JavaUntil(_)
-        | Expr::Error(_) => true,
+        | Expr::Error(_) => Visit::Leaf(true),
     }
 }
 
@@ -8091,6 +8255,24 @@ struct TerminatorFrame {
     mode: Option<token::ParseMode>,
 }
 
+/// Ordinary repetition between body attempts (see `expression_repeat`).
+#[derive(Default)]
+struct Repetition {
+    result: Fragment,
+    /// The native consumed collection of the body results (see `append_fragment`).
+    collection: Option<Box<token::NativeCollection>>,
+    owner_start: usize,
+    iterations: usize,
+    start: usize,
+    progress_start: usize,
+    count: usize,
+    min: usize,
+    max: Option<usize>,
+    java: bool,
+    /// ZeroMatch: one attempt despite `max == Some(0)`.
+    probe: bool,
+}
+
 /// Loop state of a Java Occurs with a terminator, boxed out of the recursive frame.
 struct TerminatedRepeat {
     result: Fragment,
@@ -8754,5 +8936,85 @@ fn number_deferred_success_does_not_allocate_diagnostic_names() {
         assert_eq!(context.expected_names.ids.capacity(), 0);
         assert_eq!(context.expected.capacity(), 0);
         assert_eq!(context.diagnostic_frames.capacity(), 0);
+    }
+}
+
+#[cfg(test)]
+mod analysis_walk_tests {
+    use super::*;
+
+    fn custom(_context: &mut ParseContext<'_>) -> ParseResult {
+        unreachable!("never parsed")
+    }
+
+    /// Children, single children and pairs. The references name no rule of the grammars
+    /// below, so only `leaf` decides the verdict.
+    fn mixed(levels: usize, leaf: Expr) -> Expr {
+        let mut expression = leaf;
+        for level in 0..levels {
+            let reference = Expr::Rule(10_000 + level);
+            expression = match level % 4 {
+                0 => Expr::choice([expression, reference]),
+                1 => Expr::sequence([Expr::literal("x"), expression, reference]),
+                2 => expression.optional(),
+                _ => reference.catch_labels(expression, ["label"]),
+            };
+        }
+        expression
+    }
+
+    /// Verdict, visited expressions, recorded references and whether the last visit was
+    /// the custom leaf.
+    fn walk(expression: &Expr, budget: usize) -> (bool, Vec<*const Expr>, Vec<usize>, bool) {
+        let mut visited = Vec::new();
+        let mut references = Vec::new();
+        let mut last_custom = false;
+        let holds = all_expressions_within(
+            expression,
+            &mut |expression| {
+                visited.push(expression as *const Expr);
+                last_custom = matches!(expression, Expr::Custom(_));
+                memo_safety_visit(expression, &mut references, false)
+            },
+            budget,
+        );
+        (holds, visited, references, last_custom)
+    }
+
+    #[test]
+    fn heap_walk_visits_like_the_recursive_walk_and_stops_at_the_same_failure() {
+        for (leaf, holds) in [(Expr::literal("a"), true), (Expr::Custom(custom), false)] {
+            let expression = mixed(40, leaf);
+            let recursive = walk(&expression, usize::MAX);
+            assert_eq!(recursive.0, holds);
+            // A failure stops the walk at the custom leaf, before the references after it.
+            assert_eq!(recursive.3, !holds);
+            // No reference on the optional levels; the pairs visit theirs before descending.
+            assert_eq!(recursive.2.len(), if holds { 30 } else { 10 });
+            for budget in [0, 1, 7, 39] {
+                assert_eq!(walk(&expression, budget), recursive, "budget {budget}");
+            }
+        }
+    }
+
+    #[test]
+    fn analyses_stay_exact_below_the_recursion_budget() {
+        let deep = |leaf| Rule {
+            name: "deep",
+            expression: mixed(3 * ANALYSIS_RECURSION, leaf),
+        };
+        let unsafe_leaf = Rule {
+            name: "leaf",
+            expression: Expr::Custom(custom),
+        };
+        let plain = vec![deep(Expr::literal("a"))];
+        let custom_leaf = vec![deep(Expr::Custom(custom))];
+        assert!(grammar_allows_deferred_diagnostics(&plain));
+        assert!(!grammar_allows_deferred_diagnostics(&custom_leaf));
+        // Rule 0 references rule 1 only at the bottom of the deep body.
+        let mut referencing = vec![deep(Expr::Rule(1)), unsafe_leaf];
+        assert_eq!(memo_safe_rules(&referencing), [false, false]);
+        referencing[1].expression = Expr::literal("a");
+        assert_eq!(memo_safe_rules(&referencing), [true, true]);
     }
 }
