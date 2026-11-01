@@ -411,7 +411,9 @@ class Hidden { public static class Leaked {} }
         data['assessments']['owned-capture']['fixtures'] = []
         self.assertIn('共通検証根拠がない', self.errors(data))
         data = copy.deepcopy(self.data)
-        data['assessments']['reference-by-name']['issues'] = []
+        # 子 issue の完了で verified へ移る判定があるため、未完了の判定を選ぶ。
+        pending = next(name for name, entry in data['assessments'].items() if entry['status'] != 'verified')
+        data['assessments'][pending]['issues'] = []
         self.assertIn('後続 issue がない', self.errors(data))
         data = copy.deepcopy(self.data)
         data['assessments']['owned-capture']['code'] = ['rust/not-present.rs#L1']
