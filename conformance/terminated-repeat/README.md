@@ -143,6 +143,11 @@ Java / Rust の全診断モードで共通期待値へ比較し、Java 専用の
   FIRST 除外の Off / On / Audit 同値性、memo・snapshot cache を承認しないこと、1500 段の入れ子が
   2 MiB stack で資源失敗になることを検査する。`wrappers.tsv` / `holders.tsv` は token trace（既定の上限）を有効にして葉を比べる。
 - 資源失敗: Java `ResourcePublicationTest` と Rust `tests/resource_publication.rs` が `resource-abort/cases.tsv` を実行する。
+- 返却 source（#1023）: `../collector-source/terminated.tsv`（177行）は、反復を `NamedCapture`・述語・
+  `CaptureBoundaryParser.input` で包んだときの値を Java で実測した表。Java `CollectorSourceTest` と Rust
+  `tests/collector_source.rs` が、full-input・`.stop_consume()` の root・`ParseContext::parse`・明示 Classic の
+  4 入口 × memo 2 × 診断 3 で読む。full-input 入口では反復は native のまま動き、body と commit した terminator を
+  Java の consumed collector と同じ規則で収集する（収集の状態は heap の `TerminatedRepeat` に置く）。
 
 trace 上限の扱い（Classic の collect が後で除外する葉も上限に数える）は terminator がない `seq + match_only` でも
 起きる既存の問題で、ここでは既定の上限だけを使い、別 issue で扱う。

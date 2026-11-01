@@ -287,6 +287,8 @@ public class SemanticPredicateParserTest {
                 // Java の生成 source は anchor を持たない。Rust の anchor 0 / cursor を同じ値で照合する。
                 case "gen:": case "gen0:": case "genc:": return generated("");
                 case "leaf": return virtualInput();
+                case "proj": return projected("Z");
+                case "proj0": return projected("");
                 default: return new WordParser(name);
             }
         }
@@ -319,6 +321,8 @@ public class SemanticPredicateParserTest {
             case "Choice": return new Choice(parsers);
             case "Chain": return new Chain(parsers);
             case "Opt": return new Optional(parsers.get(0));
+            case "Rep": return new ZeroOrMore(parsers.get(0));
+            case "Rec": return new SyncPointRecoveryParser(parsers.get(0), ";");
             default: throw new IllegalArgumentException(name);
         }
     }
@@ -405,7 +409,7 @@ public class SemanticPredicateParserTest {
     /** The same contract decides a whole parse (shared oracle, conformance/semantic-predicate-source/full.tsv). */
     @Test public void returnedSourceDecidesTheWholeParse() throws java.io.IOException {
         var rows = rows("full.tsv");
-        assertEquals(21, rows.size());
+        assertEquals(37, rows.size());
         for (String[] row : rows) for (boolean wantsC : List.of(true, false)) {
           for (var memo : org.unlaxer.context.Memoization.values()) for (var diagnostics : ParseOptions.Diagnostics.values()) {
             try (var context = ParseContext.withOptions(StringSource.createRootSource(PREFIX + "c"),

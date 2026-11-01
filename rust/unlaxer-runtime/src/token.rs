@@ -374,7 +374,10 @@ impl ParseContext<'_> {
             .remove(name)
     }
     /// Adds a token node without advancing either input cursor. Generated sources
-    /// must use a virtual kind; input-backed virtual kinds are also allowed.
+    /// must use a virtual kind; input-backed virtual kinds are also allowed. A custom
+    /// parser that returns an input-backed token of another kind than `Consumed` is
+    /// collected by that kind, as a Classic child of the kind: consumed collectors
+    /// leave it out, as Java's commit does.
     pub fn add_token_node(
         &mut self,
         rule: usize,
@@ -1262,20 +1265,13 @@ impl ParseContext<'_> {
             // collector anchors at its active cursor, not that callback span.
             return None;
         }
-        let mut first = None;
-        let mut single_projection = None;
-        let mut length = 0;
-        let mut end = 0;
-        let mut projected = false;
-        let mut generated = true;
-        let mut parts = Vec::new();
+        let mut collected = Collected::new();
         for &index in &fragment.nodes {
             if self.token_kind_at(index) != kind {
                 continue;
             }
             let node = &self.nodes[index];
             let source = self.tokens.values.get(&index).map(|info| &info.source);
-            let detached = matches!(source, Some(TokenSource::Generated { .. }));
             let text = match source {
                 Some(TokenSource::Generated { text, .. }) => text.as_str(),
                 _ => source
@@ -1285,43 +1281,332 @@ impl ParseContext<'_> {
             if text.is_empty() && kind.is_virtual() {
                 continue;
             }
-            // Empty children retain their own source until a nonempty child occurs.
-            if first.is_none() || length == 0 && !text.is_empty() {
-                first = Some(node.span.start);
-                end = node.span.start;
-            }
-            if !text.is_empty() {
-                generated &= detached;
-                projected |= detached
-                    || end != node.span.start
-                    || source.is_some_and(|source| source.projected_text().is_some());
-                length += if detached {
-                    text.chars().count()
+            collected.push(node.span, source, text);
+        }
+        collected.finish(kind)
+    }
+    /// A non-Classic collector (Sequence, NonOrdered, Repeat, Optional, Recovery) returns what
+    /// Java's consumed collector returns: a projection of the current kind is collected in
+    /// order, a Classic child of another kind contributes nothing, a Classic child collects
+    /// what it returned, and other input is what it consumed. Only such a projection or
+    /// Classic child starts a collection; plain input keeps no source.
+    ///
+    /// Returns true when this child started the collection at `owner_start` after children that
+    /// consumed nothing. The consumed tokens over the input among the CST roots they returned (a
+    /// host's) start it (see [`Self::collect_returned_input`]), and only the caller knows whether
+    /// one of them returns an empty token in Java (see [`Self::anchor_native_collection`]). Plain
+    /// input never starts a collection, so the ordinary path never asks.
+    pub(crate) fn append_fragment(
+        &self,
+        result: &mut Fragment,
+        child: Fragment,
+        fallback: Span,
+        owner_start: usize,
+        collection: &mut Option<Box<NativeCollection>>,
+    ) -> bool {
+        let mut marker = None;
+        let mut unanchored = false;
+        if self.token_mode.is_none() {
+            let projection = child
+                .parsed_source()
+                .filter(|source| native_projection(source))
+                .and_then(|source| {
+                    Some(TokenSource::Projected {
+                        span: source.span,
+                        text: std::sync::Arc::clone(source.text.as_deref()?),
+                    })
+                });
+            // A Classic child whose collection is not its consumed input (the "" at the
+            // cursor after a dropped virtual token) contributes that collection, as a Java
+            // Chain collects the child's token.
+            let part = projection.or_else(|| {
+                child
+                    .source
+                    .as_deref()
+                    .filter(|source| returned_input(source, fallback))
+                    .map(|source| TokenSource::Input(source.span))
+            });
+            let other_kind = child.source.as_deref().is_some_and(other_kind_classic);
+            let excluded = other_kind && fallback.start != fallback.end;
+            if part.is_some() || excluded || collection.is_some() {
+                // Before the first collected child, the Box append_classic_fragment made has the
+                // consumed kind once a Classic child of that kind (an Optional over MatchOnly, a
+                // rule) returned a token: an empty one still starts the collection, as in Java.
+                let starts = collection.is_none();
+                let returned = starts
+                    && result
+                        .source
+                        .as_deref()
+                        .is_some_and(|source| source.kind == TokenKind::Consumed);
+                let collection = collection.get_or_insert_with(|| {
+                    Box::new(NativeCollection {
+                        parts: Vec::new(),
+                        start: owner_start,
+                        end: owner_start,
+                    })
+                });
+                // The input before this child, including skipped trivia, is consumed text.
+                let before = if part.is_some() || excluded {
+                    fallback.start
                 } else {
-                    node.span.end - node.span.start
+                    fallback.end
                 };
-                end = node.span.end;
-                if parts.is_empty() {
-                    single_projection = source.and_then(TokenSource::owned_shared);
-                } else {
-                    single_projection = None;
+                if collection.end < before || returned {
+                    collection.parts.push(TokenSource::Input(Span {
+                        start: collection.end,
+                        end: before,
+                    }));
+                } else if starts {
+                    self.collect_returned_input(result, collection);
+                    unanchored = true;
                 }
-                parts.push(text);
+                collection.parts.extend(part);
+                collection.end = collection.end.max(fallback.end);
+            } else if child.source.as_deref().is_some_and(|source| source.classic) {
+                // Until a collection starts, the kind of that Box records whether a Classic
+                // child returned a token of the consumed kind (see above); a MatchOnly that
+                // returned nothing of it does not, nor does a node-less Classic success (a PEG
+                // assertion under StopInvert / StopConsume returns no token, as in Java).
+                // finish_native_collection replaces the Box.
+                marker = if !other_kind && !child.nodes.is_empty() {
+                    Some(TokenKind::Consumed)
+                } else {
+                    result.source.is_none().then_some(TokenKind::MatchOnly)
+                };
             }
         }
-        first.map(|start| FragmentSource {
-            parsed_source: None,
-            span: Span {
-                start,
-                end: if generated { start } else { start + length },
+        self.append_classic_fragment(result, child, fallback, owner_start);
+        if let Some((kind, source)) = marker.zip(result.source.as_deref_mut()) {
+            source.kind = kind;
+        }
+        unanchored
+    }
+    /// Starts `collection` with the CST roots the earlier children of `result` returned that are
+    /// tokens of the consumed kind over the input, in order: as in Java, a host's token (an empty
+    /// `Token(consumed, peek(cursor, 0))`, or input it did not consume) is collected at its own
+    /// position. Asked before the child that starts the collection is appended, when the earlier
+    /// children consumed nothing, so their tokens are not otherwise collected (see
+    /// [`Self::append_fragment`]).
+    #[cold]
+    #[inline(never)]
+    fn collect_returned_input(&self, result: &Fragment, collection: &mut NativeCollection) {
+        collection
+            .parts
+            .extend(result.nodes.iter().filter_map(|index| {
+                let info = self.tokens.values.get(index)?;
+                match info.source {
+                    TokenSource::Input(span) if info.kind == TokenKind::Consumed => {
+                        Some(TokenSource::Input(span))
+                    }
+                    _ => None,
+                }
+            }));
+    }
+    /// A Sequence child `element` left its collection unanchored (see [`Self::append_fragment`]):
+    /// the elements before it, which consumed nothing, decide its start.
+    #[cold]
+    #[inline(never)]
+    pub(crate) fn anchor_sequence(
+        collection: &mut Option<Box<NativeCollection>>,
+        elements: &[Expr],
+        element: &Expr,
+    ) {
+        let index = elements
+            .iter()
+            .position(|candidate| std::ptr::eq(candidate, element))
+            .expect("element of the sequence");
+        if elements[..index].iter().any(java_returns_token) {
+            Self::anchor_native_collection(collection);
+        }
+    }
+    /// The NonOrdered form of [`Self::anchor_sequence`]: the other `selected` children, which
+    /// matched before `child`, consumed nothing.
+    #[cold]
+    #[inline(never)]
+    pub(crate) fn anchor_non_ordered(
+        collection: &mut Option<Box<NativeCollection>>,
+        children: &[Expr],
+        selected: &[bool],
+        child: &Expr,
+    ) {
+        if children.iter().zip(selected).any(|(earlier, &selected)| {
+            selected && !std::ptr::eq(earlier, child) && java_returns_token(earlier)
+        }) {
+            Self::anchor_native_collection(collection);
+        }
+    }
+    /// An earlier child of a collection that [`Self::append_fragment`] left unanchored returned
+    /// an empty token of the consumed kind (see [`java_returns_token`]): as in Java, the
+    /// collection starts with it at the owner's start, instead of "" at the consumed cursor. It
+    /// precedes a host's token (see [`Self::collect_returned_input`]), which only differs from
+    /// Java when that host token is away from the cursor and came first.
+    fn anchor_native_collection(collection: &mut Option<Box<NativeCollection>>) {
+        if let Some(collection) = collection.as_deref_mut() {
+            let start = collection.start;
+            collection
+                .parts
+                .insert(0, TokenSource::Input(Span { start, end: start }));
+        }
+    }
+    /// A non-Classic collector of one child (Optional, Recovery, a value boundary) that
+    /// started at byte `start`. It updates `fragment` in place, which keeps a second
+    /// fragment out of the callers' recursive frames.
+    pub(crate) fn collect_native_child(&self, fragment: &mut Fragment, start: usize) {
+        if self.token_mode.is_some() {
+            return;
+        }
+        let Some(source) = fragment.source.as_deref() else {
+            return;
+        };
+        let projection = fragment.parsed_source().is_some_and(native_projection);
+        if !source.classic && !projection {
+            // Not collected (see `append_fragment`): the non-Classic source is dropped, as
+            // before, and the nodes stay where they are.
+            fragment.source = None;
+            return;
+        }
+        let span = self.span(start);
+        let collected = projection
+            || other_kind_classic(source) && span.start != span.end
+            || returned_input(source, span);
+        if !projection {
+            // One Classic child collects one part: the input it consumed (consuming nothing,
+            // nothing of this kind), the "" after a child of another kind, or the collection
+            // it returned. That part is the collection, in the child's own Box.
+            let span = if !collected {
+                span
+            } else if other_kind_classic(source) {
+                Span {
+                    start: span.end,
+                    end: span.end,
+                }
+            } else {
+                source.span
+            };
+            if let Some(source) = fragment.source.as_deref_mut() {
+                *source = FragmentSource {
+                    parsed_source: None,
+                    span,
+                    kind: TokenKind::Consumed,
+                    classic: true,
+                    generated: false,
+                    text: None,
+                };
+            }
+            return;
+        }
+        let mut result = Fragment::default();
+        let mut collection = None;
+        self.append_fragment(
+            &mut result,
+            std::mem::take(fragment),
+            span,
+            span.start,
+            &mut collection,
+        );
+        self.finish_native_collection(&mut result, collection, move |_| span.start);
+        *fragment = result;
+    }
+    /// A non-Classic Choice is a Java Choice: it returns the selected child's Parsed, while its
+    /// own token collects that child in the consumed kind. A Classic child of another kind (a
+    /// low-level MatchOnly, a host token of another kind) contributes nothing to it, so the
+    /// Choice's collection is "" at the consumed cursor, which starts the collection of a
+    /// collector around it. Only such a child pays for the Box that keeps its source.
+    #[inline(never)]
+    pub(crate) fn collect_native_choice(&self, fragment: &mut Fragment) {
+        let Some(source) = fragment
+            .source
+            .as_deref_mut()
+            .filter(|source| source.parsed_source.is_none() && other_kind_classic(source))
+        else {
+            return;
+        };
+        let at = self.code_point(self.position);
+        let selected = std::mem::replace(
+            source,
+            FragmentSource {
+                parsed_source: None,
+                span: Span { start: at, end: at },
+                kind: TokenKind::Consumed,
+                classic: true,
+                generated: false,
+                text: None,
             },
-            kind,
-            classic: true,
-            generated: generated && length > 0,
-            text: projected
-                .then(|| single_projection.unwrap_or_else(|| std::sync::Arc::from(parts.concat())))
-                .map(Box::new),
-        })
+        );
+        source.parsed_source = Some(Box::new(selected));
+    }
+    /// Completes [`Self::append_fragment`] at the collector's end. A Classic child keeps the
+    /// result Classic, so a rule boundary still collects the CST exactly as before.
+    /// `owner_start` (a code point) is computed only when the result needs a source.
+    pub(crate) fn finish_native_collection(
+        &self,
+        result: &mut Fragment,
+        collection: Option<Box<NativeCollection>>,
+        owner_start: impl FnOnce(&Self) -> usize,
+    ) {
+        if self.token_mode.is_some() {
+            return;
+        }
+        let classic = result
+            .source
+            .as_deref()
+            .is_some_and(|source| source.classic);
+        let Some(mut collection) = collection else {
+            if let Some(source) = result.source.as_deref_mut().filter(|_| classic) {
+                // The consumed collection of Classic children that returned nothing of this
+                // kind is the consumed input; reuse the Box append_classic_fragment made.
+                *source = FragmentSource {
+                    parsed_source: None,
+                    span: Span {
+                        start: owner_start(self),
+                        end: self.code_point(self.position),
+                    },
+                    kind: TokenKind::Consumed,
+                    classic,
+                    generated: false,
+                    text: None,
+                };
+            }
+            return;
+        };
+        let end = self.code_point(self.position);
+        if collection.end < end {
+            collection.parts.push(TokenSource::Input(Span {
+                start: collection.end,
+                end,
+            }));
+        }
+        let mut collected = Collected::new();
+        for part in &collection.parts {
+            let text = match part {
+                TokenSource::Input(span) => self.text(*span).expect("validated input source"),
+                _ => part.projected_text().expect("collected projection"),
+            };
+            let span = match part {
+                TokenSource::Input(span) | TokenSource::Projected { span, .. } => *span,
+                TokenSource::Generated { .. } => unreachable!("generated is not collected"),
+            };
+            collected.push(span, Some(part), text);
+        }
+        // Nothing of the current kind was returned: "" at the consumed cursor.
+        let source = collected
+            .finish(TokenKind::Consumed)
+            .or_else(|| {
+                classic.then_some(FragmentSource {
+                    parsed_source: None,
+                    span: Span { start: end, end },
+                    kind: TokenKind::Consumed,
+                    classic,
+                    generated: false,
+                    text: None,
+                })
+            })
+            .map(|mut source| {
+                source.classic = classic;
+                source
+            })
+            .filter(|source| source.classic || source.text.is_some());
+        result.source = source.map(Box::new);
     }
     pub(crate) fn append_classic_fragment(
         &self,
@@ -1398,18 +1683,7 @@ impl ParseContext<'_> {
             return fragment;
         }
         let source = self.collected_source(&fragment, kind);
-        fragment
-            .nodes
-            .retain(|index| self.token_kind_at(*index) == kind);
-        fragment.captures.retain_mut(|capture| {
-            if capture.nodes.is_empty() {
-                return true;
-            }
-            capture
-                .nodes
-                .retain(|index| self.token_kind_at(*index) == kind);
-            !capture.nodes.is_empty()
-        });
+        self.retain_kind_nodes(&mut fragment, kind);
         let anchor = if kind.is_real() {
             self.code_point(if kind == TokenKind::Consumed {
                 self.position
@@ -1431,6 +1705,22 @@ impl ParseContext<'_> {
             text: None,
         })));
         fragment
+    }
+    /// The CST side of a Classic collection: only nodes of `kind` stay, and a capture whose
+    /// nodes all disappear is dropped.
+    pub(crate) fn retain_kind_nodes(&self, fragment: &mut Fragment, kind: TokenKind) {
+        fragment
+            .nodes
+            .retain(|index| self.token_kind_at(*index) == kind);
+        fragment.captures.retain_mut(|capture| {
+            if capture.nodes.is_empty() {
+                return true;
+            }
+            capture
+                .nodes
+                .retain(|index| self.token_kind_at(*index) == kind);
+            !capture.nodes.is_empty()
+        });
     }
     fn token_source(source: &FragmentSource) -> TokenSource {
         if source.generated {
@@ -1562,6 +1852,172 @@ impl ParseContext<'_> {
         value.source = Self::token_source(source);
     }
 }
+
+/// Whether a non-Classic collector collects `source` as a projection of the consumed kind.
+fn native_projection(source: &FragmentSource) -> bool {
+    source.text.is_some() && source.kind == TokenKind::Consumed && !source.generated
+}
+
+/// Whether a Classic child of the consumed kind returned a collection other than the input it
+/// consumed (`consumed`), which a non-Classic collector then collects as that child's input.
+fn returned_input(source: &FragmentSource, consumed: Span) -> bool {
+    source.classic
+        && source.kind == TokenKind::Consumed
+        && source.text.is_none()
+        && !source.generated
+        && source.span != consumed
+}
+
+/// Whether `source` is a Classic child of another kind (a low-level MatchOnly) that returned no
+/// projection: a non-Classic consumed collector collects nothing from it.
+pub(crate) fn other_kind_classic(source: &FragmentSource) -> bool {
+    source.classic
+        && source.kind != TokenKind::Consumed
+        && source.text.is_none()
+        && !source.generated
+}
+
+/// Whether a successful non-Classic `expression` returns a token of the consumed kind in Java,
+/// even an empty one, which then starts the collection of its parent. A Java collector (Chain,
+/// NonOrdered, a Choice, Occurs, a rule, recovery, a capture or value boundary, EmptyParser)
+/// commits one, and a lexical leaf (Lexing.LiteralParser, LexicalTokenParser) adds one of the
+/// text it matched. A PEG assertion restores the token stack and returns none, and NamedCapture,
+/// CaptureScope, Commit, Label, InvertMatchPropagationStopper, SemanticPredicateParser,
+/// SemanticPredicateScope and NameResolutionScope (none of them a CollectingParser) return what
+/// their child returned. What a host returned only its CST says (see
+/// `ParseContext::collect_returned_input`); other expressions are not known to return one.
+/// Asked only when a collection starts after children that consumed nothing (see
+/// [`ParseContext::append_fragment`]).
+pub(crate) fn java_returns_token(mut expression: &Expr) -> bool {
+    loop {
+        match expression {
+            Expr::OwnedCapture(_, child)
+            | Expr::CaptureScope(child)
+            | Expr::Commit { child, .. }
+            | Expr::Label { child, .. }
+            | Expr::StopInvert(child)
+            | Expr::SemanticPredicate { child, .. }
+            | Expr::SemanticPredicateScope { child, .. }
+            | Expr::NameResolutionScope { child, .. } => expression = child,
+            Expr::Sequence(_)
+            | Expr::NonOrdered(_)
+            | Expr::Choice(_)
+            | Expr::LongestChoice(_)
+            | Expr::UniqueLongestChoice(_)
+            | Expr::PredictiveChoice { .. }
+            | Expr::Optional(_)
+            | Expr::JavaOptional(_)
+            | Expr::Repeat { .. }
+            | Expr::JavaRepeat { .. }
+            | Expr::JavaTerminatedRepeat { .. }
+            | Expr::Rule(_)
+            | Expr::Recovery { .. }
+            | Expr::Capture(..)
+            | Expr::TextValue(_)
+            | Expr::ValueBoundary(_)
+            | Expr::CaptureBoundary(..)
+            | Expr::InputCaptureBoundary(..)
+            | Expr::JavaEmpty
+            | Expr::JavaEmptyLiteral
+            | Expr::Lexical(..) => return true,
+            _ => return false,
+        }
+    }
+}
+
+/// Input and projections a non-Classic collector returned, in order (see `append_fragment`).
+/// It exists only from the first projection or excluded Classic child on; after that every
+/// child appends the input it consumed as one part (adjacent input parts are not merged).
+pub(crate) struct NativeCollection {
+    parts: Vec<TokenSource>,
+    // The owner's start (a code point), where an unanchored collection starts.
+    start: usize,
+    end: usize,
+}
+
+/// Java's collected source of a token sequence: one shared rule for the Classic and the
+/// non-Classic collectors.
+struct Collected<'t> {
+    first: Option<usize>,
+    single_projection: Option<std::sync::Arc<str>>,
+    length: usize,
+    end: usize,
+    projected: bool,
+    generated: bool,
+    // An empty projection before any nonempty child stays a projection, as Java's sub-source.
+    empty_projection: bool,
+    parts: Vec<&'t str>,
+}
+
+impl<'t> Collected<'t> {
+    fn new() -> Self {
+        Self {
+            first: None,
+            single_projection: None,
+            length: 0,
+            end: 0,
+            projected: false,
+            generated: true,
+            empty_projection: false,
+            parts: Vec::new(),
+        }
+    }
+    fn push(&mut self, span: Span, source: Option<&TokenSource>, text: &'t str) {
+        let detached = matches!(source, Some(TokenSource::Generated { .. }));
+        let projection = source.is_some_and(|source| source.projected_text().is_some());
+        // Empty children retain their own source until a nonempty child occurs.
+        if self.first.is_none() || self.length == 0 && !text.is_empty() {
+            self.first = Some(span.start);
+            self.end = span.start;
+            self.empty_projection = text.is_empty() && projection;
+        }
+        if !text.is_empty() {
+            self.generated &= detached;
+            self.projected |= detached || self.end != span.start || projection;
+            self.length += if detached {
+                text.chars().count()
+            } else {
+                span.end - span.start
+            };
+            self.end = span.end;
+            if self.parts.is_empty() {
+                self.single_projection = source.and_then(TokenSource::owned_shared);
+            } else {
+                self.single_projection = None;
+            }
+            self.parts.push(text);
+        }
+    }
+    fn finish(self, kind: TokenKind) -> Option<FragmentSource> {
+        let Self {
+            first,
+            single_projection,
+            length,
+            projected,
+            generated,
+            empty_projection,
+            parts,
+            ..
+        } = self;
+        first.map(|start| FragmentSource {
+            parsed_source: None,
+            span: Span {
+                start,
+                end: if generated { start } else { start + length },
+            },
+            kind,
+            classic: true,
+            generated: generated && length > 0,
+            text: if projected {
+                Some(single_projection.unwrap_or_else(|| std::sync::Arc::from(parts.concat())))
+            } else {
+                empty_projection.then(|| std::sync::Arc::from(""))
+            }
+            .map(Box::new),
+        })
+    }
+}
+
 fn classic_number() -> &'static Expr {
     static VALUE: std::sync::OnceLock<Expr> = std::sync::OnceLock::new();
     VALUE.get_or_init(|| {
