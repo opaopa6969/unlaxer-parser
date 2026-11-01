@@ -27,6 +27,20 @@ exports.verify = async function () {
   ]);
   await editor.edit(edit => edit.replace(new vscode.Range(0,0,document.lineCount,0), "grammar G { @root Start ::= 'x'; }"));
   await diagnostics(0);
+  // #894: a complete first grammar followed by a supplementary invalid scalar.
+  // The hover reports the root's consumed UTF-16 prefix, while the diagnostic
+  // highlights one complete scalar. Data/absent keys are checked over stdio.
+  await editor.edit(edit => edit.replace(new vscode.Range(0,0,document.lineCount,0), "grammar A {}\r\n😀"));
+  const syntax = await diagnostics(1);
+  assert.deepEqual(syntax.map(d => ({code:d.code, severity:d.severity, source:d.source, message:d.message,
+    range:[d.range.start.line,d.range.start.character,d.range.end.line,d.range.end.character]})), [
+    {code:'ULX-PARSE-001',severity:vscode.DiagnosticSeverity.Error,source:'unlaxer',
+      message:"Expected ' ' or '//' or 'grammar' or '{' or '}' (in WordParser)",range:[1,0,1,2]}
+  ]);
+  const hover = await vscode.commands.executeCommand('vscode.executeHoverProvider', uri, new vscode.Position(1, 2));
+  assert.deepEqual(hover.flatMap(h => h.contents.map(c => c.value)), ['Parse error at offset 14']);
+  await editor.edit(edit => edit.replace(new vscode.Range(0,0,document.lineCount,0), "grammar G { @root Start ::= 'x'; }"));
+  await diagnostics(0);
   await document.save();
   console.log('Packaged validator: Java/Rust shared warning/error, messages, CRLF/UTF-16 ranges and repair passed');
 };
