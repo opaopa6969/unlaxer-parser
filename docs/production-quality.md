@@ -63,7 +63,12 @@ Java CLI 1732呼出しを既存 `CodegenBatchHost` の1 JVMに集約する。Rus
 Java の credentials は1つのテスト専用ファイルの全内容をケースごとに置き換え、各呼出しで
 製品の resolver に読み直させる。入力・出力ディレクトリはケースごとに分離する。resolve は既存 snapshot の
 有無ごと・各 host の直前に lock/cache を復元する。終了コード・診断・生成 bytes・通信回数・失敗時の不変性は集約前と同じ
-独立期待値で照合する。`scripts/ubnf_package_json.py --unbatched` で従来のプロセス単位でも比較でき、
+独立期待値で照合する。`scripts/ubnf_package_json.py --unbatched` で従来のプロセス単位でも比較できる。
+batch host は `CodegenMain.run` を呼ぶため、`main` の `System.exit`、プロセスごとの
+`UBNF_CREDENTIALS_FILE`、cwd は通らない。そこで既定の実行でも代表5ケース（exit 0/3/4、
+HTTPS の通信回数、ケースごとの credentials の拒否）は Java CLI を呼出しごとに JVM を起動して
+再実行する。同じ独立期待値に加え、exit・`lastError`・stderr 全文・生成 hash が batch の記録と
+一致することを確かめる（`target/package-json-cli-process.json`）。
 `target/package-json-cli.json` の各操作の `seconds` / `execution` とケース全体の `seconds` で計測する。
 テスト内の上限は1操作30秒・スクリプト全体1000秒・native build 180秒を維持し、
 計測でそれぞれ実測の3倍以上の余裕があることを確認する。

@@ -231,6 +231,39 @@ def check_cli(directory, commands, evidence, cases=None, *, unbatched=False):
             os.environ['UBNF_CREDENTIALS_FILE'] = previous
 
 
+# #1035: the batch host calls CodegenMain.run, so launcher-only behaviour (main's
+# System.exit, per-process UBNF_CREDENTIALS_FILE and cwd) is outside it. These
+# cases also start a JVM per Java call; each category must stay represented.
+PROCESS_SAMPLE = {
+    'manifest-bom-one': 'generation and resolve succeed (exit 0)',
+    'manifest-bom-two': 'load and resolve fail (exit 3)',
+    'surrogate-body-literal-used-high': 'Java partial output (exit 4)',
+    'surrogate-https-direct-path-pair': 'HTTPS resolve and request count',
+    'surrogate-https-credentials-invalid-json': 'per-process credentials file rejected',
+}
+
+
+def check_process_sample(directory, commands, evidence, sample):
+    """Repeat PROCESS_SAMPLE as real processes and require the batch records."""
+    cases = [case for case in fixtures() if case['id'] in PROCESS_SAMPLE]
+    assert len(cases) == len(PROCESS_SAMPLE), 'process sample cases disappeared'
+    directory.mkdir()
+    check_cli(directory, commands, sample, cases, unbatched=True)
+    batched = {record['case']: record for record in evidence}
+    for record in sample:
+        runs = batched[record['case']]['runs']
+        assert len(record['runs']) == len(runs), (record['case'], 'process sample run count')
+        for process, batch in zip(record['runs'], runs):
+            assert process['execution'] == 'process', (record['case'], process['host'])
+            assert batch['execution'] == ('batch' if batch['host'] == 'java' else 'process'), (record['case'], batch['host'])
+            for key in ['host', 'operation', 'exit', 'generatedHashes']:
+                assert process.get(key) == batch.get(key), (record['case'], process['host'], key, process.get(key), batch.get(key))
+            # Only the case folder differs; every other stderr byte must match.
+            for key in ['lastError', 'stderr']:
+                assert process[key].replace(str(directory), str(directory.parent)) == batch[key], (
+                    record['case'], process['host'], process['operation'], key, 'differs from batch')
+
+
 def _check_cli(directory, commands, evidence, cases, connection, java_credentials=None):
     origin, ca, received = connection
     for case in cases:
@@ -417,13 +450,18 @@ def main():
     commands = [('java', [args.java, '--enable-preview', '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'])]
     if args.rust:
         commands.append(('rust', [args.rust]))
-    evidence = []
+    evidence, sample = [], []
     try:
         with tempfile.TemporaryDirectory(prefix='package-json-', dir=os.environ.get('TMPDIR')) as temporary:
             check_cli(Path(temporary), commands, evidence, [c for c in fixtures() if c.get('surrogate939')] if args.only_939 else None,
                       unbatched=args.unbatched)
+            if not args.unbatched and not args.only_939:
+                check_process_sample(Path(temporary) / 'process-sample', commands, evidence, sample)
     finally:
         Path(args.output).write_text(json.dumps(evidence, ensure_ascii=True, indent=2) + '\n')
+        output = Path(args.output)
+        output.with_name(output.stem + '-process' + output.suffix).write_text(
+            json.dumps(sample, ensure_ascii=True, indent=2) + '\n')
 
 
 if __name__ == '__main__':
