@@ -115,9 +115,75 @@ pub fn scan(text: &str) -> Vec<Lexeme> {
     out
 }
 pub fn file_path(uri: &str) -> Result<PathBuf, String> {
-    let path = uri.strip_prefix("file://").ok_or("file URI required")?;
-    if !path.starts_with('/') || path.contains(['?', '#']) {
-        return Err("local file URI required".into());
+    // URI.create followed by UnixPath.of(URI), as in UbnfEditorIndex. This
+    // still authorizes only local file overlays; no provider is instantiated.
+    let syntax_error = |reason: &str, at: usize| {
+        format!(
+            "{reason} at index {}: {uri}",
+            uri[..at].encode_utf16().count()
+        )
+    };
+    // URI's component scan: brackets are legal only after '?'/'#', and a
+    // second '#' is illegal inside the fragment.
+    let mut component = "path";
+    for (at, c) in uri.char_indices() {
+        match (component, c) {
+            ("path", '?') => component = "query",
+            ("path" | "query", '#') => component = "fragment",
+            _ if c.is_ascii_control()
+                || " <>\"{}|\\^`".contains(c)
+                || component == "path" && "[]".contains(c)
+                || component == "fragment" && c == '#' =>
+            {
+                let reason = format!("Illegal character in {component}");
+                return Err(syntax_error(&reason, at));
+            }
+            _ => {}
+        }
+        if c == '%'
+            && !uri
+                .as_bytes()
+                .get(at + 1..at + 3)
+                .is_some_and(|hex| hex.iter().all(u8::is_ascii_hexdigit))
+        {
+            return Err(syntax_error("Malformed escape pair", at));
+        }
+    }
+    let (scheme, rest) = uri.split_once(':').ok_or("Missing scheme")?;
+    for (at, c) in scheme.char_indices() {
+        if !(c.is_ascii_alphabetic() || at > 0 && (c.is_ascii_digit() || "+-.".contains(c))) {
+            return Err(syntax_error("Illegal character in scheme name", at));
+        }
+    }
+    if scheme.is_empty() {
+        return Err(syntax_error("Expected scheme name", 0));
+    }
+    if rest.is_empty() {
+        return Err(syntax_error("Expected scheme-specific part", uri.len()));
+    }
+    if !scheme.eq_ignore_ascii_case("file") {
+        return Err(format!("Provider \"{scheme}\" not installed"));
+    }
+    if !rest.starts_with('/') {
+        return Err("URI is not hierarchical".into());
+    }
+    let path = if let Some(path) = rest.strip_prefix("//") {
+        if path.is_empty() {
+            return Err(syntax_error("Expected authority", uri.len()));
+        }
+        // An empty authority before a query/fragment is accepted by URI.
+        if !path.starts_with(['/', '?', '#']) {
+            return Err("URI has an authority component".into());
+        }
+        path
+    } else {
+        rest
+    };
+    if path.contains('#') {
+        return Err("URI has a fragment component".into());
+    }
+    if path.contains('?') {
+        return Err("URI has a query component".into());
     }
     let mut decoded = Vec::new();
     let bytes = path.as_bytes();
@@ -132,10 +198,11 @@ pub fn file_path(uri: &str) -> Result<PathBuf, String> {
             i += 1;
         }
     }
-    let text = String::from_utf8(decoded).map_err(|_| "URI must be UTF-8")?;
-    if text.contains('\0') {
-        return Err("invalid URI path".into());
+    // UnixUriUtils rejects a decoded NUL octet before any charset decoding.
+    if decoded.contains(&0) {
+        return Err("Nul character not allowed".into());
     }
+    let text = String::from_utf8(decoded).map_err(|_| "URI must be UTF-8")?;
     Ok(PathBuf::from(text))
 }
 /// Java `UnixPath.toUri()` (UnixUriUtils): RFC 2396 path characters, i.e. unreserved
