@@ -688,9 +688,7 @@ completion の `context.triggerKind` の18入力×全6キー順、scalar/空配�
 Java server の `-Xmx8g`、runner の既定timeout20秒、self-hosted runs-on を維持する。
 子プロセスは #1046 の TestProcesses.builder を使い、同じ helper source を test source の symlink で共有する。
 
-通常の position 等の **enum 以外の Integer** の遅延変換にも差を実測したが、今回の受理域は広げない
-（Gson Integer adapter は NumberFormatException を決定的エラーにするため、遅延の scale 外は Java が `-32700`、native は受理する差も含む）。
-受け入れ条件付き [#1052](https://github.com/opaopa6969/unlaxer-parser/issues/1052) に分離した。
+通常の Integer DTO の遅延変換は下記の #1052 を参照。
 全raw frame・全DTO adapterのparity完了、親 #885/#864/#111 の完了とはしない。
 
 PR初版の直接stdio 3851件は JDK21 **85.819秒** / JDK17 **68.816秒**。
@@ -705,3 +703,37 @@ Pythonは222件＋585 subtestsが成功した。遅延enumの検査を従来の�
 レビューで追加した mutation（stream 経路に遅延検査を戻す・1024字規則を外す・request DTO を常に stream 扱い）は
 それぞれ `accepted-initialize/1e-10000/0`、`configure/limits/CompletionItemKind/1.5/len1024/0`、
 `request/CompletionTriggerKind/1.5/1` で検出された。
+
+
+### 通常 Integer DTO の遅延変換（#1052）
+
+LSP4J 0.23.1 / Gson 2.13.2、固定 Java `384fcf3eb1c0ce3e207ac580cec5fcac4b478b34` の
+実 stdio を参照する。#1031 の最終 params の経路判定を Position、didOpen/didChange の version、
+contentChanges の range/rangeLength、initialize/configure の processId と ClientCapabilities、
+生成型表にある request DTO の Integer 欄で共有する。読み取りと dispatch が同じ変換を使い、
+hover と navigation は実際に変換された line/character で位置を解決する。
+
+| 入力・境界 | method が先（JsonReader） | params が先（JsonTreeReader） |
+| --- | --- | --- |
+| `1.5` / `-1.5` | `-32700` | 0 に向けて切り捨て、1 / -1 |
+| `4294967297` / `4294967297.9` / `18446744073709551617` | `-32700` | 下位32 bitを符号付き int として保持し、すべて1 |
+| `"1"` / `"١"` | 1 | 1 |
+| `"1.0"` / `"1e0"` / `" 1"` / `"0x1p0"` | double fallback で1 | Integer.parseInt で `-32700` |
+| `1e-9999` / `1e-10000` / `0e10000` | double で0 | `1e-9999` は0。後二者は Gson NumberLimits の scale 制限で `-32700` |
+| `1e9999` / `1e10000` | `-32700` | 前者は32 bitで0。後者は scale 制限で `-32700` |
+| 1023字 / 1024字の `1.000…e0` | 両方1 | 1023字なら1、1024字なら unquoted STRING が Integer.parseInt で `-32700` |
+| `null` / 省略、配列・オブジェクト・真偽値 | primitive Position 欄は既定値0、nullable Integer は null。配列・オブジェクト・真偽値は `-32700` | 同じ |
+| workDoneToken、partialResultToken | 数値分岐は Integer。文字列分岐と1024字以上の unquoted STRING は String | 同じ分岐で数値だけ遅延 Integer 変換 |
+
+Java が応答する場合は id/code/message/result を一致させる。method→params→id で Integer の
+変換が失敗すると Java reader は id を回復できず無応答となる。#1001 と同じ恒久差として、
+クライアントが応答を待ち続けないよう native は元id付き `-32700 Message could not be parsed.` を返す。
+型不正の通知は適用されず、診断を発行せずに直前の文書を保持する。version は DTO の変換後に
+サービスが捨てる値なので、文書が開くか更新されるかと診断の `version: 0` で観測する。
+range/rangeLength も Full sync では使わないが、後続 change を含め DTO 全体の変換を先に確認する。
+
+既存必須 jsonrpc suite を **4104→4231ケース**へ拡張する。手書き raw frame と、文法上の
+参照・定義位置および変換規則に基づく独立 oracle を使う。代表値の全6キー順、符号や指数原表記を
+含む1023 / 1024字境界、変換後の定義位置と負の hover 位置、未初期化の維持と initialize 再試行、
+configure 失敗後の旧 profile の VALIDATE gate と旧文書、後続 request を確認する。Java の無応答は
+後続 barrier と1秒 deadline で照合する。#901 は codeAction / signatureHelp の製品機能を追跡する。

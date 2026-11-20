@@ -156,12 +156,12 @@ impl Server {
                         "textDocument/didOpen" => {
                             let source = rpc::gson_string(&doc["text"])
                                 .ok_or_else(|| invalid("document text required"))?;
-                            rpc::notified_version(doc)?;
+                            rpc::notified_version(doc, stream)?;
                             self.documents.insert(uri.clone(), Document { source });
                             self.publish(&uri, &mut out);
                         }
                         "textDocument/didChange" => {
-                            rpc::change_shape(params)?;
+                            rpc::change_shape(params, stream)?;
                             let changes = params["contentChanges"]
                                 .as_array()
                                 .ok_or_else(|| invalid("contentChanges required"))?;
@@ -169,7 +169,7 @@ impl Server {
                             // Java Ext ignores range and applies the first text as a full snapshot.
                             let source = rpc::gson_string(&change["text"])
                                 .ok_or_else(|| invalid("change text required"))?;
-                            rpc::notified_version(doc)?;
+                            rpc::notified_version(doc, stream)?;
                             // Java Ext parseDocument also opens a URI that was never opened.
                             self.documents.insert(uri.clone(), Document { source });
                             self.publish(&uri, &mut out);
@@ -214,21 +214,19 @@ impl Server {
                     };
                     // wordAt/substring use the raw character; negative characters
                     // fail in hover and completion, while navigation clamps to zero.
-                    if params["position"].is_null()
-                        || rpc::gson_integer(&params["position"]["character"])
-                            .is_some_and(|n| n < 0)
-                    {
+                    let position =
+                        rpc::position(&params["position"], stream).ok_or_else(rpc::internal)?;
+                    if position.character < 0 {
                         return Err(rpc::internal());
                     }
-                    let offset = text::offset(&doc.source, &params["position"])
+                    let offset = text::offset(&doc.source, position)
                         .ok_or_else(|| invalid("invalid UTF-16 position"))?;
-                    let index_offset = text::index_offset(&doc.source, &params["position"])
-                        .and_then(|n| usize::try_from(n).ok())
-                        .map(|_| offset);
+                    let index_offset =
+                        (text::index_offset(&doc.source, position) >= 0).then_some(offset);
                     let source = doc.source.clone();
                     let index = self.index(uri).unwrap();
-                    let empty_line = rpc::gson_integer(&params["position"]["line"])
-                        .is_some_and(|n| n < 0 || n as usize >= source.split('\n').count());
+                    let empty_line =
+                        position.line < 0 || position.line as usize >= source.split('\n').count();
                     Ok(if method.ends_with("completion") {
                         features::completion(&source, &index, offset, empty_line, index_offset)
                     } else {
@@ -275,12 +273,10 @@ impl Server {
                     if method == "textDocument/documentSymbol" {
                         return Ok(navigation::symbols(&source, &index));
                     }
-                    if params["position"].is_null() {
-                        return Err(rpc::internal());
-                    }
-                    let offset = text::index_offset(&source, &params["position"])
-                        .and_then(|n| usize::try_from(n).ok())
-                        .and_then(|_| text::binding_offset(&source, &params["position"]));
+                    let position =
+                        rpc::position(&params["position"], stream).ok_or_else(rpc::internal)?;
+                    let offset = (text::index_offset(&source, position) >= 0)
+                        .then(|| text::binding_offset(&source, position));
                     match method {
                         "textDocument/definition" => Ok(navigation::definition(&index, offset)),
                         "textDocument/references" => {
