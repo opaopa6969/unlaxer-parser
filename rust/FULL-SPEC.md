@@ -232,6 +232,34 @@ null idは通知とし、生1e400はserde_json arbitrary_precisionをcrate自身
 requestの元id付きparse error / 通知破棄へ揃える。Javaのid読取り前失敗・arity>1・capabilities null・
 不正workDoneTokenによる無応答はreaderの欠陥として恒久差にし、clientを固める動作を移植せずnativeの
 決定的応答を維持する。全6キー順・重複・失敗後の設定/文書保持と再試行を両実stdioで確認する。
-#901のJava3機能を維持し、全ClientCapabilities schemaや全DTO parityの完了とは扱わない。
-Integer外・非scalarのidはJava無応答・nativeは同じ値を返す恒久差。position受理域と他methodのDTOは #1005。
+#901のJava3機能を維持し、全DTO parityの完了とは扱わない。
+Integer外・非scalarのidはJava無応答・nativeは同じ値を返す恒久差。position受理域と他methodのDTOは #1005 で次の範囲を追加した。
+#1005: 同じ必須 jsonrpc suite を916件へ拡張。version/position の Gson Integer 変換を共有し、
+負の character は hover/completion の Internal error と navigation の0丸めを区別する。
+11標準 authoring request の入れ子 DTO と packageSource uri、38標準 request の workDoneToken 数値を
+Java の id 付き -32700 に揃え、失敗前の設定・文書を保持する。ClientCapabilities と11 request は
+lsp4j 0.23.1 sources JAR から継承欄込みで機械生成した106 DTO/299欄の単一型表で検査する。
+null/未知欄/untyped値・collection の単一要素受理を保つ。workDoneToken:{} の Java 無応答は
+#1001 と同じ恒久差とし、native の決定的応答を維持する。didChange の数値/真偽値 text は
+Gson String に変換し、指数・負の0の原表記を保持する。全changeの検査を通るまで適用しない。
+ClientCapabilities enum の非整数で Java が無応答となる残差は #1031 で追跡する。
+#1033: 既存 jsonrpc suite は951件。didOpen の scalar text と didOpen/didChange/didSave/didClose の
+scalar uri を共有 Gson String 変換で受理し、数値は原表記を保持する（request の uri lookup も同じ）。
+文書診断の totalLength で `1.50` / `1.5` を区別し、別表記 URI の文書を混同しない。
+index offset の `start + character` は UTF-16 の32 bit wrapping。行内 prefix/word の丸めとは分離し、
+負の index offset は scope/use に一致せず、completion の字句状態（`::=` の後方探索）も行わない。completion の40/42件、hover と navigation 4 method、
+1行目・2行目以降・MAX_VALUE直前/一致/直後・非BMP/CRLF・未終端 token 規則を両JDK実stdioで検証する。
+決定的な応答なので恒久差にはせず Java に揃える。
 [固定対応表と検証境界](../docs/ubnf-authoring-lsp.md#json-rpc-層の固定契約994) を参照。
+
+#1031: ClientCapabilities enum 全21欄（整数10・文字列11）の18入力と全6キー順を既存 jsonrpc
+suite 4104件で検証する。sources JAR 宣言と欄の Javadoc link から20 enum domain の reader/定数を
+機械生成し、整数 enum と開いた String 定数クラスを区別する。1.0・未知定数/文字列/null は受理。
+params-before-method の整数 enum は JsonTreeReader の遅延変換に合わせ、小数/巨大数も受理する。
+Gson NumberLimits の scale 検査は遅延変換だけに掛け、stream で double の厳密な整数になる
+`1e-10000` 等は受理する。1024字以上の数値 token は Gson が unquoted STRING とするため両経路で受理する。
+request DTO の整数 enum（completion の context.triggerKind 等）も同じ経路判定に揃える。
+stream の非整数/int外数値、遅延変換のscale外、id回復不能の
+Java無応答は恒久差とし、native は元id付き -32700 を返す。失敗initialize後の再試行、
+configure失敗後の旧設定/文書/新入力と後続request、barrier＋1秒deadlineを両JDK実stdioで確認する。
+enum以外の Integer DTO の遅延変換は #1052 に残す。Java製品・3.3.0・parserのhot pathは変えない。

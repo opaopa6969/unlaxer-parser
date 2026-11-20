@@ -371,7 +371,7 @@ public class AutoCommitConformanceTest {
 
     private String run(List<String> command, int expected) throws Exception {
         Path log = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         builder.environment().put("CARGO_INCREMENTAL", "0");
         var process = builder.start();
         if (!process.waitFor(300, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("timeout " + command); }

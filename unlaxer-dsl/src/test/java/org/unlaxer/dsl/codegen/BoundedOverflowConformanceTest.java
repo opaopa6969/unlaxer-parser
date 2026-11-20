@@ -57,7 +57,7 @@ public class BoundedOverflowConformanceTest {
             "[assumption] BoundedOverflowConformanceTest requires -DrustConformance=true and cargo");
         assumeTrue(Boolean.getBoolean("rustConformance"));
         Path log = temporary.newFile().toPath();
-        var process = new ProcessBuilder("cargo", "test", "--locked", "--manifest-path",
+        var process = org.unlaxer.dsl.TestProcesses.builder("cargo", "test", "--locked", "--manifest-path",
             ROOT.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator", "--test", "bounded_overflow")
             .redirectErrorStream(true).redirectOutput(log.toFile()).start();
         if (!process.waitFor(180, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("native fixture timeout"); }

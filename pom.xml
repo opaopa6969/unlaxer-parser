@@ -56,6 +56,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
+		<unlaxer.test.jvmArgs></unlaxer.test.jvmArgs>
 	</properties>
 
 	<distributionManagement>
@@ -144,4 +145,32 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<!-- Test/CI opt-in only. java.io.tmpdir must be set before JVM startup (#1045). -->
+	<profiles>
+		<profile>
+			<id>test-tmpdir</id>
+			<activation><property><name>unlaxer.test.tmpdir</name></property></activation>
+			<properties>
+				<unlaxer.test.jvmArgs>"-Djava.io.tmpdir=${unlaxer.test.tmpdir}"</unlaxer.test.jvmArgs>
+			</properties>
+			<build>
+				<pluginManagement>
+					<plugins>
+						<plugin>
+							<groupId>org.apache.maven.plugins</groupId>
+							<artifactId>maven-surefire-plugin</artifactId>
+							<version>3.2.5</version>
+							<configuration>
+								<argLine>${unlaxer.test.jvmArgs}</argLine>
+								<systemPropertyVariables>
+									<unlaxer.test.tmpdir>${unlaxer.test.tmpdir}</unlaxer.test.tmpdir>
+								</systemPropertyVariables>
+							</configuration>
+						</plugin>
+					</plugins>
+				</pluginManagement>
+			</build>
+		</profile>
+	</profiles>
 </project>

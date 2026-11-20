@@ -403,7 +403,7 @@ public class ParameterizedRuleConformanceTest {
     /** A negative {@code expected} accepts any failing exit status. */
     private String run(List<String> command, String input, int expected) throws Exception {
         Path output = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(output.toFile());
         builder.environment().put("CARGO_INCREMENTAL", "0");
         var process = builder.start();
         try {

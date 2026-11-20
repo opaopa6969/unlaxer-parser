@@ -151,7 +151,7 @@ public class NumberTokenConformanceTest {
 
     private void run(List<String> command) throws Exception {
         Path log = temporary.newFile().toPath();
-        var process = new ProcessBuilder(command).directory(repo.toFile()).redirectErrorStream(true)
+        var process = org.unlaxer.dsl.TestProcesses.builder(command).directory(repo.toFile()).redirectErrorStream(true)
                 .redirectOutput(log.toFile()).start();
         try {
             assertTrue("timeout: " + command, process.waitFor(180, TimeUnit.SECONDS));

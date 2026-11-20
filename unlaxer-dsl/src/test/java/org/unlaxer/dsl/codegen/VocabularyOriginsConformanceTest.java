@@ -18,7 +18,7 @@ public class VocabularyOriginsConformanceTest {
         assumeTrue(Boolean.getBoolean("rustConformance"));
         Path repository = Path.of("..").toAbsolutePath().normalize();
         Path log = temporary.newFile().toPath();
-        Process build = new ProcessBuilder("cargo", "build", "--locked", "--manifest-path", repository.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator").redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        Process build = org.unlaxer.dsl.TestProcesses.builder("cargo", "build", "--locked", "--manifest-path", repository.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator").redirectErrorStream(true).redirectOutput(log.toFile()).start();
         assertTrue(build.waitFor(90, TimeUnit.SECONDS)); assertEquals(Files.readString(log), 0, build.exitValue());
         String source = "grammar Layout {\n @ubnf: v2\n // 😀\n token GAP ::= ' ' | '#';\n token WORD ::= 'word';\n}\n";
         List<String> report = new ArrayList<>(List.of("fixture\tidentity\tscalar_definitions\tjava_native_json"));
@@ -35,7 +35,7 @@ public class VocabularyOriginsConformanceTest {
                 UBNFPackageResolver.resolve(directory.resolve("ubnf.json"));
             }
             JsonObject javaResult = VocabularyOrigins.inspect(grammar);
-            Process nativeProcess = new ProcessBuilder(repository.resolve("rust/target/debug/unlaxer").toString(), "deps", "inspect", "--grammar", grammar.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+            Process nativeProcess = org.unlaxer.dsl.TestProcesses.builder(repository.resolve("rust/target/debug/unlaxer").toString(), "deps", "inspect", "--grammar", grammar.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
             assertTrue(nativeProcess.waitFor(20, TimeUnit.SECONDS)); assertEquals(Files.readString(log), 0, nativeProcess.exitValue());
             assertEquals(javaResult.toString() + "\n", Files.readString(log));
             JsonObject module = javaResult.getAsJsonArray("modules").get(0).getAsJsonObject();
@@ -50,7 +50,7 @@ public class VocabularyOriginsConformanceTest {
                 assertEquals(UBNFPackageResolver.sha256(Files.readAllBytes(directory.resolve("artifact.json"))), identity.get("sha256").getAsString());
             } else assertTrue(module.get("identity").isJsonNull());
             Path output = directory.resolve("playground");
-            Process playground = new ProcessBuilder(repository.resolve("rust/target/debug/unlaxer").toString(), "playground", "--grammar", grammar.toString(), "--output", output.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+            Process playground = org.unlaxer.dsl.TestProcesses.builder(repository.resolve("rust/target/debug/unlaxer").toString(), "playground", "--grammar", grammar.toString(), "--output", output.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
             assertTrue(playground.waitFor(20, TimeUnit.SECONDS)); assertEquals(Files.readString(log), 0, playground.exitValue());
             for (var entry : org.unlaxer.dsl.codegen.rust.PlaygroundGenerator.generate(grammar).entrySet())
                 assertEquals(entry.getKey(), entry.getValue(), Files.readString(output.resolve(entry.getKey())));
@@ -60,7 +60,7 @@ public class VocabularyOriginsConformanceTest {
                 Path cached = directory.resolve(".ubnf-cache/packages/" + standardHash + ".json");
                 Files.writeString(cached, Files.readString(cached) + " ");
                 assertTrue(assertThrows(IllegalArgumentException.class, () -> VocabularyOrigins.inspect(grammar)).getMessage().contains("artifact hash mismatch"));
-                Process rejected = new ProcessBuilder(repository.resolve("rust/target/debug/unlaxer").toString(), "deps", "inspect", "--grammar", grammar.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+                Process rejected = org.unlaxer.dsl.TestProcesses.builder(repository.resolve("rust/target/debug/unlaxer").toString(), "deps", "inspect", "--grammar", grammar.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
                 assertTrue(rejected.waitFor(20, TimeUnit.SECONDS)); assertNotEquals(0, rejected.exitValue()); assertTrue(Files.readString(log).contains("artifact hash mismatch"));
                 report.add("unverified-transitive-origin\trefused\trefused\tpass");
             }
@@ -76,7 +76,7 @@ public class VocabularyOriginsConformanceTest {
         Files.writeString(directory.resolve("ubnf.json"), coexistence.get("manifest").toString());
         UBNFPackageResolver.resolve(directory.resolve("ubnf.json"));
         JsonObject snapshot = VocabularyOrigins.inspect(grammar);
-        Process inspect = new ProcessBuilder(repository.resolve("rust/target/debug/unlaxer").toString(),
+        Process inspect = org.unlaxer.dsl.TestProcesses.builder(repository.resolve("rust/target/debug/unlaxer").toString(),
             "deps", "inspect", "--grammar", grammar.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         assertTrue(inspect.waitFor(20, TimeUnit.SECONDS)); assertEquals(Files.readString(log), 0, inspect.exitValue());
         assertEquals(snapshot.toString() + "\n", Files.readString(log));

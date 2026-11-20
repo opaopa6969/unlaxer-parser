@@ -527,7 +527,7 @@ public class NestedTypeofConformanceTest {
     private String run(List<String> command, String input, int expected) throws Exception {
         Path output = temporary.newFile().toPath();
         var builder =
-                new ProcessBuilder(command)
+                org.unlaxer.dsl.TestProcesses.builder(command)
                         .redirectErrorStream(true)
                         .redirectOutput(output.toFile());
         builder.environment().put("CARGO_INCREMENTAL", "0");

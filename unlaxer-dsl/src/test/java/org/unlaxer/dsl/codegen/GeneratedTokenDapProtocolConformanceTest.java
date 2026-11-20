@@ -62,12 +62,12 @@ public class GeneratedTokenDapProtocolConformanceTest {
         var evidence = new ArrayList<String>(List.of("backend\tfixture\tbase\toffset\tindex\tlabel\tstart_cp\tend_cp\tline\tcolumn\tend_line\tend_column\tvalue"));
         try (var wire = javaWire(true)) { exercise(wire, "java", evidence); }
         Path log = temporary.newFile().toPath();
-        var build = new ProcessBuilder("cargo", "build", "--offline", "--locked", "--manifest-path", ROOT.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-dap", "--example", "generated_token_dap").redirectErrorStream(true).redirectOutput(log.toFile());
+        var build = org.unlaxer.dsl.TestProcesses.builder("cargo", "build", "--offline", "--locked", "--manifest-path", ROOT.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-dap", "--example", "generated_token_dap").redirectErrorStream(true).redirectOutput(log.toFile());
         build.environment().put("CARGO_TARGET_DIR", ROOT.resolve("rust/target").toString());
         var process = build.start();
         try { assertTrue("Rust build timeout", process.waitFor(180, TimeUnit.SECONDS)); assertEquals(Files.readString(log), 0, process.exitValue()); }
         finally { if (process.isAlive()) process.destroyForcibly(); }
-        try (var wire = new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/examples/generated_token_dap").toString(), FIXTURES.resolve("cases.json").toString()).redirectError(temporary.newFile()).start())) {
+        try (var wire = new Wire(org.unlaxer.dsl.TestProcesses.builder(ROOT.resolve("rust/target/debug/examples/generated_token_dap").toString(), FIXTURES.resolve("cases.json").toString()).redirectError(temporary.newFile()).start())) {
             exercise(wire, "rust", evidence);
         }
         assertEquals(evidence.stream().filter(s -> s.startsWith("java\t")).map(s -> s.substring(5)).toList(), evidence.stream().filter(s -> s.startsWith("rust\t")).map(s -> s.substring(5)).toList());
@@ -153,7 +153,7 @@ public class GeneratedTokenDapProtocolConformanceTest {
             boolean ok = compiler.getTask(errors, manager, null, List.of("--release", "17", "-classpath", System.getProperty("java.class.path"), "-d", classes.toString()), null, sources).call();
             assertTrue(errors.toString(), ok);
         }
-        return new Wire(new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-cp", classes+File.pathSeparator+System.getProperty("java.class.path"), "wire.generated.JavaMain", FIXTURES.resolve("cases.json").toString()).redirectError(temporary.newFile()).start());
+        return new Wire(org.unlaxer.dsl.TestProcesses.builder(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-cp", classes+File.pathSeparator+System.getProperty("java.class.path"), "wire.generated.JavaMain", FIXTURES.resolve("cases.json").toString()).redirectError(temporary.newFile()).start());
     }
     private Path launch(Wire wire, String fixture, int offset) throws Exception {
         var row = rows().asList().stream().map(JsonElement::getAsJsonObject).filter(r -> r.get("name").getAsString().equals(fixture)).findFirst().orElseThrow();

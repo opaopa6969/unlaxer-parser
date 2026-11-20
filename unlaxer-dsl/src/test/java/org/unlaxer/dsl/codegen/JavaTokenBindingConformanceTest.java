@@ -164,7 +164,7 @@ public class JavaTokenBindingConformanceTest {
     }
     private void run(List<String> command)throws Exception {runExpected(command,0);}
     private String runExpected(List<String> command,int exitCode)throws Exception {
-        Path log=temporary.newFile().toPath();var process=new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        Path log=temporary.newFile().toPath();var process=org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         if(!process.waitFor(180,TimeUnit.SECONDS)){process.destroyForcibly();fail("timeout "+command);}
         String output=Files.readString(log);assertEquals(command+"\n"+output,exitCode,process.exitValue());return output;
     }

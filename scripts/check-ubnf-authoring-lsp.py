@@ -13,6 +13,12 @@ import tempfile
 import threading
 import time
 
+try:
+    from java_tmp import java_command as java_with_tmpdir
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command as java_with_tmpdir
+
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PARAMS = object()
 OMIT_PARAMS = object()
@@ -465,7 +471,7 @@ def main():
     args = parser.parse_args()
     # The 64 MiB boundary needs more than 4 GiB; bound each test JVM instead of
     # letting host-wide ergonomics reserve ~22 GiB per concurrently live JVM.
-    java_command = [args.java, '-Xmx8g', '--enable-preview', '-cp', args.classpath]
+    java_command = java_with_tmpdir(args.java) + ['-Xmx8g', '--enable-preview', '-cp', args.classpath]
     java = Client(java_command + ['org.unlaxer.dsl.lsp.ubnf.UBNFLspLauncherExt'])
     native = Client([args.rust], native=True)
     try:

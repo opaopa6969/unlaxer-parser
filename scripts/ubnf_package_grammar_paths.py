@@ -8,6 +8,12 @@ import shutil
 import subprocess
 import tempfile
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = "grammar Main { @import layout from 'pkg:std/layout' @ubnf: v2 @whitespace: layout.SPACES @root @mapping(Value) Start ::= 'a'; }\n"
 MISSING = 'E-PACKAGE: missing lock; run unlaxer deps resolve --manifest ubnf.json'
@@ -177,7 +183,7 @@ def main():
     try:
         with tempfile.TemporaryDirectory(prefix='package-grammar-', dir=os.environ.get('TMPDIR')) as temporary:
             run_cli(args.suite, Path(temporary),
-                    [args.java, '-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'], [args.rust], evidence)
+                    java_command(args.java) + ['-cp', args.classpath, 'org.unlaxer.dsl.CodegenMain'], [args.rust], evidence)
     finally:
         Path(args.output).write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + '\n')
 

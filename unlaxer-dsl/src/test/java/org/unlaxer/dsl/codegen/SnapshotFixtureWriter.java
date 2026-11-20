@@ -13,7 +13,7 @@ import org.unlaxer.dsl.bootstrap.UBNFMapper;
  *
  * <pre>
  *   mvn -q -DskipTests test-compile
- *   CP="target/classes:target/test-classes:$(mvn -q -DincludeScope=test -Dmdep.outputFile=/tmp/unlaxer-dsl-test-cp.txt dependency:build-classpath >/dev/null && cat /tmp/unlaxer-dsl-test-cp.txt)"
+ *   CP="target/classes:target/test-classes:$(mvn -q -DincludeScope=test -Dmdep.outputFile=target/unlaxer-dsl-test-cp.txt dependency:build-classpath >/dev/null && cat target/unlaxer-dsl-test-cp.txt)"
  *   java --enable-preview -cp "$CP" org.unlaxer.dsl.codegen.SnapshotFixtureWriter
  * </pre>
  */

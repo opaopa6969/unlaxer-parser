@@ -43,7 +43,7 @@ public class ClassicLspKeywordConformanceTest {
         var expected=JsonParser.parseString(Files.readString(fixture.resolve("labels.json"))).getAsJsonArray();
         assertEquals(12,expected.size());
         SortedSet<String> javaLabels;
-        try(var wire=new Wire(new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-cp",classes+File.pathSeparator+System.getProperty("java.class.path"),"wire.keywords.Main").redirectError(temporary.newFile()).start())) {
+        try(var wire=new Wire(org.unlaxer.dsl.TestProcesses.builder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-cp",classes+File.pathSeparator+System.getProperty("java.class.path"),"wire.keywords.Main").redirectError(temporary.newFile()).start())) {
             javaLabels=exercise(wire,expected,"Java");
         }
         if(!Boolean.getBoolean("rustConformance")) {System.out.println("[assumption] Rust keyword completion cross-check requires -DrustConformance=true; Java oracle ran");return;}
@@ -65,7 +65,7 @@ public class ClassicLspKeywordConformanceTest {
             """.formatted(ROOT.resolve("rust/unlaxer-runtime"),ROOT.resolve("rust/unlaxer-lsp")));
         Files.writeString(project.resolve("src/main.rs"),"mod generated; fn main() { std::process::exit(generated::lsp::serve_stdio_status().unwrap()); }\n");
         run(List.of("cargo","build","--quiet","--offline","--manifest-path",project.resolve("Cargo.toml").toString()));
-        try(var wire=new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/keyword-lsp-fixture").toString()).redirectError(temporary.newFile()).start())) {
+        try(var wire=new Wire(org.unlaxer.dsl.TestProcesses.builder(ROOT.resolve("rust/target/debug/keyword-lsp-fixture").toString()).redirectError(temporary.newFile()).start())) {
             assertEquals(javaLabels,exercise(wire,expected,"Rust"));
         }
     }
@@ -87,7 +87,7 @@ public class ClassicLspKeywordConformanceTest {
         assertTrue(backend,wire.process.waitFor(5,TimeUnit.SECONDS));assertEquals(backend,0,wire.process.exitValue());return labels;
     }
     private void run(List<String> command)throws Exception {
-        var builder=new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true);
+        var builder=org.unlaxer.dsl.TestProcesses.builder(command).directory(ROOT.toFile()).redirectErrorStream(true);
         builder.environment().put("CARGO_INCREMENTAL","0");builder.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());
         Path log=temporary.newFile().toPath();var process=builder.redirectOutput(log.toFile()).start();
         try {assertTrue("timeout "+command,process.waitFor(180,TimeUnit.SECONDS));assertEquals(command+"\n"+Files.readString(log),0,process.exitValue());}

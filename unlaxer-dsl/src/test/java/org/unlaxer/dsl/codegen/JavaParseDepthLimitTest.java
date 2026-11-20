@@ -33,7 +33,7 @@ public class JavaParseDepthLimitTest {
         }
         Path log = temporary.newFile("probe.log").toPath();
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        Process process = new ProcessBuilder(java, "-Xss1m", "-Xint", "-classpath",
+        Process process = org.unlaxer.dsl.TestProcesses.builder(java, "-Xss1m", "-Xint", "-classpath",
             classes + File.pathSeparator + System.getProperty("java.class.path"), Probe.class.getName())
             .redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {

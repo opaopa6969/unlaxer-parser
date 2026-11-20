@@ -146,7 +146,7 @@ public class ProjectedTokenDapProtocolConformanceTest {
             boolean ok = compiler.getTask(errors, manager, null, List.of("--release", "17", "-classpath", System.getProperty("java.class.path"), "-d", classes.toString()), null, sources).call();
             assertTrue(errors.toString(), ok);
         }
-        return new Wire(new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-cp", classes+File.pathSeparator+System.getProperty("java.class.path"), "wire.projected.JavaMain", FIXTURES.resolve(fixtures).toString()).redirectError(temporary.newFile()).start());
+        return new Wire(org.unlaxer.dsl.TestProcesses.builder(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-cp", classes+File.pathSeparator+System.getProperty("java.class.path"), "wire.projected.JavaMain", FIXTURES.resolve(fixtures).toString()).redirectError(temporary.newFile()).start());
     }
     private Path launch(Wire wire, String fixture, int offset) throws Exception {
         var row = rows().asList().stream().map(JsonElement::getAsJsonObject).filter(r -> r.get("name").getAsString().equals(fixture)).findFirst().orElseThrow();
@@ -166,12 +166,12 @@ public class ProjectedTokenDapProtocolConformanceTest {
     private static JsonArray rows() throws Exception { return JsonParser.parseString(Files.readString(FIXTURES.resolve("cases.json"))).getAsJsonArray(); }
     private Wire rustWire(String fixtures) throws Exception {
         Path log = temporary.newFile().toPath();
-        var build = new ProcessBuilder("cargo", "build", "--offline", "--locked", "--manifest-path", ROOT.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-dap", "--example", "projected_token_dap").redirectErrorStream(true).redirectOutput(log.toFile());
+        var build = org.unlaxer.dsl.TestProcesses.builder("cargo", "build", "--offline", "--locked", "--manifest-path", ROOT.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-dap", "--example", "projected_token_dap").redirectErrorStream(true).redirectOutput(log.toFile());
         build.environment().put("CARGO_TARGET_DIR", ROOT.resolve("rust/target").toString());
         var process = build.start();
         try { assertTrue("Rust build timeout", process.waitFor(180, TimeUnit.SECONDS)); assertEquals(Files.readString(log), 0, process.exitValue()); }
         finally { if (process.isAlive()) process.destroyForcibly(); }
-        return new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/examples/projected_token_dap").toString(), FIXTURES.resolve(fixtures).toString()).redirectError(temporary.newFile()).start());
+        return new Wire(org.unlaxer.dsl.TestProcesses.builder(ROOT.resolve("rust/target/debug/examples/projected_token_dap").toString(), FIXTURES.resolve(fixtures).toString()).redirectError(temporary.newFile()).start());
     }
 
     @Test public void projectedOverflowKeepsFailuresLocalAndLifecycleOverStdio() throws Exception {

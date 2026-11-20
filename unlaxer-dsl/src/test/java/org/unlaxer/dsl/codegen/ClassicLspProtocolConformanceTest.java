@@ -63,7 +63,7 @@ public class ClassicLspProtocolConformanceTest {
         }
         String javaExecutable=Path.of(System.getProperty("java.home"),"bin","java").toString();
         var javaCommand = List.of(javaExecutable, "-cp", classes+File.pathSeparator+System.getProperty("java.class.path"), "wire.fixture.Main");
-        try(var wire=new Wire(new ProcessBuilder(javaCommand).redirectError(temporary.newFile("java-stderr.log")).start())) {
+        try(var wire=new Wire(org.unlaxer.dsl.TestProcesses.builder(javaCommand).redirectError(temporary.newFile("java-stderr.log")).start())) {
             assertEquals(-32002, wire.response("fixture/probe", Map.of()).getAsJsonObject("error").get("code").getAsInt());
             exercise(wire);
         }
@@ -76,7 +76,7 @@ public class ClassicLspProtocolConformanceTest {
             }
         }
         var embeddedCommand = new ArrayList<>(javaCommand); embeddedCommand.add("embedded"); embeddedCommand.add(embeddedFrames.toString());
-        var embedded = new ProcessBuilder(embeddedCommand).redirectError(temporary.newFile("embedded-stderr.log")).start();
+        var embedded = org.unlaxer.dsl.TestProcesses.builder(embeddedCommand).redirectError(temporary.newFile("embedded-stderr.log")).start();
         assertTrue("embedded process returned", embedded.waitFor(5, TimeUnit.SECONDS));
         assertEquals(0, embedded.exitValue());
         assertEquals("embedded host alive", new String(embedded.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim());
@@ -104,12 +104,12 @@ public class ClassicLspProtocolConformanceTest {
         Files.writeString(project.resolve("src/main.rs"),"mod generated; fn main() { std::process::exit(generated::lsp::serve_stdio_status().unwrap()); }\n");
         run(List.of("cargo","build","--quiet","--offline","--manifest-path",project.resolve("Cargo.toml").toString()),ROOT);
         Path executable=ROOT.resolve("rust/target/debug/classic-lsp-fixture");
-        try(var wire=new Wire(new ProcessBuilder(executable.toString()).redirectError(temporary.newFile("rust-stderr.log")).start())) { exercise(wire); }
+        try(var wire=new Wire(org.unlaxer.dsl.TestProcesses.builder(executable.toString()).redirectError(temporary.newFile("rust-stderr.log")).start())) { exercise(wire); }
         exerciseUncleanExit(List.of(executable.toString()), "rust");
     }
     private void exerciseUncleanExit(List<String> command, String backend) throws Exception {
         for (boolean initialize : List.of(false, true)) {
-            try (var wire = new Wire(new ProcessBuilder(command).redirectError(temporary.newFile()).start())) {
+            try (var wire = new Wire(org.unlaxer.dsl.TestProcesses.builder(command).redirectError(temporary.newFile()).start())) {
                 if (initialize) wire.request("initialize", Map.of("capabilities", Map.of()));
                 wire.notify("exit", null);
                 assertTrue(backend + " exit before shutdown must stop without EOF", wire.process.waitFor(5, TimeUnit.SECONDS));
@@ -117,7 +117,7 @@ public class ClassicLspProtocolConformanceTest {
             }
         }
         for (boolean shutdown : List.of(false, true)) {
-            try (var wire = new Wire(new ProcessBuilder(command).redirectError(temporary.newFile()).start())) {
+            try (var wire = new Wire(org.unlaxer.dsl.TestProcesses.builder(command).redirectError(temporary.newFile()).start())) {
                 wire.request("initialize", Map.of("capabilities", Map.of()));
                 if (shutdown) wire.response("shutdown", null);
                 wire.output.close();
@@ -203,7 +203,7 @@ public class ClassicLspProtocolConformanceTest {
         assertEquals("shutdown/exit status", 0, wire.process.exitValue());
     }
     private void run(List<String> command,Path directory)throws Exception {
-        ProcessBuilder builder=new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true);builder.environment().put("CARGO_INCREMENTAL","0");builder.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());
+        ProcessBuilder builder=org.unlaxer.dsl.TestProcesses.builder(command).directory(directory.toFile()).redirectErrorStream(true);builder.environment().put("CARGO_INCREMENTAL","0");builder.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());
         Path log=temporary.newFile().toPath();builder.redirectOutput(log.toFile());var process=builder.start();
         try { assertTrue("command timeout: "+command,process.waitFor(120,TimeUnit.SECONDS));assertEquals(command+"\n"+Files.readString(log),0,process.exitValue()); } finally { if (process.isAlive()) process.destroyForcibly(); }
     }

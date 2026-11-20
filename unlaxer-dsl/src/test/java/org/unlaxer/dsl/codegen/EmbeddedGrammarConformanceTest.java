@@ -200,7 +200,7 @@ public class EmbeddedGrammarConformanceTest {
     }
     private void run(List<String> arguments) throws Exception {
         Path log = temporary.newFile().toPath();
-        var process = new ProcessBuilder(arguments).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        var process = org.unlaxer.dsl.TestProcesses.builder(arguments).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         if (!process.waitFor(60, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("timeout: " + arguments); }
         assertEquals(arguments + "\n" + Files.readString(log), 0, process.exitValue());
     }

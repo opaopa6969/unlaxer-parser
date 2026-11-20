@@ -51,7 +51,27 @@ verifier が失敗しても証跡はアップロードし、Maven 未実行・�
 XML は `optin-cross-language-core` / `optin-cross-language-cli`、生成証跡は
 `rust-conformance-core` / `rust-conformance-cli` artifact の和で確認する。
 両 shard は独立した Maven repository と Cargo build を使用し、ハーネスの並列度は増やさない。
-matrix は `max-parallel: 2` / `fail-fast: false`、各 job の timeout は50分。
+matrix は `max-parallel: 2` / `fail-fast: false`、各 job の timeout は75分（#1035）。
+2026-10-31 の直近5件の master 成功 run（41163126651、41182366451、41198835881、
+41228434097、41233307704）は core 32.9〜35.7分、cli 37.3〜39.8分だった。
+高負荷時の run 41229276882 / 41234848629 の attempt 1 では、それぞれ core / cli が
+50分で打ち切られた。同時期の cli は49.22分、core の再実行は47.65分で完了しており、
+75分はこれら完了実測の1.5倍以上にもなる。打ち切り値は完了時間ではなく下限として扱う。
+既存2 shard の配分と self-hosted runner を保ち、`PackageJsonAcceptanceConformanceTest` の
+Java CLI 1732呼出しを既存 `CodegenBatchHost` の1 JVMに集約する。Rust CLI 1319呼出しと
+全481 fixture の検査は維持し、両言語を直列に実行する。
+Java の credentials は1つのテスト専用ファイルの全内容をケースごとに置き換え、各呼出しで
+製品の resolver に読み直させる。入力・出力ディレクトリはケースごとに分離する。resolve は既存 snapshot の
+有無ごと・各 host の直前に lock/cache を復元する。終了コード・診断・生成 bytes・通信回数・失敗時の不変性は集約前と同じ
+独立期待値で照合する。`scripts/ubnf_package_json.py --unbatched` で従来のプロセス単位でも比較できる。
+batch host は `CodegenMain.run` を呼ぶため、`main` の `System.exit`、プロセスごとの
+`UBNF_CREDENTIALS_FILE`、cwd は通らない。そこで既定の実行でも代表5ケース（exit 0/3/4、
+HTTPS の通信回数、ケースごとの credentials の拒否）は Java CLI を呼出しごとに JVM を起動して
+再実行する。同じ独立期待値に加え、exit・`lastError`・stderr 全文・生成 hash が batch の記録と
+一致することを確かめる（`target/package-json-cli-process.json`）。
+`target/package-json-cli.json` の各操作の `seconds` / `execution` とケース全体の `seconds` で計測する。
+テスト内の上限は1操作30秒・スクリプト全体1000秒・native build 180秒を維持し、
+計測でそれぞれ実測の3倍以上の余裕があることを確認する。
 集約 job `rust` は元の check 名 `Rust backend and Java conformance` を保ち、
 どちらかが失敗・cancel・skip なら成功にしない。branch protection の設定は変更しない。
 
@@ -242,3 +262,34 @@ DAPはAST/token inspectionであり、live evaluatorの停止・再開ではな�
 監査で再現したJavaのFIRST誤判定（`k`と`K`が診断policyによって不一致になる）も修正する。
 この追加は上記3.3.0配布記録の検証対象には含まれず、公開済み3.3.0には入っていない。
 新しい共通fixture、Java17/21の生成parser検証、Unicode表の再生成checkを継続CIへ追加する。
+
+### CI の一時領域（#1045）
+
+全 workflow は各 job の最初の step で `TMPDIR` / `TMP` / `TEMP` を `${{ runner.temp }}` に向け、
+`GITHUB_ENV` で後続 action / step へ引き継ぐ（runner context は job env では使えない）。
+checkout・toolchain setup・Python `tempfile`・shell `mktemp`・cargo/rustc・Node の
+`os.tmpdir()` も runner の work disk を使う。build 成果物の `target/`、npm/cargo の
+依存 cache、job 専用 Maven repository の既存の配置はそのままとする。
+Maven 本体には `MAVEN_OPTS` で `java.io.tmpdir` と `unlaxer.test.tmpdir` を渡し、親 POM の
+opt-in profile が Surefire の `argLine` へ起動前に渡す。JDK が一時パスを早期に cache
+するため `systemPropertyVariables` だけでは不十分。既存の preview 引数は維持し、
+追加の `unlaxer.test.jvmArgs` を連結する（既存の JaCoCo / `@{argLine}` 設定はない）。
+property 未指定のローカル実行では OS 既定値を維持する。
+
+JVM property は子 JVM に自動継承されないため、DSL のテストは `TestProcesses.builder` で
+`java` / `javac` へ明示的に渡す。Python の Java 起動には `java_tmp.java_command` を使い、
+さらに起動する provider のテスト用 command にも渡す。native fixture が実行ファイルパスだけを
+受け取る箇所は、`unlaxer.test.tmpdir`（Python は `TMPDIR`）があるときだけ
+`scripts/ci/java-tmpdir/bin/java` を渡し、未指定のローカル実行では実行中の JDK の `java` のままとする。
+wrapper は `UNLAXER_TEST_JAVA`（`TestProcesses.builder` が実行中の JDK を設定）を優先し、無ければ PATH の `java` を使う。`JAVA_TOOL_OPTIONS` / `_JAVA_OPTIONS` /
+`JDK_JAVA_OPTIONS` は stderr の launcher notice が conformance を壊すため使わない。
+downstream の固定 POM は変更せず、Surefire の `jvm` に同 launcher を指定して既存の
+`argLine`（preview / add-opens）を維持する。
+静的解析の forked javac は `-J-Djava.io.tmpdir`、SpotBugs は `jvmArgs` で Maven の一時領域を引き継ぐ。
+Javadoc は `MAVEN_OPTS` の `additionalJOption` から `-J-Djava.io.tmpdir` を渡すため、
+親 POM を継承しない固定 downstream の package / install も対象になる。
+fixture が意図的に指定する `java.io.tmpdir` は後置し、その失敗条件を優先する。
+
+検証は JDK17/21 の関係 conformance と `CiTempDirectoryTest`、Python tests、各プロセスの
+`mkdir` syscall 記録で行う。共有 `/tmp` の全体差分は他 job の作成を誤検知するため gate に
+しない。merge 後の master CI 3連続成功を確認するまで #1045 は close しない。

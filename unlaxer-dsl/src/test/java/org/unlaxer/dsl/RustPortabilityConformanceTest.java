@@ -608,7 +608,7 @@ public class RustPortabilityConformanceTest {
 
     private Run nativeRun(List<String> args, boolean noJava, Path cwd) throws Exception {
         Path out = temporary.newFile().toPath(), err = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(args).directory(cwd.toFile()).redirectOutput(out.toFile()).redirectError(err.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(args).directory(cwd.toFile()).redirectOutput(out.toFile()).redirectError(err.toFile());
         if (noJava) { builder.environment().put("PATH", ""); builder.environment().put("JAVA_HOME", "/missing-java"); }
         Process process = builder.start();
         if (!process.waitFor(60, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("process timeout: " + args); }

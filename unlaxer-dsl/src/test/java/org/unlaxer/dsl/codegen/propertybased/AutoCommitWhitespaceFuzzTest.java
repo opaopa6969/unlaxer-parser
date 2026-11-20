@@ -509,7 +509,7 @@ public class AutoCommitWhitespaceFuzzTest {
 
     private String run(List<String> command, String input, int seconds) throws Exception {
         Path log = temporary.newFile().toPath(), errors = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(command).redirectOutput(log.toFile()).redirectError(errors.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).redirectOutput(log.toFile()).redirectError(errors.toFile());
         builder.environment().put("CARGO_INCREMENTAL", "0");
         var process = builder.start();
         try (var stdin = process.getOutputStream()) {

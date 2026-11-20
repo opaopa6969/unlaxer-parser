@@ -141,7 +141,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<version>3.2.5</version>
 				<configuration>
-					<argLine>--enable-preview</argLine>
+					<argLine>--enable-preview ${unlaxer.test.jvmArgs}</argLine>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -194,6 +194,7 @@
 							<target>21</target>
 							<fork>true</fork>
 							<compilerArgs>
+								<arg>-J-Djava.io.tmpdir=${java.io.tmpdir}</arg>
 								<arg>--enable-preview</arg>
 								<arg>-XDcompilePolicy=simple</arg>
 								<arg>-XDaddTypeAnnotationsToSymbol=true</arg>
@@ -224,6 +225,7 @@
 						<artifactId>spotbugs-maven-plugin</artifactId>
 						<version>4.10.2.0</version>
 						<configuration>
+							<jvmArgs>-Djava.io.tmpdir=${java.io.tmpdir}</jvmArgs>
 							<effort>Default</effort>
 							<threshold>High</threshold>
 							<excludeFilterFile>${project.basedir}/../config/spotbugs-exclude.xml</excludeFilterFile>
