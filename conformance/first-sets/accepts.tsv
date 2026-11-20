@@ -1,0 +1,24 @@
+# 共通 oracle の対になる primitive が同じ受理・消費をすることの実測 (#853)。README.md 参照。
+# 値は root で parse したときの消費 code point 数、または fail。Java と Rust の実測は一致した。
+# id	empty	a	b	ab	abc	U+1F600	space-a	U+00E9
+literal	fail	fail	fail	2	2	fail	fail	fail
+empty-word	fail	fail	fail	fail	fail	fail	fail	fail
+non-bmp-literal	fail	fail	fail	fail	fail	fail	fail	fail
+choice	fail	1	1	1	1	fail	fail	fail
+sequence	fail	fail	1	2	2	fail	fail	fail
+sequence-nullable	0	1	1	2	2	0	0	0
+optional	0	1	0	1	1	0	0	0
+zero-or-more	0	1	0	1	1	0	0	0
+one-or-more	fail	1	fail	1	1	fail	fail	fail
+repeat-zero	0	0	0	0	0	0	0	0
+repeat-invalid	fail	fail	fail	fail	fail	fail	fail	fail
+eof	0	fail	fail	fail	fail	fail	fail	fail
+eof-then-literal	fail	fail	fail	fail	fail	fail	fail	fail
+zero-or-more-any	0	1	1	2	3	1	2	1
+char-range	fail	1	1	1	1	fail	fail	fail
+character-predicate	fail	1	fail	1	1	fail	fail	fail
+not-lookahead	0	fail	0	fail	fail	0	0	0
+peg-not-lookahead	0	fail	0	fail	fail	0	0	0
+case-insensitive	fail	fail	fail	2	2	fail	fail	fail
+empty-chain	0	0	0	0	0	0	0	0
+empty-choice	fail	fail	fail	fail	fail	fail	fail	fail

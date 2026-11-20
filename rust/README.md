@@ -207,6 +207,9 @@ ASCII bitset・非 ASCII フラグ・nullable・unknown・「sequence が先に 
   （消費する前に到達し得る位置にある場合。消費した後に来る custom は FIRST を広げない）。
 - `PredictiveChoice` は deferred では生成時 predictor を使わず、構造的な FIRST で除外する（全候補の retry も不要）。
 - `UNLAXER_CANDIDATE_EXCLUSION=off` で無効化、`=audit` で除外した候補を実際に評価して成功したら panic する（検証用）。
+- 同じ解析は `FirstSets::of(&grammar)` の `rule(id)` / `expression(&expr)` で読める（Java `FirstSets.of` / `FirstSet` と対称、#853）。照会は深さ 1,024・node 100,000・1,000 round を超えると `UNKNOWN` を返す（[資源上限](../conformance/first-sets/README.md#共通契約)）。
+  呼出し時だけ計算した所有 snapshot で parser は読まず、custom parser / predicate も実行しない。Java との精度差は
+  [共通 corpus](../conformance/first-sets/README.md) を参照。
 
 ### 対応するUBNF
 
