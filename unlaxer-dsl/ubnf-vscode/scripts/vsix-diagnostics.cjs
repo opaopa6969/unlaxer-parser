@@ -8,11 +8,11 @@ exports.verify = async function () {
   await vscode.workspace.fs.writeFile(uri, Buffer.from("// 😀\r\ngrammar G {\r\n Start ::= Missing;\r\n}"));
   const document = await vscode.workspace.openTextDocument(uri);
   const editor = await vscode.window.showTextDocument(document);
-  async function diagnostics(count) {
+  async function diagnostics(count, matches = () => true) {
     const deadline = Date.now() + 30000;
     do {
       const values = vscode.languages.getDiagnostics(uri);
-      if (values.length === count) return values;
+      if (values.length === count && matches(values)) return values;
       await new Promise(resolve => setTimeout(resolve, 100));
     } while (Date.now() < deadline);
     throw new Error(`validator diagnostics did not reach ${count}`);
@@ -39,6 +39,15 @@ exports.verify = async function () {
   ]);
   const hover = await vscode.commands.executeCommand('vscode.executeHoverProvider', uri, new vscode.Position(1, 2));
   assert.deepEqual(hover.flatMap(h => h.contents.map(c => c.value)), ['Parse error at offset 14']);
+  // #1024: the header replay independently reaches the opening-brace attempt.
+  await editor.edit(edit => edit.replace(new vscode.Range(0,0,document.lineCount,0), "grammar Main 😀"));
+  const headerMessage = "Expected ' ' or '//' or '{' (in WordParser)";
+  const header = await diagnostics(1, values => values[0].message === headerMessage);
+  assert.deepEqual(header.map(d => ({code:d.code, severity:d.severity, source:d.source, message:d.message,
+    range:[d.range.start.line,d.range.start.character,d.range.end.line,d.range.end.character]})), [
+    {code:'ULX-PARSE-001',severity:vscode.DiagnosticSeverity.Error,source:'unlaxer',
+      message:headerMessage,range:[0,13,0,15]}
+  ]);
   await editor.edit(edit => edit.replace(new vscode.Range(0,0,document.lineCount,0), "grammar G { @root Start ::= 'x'; }"));
   await diagnostics(0);
   await document.save();
