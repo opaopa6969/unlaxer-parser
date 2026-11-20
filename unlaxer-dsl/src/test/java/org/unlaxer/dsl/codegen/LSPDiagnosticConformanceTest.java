@@ -81,7 +81,7 @@ public class LSPDiagnosticConformanceTest {
         var map=new SegmentSourceMap(inner,List.of(new Segment(new Span(0,inner.length()),Kind.COPY,new SegmentSourceMap.Location(host,new Span(4,host.length()-2)))));
         var region=new Region("java",null,language,new Span(0,host.length()),new Span(4,host.length()-2),map,State.COMPLETE);
         var project=new LanguageQueries.Project("p",1,Map.of(host.uri(),host,dependency.uri(),dependency),Map.of());
-        var process=new ProviderProcess(List.of(java(),"-cp",System.getProperty("java.class.path"),"org.unlaxer.dsl.provider.JavacProvider"),new ProviderProtocol.Identity("javac","21.0.9"),Set.of(Operation.VALIDATE),Duration.ofSeconds(30));
+        var process=new ProviderProcess(List.of(java(), "-Djava.io.tmpdir=" + System.getProperty("java.io.tmpdir"), "-cp",System.getProperty("java.class.path"),"org.unlaxer.dsl.provider.JavacProvider"),new ProviderProtocol.Identity("javac","21.0.9"),Set.of(Operation.VALIDATE),Duration.ofSeconds(30));
         return new LanguageQueries(new LanguageRegions(host,List.of(region)),project,Map.of(language,process));
     }
     private static JsonArray normalize(List<JsonObject> messages){
@@ -104,6 +104,6 @@ public class LSPDiagnosticConformanceTest {
         }assertEquals(event.toString(),event.get("expected"),counts);assertEquals(event.has("warnings")?event.get("warnings").getAsInt():0,warnings);
     }
     private static String java(){return Path.of(System.getProperty("java.home"),"bin","java").toString();}
-    private String run(List<String> command)throws Exception{Path log=temporary.newFile().toPath();var builder=new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());builder.environment().put("CARGO_INCREMENTAL","0");var process=builder.start();if(!process.waitFor(120,TimeUnit.SECONDS)){process.destroyForcibly();fail("timeout "+command);}String output=Files.readString(log);assertEquals(output,0,process.exitValue());return output;}
+    private String run(List<String> command)throws Exception{Path log=temporary.newFile().toPath();var builder=org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());builder.environment().put("CARGO_INCREMENTAL","0");var process=builder.start();if(!process.waitFor(120,TimeUnit.SECONDS)){process.destroyForcibly();fail("timeout "+command);}String output=Files.readString(log);assertEquals(output,0,process.exitValue());return output;}
     private static JavaFileObject source(String name,String text){return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignored){return text;}};}
 }

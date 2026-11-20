@@ -223,7 +223,7 @@ public class IncrementalCacheConformanceTest {
         } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
     }
     private String run(List<String> command,Path directory)throws Exception {
-        Path log=temporary.newFile().toPath();var process=new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        Path log=temporary.newFile().toPath();var process=org.unlaxer.dsl.TestProcesses.builder(command).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try { assertTrue("timeout "+command,process.waitFor(120,TimeUnit.SECONDS));String output=Files.readString(log);assertEquals(command+"\n"+output,0,process.exitValue());return output; }
         finally { if(process.isAlive()) process.destroyForcibly(); }
     }

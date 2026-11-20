@@ -198,7 +198,7 @@ public class PackagedLanguageProfileConformanceTest {
     }
     private record Run(int code, String output) {}
     private Run run(List<String> command, boolean offline) throws Exception {
-        Path log = temporary.newFile().toPath(); var builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
+        Path log = temporary.newFile().toPath(); var builder = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         if (offline) { builder.environment().put("PATH", ""); builder.environment().put("JAVA_HOME", "/nonexistent"); }
         var process = builder.start(); if (!process.waitFor(180, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("process timeout"); }
         return new Run(process.exitValue(), Files.readString(log));

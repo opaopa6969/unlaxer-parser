@@ -1,0 +1,1053 @@
+{
+  "lsp4jVersion": "0.23.1",
+  "sourcesSha256": "98b0c16e84fc4188043ab2e18c5bbbfa0fbd0aacfb47ef70b47e8f07242e28da",
+  "requests": {
+    "textDocument/codeAction": "CodeActionParams",
+    "textDocument/completion": "CompletionParams",
+    "textDocument/definition": "DefinitionParams",
+    "textDocument/documentSymbol": "DocumentSymbolParams",
+    "textDocument/foldingRange": "FoldingRangeRequestParams",
+    "textDocument/hover": "HoverParams",
+    "textDocument/linkedEditingRange": "LinkedEditingRangeParams",
+    "textDocument/references": "ReferenceParams",
+    "textDocument/rename": "RenameParams",
+    "textDocument/semanticTokens/full": "SemanticTokensParams",
+    "textDocument/signatureHelp": "SignatureHelpParams"
+  },
+  "workDoneMethods": [
+    "callHierarchy/incomingCalls",
+    "callHierarchy/outgoingCalls",
+    "textDocument/codeAction",
+    "textDocument/codeLens",
+    "textDocument/colorPresentation",
+    "textDocument/completion",
+    "textDocument/declaration",
+    "textDocument/definition",
+    "textDocument/diagnostic",
+    "textDocument/documentColor",
+    "textDocument/documentHighlight",
+    "textDocument/documentLink",
+    "textDocument/documentSymbol",
+    "textDocument/foldingRange",
+    "textDocument/formatting",
+    "textDocument/hover",
+    "textDocument/implementation",
+    "textDocument/inlayHint",
+    "textDocument/inlineValue",
+    "textDocument/linkedEditingRange",
+    "textDocument/moniker",
+    "textDocument/prepareCallHierarchy",
+    "textDocument/prepareRename",
+    "textDocument/prepareTypeHierarchy",
+    "textDocument/rangeFormatting",
+    "textDocument/references",
+    "textDocument/rename",
+    "textDocument/selectionRange",
+    "textDocument/semanticTokens/full",
+    "textDocument/semanticTokens/full/delta",
+    "textDocument/semanticTokens/range",
+    "textDocument/signatureHelp",
+    "textDocument/typeDefinition",
+    "typeHierarchy/subtypes",
+    "typeHierarchy/supertypes",
+    "workspace/diagnostic",
+    "workspace/executeCommand",
+    "workspace/symbol"
+  ],
+  "types": {
+    "CallHierarchyCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "ClientCapabilities": {
+      "experimental": "any",
+      "general": "GeneralClientCapabilities",
+      "notebookDocument": "NotebookDocumentClientCapabilities",
+      "textDocument": "TextDocumentClientCapabilities",
+      "window": "WindowClientCapabilities",
+      "workspace": "WorkspaceClientCapabilities"
+    },
+    "CodeActionCapabilities": {
+      "codeActionLiteralSupport": "CodeActionLiteralSupportCapabilities",
+      "dataSupport": "boolean",
+      "disabledSupport": "boolean",
+      "dynamicRegistration": "boolean",
+      "honorsChangeAnnotations": "boolean",
+      "isPreferredSupport": "boolean",
+      "resolveSupport": "CodeActionResolveSupportCapabilities"
+    },
+    "CodeActionContext": {
+      "diagnostics": [
+        "list",
+        "Diagnostic"
+      ],
+      "only": [
+        "list",
+        [
+          "enum",
+          "CodeActionKind"
+        ]
+      ],
+      "triggerKind": [
+        "enum",
+        "CodeActionTriggerKind"
+      ]
+    },
+    "CodeActionKindCapabilities": {
+      "valueSet": [
+        "list",
+        [
+          "enum",
+          "CodeActionKind"
+        ]
+      ]
+    },
+    "CodeActionLiteralSupportCapabilities": {
+      "codeActionKind": "CodeActionKindCapabilities"
+    },
+    "CodeActionParams": {
+      "context": "CodeActionContext",
+      "partialResultToken": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "range": "Range",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "CodeActionResolveSupportCapabilities": {
+      "properties": [
+        "list",
+        "string"
+      ]
+    },
+    "CodeLensCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "CodeLensWorkspaceCapabilities": {
+      "refreshSupport": "boolean"
+    },
+    "ColorProviderCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "CompletionCapabilities": {
+      "completionItem": "CompletionItemCapabilities",
+      "completionItemKind": "CompletionItemKindCapabilities",
+      "completionList": "CompletionListCapabilities",
+      "contextSupport": "boolean",
+      "dynamicRegistration": "boolean",
+      "insertTextMode": [
+        "enum",
+        "InsertTextMode"
+      ]
+    },
+    "CompletionContext": {
+      "triggerCharacter": "string",
+      "triggerKind": [
+        "enum",
+        "CompletionTriggerKind"
+      ]
+    },
+    "CompletionItemCapabilities": {
+      "commitCharactersSupport": "boolean",
+      "deprecatedSupport": "boolean",
+      "documentationFormat": [
+        "list",
+        [
+          "enum",
+          "MarkupKind"
+        ]
+      ],
+      "insertReplaceSupport": "boolean",
+      "insertTextModeSupport": "CompletionItemInsertTextModeSupportCapabilities",
+      "labelDetailsSupport": "boolean",
+      "preselectSupport": "boolean",
+      "resolveSupport": "CompletionItemResolveSupportCapabilities",
+      "snippetSupport": "boolean",
+      "tagSupport": "CompletionItemTagSupportCapabilities"
+    },
+    "CompletionItemInsertTextModeSupportCapabilities": {
+      "valueSet": [
+        "list",
+        [
+          "enum",
+          "InsertTextMode"
+        ]
+      ]
+    },
+    "CompletionItemKindCapabilities": {
+      "valueSet": [
+        "list",
+        [
+          "enum",
+          "CompletionItemKind"
+        ]
+      ]
+    },
+    "CompletionItemResolveSupportCapabilities": {
+      "properties": [
+        "list",
+        "string"
+      ]
+    },
+    "CompletionItemTagSupportCapabilities": {
+      "valueSet": [
+        "list",
+        [
+          "enum",
+          "CompletionItemTag"
+        ]
+      ]
+    },
+    "CompletionListCapabilities": {
+      "itemDefaults": [
+        "list",
+        "string"
+      ]
+    },
+    "CompletionParams": {
+      "context": "CompletionContext",
+      "partialResultToken": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "DeclarationCapabilities": {
+      "dynamicRegistration": "boolean",
+      "linkSupport": "boolean"
+    },
+    "DefinitionCapabilities": {
+      "dynamicRegistration": "boolean",
+      "linkSupport": "boolean"
+    },
+    "DefinitionParams": {
+      "partialResultToken": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "Diagnostic": {
+      "code": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "codeDescription": "DiagnosticCodeDescription",
+      "data": "any",
+      "message": "string",
+      "range": "Range",
+      "relatedInformation": [
+        "list",
+        "DiagnosticRelatedInformation"
+      ],
+      "severity": [
+        "enum",
+        "DiagnosticSeverity"
+      ],
+      "source": "string",
+      "tags": [
+        "list",
+        [
+          "enum",
+          "DiagnosticTag"
+        ]
+      ]
+    },
+    "DiagnosticCapabilities": {
+      "dynamicRegistration": "boolean",
+      "relatedDocumentSupport": "boolean"
+    },
+    "DiagnosticCodeDescription": {
+      "href": "string"
+    },
+    "DiagnosticRelatedInformation": {
+      "location": "Location",
+      "message": "string"
+    },
+    "DiagnosticWorkspaceCapabilities": {
+      "refreshSupport": "boolean"
+    },
+    "DiagnosticsTagSupport": {
+      "valueSet": [
+        "list",
+        [
+          "enum",
+          "DiagnosticTag"
+        ]
+      ]
+    },
+    "DidChangeConfigurationCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "DidChangeWatchedFilesCapabilities": {
+      "dynamicRegistration": "boolean",
+      "relativePatternSupport": "boolean"
+    },
+    "DocumentHighlightCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "DocumentLinkCapabilities": {
+      "dynamicRegistration": "boolean",
+      "tooltipSupport": "boolean"
+    },
+    "DocumentSymbolCapabilities": {
+      "dynamicRegistration": "boolean",
+      "hierarchicalDocumentSymbolSupport": "boolean",
+      "labelSupport": "boolean",
+      "symbolKind": "SymbolKindCapabilities",
+      "tagSupport": "SymbolTagSupportCapabilities"
+    },
+    "DocumentSymbolParams": {
+      "partialResultToken": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "DynamicRegistrationCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "ExecuteCommandCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "FileOperationsWorkspaceCapabilities": {
+      "didCreate": "boolean",
+      "didDelete": "boolean",
+      "didRename": "boolean",
+      "dynamicRegistration": "boolean",
+      "willCreate": "boolean",
+      "willDelete": "boolean",
+      "willRename": "boolean"
+    },
+    "FoldingRangeCapabilities": {
+      "dynamicRegistration": "boolean",
+      "foldingRange": "FoldingRangeSupportCapabilities",
+      "foldingRangeKind": "FoldingRangeKindSupportCapabilities",
+      "lineFoldingOnly": "boolean",
+      "rangeLimit": "integer"
+    },
+    "FoldingRangeKindSupportCapabilities": {
+      "valueSet": [
+        "list",
+        [
+          "enum",
+          "FoldingRangeKind"
+        ]
+      ]
+    },
+    "FoldingRangeRequestParams": {
+      "partialResultToken": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "FoldingRangeSupportCapabilities": {
+      "collapsedText": "boolean"
+    },
+    "FormattingCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "GeneralClientCapabilities": {
+      "markdown": "MarkdownCapabilities",
+      "positionEncodings": [
+        "list",
+        [
+          "enum",
+          "PositionEncodingKind"
+        ]
+      ],
+      "regularExpressions": "RegularExpressionsCapabilities",
+      "staleRequestSupport": "StaleRequestCapabilities"
+    },
+    "HoverCapabilities": {
+      "contentFormat": [
+        "list",
+        [
+          "enum",
+          "MarkupKind"
+        ]
+      ],
+      "dynamicRegistration": "boolean"
+    },
+    "HoverParams": {
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "ImplementationCapabilities": {
+      "dynamicRegistration": "boolean",
+      "linkSupport": "boolean"
+    },
+    "InlayHintCapabilities": {
+      "dynamicRegistration": "boolean",
+      "resolveSupport": "InlayHintResolveSupportCapabilities"
+    },
+    "InlayHintResolveSupportCapabilities": {
+      "properties": [
+        "list",
+        "string"
+      ]
+    },
+    "InlayHintWorkspaceCapabilities": {
+      "refreshSupport": "boolean"
+    },
+    "InlineValueCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "InlineValueWorkspaceCapabilities": {
+      "refreshSupport": "boolean"
+    },
+    "LinkedEditingRangeCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "LinkedEditingRangeParams": {
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "Location": {
+      "range": "Range",
+      "uri": "string"
+    },
+    "MarkdownCapabilities": {
+      "allowedTags": [
+        "list",
+        "string"
+      ],
+      "parser": "string",
+      "version": "string"
+    },
+    "MarkupContent": {
+      "kind": [
+        "enum",
+        "MarkupKind"
+      ],
+      "value": "string"
+    },
+    "MonikerCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "NotebookDocumentClientCapabilities": {
+      "synchronization": "NotebookDocumentSyncClientCapabilities"
+    },
+    "NotebookDocumentSyncClientCapabilities": {
+      "dynamicRegistration": "boolean",
+      "executionSummarySupport": "boolean"
+    },
+    "OnTypeFormattingCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "ParameterInformation": {
+      "documentation": [
+        "either",
+        "string",
+        "MarkupContent"
+      ],
+      "label": [
+        "either",
+        "string",
+        [
+          "tuple",
+          "integer",
+          "integer"
+        ]
+      ]
+    },
+    "ParameterInformationCapabilities": {
+      "labelOffsetSupport": "boolean"
+    },
+    "Position": {
+      "character": "integer",
+      "line": "integer"
+    },
+    "PublishDiagnosticsCapabilities": {
+      "codeDescriptionSupport": "boolean",
+      "dataSupport": "boolean",
+      "relatedInformation": "boolean",
+      "tagSupport": [
+        "either",
+        "boolean",
+        "DiagnosticsTagSupport"
+      ],
+      "versionSupport": "boolean"
+    },
+    "Range": {
+      "end": "Position",
+      "start": "Position"
+    },
+    "RangeFormattingCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "ReferenceContext": {
+      "includeDeclaration": "boolean"
+    },
+    "ReferenceParams": {
+      "context": "ReferenceContext",
+      "partialResultToken": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "ReferencesCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "RegularExpressionsCapabilities": {
+      "engine": "string",
+      "version": "string"
+    },
+    "RenameCapabilities": {
+      "dynamicRegistration": "boolean",
+      "honorsChangeAnnotations": "boolean",
+      "prepareSupport": "boolean",
+      "prepareSupportDefaultBehavior": [
+        "enum",
+        "PrepareSupportDefaultBehavior"
+      ]
+    },
+    "RenameParams": {
+      "newName": "string",
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "SelectionRangeCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "SemanticTokensCapabilities": {
+      "augmentsSyntaxTokens": "boolean",
+      "dynamicRegistration": "boolean",
+      "formats": [
+        "list",
+        [
+          "enum",
+          "TokenFormat"
+        ]
+      ],
+      "multilineTokenSupport": "boolean",
+      "overlappingTokenSupport": "boolean",
+      "requests": "SemanticTokensClientCapabilitiesRequests",
+      "serverCancelSupport": "boolean",
+      "tokenModifiers": [
+        "list",
+        [
+          "enum",
+          "SemanticTokenModifiers"
+        ]
+      ],
+      "tokenTypes": [
+        "list",
+        [
+          "enum",
+          "SemanticTokenTypes"
+        ]
+      ]
+    },
+    "SemanticTokensClientCapabilitiesRequests": {
+      "full": [
+        "either",
+        "boolean",
+        "SemanticTokensClientCapabilitiesRequestsFull"
+      ],
+      "range": [
+        "either",
+        "boolean",
+        "any"
+      ]
+    },
+    "SemanticTokensClientCapabilitiesRequestsFull": {
+      "delta": "boolean"
+    },
+    "SemanticTokensParams": {
+      "partialResultToken": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "SemanticTokensWorkspaceCapabilities": {
+      "refreshSupport": "boolean"
+    },
+    "ShowDocumentCapabilities": {
+      "support": "boolean"
+    },
+    "SignatureHelp": {
+      "activeParameter": "integer",
+      "activeSignature": "integer",
+      "signatures": [
+        "list",
+        "SignatureInformation"
+      ]
+    },
+    "SignatureHelpCapabilities": {
+      "contextSupport": "boolean",
+      "dynamicRegistration": "boolean",
+      "signatureInformation": "SignatureInformationCapabilities"
+    },
+    "SignatureHelpContext": {
+      "activeSignatureHelp": "SignatureHelp",
+      "isRetrigger": "boolean",
+      "triggerCharacter": "string",
+      "triggerKind": [
+        "enum",
+        "SignatureHelpTriggerKind"
+      ]
+    },
+    "SignatureHelpParams": {
+      "context": "SignatureHelpContext",
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "SignatureInformation": {
+      "activeParameter": "integer",
+      "documentation": [
+        "either",
+        "string",
+        "MarkupContent"
+      ],
+      "label": "string",
+      "parameters": [
+        "list",
+        "ParameterInformation"
+      ]
+    },
+    "SignatureInformationCapabilities": {
+      "activeParameterSupport": "boolean",
+      "documentationFormat": [
+        "list",
+        [
+          "enum",
+          "MarkupKind"
+        ]
+      ],
+      "parameterInformation": "ParameterInformationCapabilities"
+    },
+    "StaleRequestCapabilities": {
+      "cancel": "boolean",
+      "retryOnContentModified": [
+        "list",
+        "string"
+      ]
+    },
+    "SymbolCapabilities": {
+      "dynamicRegistration": "boolean",
+      "resolveSupport": "WorkspaceSymbolResolveSupportCapabilities",
+      "symbolKind": "SymbolKindCapabilities",
+      "tagSupport": "SymbolTagSupportCapabilities"
+    },
+    "SymbolKindCapabilities": {
+      "valueSet": [
+        "list",
+        [
+          "enum",
+          "SymbolKind"
+        ]
+      ]
+    },
+    "SymbolTagSupportCapabilities": {
+      "valueSet": [
+        "list",
+        [
+          "enum",
+          "SymbolTag"
+        ]
+      ]
+    },
+    "SynchronizationCapabilities": {
+      "didSave": "boolean",
+      "dynamicRegistration": "boolean",
+      "willSave": "boolean",
+      "willSaveWaitUntil": "boolean"
+    },
+    "TextDocumentClientCapabilities": {
+      "callHierarchy": "CallHierarchyCapabilities",
+      "codeAction": "CodeActionCapabilities",
+      "codeLens": "CodeLensCapabilities",
+      "colorProvider": "ColorProviderCapabilities",
+      "completion": "CompletionCapabilities",
+      "declaration": "DeclarationCapabilities",
+      "definition": "DefinitionCapabilities",
+      "diagnostic": "DiagnosticCapabilities",
+      "documentHighlight": "DocumentHighlightCapabilities",
+      "documentLink": "DocumentLinkCapabilities",
+      "documentSymbol": "DocumentSymbolCapabilities",
+      "foldingRange": "FoldingRangeCapabilities",
+      "formatting": "FormattingCapabilities",
+      "hover": "HoverCapabilities",
+      "implementation": "ImplementationCapabilities",
+      "inlayHint": "InlayHintCapabilities",
+      "inlineValue": "InlineValueCapabilities",
+      "linkedEditingRange": "LinkedEditingRangeCapabilities",
+      "moniker": "MonikerCapabilities",
+      "onTypeFormatting": "OnTypeFormattingCapabilities",
+      "publishDiagnostics": "PublishDiagnosticsCapabilities",
+      "rangeFormatting": "RangeFormattingCapabilities",
+      "references": "ReferencesCapabilities",
+      "rename": "RenameCapabilities",
+      "selectionRange": "SelectionRangeCapabilities",
+      "semanticTokens": "SemanticTokensCapabilities",
+      "signatureHelp": "SignatureHelpCapabilities",
+      "synchronization": "SynchronizationCapabilities",
+      "typeDefinition": "TypeDefinitionCapabilities",
+      "typeHierarchy": "TypeHierarchyCapabilities"
+    },
+    "TextDocumentIdentifier": {
+      "uri": "string"
+    },
+    "TextDocumentPositionAndWorkDoneProgressAndPartialResultParams": {
+      "partialResultToken": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "TextDocumentPositionAndWorkDoneProgressParams": {
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier",
+      "workDoneToken": "workDoneToken"
+    },
+    "TextDocumentPositionParams": {
+      "position": "Position",
+      "textDocument": "TextDocumentIdentifier"
+    },
+    "TypeDefinitionCapabilities": {
+      "dynamicRegistration": "boolean",
+      "linkSupport": "boolean"
+    },
+    "TypeHierarchyCapabilities": {
+      "dynamicRegistration": "boolean"
+    },
+    "WindowClientCapabilities": {
+      "showDocument": "ShowDocumentCapabilities",
+      "showMessage": "WindowShowMessageRequestCapabilities",
+      "workDoneProgress": "boolean"
+    },
+    "WindowShowMessageRequestActionItemCapabilities": {
+      "additionalPropertiesSupport": "boolean"
+    },
+    "WindowShowMessageRequestCapabilities": {
+      "messageActionItem": "WindowShowMessageRequestActionItemCapabilities"
+    },
+    "WorkDoneProgressAndPartialResultParams": {
+      "partialResultToken": [
+        "either",
+        "string",
+        "integer"
+      ],
+      "workDoneToken": "workDoneToken"
+    },
+    "WorkspaceClientCapabilities": {
+      "applyEdit": "boolean",
+      "codeLens": "CodeLensWorkspaceCapabilities",
+      "configuration": "boolean",
+      "diagnostics": "DiagnosticWorkspaceCapabilities",
+      "didChangeConfiguration": "DidChangeConfigurationCapabilities",
+      "didChangeWatchedFiles": "DidChangeWatchedFilesCapabilities",
+      "executeCommand": "ExecuteCommandCapabilities",
+      "fileOperations": "FileOperationsWorkspaceCapabilities",
+      "inlayHint": "InlayHintWorkspaceCapabilities",
+      "inlineValue": "InlineValueWorkspaceCapabilities",
+      "semanticTokens": "SemanticTokensWorkspaceCapabilities",
+      "symbol": "SymbolCapabilities",
+      "workspaceEdit": "WorkspaceEditCapabilities",
+      "workspaceFolders": "boolean"
+    },
+    "WorkspaceEditCapabilities": {
+      "changeAnnotationSupport": "WorkspaceEditChangeAnnotationSupportCapabilities",
+      "documentChanges": "boolean",
+      "failureHandling": [
+        "enum",
+        "FailureHandlingKind"
+      ],
+      "normalizesLineEndings": "boolean",
+      "resourceOperations": [
+        "list",
+        [
+          "enum",
+          "ResourceOperationKind"
+        ]
+      ]
+    },
+    "WorkspaceEditChangeAnnotationSupportCapabilities": {
+      "groupsOnLabel": "boolean"
+    },
+    "WorkspaceSymbolResolveSupportCapabilities": {
+      "properties": [
+        "list",
+        "string"
+      ]
+    }
+  },
+  "enums": {
+    "CodeActionKind": {
+      "reader": "string",
+      "unknown": "preserve",
+      "values": {
+        "Empty": "",
+        "QuickFix": "quickfix",
+        "Refactor": "refactor",
+        "RefactorExtract": "refactor.extract",
+        "RefactorInline": "refactor.inline",
+        "RefactorRewrite": "refactor.rewrite",
+        "Source": "source",
+        "SourceOrganizeImports": "source.organizeImports",
+        "SourceFixAll": "source.fixAll"
+      }
+    },
+    "CodeActionTriggerKind": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "Invoked": 1,
+        "Automatic": 2
+      }
+    },
+    "CompletionItemKind": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "Text": 1,
+        "Method": 2,
+        "Function": 3,
+        "Constructor": 4,
+        "Field": 5,
+        "Variable": 6,
+        "Class": 7,
+        "Interface": 8,
+        "Module": 9,
+        "Property": 10,
+        "Unit": 11,
+        "Value": 12,
+        "Enum": 13,
+        "Keyword": 14,
+        "Snippet": 15,
+        "Color": 16,
+        "File": 17,
+        "Reference": 18,
+        "Folder": 19,
+        "EnumMember": 20,
+        "Constant": 21,
+        "Struct": 22,
+        "Event": 23,
+        "Operator": 24,
+        "TypeParameter": 25
+      }
+    },
+    "CompletionItemTag": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "Deprecated": 1
+      }
+    },
+    "CompletionTriggerKind": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "Invoked": 1,
+        "TriggerCharacter": 2,
+        "TriggerForIncompleteCompletions": 3
+      }
+    },
+    "DiagnosticSeverity": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "Error": 1,
+        "Warning": 2,
+        "Information": 3,
+        "Hint": 4
+      }
+    },
+    "DiagnosticTag": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "Unnecessary": 1,
+        "Deprecated": 2
+      }
+    },
+    "FailureHandlingKind": {
+      "reader": "string",
+      "unknown": "preserve",
+      "values": {
+        "Abort": "abort",
+        "Transactional": "transactional",
+        "TextOnlyTransactional": "textOnlyTransactional",
+        "Undo": "undo"
+      }
+    },
+    "FoldingRangeKind": {
+      "reader": "string",
+      "unknown": "preserve",
+      "values": {
+        "Comment": "comment",
+        "Imports": "imports",
+        "Region": "region"
+      }
+    },
+    "InsertTextMode": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "AsIs": 1,
+        "AdjustIndentation": 2
+      }
+    },
+    "MarkupKind": {
+      "reader": "string",
+      "unknown": "preserve",
+      "values": {
+        "PLAINTEXT": "plaintext",
+        "MARKDOWN": "markdown"
+      }
+    },
+    "PositionEncodingKind": {
+      "reader": "string",
+      "unknown": "preserve",
+      "values": {
+        "UTF8": "utf-8",
+        "UTF16": "utf-16",
+        "UTF32": "utf-32"
+      }
+    },
+    "PrepareSupportDefaultBehavior": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "Identifier": 1
+      }
+    },
+    "ResourceOperationKind": {
+      "reader": "string",
+      "unknown": "preserve",
+      "values": {
+        "Create": "create",
+        "Rename": "rename",
+        "Delete": "delete"
+      }
+    },
+    "SemanticTokenModifiers": {
+      "reader": "string",
+      "unknown": "preserve",
+      "values": {
+        "Declaration": "declaration",
+        "Definition": "definition",
+        "Readonly": "readonly",
+        "Static": "static",
+        "Deprecated": "deprecated",
+        "Abstract": "abstract",
+        "Async": "async",
+        "Modification": "modification",
+        "Documentation": "documentation",
+        "DefaultLibrary": "defaultLibrary"
+      }
+    },
+    "SemanticTokenTypes": {
+      "reader": "string",
+      "unknown": "preserve",
+      "values": {
+        "Namespace": "namespace",
+        "Type": "type",
+        "Class": "class",
+        "Enum": "enum",
+        "Interface": "interface",
+        "Struct": "struct",
+        "TypeParameter": "typeParameter",
+        "Parameter": "parameter",
+        "Variable": "variable",
+        "Property": "property",
+        "EnumMember": "enumMember",
+        "Event": "event",
+        "Function": "function",
+        "Method": "method",
+        "Macro": "macro",
+        "Keyword": "keyword",
+        "Modifier": "modifier",
+        "Comment": "comment",
+        "String": "string",
+        "Number": "number",
+        "Regexp": "regexp",
+        "Operator": "operator",
+        "Decorator": "decorator"
+      }
+    },
+    "SignatureHelpTriggerKind": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "Invoked": 1,
+        "TriggerCharacter": 2,
+        "ContentChange": 3
+      }
+    },
+    "SymbolKind": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "File": 1,
+        "Module": 2,
+        "Namespace": 3,
+        "Package": 4,
+        "Class": 5,
+        "Method": 6,
+        "Property": 7,
+        "Field": 8,
+        "Constructor": 9,
+        "Enum": 10,
+        "Interface": 11,
+        "Function": 12,
+        "Variable": 13,
+        "Constant": 14,
+        "String": 15,
+        "Number": 16,
+        "Boolean": 17,
+        "Array": 18,
+        "Object": 19,
+        "Key": 20,
+        "Null": 21,
+        "EnumMember": 22,
+        "Struct": 23,
+        "Event": 24,
+        "Operator": 25,
+        "TypeParameter": 26
+      }
+    },
+    "SymbolTag": {
+      "reader": "integer",
+      "unknown": "null",
+      "values": {
+        "Deprecated": 1
+      }
+    },
+    "TokenFormat": {
+      "reader": "string",
+      "unknown": "preserve",
+      "values": {
+        "Relative": "relative"
+      }
+    }
+  }
+}

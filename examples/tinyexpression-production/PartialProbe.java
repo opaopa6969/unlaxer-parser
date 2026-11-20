@@ -17,7 +17,7 @@ public class PartialProbe {
       }
       if(name.equals("eof")||name.equals("multiple")||name.equals("comments-crlf")) {
         var project=new LanguageQueries.Project("partial",1,Map.of(host.uri(),host),Map.of("classpath",args[2]));
-        var provider=new ProviderProcess(List.of(args[1],"-cp",args[2],"org.unlaxer.dsl.provider.JavacProvider"),new ProviderProtocol.Identity("javac","21.0.9"),Set.of(Operation.COMPLETION),Duration.ofSeconds(30));
+        var provider=new ProviderProcess(List.of(args[1],"-Djava.io.tmpdir="+System.getProperty("java.io.tmpdir"),"-cp",args[2],"org.unlaxer.dsl.provider.JavacProvider"),new ProviderProtocol.Identity("javac","21.0.9"),Set.of(Operation.COMPLETION),Duration.ofSeconds(30));
         var result=binding.queries(project,provider).query(host,project,host.length(),Operation.COMPLETION,Map.of("prefix","tar"));
         var edit=result.items().stream().filter(i->i.label().equals("target")).findFirst().orElseThrow().edits().get(0);
         var changed=binding.tree().apply(host,8,List.of(edit));

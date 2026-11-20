@@ -103,7 +103,7 @@ public class ClassicLspLifecycleConformanceTest {
                 std::process::exit(server.exit_code());
             }
             """);
-        var builder = new ProcessBuilder("cargo", "build", "--quiet", "--offline", "--manifest-path", project.resolve("Cargo.toml").toString()).directory(ROOT.toFile()).redirectErrorStream(true);
+        var builder = org.unlaxer.dsl.TestProcesses.builder("cargo", "build", "--quiet", "--offline", "--manifest-path", project.resolve("Cargo.toml").toString()).directory(ROOT.toFile()).redirectErrorStream(true);
         builder.environment().put("CARGO_TARGET_DIR", ROOT.resolve("rust/target").toString()); builder.environment().put("CARGO_INCREMENTAL", "0");
         Path log = temporary.newFile().toPath(); var build = builder.redirectOutput(log.toFile()).start();
         try { assertTrue(build.waitFor(180, TimeUnit.SECONDS)); assertEquals(Files.readString(log), 0, build.exitValue()); }
@@ -118,7 +118,7 @@ public class ClassicLspLifecycleConformanceTest {
         String profile = Files.readString(ROOT.resolve("language-profiles/java/profile.tsv")).replace("Java21", "Emoji").replace("CompilationUnit", "Root");
         String stepsText = oracle.getAsJsonArray("steps").toString().replace("\"$validProfile\"", new Gson().toJson(Map.of("tsv", profile, "entry", "Root")));
         Path stderr = temporary.newFile().toPath();
-        try (var wire = new Wire(new ProcessBuilder(command).redirectError(stderr.toFile()).start())) {
+        try (var wire = new Wire(org.unlaxer.dsl.TestProcesses.builder(command).redirectError(stderr.toFile()).start())) {
             for (var element : JsonParser.parseString(stepsText).getAsJsonArray()) {
                 var step = element.getAsJsonObject(); var params = step.get("params");
                 if (step.has("notify")) {

@@ -17,7 +17,7 @@ public class Probe {
             catch(IllegalArgumentException e) { System.out.println(name+"\trejected");continue; }
             for(var r:binding.regions())System.out.println(name+"\tregion\t"+r.id()+"\t"+r.parseState()+"\t"+r.full().start()+"\t"+r.full().end()+"\t"+r.body().start()+"\t"+r.body().end()+"\t"+binding.javaFiles().getOrDefault(r.id(),"-"));
             var project=new LanguageQueries.Project("tiny-production",12,Map.of(host.uri(),host),Map.of("classpath",args[2]));
-            var process=new ProviderProcess(List.of(args[1],"-cp",args[2],"org.unlaxer.dsl.provider.JavacProvider"),new ProviderProtocol.Identity("javac","21.0.9"),Set.of(Operation.VALIDATE,Operation.COMPLETION,Operation.HOVER,Operation.DEFINITION),Duration.ofSeconds(30));
+            var process=new ProviderProcess(List.of(args[1],"-Djava.io.tmpdir="+System.getProperty("java.io.tmpdir"),"-cp",args[2],"org.unlaxer.dsl.provider.JavacProvider"),new ProviderProtocol.Identity("javac","21.0.9"),Set.of(Operation.VALIDATE,Operation.COMPLETION,Operation.HOVER,Operation.DEFINITION),Duration.ofSeconds(30));
             var queries=binding.queries(project,process);
             if(fields[1].equals("validate")) for(var result:queries.diagnosticsAll(host,project,Map.of())) {
                 if(!binding.javaFiles().containsKey(result.region()))continue;

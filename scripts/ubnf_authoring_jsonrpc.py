@@ -1,4 +1,4 @@
-"""#994/#1001: 手書きの wire 入力と独立全 JSON oracle。実測結果を期待値にしない。"""
+"""#994/#1001/#1005: 手書きの wire 入力と独立全 JSON oracle。実測結果を期待値にしない。"""
 import json
 import queue
 import time
@@ -31,6 +31,10 @@ def run_jsonrpc(clients, directory, omit_params):
         check(client, actual, expected, client.serial)
 
     reader = fixture['reader']
+    dto = fixture['dto']
+    # These wire fragments and oracles are independent of the generated DTO table.
+    reader['dtoInvalid'] += ['{"capabilities":' + caps + '}' for caps in dto['capabilitiesInvalid']]
+    reader['dtoAccepted'] += ['{"capabilities":' + caps + '}' for caps in dto['capabilitiesAccepted']]
     assert reader['javaRevision'] == '384fcf3eb1c0ce3e207ac580cec5fcac4b478b34'
 
     def quiet(client):
@@ -61,6 +65,46 @@ def run_jsonrpc(clients, directory, omit_params):
 
     def raw_dto(client, method, params, expected):
         raw(client, '{"jsonrpc":"2.0","id":$ID,"method":' + json.dumps(method) + ',"params":' + params + '}', expected)
+
+    enums = fixture['enumReader']
+    assert enums['javaRevision'] == reader['javaRevision']
+    assert enums['silenceSeconds'] == reader['silenceSeconds'] == 1
+
+    def enum_cases():
+        # Authored wire fragments/oracles are independent of the generated table
+        # and of measured server output. Test each reachable field separately.
+        for field in enums['fields']:
+            for token in enums['tokens']:
+                value = token['raw'].replace('"$KNOWN"', field['known'])
+                for index in range(len(reader['orders'])):
+                    outcome = token['deferredInteger'] if field['reader'] == 'integer' and index in (1, 4, 5) else token[field['reader']]
+                    # Stream parse errors occurring before id also lose the id.
+                    if index == 3 and outcome == 'parse':
+                        outcome = 'silent'
+                    yield field['id'] + '/' + value + '/' + str(index), field['raw'].replace('$VALUE', value), outcome, index
+        # Gson reader limits differ between the stream path (method first) and
+        # deferred JsonTreeReader conversion; check both paths on list/scalar.
+        for case in enums['deferredLimits']:
+            value, name = case['raw'], case['raw'] + case.get('exponent', '')
+            if 'padTo' in case:
+                exponent = case.get('exponent', '')
+                value += '0' * (case['padTo'] - len(value) - len(exponent)) + exponent
+                assert len(value) == case['padTo']
+                name += '/len' + str(case['padTo'])
+            for field in enums['fields']:
+                if field['id'] not in enums['limitFields']:
+                    continue
+                for index in range(len(reader['orders'])):
+                    outcome = case['deferred' if index in (1, 4, 5) else 'stream']
+                    yield 'limits/' + field['id'] + '/' + name + '/' + str(index), field['raw'].replace('$VALUE', value), outcome, index
+
+    def enum_response(client, method, caps, outcome, profile, order=0):
+        options = {} if profile == 'default' else {'languageProfile': {'entry': 'UBNFFile', 'tsv': configuration['profiles'][profile]}}
+        params = '{"capabilities":' + caps + ',"initializationOptions":' + json.dumps(options) + '}'
+        expected = ({'result': configuration['expected'][profile][client.backend]} if outcome == 'accepted'
+                    else None if outcome == 'silent' and client.backend == 'java' else reader['oracles']['parse'])
+        frame = reader['orders'][order].replace('$METHOD', method).replace('$PARAMS', params)
+        raw(client, frame, expected)
 
     # Isolated lifecycle sessions allow every raw key order and positional arity
     # to prove initialize retry (including Java reader failures and native success).
@@ -98,6 +142,37 @@ def run_jsonrpc(clients, directory, omit_params):
 
     for _, client in hosts:
         quiet(client)
+
+    enum_started = time.monotonic()
+    for name, caps, outcome, order in enum_cases():
+        if outcome == 'accepted':
+            continue
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1031/initialize/' + name
+            enum_response(client, 'initialize', caps, outcome, 'restricted', order)
+            response(client, 'unlaxer/configure', {}, reader['oracles']['early'])
+            response(client, 'textDocument/hover', {}, reader['oracles']['early'])
+        evidence.append({'case': '1031-initialize-' + name})
+    # Reader barriers above and a shared finite deadline catch every silent id,
+    # including responses that arrive after processing subsequent bad frames.
+    for _, client in hosts:
+        quiet(client)
+    for case in enums['initializeAccepted']:
+        for order in case['orders']:
+            for _, original in hosts:
+                client = type(original)(original.command, native=original.backend == 'rust')
+                client.fixture = 'jsonrpc/1031/accepted-initialize/' + case['raw'] + '/' + str(order)
+                try:
+                    enum_response(client, 'initialize', enums['initializeAll'].replace('$VALUE', case['raw']), 'accepted', 'restricted', order)
+                    response(client, 'initialize', {'capabilities': {}}, reader['oracles']['already'])
+                    response(client, '$/reader-barrier', {}, {'result': None})
+                    response(client, 'shutdown', {}, {'result': None})
+                    client.send('exit')
+                    assert client.process.wait(timeout=client.timeout) == 0
+                finally:
+                    client.close()
+            evidence.append({'case': '1031-accepted-initialize-' + case['raw'] + '/' + str(order)})
+    enum_elapsed = time.monotonic() - enum_started
 
     def hover(client, uri, document):
         response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': len(document['source'])}}, {'result': document['hover']})
@@ -172,6 +247,33 @@ def run_jsonrpc(clients, directory, omit_params):
         hover(client, uri, fresh)
         client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
 
+    enum_started = time.monotonic()
+    for name, caps, outcome, order in enum_cases():
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1031/configure/' + name
+            # Failures attempt to restore the default profile: retained() proves
+            # they did not commit it. Successes explicitly keep VALIDATE disabled.
+            enum_response(client, 'unlaxer/configure', caps, outcome,
+                          'restricted' if outcome == 'accepted' else 'default', order)
+            retained(client, 'enum-' + str(client.serial))
+        evidence.append({'case': '1031-configure-' + name})
+    for field in enums['fields']:
+        if '[$VALUE]' not in field['raw']:
+            continue
+        for outcome, values in [('accepted', enums['collectionAccepted']), ('parse', enums['collectionInvalid'])]:
+            for value in values:
+                caps = field['raw'].replace('[$VALUE]', value)
+                for _, client in hosts:
+                    client.fixture = 'jsonrpc/1031/collection/' + field['id'] + '/' + value
+                    enum_response(client, 'unlaxer/configure', caps, outcome,
+                                  'restricted' if outcome == 'accepted' else 'default')
+                    retained(client, 'enum-collection-' + str(client.serial))
+                evidence.append({'case': '1031-collection-' + field['id'] + '/' + value})
+    for _, client in hosts:
+        response(client, '$/reader-barrier', {}, {'result': None})
+        quiet(client)
+    evidence.append({'case': '1031-timing', 'elapsedSeconds': round(enum_elapsed + time.monotonic() - enum_started, 3)})
+
     for index, params in enumerate(reader['dtoInvalid']):
         for _, client in hosts:
             client.fixture = f'jsonrpc/reader/configure/dto-{index}'
@@ -198,6 +300,212 @@ def run_jsonrpc(clients, directory, omit_params):
     # after each input and the final drain detect missing, spurious and late ids.
     for _, client in hosts:
         quiet(client)
+
+    dto_started = time.monotonic()
+    # Error responses must retain both documents and the restricted VALIDATE gate.
+    for index, case in enumerate(dto['nestedInvalid']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/dto/nested-{index}'
+            raw_dto(client, case['method'], case['raw'], reader['oracles']['parse'])
+            retained(client, f'nested-{index}')
+        evidence.append({'case': f'dto-nested-{index}'})
+    for method in dto['workDoneMethods']:
+        for token in dto['workDoneInvalid']:
+            for _, client in hosts:
+                client.fixture = f'jsonrpc/dto/token/{method}/{token}'
+                raw_dto(client, method, '{"workDoneToken":' + token + '}', reader['oracles']['parse'])
+                retained(client, 'token-' + str(client.serial))
+            evidence.append({'case': f'dto-token-{method}-{token}'})
+    for _, client in hosts:
+        uri = (directory / 'dto-position.ubnf').as_uri()
+        client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'version': 1, 'text': dto['positionSource']}})
+        diagnostic(client, uri, [])
+
+    def position_case(method, line, character, expected):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/dto/position/{method}/{line}/{character}'
+            uri = (directory / 'dto-position.ubnf').as_uri()
+            params = '{"textDocument":{"uri":' + json.dumps(uri) + '},"position":{"line":' + line + ',"character":' + character + '}}'
+            raw_dto(client, method, params, expected)
+        evidence.append({'case': f'dto-position-{method}-{line}-{character}'})
+
+    for method, oracle in [('textDocument/hover', 'hover'), ('textDocument/completion', 'completion'), ('textDocument/definition', 'navigation')]:
+        for line in dto['zeroIntegers'] + dto['oneIntegers']:
+            position_case(method, line, '2', dto[oracle])
+        for character in dto['twoIntegers']:
+            position_case(method, '0', character, dto[oracle])
+        for character in dto['zeroIntegers']:
+            if method != 'textDocument/completion':
+                position_case(method, '0', character, dto[oracle])
+        for value in dto['invalidIntegers']:
+            position_case(method, value, '2', reader['oracles']['parse'])
+            position_case(method, '0', value, reader['oracles']['parse'])
+        position_case(method, '0', '-1', dto['negativeCharacter'] if method != 'textDocument/definition' else dto['navigation'])
+        if method != 'textDocument/completion':
+            position_case(method, '-1', '0', dto[oracle])
+    for method in ('textDocument/hover', 'textDocument/completion', 'textDocument/definition'):
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/dto/null-position/' + method
+            uri = (directory / 'dto-position.ubnf').as_uri()
+            raw_dto(client, method, '{"textDocument":{"uri":' + json.dumps(uri) + '},"position":null}', reader['oracles']['internal'])
+        evidence.append({'case': 'dto-null-position-' + method})
+    # Scalar tokens, unlike invalid numeric tokens, reach the method. The opened
+    # malformed document gives a small, independently authored hover result.
+    for token in dto['workDoneAccepted']:
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/dto/accepted-token/' + token
+            uri = (directory / 'dto-position.ubnf').as_uri()
+            raw_dto(client, 'textDocument/hover', '{"textDocument":{"uri":' + json.dumps(uri) + '},"position":{"line":0,"character":2},"workDoneToken":' + token + '}', dto['hover'])
+        evidence.append({'case': 'dto-accepted-token-' + token})
+    for _, client in hosts:
+        client.fixture = 'jsonrpc/dto/silent-token'
+        uri = (directory / 'dto-position.ubnf').as_uri()
+        raw_dto(client, 'textDocument/hover', '{"textDocument":{"uri":' + json.dumps(uri) + '},"position":{"line":0,"character":2},"workDoneToken":{}}',
+                None if client.backend == 'java' else dto['hover'])
+        response(client, '$/reader-barrier', {}, {'result': None})
+        quiet(client)
+    evidence.append({'case': 'dto-silent-token'})
+
+    # Request DTO enums use the same EnumTypeAdapter stream/deferred paths (#1031).
+    for field in enums['requestFields']:
+        uri = (directory / 'dto-position.ubnf').as_uri()
+        for token in enums['tokens']:
+            value = token['raw'].replace('"$KNOWN"', field['known'])
+            for index, order in enumerate(reader['orders']):
+                outcome = token['deferredInteger'] if field['reader'] == 'integer' and index in (1, 4, 5) else token[field['reader']]
+                if index == 3 and outcome == 'parse':
+                    outcome = 'silent'
+                params = field['raw'].replace('$URI', json.dumps(uri)).replace('$VALUE', value)
+                for _, client in hosts:
+                    client.fixture = 'jsonrpc/1031/request/' + field['id'] + '/' + value + '/' + str(index)
+                    expected = (dto[field['oracle']] if outcome == 'accepted'
+                                else None if outcome == 'silent' and client.backend == 'java' else reader['oracles']['parse'])
+                    raw(client, order.replace('$METHOD', field['method']).replace('$PARAMS', params), expected)
+                evidence.append({'case': '1031-request-' + field['id'] + '/' + value + '/' + str(index)})
+    for _, client in hosts:
+        response(client, '$/reader-barrier', {}, {'result': None})
+        quiet(client)
+
+    for index, scalar in enumerate(dto['scalarTexts']):
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/dto/scalar-text/' + scalar
+            uri = (directory / 'dto-scalar.ubnf').as_uri()
+            client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'version': 1, 'text': fixture['oldDocument']['source']}})
+            diagnostic(client, uri, [])
+            client.send_raw('{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":' + json.dumps(uri) + ',"version":2},"contentChanges":[{"text":' + scalar + '}]}}')
+            diagnostic(client, uri, [])
+            response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 0}}, dto['hover'])
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': []})
+            # A later ill-typed DTO must discard even a coercible first text.
+            client.send_raw('{"jsonrpc":"2.0","method":"textDocument/didChange","params":{"textDocument":{"uri":' + json.dumps(uri) + ',"version":3},"contentChanges":[{"text":' + json.dumps(fixture['oldDocument']['source']) + '},{"text":[]}]}}')
+            response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 0}}, dto['hover'])
+            assert not client.pending and client.messages.empty(), client.fixture
+        evidence.append({'case': 'dto-scalar-text-' + str(index)})
+    # Null DTO fields reach the method like Gson leaves them: Java dereferences
+    # textDocument/context/newName where it uses them, and a null uri is unopened.
+    for _, client in hosts:
+        uri = (directory / 'dto-null.ubnf').as_uri()
+        client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'version': 1, 'text': dto['nullSource']}})
+        diagnostic(client, uri, [])
+    for index, case in enumerate(dto['nullCases']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/dto/null-{index}'
+            uri = json.dumps((directory / 'dto-null.ubnf').as_uri())
+            expected = json.loads(json.dumps(case['expected']).replace('"$URI"', uri))
+            raw_dto(client, case['method'], case['raw'].replace('$URI', uri), expected)
+        evidence.append({'case': f'dto-null-{index}'})
+    evidence.append({'case': 'dto-timing', 'elapsedSeconds': round(time.monotonic() - dto_started, 3)})
+
+    residual_started = time.monotonic()
+    residual = fixture['residual1033']
+
+    def notify_raw(client, kind, uri, text=None):
+        frame = residual[kind + 'Raw'].replace('$URI', uri)
+        if text is not None:
+            frame = frame.replace('$TEXT', text)
+        client.send_raw(frame)
+
+    # Full diagnostic data.totalLength distinguishes 1.50 from 1.5. Checking
+    # only fallback hover would allow a numeric-spelling regression to pass.
+    for _, client in hosts:
+        configure(client, 'default')
+    for case in residual['scalarTexts']:
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1033/open-text/' + case['raw']
+            uri = (directory / 'open-scalar.ubnf').as_uri()
+            notify_raw(client, 'open', json.dumps(uri), case['raw'])
+            expected = json.loads(json.dumps(residual['syntaxDiagnostic']).replace('"$LENGTH"', str(case['length'])))
+            diagnostic(client, uri, [expected])
+            response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 0}}, dto['hover'])
+            notify_raw(client, 'close', json.dumps(uri))
+        evidence.append({'case': '1033-open-text-' + case['raw']})
+    for _, client in hosts:
+        configure(client, 'restricted')
+
+    # A live importer makes didSave's refresh observable. VALIDATE is disabled,
+    # so its independently expected publishDiagnostics params have an empty list.
+    importer = (directory / 'scalar-uri-importer.ubnf').as_uri()
+    for _, client in hosts:
+        notify_raw(client, 'open', json.dumps(importer), '"@import"')
+        diagnostic(client, importer, [])
+    for case in residual['scalarUris']:
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1033/uri/' + case['raw']
+            uri = case['spelling']
+            other = case['other']
+            # The alternate spelling remains a distinct document throughout.
+            notify_raw(client, 'open', json.dumps(other), json.dumps(fixture['oldDocument']['source']))
+            diagnostic(client, other, [])
+            diagnostic(client, importer, [])
+            notify_raw(client, 'open', case['raw'], json.dumps(kept['source']))
+            diagnostic(client, uri, [])
+            diagnostic(client, importer, [])
+            for lookup in (case['raw'], json.dumps(uri)):
+                raw_dto(client, 'textDocument/documentSymbol', '{"textDocument":{"uri":' + lookup + '}}', {'result': fixture['keptSymbols']})
+            notify_raw(client, 'change', case['raw'], json.dumps(fixture['oldDocument']['source']))
+            diagnostic(client, uri, [])
+            diagnostic(client, importer, [])
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': fixture['oldDocument']['symbols']})
+            notify_raw(client, 'save', case['raw'])
+            diagnostic(client, importer, [])
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': fixture['oldDocument']['symbols']})
+            notify_raw(client, 'close', case['raw'])
+            diagnostic(client, importer, [])
+            response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': 0}}, {'result': None})
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': other}}, {'result': fixture['oldDocument']['symbols']})
+            notify_raw(client, 'close', json.dumps(other))
+            diagnostic(client, importer, [])
+            assert not client.pending and client.messages.empty(), client.fixture
+        evidence.append({'case': '1033-uri-' + case['raw']})
+    for _, client in hosts:
+        notify_raw(client, 'close', json.dumps(importer))
+
+    for document in residual['overflowDocuments']:
+        # Boundaries are authored from start UTF-16 units (0, 12, 35, 50), not
+        # sampled server output. Each boundary runs all six shared-offset methods.
+        # The open `token T ::=` line proves the wrapped offset also drives the
+        # lexical lookback (Java lastIndexOf(..., negative) == -1: core items).
+        for _, client in hosts:
+            uri = (directory / ('int-overflow-' + document['id'] + '.ubnf')).as_uri()
+            notify_raw(client, 'open', json.dumps(uri), json.dumps(document['source']))
+            diagnostic(client, uri, [])
+        for case in document['positions']:
+            line, character = case['line'], case['character']
+            for _, client in hosts:
+                client.fixture = f"jsonrpc/1033/overflow/{document['id']}/{line}/{character}"
+                uri = (directory / ('int-overflow-' + document['id'] + '.ubnf')).as_uri()
+                end = {'line': line, 'character': len(document['source'].split('\n')[line])} if line < len(document['source'].split('\n')) else {'line': 3, 'character': 1}
+                expected = json.loads(json.dumps(residual['coreCompletion']))
+                if case['scoped']:
+                    for symbol in residual['localSymbols']:
+                        symbol = json.loads(json.dumps(symbol).replace('$URI', uri))
+                        expected.append({**symbol, 'textEdit': {'range': {'start': end, 'end': end}, 'newText': symbol['label']}})
+                params = '{"textDocument":{"uri":' + json.dumps(uri) + '},"position":{"line":' + str(line) + ',"character":' + str(character) + '},"context":{"includeDeclaration":true},"newName":"Renamed_2"}'
+                raw_dto(client, 'textDocument/completion', params, {'result': expected})
+                for method, oracle in residual['navigationOracles'].items():
+                    raw_dto(client, 'textDocument/' + method, params, oracle)
+            evidence.append({'case': f"1033-overflow-{document['id']}-{line}-{character}"})
+    evidence.append({'case': '1033-timing', 'elapsedSeconds': round(time.monotonic() - residual_started, 3)})
 
     # A later successful configure restores validation without replacing buffers.
     for _, client in hosts:

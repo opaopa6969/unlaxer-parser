@@ -29,6 +29,15 @@ jobs:
     runs-on: [unlaxer-parser-ci, Linux, X64]
     timeout-minutes: 5
     steps:
+    - name: Select job temporary directory (#1045)
+      shell: bash
+      env:
+        TMPDIR: ${{ runner.temp }}
+        TMP: ${{ runner.temp }}
+        TEMP: ${{ runner.temp }}
+        MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+      run: |
+        printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
     - name: Require both Rust conformance shards
       env:
         RESULT: ${{ needs.rust-conformance.result }}
@@ -41,7 +50,10 @@ jobs:
       RUSTUP_TOOLCHAIN: '1.85.0'
     # #954: measured class groups, two workers at most on the shared host.
     # Each shard builds locally; do not cancel its evidence when its peer fails.
-    timeout-minutes: 50
+    # #1035: successful master jobs take up to 40 min; under shared-host load
+    # both shards were cut off at 50 min and completed runs took up to 49.2 min.
+    # 75 min keeps 1.5x that loaded completion.
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -52,6 +64,15 @@ jobs:
         - shard: cli
           tests: RustConformanceTest,DeclarativeTokenConformanceTest,RustNativeGeneratorTest,RuleTriviaConformanceTest,LocalImportReaderTest,PackageDocumentReaderTest,PackageArtifactReaderTest,PackageArtifactUtf8Test,PackageLocalPathConformanceTest,PackageJsonAcceptanceConformanceTest,PackageGrammarBaseConformanceTest,CliInputIoConformanceTest,CliStderrConformanceTest,PackageResolverConformanceTest,HttpsPackageConformanceTest,VocabularyOriginsConformanceTest,UniqueLongestConformanceTest,NameSnapshotConformanceTest,NamePredicateConformanceTest,EnumConformanceTest,MixedEnumConformanceTest,EvaluationConformanceTest,TypeofConformanceTest,RecursiveHelperConformanceTest,NestedSeparatedCaptureConformanceTest,NestedSeparatedMappedCaptureConformanceTest,NestedAutoEvalConformanceTest,PropertyBasedParityTest,EmptyLiteralConformanceTest,GlobalCommentConformanceTest
     steps:
+    - name: Select job temporary directory (#1045)
+      shell: bash
+      env:
+        TMPDIR: ${{ runner.temp }}
+        TMP: ${{ runner.temp }}
+        TEMP: ${{ runner.temp }}
+        MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+      run: |
+        printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
       with:
@@ -653,6 +674,15 @@ jobs:
     timeout-minutes: 60
 
     steps:
+    - name: Select job temporary directory (#1045)
+      shell: bash
+      env:
+        TMPDIR: ${{ runner.temp }}
+        TMP: ${{ runner.temp }}
+        TEMP: ${{ runner.temp }}
+        MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+      run: |
+        printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
     - uses: actions/checkout@v4
 
     - name: Check parity ledger coverage (#771)
@@ -688,6 +718,9 @@ jobs:
         bash -n .github/actions/maven-job-repository/select.sh
         node --check .github/actions/maven-job-repository/main.js
         node --check .github/actions/maven-job-repository/post.js
+
+    - name: Check Java child temp routing (#1045)
+      run: python3 scripts/run-required-unittests.py scripts.tests.test_java_tmp
 
     - name: Test bounded network retries (#780)
       run: python3 scripts/run-required-unittests.py scripts.tests.test_ci_network_retry
@@ -729,6 +762,15 @@ jobs:
     timeout-minutes: 60
 
     steps:
+    - name: Select job temporary directory (#1045)
+      shell: bash
+      env:
+        TMPDIR: ${{ runner.temp }}
+        TMP: ${{ runner.temp }}
+        TEMP: ${{ runner.temp }}
+        MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+      run: |
+        printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
     - uses: actions/checkout@v4
 
     - name: Set up JDK 17
@@ -797,6 +839,15 @@ jobs:
     timeout-minutes: 60
 
     steps:
+    - name: Select job temporary directory (#1045)
+      shell: bash
+      env:
+        TMPDIR: ${{ runner.temp }}
+        TMP: ${{ runner.temp }}
+        TEMP: ${{ runner.temp }}
+        MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+      run: |
+        printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
     - uses: actions/checkout@v4
 
     - name: Set up JDK 21
@@ -821,7 +872,7 @@ jobs:
         bash "$GITHUB_WORKSPACE/scripts/ci/retry-network.sh" rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
 
     - name: Test authoring transport failure diagnostics (#995)
-      run: python3 scripts/run-required-unittests.py scripts.tests.test_ubnf_authoring_lsp
+      run: python3 scripts/run-required-unittests.py scripts.tests.test_ubnf_authoring_lsp scripts.tests.test_lsp4j_dto_schema
 
     - name: Prepare required tests (ubnf-authoring)
       run: python3 scripts/verify-optin-tests.py ubnf-authoring --prepare
@@ -887,6 +938,15 @@ jobs:
     timeout-minutes: 60
 
     steps:
+    - name: Select job temporary directory (#1045)
+      shell: bash
+      env:
+        TMPDIR: ${{ runner.temp }}
+        TMP: ${{ runner.temp }}
+        TEMP: ${{ runner.temp }}
+        MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+      run: |
+        printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
     - uses: actions/checkout@v4
       with:
         path: unlaxer-parser
@@ -982,7 +1042,7 @@ jobs:
         assert resolved == {'unlaxer-common': sys.argv[1], 'unlaxer-dsl': sys.argv[1]}, resolved
         print('Current p4-smoke consumer unlaxer dependencies:', resolved)
         PYTHON
-        mvn -B -P p4-smoke test -Dgpg.skip=true
+        mvn -B -P p4-smoke test -Dgpg.skip=true -Djvm="$GITHUB_WORKSPACE/unlaxer-parser/scripts/ci/java-tmpdir/bin/java"
 
     - name: Verify required tests (downstream-p4-smoke)
       id: verify-downstream-p4-smoke
@@ -1003,7 +1063,7 @@ jobs:
     - name: tinyexpression generated Node alias contract
       working-directory: tinyexpression
       run: >
-        mvn -B test -Dgpg.skip=true
+        mvn -B test -Dgpg.skip=true -Djvm="$GITHUB_WORKSPACE/unlaxer-parser/scripts/ci/java-tmpdir/bin/java"
         -Dtinyexpression.expected.mapper.snapshot=true
         -Dtinyexpression.expected.mapper.nodeAlias=true
         -Dtest=P4SourceMappingTest,P4OwnedSliceSourceTest
@@ -1116,6 +1176,7 @@ jobs:
       working-directory: tinyexpression/tools/tinyexpression-p4-lsp-vscode
       env:
         MAVEN_OPTS: >-
+          -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
           --add-opens=java.base/java.util=ALL-UNNAMED
           --add-opens=java.base/java.lang=ALL-UNNAMED
       run: |
@@ -1131,7 +1192,7 @@ jobs:
         assert resolved == {'unlaxer-common': sys.argv[1], 'unlaxer-dsl': sys.argv[1]}, resolved
         print('Current downstream IDE unlaxer dependencies:', resolved)
         PYTHON
-        mvn -B -P p4-smoke test -Dgpg.skip=true
+        mvn -B -P p4-smoke test -Dgpg.skip=true -Djvm="$GITHUB_WORKSPACE/unlaxer-parser/scripts/ci/java-tmpdir/bin/java"
 
     - name: Verify required tests (downstream-ide-smoke)
       id: verify-downstream-ide-smoke
@@ -1162,6 +1223,15 @@ jobs:
     env:
       RUSTUP_TOOLCHAIN: '1.85.0'
     steps:
+    - name: Select job temporary directory (#1045)
+      shell: bash
+      env:
+        TMPDIR: ${{ runner.temp }}
+        TMP: ${{ runner.temp }}
+        TEMP: ${{ runner.temp }}
+        MAVEN_OPTS: -Djava.io.tmpdir=${{ runner.temp }} -Dunlaxer.test.tmpdir=${{ runner.temp }} -DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}
+      run: |
+        printf '%s\n' "TMPDIR=$TMPDIR" "TMP=$TMP" "TEMP=$TEMP" "MAVEN_OPTS=$MAVEN_OPTS" >> "$GITHUB_ENV"
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
       with:

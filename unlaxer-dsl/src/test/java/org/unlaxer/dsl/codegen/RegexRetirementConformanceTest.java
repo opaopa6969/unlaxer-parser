@@ -186,7 +186,7 @@ public class RegexRetirementConformanceTest {
             assertEquals(javaError.start(), checked.diagnostics().get(0).span().start());
             Path output = temporary.getRoot().toPath().resolve("must-not-exist");
             var process =
-                    new ProcessBuilder(
+                    org.unlaxer.dsl.TestProcesses.builder(
                                     generator.toString(),
                                     "generate",
                                     "--grammar",
@@ -263,7 +263,7 @@ public class RegexRetirementConformanceTest {
     private String command(List<String> command, boolean failure) throws Exception {
         Path log = temporary.newFile().toPath();
         var process =
-                new ProcessBuilder(command)
+                org.unlaxer.dsl.TestProcesses.builder(command)
                         .redirectErrorStream(true)
                         .redirectOutput(log.toFile())
                         .start();

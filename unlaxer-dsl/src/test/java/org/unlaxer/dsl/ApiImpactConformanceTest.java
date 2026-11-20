@@ -319,7 +319,7 @@ public class ApiImpactConformanceTest {
     }
     private Run run(List<String> command, Path cwd, boolean noJava) throws Exception {
         Path stdout = temporary.newFile().toPath(), stderr = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(command).directory(cwd.toFile()).redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).directory(cwd.toFile()).redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
         if (noJava) { builder.environment().put("PATH", ""); builder.environment().put("JAVA_HOME", "/nonexistent-java"); }
         Process process = builder.start();
         try {

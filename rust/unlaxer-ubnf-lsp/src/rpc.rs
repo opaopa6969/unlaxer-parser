@@ -1,6 +1,7 @@
 //! JSON-RPC/lsp4j compatibility at the authoring transport boundary (#994/#1001).
 use crate::Error;
 use serde_json::Value;
+use std::sync::OnceLock;
 
 pub(crate) fn internal() -> Error {
     (-32603, "Internal error.".into())
@@ -14,22 +15,174 @@ fn object(value: &Value) -> bool {
     value.is_null() || value.is_object()
 }
 
-// Gson's String adapter coerces scalar numbers/booleans, not containers.
-fn string(value: &Value) -> bool {
-    !value.is_array() && !value.is_object()
-}
-
-fn integer(value: &Value) -> bool {
+// Gson's String adapter preserves numeric spelling and coerces booleans.
+// Keep validation and consumption on the same conversion boundary.
+pub(crate) fn gson_string(value: &Value) -> Option<String> {
     match value {
-        Value::Null => true,
-        Value::Number(n) => stream_int(&n.to_string()).is_some(),
-        Value::String(s) => stream_int(s).is_some(),
+        Value::String(s) => Some(s.clone()),
+        Value::Number(n) => Some(n.to_string()),
+        Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
+// Gson's primitive boolean adapter parses strings with Boolean.parseBoolean.
+pub(crate) fn gson_boolean(value: &Value) -> bool {
+    match value {
+        Value::Bool(b) => *b,
+        Value::String(s) => s.eq_ignore_ascii_case("true"),
         _ => false,
     }
 }
+fn string(value: &Value) -> bool {
+    value.is_null() || gson_string(value).is_some()
+}
 
+pub(crate) fn gson_integer(value: &Value) -> Option<i32> {
+    match value {
+        Value::Number(n) => stream_int(&n.to_string()),
+        Value::String(s) => stream_int(s),
+        _ => None,
+    }
+}
+fn integer(value: &Value) -> bool {
+    value.is_null() || gson_integer(value).is_some()
+}
+
+// Gson's lenient JsonReader gives up on a numeric token that fills its 1024-char
+// buffer and returns it as an unquoted STRING. EnumTypeAdapter then takes the
+// name lookup path (unknown -> null) in both stream and deferred conversion.
+fn gson_unquoted_number(value: &Value) -> bool {
+    value
+        .as_number()
+        .is_some_and(|number| number.to_string().len() >= 1024)
+}
+
+// Deferred EnumTypeAdapter uses JsonTreeReader.nextInt -> LazilyParsedNumber.
+// It truncates/wraps through BigDecimal.intValue instead of doing an exact int
+// round trip. Only validate acceptance: Ext does not consume client enum values.
+// Preserve Gson 2.13.2 NumberLimits' scale bound. Its 10000-char length bound
+// is unreachable: such tokens are unquoted strings (gson_unquoted_number).
+fn tree_enum_integer(value: &Value) -> bool {
+    let Some(number) = value.as_number() else {
+        return false;
+    };
+    let raw = number.to_string();
+    if raw.parse::<i64>().is_ok() {
+        return true;
+    }
+    let (mantissa, exponent) = raw.split_once(['e', 'E']).unwrap_or((&raw, "0"));
+    let Ok(exponent) = exponent.parse::<i64>() else {
+        return false;
+    };
+    let fraction = mantissa
+        .split_once('.')
+        .map_or(0, |(_, digits)| digits.len());
+    (fraction as i64)
+        .checked_sub(exponent)
+        .is_some_and(|scale| (-9999..=9999).contains(&scale))
+}
 fn boolean(value: &Value) -> bool {
     value.is_null() || value.is_boolean() || value.is_string()
+}
+
+fn schema() -> &'static Value {
+    static SCHEMA: OnceLock<Value> = OnceLock::new();
+    SCHEMA.get_or_init(|| serde_json::from_str(include_str!("lsp4j-dto-schema.json")).unwrap())
+}
+
+// lsp4j's collection adapter also accepts a single element. Either selects by
+// token before coercion. Unknown fields and Object/experimental stay untyped.
+// `stream_enums` is true when lsp4j read params after method (JsonReader) and
+// false for params-before-method conversion through JsonTreeReader.
+fn dto(value: &Value, kind: &Value, stream_enums: bool) -> bool {
+    if value.is_null() {
+        return true;
+    }
+    if let Some(parts) = kind.as_array() {
+        return match parts[0].as_str().unwrap() {
+            "list" => value.as_array().map_or_else(
+                || dto(value, &parts[1], stream_enums),
+                |items| items.iter().all(|item| dto(item, &parts[1], stream_enums)),
+            ),
+            "tuple" => value.as_array().is_some_and(|items| {
+                items.len() == parts.len() - 1
+                    && items
+                        .iter()
+                        .zip(&parts[1..])
+                        .all(|(v, t)| dto(v, t, stream_enums))
+            }),
+            "either" => parts[1..]
+                .iter()
+                .any(|t| token_matches(value, t) && dto(value, t, stream_enums)),
+            "enum" => match schema()["enums"][parts[1].as_str().unwrap()]["reader"]
+                .as_str()
+                .unwrap()
+            {
+                // EnumTypeAdapter.nextInt only for NUMBER tokens. STRING uses
+                // parseInt then name lookup: even unknown/overflow strings are
+                // accepted (as null), rather than validated as Gson Integer.
+                // Unknown numeric constants are also null. Ext does not consume
+                // these client values, so retain their acceptance without an
+                // allowlist. With params before method, JsonTreeReader.getAsInt
+                // also accepts fractional/large numeric tokens. These values
+                // are unused by Ext; do not over-reject that successful path.
+                // Stream reader hangs become deterministic native errors.
+                "integer" => {
+                    value.is_string()
+                        || gson_unquoted_number(value)
+                        || if stream_enums {
+                            value.is_number() && integer(value)
+                        } else {
+                            tree_enum_integer(value)
+                        }
+                }
+                // The LSP string-constant classes use Gson String, including
+                // booleans/numbers and unknown strings. Their constants are not
+                // a closed acceptance set.
+                "string" => string(value),
+                _ => unreachable!("generated enum reader"),
+            },
+            _ => unreachable!("generated DTO type"),
+        };
+    }
+    match kind.as_str().unwrap() {
+        "any" => true,
+        "string" => string(value),
+        "integer" => integer(value),
+        "boolean" => boolean(value),
+        // Container/bool token failures leave Java's reader without a response.
+        // Keep deterministic native dispatch, as in #1001 (permanent difference).
+        "workDoneToken" => !value.is_number() || integer(value),
+        name => {
+            value.is_object()
+                && schema()["types"][name]
+                    .as_object()
+                    .unwrap()
+                    .iter()
+                    .all(|(key, ty)| dto(&value[key], ty, stream_enums))
+        }
+    }
+}
+fn token_matches(value: &Value, kind: &Value) -> bool {
+    if let Some(parts) = kind.as_array() {
+        return match parts[0].as_str().unwrap() {
+            "either" => parts[1..].iter().any(|t| token_matches(value, t)),
+            "enum" => {
+                if schema()["enums"][parts[1].as_str().unwrap()]["reader"] == "string" {
+                    value.is_string()
+                } else {
+                    value.is_number()
+                }
+            }
+            _ => value.is_array(),
+        };
+    }
+    match kind.as_str().unwrap() {
+        "string" => value.is_string(),
+        "integer" => value.is_number(),
+        "boolean" => value.is_boolean(),
+        _ => value.is_object(),
+    }
 }
 
 fn position(value: &Value) -> bool {
@@ -40,13 +193,10 @@ fn strings(value: &Value, fields: &[&str]) -> bool {
     fields.iter().all(|key| string(&value[key]))
 }
 
-// Deliberately bounded DTO coverage: the observed top-level fields and nested
-// representatives are listed in docs/ubnf-authoring-lsp.md (#1001). Unknown
-// properties and untyped initializationOptions/experimental stay untyped.
-fn initialize_dto(params: &Value) -> bool {
+// InitializeParams uses the #1001 boundary plus the generated complete
+// ClientCapabilities field graph (#1005). Untyped options stay untyped.
+fn initialize_dto(params: &Value, stream_enums: bool) -> bool {
     let caps = &params["capabilities"];
-    let text = &caps["textDocument"];
-    let completion = &text["completion"];
     let folders = &params["workspaceFolders"];
     integer(&params["processId"])
         && strings(params, &["rootPath", "rootUri", "locale", "trace"])
@@ -56,16 +206,11 @@ fn initialize_dto(params: &Value) -> bool {
             || folders.as_array().is_some_and(|folders| {
                 folders.iter().all(|f| object(f) && strings(f, &["uri", "name"]))
             }))
-        && object(caps)
-        && ["workspace", "textDocument", "notebookDocument", "window", "general"]
-            .iter()
-            .all(|field| object(&caps[field]))
-        && object(&text["hover"])
-        && object(completion)
-        && object(&completion["completionItem"])
-        && boolean(&completion["completionItem"]["snippetSupport"])
-        && object(&caps["workspace"]["workspaceEdit"])
-        && boolean(&caps["window"]["workDoneProgress"])
+        && dto(
+            caps,
+            &Value::String("ClientCapabilities".into()),
+            stream_enums,
+        )
         // Invalid container/bool workDoneToken makes Java's Either adapter
         // stop without a response. Keep native's deterministic acceptance.
         && (!params["workDoneToken"].is_number() || integer(&params["workDoneToken"]))
@@ -92,19 +237,27 @@ pub(crate) fn typed_request(method: &str) -> bool {
         )
 }
 
-pub(crate) fn params_shape(method: &str, params: &Value) -> Result<(), Error> {
+// `stream` selects lsp4j's conversion path (see dto). Order-free callers use
+// the method-before-params stream path.
+pub(crate) fn params_shape(method: &str, params: &Value, stream: bool) -> Result<(), Error> {
     if !typed_request(method) {
         return Ok(());
     }
     let params = initialize_params(params);
     let valid = object(params)
+        && (!schema()["workDoneMethods"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|m| m == method)
+            || !params["workDoneToken"].is_number()
+            || integer(&params["workDoneToken"]))
         && if matches!(method, "initialize" | "unlaxer/configure") {
-            initialize_dto(params)
-        } else if method == "textDocument/hover" {
-            // Bounded nested request DTO coverage observed on the Java server.
-            object(&params["textDocument"])
-                && string(&params["textDocument"]["uri"])
-                && position(&params["position"])
+            initialize_dto(params, stream)
+        } else if method == "ubnf/packageSource" {
+            string(&params["uri"])
+        } else if let Some(kind) = schema()["requests"].get(method) {
+            dto(params, kind, stream)
         } else {
             true
         };
@@ -144,20 +297,111 @@ fn initialize_stream_shape(raw: &[u8]) -> Result<Option<Error>, serde_json::Erro
     while rest[0] != b'}' {
         let (key, value, _) = next_field(&mut rest)?;
         let one_field = Value::Object([(key, value)].into_iter().collect());
-        if !initialize_dto(&one_field) {
+        if !initialize_dto(&one_field, true) {
             return Ok(Some(parse_error()));
         }
     }
     Ok(None)
 }
 
+// Gson String exposes the original numeric token, including exponent case/sign.
+// Use the validated raw object and decoded keys, never text searches.
+fn string_spellings(
+    raw: &[u8],
+    value: &mut Value,
+    fields: &[&str],
+) -> Result<(), serde_json::Error> {
+    let mut rest = raw.trim_ascii_start();
+    if rest[0] != b'{' || !value.is_object() {
+        return Ok(());
+    }
+    rest = rest[1..].trim_ascii_start();
+    while rest[0] != b'}' {
+        let (key, token, raw) = next_field(&mut rest)?;
+        if fields.contains(&key.as_str()) {
+            // Last duplicate wins, including a later non-number.
+            value[&key] = if token.is_number() {
+                Value::String(std::str::from_utf8(raw).unwrap().into())
+            } else {
+                token
+            };
+        }
+    }
+    Ok(())
+}
+fn document_string_spellings(
+    raw: &[u8],
+    params: &mut Value,
+    open: bool,
+) -> Result<(), serde_json::Error> {
+    let mut rest = raw.trim_ascii_start();
+    if rest[0] != b'{' {
+        return Ok(());
+    }
+    rest = rest[1..].trim_ascii_start();
+    let mut document = None;
+    while rest[0] != b'}' {
+        let (key, _, raw) = next_field(&mut rest)?;
+        if key == "textDocument" {
+            document = Some(raw);
+        }
+    }
+    if let Some(raw) = document {
+        string_spellings(
+            raw,
+            &mut params["textDocument"],
+            if open { &["uri", "text"] } else { &["uri"] },
+        )?;
+    }
+    Ok(())
+}
+// Recover change text after JSON/DTO validation, before state mutation.
+fn change_text_spelling(raw: &[u8], params: &mut Value) -> Result<(), serde_json::Error> {
+    let mut rest = raw.trim_ascii_start();
+    if rest[0] != b'{' {
+        return Ok(());
+    }
+    rest = rest[1..].trim_ascii_start();
+    let mut raw_changes = None;
+    while rest[0] != b'}' {
+        let (key, _, raw) = next_field(&mut rest)?;
+        if key == "contentChanges" {
+            raw_changes = Some(raw);
+        }
+    }
+    if let Some(changes) = raw_changes.filter(|raw| raw[0] == b'[') {
+        let mut changes = changes[1..].trim_ascii_start();
+        let mut index = 0;
+        while changes[0] != b']' {
+            let mut values = serde_json::Deserializer::from_slice(changes).into_iter::<Value>();
+            let value = values.next().expect("validated change")?;
+            let length = values.byte_offset();
+            if value.is_object() {
+                if let Some(target) = params["contentChanges"].get_mut(index) {
+                    string_spellings(&changes[..length], target, &["text"])?;
+                }
+            }
+            changes = changes[length..].trim_ascii_start();
+            if changes[0] == b',' {
+                changes = changes[1..].trim_ascii_start();
+            }
+            index += 1;
+        }
+    }
+    Ok(())
+}
+
 // Preserve the ordering information needed by lsp4j's stream and deferred DTO
 // paths. serde_json decodes escaped keys; raw text/string searches would not.
 // No dependency or general parser hot-path change is needed.
-pub(crate) fn read_message(bytes: &[u8]) -> Result<(Value, Option<Error>), serde_json::Error> {
+// The returned flag is true unless the final params were converted deferred
+// (params before a typed method), so the dispatcher re-checks the same path.
+pub(crate) fn read_message(
+    bytes: &[u8],
+) -> Result<(Value, Option<Error>, bool), serde_json::Error> {
     let mut message: Value = serde_json::from_slice(bytes)?;
     if !message.is_object() {
-        return Ok((message, None));
+        return Ok((message, None, true));
     }
     let mut rest = bytes.trim_ascii_start()[1..].trim_ascii_start();
     let mut method = String::new();
@@ -165,14 +409,18 @@ pub(crate) fn read_message(bytes: &[u8]) -> Result<(Value, Option<Error>), serde
     let mut error_id = None;
     let mut deferred = None;
     let mut error = None;
+    let mut raw_params = None;
     while rest[0] != b'}' {
         let (key, value, raw) = next_field(&mut rest)?;
+        if key == "params" {
+            raw_params = Some(raw);
+        }
         match key.as_str() {
             "id" => id = Some(value),
             "method" => method = value.as_str().unwrap_or("").into(),
             "params" if !typed_request(&method) => deferred = Some(value),
             "params" => {
-                let shape_error = params_shape(&method, &value).err();
+                let shape_error = params_shape(&method, &value, true).err();
                 let stream_error = if matches!(method.as_str(), "initialize" | "unlaxer/configure")
                 {
                     initialize_stream_shape(raw)?
@@ -193,19 +441,34 @@ pub(crate) fn read_message(bytes: &[u8]) -> Result<(Value, Option<Error>), serde
             _ => {}
         }
     }
+    let stream = deferred.is_none();
     if let Some(params) = deferred {
         // MessageTypeAdapter.parseParams(Object, method) does not unwrap an
         // array read under a missing/unknown method. Its DTO conversion rejects it.
         if typed_request(&method) && params.is_array() {
             error.get_or_insert_with(parse_error);
-        } else if let Err(e) = params_shape(&method, &params) {
+        } else if let Err(e) = params_shape(&method, &params, false) {
             error.get_or_insert(e);
+        }
+    }
+    if method.starts_with("textDocument/") {
+        if let Some(raw) = raw_params {
+            document_string_spellings(
+                raw,
+                &mut message["params"],
+                method == "textDocument/didOpen",
+            )?;
+        }
+    }
+    if method == "textDocument/didChange" {
+        if let Some(raw) = raw_params {
+            change_text_spelling(raw, &mut message["params"])?;
         }
     }
     if let Some(id) = error_id {
         message["id"] = id;
     }
-    Ok((message, error))
+    Ok((message, error, stream))
 }
 
 pub(crate) fn initialize_params(params: &Value) -> &Value {
@@ -239,12 +502,7 @@ pub(crate) fn change_shape(params: &Value) -> Result<(), Error> {
 }
 
 pub(crate) fn notified_version(document: &Value) -> Result<(), Error> {
-    let valid = match &document["version"] {
-        Value::Null => true,
-        Value::String(text) => stream_int(text).is_some(),
-        Value::Number(number) => stream_int(&number.to_string()).is_some(),
-        _ => false,
-    };
+    let valid = integer(&document["version"]);
     if valid {
         Ok(())
     } else {
@@ -413,4 +671,69 @@ fn string_int(value: &str) -> Option<i32> {
         }
     }
     normalized.parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn enum_reader_follows_lsp4j_stream_or_deferred_path() {
+        // Gson rules: JsonReader.nextInt needs an exact int double; deferred
+        // LazilyParsedNumber truncates within the scale limit; a token filling
+        // the 1024-char reader buffer is an unquoted string in both paths.
+        let long = format!("1.5{}", "0".repeat(1021));
+        for (value, stream_ok, deferred_ok) in [
+            ("1e-10000", true, false),
+            ("1.5", false, true),
+            (long.as_str(), true, true),
+        ] {
+            let params = format!(
+                r#"{{"capabilities":{{"textDocument":{{"completion":{{"insertTextMode":{value}}}}}}}}}"#
+            );
+            for (frame, ok, stream) in [
+                (
+                    format!(
+                        r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{params}}}"#
+                    ),
+                    stream_ok,
+                    true,
+                ),
+                (
+                    format!(
+                        r#"{{"jsonrpc":"2.0","id":1,"params":{params},"method":"initialize"}}"#
+                    ),
+                    deferred_ok,
+                    false,
+                ),
+            ] {
+                let (message, error, read_stream) = super::read_message(frame.as_bytes()).unwrap();
+                assert_eq!(stream, read_stream);
+                let checked = super::params_shape("initialize", &message["params"], read_stream);
+                assert_eq!(
+                    ok,
+                    error.is_none() && checked.is_ok(),
+                    "{value} stream={stream}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn change_text_uses_gson_scalar_spelling() {
+        for (raw, expected) in [
+            ("-0", "-0"),
+            ("0E5", "0E5"),
+            ("1e400", "1e400"),
+            ("1.50", "1.50"),
+        ] {
+            let frame = format!(
+                r#"{{"method":"textDocument/didChange","params":{{"contentChanges":[{{"text":{raw}}}]}}}}"#
+            );
+            let (message, error, _) = super::read_message(frame.as_bytes()).unwrap();
+            assert!(error.is_none());
+            assert_eq!(
+                super::gson_string(&message["params"]["contentChanges"][0]["text"]).as_deref(),
+                Some(expected)
+            );
+        }
+    }
 }

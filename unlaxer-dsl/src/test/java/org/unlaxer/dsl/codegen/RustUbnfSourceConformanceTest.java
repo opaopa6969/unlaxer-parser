@@ -112,7 +112,7 @@ public class RustUbnfSourceConformanceTest {
 
     private String run(List<String> command) throws Exception {
         Path log = temporary.newFile().toPath();
-        var process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        var process = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         if (!process.waitFor(60, TimeUnit.SECONDS)) {
             process.destroyForcibly();
             fail("process timed out: " + command);

@@ -296,7 +296,7 @@ public class RaisingOperatorConformanceTest {
         row.addProperty("grammar", LSP_GRAMMAR);
         Path classes = compileJava(row, true);
         String javaExecutable = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        try (var wire = new Wire(new ProcessBuilder(javaExecutable, "-cp", classes + File.pathSeparator + System.getProperty("java.class.path"),
+        try (var wire = new Wire(org.unlaxer.dsl.TestProcesses.builder(javaExecutable, "-cp", classes + File.pathSeparator + System.getProperty("java.class.path"),
                 "cutprobe.DiagnosticMain").redirectError(temporary.newFile("java-stderr.log")).start())) {
             exercise(wire, "Java");
         }
@@ -331,7 +331,7 @@ public class RaisingOperatorConformanceTest {
         Path target = ROOT.resolve("rust/target/cut-labeled-failure-probe");
         run(List.of("cargo", "build", "--quiet", "--offline", "--manifest-path", project.resolve("Cargo.toml").toString(),
             "--target-dir", target.toString()), 0);
-        try (var wire = new Wire(new ProcessBuilder(target.resolve("debug/cut-lsp-fixture").toString())
+        try (var wire = new Wire(org.unlaxer.dsl.TestProcesses.builder(target.resolve("debug/cut-lsp-fixture").toString())
                 .redirectError(temporary.newFile("rust-stderr.log")).start())) {
             exercise(wire, "Rust");
         }
@@ -369,7 +369,7 @@ public class RaisingOperatorConformanceTest {
 
     private String run(List<String> command, int expected) throws Exception {
         Path log = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         builder.environment().put("CARGO_INCREMENTAL", "0");
         var process = builder.start();
         if (!process.waitFor(300, TimeUnit.SECONDS)) { process.destroyForcibly(); fail("timeout " + command); }

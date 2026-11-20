@@ -130,6 +130,7 @@
 							<target>21</target>
 							<fork>true</fork>
 							<compilerArgs>
+								<arg>-J-Djava.io.tmpdir=${java.io.tmpdir}</arg>
 								<arg>-XDcompilePolicy=simple</arg>
 								<arg>-XDaddTypeAnnotationsToSymbol=true</arg>
 								<arg>--should-stop=ifError=FLOW</arg>
@@ -159,6 +160,7 @@
 						<artifactId>spotbugs-maven-plugin</artifactId>
 						<version>4.10.2.0</version>
 						<configuration>
+							<jvmArgs>-Djava.io.tmpdir=${java.io.tmpdir}</jvmArgs>
 							<effort>Default</effort>
 							<threshold>High</threshold>
 							<excludeFilterFile>${project.basedir}/../config/spotbugs-exclude.xml</excludeFilterFile>

@@ -12,14 +12,17 @@ elif [[ $# -ne 0 ]]; then
   exit 2
 fi
 
-CP_FILE="/tmp/unlaxer-dsl-test-cp.txt"
+CP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/unlaxer-dsl-test-cp.XXXXXX")
+trap 'rm -rf "$CP_DIR"' EXIT
+CP_FILE="$CP_DIR/classpath.txt"
 
 mvn -q -DskipTests test-compile
 mvn -q -DincludeScope=test -Dmdep.outputFile="$CP_FILE" dependency:build-classpath >/dev/null
 
 CP="target/classes:target/test-classes:$(cat "$CP_FILE")"
+java_launcher="$ROOT_DIR/../scripts/ci/java-tmpdir/bin/java"
 
-java --enable-preview -cp "$CP" org.unlaxer.dsl.codegen.SnapshotFixtureWriter --output-dir "$OUT_DIR"
-java --enable-preview -cp "$CP" org.unlaxer.dsl.CliFixtureWriter --output-dir "$OUT_DIR"
+"$java_launcher" --enable-preview -cp "$CP" org.unlaxer.dsl.codegen.SnapshotFixtureWriter --output-dir "$OUT_DIR"
+"$java_launcher" --enable-preview -cp "$CP" org.unlaxer.dsl.CliFixtureWriter --output-dir "$OUT_DIR"
 
 echo "Golden snapshots refreshed under $OUT_DIR"

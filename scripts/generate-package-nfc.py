@@ -11,6 +11,12 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+try:
+    from java_tmp import java_command
+except ModuleNotFoundError:
+    from scripts.java_tmp import java_command
+
+
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'rust/unlaxer-generator/src/packages/java_uri/nfc_data.rs'
 SOURCE = '''import java.text.Normalizer;
@@ -44,8 +50,8 @@ def generate(java_home):
     with tempfile.TemporaryDirectory(prefix='package-nfc-', dir=os.environ.get('TMPDIR')) as tmp:
         path = Path(tmp)
         (path / 'PackageNfcData.java').write_text(SOURCE, encoding='ascii')
-        subprocess.run([str(java_home / 'bin/javac'), export, str(path / 'PackageNfcData.java')], check=True)
-        raw = subprocess.check_output([str(java_home / 'bin/java'), export, '-cp', tmp, 'PackageNfcData'])
+        subprocess.run(java_command(str(java_home / 'bin/javac')) + [export, str(path / 'PackageNfcData.java')], check=True)
+        raw = subprocess.check_output(java_command(str(java_home / 'bin/java')) + [export, '-cp', tmp, 'PackageNfcData'])
     checksum = hashlib.sha256(raw).hexdigest()
     # Filled from Oracle JDK21.0.9; rejects a different Unicode version on regeneration.
     expected = '76318146c31b727624049ea3f76cdf6167adabd17e0ac323771d2e9ecabcd9ad'

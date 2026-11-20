@@ -23,7 +23,7 @@ public class PackageLocalPathConformanceTest {
             System.out.println("[assumption] local path conformance requires -DrustConformance=true");
         assumeTrue(Boolean.getBoolean("rustConformance"));
         Path log = Path.of("target/package-local-path-build.log");
-        Process process = new ProcessBuilder("cargo", "build", "--locked", "--manifest-path",
+        Process process = org.unlaxer.dsl.TestProcesses.builder("cargo", "build", "--locked", "--manifest-path",
             REPOSITORY.resolve("rust/Cargo.toml").toString(), "-p", "unlaxer-generator")
             .redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {
@@ -183,7 +183,7 @@ public class PackageLocalPathConformanceTest {
         command.addAll(List.of("deps", "resolve", "--manifest",
             value(fixture, "manifest", "ubnf.json").replace("${ROOT}", folder.toString())));
         Path stdout = folder.resolve("stdout.log"), stderr = folder.resolve("stderr.log");
-        var builder = new ProcessBuilder(command).directory(folder.resolve(value(fixture, "workingDirectory", ".")).toFile())
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).directory(folder.resolve(value(fixture, "workingDirectory", ".")).toFile())
             .redirectOutput(stdout.toFile()).redirectError(stderr.toFile());
         if (nativeRust) { builder.environment().put("PATH", ""); builder.environment().put("JAVA_HOME", "/nonexistent-java"); }
         Process process = builder.start();

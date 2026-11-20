@@ -69,6 +69,32 @@ class WorkflowRunnerTest(unittest.TestCase):
                 self.assertEqual(job.get('runs-on'), RUNNER, f'{name}:{job_name}')
 
 
+class WorkflowTempDirectoryTest(unittest.TestCase):
+
+    def test_every_job_and_step_retains_the_runner_temp_directory(self):
+        for name, document, _ in workflows():
+            for job_name, job in document['jobs'].items():
+                base = dict(document.get('env', {}), **job.get('env', {}))
+                setup = job['steps'][0]
+                self.assertEqual(setup.get('name'), 'Select job temporary directory (#1045)')
+                self.assertEqual(setup.get('shell'), 'bash')
+                self.assertIn('>> "$GITHUB_ENV"', setup.get('run', ''))
+                for key in ('TMPDIR', 'TMP', 'TEMP', 'MAVEN_OPTS'):
+                    self.assertIn(f'"{key}=${key}"', setup['run'])
+                # The first step exports these variables for all later actions and scripts.
+                base.update(setup['env'])
+                for step in job.get('steps', []):
+                    env = dict(base, **step.get('env', {}))
+                    where = f'{name}:{job_name}:{step.get("name", step.get("uses"))}'
+                    for key in ('TMPDIR', 'TMP', 'TEMP'):
+                        self.assertEqual(env.get(key), '${{ runner.temp }}', where)
+                    self.assertIn('-Djava.io.tmpdir=${{ runner.temp }}', env.get('MAVEN_OPTS', ''), where)
+                    self.assertIn('-Dunlaxer.test.tmpdir=${{ runner.temp }}', env.get('MAVEN_OPTS', ''), where)
+                    self.assertIn('-DadditionalJOption=-J-Djava.io.tmpdir=${{ runner.temp }}', env.get('MAVEN_OPTS', ''), where)
+                    for key in ('JAVA_TOOL_OPTIONS', '_JAVA_OPTIONS', 'JDK_JAVA_OPTIONS'):
+                        self.assertNotIn(key, env, where)
+
+
 class NetworkRetryTest(unittest.TestCase):
 
     def test_every_dependency_download_uses_the_wrapper_from_its_own_checkout(self):

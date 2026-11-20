@@ -87,9 +87,19 @@ fn atom_words(atom: &AtomicElement, out: &mut Vec<String>) {
         _ => {}
     }
 }
-pub fn completion(source: &str, index: &Index, offset: usize) -> Value {
+pub fn completion(
+    source: &str,
+    index: &Index,
+    offset: usize,
+    empty_line: bool,
+    index_offset: Option<usize>,
+) -> Value {
     let line_start = source[..offset].rfind('\n').map_or(0, |i| i + 1);
-    let prefix = &source[line_start..offset];
+    let prefix = if empty_line {
+        ""
+    } else {
+        &source[line_start..offset]
+    };
     let suffix = prefix.trim_end_matches(text::word);
     if suffix.ends_with('@') {
         return Value::Array(data()["annotations"].as_array().unwrap().iter().map(|a|{
@@ -131,7 +141,7 @@ pub fn completion(source: &str, index: &Index, offset: usize) -> Value {
             let first = run.find(|c: char| c.is_ascii_alphabetic() || c == '_')?;
             Some(format!("{}.", &run[first..]))
         });
-    let lex = text::scan(&source[..offset]);
+    let lex = text::scan(&source[..index_offset.unwrap_or(0)]);
     let lexical = lex.iter().rposition(|t| t.text == "::=").is_some_and(|i| {
         i >= 2 && lex[i - 2].text == "token" && !lex[i + 1..].iter().any(|t| t.text == ";")
     });
@@ -173,7 +183,7 @@ pub fn completion(source: &str, index: &Index, offset: usize) -> Value {
             }
         }
     }
-    if let Some(scope) = index.scope(offset) {
+    if let Some(scope) = index_offset.and_then(|offset| index.scope(offset)) {
         for (name, symbol) in &scope.symbols {
             if scope.unique(name).is_none()
                 || ((lexical || whitespace) && symbol.kind != "token")
@@ -193,7 +203,13 @@ pub fn completion(source: &str, index: &Index, offset: usize) -> Value {
     }
     Value::Array(items)
 }
-pub fn hover(source: &str, index: &Index, offset: usize) -> Value {
+pub fn hover(
+    source: &str,
+    index: &Index,
+    offset: usize,
+    empty_line: bool,
+    index_offset: Option<usize>,
+) -> Value {
     let mut start = offset;
     let mut end = offset;
     while let Some((i, c)) = source[..start].char_indices().next_back() {
@@ -210,8 +226,8 @@ pub fn hover(source: &str, index: &Index, offset: usize) -> Value {
             break;
         }
     }
-    let word = &source[start..end];
-    let annotation = start > 0 && source.as_bytes()[start - 1] == b'@';
+    let word = if empty_line { "" } else { &source[start..end] };
+    let annotation = !empty_line && start > 0 && source.as_bytes()[start - 1] == b'@';
     if annotation || keywords().iter().any(|k| k == word) {
         if let Some(help) = help(word) {
             return json!({"contents":markdown(help)});
@@ -227,7 +243,7 @@ pub fn hover(source: &str, index: &Index, offset: usize) -> Value {
             return json!({"contents":markdown(format!("**{}**\n\n{}",string(a,"signature"),string(a,"doc")))});
         }
     }
-    if let Some(scope) = index.scope(offset) {
+    if let Some(scope) = index_offset.and_then(|offset| index.scope(offset)) {
         if let Some((name, _, _)) = scope
             .uses
             .iter()

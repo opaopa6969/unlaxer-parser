@@ -142,6 +142,6 @@ public class SemanticDiagnosticConformanceTest {
         }
         assertEquals(event.toString(),event.get("expected"),observed);assertEquals(event.has("warnings")?event.get("warnings").getAsInt():0,warnings);
     }
-    private String run(List<String> command)throws Exception{Path log=temporary.newFile().toPath();var builder=new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());builder.environment().put("CARGO_INCREMENTAL","0");var process=builder.start();if(!process.waitFor(240,TimeUnit.SECONDS)){process.destroyForcibly();fail("timeout "+command);}String output=Files.readString(log);assertEquals(output,0,process.exitValue());return output;}
+    private String run(List<String> command)throws Exception{Path log=temporary.newFile().toPath();var builder=org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());builder.environment().put("CARGO_INCREMENTAL","0");var process=builder.start();if(!process.waitFor(240,TimeUnit.SECONDS)){process.destroyForcibly();fail("timeout "+command);}String output=Files.readString(log);assertEquals(output,0,process.exitValue());return output;}
     private static JavaFileObject source(String name,String text){return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignored){return text;}};}
 }

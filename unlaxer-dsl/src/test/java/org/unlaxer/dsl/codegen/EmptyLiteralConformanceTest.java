@@ -220,7 +220,7 @@ public class EmptyLiteralConformanceTest {
                 null, units).call());
         }
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        try (var wire = new LspWire(new ProcessBuilder(java, "-cp", classes + File.pathSeparator + System.getProperty("java.class.path"),
+        try (var wire = new LspWire(org.unlaxer.dsl.TestProcesses.builder(java, "-cp", classes + File.pathSeparator + System.getProperty("java.class.path"),
                 PACKAGE + ".DiagnosticMain").redirectError(temporary.newFile("java-lsp-stderr.log")).start())) {
             exerciseLabeledServer(wire, "Java", "Expected '' or 'b' (in WordParser)", List.of("''", "'b'"));
         }
@@ -255,7 +255,7 @@ public class EmptyLiteralConformanceTest {
             "mod generated; fn main() { std::process::exit(generated::lsp::serve_stdio_status().unwrap()); }\n");
         success(run(List.of("cargo", "build", "--quiet", "--offline", "--manifest-path", project.resolve("Cargo.toml").toString(),
             "--target-dir", target.toString()), "", false));
-        try (var wire = new LspWire(new ProcessBuilder(target.resolve("debug/empty-literal-lsp-fixture").toString())
+        try (var wire = new LspWire(org.unlaxer.dsl.TestProcesses.builder(target.resolve("debug/empty-literal-lsp-fixture").toString())
                 .redirectError(temporary.newFile("rust-lsp-stderr.log")).start())) {
             exerciseLabeledServer(wire, "Rust", "Expected '' or b", List.of("", "b"));
         }
@@ -791,7 +791,7 @@ public class EmptyLiteralConformanceTest {
 
     private ProcessResult run(List<String> command, String input, boolean withoutJava) throws Exception {
         Path log = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).redirectErrorStream(true).redirectOutput(log.toFile());
         if (withoutJava) {
             builder.environment().put("PATH", "");
             builder.environment().put("JAVA_HOME", "/nonexistent-unlaxer-java");

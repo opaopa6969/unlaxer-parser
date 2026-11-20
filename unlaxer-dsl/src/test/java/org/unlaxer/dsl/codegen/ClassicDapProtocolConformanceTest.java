@@ -56,7 +56,7 @@ public class ClassicDapProtocolConformanceTest {
         Path classes=temporary.newFolder("java-classes").toPath();var errors=new StringWriter();var compiler=ToolProvider.getSystemJavaCompiler();
         try(var manager=compiler.getStandardFileManager(null,null,null)) { assertTrue(errors.toString(),compiler.getTask(new PrintWriter(errors),manager,null,List.of("--release","17","-classpath",System.getProperty("java.class.path"),"-d",classes.toString()),null,sources).call()); }
         String java=Path.of(System.getProperty("java.home"),"bin","java").toString();
-        try(var wire=new Wire(new ProcessBuilder(java,"-cp",classes+File.pathSeparator+System.getProperty("java.class.path"),"wire.dap.Main").redirectError(temporary.newFile("java-stderr.log")).start())) { exercise(wire,"java"); }
+        try(var wire=new Wire(org.unlaxer.dsl.TestProcesses.builder(java,"-cp",classes+File.pathSeparator+System.getProperty("java.class.path"),"wire.dap.Main").redirectError(temporary.newFile("java-stderr.log")).start())) { exercise(wire,"java"); }
         if(!Boolean.getBoolean("rustConformance")) {System.out.println("[assumption] Rust DAP process requires -DrustConformance=true; Java wire oracle ran");return;}
         Path project=temporary.newFolder("rust-project").toPath(),modules=project.resolve("src/generated");Files.createDirectories(modules);
         Path grammarFile=project.resolve("fixture.ubnf");Files.writeString(grammarFile,text);
@@ -99,7 +99,7 @@ public class ClassicDapProtocolConformanceTest {
             fn main(){unlaxer_dap::Server::new(Backend).serve_stdio().unwrap();}
             """);
         run(List.of("cargo","build","--quiet","--offline","--manifest-path",project.resolve("Cargo.toml").toString()));
-        try(var wire=new Wire(new ProcessBuilder(ROOT.resolve("rust/target/debug/classic-dap-fixture").toString()).redirectError(temporary.newFile("rust-stderr.log")).start())) {exercise(wire,"rust"); Files.createDirectories(Path.of("target"));Files.write(Path.of("target/classic-dap-protocol.tsv"),evidence);}
+        try(var wire=new Wire(org.unlaxer.dsl.TestProcesses.builder(ROOT.resolve("rust/target/debug/classic-dap-fixture").toString()).redirectError(temporary.newFile("rust-stderr.log")).start())) {exercise(wire,"rust"); Files.createDirectories(Path.of("target"));Files.write(Path.of("target/classic-dap-protocol.tsv"),evidence);}
     }
     private void exercise(Wire wire,String backend)throws Exception {
         wire.failures = new DapFailureConformance("classic-ast", backend);
@@ -248,7 +248,7 @@ public class ClassicDapProtocolConformanceTest {
         assertEquals(context, variables, wire.request("variables", Map.of("variablesReference", 1)));
         assertTrue(context + ": rejected request emitted events", wire.pending.isEmpty());
     }
-    private void run(List<String> command)throws Exception {var builder=new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true);builder.environment().put("CARGO_INCREMENTAL","0");builder.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());Path log=temporary.newFile().toPath();builder.redirectOutput(log.toFile());var process=builder.start();try{assertTrue("timeout: "+command,process.waitFor(120,TimeUnit.SECONDS));assertEquals(command+"\n"+Files.readString(log),0,process.exitValue());}finally{if(process.isAlive())process.destroyForcibly();}}
+    private void run(List<String> command)throws Exception {var builder=org.unlaxer.dsl.TestProcesses.builder(command).directory(ROOT.toFile()).redirectErrorStream(true);builder.environment().put("CARGO_INCREMENTAL","0");builder.environment().put("CARGO_TARGET_DIR",ROOT.resolve("rust/target").toString());Path log=temporary.newFile().toPath();builder.redirectOutput(log.toFile());var process=builder.start();try{assertTrue("timeout: "+command,process.waitFor(120,TimeUnit.SECONDS));assertEquals(command+"\n"+Files.readString(log),0,process.exitValue());}finally{if(process.isAlive())process.destroyForcibly();}}
     private static JavaFileObject source(String name,String body){return new SimpleJavaFileObject(URI.create("string:///"+name.replace('.','/')+".java"),JavaFileObject.Kind.SOURCE){@Override public CharSequence getCharContent(boolean ignore){return body;}};}
     static final class Wire implements AutoCloseable {
         final Process process;final InputStream input;final OutputStream output;final ExecutorService reader=Executors.newSingleThreadExecutor();final List<JsonObject> pending=new ArrayList<>();int next,lastSeq;

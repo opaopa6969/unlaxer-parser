@@ -147,7 +147,7 @@ public class ClassicSemanticTokensConformanceTest {
             boolean overlapping = mode.equals("custom-01") || mode.equals("custom-11") || large;
             Object capabilities = mode.equals("custom") || mode.equals("default") ? Map.of() : Map.of("textDocument", Map.of("semanticTokens", Map.of("multilineTokenSupport", multiline, "overlappingTokenSupport", overlapping)));
             var command = new ArrayList<>(baseCommand); command.add(FIXTURE.toString()); command.add(mode);
-            try (var wire = new Wire(new ProcessBuilder(command).redirectError(temporary.newFile()).start())) {
+            try (var wire = new Wire(org.unlaxer.dsl.TestProcesses.builder(command).redirectError(temporary.newFile()).start())) {
                 var initialized = wire.request("initialize", Map.of("capabilities", capabilities));
                 var provider = initialized.getAsJsonObject("capabilities").getAsJsonObject("semanticTokensProvider");
                 assertTrue(provider.get("full").getAsBoolean());
@@ -219,7 +219,7 @@ public class ClassicSemanticTokensConformanceTest {
         wire.notification("textDocument/publishDiagnostics");
     }
     private void run(List<String> command) throws Exception {
-        var builder = new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true);
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).directory(ROOT.toFile()).redirectErrorStream(true);
         builder.environment().put("CARGO_INCREMENTAL", "0"); builder.environment().put("CARGO_TARGET_DIR", ROOT.resolve("rust/target").toString());
         Path log = temporary.newFile().toPath(); builder.redirectOutput(log.toFile()); var process = builder.start();
         try { assertTrue("command timeout: " + command, process.waitFor(180, TimeUnit.SECONDS)); assertEquals(command + "\n" + Files.readString(log), 0, process.exitValue()); }

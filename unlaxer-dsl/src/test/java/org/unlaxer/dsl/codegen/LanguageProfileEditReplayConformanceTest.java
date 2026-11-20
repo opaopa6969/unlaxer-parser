@@ -152,7 +152,7 @@ public class LanguageProfileEditReplayConformanceTest {
     }
     private String run(List<String> command) throws Exception {
         Path log = temporary.newFile().toPath();
-        var builder = new ProcessBuilder(command).directory(ROOT.toFile()).redirectErrorStream(true).redirectOutput(log.toFile());
+        var builder = org.unlaxer.dsl.TestProcesses.builder(command).directory(ROOT.toFile()).redirectErrorStream(true).redirectOutput(log.toFile());
         builder.environment().put("CARGO_INCREMENTAL", "0"); builder.environment().put("CARGO_TARGET_DIR", ROOT.resolve("rust/target").toString());
         var process = builder.start();
         try {
