@@ -66,6 +66,46 @@ def run_jsonrpc(clients, directory, omit_params):
     def raw_dto(client, method, params, expected):
         raw(client, '{"jsonrpc":"2.0","id":$ID,"method":' + json.dumps(method) + ',"params":' + params + '}', expected)
 
+    enums = fixture['enumReader']
+    assert enums['javaRevision'] == reader['javaRevision']
+    assert enums['silenceSeconds'] == reader['silenceSeconds'] == 1
+
+    def enum_cases():
+        # Authored wire fragments/oracles are independent of the generated table
+        # and of measured server output. Test each reachable field separately.
+        for field in enums['fields']:
+            for token in enums['tokens']:
+                value = token['raw'].replace('"$KNOWN"', field['known'])
+                for index in range(len(reader['orders'])):
+                    outcome = token['deferredInteger'] if field['reader'] == 'integer' and index in (1, 4, 5) else token[field['reader']]
+                    # Stream parse errors occurring before id also lose the id.
+                    if index == 3 and outcome == 'parse':
+                        outcome = 'silent'
+                    yield field['id'] + '/' + value + '/' + str(index), field['raw'].replace('$VALUE', value), outcome, index
+        # Gson reader limits differ between the stream path (method first) and
+        # deferred JsonTreeReader conversion; check both paths on list/scalar.
+        for case in enums['deferredLimits']:
+            value, name = case['raw'], case['raw'] + case.get('exponent', '')
+            if 'padTo' in case:
+                exponent = case.get('exponent', '')
+                value += '0' * (case['padTo'] - len(value) - len(exponent)) + exponent
+                assert len(value) == case['padTo']
+                name += '/len' + str(case['padTo'])
+            for field in enums['fields']:
+                if field['id'] not in enums['limitFields']:
+                    continue
+                for index in range(len(reader['orders'])):
+                    outcome = case['deferred' if index in (1, 4, 5) else 'stream']
+                    yield 'limits/' + field['id'] + '/' + name + '/' + str(index), field['raw'].replace('$VALUE', value), outcome, index
+
+    def enum_response(client, method, caps, outcome, profile, order=0):
+        options = {} if profile == 'default' else {'languageProfile': {'entry': 'UBNFFile', 'tsv': configuration['profiles'][profile]}}
+        params = '{"capabilities":' + caps + ',"initializationOptions":' + json.dumps(options) + '}'
+        expected = ({'result': configuration['expected'][profile][client.backend]} if outcome == 'accepted'
+                    else None if outcome == 'silent' and client.backend == 'java' else reader['oracles']['parse'])
+        frame = reader['orders'][order].replace('$METHOD', method).replace('$PARAMS', params)
+        raw(client, frame, expected)
+
     # Isolated lifecycle sessions allow every raw key order and positional arity
     # to prove initialize retry (including Java reader failures and native success).
     for case in reader['orderParams']:
@@ -102,6 +142,37 @@ def run_jsonrpc(clients, directory, omit_params):
 
     for _, client in hosts:
         quiet(client)
+
+    enum_started = time.monotonic()
+    for name, caps, outcome, order in enum_cases():
+        if outcome == 'accepted':
+            continue
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1031/initialize/' + name
+            enum_response(client, 'initialize', caps, outcome, 'restricted', order)
+            response(client, 'unlaxer/configure', {}, reader['oracles']['early'])
+            response(client, 'textDocument/hover', {}, reader['oracles']['early'])
+        evidence.append({'case': '1031-initialize-' + name})
+    # Reader barriers above and a shared finite deadline catch every silent id,
+    # including responses that arrive after processing subsequent bad frames.
+    for _, client in hosts:
+        quiet(client)
+    for case in enums['initializeAccepted']:
+        for order in case['orders']:
+            for _, original in hosts:
+                client = type(original)(original.command, native=original.backend == 'rust')
+                client.fixture = 'jsonrpc/1031/accepted-initialize/' + case['raw'] + '/' + str(order)
+                try:
+                    enum_response(client, 'initialize', enums['initializeAll'].replace('$VALUE', case['raw']), 'accepted', 'restricted', order)
+                    response(client, 'initialize', {'capabilities': {}}, reader['oracles']['already'])
+                    response(client, '$/reader-barrier', {}, {'result': None})
+                    response(client, 'shutdown', {}, {'result': None})
+                    client.send('exit')
+                    assert client.process.wait(timeout=client.timeout) == 0
+                finally:
+                    client.close()
+            evidence.append({'case': '1031-accepted-initialize-' + case['raw'] + '/' + str(order)})
+    enum_elapsed = time.monotonic() - enum_started
 
     def hover(client, uri, document):
         response(client, 'textDocument/hover', {'textDocument': {'uri': uri}, 'position': {'line': 0, 'character': len(document['source'])}}, {'result': document['hover']})
@@ -175,6 +246,33 @@ def run_jsonrpc(clients, directory, omit_params):
         diagnostic(client, uri, [])
         hover(client, uri, fresh)
         client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
+
+    enum_started = time.monotonic()
+    for name, caps, outcome, order in enum_cases():
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1031/configure/' + name
+            # Failures attempt to restore the default profile: retained() proves
+            # they did not commit it. Successes explicitly keep VALIDATE disabled.
+            enum_response(client, 'unlaxer/configure', caps, outcome,
+                          'restricted' if outcome == 'accepted' else 'default', order)
+            retained(client, 'enum-' + str(client.serial))
+        evidence.append({'case': '1031-configure-' + name})
+    for field in enums['fields']:
+        if '[$VALUE]' not in field['raw']:
+            continue
+        for outcome, values in [('accepted', enums['collectionAccepted']), ('parse', enums['collectionInvalid'])]:
+            for value in values:
+                caps = field['raw'].replace('[$VALUE]', value)
+                for _, client in hosts:
+                    client.fixture = 'jsonrpc/1031/collection/' + field['id'] + '/' + value
+                    enum_response(client, 'unlaxer/configure', caps, outcome,
+                                  'restricted' if outcome == 'accepted' else 'default')
+                    retained(client, 'enum-collection-' + str(client.serial))
+                evidence.append({'case': '1031-collection-' + field['id'] + '/' + value})
+    for _, client in hosts:
+        response(client, '$/reader-barrier', {}, {'result': None})
+        quiet(client)
+    evidence.append({'case': '1031-timing', 'elapsedSeconds': round(enum_elapsed + time.monotonic() - enum_started, 3)})
 
     for index, params in enumerate(reader['dtoInvalid']):
         for _, client in hosts:
@@ -267,6 +365,26 @@ def run_jsonrpc(clients, directory, omit_params):
         response(client, '$/reader-barrier', {}, {'result': None})
         quiet(client)
     evidence.append({'case': 'dto-silent-token'})
+
+    # Request DTO enums use the same EnumTypeAdapter stream/deferred paths (#1031).
+    for field in enums['requestFields']:
+        uri = (directory / 'dto-position.ubnf').as_uri()
+        for token in enums['tokens']:
+            value = token['raw'].replace('"$KNOWN"', field['known'])
+            for index, order in enumerate(reader['orders']):
+                outcome = token['deferredInteger'] if field['reader'] == 'integer' and index in (1, 4, 5) else token[field['reader']]
+                if index == 3 and outcome == 'parse':
+                    outcome = 'silent'
+                params = field['raw'].replace('$URI', json.dumps(uri)).replace('$VALUE', value)
+                for _, client in hosts:
+                    client.fixture = 'jsonrpc/1031/request/' + field['id'] + '/' + value + '/' + str(index)
+                    expected = (dto[field['oracle']] if outcome == 'accepted'
+                                else None if outcome == 'silent' and client.backend == 'java' else reader['oracles']['parse'])
+                    raw(client, order.replace('$METHOD', field['method']).replace('$PARAMS', params), expected)
+                evidence.append({'case': '1031-request-' + field['id'] + '/' + value + '/' + str(index)})
+    for _, client in hosts:
+        response(client, '$/reader-barrier', {}, {'result': None})
+        quiet(client)
 
     for index, scalar in enumerate(dto['scalarTexts']):
         for _, client in hosts:
