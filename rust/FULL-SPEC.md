@@ -262,4 +262,9 @@ request DTO の整数 enum（completion の context.triggerKind 等）も同じ�
 stream の非整数/int外数値、遅延変換のscale外、id回復不能の
 Java無応答は恒久差とし、native は元id付き -32700 を返す。失敗initialize後の再試行、
 configure失敗後の旧設定/文書/新入力と後続request、barrier＋1秒deadlineを両JDK実stdioで確認する。
-enum以外の Integer DTO の遅延変換は #1052 に残す。Java製品・3.3.0・parserのhot pathは変えない。
+#1052 で同じ経路判定を通常 Integer DTO に適用する。method 先行の JsonReader は整数または
+double の厳密な int 往復を受理し、params 先行の JsonTreeReader は数値を小数点以下切り捨て後に
+符号付き32 bitへ折り返す。遅延の文字列は Integer.parseInt、数値は |scale| < 10000 を要求する。
+1024字以上の数値 token は両経路で文字列として扱う。position の解決位置、version と change DTO の
+受理後の文書、request の Integer 欄、初期化・設定の失敗後の状態を既存 jsonrpc suite の4231件で
+比較する。Javaが無応答のrequestには native の決定的な元id付き -32700 を返す。

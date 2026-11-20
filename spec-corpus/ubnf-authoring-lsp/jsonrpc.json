@@ -2755,5 +2755,328 @@
         "oracle": "completion"
       }
     ]
+  },
+  "integerReader": {
+    "source": "grammar N {\n  @root S ::= T ;\n  T ::= 'a' ;\n  U ::=\nT ;\n}",
+    "definition": {
+      "result": [
+        {
+          "uri": "$URI",
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 2
+            },
+            "end": {
+              "line": 2,
+              "character": 3
+            }
+          }
+        }
+      ]
+    },
+    "positionRaw": "{\"textDocument\":{\"uri\":$URI},\"position\":{\"line\":$LINE,\"character\":$CHARACTER}}",
+    "positions": [
+      {
+        "raw": "1",
+        "stream": "hit",
+        "tree": "hit"
+      },
+      {
+        "raw": "1.5",
+        "stream": "parse",
+        "tree": "hit"
+      },
+      {
+        "raw": "-1.5",
+        "stream": "parse",
+        "tree": "miss"
+      },
+      {
+        "raw": "1.0",
+        "stream": "hit",
+        "tree": "hit"
+      },
+      {
+        "raw": "10e-1",
+        "stream": "hit",
+        "tree": "hit"
+      },
+      {
+        "raw": "1.999999999999999999999999",
+        "stream": "miss",
+        "tree": "hit"
+      },
+      {
+        "raw": "\"1\"",
+        "stream": "hit",
+        "tree": "hit"
+      },
+      {
+        "raw": "\"1.0\"",
+        "stream": "hit",
+        "tree": "parse"
+      },
+      {
+        "raw": "\"1e0\"",
+        "stream": "hit",
+        "tree": "parse"
+      },
+      {
+        "raw": "\" 1\"",
+        "stream": "hit",
+        "tree": "parse"
+      },
+      {
+        "raw": "\"0x1p0\"",
+        "stream": "hit",
+        "tree": "parse"
+      },
+      {
+        "raw": "\"١\"",
+        "stream": "hit",
+        "tree": "hit"
+      },
+      {
+        "raw": "\"4294967297\"",
+        "stream": "parse",
+        "tree": "parse"
+      },
+      {
+        "raw": "4294967297",
+        "stream": "parse",
+        "tree": "hit"
+      },
+      {
+        "raw": "4294967297.9",
+        "stream": "parse",
+        "tree": "hit"
+      },
+      {
+        "raw": "18446744073709551617",
+        "stream": "parse",
+        "tree": "hit"
+      },
+      {
+        "raw": "1e400",
+        "stream": "parse",
+        "tree": "miss"
+      },
+      {
+        "raw": "1e-9999",
+        "stream": "miss",
+        "tree": "miss"
+      },
+      {
+        "raw": "1e-10000",
+        "stream": "miss",
+        "tree": "parse"
+      },
+      {
+        "raw": "1e9999",
+        "stream": "parse",
+        "tree": "miss"
+      },
+      {
+        "raw": "0e10000",
+        "stream": "miss",
+        "tree": "parse"
+      },
+      {
+        "raw": "1e10000",
+        "stream": "parse",
+        "tree": "parse"
+      },
+      {
+        "raw": "null",
+        "stream": "miss",
+        "tree": "miss"
+      },
+      {
+        "raw": "true",
+        "stream": "parse",
+        "tree": "parse"
+      },
+      {
+        "raw": "{}",
+        "stream": "parse",
+        "tree": "parse"
+      },
+      {
+        "raw": "[]",
+        "stream": "parse",
+        "tree": "parse"
+      }
+    ],
+    "lengths": [
+      {
+        "mantissa": "1.",
+        "exponent": "e0",
+        "length": 1023,
+        "stream": "hit",
+        "tree": "hit"
+      },
+      {
+        "mantissa": "1.",
+        "exponent": "e0",
+        "length": 1024,
+        "stream": "hit",
+        "tree": "parse"
+      },
+      {
+        "mantissa": "1.5",
+        "exponent": "",
+        "length": 1023,
+        "stream": "parse",
+        "tree": "hit"
+      },
+      {
+        "mantissa": "1.5",
+        "exponent": "",
+        "length": 1024,
+        "stream": "parse",
+        "tree": "parse"
+      },
+      {
+        "mantissa": "1.",
+        "exponent": "e-10000",
+        "length": 1024,
+        "stream": "miss",
+        "tree": "parse"
+      }
+    ],
+    "characters": [
+      {
+        "raw": "14.9",
+        "method": "definition",
+        "expected": "hit"
+      },
+      {
+        "raw": "-4294967282.9",
+        "method": "definition",
+        "expected": "hit"
+      },
+      {
+        "raw": "-1.9",
+        "method": "hover",
+        "expected": "internal"
+      },
+      {
+        "raw": "1e-10000",
+        "method": "hover",
+        "expected": "parse"
+      }
+    ],
+    "zeroCharacters": [
+      {"raw": "1e-9999", "stream": "hit", "tree": "hit"},
+      {"raw": "1e-10000", "stream": "hit", "tree": "parse"}
+    ],
+    "lifecycleFailures": [
+      {
+        "params": "{\"capabilities\":{},\"processId\":1.5,$OPTIONS}",
+        "order": 3,
+        "java": "silent"
+      },
+      {
+        "params": "{\"capabilities\":{},\"processId\":1e-10000,$OPTIONS}",
+        "order": 5,
+        "java": "parse"
+      },
+      {
+        "params": "{\"capabilities\":{\"textDocument\":{\"foldingRange\":{\"rangeLimit\":\"1.0\"}}},$OPTIONS}",
+        "order": 1,
+        "java": "parse"
+      }
+    ],
+    "retryParams": "{\"capabilities\":{\"textDocument\":{\"foldingRange\":{\"rangeLimit\":1.5}}},\"processId\":1.5,$OPTIONS}",
+    "requestFields": [
+      {
+        "method": "textDocument/hover",
+        "params": "{\"textDocument\":{\"uri\":\"file:///not-open.ubnf\"},\"workDoneToken\":$VALUE}",
+        "success": {
+          "result": null
+        }
+      },
+      {
+        "method": "textDocument/foldingRange",
+        "params": "{\"textDocument\":{\"uri\":\"file:///not-open.ubnf\"},\"partialResultToken\":$VALUE}",
+        "success": {
+          "result": []
+        }
+      }
+    ],
+    "requestValues": [
+      {
+        "raw": "1.5",
+        "stream": false,
+        "tree": true
+      },
+      {
+        "raw": "1e-10000",
+        "stream": true,
+        "tree": false
+      },
+      {
+        "raw": "\"1.5\"",
+        "stream": true,
+        "tree": true
+      }
+    ],
+    "openParams": "{\"textDocument\":{\"uri\":$URI,\"version\":$VERSION,\"text\":$SOURCE}}",
+    "changeParams": "{\"textDocument\":{\"uri\":$URI,\"version\":$VERSION},\"contentChanges\":[$CHANGES]}",
+    "versions": [
+      {
+        "raw": "1.5",
+        "stream": false,
+        "tree": true
+      },
+      {
+        "raw": "4294967297",
+        "stream": false,
+        "tree": true
+      },
+      {
+        "raw": "1e-10000",
+        "stream": true,
+        "tree": false
+      },
+      {
+        "raw": "\"1.0\"",
+        "stream": true,
+        "tree": false
+      },
+      {
+        "raw": "\"1\"",
+        "stream": true,
+        "tree": true
+      },
+      {
+        "raw": "null",
+        "stream": true,
+        "tree": true
+      },
+      {
+        "raw": "{}",
+        "stream": false,
+        "tree": false
+      }
+    ],
+    "changes": [
+      {
+        "raw": "{\"text\":$SOURCE},{\"text\":\"ignored\",\"rangeLength\":1.5,\"range\":{\"start\":{\"line\":1.5,\"character\":0},\"end\":{\"line\":1,\"character\":2.5}}}",
+        "stream": false,
+        "tree": true
+      },
+      {
+        "raw": "{\"text\":$SOURCE},{\"text\":\"ignored\",\"rangeLength\":1e-10000}",
+        "stream": true,
+        "tree": false
+      },
+      {
+        "raw": "{\"text\":$SOURCE},{\"text\":\"ignored\",\"range\":{\"start\":{\"line\":\"1.0\"},\"end\":null}}",
+        "stream": true,
+        "tree": false
+      }
+    ]
   }
 }

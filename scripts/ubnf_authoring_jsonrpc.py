@@ -32,6 +32,7 @@ def run_jsonrpc(clients, directory, omit_params):
 
     reader = fixture['reader']
     dto = fixture['dto']
+    integers = fixture['integerReader']
     # These wire fragments and oracles are independent of the generated DTO table.
     reader['dtoInvalid'] += ['{"capabilities":' + caps + '}' for caps in dto['capabilitiesInvalid']]
     reader['dtoAccepted'] += ['{"capabilities":' + caps + '}' for caps in dto['capabilitiesAccepted']]
@@ -105,6 +106,24 @@ def run_jsonrpc(clients, directory, omit_params):
                     else None if outcome == 'silent' and client.backend == 'java' else reader['oracles']['parse'])
         frame = reader['orders'][order].replace('$METHOD', method).replace('$PARAMS', params)
         raw(client, frame, expected)
+
+    def integer_request(client, method, params, order, expected):
+        raw(client, reader['orders'][order].replace('$METHOD', method).replace('$PARAMS', params), expected)
+
+    def integer_lifecycle(client, method, case):
+        outcome = case['java'] if client.backend == 'java' else 'parse'
+        frame = order_frame(reader['orders'][case['order']], method, {'raw': case['params']}, 'default')
+        raw(client, frame, None if outcome == 'silent' else reader['oracles'][outcome])
+
+    integer_started = time.monotonic()
+    for index, case in enumerate(integers['lifecycleFailures']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/1052/initialize/{index}'
+            integer_lifecycle(client, 'initialize', case)
+            response(client, 'textDocument/hover', {}, reader['oracles']['early'])
+        evidence.append({'case': f'1052-initialize-{index}'})
+
+    integer_initialize_elapsed = time.monotonic() - integer_started
 
     # Isolated lifecycle sessions allow every raw key order and positional arity
     # to prove initialize retry (including Java reader failures and native success).
@@ -208,7 +227,8 @@ def run_jsonrpc(clients, directory, omit_params):
         evidence.append({'case': f'reader-initialize-dto-{index}'})
     for _, client in hosts:
         client.fixture = 'jsonrpc/retry-initialize'
-        configure(client, 'restricted', 'initialize')
+        frame = order_frame(reader['orders'][1], 'initialize', {'raw': integers['retryParams']}, 'restricted')
+        raw(client, frame, {'result': configuration['expected']['restricted'][client.backend]})
         client.send('initialized')
         for case in fixture['invalidParams']:
             response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': (directory / ('early-' + case['id'] + '.ubnf')).as_uri()}}, {'result': []})
@@ -246,6 +266,15 @@ def run_jsonrpc(clients, directory, omit_params):
         diagnostic(client, uri, [])
         hover(client, uri, fresh)
         client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
+
+    integer_started = time.monotonic()
+    for index, case in enumerate(integers['lifecycleFailures']):
+        for _, client in hosts:
+            client.fixture = f'jsonrpc/1052/configure/{index}'
+            integer_lifecycle(client, 'unlaxer/configure', case)
+            retained(client, f'integer-{index}')
+        evidence.append({'case': f'1052-configure-{index}'})
+    integer_lifecycle_elapsed = time.monotonic() - integer_started
 
     enum_started = time.monotonic()
     for name, caps, outcome, order in enum_cases():
@@ -385,6 +414,87 @@ def run_jsonrpc(clients, directory, omit_params):
     for _, client in hosts:
         response(client, '$/reader-barrier', {}, {'result': None})
         quiet(client)
+
+    integer_started = time.monotonic()
+    integer_uri = (directory / 'integer-position.ubnf').as_uri()
+    for _, client in hosts:
+        client.send('textDocument/didOpen', {'textDocument': {'uri': integer_uri, 'version': 1, 'text': integers['source']}})
+        diagnostic(client, integer_uri, [])
+    integer_oracles = {
+        **reader['oracles'],
+        'hit': json.loads(json.dumps(integers['definition']).replace('"$URI"', json.dumps(integer_uri))),
+        'miss': {'result': []},
+    }
+
+    def integer_position(name, method, line, character, order, outcome):
+        params = integers['positionRaw'].replace('$URI', json.dumps(integer_uri)).replace('$LINE', line).replace('$CHARACTER', character)
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1052/' + name
+            expected = None if outcome == 'parse' and order == 3 and client.backend == 'java' else integer_oracles[outcome]
+            integer_request(client, 'textDocument/' + method, params, order, expected)
+        evidence.append({'case': '1052-' + name})
+
+    paths = ((0, 'stream'), (1, 'tree'))
+    for index, case in enumerate(integers['positions']):
+        orders = (*paths, (2, 'stream'), (3, 'stream'), (4, 'tree'), (5, 'tree')) if case['raw'] == '1.5' else paths
+        for order, path in orders:
+            integer_position(f'line/{index}/{order}', 'definition', case['raw'], '14', order, case[path])
+    for case in integers['lengths']:
+        raw_number = case['mantissa'] + '0' * (case['length'] - len(case['mantissa']) - len(case['exponent'])) + case['exponent']
+        for order, path in paths:
+            integer_position(f"length/{case['mantissa']}/{case['exponent']}/{case['length']}/{order}", 'definition', raw_number, '14', order, case[path])
+    for index, case in enumerate(integers['characters']):
+        integer_position(f'character/{index}', case['method'], '1', case['raw'], 1, case['expected'])
+
+    # T begins at character zero on line 4; only the converted zero resolves it.
+    for index, case in enumerate(integers['zeroCharacters']):
+        for order, path in paths:
+            integer_position(f'zero-character/{index}/{order}', 'definition', '4', case['raw'], order, case[path])
+
+    for field in integers['requestFields']:
+        for index, case in enumerate(integers['requestValues']):
+            for order, path in paths:
+                name = f"request/{field['method']}/{index}/{order}"
+                for _, client in hosts:
+                    client.fixture = 'jsonrpc/1052/' + name
+                    integer_request(client, field['method'], field['params'].replace('$VALUE', case['raw']), order,
+                                    field['success'] if case[path] else reader['oracles']['parse'])
+                evidence.append({'case': '1052-' + name})
+
+    def integer_notification(kind, case, index, path):
+        method = 'textDocument/did' + kind.capitalize()
+        name = f'{kind}/{index}/{path}'
+        uri = (directory / ('integer-' + kind + '.ubnf')).as_uri()
+        for _, client in hosts:
+            client.fixture = 'jsonrpc/1052/' + name
+            if kind == 'change':
+                client.send('textDocument/didOpen', {'textDocument': {'uri': uri, 'version': 1, 'text': fixture['oldDocument']['source']}})
+                diagnostic(client, uri, [])
+            params = (integers[kind + 'Params'].replace('$URI', json.dumps(uri))
+                      .replace('$VERSION', case['version']).replace('$CHANGES', case['changes'])
+                      .replace('$SOURCE', json.dumps(kept['source'])))
+            keys = ('"method":$METHOD,"params":$PARAMS' if path == 'stream'
+                    else '"params":$PARAMS,"method":$METHOD')
+            client.send_raw('{"jsonrpc":"2.0",' + keys.replace('$METHOD', json.dumps(method)).replace('$PARAMS', params) + '}')
+            if case[path]:
+                diagnostic(client, uri, [])
+            symbols = fixture['keptSymbols'] if case[path] else fixture['oldDocument']['symbols'] if kind == 'change' else []
+            response(client, 'textDocument/documentSymbol', {'textDocument': {'uri': uri}}, {'result': symbols})
+            assert not client.pending and client.messages.empty(), client.fixture
+            client.send('textDocument/didClose', {'textDocument': {'uri': uri}})
+        evidence.append({'case': '1052-' + name})
+
+    for path in ('stream', 'tree'):
+        for index, case in enumerate(integers['versions']):
+            for kind in ('open', 'change'):
+                integer_notification(kind, {**case, 'version': case['raw'], 'changes': '{"text":$SOURCE}'}, f'version-{index}', path)
+        for index, case in enumerate(integers['changes']):
+            integer_notification('change', {**case, 'version': '2', 'changes': case['raw']}, f'range-{index}', path)
+    for _, client in hosts:
+        response(client, '$/reader-barrier', {}, {'result': None})
+        quiet(client)
+    evidence.append({'case': '1052-timing', 'elapsedSeconds': round(
+        integer_initialize_elapsed + integer_lifecycle_elapsed + time.monotonic() - integer_started, 3)})
 
     for index, scalar in enumerate(dto['scalarTexts']):
         for _, client in hosts:
